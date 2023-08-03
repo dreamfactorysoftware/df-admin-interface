@@ -1,0 +1,21 @@
+<div class="saml-auth-providers">
+  <div class="panel panel-default" *ngIf="samls.length !== 0">
+    <div class="panel-heading">SAML 2.0 Login</div>
+    <div class="panel-body">
+      <span style="margin-right: 10px" *ngFor="let item of samls | keyvalue">
+        <!--we have an icon-->
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          *ngIf="item.value.icon_class"
+          (click)="samlAuthLogin(item.value.path)">
+          <i class="fa {{ item.value.icon_class }} fa-2x"></i>
+        </button>
+        <!--there is no icon-->
+        <a *ngIf="!item.value.icon_class" [attr.href]="getIconHref(item)">{{
+          item.value.label
+        }}</a>
+      </span>
+    </div>
+  </div>
+</div>

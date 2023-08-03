@@ -12,7 +12,8 @@ import {
 } from '@angular/common/http';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { CaseInterceptor } from './core/interceptors/case.interceptor';
-i;
+import { UserManagementModule } from './admin_components/adf-user-management/user-management.module';
+
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
 }
@@ -23,6 +24,7 @@ export function createTranslateLoader(http: HttpClient) {
     BrowserModule,
     AppRoutingModule,
     BrowserAnimationsModule,
+    HttpClientModule,
     TranslateModule.forRoot({
       loader: {
         provide: TranslateLoader,
@@ -32,6 +34,7 @@ export function createTranslateLoader(http: HttpClient) {
       defaultLanguage: 'en',
     }),
     HttpClientModule,
+    UserManagementModule,
   ],
   providers: [
     {

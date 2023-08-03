@@ -1,0 +1,130 @@
+<!-- eslint-disable @angular-eslint/template/interactive-supports-focus -->
+<!-- eslint-disable @angular-eslint/template/click-events-have-key-events -->
+<!-- eslint-disable prettier/prettier -->
+<div *ngIf="showTemplate">
+  <div class="row">
+    <div
+      class="col-md-4 col-md-offset-4 col-sm-6 col-sm-offset-3 col-xs-10 col-xs-offset-1 df-auth-container df-section-all-round"
+      *ngIf="!loginDirect">
+      <!-- Login Section -->
+      <div class="df-auth-panel" *ngIf="loginActive">
+        <div class="alert alert-danger" role="alert" *ngIf="errorMsg !== ''">
+          <button type="button" class="close" (click)="dismissError()">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          {{ errorMsg }}
+        </div>
+
+        <div class="alert alert-success" role="alert" *ngIf="successMsg !== ''">
+          <button type="button" class="close" (click)="dismissSuccess()">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          {{ successMsg }}
+        </div>
+
+        <div class="panel panel-default df-panel-heading">
+          <div class="panel-heading">
+            <!-- Page title -->
+            <h3 class="panel-title">{{ loginFormTitle }}</h3>
+          </div>
+          <div class="panel-body form-controls">
+            <app-df-waiting data-show="loginWaiting"></app-df-waiting>
+            <!-- Login Form -->
+            <form
+              name="loginForm"
+              [formGroup]="loginFormGroup"
+              (ngSubmit)="login(creds)">
+              <div *ngIf="adldapAvailable">
+                <div class="form-group">
+                  <span><i class="fa fa-fw fa-sign-in"></i>Services:</span>
+                  <select
+                    (change)="useAdLdapService(selectedService)"
+                    class="form-control"
+                    formControlName="selectedService">
+                    <option *ngFor="let ldap of adldap" [value]="ldap.name">
+                      -- {{ systemConfig.platform.host }} --
+                    </option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <div
+                  class="input-group"
+                  [ngClass]="{ 'has-error': emailError }">
+                  <span class="input-group-addon"
+                    ><i class="fa fa-fw {{ userField.icon }}"></i
+                  ></span>
+                  <input
+                    type="{{ userField.type }}"
+                    id="df-login-email"
+                    name="df-login-email"
+                    placeholder="{{ userField.text }}"
+                    formControlName="email"
+                    class="form-control"
+                    ng-required="false" />
+                </div>
+              </div>
+              <div *ngIf="!hidePasswordField">
+                <div class="form-group">
+                  <div class="input-group">
+                    <span class="input-group-addon"
+                      ><i class="fa fa-fw fa-key"></i
+                    ></span>
+                    <input
+                      type="password"
+                      id="df-login-password"
+                      name="df-login-password"
+                      placeholder="Enter Password"
+                      formControlName="password"
+                      class="form-control"
+                      ng-required="false" />
+                  </div>
+                </div>
+                <div class="form-group" *ngIf="allowForeverSessions">
+                  <div class="checkbox">
+                    <label>
+                      <input
+                        type="checkbox"
+                        [checked]="rememberMe"
+                        formControlName="rememberMe"
+                        (change)="rememberLogin(rememberMe)" />
+                      Remember Me
+                    </label>
+                  </div>
+                </div>
+
+                <!-- <input type="submit" value="submit"> -->
+                <input
+                  class="btn btn-primary btn-block"
+                  id="submit-login"
+                  type="submit"
+                  value="Login" />
+
+                <!--OAuth login-->
+                <div class="form-group" *ngIf="showOAuth">
+                  <app-df-remote-auth-providers></app-df-remote-auth-providers>
+                </div>
+                <div class="form-group">
+                  <app-df-saml-auth-providers></app-df-saml-auth-providers>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="pull-right">
+          <a
+            id="forgot-password-active"
+            type="button"
+            (click)="forgotPassword()"
+            >Forgot Password</a
+          >
+        </div>
+      </div>
+      <!-- End Login Section -->
+
+      <app-df-forgot-pword-email
+        *ngIf="!loginActive"></app-df-forgot-pword-email>
+    </div>
+  </div>
+</div>

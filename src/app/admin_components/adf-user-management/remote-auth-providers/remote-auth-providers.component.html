@@ -1,0 +1,23 @@
+<!-- eslint-disable prettier/prettier -->
+<div class="remote-login-providers">
+  <br />
+  <div class="panel panel-default" *ngIf="oauths.length !== 0">
+    <div class="panel-heading">OAuth Login</div>
+    <div class="panel-body">
+      <span *ngFor="let item of oauths | keyvalue">
+        <!--we have an icon-->
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          *ngIf="item.value.icon_class"
+          (click)="remoteAuthLogin(item.value.path)">
+          <i class="fa {{ item.value.icon_class }} fa-2x"></i>
+        </button>
+        <!--there is no icon-->
+        <a *ngIf="!item.value.icon_class" [attr.href]="getIconHref(item)">{{
+          item.value.label
+        }}</a>
+      </span>
+    </div>
+  </div>
+</div>
