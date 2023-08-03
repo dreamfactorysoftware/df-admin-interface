@@ -17,6 +17,8 @@ import { LoadingInterceptor } from './core/interceptors/loading.interceptor';
 import { SessionTokenInterceptor } from './core/interceptors/session-token.interceptor';
 import { DfSystemConfigDataService } from './core/services/df-system-config-data.service';
 
+import { AdfUserManagementModule } from './adf-user-management/adf-user-management.module';
+
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
 }
@@ -67,6 +69,7 @@ export function initEnvironment(
       useClass: SessionTokenInterceptor,
       multi: true,
     },
+    AdfUserManagementModule,
   ],
   bootstrap: [AppComponent],
 })
