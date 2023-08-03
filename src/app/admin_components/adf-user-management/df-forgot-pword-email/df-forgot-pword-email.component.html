@@ -4,7 +4,11 @@
   <!-- Page title -->
   <!--<h1>Email Password Reset</h1>-->
 
-  <div class="alert alert-danger" role="alert" *ngIf="errorMsg !== ''">
+  <div
+    class="alert alert-danger"
+    id="alert-danger"
+    role="alert"
+    *ngIf="errorMsg !== ''">
     <button type="button" class="close" (click)="dismissError()">
       <span aria-hidden="true">&times;</span>
     </button>
@@ -146,7 +150,7 @@
                 formControlName="new_password"
                 class="form-control"
                 required
-                data-ng-keyup="verifyPassword(sq)" />
+                (keyup)="verifyPassword()" />
             </div>
           </div>
 
@@ -165,7 +169,7 @@
                 formControlName="verify_password"
                 class="form-control"
                 required
-                data-ng-keyup="verifyPassword(sq)" />
+                (keyup)="verifyPassword()" />
             </div>
           </div>
 

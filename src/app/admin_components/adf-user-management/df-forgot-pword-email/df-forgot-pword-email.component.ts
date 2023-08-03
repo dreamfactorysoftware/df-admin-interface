@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { SystemConfigDataService } from '../../../services/system-config-data.service';
@@ -130,7 +131,6 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
     this.errorMsg = '';
   }
 
-  // TODO: consider refactoring to add admin as a parameter
   resetPasswordRequest(requestDataObj: ResetPasswordObj, admin = false) {
     if (!admin) {
       // Post request for password change and return promise
@@ -247,8 +247,10 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
     }
   }
 
-  verifyPassword(userDataObj: SecurityQuestionPayload) {
-    this.identical = userDataObj.new_password === userDataObj.verify_password;
+  verifyPassword() {
+    this.identical =
+      this.securityQuestionFormGroup.value.new_password ===
+      this.securityQuestionFormGroup.value.verify_password;
   }
 
   verifyPasswordLength(credsDataObj: SecurityQuestionPayload) {
