@@ -11,7 +11,11 @@
     {{ errorMsg }}
   </div>
 
-  <div class="alert alert-success" role="alert" *ngIf="successMsg !== ''">
+  <div
+    class="alert alert-success"
+    id="alert-success"
+    role="alert"
+    *ngIf="successMsg !== ''">
     <button type="button" class="close" (click)="dismissSuccess()">
       <span aria-hidden="true">&times;</span>
     </button>
@@ -24,7 +28,7 @@
         <h3 class="panel-title">Password Reset</h3>
       </div>
       <div class="panel-body">
-        <app-df-waiting *ngIf="requestWaiting"></app-df-waiting>
+        <df-waiting *ngIf="requestWaiting"></df-waiting>
         <p *ngIf="resetByEmail">
           Enter your email address to reset your password.
         </p>
@@ -34,6 +38,7 @@
 
         <!-- Forgot Password Form -->
         <form
+          class="reset-password-form"
           name="reset-password-form"
           [formGroup]="resetPasswordForm"
           (ngSubmit)="requestPasswordReset()"
@@ -76,11 +81,12 @@
         <h3 class="panel-title">Security Question</h3>
       </div>
       <div class="panel-body">
-        <app-df-waiting *ngIf="questionWaiting"></app-df-waiting>
+        <df-waiting *ngIf="questionWaiting"></df-waiting>
         <p>Answer the security question to reset your password.</p>
 
         <!-- Forgot Password Form -->
         <form
+          class="security-question-form"
           name="security-question-form"
           [formGroup]="securityQuestionFormGroup"
           (ngSubmit)="securityQuestionSubmit()"

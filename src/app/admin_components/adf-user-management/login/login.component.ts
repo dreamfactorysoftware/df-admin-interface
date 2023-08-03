@@ -6,10 +6,10 @@ import {
   SimpleChanges,
   ChangeDetectorRef,
 } from '@angular/core';
-import { SystemConfigDataService } from 'src/app/services/system-config-data.service';
+import { SystemConfigDataService } from '../../../services/system-config-data.service';
 import { Router } from '@angular/router';
-import { UserDataService } from 'src/app/services/user-data-service.service';
-import { UserEventsService } from 'src/app/services/user-events-service.service';
+import { UserDataService } from '../../../services/user-data-service.service';
+import { UserEventsService } from '../../../services/user-events-service.service';
 import { lastValueFrom } from 'rxjs';
 import { FormControl, FormGroup } from '@angular/forms';
 
@@ -33,7 +33,7 @@ type UserField = {
 };
 
 @Component({
-  selector: 'app-df-user-login',
+  selector: 'df-user-login',
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css'],
 })
@@ -101,6 +101,7 @@ export class LoginComponent implements OnInit, OnChanges {
       text: 'Enter Email',
       type: 'email',
     };
+    this.options = {};
   }
 
   ngOnInit(): void {

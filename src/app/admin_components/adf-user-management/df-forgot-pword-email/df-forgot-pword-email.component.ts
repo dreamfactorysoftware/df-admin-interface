@@ -1,9 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { SystemConfigDataService } from 'src/app/services/system-config-data.service';
+import { SystemConfigDataService } from '../../../services/system-config-data.service';
 import { lastValueFrom } from 'rxjs';
 import { FormControl, FormGroup } from '@angular/forms';
-import { UserEventsService } from 'src/app/services/user-events-service.service';
+import { UserEventsService } from '../../../services/user-events-service.service';
 
 // TODO: update when necessary
 const INSTANCE_URL = { url: '' };
@@ -24,7 +24,7 @@ type ResetPasswordObj = {
 };
 
 @Component({
-  selector: 'app-df-forgot-pword-email',
+  selector: 'df-forgot-pword-email',
   templateUrl: './df-forgot-pword-email.component.html',
   styleUrls: ['./df-forgot-pword-email.component.css'],
 })
@@ -55,6 +55,7 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
 
   securityQuestionFormGroup = new FormGroup({
     email: new FormControl(''),
+    username: new FormControl(''),
     security_question: new FormControl(''),
     security_answer: new FormControl(''),
     new_password: new FormControl(''),
@@ -130,25 +131,26 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
   }
 
   // TODO: consider refactoring to add admin as a parameter
-  private resetPasswordRequest(
-    requestDataObj: ResetPasswordObj,
-    admin = false
-  ) {
+  resetPasswordRequest(requestDataObj: ResetPasswordObj, admin = false) {
     if (!admin) {
       // Post request for password change and return promise
-      return this.http.post(
-        INSTANCE_URL.url + '/user/password?reset=true',
-        requestDataObj
+      return lastValueFrom(
+        this.http.post(
+          INSTANCE_URL.url + '/user/password?reset=true',
+          requestDataObj
+        )
       );
     } else {
-      return this.http.post(
-        INSTANCE_URL.url + '/system/admin/password?reset=true',
-        requestDataObj
+      return lastValueFrom(
+        this.http.post(
+          INSTANCE_URL.url + '/system/admin/password?reset=true',
+          requestDataObj
+        )
       );
     }
   }
 
-  requestPasswordReset() {
+  async requestPasswordReset() {
     // Add property to the request data
     // this contains an object with the email address
     //requestDataObj['reset'] = true;
@@ -162,7 +164,7 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
     // Turn on waiting directive
     this.requestWaiting = true;
 
-    lastValueFrom(this.resetPasswordRequest(requestDataObj))
+    this.resetPasswordRequest(requestDataObj)
       .then((result: any) => {
         if (Object.hasOwn(result.data, 'security_question')) {
           this.emailForm = false;
@@ -173,6 +175,12 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
             ? requestDataObj.username
             : null;
           this.sq.security_question = result.data.security_question;
+
+          this.securityQuestionFormGroup.patchValue({
+            email: this.sq.email,
+            username: this.sq.username,
+            security_question: this.sq.security_question,
+          });
         } else {
           this.successMsg =
             "A password reset email has been sent to the user's email address.";
@@ -184,7 +192,7 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
       })
       .catch(err => {
         if (err.status == '401' || err.status == '404') {
-          lastValueFrom(this.resetPasswordRequest(requestDataObj, true))
+          this.resetPasswordRequest(requestDataObj, true)
             .then(
               // handle successful password reset
               (result: any) => {
@@ -250,7 +258,7 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
   securityQuestionSubmit() {
     const sq: SecurityQuestionPayload = {
       email: this.securityQuestionFormGroup.value.email as string | null,
-      username: null, // TODO: possibly add username field here
+      username: this.securityQuestionFormGroup.value.username as string | null,
       security_question: this.securityQuestionFormGroup.value
         .security_question as string | null,
       security_answer: this.securityQuestionFormGroup.value.security_answer as

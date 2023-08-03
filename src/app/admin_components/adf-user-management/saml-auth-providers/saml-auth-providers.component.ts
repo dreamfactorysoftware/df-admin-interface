@@ -1,11 +1,11 @@
 import { Component } from '@angular/core';
-import { SystemConfigDataService } from 'src/app/services/system-config-data.service';
+import { SystemConfigDataService } from '../../../services/system-config-data.service';
 
 // TODO: update when necessary
 const INSTANCE_URL = { url: '' };
 
 @Component({
-  selector: 'app-df-saml-auth-providers',
+  selector: 'df-saml-auth-providers',
   templateUrl: './saml-auth-providers.component.html',
   styleUrls: ['./saml-auth-providers.component.css'],
 })

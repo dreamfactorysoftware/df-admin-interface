@@ -28,7 +28,7 @@
             <h3 class="panel-title">{{ loginFormTitle }}</h3>
           </div>
           <div class="panel-body form-controls">
-            <app-df-waiting data-show="loginWaiting"></app-df-waiting>
+            <df-waiting data-show="loginWaiting"></df-waiting>
             <!-- Login Form -->
             <form
               name="loginForm"
@@ -102,10 +102,10 @@
 
                 <!--OAuth login-->
                 <div class="form-group" *ngIf="showOAuth">
-                  <app-df-remote-auth-providers></app-df-remote-auth-providers>
+                  <df-remote-auth-providers></df-remote-auth-providers>
                 </div>
                 <div class="form-group">
-                  <app-df-saml-auth-providers></app-df-saml-auth-providers>
+                  <df-saml-auth-providers></df-saml-auth-providers>
                 </div>
               </div>
             </form>
@@ -123,8 +123,7 @@
       </div>
       <!-- End Login Section -->
 
-      <app-df-forgot-pword-email
-        *ngIf="!loginActive"></app-df-forgot-pword-email>
+      <df-forgot-pword-email *ngIf="!loginActive"></df-forgot-pword-email>
     </div>
   </div>
 </div>
