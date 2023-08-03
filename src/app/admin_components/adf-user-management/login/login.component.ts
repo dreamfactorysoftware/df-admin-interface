@@ -16,6 +16,8 @@ import { FormControl, FormGroup } from '@angular/forms';
 // TODO: update when necessary
 const INSTANCE_URL = { url: '' };
 
+const defaults = { showTemplate: true };
+
 type UserCredObj = {
   username?: string;
   email?: string;
@@ -56,6 +58,8 @@ export class LoginComponent implements OnInit, OnChanges {
   adldap: any[];
   selectedService: any;
   userField: UserField;
+  es: any;
+  options: any;
 
   loginFormGroup = new FormGroup({
     selectedService: new FormControl(),
@@ -100,6 +104,10 @@ export class LoginComponent implements OnInit, OnChanges {
   }
 
   ngOnInit(): void {
+    this.options = Object.assign(this.options, defaults);
+
+    this.es = this.userEventService.login;
+
     this.systemConfig = this.systemConfigDataService.getSystemConfig();
     if (this.systemConfig && this.systemConfig.authentication) {
       if (Object.hasOwn(this.systemConfig.authentication, 'adldap')) {

@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { SystemConfigDataService } from 'src/app/services/system-config-data.service';
 import { lastValueFrom } from 'rxjs';
 import { FormControl, FormGroup } from '@angular/forms';
+import { UserEventsService } from 'src/app/services/user-events-service.service';
 
 // TODO: update when necessary
 const INSTANCE_URL = { url: '' };
@@ -62,11 +63,10 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
 
   constructor(
     private http: HttpClient,
-    systemConfigDataService: SystemConfigDataService
+    private systemConfigDataService: SystemConfigDataService,
+    private userEventsService: UserEventsService
   ) {
-    // TODO: add usereventservice
-    //this.es = userEventsService.password;
-    this.es = '';
+    this.es = userEventsService.password;
 
     this.emailForm = true;
     this.emailError = false;
@@ -122,11 +122,11 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
   }
 
   dismissSuccess() {
-    throw new Error('Method not Implemented Yet!');
+    this.successMsg = '';
   }
 
   dismissError() {
-    throw new Error('Method not Implemented Yet!');
+    this.errorMsg = '';
   }
 
   // TODO: consider refactoring to add admin as a parameter

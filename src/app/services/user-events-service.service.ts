@@ -4,5 +4,8 @@ import { Injectable } from '@angular/core';
   providedIn: 'root',
 })
 export class UserEventsService {
+  password = '';
+  login = '';
+
   constructor() {}
 }
