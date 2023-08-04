@@ -28,7 +28,7 @@
             <h3 class="panel-title">{{ loginFormTitle }}</h3>
           </div>
           <div class="panel-body form-controls">
-            <df-waiting data-show="loginWaiting"></df-waiting>
+            <df-waiting *ngIf="loginWaiting"></df-waiting>
             <!-- Login Form -->
             <form
               name="loginForm"

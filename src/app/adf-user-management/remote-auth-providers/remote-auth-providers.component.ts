@@ -1,17 +1,17 @@
 import { Component } from '@angular/core';
-import { SystemConfigDataService } from '../../../services/system-config-data.service';
+import { SystemConfigDataService } from '../../services/system-config-data.service';
 
 // TODO: update when necessary
 const INSTANCE_URL = { url: '' };
 
 @Component({
-  selector: 'df-saml-auth-providers',
-  templateUrl: './saml-auth-providers.component.html',
-  styleUrls: ['./saml-auth-providers.component.css'],
+  selector: 'df-remote-auth-providers',
+  templateUrl: './remote-auth-providers.component.html',
+  styleUrls: ['./remote-auth-providers.component.css'],
 })
-export class SAMLAuthProvidersComponent {
+export class RemoteAuthProvidersComponent {
   url: string = INSTANCE_URL.url;
-  samls: any[] = [];
+  oauths: any[] = [];
   systemConfig: any;
 
   constructor(private systemConfigDataService: SystemConfigDataService) {
@@ -20,13 +20,13 @@ export class SAMLAuthProvidersComponent {
     if (
       this.systemConfig &&
       this.systemConfig.authentication &&
-      Object.hasOwn(this.systemConfig.authentication, 'saml')
+      Object.hasOwn(this.systemConfig.authentication, 'oauth')
     ) {
-      this.samls = this.systemConfig.authentication.saml;
+      this.oauths = this.systemConfig.authentication.oauth;
     }
   }
 
-  samlAuthLogin(providerData: any) {
+  remoteAuthLogin(providerData: any) {
     window.top!.location.href = this.url + '/' + providerData;
   }
 

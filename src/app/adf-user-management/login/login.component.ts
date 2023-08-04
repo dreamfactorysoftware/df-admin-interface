@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { HttpClient } from '@angular/common/http';
 import {
   Component,
@@ -5,12 +6,13 @@ import {
   OnInit,
   SimpleChanges,
   ChangeDetectorRef,
+  OnDestroy,
 } from '@angular/core';
-import { SystemConfigDataService } from '../../../services/system-config-data.service';
+import { SystemConfigDataService } from '../../services/system-config-data.service';
 import { Router } from '@angular/router';
-import { UserDataService } from '../../../services/user-data-service.service';
-import { UserEventsService } from '../../../services/user-events-service.service';
-import { lastValueFrom } from 'rxjs';
+import { UserDataService } from '../../services/user-data-service.service';
+import { UserEventsService } from '../../services/user-events-service.service';
+import { Subject, takeUntil } from 'rxjs';
 import { FormControl, FormGroup } from '@angular/forms';
 
 // TODO: update when necessary
@@ -37,7 +39,7 @@ type UserField = {
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css'],
 })
-export class LoginComponent implements OnInit, OnChanges {
+export class LoginComponent implements OnInit, OnChanges, OnDestroy {
   errorMsg: string;
   successMsg: string;
   loginFormTitle: string;
@@ -60,6 +62,7 @@ export class LoginComponent implements OnInit, OnChanges {
   userField: UserField;
   es: any;
   options: any;
+  private destroy$ = new Subject();
 
   loginFormGroup = new FormGroup({
     selectedService: new FormControl(),
@@ -142,12 +145,11 @@ export class LoginComponent implements OnInit, OnChanges {
       this.loginWaiting = true;
       this.showOAuth = false;
       this.loginDirect = true;
-      lastValueFrom(
-        this.http.get(INSTANCE_URL.url + '/user/session?session_token=' + token)
-      )
-        .then(
-          // success method
-          (result: any) => {
+      this.http
+        .get(INSTANCE_URL.url + '/user/session?session_token=' + token)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (result: any) => {
             // Set the current user in the UserDataService service
             this.userDataService.setCurrentUser(result.data);
 
@@ -155,33 +157,33 @@ export class LoginComponent implements OnInit, OnChanges {
             //this.$emit(this.es.loginSuccess, result.data);
 
             this.loginDirect = false;
-          }
-        )
-        .catch(result => {
-          // Reload the admin app to remove session_token param from url and show the login prompt.
-          window.location.href = baseUrl + '#/login';
-          this.loginDirect = false;
+          },
+          error: (error: any) => {
+            // Reload the admin app to remove session_token param from url and show the login prompt.
+            window.location.href = baseUrl + '#/login';
+            this.loginDirect = false;
+          },
         });
     } else if ((oauth_code && oauth_state) || oauth_token) {
       this.loginWaiting = true;
       this.showOAuth = false;
-      lastValueFrom(
-        this.http.post(
+      this.http
+        .post(
           INSTANCE_URL.url +
             '/user/session?oauth_callback=true&' +
             location.search.substring(1),
           {}
         )
-      ).then(
-        // success method
-        (result: any) => {
-          // Set the current user in the UserDataService service
-          this.userDataService.setCurrentUser(result.data);
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (result: any) => {
+            // Set the current user in the UserDataService service
+            this.userDataService.setCurrentUser(result.data);
 
-          // Emit a success message so we can hook in
-          //this.$emit(this.es.loginSuccess, result.data);
-        }
-      );
+            // Emit a success message so we can hook in
+            //this.$emit(this.es.loginSuccess, result.data);
+          },
+        });
     }
   }
 
@@ -196,6 +198,11 @@ export class LoginComponent implements OnInit, OnChanges {
       this.showTemplate = newValue.showTemplate;
       this.cdRef.detectChanges(); // Detect changes manually if needed
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next(1);
+    this.destroy$.complete();
   }
 
   dismissError() {
@@ -252,7 +259,7 @@ export class LoginComponent implements OnInit, OnChanges {
     }
   }
 
-  getQueryParameter(key: any) {
+  getQueryParameter(key: string) {
     key = key.replace(/[*+?^$.[\]{}()|\\/]/g, '\\$&');
     const match = window.location.search.match(
       new RegExp('[?&]' + key + '=([^&]+)(&|$)')
@@ -280,6 +287,8 @@ export class LoginComponent implements OnInit, OnChanges {
     }
 
     credsDataObj.remember_me = this.loginFormGroup.value.rememberMe as boolean;
+
+    this._login(credsDataObj);
   }
 
   _login(credsDataObj: UserCredObj) {
@@ -287,73 +296,59 @@ export class LoginComponent implements OnInit, OnChanges {
     this.loginWaiting = true;
 
     // call private login request function with a credentials object
-    lastValueFrom(this.loginRequest(credsDataObj, false))
-      .then(
-        // success method
-        (result: any) => {
-          // Set the current user in the UserDataService service
-          this.userDataService.setCurrentUser(result.data);
+    this.loginRequest(credsDataObj, false).subscribe({
+      // success method
+      next: (result: any) => {
+        // Set the current user in the UserDataService service
+        this.userDataService.setCurrentUser(result.data);
 
-          // Emit a success message so we can hook in
-          // this.$emit(this.es.loginSuccess, result.data);
-          // this.$root.$emit(this.es.loginSuccess, result.data);
+        // Emit a success message so we can hook in
+        // this.$emit(this.es.loginSuccess, result.data);
+        // this.$root.$emit(this.es.loginSuccess, result.data);
+      },
+      error: (reject: any) => {
+        if (
+          (reject.status == '401' || reject.status == '404') &&
+          !this.selectedService
+        ) {
+          this.loginWaiting = true;
+          this.adminLoginRequest(credsDataObj);
+        } else {
+          // Handle Login error with template error message
+          this.errorMsg = reject.data.error.message;
+          //this.$emit(this.es.loginError, reject);
         }
-      )
-      .catch(
-        // Error method
-        (reject: any) => {
-          if (
-            (reject.status == '401' || reject.status == '404') &&
-            !this.selectedService
-          ) {
-            this.loginWaiting = true;
-            lastValueFrom(this.loginRequest(credsDataObj, true))
-              .then(
-                // success method
-                (result: any) => {
-                  // Set the current user in the UserDataService service
-                  this.userDataService.setCurrentUser(result.data);
-
-                  // Emit a success message so we can hook in
-                  // this.$emit(this.es.loginSuccess, result.data);
-                  // this.$root.$emit(this.es.loginSuccess, result.data);
-                }
-              )
-              .catch(
-                // Error method
-                reject => {
-                  // Handle Login error with template error message
-                  this.errorMsg = reject.data.error.message;
-                  // this.$emit(this.es.loginError, reject);
-                }
-              )
-              .finally(() => {
-                // shutdown waiting directive
-                this.loginWaiting = false;
-              });
-          } else {
-            // Handle Login error with template error message
-            this.errorMsg = reject.data.error.message;
-            //this.$emit(this.es.loginError, reject);
-          }
-        }
-      )
-      .finally(() => {
-        // shutdown waiting directive
-        this.loginWaiting = false;
-      });
+      },
+      complete: () => (this.loginWaiting = false),
+    });
   }
 
   loginRequest(credsDataObj: UserCredObj, admin = false) {
-    if (!admin) {
-      // Return the posted request data as a promise
-      return this.http.post(INSTANCE_URL.url + '/user/session', credsDataObj);
-    } else {
-      return this.http.post(
-        INSTANCE_URL.url + '/system/admin/session',
-        credsDataObj
-      );
-    }
+    const endpoint = admin ? '/system/admin/session' : '/user/session';
+
+    return this.http
+      .post(INSTANCE_URL.url + endpoint, credsDataObj)
+      .pipe(takeUntil(this.destroy$));
+  }
+
+  private adminLoginRequest(credsDataObj: UserCredObj) {
+    this.loginRequest(credsDataObj, true).subscribe({
+      // success method
+      next: (result: any) => {
+        // Set the current user in the UserDataService service
+        this.userDataService.setCurrentUser(result.data);
+
+        // Emit a success message so we can hook in
+        // this.$emit(this.es.loginSuccess, result.data);
+        // this.$root.$emit(this.es.loginSuccess, result.data);
+      },
+      error: reject => {
+        // Handle Login error with template error message
+        this.errorMsg = reject.data.error.message;
+        // this.$emit(this.es.loginError, reject);
+      },
+      complete: () => (this.loginWaiting = false),
+    });
   }
 
   toggleFormsState() {

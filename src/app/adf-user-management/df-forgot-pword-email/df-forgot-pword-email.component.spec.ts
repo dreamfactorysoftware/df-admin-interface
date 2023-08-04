@@ -151,4 +151,15 @@ describe('DFForgotPasswordByEmailComponent', () => {
     );
     expect(securityFormContainer).toBeTruthy();
   }));
+
+  //   type SecurityQuestionPayload = {
+  //     email: string | null;
+  //     username: string | null;
+  //     security_question: string | null;
+  //     security_answer: string | null;
+  //     new_password: string | null;
+  //     verify_password: string | null;
+  //   };
+
+  it('', () => {});
 });

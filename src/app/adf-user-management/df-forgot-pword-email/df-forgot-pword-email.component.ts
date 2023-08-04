@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { SystemConfigDataService } from '../../../services/system-config-data.service';
+import { SystemConfigDataService } from '../../services/system-config-data.service';
 import { lastValueFrom } from 'rxjs';
 import { FormControl, FormGroup } from '@angular/forms';
-import { UserEventsService } from '../../../services/user-events-service.service';
+import { UserEventsService } from '../../services/user-events-service.service';
 
 // TODO: update when necessary
 const INSTANCE_URL = { url: '' };
@@ -235,14 +235,18 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
   resetPasswordSQ(requestDataObj: SecurityQuestionPayload, admin = false) {
     if (!admin) {
       // Post request for password change and return promise
-      return this.http.post(
-        INSTANCE_URL.url + '/user/password?login=false',
-        requestDataObj
+      return lastValueFrom(
+        this.http.post(
+          INSTANCE_URL.url + '/user/password?login=false',
+          requestDataObj
+        )
       );
     } else {
-      return this.http.post(
-        INSTANCE_URL.url + '/system/admin/password?login=false',
-        requestDataObj
+      return lastValueFrom(
+        this.http.post(
+          INSTANCE_URL.url + '/system/admin/password?login=false',
+          requestDataObj
+        )
       );
     }
   }
@@ -286,7 +290,7 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
 
     this.questionWaiting = true;
 
-    lastValueFrom(this.resetPasswordSQ(sq))
+    this.resetPasswordSQ(sq)
       .then((result: any) => {
         const userCredsObj = {
           email: sq.email,
@@ -299,7 +303,7 @@ export class DFForgotPasswordByEmailComponent implements OnInit {
       })
       .catch((reject: any) => {
         if (reject.status == '401' || reject.status == '404') {
-          lastValueFrom(this.resetPasswordSQ(sq, true))
+          this.resetPasswordSQ(sq, true)
             .then(result => {
               const userCredsObj = {
                 email: sq.email,
