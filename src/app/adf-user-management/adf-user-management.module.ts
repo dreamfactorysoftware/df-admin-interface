@@ -6,7 +6,6 @@ import { TranslateModule } from '@ngx-translate/core';
 
 import { AdfUserManagementRoutingModule } from './adf-user-management-routing.module';
 import { DFPasswordResetComponent } from './df-password-reset/df-password-reset.component';
-import { DFWaitingComponent } from './df-waiting/df-waiting.component';
 
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
@@ -15,7 +14,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatCardModule } from '@angular/material/card';
 
 @NgModule({
-  declarations: [DFPasswordResetComponent, DFWaitingComponent],
+  declarations: [DFPasswordResetComponent],
   imports: [
     AdfUserManagementRoutingModule,
     ReactiveFormsModule,
