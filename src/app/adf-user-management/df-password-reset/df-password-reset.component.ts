@@ -1,10 +1,22 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  AbstractControl,
+  ValidationErrors,
+  ValidatorFn,
+} from '@angular/forms';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Location } from '@angular/common';
 // import { UserEventsService } from 'path/to/user-events.service'; TODO: add user events service
 // import { SystemConfigDataService } from 'path/to/system-config-data.service'; TODO: add system config data service
-import { Options, ResetFormData } from './types/df-password-reset.types.js';
+import {
+  Options,
+  ResetFormData,
+  UserParams,
+} from './types/df-password-reset.types';
+import { PasswordResetService } from '../services/df-password-reset.service';
 
 @Component({
   selector: 'df-password-reset',
@@ -14,8 +26,8 @@ import { Options, ResetFormData } from './types/df-password-reset.types.js';
 export class DFPasswordResetComponent implements OnInit {
   // If we don't provide an options object it defaults to showing the template.
   @Input() options: Options = { showTemplate: true, login: false };
-  @Input() inErrorMsg?: any;
-  resetForm: FormGroup;
+  @Input() inErrorMsg?: string;
+  passwordResetForm: FormGroup;
   showTemplate: boolean = this.options?.showTemplate ?? true;
   // Holds value to for identical password check
   identical = true;
@@ -25,7 +37,7 @@ export class DFPasswordResetComponent implements OnInit {
   resetByEmail = true;
   resetByUsername = false;
   resetWaiting = false;
-  user: any = {}; //unsure of complete shape. gets url params
+  user: UserParams = { email: '', username: '', code: '', admin: '' };
   isAdmin = false;
 
   // WATCHERS AND INIT
@@ -38,11 +50,10 @@ export class DFPasswordResetComponent implements OnInit {
   constructor(
     private fb: FormBuilder,
     private http: HttpClient,
-    private location: Location
-  ) {}
-
-  ngOnInit() {
-    this.resetForm = this.fb.group(
+    private location: Location,
+    private passwordResetService: PasswordResetService
+  ) {
+    this.passwordResetForm = this.fb.group(
       {
         email: [
           '',
@@ -61,16 +72,23 @@ export class DFPasswordResetComponent implements OnInit {
         ],
         code: ['', [Validators.required]],
         new_password: ['', [Validators.required, Validators.minLength(5)]],
-        confirm_password: ['', [Validators.required, Validators.minLength(5)]],
+        confirm_password: [
+          '',
+          [
+            Validators.required,
+            // Validators.minLength(5),
+            // this.passwordMatchValidator,
+          ],
+          // { validator: this.passwordMatchValidator },
+        ],
       },
       {
-        validator: this.handleMatchingPasswords(
-          'new_password',
-          'confirm_password'
-        ),
+        validator: this.passwordMatchValidator,
       }
     );
+  }
 
+  ngOnInit() {
     // CREATE SHORT NAMES
     // this.es = this.userEventsService.password; TODO: add user events service
 
@@ -91,11 +109,18 @@ export class DFPasswordResetComponent implements OnInit {
     const UrlParams = this.location.path().split('?')[1];
     if (UrlParams) {
       const params = UrlParams.split('&');
-      params.forEach(param => {
+      params.forEach((param: string) => {
         const [key, value] = param.split('=');
-        this.user[key] = value;
+        this.user[key as keyof UserParams] = value;
       });
     }
+    console.log('Params', this.user.code);
+    // update username, email, and code fields with param values
+    this.passwordResetForm.patchValue({
+      email: this.user.email,
+      username: this.user.username,
+      code: this.user.code,
+    });
     this.isAdmin = this.user.admin === '1' ? true : false;
   }
 
@@ -107,33 +132,30 @@ export class DFPasswordResetComponent implements OnInit {
     this.successMsg = '';
   }
 
-  /**
-   *  Test if our entered passwords are identical
-   *  Called on keyup in template
-   */
-  handleMatchingPasswords(
-    newPasswordControl: string,
-    confirmPasswordControl: string
-  ) {
-    return (formGroup: FormGroup) => {
-      const newPassword = formGroup.controls[newPasswordControl];
-      const confirmPassword = formGroup.controls[confirmPasswordControl];
+  passwordMatchValidator: ValidatorFn = (
+    control: AbstractControl
+  ): ValidationErrors | null => {
+    const newPassword = control.get('new_password');
+    const confirmPassword = control.get('confirm_password');
+    console.log(
+      'VAlIdAtE',
+      newPassword?.value === confirmPassword?.value
+        ? null
+        : { notmatched: true }
+    );
 
-      if (newPassword.value !== confirmPassword.value) {
-        confirmPassword.setErrors({ mustMatch: true });
-      } else {
-        confirmPassword.setErrors(null);
-      }
-    };
-  }
+    return newPassword?.value === confirmPassword?.value
+      ? null
+      : { notmatched: true };
+  };
 
-  handleResetPassword() {
+  resetPassword() {
     if (!this.identical) {
       this.errorMsg = 'Passwords do not match.';
       return;
     }
 
-    if (this.resetForm.invalid) {
+    if (this.passwordResetForm.invalid) {
       this.errorMsg = 'Please fill out all required fields.';
       return;
     }
@@ -141,34 +163,34 @@ export class DFPasswordResetComponent implements OnInit {
     this.resetWaiting = true;
 
     const resetFormData: ResetFormData = {
-      email: this.resetForm.value.email || '',
-      username: this.resetForm.value.username || '',
-      code: this.resetForm.value.code || '',
-      new_password: this.resetForm.value.new_password || '',
+      email: this.passwordResetForm.value.email || '',
+      username: this.passwordResetForm.value.username || '',
+      code: this.passwordResetForm.value.code || '',
+      new_password: this.passwordResetForm.value.new_password || '',
     };
 
     const url = this.isAdmin ? '/system/admin/password' : '/user/password';
-    const params = {
-      login: this.options.login,
-    };
+    const params = new HttpParams().set('login', this.options.login);
 
-    return this.http.post(url, resetFormData, { params }).subscribe(
-      response => {
-        this.es.passwordSetSuccess.next({
-          email: this.resetForm.value.email || null,
-          username: this.resetForm.value.username || null,
-          password: this.resetForm.value.new_password || '',
-        });
-        this.dismissError();
-        this.successMsg = 'Password successfully reset.';
-        this.resetForm.reset();
-        this.resetWaiting = false;
-        this.showTemplate = false;
-      },
-      error => {
-        this.errorMsg = error.error.message;
-        this.resetWaiting = false;
-      }
-    );
+    this.passwordResetService
+      .resetPassword(url, resetFormData, params)
+      .subscribe(
+        response => {
+          this.es.passwordSetSuccess.next({
+            email: this.passwordResetForm.value.email || null,
+            username: this.passwordResetForm.value.username || null,
+            password: this.passwordResetForm.value.new_password || '',
+          });
+          this.dismissError();
+          this.successMsg = 'Password successfully reset.';
+          this.passwordResetForm.reset();
+          this.resetWaiting = false;
+          this.showTemplate = false;
+        },
+        error => {
+          this.errorMsg = error.error.message;
+          this.resetWaiting = false;
+        }
+      );
   }
 }
