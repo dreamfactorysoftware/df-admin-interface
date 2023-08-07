@@ -8,9 +8,11 @@ import { map } from 'rxjs';
 export class DfBreakpointService {
   constructor(private breakpointObserver: BreakpointObserver) {}
 
-  isSmalllScreen$ = this.breakpointObserver
-    .observe([Breakpoints.XSmall, Breakpoints.Small])
-    .pipe(map(result => result.matches));
+  get isSmalllScreen() {
+    return this.breakpointObserver
+      .observe([Breakpoints.XSmall, Breakpoints.Small])
+      .pipe(map(result => result.matches));
+  }
 
   //add new observable for other breakpoints as needed
 }
