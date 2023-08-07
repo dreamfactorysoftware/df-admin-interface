@@ -5,7 +5,8 @@ import {
 import { TestBed } from '@angular/core/testing';
 import {
   DfSystemConfigDataService,
-  SystemConfigData,
+  Environment,
+  System,
 } from './df-system-config-data.service';
 
 describe('DfSystemConfigDataService', () => {
@@ -26,26 +27,42 @@ describe('DfSystemConfigDataService', () => {
     httpMock.verify();
   });
 
-  it('should fetch system config data', () => {
-    const testData: SystemConfigData = {
+  it('should fetch environment data', () => {
+    const testData: Environment = {
       authentication: {
-        allow_open_registration: true,
-        open_reg_email_service_id: 1,
-        allow_forever_sessions: false,
-        login_attribute: 'email',
+        allowOpenRegistration: true,
+        openRegEmailServiceId: 1,
+        allowForeverSessions: false,
+        loginAttribute: 'email',
       },
       platform: {
-        root_admin_exists: true,
+        rootAdminExists: true,
       },
     };
 
-    service.fetchSystemConfigData();
+    service.fetchEnvironmentData();
 
     const req = httpMock.expectOne('/api/v2/system/environment');
     expect(req.request.method).toBe('GET');
     req.flush(testData);
 
-    service.systemConfigData$.subscribe(data => {
+    service.environment.subscribe(data => {
+      expect(data).toEqual(testData);
+    });
+  });
+
+  it('should fetch system data', () => {
+    const testData: System = {
+      resources: [{ name: 'resource1' }, { name: 'resource2' }],
+    };
+
+    service.fetchSystemData();
+
+    const req = httpMock.expectOne('/api/v2/system');
+    expect(req.request.method).toBe('GET');
+    req.flush(testData);
+
+    service.system.subscribe(data => {
       expect(data).toEqual(testData);
     });
   });
