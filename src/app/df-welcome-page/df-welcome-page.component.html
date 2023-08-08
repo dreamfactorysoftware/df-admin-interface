@@ -1,0 +1,86 @@
+<section>
+  <section class="two-column-flex-container">
+    <article class="flex-column">
+      <div class="video-link">
+        <a href="https://youtu.be/FOSOm88RxPw" target="_blank">
+          <img class="video-image" src="assets/img/macbook-hp-df-1.png" alt="placeholder for now"/>
+          <div class="video-overlay">
+            <span id="video-link-description">Watch this video about how</span>
+          </div>
+        </a>
+      </div>
+
+      <h3>Welcome to DreamFactory</h3>
+
+      <p>The text that will eventually go here</p>
+      <ul>
+        <li *ngFor="let resource of welcomeResources">
+          <a
+            href="{{ resource.link }}"
+            target="_blank"
+            class="plain-icon-link"
+            aria-labelledby="link-label">
+            <span
+              matListItemIcon
+              class="material-icons link-icon"
+              aria-hidden="true"
+              color="primary"
+              >{{ resource.icon }}</span
+            >
+            <span id="link-label">{{ resource.name }}</span>
+          </a>
+        </li>
+      </ul>
+    </article>
+
+    <aside class="flex-column">
+      <mat-card>
+        <p>Attention OSS Users</p>
+        <p>
+          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
+          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
+          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
+          Bunches of text. Bunches of text. Bunches of text.
+        </p>
+      </mat-card>
+      <mat-card>
+        <p>We want to hear from you!</p>
+        <p>
+          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
+          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
+          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
+          Bunches of text. Bunches of text. Bunches of text.
+        </p>
+      </mat-card>
+    </aside>
+  </section>
+
+  <mat-divider></mat-divider>
+
+  <section>
+    <h4>
+      Click on a client platform below to download a sample application and
+      learn how to make API calls
+    </h4>
+
+    <section>
+      <h5>Native Examples</h5>
+
+      <ul class="flex-list-container">
+        <li *ngFor="let link of nativeExampleLinks">
+          <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h5>JavaScript Examples</h5>
+
+      <ul class="flex-list-container">
+        <li *ngFor="let link of javaScriptExampleLinks">
+          <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+        </li>
+      </ul>
+    </section>
+  </section>
+</section>
