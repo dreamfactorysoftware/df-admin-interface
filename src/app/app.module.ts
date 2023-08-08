@@ -9,9 +9,11 @@ import {
   HttpClient,
   HttpClientModule,
 } from '@angular/common/http';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { AdfUserManagementModule } from './adf-user-management/adf-user-management.module';
 import { CaseInterceptor } from './core/interceptors/case.interceptor';
+import { LoadingInterceptor } from './core/interceptors/loading.interceptor';
 
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
@@ -33,8 +35,14 @@ export function createTranslateLoader(http: HttpClient) {
     }),
     AdfUserManagementModule,
     HttpClientModule,
+    MatProgressSpinnerModule,
   ],
   providers: [
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: LoadingInterceptor,
+      multi: true,
+    },
     {
       provide: HTTP_INTERCEPTORS,
       useClass: CaseInterceptor,
