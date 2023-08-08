@@ -19,8 +19,6 @@ import { DfSystemConfigDataService } from './core/services/df-system-config-data
 
 import { AdfUserManagementModule } from './adf-user-management/adf-user-management.module';
 
-import { AdfUserManagementModule } from './adf-user-management/adf-user-management.module';
-
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
 }
@@ -32,7 +30,7 @@ export function initEnvironment(
 }
 
 @NgModule({
-  declarations: [AppComponent, WelcomePageComponent, DfIconCardLinkComponent],
+  declarations: [AppComponent],
   imports: [
     BrowserModule,
     AppRoutingModule,
