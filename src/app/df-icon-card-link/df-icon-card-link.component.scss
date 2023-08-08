@@ -1,0 +1,30 @@
+.icon-link-container {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  margin-right: 30px;
+  text-align: center;
+}
+
+.icon-link-card {
+  width: 150px;
+  height: 150px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: white;
+}
+
+.icon-img {
+  width: 70%;
+}
+
+a {
+  margin-top: 25px;
+  text-decoration: none;
+  color: black;
+}
+
+.label {
+  margin-top: 15px;
+}
