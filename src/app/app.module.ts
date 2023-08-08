@@ -61,6 +61,11 @@ export function initEnvironment(
     },
     {
       provide: HTTP_INTERCEPTORS,
+      useClass: LoadingInterceptor,
+      multi: true,
+    },
+    {
+      provide: HTTP_INTERCEPTORS,
       useClass: CaseInterceptor,
       multi: true,
     },
