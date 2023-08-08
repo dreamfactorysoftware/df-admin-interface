@@ -1,0 +1,24 @@
+@use '@angular/material' as mat;
+
+$grey-palette: mat.define-palette(mat.$grey-palette);
+
+.loading-spinner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  .backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: mat.get-color-from-palette($grey-palette, 500);
+    opacity: 0.3;
+  }
+}

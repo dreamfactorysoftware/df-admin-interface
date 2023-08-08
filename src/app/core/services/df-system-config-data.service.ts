@@ -4,7 +4,6 @@ import {
   BehaviorSubject,
   Observable,
   catchError,
-  delay,
   retry,
   throwError,
 } from 'rxjs';
@@ -51,7 +50,9 @@ export class DfSystemConfigDataService {
 
   fetchEnvironmentData() {
     this.http
-      .get<Environment>('/api/v2/system/environment')
+      .get<Environment>('/api/v2/system/environment', {
+        headers: { 'show-loading': '' },
+      })
       .pipe(
         catchError(err => {
           this.authService.clearToken();
