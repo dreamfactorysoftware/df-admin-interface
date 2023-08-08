@@ -12,7 +12,7 @@ import {
 } from '@angular/common/http';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { CaseInterceptor } from './core/interceptors/case.interceptor';
-import { UserManagementModule } from './admin_components/adf-user-management/user-management.module';
+import { UserManagementModule } from './adf-user-management/user-management.module';
 
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');

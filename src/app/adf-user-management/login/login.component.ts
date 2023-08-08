@@ -1,24 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { HttpClient } from '@angular/common/http';
-import {
-  Component,
-  OnChanges,
-  OnInit,
-  SimpleChanges,
-  ChangeDetectorRef,
-  OnDestroy,
-} from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { SystemConfigDataService } from '../../services/system-config-data.service';
-import { Router } from '@angular/router';
 import { UserDataService } from '../../services/user-data-service.service';
 import { UserEventsService } from '../../services/user-events-service.service';
-import { Subject, takeUntil } from 'rxjs';
-import { FormControl, FormGroup } from '@angular/forms';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
 
 // TODO: update when necessary
-const INSTANCE_URL = { url: '' };
-
-const defaults = { showTemplate: true };
+//const INSTANCE_URL = { url: '' };
 
 type UserCredObj = {
   username?: string;
@@ -37,14 +25,14 @@ type UserField = {
 @Component({
   selector: 'df-user-login',
   templateUrl: './login.component.html',
-  styleUrls: ['./login.component.css'],
+  styleUrls: ['./login.component.scss'],
 })
-export class LoginComponent implements OnInit, OnChanges, OnDestroy {
+export class LoginComponent implements OnInit {
   errorMsg: string;
   successMsg: string;
   loginFormTitle: string;
   adldapAvailable: boolean;
-  loginAttribute: string;
+  loginAttribute = 'email';
   loginActive: boolean;
   loginDirect: boolean;
   loginWaiting: boolean;
@@ -60,39 +48,34 @@ export class LoginComponent implements OnInit, OnChanges, OnDestroy {
   adldap: any[];
   selectedService: any;
   userField: UserField;
-  es: any;
-  options: any;
-  private destroy$ = new Subject();
 
   loginFormGroup = new FormGroup({
     selectedService: new FormControl(),
-    email: new FormControl(''),
-    password: new FormControl(''),
+    userID: new FormControl('', [
+      //this can be email or username based on the loginAttribute variable
+      Validators.required,
+      this.loginAttribute === 'email'
+        ? Validators.email
+        : Validators.minLength(3) && Validators.maxLength(256),
+    ]),
+    password: new FormControl('', [
+      Validators.required,
+      Validators.minLength(8),
+    ]),
     rememberMe: new FormControl(false),
   });
 
-  constructor(
-    private systemConfigDataService: SystemConfigDataService,
-    private userDataService: UserDataService,
-    private userEventService: UserEventsService,
-    private http: HttpClient,
-    private router: Router,
-    private cdRef: ChangeDetectorRef
-  ) {
+  constructor(private systemConfigDataService: SystemConfigDataService) {
     this.errorMsg = '';
     this.successMsg = '';
     this.loginFormTitle = 'Login';
     this.adldapAvailable = false;
-    this.loginActive = true;
-    this.loginAttribute = 'email';
-    this.loginDirect = false;
     this.loginWaiting = false;
     this.rememberMe = false;
     this.resetPasswordActive = false;
     this.showOAuth = true;
     this.allowForeverSessions = false;
     this.emailError = false;
-    this.showTemplate = true;
     this.hidePasswordField = false;
     this.adldap = [];
     this.creds = {
@@ -104,14 +87,9 @@ export class LoginComponent implements OnInit, OnChanges, OnDestroy {
       text: 'Enter Email',
       type: 'email',
     };
-    this.options = {};
   }
 
   ngOnInit(): void {
-    this.options = Object.assign(this.options, defaults);
-
-    this.es = this.userEventService.login;
-
     this.systemConfig = this.systemConfigDataService.getSystemConfig();
     if (this.systemConfig && this.systemConfig.authentication) {
       if (Object.hasOwn(this.systemConfig.authentication, 'adldap')) {
@@ -134,75 +112,13 @@ export class LoginComponent implements OnInit, OnChanges, OnDestroy {
     this.selectedService = null;
     this.rememberMe = false;
 
-    const token = this.getQueryParameter('session_token');
-    const oauth_code = this.getQueryParameter('code');
-    const oauth_state = this.getQueryParameter('state');
-    const oauth_token = this.getQueryParameter('oauth_token');
-    const uri = window.location.href.split('?');
-    const baseUrl = uri[0];
-
-    if (token !== '') {
-      this.loginWaiting = true;
-      this.showOAuth = false;
-      this.loginDirect = true;
-      this.http
-        .get(INSTANCE_URL.url + '/user/session?session_token=' + token)
-        .pipe(takeUntil(this.destroy$))
-        .subscribe({
-          next: (result: any) => {
-            // Set the current user in the UserDataService service
-            this.userDataService.setCurrentUser(result.data);
-
-            // Emit a success message so we can hook in
-            //this.$emit(this.es.loginSuccess, result.data);
-
-            this.loginDirect = false;
-          },
-          error: (error: any) => {
-            // Reload the admin app to remove session_token param from url and show the login prompt.
-            window.location.href = baseUrl + '#/login';
-            this.loginDirect = false;
-          },
-        });
-    } else if ((oauth_code && oauth_state) || oauth_token) {
-      this.loginWaiting = true;
-      this.showOAuth = false;
-      this.http
-        .post(
-          INSTANCE_URL.url +
-            '/user/session?oauth_callback=true&' +
-            location.search.substring(1),
-          {}
-        )
-        .pipe(takeUntil(this.destroy$))
-        .subscribe({
-          next: (result: any) => {
-            // Set the current user in the UserDataService service
-            this.userDataService.setCurrentUser(result.data);
-
-            // Emit a success message so we can hook in
-            //this.$emit(this.es.loginSuccess, result.data);
-          },
-        });
-    }
-  }
-
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['options'] && changes['options'].currentValue) {
-      this.handleOptionsChange(changes['options'].currentValue);
-    }
-  }
-
-  private handleOptionsChange(newValue: any) {
-    if (Object.hasOwn(newValue, 'showTemplate')) {
-      this.showTemplate = newValue.showTemplate;
-      this.cdRef.detectChanges(); // Detect changes manually if needed
-    }
-  }
-
-  ngOnDestroy(): void {
-    this.destroy$.next(1);
-    this.destroy$.complete();
+    //TODO: could be needed for oauth
+    // const token = this.getQueryParameter('session_token');
+    // const oauth_code = this.getQueryParameter('code');
+    // const oauth_state = this.getQueryParameter('state');
+    // const oauth_token = this.getQueryParameter('oauth_token');
+    // const uri = window.location.href.split('?');
+    // const baseUrl = uri[0];
   }
 
   dismissError() {
@@ -213,23 +129,26 @@ export class LoginComponent implements OnInit, OnChanges, OnDestroy {
     this.successMsg = '';
   }
 
+  getUserIDErrorMessage() {
+    if (this.loginFormGroup.controls.userID.hasError('required')) {
+      return 'You must enter a value';
+    }
+
+    return this.loginFormGroup.controls.userID.hasError('email')
+      ? 'Not a valid email'
+      : '';
+  }
+
   showLoginForm() {
     this.toggleFormsState();
   }
 
   forgotPassword() {
-    // this.$broadcast(this.userEventsService.password.passwordResetRequest, {
-    //   email: this.creds.email,
-    // });
+    console.log('Forgot password clicked!');
   }
 
   rememberLogin(checked: boolean) {
     this.rememberMe = checked;
-  }
-
-  skipLogin() {
-    //window.location.href = '/services';
-    this.router.navigate(['/services']);
   }
 
   useAdLdapService(service: any) {
@@ -268,87 +187,17 @@ export class LoginComponent implements OnInit, OnChanges, OnDestroy {
     return result ?? '';
   }
 
-  login(credsDataObj: UserCredObj) {
-    // check if the user has entered creds or if
-    // they were supplied through a browser mechanism
-    credsDataObj.password = this.loginFormGroup.value.password as string;
-    if (this.selectedService) {
-      credsDataObj.username = this.loginFormGroup.value.email as string;
-      credsDataObj.service = this.loginFormGroup.value
-        .selectedService as string;
-    } else if (this.loginAttribute === 'username') {
-      credsDataObj.username = this.loginFormGroup.value.email as string;
-    } else if (credsDataObj.email === '' || credsDataObj.password === '') {
-      // They were either supplied by a browser mechanism or
-      // they weren't entered.  We use jQuery to grab the vals
-      // If they are still empty the error handler will take care of
-      // it for us.
-      credsDataObj.email = this.loginFormGroup.value.email as string;
+  login() {
+    console.log('Login clicked!');
+    if (this.isFormValid()) {
+      this.loginWaiting = true;
+      // TODO: add login request logic here
     }
-
-    credsDataObj.remember_me = this.loginFormGroup.value.rememberMe as boolean;
-
-    this._login(credsDataObj);
+    this.loginWaiting = false;
   }
 
-  _login(credsDataObj: UserCredObj) {
-    // fire up waiting directive
-    this.loginWaiting = true;
-
-    // call private login request function with a credentials object
-    this.loginRequest(credsDataObj, false).subscribe({
-      // success method
-      next: (result: any) => {
-        // Set the current user in the UserDataService service
-        this.userDataService.setCurrentUser(result.data);
-
-        // Emit a success message so we can hook in
-        // this.$emit(this.es.loginSuccess, result.data);
-        // this.$root.$emit(this.es.loginSuccess, result.data);
-      },
-      error: (reject: any) => {
-        if (
-          (reject.status == '401' || reject.status == '404') &&
-          !this.selectedService
-        ) {
-          this.loginWaiting = true;
-          this.adminLoginRequest(credsDataObj);
-        } else {
-          // Handle Login error with template error message
-          this.errorMsg = reject.data.error.message;
-          //this.$emit(this.es.loginError, reject);
-        }
-      },
-      complete: () => (this.loginWaiting = false),
-    });
-  }
-
-  loginRequest(credsDataObj: UserCredObj, admin = false) {
-    const endpoint = admin ? '/system/admin/session' : '/user/session';
-
-    return this.http
-      .post(INSTANCE_URL.url + endpoint, credsDataObj)
-      .pipe(takeUntil(this.destroy$));
-  }
-
-  private adminLoginRequest(credsDataObj: UserCredObj) {
-    this.loginRequest(credsDataObj, true).subscribe({
-      // success method
-      next: (result: any) => {
-        // Set the current user in the UserDataService service
-        this.userDataService.setCurrentUser(result.data);
-
-        // Emit a success message so we can hook in
-        // this.$emit(this.es.loginSuccess, result.data);
-        // this.$root.$emit(this.es.loginSuccess, result.data);
-      },
-      error: reject => {
-        // Handle Login error with template error message
-        this.errorMsg = reject.data.error.message;
-        // this.$emit(this.es.loginError, reject);
-      },
-      complete: () => (this.loginWaiting = false),
-    });
+  isFormValid() {
+    return this.loginFormGroup.valid;
   }
 
   toggleFormsState() {
