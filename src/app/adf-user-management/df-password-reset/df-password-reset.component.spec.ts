@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule, FormGroupDirective } from '@angular/forms';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { TranslateModule } from '@ngx-translate/core';
 import { DFPasswordResetComponent } from './df-password-reset.component';
 import { PasswordResetService } from '../services/df-password-reset.service';
 
@@ -11,7 +12,11 @@ describe('DFPasswordResetComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ReactiveFormsModule, HttpClientTestingModule],
+      imports: [
+        ReactiveFormsModule,
+        HttpClientTestingModule,
+        TranslateModule.forRoot(),
+      ],
       declarations: [DFPasswordResetComponent],
       providers: [PasswordResetService],
     }).compileComponents();
@@ -23,8 +28,8 @@ describe('DFPasswordResetComponent', () => {
     passwordResetService = TestBed.inject(PasswordResetService);
 
     // Mock the location path
-    // spyOn(component.location, 'path').and.returnValue(
-    //   '/reset-password?code=12345'
+    // spyOn(component['location'], 'path').and.returnValue(
+    //   '/reset-password?code=12345&email=test@email.com&username=testuser&admin=1'
     // );
   });
 
@@ -32,27 +37,27 @@ describe('DFPasswordResetComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  // it('should set the username and email controls to readonly if they have values', () => {
-  //   component.passwordResetForm.setValue({
-  //     email: 'user@example.com',
-  //     username: 'john_doe',
-  //     code: '12345',
-  //     new_password: '',
-  //     confirm_password: '',
-  //   });
+  it('should set the username and email controls to readonly if they have values', () => {
+    component.passwordResetForm.setValue({
+      email: 'user@example.com',
+      username: 'john_doe',
+      code: '12345',
+      new_password: '',
+      confirm_password: '',
+    });
 
-  //   fixture.detectChanges();
+    fixture.detectChanges();
 
-  //   const emailInput = fixture.nativeElement.querySelector(
-  //     'input[formControlName="email"]'
-  //   );
-  //   const usernameInput = fixture.nativeElement.querySelector(
-  //     'input[formControlName="username"]'
-  //   );
+    const emailInput = fixture.nativeElement.querySelector(
+      'input[formControlName="email"]'
+    );
+    const usernameInput = fixture.nativeElement.querySelector(
+      'input[formControlName="username"]'
+    );
 
-  //   expect(emailInput.readOnly).toBe(true);
-  //   expect(usernameInput.readOnly).toBe(true);
-  // });
+    expect(emailInput.readOnly).toBe(true);
+    expect(usernameInput.readOnly).toBe(true);
+  });
 
   // it('should set the username and email controls to editable if they do not have values', () => {
   //   component.passwordResetForm.setValue({
