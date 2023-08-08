@@ -15,17 +15,20 @@ export class CaseInterceptor implements HttpInterceptor {
     req: HttpRequest<any>,
     next: HttpHandler
   ): Observable<HttpEvent<any>> {
-    const transformedRequest = req.clone({
-      body: this.mapCamelToSnake(req.body),
-    });
-    return next.handle(transformedRequest).pipe(
-      map(event => {
-        if (event instanceof HttpResponse) {
-          return event.clone({ body: this.mapSnakeToCamel(event.body) });
-        }
-        return event;
-      })
-    );
+    if (req.url.startsWith('/api')) {
+      const transformedRequest = req.clone({
+        body: this.mapCamelToSnake(req.body),
+      });
+      return next.handle(transformedRequest).pipe(
+        map(event => {
+          if (event instanceof HttpResponse) {
+            return event.clone({ body: this.mapSnakeToCamel(event.body) });
+          }
+          return event;
+        })
+      );
+    }
+    return next.handle(req);
   }
   private mapSnakeToCamel(obj: any): any {
     const convert = (str: string) =>
