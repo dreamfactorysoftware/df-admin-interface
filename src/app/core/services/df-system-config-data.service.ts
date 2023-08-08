@@ -1,6 +1,14 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import {
+  BehaviorSubject,
+  Observable,
+  catchError,
+  delay,
+  retry,
+  throwError,
+} from 'rxjs';
+import { DfAuthService } from './df-auth.service';
 
 @Injectable({
   providedIn: 'root',
@@ -20,7 +28,10 @@ export class DfSystemConfigDataService {
 
   private _system$ = new BehaviorSubject<System>({ resources: [] });
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private authService: DfAuthService
+  ) {}
 
   get environment(): Observable<Environment> {
     return this._environment$.asObservable();
@@ -41,6 +52,13 @@ export class DfSystemConfigDataService {
   fetchEnvironmentData() {
     this.http
       .get<Environment>('/api/v2/system/environment')
+      .pipe(
+        catchError(err => {
+          this.authService.clearToken();
+          return throwError(() => new Error(err));
+        }),
+        retry(1)
+      )
       .subscribe(data => (this.environment = data));
   }
 
