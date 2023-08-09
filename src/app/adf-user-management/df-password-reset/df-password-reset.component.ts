@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Location } from '@angular/common';
 import { UserParams } from './types/df-password-reset.types';
-import { DFPasswordResetService } from '../services/df-password.service';
+import { DfPasswordResetService } from '../services/df-password.service';
 import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
 import { matchValidator } from '../../shared/validators/match.validator';
 import { Subject, catchError, switchMap, takeUntil, throwError } from 'rxjs';
@@ -17,7 +17,7 @@ import { Router } from '@angular/router';
   selector: 'df-password-reset',
   templateUrl: './df-password-reset.component.html',
 })
-export class DFPasswordResetComponent implements OnInit, OnDestroy {
+export class DfPasswordResetComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();
   passwordResetForm: FormGroup;
   user: UserParams = { email: '', username: '', code: '', admin: '' };
@@ -29,7 +29,7 @@ export class DFPasswordResetComponent implements OnInit, OnDestroy {
   constructor(
     private fb: FormBuilder,
     private location: Location,
-    private passwordResetService: DFPasswordResetService,
+    private passwordResetService: DfPasswordResetService,
     private systemConfigDataService: DfSystemConfigDataService,
     private authService: DfAuthService,
     private router: Router

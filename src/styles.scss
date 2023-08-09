@@ -25,4 +25,8 @@ body {
   button {
     width: 100%;
   }
+  .action-links {
+    display: flex;
+    justify-content: flex-end;
+  }
 }

@@ -6,7 +6,7 @@ import { GenericSuccessResponse } from '../../shared/types/generic-http';
 @Injectable({
   providedIn: 'root',
 })
-export class DFPasswordResetService {
+export class DfPasswordResetService {
   constructor(private http: HttpClient) {}
 
   resetPassword(data: ResetFormData, isAdmin: boolean) {

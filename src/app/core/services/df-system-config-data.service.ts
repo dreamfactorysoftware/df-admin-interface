@@ -19,6 +19,7 @@ export class DfSystemConfigDataService {
       openRegEmailServiceId: 0,
       allowForeverSessions: false,
       loginAttribute: 'email',
+      adldap: [],
     },
     platform: {
       rootAdminExists: false,
@@ -79,12 +80,19 @@ export interface Environment {
     openRegEmailServiceId: number;
     allowForeverSessions: boolean;
     loginAttribute: string;
+    adldap: Array<LdapService>;
   };
   platform: {
     rootAdminExists: boolean;
+    host?: string;
   };
 }
 
 export interface System {
   resources: Array<{ name: string }>;
+}
+
+export interface LdapService {
+  name: string;
+  label: string;
 }
