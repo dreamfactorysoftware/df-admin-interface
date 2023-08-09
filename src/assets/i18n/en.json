@@ -1,6 +1,9 @@
 {
   "userManagement": {
     "requiredForLogin": "Required for login",
+    "resetPassword": "Reset Password",
+    "login": "Login",
+    "forgotPassword": "Forgot Password",
     "controls": {
       "username": {
         "label": "Choose Username",
@@ -36,9 +39,7 @@
       "verifyPassword": {
         "label": "Verify Password"
       },
-      "resetPassword": {
-        "label": "Reset Password"
-      },
+
       "confirmationCode": {
         "label": "Enter confirmation code",
         "errors": {
@@ -51,6 +52,9 @@
           "label": "Confirm password is required",
           "match": "Passwords do not match"
         }
+      },
+      "services": {
+        "label": "Services"
       }
     }
   }

@@ -12,6 +12,19 @@
   <mat-divider></mat-divider>
   <mat-card-content>
     <form name="login-form" [formGroup]="loginForm" (ngSubmit)="login()">
+      <mat-form-field appearance="fill" *ngIf="ldapAvailable">
+        <mat-label>
+          {{ 'userManagement.controls.services.label' | translate }}</mat-label
+        >
+        <mat-select formControlName="services">
+          <mat-option></mat-option>
+          <mat-option
+            *ngFor="let service of ldapServices"
+            [value]="service.name">
+            {{ service.label }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
       <mat-form-field appearance="fill" *ngIf="loginAttribute === 'email'">
         <mat-label>
           {{ 'userManagement.controls.email.label' | translate }}</mat-label
@@ -71,5 +84,10 @@
         {{ 'userManagement.login' | translate }}
       </button>
     </form>
+    <div class="action-links">
+      <a mat-button routerLink="/forgot-password" target="_self">{{
+        'userManagement.forgotPassword' | translate
+      }}</a>
+    </div>
   </mat-card-content>
 </mat-card>

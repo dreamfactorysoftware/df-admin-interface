@@ -6,7 +6,10 @@ import {
   DfAuthService,
   LoginCredentials,
 } from '../../core/services/df-auth.service';
-import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
+import {
+  DfSystemConfigDataService,
+  LdapService,
+} from '../../core/services/df-system-config-data.service';
 import { AlertType } from '../../shared/components/df-alert/df-alert.component';
 import { Router } from '@angular/router';
 
@@ -19,7 +22,10 @@ export class DfLoginComponent implements OnInit, OnDestroy {
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
+  envloginAttribute = 'email';
   loginAttribute = 'email';
+  ldapAvailable = false;
+  ldapServices: LdapService[] = [];
 
   loginForm: FormGroup;
   constructor(
@@ -29,8 +35,9 @@ export class DfLoginComponent implements OnInit, OnDestroy {
     private router: Router
   ) {
     this.loginForm = this.fb.group({
-      username: ['', [Validators.required]],
-      email: ['', [Validators.required, Validators.email]],
+      services: [''],
+      username: [''],
+      email: [''],
       password: ['', [Validators.required]],
     });
   }
@@ -39,8 +46,21 @@ export class DfLoginComponent implements OnInit, OnDestroy {
     this.systemConfigDataService.environment$
       .pipe(takeUntil(this.destroyed$))
       .subscribe(env => {
-        this.loginAttribute = env.authentication.loginAttribute;
+        this.envloginAttribute = env.authentication.loginAttribute;
+        this.setLoginAttribute(env.authentication.loginAttribute);
+        this.ldapAvailable = env.authentication.adldap.length > 0;
+        this.ldapServices = env.authentication.adldap;
       });
+
+    this.loginForm.controls['services'].valueChanges.subscribe(
+      (value: string) => {
+        if (value) {
+          this.setLoginAttribute('username');
+        } else {
+          this.setLoginAttribute(this.envloginAttribute);
+        }
+      }
+    );
   }
 
   ngOnDestroy() {
@@ -48,13 +68,38 @@ export class DfLoginComponent implements OnInit, OnDestroy {
     this.destroyed$.complete();
   }
 
+  setLoginAttribute(attribute: string) {
+    console.log('setLoginAttribute', attribute);
+    this.loginAttribute = attribute;
+    if (attribute === 'username') {
+      this.loginForm.controls['username'].addValidators(Validators.required);
+      this.loginForm.controls['email'].clearValidators();
+    } else {
+      this.loginForm.controls['email'].addValidators([
+        Validators.required,
+        Validators.email,
+      ]);
+      this.loginForm.controls['username'].clearValidators();
+    }
+    this.loginForm.controls['username'].updateValueAndValidity();
+    this.loginForm.controls['email'].updateValueAndValidity();
+  }
+
   login() {
     if (this.loginForm.invalid) {
       return;
     }
     const credentials: LoginCredentials = {
-      password: this.loginForm.value.newPassword,
+      password: this.loginForm.value.password,
     };
+    if (this.ldapAvailable && this.loginForm.value.services !== '') {
+      credentials.service = this.loginForm.value.services;
+    }
+    if (this.loginAttribute === 'username') {
+      credentials.username = credentials.email = this.loginForm.value.username;
+    } else {
+      credentials.email = this.loginForm.value.email;
+    }
     this.authService
       .login(credentials)
       .pipe(
