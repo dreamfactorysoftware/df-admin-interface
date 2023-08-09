@@ -1,5 +1,5 @@
 <div *ngIf="showAlert" class="alert-container" [class]="alertType">
-  <mat-icon fontSet="fa" class="alert-icon" fontIcon="twitter"></mat-icon>
+  <mat-icon class="alert-icon">{{ icon }}</mat-icon>
   <span class="alert-message">{{ message }}</span>
   <button
     mat-icon-button

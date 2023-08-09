@@ -1,9 +1,13 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-
+import { CommonModule } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
 @Component({
   selector: 'df-alert',
   templateUrl: './df-alert.component.html',
   styleUrls: ['./df-alert.component.scss'],
+  standalone: true,
+  imports: [MatIconModule, CommonModule, MatButtonModule],
 })
 export class DfAlertComponent {
   @Input() message: string;

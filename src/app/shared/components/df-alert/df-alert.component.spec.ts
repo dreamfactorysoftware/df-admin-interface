@@ -7,7 +7,7 @@ describe('DfAlertComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [DfAlertComponent],
+      imports: [DfAlertComponent],
     }).compileComponents();
   });
 
