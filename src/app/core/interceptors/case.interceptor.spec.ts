@@ -51,18 +51,67 @@ describe('CaseInterceptor', () => {
 
   it('should convert response body from snake case to camel case', () => {
     const responseBody = {
-      user_id: 123,
-      first_name: 'John',
-      last_name: 'Doe',
-      email: 'john.doe@example.com',
+      authentication: {
+        admin: {
+          path: 'system/admin/session',
+          verb: 'POST',
+          payload: {
+            email: 'string',
+            password: 'string',
+            remember_me: 'bool',
+          },
+        },
+        user: {
+          path: 'user/session',
+          verb: 'POST',
+          payload: {
+            email: 'string',
+            password: 'string',
+            remember_me: 'bool',
+          },
+        },
+        oauth: [],
+        adldap: [],
+        saml: [],
+        allow_open_registration: true,
+        open_reg_email_service_id: 6,
+        allow_forever_sessions: false,
+        login_attribute: 'username',
+      },
+      apps: [],
+      platform: { root_admin_exists: true },
     };
-
     httpClient.get('/api/users/123').subscribe(data => {
       expect(data).toEqual({
-        userId: 123,
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john.doe@example.com',
+        authentication: {
+          admin: {
+            path: 'system/admin/session',
+            verb: 'POST',
+            payload: {
+              email: 'string',
+              password: 'string',
+              rememberMe: 'bool',
+            },
+          },
+          user: {
+            path: 'user/session',
+            verb: 'POST',
+            payload: {
+              email: 'string',
+              password: 'string',
+              rememberMe: 'bool',
+            },
+          },
+          oauth: [],
+          adldap: [],
+          saml: [],
+          allowOpenRegistration: true,
+          openRegEmailServiceId: 6,
+          allowForeverSessions: false,
+          loginAttribute: 'username',
+        },
+        apps: [],
+        platform: { rootAdminExists: true },
       });
     });
 

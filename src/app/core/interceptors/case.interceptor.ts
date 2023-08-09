@@ -33,20 +33,34 @@ export class CaseInterceptor implements HttpInterceptor {
   private mapSnakeToCamel(obj: any): any {
     const convert = (str: string) =>
       str.replace(/([-_]\w)/g, g => g[1].toUpperCase());
-    const newObj: any = {};
-    for (const key in obj) {
-      newObj[convert(key)] = obj[key];
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.mapSnakeToCamel(item));
+    } else if (typeof obj === 'object' && obj !== null) {
+      const newObj: any = {};
+      for (const key in obj) {
+        newObj[convert(key)] = this.mapSnakeToCamel(obj[key]);
+      }
+      return newObj;
+    } else {
+      return obj;
     }
-    return newObj;
   }
 
   private mapCamelToSnake(obj: any): any {
     const convert = (str: string) =>
       str.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1_$2').toLowerCase();
-    const newObj: any = {};
-    for (const key in obj) {
-      newObj[convert(key)] = obj[key];
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.mapCamelToSnake(item));
+    } else if (typeof obj === 'object' && obj !== null) {
+      const newObj: any = {};
+      for (const key in obj) {
+        newObj[convert(key)] = this.mapCamelToSnake(obj[key]);
+      }
+      return newObj;
+    } else {
+      return obj;
     }
-    return newObj;
   }
 }

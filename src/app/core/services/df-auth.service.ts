@@ -7,8 +7,11 @@ import { BehaviorSubject, catchError, map } from 'rxjs';
   providedIn: 'root',
 })
 export class DfAuthService {
-  private isLoggedIn$ = new BehaviorSubject<boolean>(false);
-  userData: UserData | null;
+  private isLoggedInSubject = new BehaviorSubject<boolean>(false);
+  isLoggedIn$ = this.isLoggedInSubject.asObservable();
+  private userDataSubject = new BehaviorSubject<UserData | null>(null);
+  userData$ = this.userDataSubject.asObservable();
+
   private TOKEN_KEY = 'session_token';
 
   constructor(
@@ -25,7 +28,7 @@ export class DfAuthService {
       })
       .pipe(
         map(userData => {
-          this.setUserData(userData);
+          this.userData = userData;
           return userData;
         }),
         catchError(() => {
@@ -33,7 +36,7 @@ export class DfAuthService {
             .post<UserData>('/api/v2/system/admin/session', credentials, {})
             .pipe(
               map(userData => {
-                this.setUserData(userData);
+                this.userData = userData;
                 return userData;
               })
             );
@@ -51,21 +54,26 @@ export class DfAuthService {
         this.userData = null;
         this.router.navigate(['/login']);
       });
-    this.isLoggedIn$.next(false);
+    this.isLoggedInSubject.next(false);
   }
 
   clearToken() {
     sessionStorage.removeItem(this.TOKEN_KEY);
   }
 
-  setUserData(userData: UserData) {
-    this.isLoggedIn$.next(true);
-    this.token = userData.sessionToken;
-    this.userData = userData;
+  get userData(): UserData | null {
+    return this.userDataSubject.value;
   }
 
-  get isLoggedIn() {
-    return this.isLoggedIn$.asObservable();
+  set userData(userData: UserData | null) {
+    this.userDataSubject.next(userData);
+    if (userData) {
+      this.token = userData.sessionToken;
+    }
+  }
+
+  set isLoggedIn(isLoggedIn: boolean) {
+    this.isLoggedInSubject.next(isLoggedIn);
   }
 
   get token(): string | null {

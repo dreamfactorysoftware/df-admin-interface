@@ -21,10 +21,10 @@ export class DFPasswordResetComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();
   passwordResetForm: FormGroup;
   user: UserParams = { email: '', username: '', code: '', admin: '' };
-  environment = this.systemConfigDataService.environment;
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
+  loginAttribute = 'email';
 
   constructor(
     private fb: FormBuilder,
@@ -52,6 +52,11 @@ export class DFPasswordResetComponent implements OnInit, OnDestroy {
         this.user[key as keyof UserParams] = value;
       });
     }
+    this.systemConfigDataService.environment$
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(env => {
+        this.loginAttribute = env.authentication.loginAttribute;
+      });
     this.passwordResetForm.patchValue({
       email: this.user.email,
       username: this.user.username,
@@ -66,10 +71,6 @@ export class DFPasswordResetComponent implements OnInit, OnDestroy {
 
   get isAdmin() {
     return this.user.admin === '1';
-  }
-
-  get loginAttribute() {
-    return this.environment.authentication.loginAttribute;
   }
 
   resetPassword() {
