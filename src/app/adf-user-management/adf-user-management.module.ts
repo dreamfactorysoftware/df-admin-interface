@@ -37,6 +37,5 @@ import { DfForgotPasswordComponent } from './df-forgot-password/df-forgot-passwo
     AdfUserManagementRoutingModule,
     MatSelectModule,
   ],
-  exports: [DFPasswordResetComponent],
 })
 export class AdfUserManagementModule {}
