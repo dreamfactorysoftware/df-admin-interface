@@ -42,7 +42,7 @@ describe('SessionTokenInterceptor', () => {
     };
 
     const token = 'test-token';
-    jest.spyOn(authService, 'getToken').mockReturnValue(token);
+    jest.spyOn(authService, 'token', 'get').mockReturnValue(token);
 
     http.get('/api/users/1').subscribe(data => {
       expect(data).toBeTruthy();
@@ -82,7 +82,7 @@ describe('SessionTokenInterceptor', () => {
       email: 'john.doe@example.com',
     };
 
-    jest.spyOn(authService, 'getToken').mockReturnValue(null);
+    jest.spyOn(authService, 'token', 'get').mockReturnValue(null);
 
     http.get('/api/users/1').subscribe(data => {
       expect(data).toBeTruthy();

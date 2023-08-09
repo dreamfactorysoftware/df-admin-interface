@@ -14,7 +14,6 @@ import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { CaseInterceptor } from './core/interceptors/case.interceptor';
 import { LoadingInterceptor } from './core/interceptors/loading.interceptor';
-import { AdfUserManagementModule } from './adf-user-management/adf-user-management.module';
 
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
@@ -34,7 +33,6 @@ export function createTranslateLoader(http: HttpClient) {
       },
       defaultLanguage: 'en',
     }),
-    AdfUserManagementModule,
     HttpClientModule,
     MatProgressSpinnerModule,
   ],

@@ -54,7 +54,7 @@ describe('DfSystemConfigDataService', () => {
 
       setTimeout(() => {
         expect(service.environment).toBeTruthy();
-        service.environment.subscribe(data => {
+        service.environment$.subscribe(data => {
           expect(data).toEqual(testData);
         });
 
@@ -95,7 +95,7 @@ describe('DfSystemConfigDataService', () => {
 
       setTimeout(() => {
         expect(service.system).toBeTruthy();
-        service.system.subscribe(data => {
+        service.system$.subscribe(data => {
           expect(data).toEqual(testData);
         });
 

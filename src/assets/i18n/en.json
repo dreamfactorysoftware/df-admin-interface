@@ -4,10 +4,18 @@
     "controls": {
       "username": {
         "label": "Choose Username",
-        "optional": "(Optional, defaults to email address)"
+        "altLabel": "Enter Username",
+        "optional": "(Optional, defaults to email address)",
+        "errors": {
+          "required": "Username is required"
+        }
       },
       "email": {
-        "label": "Enter Email"
+        "label": "Enter Email",
+        "errors": {
+          "required": "Email is required",
+          "invalid": "Invalid email format"
+        }
       },
       "firstName": {
         "label": "Enter First Name"
@@ -19,7 +27,11 @@
         "label": "Enter Display Name"
       },
       "password": {
-        "label": "Enter Password"
+        "label": "Enter Password",
+        "errors": {
+          "required": "New password is required",
+          "length": "Password must be at least 5 characters long"
+        }
       },
       "verifyPassword": {
         "label": "Verify Password"
@@ -27,38 +39,18 @@
       "resetPassword": {
         "label": "Reset Password"
       },
-      "emailRequired": {
-        "label": "Email is required"
-      },
-      "invalidEmail": {
-        "label": "Invalid email format"
-      },
-      "usernameRequired": {
-        "label": "Username is required"
-      },
-      "enterUsername": {
-        "label": "Enter Username"
-      },
-      "codeRequired": {
-        "label": "Confirmation code is required"
-      },
-      "enterCode": {
-        "label": "Enter confirmation code"
-      },
-      "newPasswordRequired": {
-        "label": "New password is required"
-      },
-      "passwordLength": {
-        "label": "Password must be at least 5 characters long"
-      },
-      "confirmPasswordRequired": {
-        "label": "Confirm password is required"
-      },
-      "passwordLength": {
-        "label": "Passwords do not match"
+      "confirmationCode": {
+        "label": "Enter confirmation code",
+        "errors": {
+          "required": "Confirmation code is required"
+        }
       },
       "confirmPassword": {
-        "label": "Confirm Password"
+        "label": "Confirm Password",
+        "errors": {
+          "label": "Confirm password is required",
+          "match": "Passwords do not match"
+        }
       }
     }
   }

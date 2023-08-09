@@ -1,14 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ReactiveFormsModule, FormGroupDirective } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { TranslateModule } from '@ngx-translate/core';
 import { DFPasswordResetComponent } from './df-password-reset.component';
-import { PasswordResetService } from '../services/df-password-reset.service';
+import { DFPasswordResetService } from '../services/df-password.service';
 
 describe('DFPasswordResetComponent', () => {
   let component: DFPasswordResetComponent;
   let fixture: ComponentFixture<DFPasswordResetComponent>;
-  let passwordResetService: PasswordResetService;
+  let passwordResetService: DFPasswordResetService;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -18,14 +18,14 @@ describe('DFPasswordResetComponent', () => {
         TranslateModule.forRoot(),
       ],
       declarations: [DFPasswordResetComponent],
-      providers: [PasswordResetService],
+      providers: [DFPasswordResetService],
     }).compileComponents();
   });
 
   beforeEach(() => {
     fixture = TestBed.createComponent(DFPasswordResetComponent);
     component = fixture.componentInstance;
-    passwordResetService = TestBed.inject(PasswordResetService);
+    passwordResetService = TestBed.inject(DFPasswordResetService);
 
     // Mock the location path
     // spyOn(component['location'], 'path').and.returnValue(
