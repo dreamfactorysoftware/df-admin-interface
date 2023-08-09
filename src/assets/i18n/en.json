@@ -45,7 +45,6 @@
         "label": "Verify Password",
         "altLabel": "Verify new password"
       },
-
       "confirmationCode": {
         "label": "Enter confirmation code",
         "errors": {
