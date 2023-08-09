@@ -15,6 +15,7 @@ import { AppComponent } from './app.component';
 import { CaseInterceptor } from './core/interceptors/case.interceptor';
 import { LoadingInterceptor } from './core/interceptors/loading.interceptor';
 import { SessionTokenInterceptor } from './core/interceptors/session-token.interceptor';
+import { DfServiceModule } from './adf-services/df-service.module';
 
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
@@ -27,6 +28,7 @@ export function createTranslateLoader(http: HttpClient) {
     AppRoutingModule,
     BrowserAnimationsModule,
     HttpClientModule,
+    DfServiceModule,
     TranslateModule.forRoot({
       loader: {
         provide: TranslateLoader,

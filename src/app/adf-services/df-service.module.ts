@@ -6,6 +6,10 @@ import { DfServiceInfoComponent } from './df-service-info/df-service-info.compon
 import { ReactiveFormsModule } from '@angular/forms';
 import { DfServiceTableComponent } from './df-service-table/df-service-table.component';
 import { MatTableModule } from '@angular/material/table';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { DfServiceDialogComponent } from './df-service-dialog/df-service-dialog.component';
+import { MatDialogModule } from '@angular/material/dialog';
+import { MatInputModule } from '@angular/material/input';
 
 @NgModule({
   declarations: [
@@ -13,7 +17,16 @@ import { MatTableModule } from '@angular/material/table';
     DfServiceDetailsComponent,
     DfServiceInfoComponent,
     DfServiceTableComponent,
+    DfServiceDialogComponent,
   ],
-  imports: [CommonModule, MatTableModule, ReactiveFormsModule],
+  imports: [
+    CommonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatTableModule,
+    MatDialogModule,
+    ReactiveFormsModule,
+  ],
+  exports: [DfServiceComponent],
 })
 export class DfServiceModule {}
