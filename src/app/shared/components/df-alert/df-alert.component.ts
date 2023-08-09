@@ -1,13 +1,14 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { IconProp } from '@fortawesome/fontawesome-svg-core';
 @Component({
   selector: 'df-alert',
   templateUrl: './df-alert.component.html',
   styleUrls: ['./df-alert.component.scss'],
   standalone: true,
-  imports: [MatIconModule, CommonModule, MatButtonModule],
+  imports: [CommonModule, MatButtonModule, FontAwesomeModule],
 })
 export class DfAlertComponent {
   @Input() message: string;
@@ -19,18 +20,18 @@ export class DfAlertComponent {
     this.alertClosed.emit();
   }
 
-  get icon(): string {
+  get icon(): IconProp {
     switch (this.alertType) {
       case 'success':
-        return 'check_circle';
+        return 'check-circle';
       case 'error':
-        return 'error';
+        return 'circle-exclamation';
       case 'warning':
-        return 'warning';
+        return 'circle-exclamation';
       case 'info':
-        return 'info';
+        return 'circle-info';
       default:
-        return 'info';
+        return 'circle-info';
     }
   }
 }
