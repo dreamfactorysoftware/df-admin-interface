@@ -1,1 +1,5 @@
-<df-user-login></df-user-login>
+<router-outlet></router-outlet>
+<div *ngIf="activeSpinner$ | async" class="loading-spinner">
+  <div class="backdrop"></div>
+  <mat-spinner></mat-spinner>
+</div>

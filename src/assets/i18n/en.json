@@ -1,0 +1,57 @@
+{
+  "userManagement": {
+    "requiredForLogin": "Required for login",
+    "controls": {
+      "username": {
+        "label": "Choose Username",
+        "altLabel": "Enter Username",
+        "optional": "(Optional, defaults to email address)",
+        "errors": {
+          "required": "Username is required"
+        }
+      },
+      "email": {
+        "label": "Enter Email",
+        "errors": {
+          "required": "Email is required",
+          "invalid": "Invalid email format"
+        }
+      },
+      "firstName": {
+        "label": "Enter First Name"
+      },
+      "lastName": {
+        "label": "Enter Last Name"
+      },
+      "displayName": {
+        "label": "Enter Display Name"
+      },
+      "password": {
+        "label": "Enter Password",
+        "errors": {
+          "required": "New password is required",
+          "length": "Password must be at least 5 characters long"
+        }
+      },
+      "verifyPassword": {
+        "label": "Verify Password"
+      },
+      "resetPassword": {
+        "label": "Reset Password"
+      },
+      "confirmationCode": {
+        "label": "Enter confirmation code",
+        "errors": {
+          "required": "Confirmation code is required"
+        }
+      },
+      "confirmPassword": {
+        "label": "Confirm Password",
+        "errors": {
+          "label": "Confirm password is required",
+          "match": "Passwords do not match"
+        }
+      }
+    }
+  }
+}

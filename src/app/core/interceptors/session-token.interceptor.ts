@@ -17,7 +17,7 @@ export class SessionTokenInterceptor implements HttpInterceptor {
     next: HttpHandler
   ): Observable<HttpEvent<any>> {
     if (req.url.startsWith('/api')) {
-      const token = this.authService.getToken();
+      const token = this.authService.token;
       if (token) {
         req = req.clone({
           setHeaders: {

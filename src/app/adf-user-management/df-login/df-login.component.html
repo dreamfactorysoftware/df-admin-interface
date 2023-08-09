@@ -1,0 +1,75 @@
+<mat-card class="user-management-card">
+  <df-alert
+    [message]="alertMsg"
+    [showAlert]="showAlert"
+    [alertType]="alertType"
+    (alertClosed)="showAlert = false"></df-alert>
+  <mat-card-header>
+    <mat-card-title>
+      {{ 'userManagement.login' | translate }}
+    </mat-card-title>
+  </mat-card-header>
+  <mat-divider></mat-divider>
+  <mat-card-content>
+    <form name="login-form" [formGroup]="loginForm" (ngSubmit)="login()">
+      <mat-form-field appearance="fill" *ngIf="loginAttribute === 'email'">
+        <mat-label>
+          {{ 'userManagement.controls.email.label' | translate }}</mat-label
+        >
+        <input
+          matInput
+          type="email"
+          id="df-password-reset-email"
+          name="df-password-reset-email"
+          formControlName="email" />
+        <mat-error
+          *ngIf="
+            loginForm.get('email')?.errors?.['email'] &&
+            !loginForm.get('email')?.errors?.['required']
+          ">
+          {{ 'userManagement.controls.email.errors.invalid' | translate }}
+        </mat-error>
+        <mat-error
+          *ngIf="
+            !loginForm.get('email')?.errors?.['email'] &&
+            loginForm.get('email')?.errors?.['required']
+          ">
+          {{ 'userManagement.controls.email.errors.required' | translate }}
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" *ngIf="loginAttribute === 'username'">
+        <mat-label>{{
+          'userManagement.controls.username.altLabel' | translate
+        }}</mat-label>
+        <input
+          matInput
+          type="text"
+          id="df-passsword-reset-username"
+          name="df-passsword-reset-username"
+          formControlName="username" />
+        <mat-error *ngIf="loginForm.get('username')?.errors?.['required']">
+          {{ 'userManagement.controls.username.errors.required' | translate }}
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill">
+        <mat-label>{{
+          'userManagement.controls.password.label' | translate
+        }}</mat-label>
+        <input
+          matInput
+          type="password"
+          id="df-password-reset-password"
+          name="df-password-reset-password"
+          formControlName="password" />
+        <mat-error *ngIf="loginForm.get('password')?.errors?.['required']">
+          {{ 'userManagement.controls.password.errors.required' | translate }}
+        </mat-error>
+      </mat-form-field>
+      <button mat-button color="primary" type="submit" id="submit-login">
+        {{ 'userManagement.login' | translate }}
+      </button>
+    </form>
+  </mat-card-content>
+</mat-card>

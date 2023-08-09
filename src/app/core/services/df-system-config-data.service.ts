@@ -4,7 +4,6 @@ import {
   BehaviorSubject,
   Observable,
   catchError,
-  delay,
   retry,
   throwError,
 } from 'rxjs';
@@ -14,7 +13,7 @@ import { DfAuthService } from './df-auth.service';
   providedIn: 'root',
 })
 export class DfSystemConfigDataService {
-  private _environment$ = new BehaviorSubject<Environment>({
+  private environmentSubject = new BehaviorSubject<Environment>({
     authentication: {
       allowOpenRegistration: false,
       openRegEmailServiceId: 0,
@@ -25,33 +24,37 @@ export class DfSystemConfigDataService {
       rootAdminExists: false,
     },
   });
+  environment$: Observable<Environment> =
+    this.environmentSubject.asObservable();
 
-  private _system$ = new BehaviorSubject<System>({ resources: [] });
-
+  private systemSubject = new BehaviorSubject<System>({ resources: [] });
+  system$: Observable<System> = this.systemSubject.asObservable();
   constructor(
     private http: HttpClient,
     private authService: DfAuthService
   ) {}
 
-  get environment(): Observable<Environment> {
-    return this._environment$.asObservable();
+  get environment(): Environment {
+    return this.environmentSubject.value;
   }
 
   private set environment(data: Environment) {
-    this._environment$.next(data);
+    this.environmentSubject.next(data);
   }
 
-  get system(): Observable<System> {
-    return this._system$.asObservable();
+  get system(): System {
+    return this.systemSubject.value;
   }
 
   private set system(data: System) {
-    this._system$.next(data);
+    this.systemSubject.next(data);
   }
 
   fetchEnvironmentData() {
     this.http
-      .get<Environment>('/api/v2/system/environment')
+      .get<Environment>('/api/v2/system/environment', {
+        headers: { 'show-loading': '' },
+      })
       .pipe(
         catchError(err => {
           this.authService.clearToken();

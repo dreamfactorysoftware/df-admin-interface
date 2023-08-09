@@ -1,0 +1,11 @@
+<div *ngIf="showAlert" class="alert-container" [class]="alertType" role="alert">
+  <fa-icon class="alert-icon" [icon]="icon">close</fa-icon>
+  <span class="alert-message">{{ message }}</span>
+  <button
+    mat-icon-button
+    class="dismiss-alert"
+    color="primary"
+    (click)="dismissAlert()">
+    <fa-icon icon="xmark">close</fa-icon>
+  </button>
+</div>

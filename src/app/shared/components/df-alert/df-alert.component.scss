@@ -1,0 +1,50 @@
+@use '@angular/material' as mat;
+
+$green-palette: mat.define-palette(mat.$green-palette);
+$red-palette: mat.define-palette(mat.$red-palette);
+$orange-palette: mat.define-palette(mat.$orange-palette);
+$blue-palette: mat.define-palette(mat.$blue-palette);
+
+.alert-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid;
+  border-radius: 5px;
+
+  .alert-message {
+    flex: 1;
+  }
+  .alert-icon {
+    padding: 0 10px;
+  }
+  &.success {
+    border-color: mat.get-color-from-palette($green-palette, 300);
+    background-color: mat.get-color-from-palette($green-palette, 100);
+    .alert-icon {
+      color: mat.get-color-from-palette($green-palette, 300);
+    }
+  }
+  &.error {
+    border-color: mat.get-color-from-palette($red-palette, 300);
+    background-color: mat.get-color-from-palette($red-palette, 100);
+    .alert-icon {
+      color: mat.get-color-from-palette($red-palette, 300);
+    }
+  }
+  &.warning {
+    border-color: mat.get-color-from-palette($orange-palette, 300);
+    background-color: mat.get-color-from-palette($orange-palette, 100);
+    .alert-icon {
+      color: mat.get-color-from-palette($orange-palette, 300);
+    }
+  }
+  &.info {
+    border-color: mat.get-color-from-palette($blue-palette, 300);
+    background-color: mat.get-color-from-palette($blue-palette, 100);
+    .alert-icon {
+      color: mat.get-color-from-palette($blue-palette, 300);
+    }
+  }
+}
