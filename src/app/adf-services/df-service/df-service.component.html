@@ -4,7 +4,15 @@
   </div>
   <div>
     <div class="create-button-container">
-      <button mat-raised-button color="primary">Create Service</button>
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="openCreateServiceDialog()">
+        Create Service
+      </button>
+    </div>
+    <div>
+      <df-service-dialog></df-service-dialog>
     </div>
     <div class="manage-services-container">
       <df-service-table></df-service-table>
