@@ -14,6 +14,7 @@ import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { CaseInterceptor } from './core/interceptors/case.interceptor';
 import { LoadingInterceptor } from './core/interceptors/loading.interceptor';
+import { SessionTokenInterceptor } from './core/interceptors/session-token.interceptor';
 
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
@@ -46,6 +47,11 @@ export function createTranslateLoader(http: HttpClient) {
     {
       provide: HTTP_INTERCEPTORS,
       useClass: CaseInterceptor,
+      multi: true,
+    },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: SessionTokenInterceptor,
       multi: true,
     },
   ],

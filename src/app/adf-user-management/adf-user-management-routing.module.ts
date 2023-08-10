@@ -8,6 +8,7 @@ import { DfForgotPasswordComponent } from './df-forgot-password/df-forgot-passwo
 import { urlQueryLoginGuard } from './guards/url-query-login.guard';
 
 const routes: Routes = [
+  { path: '', redirectTo: ROUTES.LOGIN, pathMatch: 'full' },
   { path: ROUTES.PASSWORD_RESET, component: DfPasswordResetComponent },
   {
     path: ROUTES.LOGIN,

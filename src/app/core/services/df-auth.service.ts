@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject, catchError, map } from 'rxjs';
+import { BehaviorSubject, catchError, map, of } from 'rxjs';
 import { URLS } from '../constants/urls';
 import { SHOW_LOADING_HEADER } from '../constants/http-headers';
 import { ROUTES } from '../constants/routes';
@@ -38,12 +38,26 @@ export class DfAuthService {
             .post<UserData>(URLS.ADMIN_SESSION, credentials, {})
             .pipe(
               map(userData => {
+                this.isLoggedIn = true;
                 this.userData = userData;
                 return userData;
               })
             );
         })
       );
+  }
+
+  checkSession() {
+    if (this.token) {
+      return this.loginWithToken(this.token).pipe(
+        map(() => true),
+        catchError(() => {
+          this.clearToken();
+          return of(false);
+        })
+      );
+    }
+    return of(false);
   }
 
   loginWithToken(token: string) {
