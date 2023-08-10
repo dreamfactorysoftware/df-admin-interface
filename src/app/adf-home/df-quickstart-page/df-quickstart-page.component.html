@@ -1,0 +1,43 @@
+<section>
+  <h2>{{ 'home.quickstartPage.quickstartHeading' | translate }}</h2>
+
+  <p>{{ 'home.quickstartPage.quickstartSubHeading' | translate }}</p>
+
+  <ol>
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepOne' | translate }}</li>
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepTwo' | translate }}</li>
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepThree' | translate }}</li>
+  </ol>
+</section>
+
+<mat-divider></mat-divider>
+
+<section class="platforms-section">
+  <h3 class="mat-h3">
+    {{ 'home.quickstartPage.clientPlatformHeading' | translate }}
+  </h3>
+
+  <article>
+    <h4 class="mat-h4">
+      {{ 'home.quickstartPage.nativeExamplesHeading' | translate }}
+    </h4>
+
+    <ul class="flex-list-container">
+      <li *ngFor="let link of nativeExampleLinks">
+        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+      </li>
+    </ul>
+  </article>
+
+  <article>
+    <h4 class="mat-h4">
+      {{ 'home.quickstartPage.javaScriptExamplesHeading' | translate }}
+    </h4>
+
+    <ul class="flex-list-container">
+      <li *ngFor="let link of javaScriptExampleLinks">
+        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+      </li>
+    </ul>
+  </article>
+</section>

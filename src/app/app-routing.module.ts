@@ -1,7 +1,6 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { ROUTES } from './core/constants/routes';
-import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
 import { loggedInGuard } from './core/guards/logged-in.guard';
 import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
 
@@ -21,7 +20,8 @@ const routes: Routes = [
   },
   {
     path: ROUTES.HOME,
-    component: DfPlaceHolderComponent,
+    loadChildren: () =>
+      import('./adf-home/adf-home.module').then(m => m.AdfHomeModule),
     canActivate: [loggedInGuard],
   },
 ];

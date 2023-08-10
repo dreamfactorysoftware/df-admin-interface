@@ -1,0 +1,24 @@
+.platforms-section,
+.installers-section {
+  article {
+    padding: 25px 0;
+  }
+}
+
+section {
+  padding-top: 30px;
+  padding-bottom: 50px;
+}
+
+ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.flex-list-container {
+  display: flex;
+  justify-content: flex-start;
+  height: auto;
+  list-style-type: none;
+  padding: 0;
+}
