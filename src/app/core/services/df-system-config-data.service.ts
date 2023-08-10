@@ -4,6 +4,7 @@ import {
   BehaviorSubject,
   Observable,
   catchError,
+  lastValueFrom,
   retry,
   throwError,
 } from 'rxjs';
@@ -53,19 +54,20 @@ export class DfSystemConfigDataService {
     this.systemSubject.next(data);
   }
 
-  fetchEnvironmentData() {
-    this.http
-      .get<Environment>(URLS.ENVIRONMENT, {
-        headers: SHOW_LOADING_HEADER,
-      })
-      .pipe(
-        catchError(err => {
-          this.authService.clearToken();
-          return throwError(() => new Error(err));
-        }),
-        retry(1)
-      )
-      .subscribe(data => (this.environment = data));
+  async fetchEnvironmentData() {
+    this.environment = await lastValueFrom(
+      this.http
+        .get<Environment>(URLS.ENVIRONMENT, {
+          headers: SHOW_LOADING_HEADER,
+        })
+        .pipe(
+          catchError(err => {
+            this.authService.clearToken();
+            return throwError(() => new Error(err));
+          }),
+          retry(1)
+        )
+    );
   }
 
   fetchSystemData() {
