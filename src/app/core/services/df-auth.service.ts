@@ -30,7 +30,6 @@ export class DfAuthService {
       .pipe(
         map(userData => {
           this.userData = userData;
-          this.isLoggedIn = true;
           return userData;
         }),
         catchError(() => {
@@ -38,7 +37,6 @@ export class DfAuthService {
             .post<UserData>(URLS.ADMIN_SESSION, credentials, {})
             .pipe(
               map(userData => {
-                this.isLoggedIn = true;
                 this.userData = userData;
                 return userData;
               })
@@ -71,7 +69,25 @@ export class DfAuthService {
       .pipe(
         map(userData => {
           this.userData = userData;
-          this.isLoggedIn = true;
+          return userData;
+        })
+      );
+  }
+
+  oauthLogin(oauthToken: string, code: string, state: string) {
+    return this.http
+      .post<UserData>(URLS.USER_SESSION, {
+        headers: SHOW_LOADING_HEADER,
+        params: {
+          oauth_callback: true,
+          oauth_token: oauthToken,
+          code,
+          state,
+        },
+      })
+      .pipe(
+        map(userData => {
+          this.userData = userData;
           return userData;
         })
       );
@@ -102,6 +118,7 @@ export class DfAuthService {
     this.userDataSubject.next(userData);
     if (userData) {
       this.token = userData.sessionToken;
+      this.isLoggedIn = true;
     }
   }
 

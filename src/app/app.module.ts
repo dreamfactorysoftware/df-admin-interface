@@ -1,4 +1,4 @@
-import { NgModule } from '@angular/core';
+import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 
 import {
@@ -16,9 +16,16 @@ import { CaseInterceptor } from './core/interceptors/case.interceptor';
 import { LoadingInterceptor } from './core/interceptors/loading.interceptor';
 import { SessionTokenInterceptor } from './core/interceptors/session-token.interceptor';
 import { DfServiceModule } from './adf-services/df-service.module';
+import { DfSystemConfigDataService } from './core/services/df-system-config-data.service';
 
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
+}
+
+export function initEnvironment(
+  systemConfigService: DfSystemConfigDataService
+) {
+  return () => systemConfigService.fetchEnvironmentData();
 }
 
 @NgModule({
@@ -41,6 +48,12 @@ export function createTranslateLoader(http: HttpClient) {
     MatProgressSpinnerModule,
   ],
   providers: [
+    {
+      provide: APP_INITIALIZER,
+      useFactory: initEnvironment,
+      deps: [DfSystemConfigDataService],
+      multi: true,
+    },
     {
       provide: HTTP_INTERCEPTORS,
       useClass: LoadingInterceptor,

@@ -20,4 +20,5 @@ export enum ROUTES {
   REPORTS = 'reports',
   PASSWORD_RESET = 'password-reset',
   FORGOT_PASSWORD = 'forgot-password',
+  REGISTER = 'register',
 }

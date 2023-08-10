@@ -4,13 +4,15 @@ import { DfAuthService } from '../../core/services/df-auth.service';
 import { catchError, map, of } from 'rxjs';
 import { ROUTES } from '../../core/constants/routes';
 
-export const urlQueryLoginGuard = (next: ActivatedRouteSnapshot) => {
+export const oauthLoginGuard = (next: ActivatedRouteSnapshot) => {
   const router = inject(Router);
   const authService = inject(DfAuthService);
-  const sessionToken = next.queryParams['session_token'];
+  const code = next.queryParams['code'];
+  const state = next.queryParams['state'];
+  const oauthToken = next.queryParams['oauth_token'];
 
-  if (sessionToken) {
-    return authService.loginWithToken(sessionToken).pipe(
+  if ((code && state) || oauthToken) {
+    return authService.oauthLogin(oauthToken, code, state).pipe(
       map(() => {
         router.navigate([]);
         return false;

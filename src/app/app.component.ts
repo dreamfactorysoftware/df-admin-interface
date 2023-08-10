@@ -1,5 +1,4 @@
-import { Component, OnInit } from '@angular/core';
-import { DfSystemConfigDataService } from './core/services/df-system-config-data.service';
+import { Component } from '@angular/core';
 import { DfLoadingSpinnerService } from './core/services/df-loading-spinner.service';
 
 @Component({
@@ -7,14 +6,8 @@ import { DfLoadingSpinnerService } from './core/services/df-loading-spinner.serv
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
 })
-export class AppComponent implements OnInit {
+export class AppComponent {
   title = 'df-admin-interface';
   activeSpinner$ = this.loadingSpinnerService.active;
-  constructor(
-    private systemConfigDataService: DfSystemConfigDataService,
-    private loadingSpinnerService: DfLoadingSpinnerService
-  ) {}
-  ngOnInit() {
-    this.systemConfigDataService.fetchEnvironmentData();
-  }
+  constructor(private loadingSpinnerService: DfLoadingSpinnerService) {}
 }
