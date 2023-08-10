@@ -1,0 +1,13 @@
+<section>
+  <h2 class="mat-h2">
+    {{ 'home.resourcesPage.resourcesHeading' | translate }}
+  </h2>
+  <p class="mat-body">
+    {{ 'home.resourcesPage.resourcesSubHeading' | translate }}
+  </p>
+  <ul>
+    <li *ngFor="let resource of resourcesPageResources">
+      <df-icon-link [linkItem]="resource"></df-icon-link>
+    </li>
+  </ul>
+</section>

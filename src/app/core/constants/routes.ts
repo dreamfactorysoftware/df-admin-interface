@@ -22,4 +22,8 @@ export enum ROUTES {
   FORGOT_PASSWORD = 'forgot-password',
   REGISTER = 'register',
   USER_INVITE = 'user-invite',
+  WELCOME = 'welcome',
+  QUICKSTART = 'quickstart',
+  RESOURCES = 'resources',
+  DOWNLOAD = 'download',
 }
