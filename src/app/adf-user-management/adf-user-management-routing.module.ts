@@ -12,17 +12,26 @@ import { oauthLoginGuard } from './guards/oauth-login.guard';
 
 const routes: Routes = [
   { path: '', redirectTo: ROUTES.LOGIN, pathMatch: 'full' },
-  { path: ROUTES.PASSWORD_RESET, component: DfPasswordResetComponent },
   {
     path: ROUTES.LOGIN,
     component: DfLoginComponent,
     canActivate: [urlQueryLoginGuard, oauthLoginGuard],
   },
-  { path: ROUTES.FORGOT_PASSWORD, component: DfForgotPasswordComponent },
   {
     path: ROUTES.REGISTER,
     component: DfPlaceHolderComponent,
     canActivate: [openRegisterGuard],
+  },
+  { path: ROUTES.FORGOT_PASSWORD, component: DfForgotPasswordComponent },
+  {
+    path: ROUTES.PASSWORD_RESET,
+    component: DfPasswordResetComponent,
+    data: { type: 'reset' },
+  },
+  {
+    path: ROUTES.USER_INVITE,
+    component: DfPasswordResetComponent,
+    data: { type: 'confirm' },
   },
 ];
 

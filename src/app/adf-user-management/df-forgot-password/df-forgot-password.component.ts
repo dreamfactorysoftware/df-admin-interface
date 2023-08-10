@@ -14,6 +14,7 @@ import {
 } from '../../core/services/df-auth.service';
 
 @Component({
+  selector: 'df-forgot-password',
   templateUrl: './df-forgot-password.component.html',
 })
 export class DfForgotPasswordComponent implements OnInit, OnDestroy {

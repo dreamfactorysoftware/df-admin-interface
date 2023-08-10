@@ -11,7 +11,7 @@ import {
   DfAuthService,
   LoginCredentials,
 } from '../../core/services/df-auth.service';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'df-password-reset',
@@ -25,6 +25,7 @@ export class DfPasswordResetComponent implements OnInit, OnDestroy {
   showAlert = false;
   alertType: AlertType = 'error';
   loginAttribute = 'email';
+  type = 'reset';
 
   constructor(
     private fb: FormBuilder,
@@ -32,7 +33,8 @@ export class DfPasswordResetComponent implements OnInit, OnDestroy {
     private passwordResetService: DfPasswordResetService,
     private systemConfigDataService: DfSystemConfigDataService,
     private authService: DfAuthService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {
     this.passwordResetForm = this.fb.group({
       username: ['', [Validators.required]],
@@ -61,6 +63,11 @@ export class DfPasswordResetComponent implements OnInit, OnDestroy {
       email: this.user.email,
       username: this.user.username,
       code: this.user.code,
+    });
+    this.route.data.pipe(takeUntil(this.destroyed$)).subscribe(data => {
+      if ('type' in data) {
+        this.type = data['type'];
+      }
     });
   }
 

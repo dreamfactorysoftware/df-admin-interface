@@ -21,4 +21,5 @@ export enum ROUTES {
   PASSWORD_RESET = 'password-reset',
   FORGOT_PASSWORD = 'forgot-password',
   REGISTER = 'register',
+  USER_INVITE = 'user-invite',
 }
