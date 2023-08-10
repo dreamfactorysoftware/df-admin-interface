@@ -20,7 +20,13 @@ import { TranslateModule } from '@ngx-translate/core';
     DfIconCardLinkComponent,
     DfIconLinkComponent,
   ],
-  imports: [CommonModule, MatDividerModule, MatCardModule, FontAwesomeModule, TranslateModule],
+  imports: [
+    CommonModule,
+    MatDividerModule,
+    MatCardModule,
+    FontAwesomeModule,
+    TranslateModule,
+  ],
   exports: [
     DfWelcomePageComponent,
     DfResourcesPageComponent,

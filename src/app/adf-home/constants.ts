@@ -18,7 +18,7 @@ const gettingStartedGuide = {
 const writtenTutorials = {
   name: 'home.resourceLinks.writtenTutorials',
   icon: faFileLines,
-  link: 'http://wiki.dreamfactory.com/DreamFactory/Tutorials'
+  link: 'http://wiki.dreamfactory.com/DreamFactory/Tutorials',
 };
 
 const videoTutorials = {
@@ -57,14 +57,32 @@ const dreamFactoryBlog = {
   link: 'https://blog.dreamfactory.com/',
 };
 
-const contactSupport =   {
+const contactSupport = {
   name: 'home.resourceLinks.contactSupport',
   icon: faLifeRing,
   link: 'https://www.dreamfactory.com/support',
 };
 
-export const welcomePageResources = [gettingStartedGuide, videoTutorials, fullDocumentation, communityForum, bugFeatureRequests, dreamFactoryTwitter, dreamFactoryBlog, contactSupport];
-export const resourcesPageResources = [writtenTutorials, videoTutorials, fullDocumentation, communityForum, bugFeatureRequests, dreamFactoryTwitter, dreamFactoryBlog, contactSupport];
+export const welcomePageResources = [
+  gettingStartedGuide,
+  videoTutorials,
+  fullDocumentation,
+  communityForum,
+  bugFeatureRequests,
+  dreamFactoryTwitter,
+  dreamFactoryBlog,
+  contactSupport,
+];
+export const resourcesPageResources = [
+  writtenTutorials,
+  videoTutorials,
+  fullDocumentation,
+  communityForum,
+  bugFeatureRequests,
+  dreamFactoryTwitter,
+  dreamFactoryBlog,
+  contactSupport,
+];
 
 export const nativeExampleLinks = [
   {

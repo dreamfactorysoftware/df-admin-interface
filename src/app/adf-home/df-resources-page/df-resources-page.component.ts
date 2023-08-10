@@ -7,6 +7,5 @@ import { resourcesPageResources } from '../constants';
   styleUrls: ['./df-resources-page.component.scss'],
 })
 export class DfResourcesPageComponent {
-
   resourcesPageResources = resourcesPageResources;
 }

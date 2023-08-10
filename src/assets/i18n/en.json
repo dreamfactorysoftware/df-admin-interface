@@ -2,7 +2,7 @@
   "home": {
     "resourceLinks": {
       "gettingStartedGuide": "Getting Started Guide",
-      "writtenTutorials":"Written Tutorials",
+      "writtenTutorials": "Written Tutorials",
       "videoTutorials": "Video Tutorials",
       "fullDocumentation": "Full Documentation",
       "communityForum": "Community Forum",
@@ -34,7 +34,6 @@
       "clientPlatformHeading": "Click on a client platform below to download a sample application and learn how to make API calls:",
       "nativeExamplesHeading": "Native Examples",
       "javaScriptExamplesHeading": "JavaScript Examples"
-
     },
     "resourcesPage": {
       "resourcesHeading": "Resources",
@@ -68,7 +67,6 @@
       "angularJs": "Angular JS",
       "angular2": "Angular 2",
       "react": "React"
-
     }
   },
   "userManagement": {

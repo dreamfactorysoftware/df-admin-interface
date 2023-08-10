@@ -1,7 +1,15 @@
 import { Component } from '@angular/core';
-import { faCirclePlay, faComment, faHeart } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCirclePlay,
+  faComment,
+  faHeart,
+} from '@fortawesome/free-solid-svg-icons';
 
-import { javaScriptExampleLinks, nativeExampleLinks, welcomePageResources } from '../constants';
+import {
+  javaScriptExampleLinks,
+  nativeExampleLinks,
+  welcomePageResources,
+} from '../constants';
 
 @Component({
   selector: 'df-welcome-page',
