@@ -10,16 +10,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { TranslateLoader, TranslateModule } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { CaseInterceptor } from './core/interceptors/case.interceptor';
 import { LoadingInterceptor } from './core/interceptors/loading.interceptor';
 import { SessionTokenInterceptor } from './core/interceptors/session-token.interceptor';
 import { DfSystemConfigDataService } from './core/services/df-system-config-data.service';
-
-import { AdfUserManagementModule } from './adf-user-management/adf-user-management.module';
-import { AdfHomeModule } from './adf-home/adf-home.module';
 
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
@@ -38,8 +34,6 @@ export function initEnvironment(
     AppRoutingModule,
     BrowserAnimationsModule,
     HttpClientModule,
-    FontAwesomeModule,
-    AdfHomeModule,
     TranslateModule.forRoot({
       loader: {
         provide: TranslateLoader,
@@ -65,11 +59,6 @@ export function initEnvironment(
     },
     {
       provide: HTTP_INTERCEPTORS,
-      useClass: LoadingInterceptor,
-      multi: true,
-    },
-    {
-      provide: HTTP_INTERCEPTORS,
       useClass: CaseInterceptor,
       multi: true,
     },
@@ -78,7 +67,6 @@ export function initEnvironment(
       useClass: SessionTokenInterceptor,
       multi: true,
     },
-    AdfUserManagementModule,
   ],
   bootstrap: [AppComponent],
 })
