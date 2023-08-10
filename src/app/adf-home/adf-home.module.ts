@@ -10,6 +10,7 @@ import { DfIconLinkComponent } from './df-icon-link/df-icon-link.component';
 import { MatCardModule } from '@angular/material/card';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { TranslateModule } from '@ngx-translate/core';
+import { AdfHomeRoutingModule } from './adf-home-routing.module';
 
 @NgModule({
   declarations: [
@@ -26,6 +27,7 @@ import { TranslateModule } from '@ngx-translate/core';
     MatCardModule,
     FontAwesomeModule,
     TranslateModule,
+    AdfHomeRoutingModule,
   ],
   exports: [
     DfWelcomePageComponent,
