@@ -10,6 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { TranslateLoader, TranslateModule } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
+import { FontAwesomeModule, FaIconLibrary } from '@fortawesome/angular-fontawesome';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { CaseInterceptor } from './core/interceptors/case.interceptor';
@@ -18,6 +19,7 @@ import { SessionTokenInterceptor } from './core/interceptors/session-token.inter
 import { DfSystemConfigDataService } from './core/services/df-system-config-data.service';
 
 import { AdfUserManagementModule } from './adf-user-management/adf-user-management.module';
+import { AdfHomeModule } from './adf-home/adf-home.module';
 
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
@@ -36,6 +38,12 @@ export function initEnvironment(
     AppRoutingModule,
     BrowserAnimationsModule,
     HttpClientModule,
+    MatCardModule,
+    MatListModule,
+    MatIconModule,
+    MatDividerModule,
+    FontAwesomeModule,
+    AdfHomeModule,
     TranslateModule.forRoot({
       loader: {
         provide: TranslateLoader,
