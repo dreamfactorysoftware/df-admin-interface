@@ -2,13 +2,14 @@
   <section class="two-column-flex-container">
     <article class="flex-column">
       <div class="video-link">
-        <a href="https://youtu.be/FOSOm88RxPw" target="_blank">
+        <a href="https://youtu.be/FOSOm88RxPw" target="_blank" aria-labelledby="video-link-description">
           <img
             class="video-image"
             src="assets/img/macbook-hp-df-1.png"
             alt="placeholder for now" />
           <div class="video-overlay">
-            <span id="video-link-description">Watch this video about how</span>
+            <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
+            <span id="video-link-description">Watch our video!</span>
           </div>
         </a>
       </div>
@@ -18,20 +19,7 @@
       <p>The text that will eventually go here</p>
       <ul>
         <li *ngFor="let resource of welcomeResources">
-          <a
-            href="{{ resource.link }}"
-            target="_blank"
-            class="plain-icon-link"
-            aria-labelledby="link-label">
-            <span
-              matListItemIcon
-              class="material-icons link-icon"
-              aria-hidden="true"
-              color="primary"
-              >{{ resource.icon }}</span
-            >
-            <span id="link-label">{{ resource.name }}</span>
-          </a>
+          <df-icon-link [linkItem]="resource"></df-icon-link>
         </li>
       </ul>
     </article>
