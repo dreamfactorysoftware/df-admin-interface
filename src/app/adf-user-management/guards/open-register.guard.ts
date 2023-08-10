@@ -1,8 +1,8 @@
 import { inject } from '@angular/core';
 import { map } from 'rxjs/operators';
 import { Router } from '@angular/router';
-import { ROUTES } from '../constants/routes';
-import { DfSystemConfigDataService } from '../services/df-system-config-data.service';
+import { ROUTES } from '../../core/constants/routes';
+import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
 
 export const openRegisterGuard = () => {
   const systemConfigService = inject(DfSystemConfigDataService);

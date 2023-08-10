@@ -7,7 +7,8 @@ import { DfLoginComponent } from './df-login/df-login.component';
 import { DfForgotPasswordComponent } from './df-forgot-password/df-forgot-password.component';
 import { urlQueryLoginGuard } from './guards/url-query-login.guard';
 import { DfPlaceHolderComponent } from '../shared/components/df-placeholder/df-placeholder.component';
-import { openRegisterGuard } from '../core/guards/open-register.guard';
+import { openRegisterGuard } from './guards/open-register.guard';
+import { oauthLoginGuard } from './guards/oauth-login.guard';
 
 const routes: Routes = [
   { path: '', redirectTo: ROUTES.LOGIN, pathMatch: 'full' },
@@ -15,7 +16,7 @@ const routes: Routes = [
   {
     path: ROUTES.LOGIN,
     component: DfLoginComponent,
-    canActivate: [urlQueryLoginGuard],
+    canActivate: [urlQueryLoginGuard, oauthLoginGuard],
   },
   { path: ROUTES.FORGOT_PASSWORD, component: DfForgotPasswordComponent },
   {
