@@ -1,16 +1,73 @@
-<h1 mat-dialog-title>Create Service</h1>
-<div mat-dialog-content>
-  <p>
-    Lorem ipsum dolor sit amet consectetur adipisicing elit. Soluta, quod nam!
-    Voluptas soluta deleniti error sunt consequuntur quidem mollitia nemo, alias
-    deserunt architecto eum iure vitae earum laudantium, quisquam doloribus!
-  </p>
-  <mat-form-field>
-    <mat-label>Service Type</mat-label>
-    <input matInput placeholder="Ex. Pizza" />
-  </mat-form-field>
+<!-- TODO: add translation to this component (to text, placeholders etc) -->
+<h1 mat-dialog-title>
+  {{ isCreateServiceEnabled ? 'Create' : 'Manage' }} Service
+</h1>
+<div class="service-info-container" mat-dialog-content>
+  <div class="stepper-container">
+    <mat-horizontal-stepper [linear]="!isCreateServiceEnabled" #stepper>
+      <mat-step [stepControl]="firstFormGroup">
+        <form [formGroup]="firstFormGroup">
+          <ng-template matStepLabel>Info</ng-template>
+          <mat-form-field>
+            <mat-label>Select Service Type</mat-label>
+            <mat-select [disabled]="!isCreateServiceEnabled">
+              <mat-option></mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Namespace</mat-label>
+            <input matInput />
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Label</mat-label>
+            <input matInput />
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Description</mat-label>
+            <input matInput />
+          </mat-form-field>
+          <!-- <mat-form-field>
+            <mat-label>Name</mat-label>
+            <input
+              matInput
+              placeholder="Last name, First name"
+              formControlName="firstCtrl"
+              required />
+          </mat-form-field> -->
+          <div>
+            <button mat-button matStepperNext>Next</button>
+          </div>
+        </form>
+      </mat-step>
+      <mat-step [stepControl]="secondFormGroup" label="Config">
+        <form [formGroup]="secondFormGroup">
+          <p>Config Section</p>
+          <!-- <mat-form-field>
+            <mat-label>Address</mat-label>
+            <input
+              matInput
+              formControlName="secondCtrl"
+              placeholder="Ex. 1 Main St, New York, NY"
+              required />
+          </mat-form-field> -->
+          <div>
+            <button mat-button matStepperPrevious>Back</button>
+            <button mat-button matStepperNext>Next</button>
+          </div>
+        </form>
+      </mat-step>
+      <mat-step>
+        <ng-template matStepLabel>Definition</ng-template>
+        <p>You are now done.</p>
+        <div>
+          <button mat-button matStepperPrevious>Back</button>
+          <button mat-button (click)="stepper.reset()">Reset</button>
+        </div>
+      </mat-step>
+    </mat-horizontal-stepper>
+  </div>
 </div>
 <div mat-dialog-actions>
   <button mat-button (click)="onClose()">Close</button>
-  <button mat-button cdkFocusInitial>Create</button>
+  <button mat-button cdkFocusInitial>Next</button>
 </div>

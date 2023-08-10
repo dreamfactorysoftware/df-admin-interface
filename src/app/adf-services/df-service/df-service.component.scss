@@ -1,0 +1,14 @@
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
+
+.df-service-container {
+  .stepper-container {
+    width: 80%;
+  }
+
+  .manage-services-container {
+    .manage-services-header-container {
+      display: flex;
+      justify-content: space-between;
+    }
+  }
+}
