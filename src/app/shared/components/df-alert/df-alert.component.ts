@@ -3,6 +3,12 @@ import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
+import {
+  faXmark,
+  faCheckCircle,
+  faCircleExclamation,
+  faCircleInfo,
+} from '@fortawesome/free-solid-svg-icons';
 @Component({
   selector: 'df-alert',
   templateUrl: './df-alert.component.html',
@@ -16,6 +22,8 @@ export class DfAlertComponent {
   @Input() showAlert = false;
   @Output() alertClosed = new EventEmitter<void>();
 
+  faXmark = faXmark;
+
   dismissAlert(): void {
     this.alertClosed.emit();
   }
@@ -23,15 +31,15 @@ export class DfAlertComponent {
   get icon(): IconProp {
     switch (this.alertType) {
       case 'success':
-        return 'check-circle';
+        return faCheckCircle;
       case 'error':
-        return 'circle-exclamation';
+        return faCircleExclamation;
       case 'warning':
-        return 'circle-exclamation';
+        return faCircleExclamation;
       case 'info':
-        return 'circle-info';
+        return faCircleInfo;
       default:
-        return 'circle-info';
+        return faCircleInfo;
     }
   }
 }

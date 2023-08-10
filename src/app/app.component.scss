@@ -12,6 +12,7 @@ $grey-palette: mat.define-palette(mat.$grey-palette);
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  height: 100%;
   .backdrop {
     position: absolute;
     top: 0;
