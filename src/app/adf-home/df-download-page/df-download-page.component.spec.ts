@@ -8,7 +8,7 @@ describe('DfDownloadPageComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfDownloadPageComponent]
+      declarations: [DfDownloadPageComponent],
     });
     fixture = TestBed.createComponent(DfDownloadPageComponent);
     component = fixture.componentInstance;

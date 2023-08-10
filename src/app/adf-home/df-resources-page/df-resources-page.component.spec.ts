@@ -8,7 +8,7 @@ describe('DfResourcesPageComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfResourcesPageComponent]
+      declarations: [DfResourcesPageComponent],
     });
     fixture = TestBed.createComponent(DfResourcesPageComponent);
     component = fixture.componentInstance;

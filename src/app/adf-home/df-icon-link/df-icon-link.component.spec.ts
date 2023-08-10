@@ -8,7 +8,7 @@ describe('DfIconLinkComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfIconLinkComponent]
+      declarations: [DfIconLinkComponent],
     });
     fixture = TestBed.createComponent(DfIconLinkComponent);
     component = fixture.componentInstance;

@@ -10,16 +10,21 @@ import { DfIconLinkComponent } from './df-icon-link/df-icon-link.component';
 import { MatCardModule } from '@angular/material/card';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 
-
-
 @NgModule({
-  declarations: [DfWelcomePageComponent, DfResourcesPageComponent, DfDownloadPageComponent, DfQuickstartPageComponent, DfIconCardLinkComponent, DfIconLinkComponent ],
-  imports: [
-    CommonModule,
-    MatDividerModule,
-    MatCardModule,
-    FontAwesomeModule,
+  declarations: [
+    DfWelcomePageComponent,
+    DfResourcesPageComponent,
+    DfDownloadPageComponent,
+    DfQuickstartPageComponent,
+    DfIconCardLinkComponent,
+    DfIconLinkComponent,
   ],
-  exports: [DfWelcomePageComponent, DfResourcesPageComponent, DfDownloadPageComponent, DfQuickstartPageComponent],
+  imports: [CommonModule, MatDividerModule, MatCardModule, FontAwesomeModule],
+  exports: [
+    DfWelcomePageComponent,
+    DfResourcesPageComponent,
+    DfDownloadPageComponent,
+    DfQuickstartPageComponent,
+  ],
 })
-export class AdfHomeModule { }
+export class AdfHomeModule {}

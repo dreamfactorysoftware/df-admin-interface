@@ -1,6 +1,15 @@
 import { Component } from '@angular/core';
 import { faTwitter } from '@fortawesome/free-brands-svg-icons';
-import { faBook, faBug, faCirclePlay, faComments, faFileLines, faLifeRing, faPenToSquare, faVideo } from '@fortawesome/free-solid-svg-icons';
+import {
+  faBook,
+  faBug,
+  faCirclePlay,
+  faComments,
+  faFileLines,
+  faLifeRing,
+  faPenToSquare,
+  faVideo,
+} from '@fortawesome/free-solid-svg-icons';
 import { javaScriptExampleLinks, nativeExampleLinks } from '../constants';
 
 @Component({
@@ -9,7 +18,6 @@ import { javaScriptExampleLinks, nativeExampleLinks } from '../constants';
   styleUrls: ['./df-welcome-page.component.scss'],
 })
 export class DfWelcomePageComponent {
-
   faCirclePlay = faCirclePlay;
   faFileLines = faFileLines;
   faVideo = faVideo;
@@ -65,6 +73,4 @@ export class DfWelcomePageComponent {
       link: 'https://www.dreamfactory.com/support',
     },
   ];
-
-
 }

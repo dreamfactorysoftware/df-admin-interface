@@ -8,7 +8,7 @@ describe('DfQuickstartPageComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfQuickstartPageComponent]
+      declarations: [DfQuickstartPageComponent],
     });
     fixture = TestBed.createComponent(DfQuickstartPageComponent);
     component = fixture.componentInstance;

@@ -10,11 +10,8 @@ interface LinkItem {
 @Component({
   selector: 'df-icon-link',
   templateUrl: './df-icon-link.component.html',
-  styleUrls: ['./df-icon-link.component.scss']
+  styleUrls: ['./df-icon-link.component.scss'],
 })
 export class DfIconLinkComponent {
-
-    @Input() linkItem: LinkItem;
-
-
+  @Input() linkItem: LinkItem;
 }
