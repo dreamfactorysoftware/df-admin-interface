@@ -39,6 +39,6 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
     AdfUserManagementRoutingModule,
     MatSelectModule,
   ],
-  exports: [DFPasswordResetComponent],
+  exports: [DfPasswordResetComponent],
 })
 export class AdfUserManagementModule {}

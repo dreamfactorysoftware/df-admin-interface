@@ -1,26 +1,41 @@
-<h2>Quickstart</h2>
+<section>
+  <h2>{{ 'home.quickstartPage.quickstartHeading' | translate }}</h2>
 
-<p>Dummy text pending real text</p>
+  <p>{{ 'home.quickstartPage.quickstartSubHeading' | translate }}</p>
 
-<ol>
-  <li>Click on your favourite client platform below...</li>
-  <li>Follow the instructions in the README file...</li>
-  <li>If you have any problems...</li>
-</ol>
+  <ol>
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepOne' | translate }}</li>
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepTwo' | translate }}</li>
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepThree' | translate }}</li>
+  </ol>
+</section>
 
 <mat-divider></mat-divider>
 
-<h3>
-  Click on a client platform below to download a sample application and learn
-  how to make API calls:
-</h3>
+<section class="platforms-section">
+  <h3 class="mat-h3">
+    {{ 'home.quickstartPage.clientPlatformHeading' | translate }}
+  </h3>
 
-<h4>Native Examples</h4>
+  <article>
+    <h4 class="mat-h4">{{ 'home.quickstartPage.nativeExamplesHeading' | translate }}</h4>
 
-<ul class="flex-list-container">
-  <li *ngFor="let link of nativeExampleLinks">
-    <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
-  </li>
-</ul>
+    <ul class="flex-list-container">
+      <li *ngFor="let link of nativeExampleLinks">
+        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+      </li>
+    </ul>
+  </article>
 
-<h4>JavaScript Examples</h4>
+  <article>
+    <h4 class="mat-h4">{{ 'home.quickstartPage.javaScriptExamplesHeading' | translate }}</h4>
+
+    <ul class="flex-list-container">
+      <li *ngFor="let link of javaScriptExampleLinks">
+        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+      </li>
+    </ul>
+  </article>
+
+</section>
+

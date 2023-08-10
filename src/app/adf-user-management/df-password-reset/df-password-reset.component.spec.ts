@@ -2,13 +2,13 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { TranslateModule } from '@ngx-translate/core';
-import { DFPasswordResetComponent } from './df-password-reset.component';
-import { DFPasswordResetService } from '../services/df-password.service';
+import { DfPasswordResetComponent } from './df-password-reset.component';
+import { DfPasswordResetService } from '../services/df-password.service';
 
-describe('DFPasswordResetComponent', () => {
-  let component: DFPasswordResetComponent;
-  let fixture: ComponentFixture<DFPasswordResetComponent>;
-  let passwordResetService: DFPasswordResetService;
+describe('DfPasswordResetComponent', () => {
+  let component: DfPasswordResetComponent;
+  let fixture: ComponentFixture<DfPasswordResetComponent>;
+  let passwordResetService: DfPasswordResetService;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -17,15 +17,15 @@ describe('DFPasswordResetComponent', () => {
         HttpClientTestingModule,
         TranslateModule.forRoot(),
       ],
-      declarations: [DFPasswordResetComponent],
-      providers: [DFPasswordResetService],
+      declarations: [DfPasswordResetComponent],
+      providers: [DfPasswordResetService],
     }).compileComponents();
   });
 
   beforeEach(() => {
-    fixture = TestBed.createComponent(DFPasswordResetComponent);
+    fixture = TestBed.createComponent(DfPasswordResetComponent);
     component = fixture.componentInstance;
-    passwordResetService = TestBed.inject(DFPasswordResetService);
+    passwordResetService = TestBed.inject(DfPasswordResetService);
 
     // Mock the location path
     // spyOn(component['location'], 'path').and.returnValue(

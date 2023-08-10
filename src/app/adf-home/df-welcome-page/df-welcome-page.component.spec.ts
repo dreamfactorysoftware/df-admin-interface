@@ -1,16 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { WelcomePageComponent } from './df-welcome-page.component';
+import { DfWelcomePageComponent } from './df-welcome-page.component';
 
 describe('WelcomePageComponent', () => {
-  let component: WelcomePageComponent;
-  let fixture: ComponentFixture<WelcomePageComponent>;
+  let component: DfWelcomePageComponent;
+  let fixture: ComponentFixture<DfWelcomePageComponent>;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [WelcomePageComponent],
+      declarations: [DfWelcomePageComponent],
     });
-    fixture = TestBed.createComponent(WelcomePageComponent);
+    fixture = TestBed.createComponent(DfWelcomePageComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

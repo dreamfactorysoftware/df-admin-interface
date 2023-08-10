@@ -1,6 +1,7 @@
-<section>
+
   <section class="two-column-flex-container">
     <article class="flex-column">
+
       <div class="video-link">
         <a
           href="https://youtu.be/FOSOm88RxPw"
@@ -12,38 +13,34 @@
             alt="placeholder for now" />
           <div class="video-overlay">
             <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
-            <span id="video-link-description">Watch our video!</span>
+            <span id="video-link-description">{{ 'home.welcomePage.watchVideoCta' | translate }}</span>
           </div>
         </a>
       </div>
 
-      <h3>Welcome to DreamFactory</h3>
+      <article>
+        <h2 class="mat-h2">{{ 'home.welcomePage.welcomeHeading' | translate }}</h2>
+        <p class="mat-body">{{ 'home.welcomePage.welcomeSubHeading' | translate }}</p>
+        <ul>
+          <li *ngFor="let resource of welcomePageResources">
+            <df-icon-link [linkItem]="resource"></df-icon-link>
+          </li>
+        </ul>
+      </article>
 
-      <p>The text that will eventually go here</p>
-      <ul>
-        <li *ngFor="let resource of welcomeResources">
-          <df-icon-link [linkItem]="resource"></df-icon-link>
-        </li>
-      </ul>
     </article>
 
     <aside class="flex-column">
-      <mat-card>
-        <p>Attention OSS Users</p>
-        <p>
-          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
-          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
-          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
-          Bunches of text. Bunches of text. Bunches of text.
+      <mat-card class="notice-card">
+        <h3 class="mat-h3"><fa-icon [icon]="faHeart" class="pre-heading-icon"></fa-icon>{{ 'home.welcomePage.ossUsersHeading' | translate }}</h3>
+        <p class="mat-body">
+          {{ 'home.welcomePage.ossUsersText' | translate }}
         </p>
       </mat-card>
-      <mat-card>
-        <p>We want to hear from you!</p>
-        <p>
-          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
-          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
-          Bunches of text. Bunches of text. Bunches of text. Bunches of text.
-          Bunches of text. Bunches of text. Bunches of text.
+      <mat-card class="notice-card">
+        <h3 class="mat-h3"><fa-icon [icon]="faComment" class="pre-heading-icon"></fa-icon>{{ 'home.welcomePage.hearFromYouHeading' | translate }}</h3>
+        <p class="mat-body">
+          {{ 'home.welcomePage.hearFromYouText' | translate }}
         </p>
       </mat-card>
     </aside>
@@ -51,30 +48,30 @@
 
   <mat-divider></mat-divider>
 
-  <section>
-    <h4>
-      Click on a client platform below to download a sample application and
-      learn how to make API calls
-    </h4>
+  <section class="platforms-section">
+    <h3 class="mat-h3">
+      {{ 'home.welcomePage.clientPlatformHeading' | translate }}
+    </h3>
 
-    <section>
-      <h5>Native Examples</h5>
+    <article>
+      <h4 class="mat-h4">{{ 'home.welcomePage.nativeExamplesHeading' | translate }}</h4>
 
       <ul class="flex-list-container">
         <li *ngFor="let link of nativeExampleLinks">
           <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
         </li>
       </ul>
-    </section>
+    </article>
 
-    <section>
-      <h5>JavaScript Examples</h5>
+    <article>
+      <h4 class="mat-h4">{{ 'home.welcomePage.javaScriptExamplesHeading' | translate }}</h4>
 
       <ul class="flex-list-container">
         <li *ngFor="let link of javaScriptExampleLinks">
           <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
         </li>
       </ul>
-    </section>
+    </article>
+
   </section>
-</section>
+

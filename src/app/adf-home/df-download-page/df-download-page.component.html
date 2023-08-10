@@ -1,1 +1,24 @@
-<p>df-download-page works!</p>
+<section class="installers-section">
+  <h2>{{ 'home.downloadPage.downloadHeading' | translate }}</h2>
+  <p>{{ 'home.downloadPage.downloadText' | translate }}</p>
+
+  <article>
+    <h3 class="mat-h3">{{ 'home.downloadPage.cloudInstallersHeading' | translate }}</h3>
+
+    <ul class="flex-list-container">
+      <li *ngFor="let link of cloudInstallerLinks">
+        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+      </li>
+    </ul>
+  </article>
+
+  <article>
+    <h3 class="mat-h3">{{ 'home.downloadPage.localInstallersHeading' | translate }}</h3>
+
+    <ul class="flex-list-container">
+      <li *ngFor="let link of localInstallerLinks">
+        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+      </li>
+    </ul>
+  </article>
+</section>>

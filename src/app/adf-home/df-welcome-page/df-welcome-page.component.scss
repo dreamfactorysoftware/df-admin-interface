@@ -1,6 +1,12 @@
+@use '@angular/material' as mat;
+@import '../adf-home.module.scss';
+
+$orange-palette: mat.define-palette(mat.$orange-palette);
+
 .two-column-flex-container {
   display: flex;
   justify-content: stretch;
+  padding-bottom: 50px;
 }
 
 .flex-column {
@@ -40,19 +46,12 @@
   font-weight: bold;
 }
 
-mat-card {
+mat-card.notice-card {
   padding: 30px;
   margin-bottom: 40px;
 }
 
-.flex-list-container {
-  display: flex;
-  justify-content: flex-start;
-  height: auto;
-  list-style-type: none;
-  padding: 0;
-}
-
-ul {
-  list-style-type: none;
+.pre-heading-icon {
+  margin-right: 10px;
+  color: mat.get-color-from-palette($orange-palette, 300);
 }

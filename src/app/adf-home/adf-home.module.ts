@@ -9,6 +9,7 @@ import { DfIconCardLinkComponent } from './df-icon-card-link/df-icon-card-link.c
 import { DfIconLinkComponent } from './df-icon-link/df-icon-link.component';
 import { MatCardModule } from '@angular/material/card';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { TranslateModule } from '@ngx-translate/core';
 
 @NgModule({
   declarations: [
@@ -19,7 +20,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
     DfIconCardLinkComponent,
     DfIconLinkComponent,
   ],
-  imports: [CommonModule, MatDividerModule, MatCardModule, FontAwesomeModule],
+  imports: [CommonModule, MatDividerModule, MatCardModule, FontAwesomeModule, TranslateModule],
   exports: [
     DfWelcomePageComponent,
     DfResourcesPageComponent,
