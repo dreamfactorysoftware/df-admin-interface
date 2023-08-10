@@ -36,6 +36,7 @@ import { DfRegisterComponent } from './df-register/df-register.component';
     MatCardModule,
     MatDividerModule,
     DfAlertComponent,
+    FontAwesomeModule,
     AdfUserManagementRoutingModule,
     MatSelectModule,
   ],
