@@ -6,6 +6,8 @@
     "login": "Login",
     "forgotPassword": "Forgot Password",
     "requestPasswordReset": "Request Password Reset",
+    "invitatonConfirmation": "Invitation Confirmation",
+    "confirmUser": "Confirm User",
     "controls": {
       "username": {
         "label": "Choose Username",
@@ -33,13 +35,15 @@
       },
       "password": {
         "label": "Enter Password",
+        "altLabel": "Confirm new password",
         "errors": {
           "required": "New password is required",
           "length": "Password must be at least 5 characters long"
         }
       },
       "verifyPassword": {
-        "label": "Verify Password"
+        "label": "Verify Password",
+        "altLabel": "Verify new password"
       },
 
       "confirmationCode": {
@@ -50,6 +54,7 @@
       },
       "confirmPassword": {
         "label": "Confirm Password",
+        "altLabel": "Confirm new password",
         "errors": {
           "label": "Confirm password is required",
           "match": "Passwords do not match"
