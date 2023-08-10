@@ -30,6 +30,7 @@ export class DfAuthService {
       .pipe(
         map(userData => {
           this.userData = userData;
+          this.isLoggedIn = true;
           return userData;
         }),
         catchError(() => {
@@ -45,6 +46,23 @@ export class DfAuthService {
       );
   }
 
+  loginWithToken(token: string) {
+    return this.http
+      .get<UserData>(URLS.USER_SESSION, {
+        headers: SHOW_LOADING_HEADER,
+        params: {
+          session_token: token,
+        },
+      })
+      .pipe(
+        map(userData => {
+          this.userData = userData;
+          this.isLoggedIn = true;
+          return userData;
+        })
+      );
+  }
+
   logout() {
     this.http
       .delete(
@@ -55,7 +73,7 @@ export class DfAuthService {
         this.userData = null;
         this.router.navigate([`/${ROUTES.AUTH}/${ROUTES.LOGIN}`]);
       });
-    this.isLoggedInSubject.next(false);
+    this.isLoggedIn = false;
   }
 
   clearToken() {
