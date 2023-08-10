@@ -38,10 +38,6 @@ export function initEnvironment(
     AppRoutingModule,
     BrowserAnimationsModule,
     HttpClientModule,
-    MatCardModule,
-    MatListModule,
-    MatIconModule,
-    MatDividerModule,
     FontAwesomeModule,
     AdfHomeModule,
     TranslateModule.forRoot({
