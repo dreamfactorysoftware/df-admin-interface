@@ -8,6 +8,8 @@ import {
   throwError,
 } from 'rxjs';
 import { DfAuthService } from './df-auth.service';
+import { URLS } from '../constants/urls';
+import { SHOW_LOADING_HEADER } from '../constants/http-headers';
 
 @Injectable({
   providedIn: 'root',
@@ -53,8 +55,8 @@ export class DfSystemConfigDataService {
 
   fetchEnvironmentData() {
     this.http
-      .get<Environment>('/api/v2/system/environment', {
-        headers: { 'show-loading': '' },
+      .get<Environment>(URLS.ENVIRONMENT, {
+        headers: SHOW_LOADING_HEADER,
       })
       .pipe(
         catchError(err => {
@@ -67,9 +69,7 @@ export class DfSystemConfigDataService {
   }
 
   fetchSystemData() {
-    this.http
-      .get<System>('/api/v2/system')
-      .subscribe(data => (this.system = data));
+    this.http.get<System>(URLS.SYSTEM).subscribe(data => (this.system = data));
   }
 }
 

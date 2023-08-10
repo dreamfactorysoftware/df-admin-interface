@@ -2,8 +2,10 @@
   "userManagement": {
     "requiredForLogin": "Required for login",
     "resetPassword": "Reset Password",
+    "passwordReset": "Password Reset",
     "login": "Login",
     "forgotPassword": "Forgot Password",
+    "requestPasswordReset": "Request Password Reset",
     "controls": {
       "username": {
         "label": "Choose Username",
@@ -55,7 +57,19 @@
       },
       "services": {
         "label": "Services"
+      },
+      "securityQuestion": {
+        "label": "Security Question"
+      },
+      "securityAnswer": {
+        "label": "Enter security answer",
+        "errors": {
+          "required": "Security answer is required"
+        }
       }
+    },
+    "alerts": {
+      "resetEmailSent": "A password reset email has been sent to the user's email address."
     }
   }
 }

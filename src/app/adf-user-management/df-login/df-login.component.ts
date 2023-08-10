@@ -12,6 +12,7 @@ import {
 } from '../../core/services/df-system-config-data.service';
 import { AlertType } from '../../shared/components/df-alert/df-alert.component';
 import { Router } from '@angular/router';
+import { ROUTES } from '../../core/constants/routes';
 
 @Component({
   selector: 'df-user-login',
@@ -26,6 +27,8 @@ export class DfLoginComponent implements OnInit, OnDestroy {
   loginAttribute = 'email';
   ldapAvailable = false;
   ldapServices: LdapService[] = [];
+
+  fpRoute = `/${ROUTES.AUTH}/${ROUTES.FORGOT_PASSWORD}`;
 
   loginForm: FormGroup;
   constructor(
@@ -69,7 +72,6 @@ export class DfLoginComponent implements OnInit, OnDestroy {
   }
 
   setLoginAttribute(attribute: string) {
-    console.log('setLoginAttribute', attribute);
     this.loginAttribute = attribute;
     if (attribute === 'username') {
       this.loginForm.controls['username'].addValidators(Validators.required);

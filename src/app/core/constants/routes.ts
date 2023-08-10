@@ -19,4 +19,5 @@ export enum ROUTES {
   SCHEDULER = 'scheduler',
   REPORTS = 'reports',
   PASSWORD_RESET = 'password-reset',
+  FORGOT_PASSWORD = 'forgot-password',
 }

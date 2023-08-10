@@ -29,12 +29,7 @@
         <mat-label>
           {{ 'userManagement.controls.email.label' | translate }}</mat-label
         >
-        <input
-          matInput
-          type="email"
-          id="df-password-reset-email"
-          name="df-password-reset-email"
-          formControlName="email" />
+        <input matInput type="email" formControlName="email" />
         <mat-error
           *ngIf="
             loginForm.get('email')?.errors?.['email'] &&
@@ -55,12 +50,7 @@
         <mat-label>{{
           'userManagement.controls.username.altLabel' | translate
         }}</mat-label>
-        <input
-          matInput
-          type="text"
-          id="df-passsword-reset-username"
-          name="df-passsword-reset-username"
-          formControlName="username" />
+        <input matInput type="text" formControlName="username" />
         <mat-error *ngIf="loginForm.get('username')?.errors?.['required']">
           {{ 'userManagement.controls.username.errors.required' | translate }}
         </mat-error>
@@ -70,22 +60,17 @@
         <mat-label>{{
           'userManagement.controls.password.label' | translate
         }}</mat-label>
-        <input
-          matInput
-          type="password"
-          id="df-password-reset-password"
-          name="df-password-reset-password"
-          formControlName="password" />
+        <input matInput type="password" formControlName="password" />
         <mat-error *ngIf="loginForm.get('password')?.errors?.['required']">
           {{ 'userManagement.controls.password.errors.required' | translate }}
         </mat-error>
       </mat-form-field>
-      <button mat-button color="primary" type="submit" id="submit-login">
+      <button mat-button color="primary" type="submit">
         {{ 'userManagement.login' | translate }}
       </button>
     </form>
     <div class="action-links">
-      <a mat-button routerLink="/forgot-password" target="_self">{{
+      <a mat-button [routerLink]="fpRoute" target="_self">{{
         'userManagement.forgotPassword' | translate
       }}</a>
     </div>

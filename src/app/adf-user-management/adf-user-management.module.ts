@@ -14,8 +14,13 @@ import { DfAlertComponent } from '../shared/components/df-alert/df-alert.compone
 import { AdfUserManagementRoutingModule } from './adf-user-management-routing.module';
 import { DfLoginComponent } from './df-login/df-login.component';
 import { MatSelectModule } from '@angular/material/select';
+import { DfForgotPasswordComponent } from './df-forgot-password/df-forgot-password.component';
 @NgModule({
-  declarations: [DfPasswordResetComponent, DfLoginComponent],
+  declarations: [
+    DfPasswordResetComponent,
+    DfLoginComponent,
+    DfForgotPasswordComponent,
+  ],
   imports: [
     ReactiveFormsModule,
     FormsModule,

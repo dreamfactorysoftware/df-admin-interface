@@ -2,6 +2,9 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { BehaviorSubject, catchError, map } from 'rxjs';
+import { URLS } from '../constants/urls';
+import { SHOW_LOADING_HEADER } from '../constants/http-headers';
+import { ROUTES } from '../constants/routes';
 
 @Injectable({
   providedIn: 'root',
@@ -21,10 +24,8 @@ export class DfAuthService {
 
   login(credentials: LoginCredentials) {
     return this.http
-      .post<UserData>('/api/v2/user/session', credentials, {
-        headers: {
-          'show-loading': '',
-        },
+      .post<UserData>(URLS.USER_SESSION, credentials, {
+        headers: SHOW_LOADING_HEADER,
       })
       .pipe(
         map(userData => {
@@ -33,7 +34,7 @@ export class DfAuthService {
         }),
         catchError(() => {
           return this.http
-            .post<UserData>('/api/v2/system/admin/session', credentials, {})
+            .post<UserData>(URLS.ADMIN_SESSION, credentials, {})
             .pipe(
               map(userData => {
                 this.userData = userData;
@@ -47,12 +48,12 @@ export class DfAuthService {
   logout() {
     this.http
       .delete(
-        `/api/v2${this.userData?.isSysAdmin} ? '/system/admin/session' : '/user/session'`
+        this.userData?.isSysAdmin ? URLS.ADMIN_SESSION : URLS.USER_SESSION
       )
       .subscribe(() => {
         this.clearToken();
         this.userData = null;
-        this.router.navigate(['/login']);
+        this.router.navigate([`/${ROUTES.AUTH}/${ROUTES.LOGIN}`]);
       });
     this.isLoggedInSubject.next(false);
   }
