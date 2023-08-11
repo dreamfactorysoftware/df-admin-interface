@@ -26,7 +26,7 @@
 
     <ul
       class="flex-list-container"
-      [ngClass]="{ 'x-small': isXSmall }"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
       aria-labelledby="native-examples-heading">
       <li *ngFor="let link of nativeExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
@@ -41,7 +41,7 @@
 
     <ul
       class="flex-list-container"
-      [ngClass]="{ 'x-small': isXSmall }"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
       aria-labelledby="javascript-examples-heading">
       <li *ngFor="let link of javaScriptExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>

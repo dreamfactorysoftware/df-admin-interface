@@ -11,13 +11,6 @@ export class DfQuickstartPageComponent {
   nativeExampleLinks = nativeExampleLinks;
   javaScriptExampleLinks = javaScriptExampleLinks;
 
-  isXSmall: boolean;
+  constructor(public breakpointService: DfBreakpointService) {}
 
-  constructor(private breakpointService: DfBreakpointService) {}
-
-  ngOnInit(): void {
-    this.breakpointService.isXSmallScreen.subscribe((isXSmall: boolean) => {
-      this.isXSmall = isXSmall;
-    });
-  }
 }

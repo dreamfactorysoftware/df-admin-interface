@@ -1,4 +1,4 @@
-<section class="two-column-flex-container" [ngClass]="{ mobile: isMobile }">
+<section class="two-column-flex-container" [class.mobile]="breakpointService.isSmallScreen | async">
   <article class="flex-column">
     <div class="video-link">
       <a
@@ -73,7 +73,7 @@
 
     <ul
       class="flex-list-container"
-      [ngClass]="{ 'x-small': isXSmall }"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
       aria-labelledby="native-examples-heading">
       <li *ngFor="let link of nativeExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
@@ -88,7 +88,7 @@
 
     <ul
       class="flex-list-container"
-      [ngClass]="{ 'x-small': isXSmall }"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
       aria-labelledby="javascript-examples-heading">
       <li *ngFor="let link of javaScriptExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>

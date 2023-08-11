@@ -1,4 +1,5 @@
 import { Component, Input } from '@angular/core';
+import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 
 interface LinkInfo {
   name: string;
@@ -12,5 +13,8 @@ interface LinkInfo {
   styleUrls: ['./df-icon-card-link.component.scss'],
 })
 export class DfIconCardLinkComponent {
+
+  constructor(public breakpointService: DfBreakpointService) {}
+
   @Input() linkInfo: LinkInfo;
 }

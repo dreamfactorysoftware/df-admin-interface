@@ -9,7 +9,7 @@
 
     <ul
       class="flex-list-container"
-      [ngClass]="{ 'x-small': isXSmall }"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
       aria-labelledby="cloud-installers">
       <li *ngFor="let link of cloudInstallerLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
@@ -24,7 +24,7 @@
 
     <ul
       class="flex-list-container"
-      [ngClass]="{ 'x-small': isXSmall }"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
       aria-labelledby="local-installers">
       <li *ngFor="let link of localInstallerLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>

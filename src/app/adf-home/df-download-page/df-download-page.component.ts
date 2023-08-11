@@ -7,15 +7,8 @@ import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service
   styleUrls: ['./df-download-page.component.scss'],
 })
 export class DfDownloadPageComponent {
-  isXSmall: boolean;
 
-  constructor(private breakpointService: DfBreakpointService) {}
-
-  ngOnInit(): void {
-    this.breakpointService.isXSmallScreen.subscribe((isXSmall: boolean) => {
-      this.isXSmall = isXSmall;
-    });
-  }
+  constructor(public breakpointService: DfBreakpointService) {}
 
   cloudInstallerLinks = [
     {
