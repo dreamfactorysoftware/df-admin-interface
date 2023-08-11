@@ -1,58 +1,64 @@
-<table mat-table [dataSource]="dataSource" class="mat-elevation-z8">
-  <!-- ID Column -->
-  <ng-container matColumnDef="id">
-    <th mat-header-cell *matHeaderCellDef>ID</th>
-    <td mat-cell *matCellDef="let element">{{ element.id }}</td>
-  </ng-container>
+<div class="manage-services-container">
+  <table mat-table [dataSource]="dataSource" class="mat-elevation-z8" matSort>
+    <!-- ID Column -->
+    <ng-container matColumnDef="id">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>ID</th>
+      <td mat-cell *matCellDef="let element">{{ element.id }}</td>
+    </ng-container>
 
-  <!-- Name Column -->
-  <ng-container matColumnDef="name">
-    <th mat-header-cell *matHeaderCellDef>Name</th>
-    <td mat-cell *matCellDef="let element">{{ element.name }}</td>
-  </ng-container>
+    <!-- Name Column -->
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+      <td mat-cell *matCellDef="let element">{{ element.name }}</td>
+    </ng-container>
 
-  <!-- Label Column -->
-  <ng-container matColumnDef="label">
-    <th mat-header-cell *matHeaderCellDef>Label</th>
-    <td mat-cell *matCellDef="let element">{{ element.label }}</td>
-  </ng-container>
+    <!-- Label Column -->
+    <ng-container matColumnDef="label">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Label</th>
+      <td mat-cell *matCellDef="let element">{{ element.label }}</td>
+    </ng-container>
 
-  <!-- Description Column -->
-  <ng-container matColumnDef="description">
-    <th mat-header-cell *matHeaderCellDef>Description</th>
-    <td mat-cell *matCellDef="let element">{{ element.description }}</td>
-  </ng-container>
+    <!-- Description Column -->
+    <ng-container matColumnDef="description">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
+      <td mat-cell *matCellDef="let element">{{ element.description }}</td>
+    </ng-container>
 
-  <!-- Type Column -->
-  <ng-container matColumnDef="type">
-    <th mat-header-cell *matHeaderCellDef>Type</th>
-    <td mat-cell *matCellDef="let element">{{ element.type }}</td>
-  </ng-container>
+    <!-- Type Column -->
+    <ng-container matColumnDef="type">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+      <td mat-cell *matCellDef="let element">{{ element.type }}</td>
+    </ng-container>
 
-  <!-- Active Column -->
-  <ng-container matColumnDef="active">
-    <th mat-header-cell *matHeaderCellDef>Active</th>
-    <td mat-cell *matCellDef="let element">{{ element.active }}</td>
-  </ng-container>
+    <!-- Active Column -->
+    <ng-container matColumnDef="active">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Active</th>
+      <td mat-cell *matCellDef="let element">{{ element.active }}</td>
+    </ng-container>
 
-  <!-- Delete Column -->
-  <ng-container matColumnDef="deletable">
-    <th mat-header-cell *matHeaderCellDef></th>
-    <td mat-cell *matCellDef="let element">
-      <button
-        *ngIf="element.deletable"
-        mat-icon-button
-        color="primary"
-        aria-label="Delete service icon"
-        (click)="onDelete(element.id)">
-        <mat-icon>delete</mat-icon>
-      </button>
-    </td>
-  </ng-container>
+    <!-- Delete Column -->
+    <ng-container matColumnDef="deletable">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let element">
+        <button
+          *ngIf="element.deletable"
+          mat-icon-button
+          color="primary"
+          aria-label="Delete service icon"
+          (click)="onDelete(element.id)">
+          <fa-icon [icon]="faTrash">delete</fa-icon>
+        </button>
+      </td>
+    </ng-container>
 
-  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-  <tr
-    mat-row
-    *matRowDef="let row; columns: displayedColumns"
-    (click)="onRowClick(row)"></tr>
-</table>
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr
+      mat-row
+      *matRowDef="let row; columns: displayedColumns"
+      (click)="onRowClick(row)"></tr>
+  </table>
+
+  <mat-paginator
+    [pageSizeOptions]="[5, 10, 25, 100]"
+    aria-label="Select page of services"></mat-paginator>
+</div>
