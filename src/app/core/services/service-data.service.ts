@@ -7,9 +7,8 @@ import { URLS } from '../constants/urls';
   providedIn: 'root',
 })
 export class ServiceDataService {
-  private systemServiceDataSubject = new BehaviorSubject<
-    SystemServiceData[] | null
-  >(null);
+  private systemServiceDataSubject =
+    new BehaviorSubject<SystemServiceDataResponse | null>(null);
   systemServiceData$ = this.systemServiceDataSubject.asObservable();
 
   constructor(private http: HttpClient) {}
@@ -17,7 +16,7 @@ export class ServiceDataService {
   getSystemServiceData() {
     console.log('system service data invoked!'); // TODO: remove this line
     return this.http
-      .get<SystemServiceData[]>(URLS.SYSTEM_SERVICE)
+      .get<SystemServiceDataResponse>(URLS.SYSTEM_SERVICE)
       .subscribe(data => {
         this.systemServiceData = data;
         console.log('data: ', data); // TODO: remove this line as well
@@ -25,13 +24,18 @@ export class ServiceDataService {
       });
   }
 
-  get systemServiceData(): SystemServiceData[] | null {
+  get systemServiceData(): SystemServiceDataResponse | null {
     return this.systemServiceDataSubject.value;
   }
 
-  set systemServiceData(systemServiceData: SystemServiceData[] | null) {
+  set systemServiceData(systemServiceData: SystemServiceDataResponse | null) {
     this.systemServiceDataSubject.next(systemServiceData);
   }
+}
+
+export interface SystemServiceDataResponse {
+  meta: { count: number };
+  resource: SystemServiceData[];
 }
 
 export interface SystemServiceData {

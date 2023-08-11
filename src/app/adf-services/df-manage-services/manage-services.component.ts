@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import {
   ServiceDataService,
-  SystemServiceData,
+  SystemServiceDataResponse,
 } from 'src/app/core/services/service-data.service';
 
 type ServiceTableData = {
@@ -32,11 +32,12 @@ export class DfManageServicesComponent implements OnInit, OnDestroy {
     'active',
     'deletable',
   ];
-  dataSource: ServiceTableData[];
+  dataSource: ServiceTableData[] | undefined;
 
-  systemServiceData: SystemServiceData[] | null;
+  systemServiceData: SystemServiceDataResponse | null;
 
   constructor(private systemDataService: ServiceDataService) {
+    this.dataSource = [];
     // TODO: replace/remove this
     this.dataSource = exampleData.resource.map(val => {
       return {
@@ -56,10 +57,15 @@ export class DfManageServicesComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.systemServiceData = data;
-        this.systemServiceData?.map(val => {
-          console.log('val: ', val); // TODO: remove this line when ready
+        this.dataSource = this.systemServiceData?.resource.map(val => {
           return {
-            ...val,
+            id: val.id,
+            name: val.name,
+            label: val.label,
+            description: val.description,
+            type: val.type,
+            active: val.is_active,
+            deletable: val.deletable,
           };
         });
       });
