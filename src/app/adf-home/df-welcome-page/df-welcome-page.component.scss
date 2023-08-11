@@ -7,10 +7,30 @@ $orange-palette: mat.define-palette(mat.$orange-palette);
   display: flex;
   justify-content: stretch;
   padding-bottom: 50px;
+
+  &.mobile {
+    flex-direction: column;
+
+    .flex-column:first-child {
+      padding-right: 0;
+      padding-bottom: 25px;
+    }
+
+    .flex-column:last-child {
+      padding: 0;
+    }
+  }
 }
 
 .flex-column {
   flex-basis: 50%;
+
+  &:first-child {
+    padding-right: 25px;
+  }
+  &:last-child {
+    padding-left: 25px;
+  }
 }
 
 .video-link {
@@ -55,3 +75,4 @@ mat-card.notice-card {
   margin-right: 10px;
   color: mat.get-color-from-palette($orange-palette, 300);
 }
+

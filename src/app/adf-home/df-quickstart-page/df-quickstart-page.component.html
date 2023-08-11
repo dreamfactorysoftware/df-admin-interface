@@ -1,9 +1,9 @@
 <section>
   <h2>{{ 'home.quickstartPage.quickstartHeading' | translate }}</h2>
 
-  <p>{{ 'home.quickstartPage.quickstartSubHeading' | translate }}</p>
+  <p id="quickstart-instructions-heading">{{ 'home.quickstartPage.quickstartSubHeading' | translate }}</p>
 
-  <ol>
+  <ol aria-labelledby="quickstart-instructions-heading">
     <li>{{ 'home.quickstartPage.quickstartSteps.stepOne' | translate }}</li>
     <li>{{ 'home.quickstartPage.quickstartSteps.stepTwo' | translate }}</li>
     <li>{{ 'home.quickstartPage.quickstartSteps.stepThree' | translate }}</li>
@@ -18,11 +18,11 @@
   </h3>
 
   <article>
-    <h4 class="mat-h4">
+    <h4 class="mat-h4" id="native-examples-heading">
       {{ 'home.quickstartPage.nativeExamplesHeading' | translate }}
     </h4>
 
-    <ul class="flex-list-container">
+    <ul class="flex-list-container" aria-labelledby="native-examples-heading">
       <li *ngFor="let link of nativeExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>
@@ -30,11 +30,11 @@
   </article>
 
   <article>
-    <h4 class="mat-h4">
+    <h4 class="mat-h4" id="javascript-examples-heading">
       {{ 'home.quickstartPage.javaScriptExamplesHeading' | translate }}
     </h4>
 
-    <ul class="flex-list-container">
+    <ul class="flex-list-container" aria-labelledby="javascript-examples-heading">
       <li *ngFor="let link of javaScriptExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>

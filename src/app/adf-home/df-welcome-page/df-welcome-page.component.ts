@@ -10,6 +10,7 @@ import {
   nativeExampleLinks,
   welcomePageResources,
 } from '../constants';
+import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 
 @Component({
   selector: 'df-welcome-page',
@@ -17,6 +18,7 @@ import {
   styleUrls: ['./df-welcome-page.component.scss'],
 })
 export class DfWelcomePageComponent {
+
   faCirclePlay = faCirclePlay;
   faHeart = faHeart;
   faComment = faComment;
@@ -24,4 +26,14 @@ export class DfWelcomePageComponent {
   welcomePageResources = welcomePageResources;
   nativeExampleLinks = nativeExampleLinks;
   javaScriptExampleLinks = javaScriptExampleLinks;
+
+  isMobile: boolean;
+
+  constructor(private breakpointService: DfBreakpointService) {}
+
+  ngOnInit(): void {
+    this.breakpointService.isSmallScreen.subscribe(isSmall => {
+      this.isMobile = isSmall;
+    });
+  }
 }
