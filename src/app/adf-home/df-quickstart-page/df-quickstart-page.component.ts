@@ -8,7 +8,6 @@ import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service
   styleUrls: ['./df-quickstart-page.component.scss'],
 })
 export class DfQuickstartPageComponent {
-
   nativeExampleLinks = nativeExampleLinks;
   javaScriptExampleLinks = javaScriptExampleLinks;
 

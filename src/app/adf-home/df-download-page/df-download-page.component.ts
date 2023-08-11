@@ -7,7 +7,6 @@ import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service
   styleUrls: ['./df-download-page.component.scss'],
 })
 export class DfDownloadPageComponent {
-
   isXSmall: boolean;
 
   constructor(private breakpointService: DfBreakpointService) {}

@@ -71,7 +71,10 @@
       {{ 'home.welcomePage.nativeExamplesHeading' | translate }}
     </h4>
 
-    <ul class="flex-list-container" [ngClass]="{ 'x-small': isXSmall }" aria-labelledby="native-examples-heading">
+    <ul
+      class="flex-list-container"
+      [ngClass]="{ 'x-small': isXSmall }"
+      aria-labelledby="native-examples-heading">
       <li *ngFor="let link of nativeExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>
