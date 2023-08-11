@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { URLS } from '../constants/urls';
@@ -18,20 +18,16 @@ export class ServiceDataService {
   constructor(private http: HttpClient) {}
 
   getSystemServiceData() {
-    console.log('system service data invoked!'); // TODO: remove this line
-
-    let queryParams = new HttpParams();
-    queryParams = queryParams.append('include_count', true);
-    queryParams = queryParams.append('limit', 100);
-    queryParams = queryParams.append('related', 'service_doc_by_service_id');
-
     return this.http
       .get<SystemServiceDataResponse>(URLS.SYSTEM_SERVICE, {
-        params: queryParams,
+        params: {
+          include_count: true,
+          limit: 100,
+          related: 'service_doc_by_service_id',
+        },
       })
       .subscribe(data => {
         this.systemServiceData = data;
-        console.log('data: ', data); // TODO: remove this line as well
         return data;
       });
   }
@@ -41,7 +37,6 @@ export class ServiceDataService {
       .get<ServiceTypeResponse>(URLS.SERVICE_TYPE)
       .subscribe(data => {
         this.serviceTypeData = data;
-        console.log('data: ', data); // TODO: remove this line as well
         return data;
       });
   }

@@ -13,8 +13,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
 import { MatStepperModule } from '@angular/material/stepper';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatSortModule } from '@angular/material/sort';
 import { TranslateModule } from '@ngx-translate/core';
 import { MatIconModule } from '@angular/material/icon';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 
 // TODO: add translation to all components in this module
 
@@ -28,6 +31,7 @@ import { MatIconModule } from '@angular/material/icon';
   ],
   imports: [
     CommonModule,
+    FontAwesomeModule,
     FormsModule,
     MatFormFieldModule,
     MatButtonModule,
@@ -37,6 +41,8 @@ import { MatIconModule } from '@angular/material/icon';
     MatDialogModule,
     MatSelectModule,
     MatStepperModule,
+    MatSortModule,
+    MatPaginatorModule,
     ReactiveFormsModule,
     TranslateModule,
   ],
