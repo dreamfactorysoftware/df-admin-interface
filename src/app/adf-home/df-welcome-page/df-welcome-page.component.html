@@ -18,10 +18,10 @@
     </div>
 
     <article>
-      <h2 class="mat-h2">
+      <h2>
         {{ 'home.welcomePage.welcomeHeading' | translate }}
       </h2>
-      <p class="mat-body" id="get-started-links">
+      <p id="get-started-links">
         {{ 'home.welcomePage.welcomeSubHeading' | translate }}
       </p>
       <ul aria-labelledby="get-started-links">
@@ -34,29 +34,25 @@
 
   <aside class="flex-column">
     <mat-card class="notice-card">
-      <h3 class="mat-h3">
+      <h3>
         <fa-icon
           [icon]="faHeart"
           class="pre-heading-icon"
           aria-hidden="true"></fa-icon
         >{{ 'home.welcomePage.ossUsersHeading' | translate }}
       </h3>
-      <p
-        class="mat-body"
-        [innerHtml]="'home.welcomePage.ossUsersText' | translate"></p>
+      <p [innerHtml]="'home.welcomePage.ossUsersText' | translate"></p>
     </mat-card>
 
     <mat-card class="notice-card">
-      <h3 class="mat-h3">
+      <h3>
         <fa-icon
           [icon]="faComment"
           class="pre-heading-icon"
           aria-hidden="true"></fa-icon
         >{{ 'home.welcomePage.hearFromYouHeading' | translate }}
       </h3>
-      <p
-        class="mat-body"
-        [innerHtml]="'home.welcomePage.hearFromYouText' | translate"></p>
+      <p [innerHtml]="'home.welcomePage.hearFromYouText' | translate"></p>
     </mat-card>
   </aside>
 </section>
@@ -64,12 +60,12 @@
 <mat-divider></mat-divider>
 
 <section class="platforms-section">
-  <h3 class="mat-h3">
+  <h3>
     {{ 'home.welcomePage.clientPlatformHeading' | translate }}
   </h3>
 
   <article>
-    <h4 class="mat-h4" id="native-examples-heading">
+    <h4 id="native-examples-heading">
       {{ 'home.welcomePage.nativeExamplesHeading' | translate }}
     </h4>
 
@@ -84,7 +80,7 @@
   </article>
 
   <article>
-    <h4 class="mat-h4" id="javascript-examples-heading">
+    <h4 id="javascript-examples-heading">
       {{ 'home.welcomePage.javaScriptExamplesHeading' | translate }}
     </h4>
 
