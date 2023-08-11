@@ -14,6 +14,7 @@ import { ActivatedRoute, Router } from '@angular/router';
   selector: 'df-password-reset',
   templateUrl: './df-password-reset.component.html',
   providers: [DfPasswordResetService],
+  styleUrls: ['../adf-user-management.scss'],
 })
 export class DfPasswordResetComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();

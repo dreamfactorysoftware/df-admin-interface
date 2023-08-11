@@ -13,6 +13,7 @@ import { DfAuthService, LoginCredentials } from '../services/df-auth.service';
 @Component({
   selector: 'df-forgot-password',
   templateUrl: './df-forgot-password.component.html',
+  styleUrls: ['../adf-user-management.scss'],
   providers: [DfPasswordResetService],
 })
 export class DfForgotPasswordComponent implements OnInit, OnDestroy {

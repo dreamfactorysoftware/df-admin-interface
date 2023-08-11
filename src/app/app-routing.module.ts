@@ -3,6 +3,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { ROUTES } from './core/constants/routes';
 import { loggedInGuard } from './core/guards/logged-in.guard';
 import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
+import { HashLocationStrategy, LocationStrategy } from '@angular/common';
 
 const routes: Routes = [
   {
@@ -27,7 +28,13 @@ const routes: Routes = [
 ];
 
 @NgModule({
-  imports: [RouterModule.forRoot(routes)],
+  imports: [RouterModule.forRoot(routes, { useHash: true })],
   exports: [RouterModule],
+  providers: [
+    {
+      provide: LocationStrategy,
+      useClass: HashLocationStrategy,
+    },
+  ],
 })
 export class AppRoutingModule {}

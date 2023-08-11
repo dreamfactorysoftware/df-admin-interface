@@ -9,6 +9,7 @@ import { ROUTES } from 'src/app/core/constants/routes';
 @Component({
   selector: 'df-register',
   templateUrl: './df-register.component.html',
+  styleUrls: ['../adf-user-management.scss'],
 })
 export class DfRegisterComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();

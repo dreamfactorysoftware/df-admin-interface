@@ -85,6 +85,8 @@
       "title": "Thanks For Registering!",
       "message": "A confirmation email has been sent to the email address that you registered with. Upon confirmation you will be able to login to the application. Thanks!"
     },
+    "oAuth": "OAuth Login",
+    "saml": "SAML 2.0 Login",
     "controls": {
       "username": {
         "label": "Choose Username",
@@ -159,7 +161,8 @@
       }
     },
     "alerts": {
-      "resetEmailSent": "A password reset email has been sent to the user's email address."
+      "resetEmailSent": "A password reset email has been sent to the user's email address.",
+      "close": "Close alert"
     }
   }
 }
