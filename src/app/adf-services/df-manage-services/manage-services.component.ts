@@ -10,11 +10,11 @@ type ServiceTableData = {
 };
 
 @Component({
-  selector: 'df-service-table',
-  templateUrl: './df-service-table.component.html',
-  styleUrls: ['./df-service-table.component.scss'],
+  selector: 'df-manage-services',
+  templateUrl: './manage-services.component.html',
+  styleUrls: ['./manage-services.component.scss'],
 })
-export class DfServiceTableComponent {
+export class DfManageServicesComponent {
   displayedColumns: string[] = [
     'id',
     'name',
