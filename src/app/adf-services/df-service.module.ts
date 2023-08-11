@@ -14,6 +14,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
 import { MatStepperModule } from '@angular/material/stepper';
 import { TranslateModule } from '@ngx-translate/core';
+import { MatIconModule } from '@angular/material/icon';
 
 // TODO: add translation to all components in this module
 
@@ -30,6 +31,7 @@ import { TranslateModule } from '@ngx-translate/core';
     FormsModule,
     MatFormFieldModule,
     MatButtonModule,
+    MatIconModule,
     MatInputModule,
     MatTableModule,
     MatDialogModule,

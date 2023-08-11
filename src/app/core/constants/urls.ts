@@ -7,4 +7,5 @@ export enum URLS {
   ADMIN_SESSION = `${BASE_URL}/system/admin/session`,
   USER_PASSWORD = `${BASE_URL}/user/password`,
   ADMIN_PASSWORD = `${BASE_URL}/system/admin/password`,
+  SYSTEM_SERVICE = `${BASE_URL}/system/service?include_count=true&limit=100&related=service_doc_by_service_id`,
 }
