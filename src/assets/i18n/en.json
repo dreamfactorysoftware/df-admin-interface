@@ -71,5 +71,17 @@
     "alerts": {
       "resetEmailSent": "A password reset email has been sent to the user's email address."
     }
+  },
+  "services": {
+    "create": "Create",
+    "update": "Update",
+    "createService": "Create Service",
+    "manageService": "Manage Services",
+    "back": "Back",
+    "next": "Next",
+    "close": "Close",
+    "reset": "Reset",
+    "selectServiceType": "Select Service Type",
+    "controls": {}
   }
 }

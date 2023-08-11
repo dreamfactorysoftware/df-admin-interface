@@ -1,6 +1,6 @@
 import { Component, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { DfServiceDialogComponent } from '../df-service-dialog/df-service-dialog.component';
+import { DfServiceFormComponent } from '../df-service-form/df-service-form.component';
 import { Subject, takeUntil } from 'rxjs';
 
 @Component({
@@ -14,8 +14,9 @@ export class DfServiceComponent implements OnDestroy {
   constructor(public dialog: MatDialog) {}
 
   openCreateServiceDialog() {
-    const dialogRef = this.dialog.open(DfServiceDialogComponent, {
+    const dialogRef = this.dialog.open(DfServiceFormComponent, {
       data: {},
+      disableClose: true,
     });
 
     dialogRef
@@ -23,6 +24,7 @@ export class DfServiceComponent implements OnDestroy {
       .pipe(takeUntil(this.notifier))
       .subscribe(result => {
         console.log('The dialog was closed');
+        console.log(result);
       });
   }
 
