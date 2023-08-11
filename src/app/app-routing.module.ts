@@ -3,6 +3,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { ROUTES } from './core/constants/routes';
 import { loggedInGuard } from './core/guards/logged-in.guard';
 import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
+import { DfServiceComponent } from './adf-services/df-service/df-service.component';
 
 const routes: Routes = [
   {
@@ -22,6 +23,11 @@ const routes: Routes = [
     path: ROUTES.HOME,
     loadChildren: () =>
       import('./adf-home/adf-home.module').then(m => m.AdfHomeModule),
+    canActivate: [loggedInGuard],
+  },
+  {
+    path: ROUTES.SERVICES,
+    component: DfServiceComponent,
     canActivate: [loggedInGuard],
   },
 ];

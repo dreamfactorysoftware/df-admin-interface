@@ -1,7 +1,7 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DfServiceComponent } from './df-service/df-service.component';
-import { DfServiceConfigComponent } from './df-service-details/df-service-config.component';
+import { DfServiceDefinitionComponent } from './df-service-definition/df-service-definition.component';
 import { DfServiceInfoComponent } from './df-service-info/df-service-info.component';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { DfManageServicesComponent } from './df-manage-services/manage-services.component';
@@ -21,7 +21,7 @@ import { MatIconModule } from '@angular/material/icon';
 @NgModule({
   declarations: [
     DfServiceComponent,
-    DfServiceConfigComponent,
+    DfServiceDefinitionComponent,
     DfServiceInfoComponent,
     DfManageServicesComponent,
     DfServiceFormComponent,
