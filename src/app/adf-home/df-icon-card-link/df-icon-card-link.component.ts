@@ -13,7 +13,6 @@ interface LinkInfo {
   styleUrls: ['./df-icon-card-link.component.scss'],
 })
 export class DfIconCardLinkComponent {
-
   constructor(public breakpointService: DfBreakpointService) {}
 
   @Input() linkInfo: LinkInfo;

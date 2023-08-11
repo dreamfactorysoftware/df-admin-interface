@@ -12,5 +12,4 @@ export class DfQuickstartPageComponent {
   javaScriptExampleLinks = javaScriptExampleLinks;
 
   constructor(public breakpointService: DfBreakpointService) {}
-
 }
