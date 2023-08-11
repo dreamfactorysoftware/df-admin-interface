@@ -4,7 +4,7 @@ import { DfServiceComponent } from './df-service/df-service.component';
 import { DfServiceConfigComponent } from './df-service-details/df-service-config.component';
 import { DfServiceInfoComponent } from './df-service-info/df-service-info.component';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { DfServiceTableComponent } from './df-service-table/df-service-table.component';
+import { DfManageServicesComponent } from './df-manage-services/manage-services.component';
 import { MatTableModule } from '@angular/material/table';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { DfServiceFormComponent } from './df-service-form/df-service-form.component';
@@ -22,7 +22,7 @@ import { TranslateModule } from '@ngx-translate/core';
     DfServiceComponent,
     DfServiceConfigComponent,
     DfServiceInfoComponent,
-    DfServiceTableComponent,
+    DfManageServicesComponent,
     DfServiceFormComponent,
   ],
   imports: [
