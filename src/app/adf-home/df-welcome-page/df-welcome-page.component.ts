@@ -26,13 +26,5 @@ export class DfWelcomePageComponent {
   nativeExampleLinks = nativeExampleLinks;
   javaScriptExampleLinks = javaScriptExampleLinks;
 
-  isMobile: boolean;
-
-  constructor(private breakpointService: DfBreakpointService) {}
-
-  ngOnInit(): void {
-    this.breakpointService.isSmallScreen.subscribe(isSmall => {
-      this.isMobile = isSmall;
-    });
-  }
+  constructor(public breakpointService: DfBreakpointService) {}
 }

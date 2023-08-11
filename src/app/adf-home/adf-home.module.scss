@@ -20,4 +20,8 @@ ul {
   flex-wrap: wrap;
   list-style-type: none;
   padding: 0;
+
+  &.x-small {
+    justify-content: center;
+  }
 }

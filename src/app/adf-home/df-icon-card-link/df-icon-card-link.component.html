@@ -1,12 +1,11 @@
-<li>
-  <a
-    href="{{ linkInfo.url }}"
-    target="_blank"
-    class="icon-link-container"
-    aria-labelledby="link-label">
-    <mat-card class="icon-link-card">
-      <img src="assets/img/{{ linkInfo.icon }}" class="icon-img" alt="" />
-    </mat-card>
-    <span class="label" id="link-label">{{ linkInfo.name | translate }}</span>
-  </a>
-</li>
+<a
+  href="{{ linkInfo.url }}"
+  target="_blank"
+  class="icon-link-container"
+  [class.x-small]="breakpointService.isXSmallScreen | async"
+  aria-labelledby="link-label">
+  <mat-card class="icon-link-card">
+    <img src="assets/img/{{ linkInfo.icon }}" class="icon-img" alt="" />
+  </mat-card>
+  <span class="label" id="link-label">{{ linkInfo.name | translate }}</span>
+</a>

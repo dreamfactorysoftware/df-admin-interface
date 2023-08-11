@@ -14,5 +14,11 @@ export class DfBreakpointService {
       .pipe(map(result => result.matches));
   }
 
+  get isXSmallScreen() {
+    return this.breakpointObserver
+      .observe([Breakpoints.XSmall])
+      .pipe(map(result => result.matches));
+  }
+
   //add new observable for other breakpoints as needed
 }

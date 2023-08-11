@@ -7,7 +7,10 @@
       {{ 'home.downloadPage.cloudInstallersHeading' | translate }}
     </h3>
 
-    <ul class="flex-list-container" aria-labelledby="cloud-installers">
+    <ul
+      class="flex-list-container"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
+      aria-labelledby="cloud-installers">
       <li *ngFor="let link of cloudInstallerLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>
@@ -19,7 +22,10 @@
       {{ 'home.downloadPage.localInstallersHeading' | translate }}
     </h3>
 
-    <ul class="flex-list-container" aria-labelledby="local-installers">
+    <ul
+      class="flex-list-container"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
+      aria-labelledby="local-installers">
       <li *ngFor="let link of localInstallerLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>
