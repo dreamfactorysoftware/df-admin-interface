@@ -3,11 +3,11 @@
   <p>{{ 'home.downloadPage.downloadText' | translate }}</p>
 
   <article>
-    <h3 class="mat-h3">
+    <h3 class="mat-h3" id="cloud-installers">
       {{ 'home.downloadPage.cloudInstallersHeading' | translate }}
     </h3>
 
-    <ul class="flex-list-container">
+    <ul class="flex-list-container" aria-labelledby="cloud-installers">
       <li *ngFor="let link of cloudInstallerLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>
@@ -15,11 +15,11 @@
   </article>
 
   <article>
-    <h3 class="mat-h3">
+    <h3 class="mat-h3" id="local-installers">
       {{ 'home.downloadPage.localInstallersHeading' | translate }}
     </h3>
 
-    <ul class="flex-list-container">
+    <ul class="flex-list-container" aria-labelledby="local-installers">
       <li *ngFor="let link of localInstallerLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>

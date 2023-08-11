@@ -1,11 +1,11 @@
 <section>
-  <h2 class="mat-h2">
+  <h2 class="mat-h2" id="resources-heading">
     {{ 'home.resourcesPage.resourcesHeading' | translate }}
   </h2>
   <p class="mat-body">
     {{ 'home.resourcesPage.resourcesSubHeading' | translate }}
   </p>
-  <ul>
+  <ul aria-labelledby="resources-heading">
     <li *ngFor="let resource of resourcesPageResources">
       <df-icon-link [linkItem]="resource"></df-icon-link>
     </li>
