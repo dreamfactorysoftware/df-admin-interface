@@ -4,12 +4,14 @@
 </h1>
 <div class="service-info-container" mat-dialog-content>
   <div class="stepper-container">
-    <mat-horizontal-stepper [linear]="!isCreateServiceEnabled" #stepper>
+    <mat-horizontal-stepper [linear]="false" #stepper>
       <mat-step [stepControl]="firstFormGroup">
         <form [formGroup]="firstFormGroup">
           <ng-template matStepLabel>Info</ng-template>
           <mat-form-field>
-            <mat-label>Select Service Type</mat-label>
+            <mat-label>{{
+              'services.selectServiceType' | translate
+            }}</mat-label>
             <mat-select [disabled]="!isCreateServiceEnabled">
               <mat-option></mat-option>
             </mat-select>
@@ -26,15 +28,10 @@
             <mat-label>Description</mat-label>
             <input matInput />
           </mat-form-field>
-          <!-- <mat-form-field>
-            <mat-label>Name</mat-label>
-            <input
-              matInput
-              placeholder="Last name, First name"
-              formControlName="firstCtrl"
-              required />
-          </mat-form-field> -->
           <div>
+            <button mat-button (click)="onClose()">
+              {{ 'services.close' | translate }}
+            </button>
             <button mat-button matStepperNext>Next</button>
           </div>
         </form>
@@ -42,32 +39,40 @@
       <mat-step [stepControl]="secondFormGroup" label="Config">
         <form [formGroup]="secondFormGroup">
           <p>Config Section</p>
-          <!-- <mat-form-field>
-            <mat-label>Address</mat-label>
-            <input
-              matInput
-              formControlName="secondCtrl"
-              placeholder="Ex. 1 Main St, New York, NY"
-              required />
-          </mat-form-field> -->
           <div>
-            <button mat-button matStepperPrevious>Back</button>
-            <button mat-button matStepperNext>Next</button>
+            <button mat-button matStepperPrevious>
+              {{ 'services.back' | translate }}
+            </button>
+            <button mat-button matStepperNext>
+              {{ 'services.next' | translate }}
+            </button>
           </div>
         </form>
       </mat-step>
       <mat-step>
         <ng-template matStepLabel>Definition</ng-template>
-        <p>You are now done.</p>
+        <df-service-config></df-service-config>
         <div>
-          <button mat-button matStepperPrevious>Back</button>
-          <button mat-button (click)="stepper.reset()">Reset</button>
+          <button mat-button matStepperPrevious>
+            {{ 'services.back' | translate }}
+          </button>
+          <button mat-button (click)="stepper.reset()">
+            {{ 'services.reset' | translate }}
+          </button>
+          <button mat-button (click)="onSubmit()">
+            {{
+              (isCreateServiceEnabled ? 'services.create' : 'services.update')
+                | translate
+            }}
+          </button>
         </div>
       </mat-step>
     </mat-horizontal-stepper>
   </div>
 </div>
-<div mat-dialog-actions>
-  <button mat-button (click)="onClose()">Close</button>
-  <button mat-button cdkFocusInitial>Next</button>
-</div>
+<!-- <div mat-dialog-actions>
+  <button mat-button (click)="onClose()">
+    {{ 'services.close' | translate }}
+  </button>
+  <button mat-button cdkFocusInitial>{{ 'services.next' | translate }}</button>
+</div> -->
