@@ -18,6 +18,7 @@ import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service
   styleUrls: ['./df-welcome-page.component.scss'],
 })
 export class DfWelcomePageComponent {
+
   faCirclePlay = faCirclePlay;
   faHeart = faHeart;
   faComment = faComment;
