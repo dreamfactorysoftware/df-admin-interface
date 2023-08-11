@@ -32,7 +32,7 @@ export function initEnvironment(
 }
 
 @NgModule({
-  declarations: [AppComponent, WelcomePageComponent, DfIconCardLinkComponent],
+  declarations: [AppComponent],
   imports: [
     BrowserModule,
     AppRoutingModule,
