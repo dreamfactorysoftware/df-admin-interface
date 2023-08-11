@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 
 @Component({
   selector: 'df-download-page',
@@ -6,6 +7,17 @@ import { Component } from '@angular/core';
   styleUrls: ['./df-download-page.component.scss'],
 })
 export class DfDownloadPageComponent {
+
+  isXSmall: boolean;
+
+  constructor(private breakpointService: DfBreakpointService) {}
+
+  ngOnInit(): void {
+    this.breakpointService.isXSmallScreen.subscribe((isXSmall: boolean) => {
+      this.isXSmall = isXSmall;
+    });
+  }
+
   cloudInstallerLinks = [
     {
       name: 'home.brandNames.oracleCloud',

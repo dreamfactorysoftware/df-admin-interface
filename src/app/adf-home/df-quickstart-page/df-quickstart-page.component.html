@@ -24,7 +24,7 @@
       {{ 'home.quickstartPage.nativeExamplesHeading' | translate }}
     </h4>
 
-    <ul class="flex-list-container" aria-labelledby="native-examples-heading">
+    <ul class="flex-list-container" [ngClass]="{ 'x-small': isXSmall }" aria-labelledby="native-examples-heading">
       <li *ngFor="let link of nativeExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>
@@ -38,6 +38,7 @@
 
     <ul
       class="flex-list-container"
+      [ngClass]="{ 'x-small': isXSmall }"
       aria-labelledby="javascript-examples-heading">
       <li *ngFor="let link of javaScriptExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
