@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { Router, ActivatedRouteSnapshot } from '@angular/router';
-import { DfAuthService } from '../../core/services/df-auth.service';
+import { DfAuthService } from '../services/df-auth.service';
 import { catchError, map, of } from 'rxjs';
 import { ROUTES } from '../../core/constants/routes';
 

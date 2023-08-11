@@ -18,7 +18,7 @@ export enum ROUTES {
   LIMITS = 'limits',
   SCHEDULER = 'scheduler',
   REPORTS = 'reports',
-  PASSWORD_RESET = 'password-reset',
+  RESET_PASSWORD = 'reset-password',
   FORGOT_PASSWORD = 'forgot-password',
   REGISTER = 'register',
   USER_INVITE = 'user-invite',
@@ -26,4 +26,5 @@ export enum ROUTES {
   QUICKSTART = 'quickstart',
   RESOURCES = 'resources',
   DOWNLOAD = 'download',
+  REGISTER_CONFIRM = 'register-confirm',
 }

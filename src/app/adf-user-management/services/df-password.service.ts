@@ -13,9 +13,7 @@ import {
   HTTP_OPTION_RESET_TRUE,
 } from '../../core/constants/http-headers';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable()
 export class DfPasswordResetService {
   constructor(private http: HttpClient) {}
   resetPassword(data: ResetFormData, isAdmin: boolean) {

@@ -5,7 +5,7 @@ import {
   HttpClientTestingModule,
   HttpTestingController,
 } from '@angular/common/http/testing';
-import { DfAuthService } from '../services/df-auth.service';
+import { DfAuthService } from '../../adf-user-management/services/df-auth.service';
 
 describe('SessionTokenInterceptor', () => {
   let http: HttpClient;

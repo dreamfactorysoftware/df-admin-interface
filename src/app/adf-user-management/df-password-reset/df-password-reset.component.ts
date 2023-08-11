@@ -7,15 +7,13 @@ import { DfSystemConfigDataService } from '../../core/services/df-system-config-
 import { matchValidator } from '../../shared/validators/match.validator';
 import { Subject, catchError, switchMap, takeUntil, throwError } from 'rxjs';
 import { AlertType } from '../../shared/components/df-alert/df-alert.component';
-import {
-  DfAuthService,
-  LoginCredentials,
-} from '../../core/services/df-auth.service';
+import { DfAuthService, LoginCredentials } from '../services/df-auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'df-password-reset',
   templateUrl: './df-password-reset.component.html',
+  providers: [DfPasswordResetService],
 })
 export class DfPasswordResetComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();
@@ -89,11 +87,6 @@ export class DfPasswordResetComponent implements OnInit, OnDestroy {
       .resetPassword(resetCred, this.isAdmin)
       .pipe(
         takeUntil(this.destroyed$),
-        catchError(err => {
-          this.alertMsg = err.error.error.message;
-          this.showAlert = true;
-          return throwError(() => new Error(err));
-        }),
         switchMap(() => {
           const credentials: LoginCredentials = {
             password: resetCred.newPassword,
@@ -104,6 +97,11 @@ export class DfPasswordResetComponent implements OnInit, OnDestroy {
             credentials.username = resetCred.username;
           }
           return this.authService.login(credentials);
+        }),
+        catchError(err => {
+          this.alertMsg = err.error.error.message;
+          this.showAlert = true;
+          return throwError(() => new Error(err));
         })
       )
       .subscribe(() => {

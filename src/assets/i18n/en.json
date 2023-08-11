@@ -77,7 +77,14 @@
     "forgotPassword": "Forgot Password",
     "requestPasswordReset": "Request Password Reset",
     "invitatonConfirmation": "Invitation Confirmation",
+    "registrationConfirmation": "Registration Confirmation",
     "confirmUser": "Confirm User",
+    "register": "Register",
+    "registerSuccess": {
+      "header": "Registration Success",
+      "title": "Thanks For Registering!",
+      "message": "A confirmation email has been sent to the email address that you registered with. Upon confirmation you will be able to login to the application. Thanks!"
+    },
     "controls": {
       "username": {
         "label": "Choose Username",
@@ -95,13 +102,22 @@
         }
       },
       "firstName": {
-        "label": "Enter First Name"
+        "label": "Enter First Name",
+        "errors": {
+          "required": "First name is required"
+        }
       },
       "lastName": {
-        "label": "Enter Last Name"
+        "label": "Enter Last Name",
+        "errors": {
+          "required": "Last name is required"
+        }
       },
       "displayName": {
-        "label": "Enter Display Name"
+        "label": "Enter Display Name",
+        "errors": {
+          "required": "Display name is required"
+        }
       },
       "password": {
         "label": "Enter Password",

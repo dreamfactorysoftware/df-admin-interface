@@ -8,9 +8,10 @@ import {
   retry,
   throwError,
 } from 'rxjs';
-import { DfAuthService } from './df-auth.service';
+import { DfAuthService } from '../../adf-user-management/services/df-auth.service';
 import { URLS } from '../constants/urls';
 import { SHOW_LOADING_HEADER } from '../constants/http-headers';
+import { DfUserDataService } from './df-user-data.service';
 
 @Injectable({
   providedIn: 'root',
@@ -35,7 +36,8 @@ export class DfSystemConfigDataService {
   system$: Observable<System> = this.systemSubject.asObservable();
   constructor(
     private http: HttpClient,
-    private authService: DfAuthService
+    private authService: DfAuthService,
+    private userDataService: DfUserDataService
   ) {}
 
   get environment(): Environment {
@@ -62,7 +64,7 @@ export class DfSystemConfigDataService {
         })
         .pipe(
           catchError(err => {
-            this.authService.clearToken();
+            this.userDataService.clearToken();
             return throwError(() => new Error(err));
           }),
           retry(1)
