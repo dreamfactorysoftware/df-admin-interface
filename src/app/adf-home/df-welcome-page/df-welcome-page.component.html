@@ -1,15 +1,11 @@
-<section class="two-column-flex-container" [ngClass]="{'mobile': isMobile}">
+<section class="two-column-flex-container" [ngClass]="{ mobile: isMobile }">
   <article class="flex-column">
-
     <div class="video-link">
       <a
         href="https://youtu.be/FOSOm88RxPw"
         target="_blank"
         aria-labelledby="video-link-description">
-        <img
-          class="video-image"
-          src="assets/img/macbook-hp-df-1.png"
-          alt="" />
+        <img class="video-image" src="assets/img/macbook-hp-df-1.png" alt="" />
         <div class="video-overlay">
           <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
           <span id="video-link-description">{{
@@ -37,17 +33,28 @@
   <aside class="flex-column">
     <mat-card class="notice-card">
       <h3 class="mat-h3">
-        <fa-icon [icon]="faHeart" class="pre-heading-icon" aria-hidden="true"></fa-icon>{{ 'home.welcomePage.ossUsersHeading' | translate }}
+        <fa-icon
+          [icon]="faHeart"
+          class="pre-heading-icon"
+          aria-hidden="true"></fa-icon
+        >{{ 'home.welcomePage.ossUsersHeading' | translate }}
       </h3>
-      <p class="mat-body" [innerHtml]="'home.welcomePage.ossUsersText' | translate"></p>
+      <p
+        class="mat-body"
+        [innerHtml]="'home.welcomePage.ossUsersText' | translate"></p>
     </mat-card>
 
     <mat-card class="notice-card">
       <h3 class="mat-h3">
-        <fa-icon [icon]="faComment" class="pre-heading-icon" aria-hidden="true"></fa-icon
+        <fa-icon
+          [icon]="faComment"
+          class="pre-heading-icon"
+          aria-hidden="true"></fa-icon
         >{{ 'home.welcomePage.hearFromYouHeading' | translate }}
       </h3>
-      <p class="mat-body" [innerHtml]="'home.welcomePage.hearFromYouText' | translate"></p>
+      <p
+        class="mat-body"
+        [innerHtml]="'home.welcomePage.hearFromYouText' | translate"></p>
     </mat-card>
   </aside>
 </section>
@@ -76,7 +83,9 @@
       {{ 'home.welcomePage.javaScriptExamplesHeading' | translate }}
     </h4>
 
-    <ul class="flex-list-container" aria-labelledby="javascript-examples-heading">
+    <ul
+      class="flex-list-container"
+      aria-labelledby="javascript-examples-heading">
       <li *ngFor="let link of javaScriptExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>

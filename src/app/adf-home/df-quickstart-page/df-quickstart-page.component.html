@@ -1,7 +1,9 @@
 <section>
   <h2>{{ 'home.quickstartPage.quickstartHeading' | translate }}</h2>
 
-  <p id="quickstart-instructions-heading">{{ 'home.quickstartPage.quickstartSubHeading' | translate }}</p>
+  <p id="quickstart-instructions-heading">
+    {{ 'home.quickstartPage.quickstartSubHeading' | translate }}
+  </p>
 
   <ol aria-labelledby="quickstart-instructions-heading">
     <li>{{ 'home.quickstartPage.quickstartSteps.stepOne' | translate }}</li>
@@ -34,7 +36,9 @@
       {{ 'home.quickstartPage.javaScriptExamplesHeading' | translate }}
     </h4>
 
-    <ul class="flex-list-container" aria-labelledby="javascript-examples-heading">
+    <ul
+      class="flex-list-container"
+      aria-labelledby="javascript-examples-heading">
       <li *ngFor="let link of javaScriptExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>
