@@ -5,7 +5,7 @@ import {
   Environment,
   System,
 } from './df-system-config-data.service';
-import { DfAuthService } from './df-auth.service';
+import { DfAuthService } from '../../adf-user-management/services/df-auth.service';
 import {
   HttpClientTestingModule,
   HttpTestingController,

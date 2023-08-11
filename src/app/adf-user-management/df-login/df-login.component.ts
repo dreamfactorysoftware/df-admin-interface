@@ -1,10 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
-import {
-  DfAuthService,
-  LoginCredentials,
-} from '../../core/services/df-auth.service';
+import { DfAuthService, LoginCredentials } from '../services/df-auth.service';
 import {
   DfSystemConfigDataService,
   LdapService,

@@ -1,0 +1,104 @@
+<mat-card class="user-management-card" *ngIf="!complete">
+  <df-alert
+    [message]="alertMsg"
+    [showAlert]="showAlert"
+    [alertType]="alertType"
+    (alertClosed)="showAlert = false"></df-alert>
+  <mat-card-header>
+    <mat-card-title>
+      {{ 'userManagement.register' | translate }}
+    </mat-card-title>
+  </mat-card-header>
+  <mat-divider></mat-divider>
+  <mat-card-content>
+    <form
+      name="reset-password-form"
+      [formGroup]="registerForm"
+      (ngSubmit)="register()">
+      <mat-form-field appearance="fill">
+        <mat-label
+          >{{ 'userManagement.controls.username.altLabel' | translate
+          }}{{
+            loginAttribute === 'email'
+              ? ' ' + ('userManagement.controls.username.optional' | translate)
+              : ''
+          }}</mat-label
+        >
+        <input matInput type="text" formControlName="username" />
+        <mat-error *ngIf="registerForm.get('username')?.errors?.['required']">
+          {{ 'userManagement.controls.username.errors.required' | translate }}
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field appearance="fill">
+        <mat-label>
+          {{ 'userManagement.controls.email.label' | translate }}</mat-label
+        >
+        <input matInput type="email" formControlName="email" />
+        <mat-error
+          *ngIf="
+            registerForm.get('email')?.errors?.['email'] &&
+            !registerForm.get('email')?.errors?.['required']
+          ">
+          {{ 'userManagement.controls.email.errors.invalid' | translate }}
+        </mat-error>
+        <mat-error
+          *ngIf="
+            !registerForm.get('email')?.errors?.['email'] &&
+            registerForm.get('email')?.errors?.['required']
+          ">
+          {{ 'userManagement.controls.email.errors.required' | translate }}
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field appearance="fill">
+        <mat-label>
+          {{ 'userManagement.controls.firstName.label' | translate }}</mat-label
+        >
+        <input matInput type="text" formControlName="firstName" />
+        <mat-error *ngIf="registerForm.get('firstName')?.errors?.['required']">
+          {{ 'userManagement.controls.firstName.errors.required' | translate }}
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field appearance="fill">
+        <mat-label>{{
+          'userManagement.controls.lastName.label' | translate
+        }}</mat-label>
+        <input matInput formControlName="lastName" />
+        <mat-error *ngIf="registerForm.get('lastName')?.errors?.['required']">
+          {{ 'userManagement.controls.lastName.errors.required' | translate }}
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill">
+        <mat-label>{{
+          'userManagement.controls.displayName.label' | translate
+        }}</mat-label>
+        <input matInput formControlName="name" />
+        <mat-error *ngIf="registerForm.get('name')?.errors?.['required']">
+          {{
+            'userManagement.controls.displayName.errors.required' | translate
+          }}
+        </mat-error>
+      </mat-form-field>
+      <button mat-button color="primary" type="submit">
+        {{ 'userManagement.register' | translate }}
+      </button>
+    </form>
+  </mat-card-content>
+</mat-card>
+<mat-card class="user-management-card" *ngIf="complete">
+  <mat-card-header>
+    <mat-card-title>
+      {{ 'userManagement.registerSuccess.header' | translate }}
+    </mat-card-title>
+  </mat-card-header>
+  <mat-divider></mat-divider>
+  <mat-card-content>
+    <h2>{{ 'userManagement.registerSuccess.title' | translate }}</h2>
+    <p>{{ 'userManagement.registerSuccess.message' | translate }}</p>
+    <div class="action-links">
+      <a mat-button [routerLink]="loginRoute" target="_self">{{
+        'userManagement.login' | translate
+      }}</a>
+    </div>
+  </mat-card-content>
+</mat-card>

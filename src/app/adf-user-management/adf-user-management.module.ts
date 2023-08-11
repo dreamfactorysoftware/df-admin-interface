@@ -15,12 +15,13 @@ import { AdfUserManagementRoutingModule } from './adf-user-management-routing.mo
 import { DfLoginComponent } from './df-login/df-login.component';
 import { MatSelectModule } from '@angular/material/select';
 import { DfForgotPasswordComponent } from './df-forgot-password/df-forgot-password.component';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { DfRegisterComponent } from './df-register/df-register.component';
 @NgModule({
   declarations: [
     DfPasswordResetComponent,
     DfLoginComponent,
     DfForgotPasswordComponent,
+    DfRegisterComponent,
   ],
   imports: [
     ReactiveFormsModule,
@@ -35,7 +36,6 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
     MatCardModule,
     MatDividerModule,
     DfAlertComponent,
-    FontAwesomeModule,
     AdfUserManagementRoutingModule,
     MatSelectModule,
   ],

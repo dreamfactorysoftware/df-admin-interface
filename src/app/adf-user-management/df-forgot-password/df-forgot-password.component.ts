@@ -8,14 +8,12 @@ import { ROUTES } from '../../core/constants/routes';
 import { DfPasswordResetService } from '../services/df-password.service';
 import { TranslateService } from '@ngx-translate/core';
 import { Router } from '@angular/router';
-import {
-  DfAuthService,
-  LoginCredentials,
-} from '../../core/services/df-auth.service';
+import { DfAuthService, LoginCredentials } from '../services/df-auth.service';
 
 @Component({
   selector: 'df-forgot-password',
   templateUrl: './df-forgot-password.component.html',
+  providers: [DfPasswordResetService],
 })
 export class DfForgotPasswordComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();

@@ -1,26 +1,36 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject, catchError, map, of } from 'rxjs';
-import { URLS } from '../constants/urls';
-import { SHOW_LOADING_HEADER } from '../constants/http-headers';
-import { ROUTES } from '../constants/routes';
+import { catchError, map, of } from 'rxjs';
+import { URLS } from '../../core/constants/urls';
+import {
+  HTTP_OPTION_LOGIN_FALSE,
+  SHOW_LOADING_HEADER,
+} from '../../core/constants/http-headers';
+import { ROUTES } from '../../core/constants/routes';
+import {
+  DfUserDataService,
+  UserData,
+} from '../../core/services/df-user-data.service';
+import { GenericSuccessResponse } from 'src/app/shared/types/generic-http';
 
 @Injectable({
   providedIn: 'root',
 })
 export class DfAuthService {
-  private isLoggedInSubject = new BehaviorSubject<boolean>(false);
-  isLoggedIn$ = this.isLoggedInSubject.asObservable();
-  private userDataSubject = new BehaviorSubject<UserData | null>(null);
-  userData$ = this.userDataSubject.asObservable();
-
-  private TOKEN_KEY = 'session_token';
-
   constructor(
     private http: HttpClient,
-    private router: Router
+    private router: Router,
+    private userDataService: DfUserDataService
   ) {}
+
+  register(data: RegisterDetails) {
+    return this.http.post<GenericSuccessResponse>(
+      URLS.REGISTER,
+      data,
+      HTTP_OPTION_LOGIN_FALSE
+    );
+  }
 
   login(credentials: LoginCredentials) {
     return this.http
@@ -29,7 +39,7 @@ export class DfAuthService {
       })
       .pipe(
         map(userData => {
-          this.userData = userData;
+          this.userDataService.userData = userData;
           return userData;
         }),
         catchError(() => {
@@ -37,7 +47,7 @@ export class DfAuthService {
             .post<UserData>(URLS.ADMIN_SESSION, credentials, {})
             .pipe(
               map(userData => {
-                this.userData = userData;
+                this.userDataService.userData = userData;
                 return userData;
               })
             );
@@ -46,11 +56,11 @@ export class DfAuthService {
   }
 
   checkSession() {
-    if (this.token) {
-      return this.loginWithToken(this.token).pipe(
+    if (this.userDataService.token) {
+      return this.loginWithToken(this.userDataService.token).pipe(
         map(() => true),
         catchError(() => {
-          this.clearToken();
+          this.userDataService.clearToken();
           return of(false);
         })
       );
@@ -68,7 +78,7 @@ export class DfAuthService {
       })
       .pipe(
         map(userData => {
-          this.userData = userData;
+          this.userDataService.userData = userData;
           return userData;
         })
       );
@@ -87,7 +97,7 @@ export class DfAuthService {
       })
       .pipe(
         map(userData => {
-          this.userData = userData;
+          this.userDataService.userData = userData;
           return userData;
         })
       );
@@ -96,42 +106,16 @@ export class DfAuthService {
   logout() {
     this.http
       .delete(
-        this.userData?.isSysAdmin ? URLS.ADMIN_SESSION : URLS.USER_SESSION
+        this.userDataService.userData?.isSysAdmin
+          ? URLS.ADMIN_SESSION
+          : URLS.USER_SESSION
       )
       .subscribe(() => {
-        this.clearToken();
-        this.userData = null;
+        this.userDataService.clearToken();
+        this.userDataService.userData = null;
         this.router.navigate([`/${ROUTES.AUTH}/${ROUTES.LOGIN}`]);
       });
-    this.isLoggedIn = false;
-  }
-
-  clearToken() {
-    sessionStorage.removeItem(this.TOKEN_KEY);
-  }
-
-  get userData(): UserData | null {
-    return this.userDataSubject.value;
-  }
-
-  set userData(userData: UserData | null) {
-    this.userDataSubject.next(userData);
-    if (userData) {
-      this.token = userData.sessionToken;
-      this.isLoggedIn = true;
-    }
-  }
-
-  set isLoggedIn(isLoggedIn: boolean) {
-    this.isLoggedInSubject.next(isLoggedIn);
-  }
-
-  get token(): string | null {
-    return sessionStorage.getItem(this.TOKEN_KEY);
-  }
-
-  set token(token: string) {
-    sessionStorage.setItem(this.TOKEN_KEY, token);
+    this.userDataService.isLoggedIn = false;
   }
 }
 
@@ -143,17 +127,10 @@ export interface LoginCredentials {
   service?: string;
 }
 
-export interface UserData {
+export interface RegisterDetails {
+  username: string;
   email: string;
-  firstName: string;
-  host: string;
-  id: number;
-  isRootAdmin: boolean;
-  isSysAdmin: boolean;
-  lastLoginDate: string;
-  lastName: string;
   name: string;
-  sessionId: string;
-  sessionToken: string;
-  tokenExpiryDate: string;
+  firstName: string;
+  lastName: string;
 }
