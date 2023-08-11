@@ -172,6 +172,14 @@
     "close": "Close",
     "reset": "Reset",
     "selectServiceType": "Select Service Type",
-    "controls": {}
+    "controls": {},
+    "serviceLinks": {
+      "quickLinksHeading": "Quick Links",
+      "scriptedEndpoints": "Scripted endpoints associated with system",
+      "apiDocumentation": "See API documentation",
+      "rolesHeading": "Roles Associated with this Service",
+      "noRolesText": "You haven't assigned any roles to this service",
+      "createRoleCta": "Create role-based access to this service"
+    }
   }
 }

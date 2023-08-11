@@ -7,6 +7,8 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { DfManageServicesComponent } from './df-manage-services/manage-services.component';
 import { MatTableModule } from '@angular/material/table';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import {MatListModule} from '@angular/material/list';
+
 import { DfServiceFormComponent } from './df-service-form/df-service-form.component';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatInputModule } from '@angular/material/input';
@@ -18,6 +20,8 @@ import { MatSortModule } from '@angular/material/sort';
 import { TranslateModule } from '@ngx-translate/core';
 import { MatIconModule } from '@angular/material/icon';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { DfServiceLinksCardComponent } from './df-service-definition/df-service-links-card/df-service-links-card.component';
+import { MatCardModule } from '@angular/material/card';
 
 // TODO: add translation to all components in this module
 
@@ -28,6 +32,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
     DfServiceInfoComponent,
     DfManageServicesComponent,
     DfServiceFormComponent,
+    DfServiceLinksCardComponent,
   ],
   imports: [
     CommonModule,
@@ -35,8 +40,10 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
     FormsModule,
     MatFormFieldModule,
     MatButtonModule,
+    MatCardModule,
     MatIconModule,
     MatInputModule,
+    MatListModule,
     MatTableModule,
     MatDialogModule,
     MatSelectModule,
