@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { URLS } from '../constants/urls';
@@ -11,17 +11,47 @@ export class ServiceDataService {
     new BehaviorSubject<SystemServiceDataResponse | null>(null);
   systemServiceData$ = this.systemServiceDataSubject.asObservable();
 
+  private serviceTypeDataSubject =
+    new BehaviorSubject<ServiceTypeResponse | null>(null);
+  serviceTypeData$ = this.serviceTypeDataSubject.asObservable();
+
   constructor(private http: HttpClient) {}
 
   getSystemServiceData() {
     console.log('system service data invoked!'); // TODO: remove this line
+
+    let queryParams = new HttpParams();
+    queryParams = queryParams.append('include_count', true);
+    queryParams = queryParams.append('limit', 100);
+    queryParams = queryParams.append('related', 'service_doc_by_service_id');
+
     return this.http
-      .get<SystemServiceDataResponse>(URLS.SYSTEM_SERVICE)
+      .get<SystemServiceDataResponse>(URLS.SYSTEM_SERVICE, {
+        params: queryParams,
+      })
       .subscribe(data => {
         this.systemServiceData = data;
         console.log('data: ', data); // TODO: remove this line as well
         return data;
       });
+  }
+
+  getServiceTypes() {
+    return this.http
+      .get<ServiceTypeResponse>(URLS.SERVICE_TYPE)
+      .subscribe(data => {
+        this.serviceTypeData = data;
+        console.log('data: ', data); // TODO: remove this line as well
+        return data;
+      });
+  }
+
+  get serviceTypeData(): ServiceTypeResponse | null {
+    return this.serviceTypeDataSubject.value;
+  }
+
+  set serviceTypeData(serviceTypeData: ServiceTypeResponse | null) {
+    this.serviceTypeDataSubject.next(serviceTypeData);
   }
 
   get systemServiceData(): SystemServiceDataResponse | null {
@@ -31,6 +61,22 @@ export class ServiceDataService {
   set systemServiceData(systemServiceData: SystemServiceDataResponse | null) {
     this.systemServiceDataSubject.next(systemServiceData);
   }
+}
+
+export interface ServiceTypeResponse {
+  resource: ServiceType[];
+}
+
+export interface ServiceType {
+  dependencies_required: null;
+  description: string;
+  group: string;
+  label: string;
+  name: string;
+  service_definition_editable: boolean;
+  singleton: boolean;
+  subscription_required: string;
+  config_schema: object[];
 }
 
 export interface SystemServiceDataResponse {

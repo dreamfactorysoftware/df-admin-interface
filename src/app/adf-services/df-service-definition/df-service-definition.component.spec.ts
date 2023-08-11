@@ -1,16 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { DfServiceConfigComponent } from './df-service-config.component';
+import { DfServiceDefinitionComponent } from './df-service-definition.component';
 
 describe('DfServiceConfigComponent', () => {
-  let component: DfServiceConfigComponent;
-  let fixture: ComponentFixture<DfServiceConfigComponent>;
+  let component: DfServiceDefinitionComponent;
+  let fixture: ComponentFixture<DfServiceDefinitionComponent>;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfServiceConfigComponent],
+      declarations: [DfServiceDefinitionComponent],
     });
-    fixture = TestBed.createComponent(DfServiceConfigComponent);
+    fixture = TestBed.createComponent(DfServiceDefinitionComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

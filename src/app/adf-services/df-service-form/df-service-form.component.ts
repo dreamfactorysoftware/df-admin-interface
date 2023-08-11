@@ -3,6 +3,7 @@
 import { Component, Inject } from '@angular/core';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { ServiceDataService } from 'src/app/core/services/service-data.service';
 
 export type ServiceSchema = {
   id: number;
@@ -26,7 +27,6 @@ export class DfServiceFormComponent {
 
   //Info
   firstFormGroup = this._formBuilder.group({
-    firstCtrl: new FormControl('', Validators.required), // TODO: remove this ctrl when ready
     namespace: new FormControl('', Validators.required),
     label: new FormControl('', Validators.required),
     description: new FormControl(''),
@@ -48,7 +48,8 @@ export class DfServiceFormComponent {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // TODO: create dialog data object and remove the above eslint comment
     @Inject(MAT_DIALOG_DATA) public data: any,
-    private _formBuilder: FormBuilder
+    private _formBuilder: FormBuilder,
+    private serviceDataService: ServiceDataService
   ) {
     console.log('constructor');
   }

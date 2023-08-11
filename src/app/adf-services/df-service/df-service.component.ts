@@ -2,6 +2,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { DfServiceFormComponent } from '../df-service-form/df-service-form.component';
 import { Subject, takeUntil } from 'rxjs';
+import { ServiceDataService } from 'src/app/core/services/service-data.service';
 
 @Component({
   selector: 'df-service',
@@ -11,7 +12,12 @@ import { Subject, takeUntil } from 'rxjs';
 export class DfServiceComponent implements OnDestroy {
   notifier = new Subject();
 
-  constructor(public dialog: MatDialog) {}
+  constructor(
+    public dialog: MatDialog,
+    private service: ServiceDataService
+  ) {
+    this.service.getSystemServiceData();
+  }
 
   openCreateServiceDialog() {
     const dialogRef = this.dialog.open(DfServiceFormComponent, {

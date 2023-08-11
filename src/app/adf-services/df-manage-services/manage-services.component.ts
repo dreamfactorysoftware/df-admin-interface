@@ -32,32 +32,33 @@ export class DfManageServicesComponent implements OnInit, OnDestroy {
     'active',
     'deletable',
   ];
-  dataSource: ServiceTableData[] | undefined;
+  dataSource: ServiceTableData[];
 
   systemServiceData: SystemServiceDataResponse | null;
 
-  constructor(private systemDataService: ServiceDataService) {
+  constructor(private serviceDataService: ServiceDataService) {
     this.dataSource = [];
     // TODO: replace/remove this
-    this.dataSource = exampleData.resource.map(val => {
-      return {
-        id: val.id,
-        name: val.name,
-        label: val.label,
-        description: val.description,
-        type: val.type,
-        active: val.is_active,
-        deletable: val.deletable,
-      };
-    });
+    // this.dataSource = exampleData.resource.map(val => {
+    //   return {
+    //     id: val.id,
+    //     name: val.name,
+    //     label: val.label,
+    //     description: val.description,
+    //     type: val.type,
+    //     active: val.is_active,
+    //     deletable: val.deletable,
+    //   };
+    // });
   }
 
   ngOnInit(): void {
-    this.systemDataService.systemServiceData$
+    this.serviceDataService.systemServiceData$
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
-        this.systemServiceData = data;
-        this.dataSource = this.systemServiceData?.resource.map(val => {
+        this.systemServiceData = data as SystemServiceDataResponse;
+        console.log('systemServiceData: ', this.systemServiceData);
+        this.dataSource = this.systemServiceData.resource.map(val => {
           return {
             id: val.id,
             name: val.name,

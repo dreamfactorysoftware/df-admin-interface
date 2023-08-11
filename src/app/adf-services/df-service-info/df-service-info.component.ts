@@ -1,7 +1,8 @@
 import { Component } from '@angular/core';
 import { FormControl } from '@angular/forms';
 
-type ServiceType = {
+// TODO: potentially delete as new object will be used in the form component
+type _ServiceType = {
   id: number;
   name: string;
   label: string;
@@ -35,9 +36,9 @@ type DfServiceInfoDataObj = {
   styleUrls: ['./df-service-info.component.scss'],
 })
 export class DfServiceInfoComponent {
-  selectedSchema: ServiceType | null;
-  newService: ServiceType | null;
-  serviceTypes: ServiceType[];
+  selectedSchema: _ServiceType | null;
+  newService: _ServiceType | null;
+  serviceTypes: _ServiceType[];
   dfServiceInfoDataObj: DfServiceInfoDataObj;
 
   namespace = new FormControl('');
