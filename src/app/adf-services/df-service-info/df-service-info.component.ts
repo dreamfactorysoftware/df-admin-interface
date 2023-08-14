@@ -1,26 +1,6 @@
 import { Component } from '@angular/core';
 import { FormControl } from '@angular/forms';
-
-// TODO: potentially delete as new object will be used in the form component
-type _ServiceType = {
-  id: number;
-  name: string;
-  label: string;
-  description: string;
-  is_active: boolean;
-  group_name: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  group_types: any[];
-  type: string;
-  mutable: boolean;
-  deletable: boolean;
-  created_date: string;
-  last_modified_date: string;
-  created_by_id: string | null;
-  last_modified_by_id: string | null;
-  config: object | null;
-  service_doc_by_service_id: string | null;
-};
+import { SystemServiceData } from 'src/app/core/services/service-data.service';
 
 type DfServiceInfoDataObj = {
   selectedServiceName: string;
@@ -36,9 +16,9 @@ type DfServiceInfoDataObj = {
   styleUrls: ['./df-service-info.component.scss'],
 })
 export class DfServiceInfoComponent {
-  selectedSchema: _ServiceType | null;
-  newService: _ServiceType | null;
-  serviceTypes: _ServiceType[];
+  selectedSchema: SystemServiceData | null;
+  newService: SystemServiceData | null;
+  serviceTypes: SystemServiceData[];
   dfServiceInfoDataObj: DfServiceInfoDataObj;
 
   namespace = new FormControl('');
@@ -46,14 +26,15 @@ export class DfServiceInfoComponent {
   description = new FormControl('');
   isActive = new FormControl(true);
 
-  serviceTypesSingleColLimit = 3; // TODO: update
+  serviceTypesSingleColLimit = 3;
 
   constructor() {
     this.selectedSchema = null;
     this.newService = null;
-    this.serviceTypes = []; // TODO: connect this to api in which this array will be populated by
+    this.serviceTypes = [];
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  changeServiceType(name: string) {}
+  changeServiceType(name: string) {
+    name;
+  }
 }

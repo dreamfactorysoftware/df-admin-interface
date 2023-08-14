@@ -1,4 +1,3 @@
-<!-- TODO: add translation to this component (to text, placeholders etc) -->
 <h1 mat-dialog-title>
   {{ isCreateServiceEnabled ? 'Create' : 'Manage' }} Service
 </h1>
@@ -17,15 +16,15 @@
             </mat-select>
           </mat-form-field>
           <mat-form-field>
-            <mat-label>Namespace</mat-label>
+            <mat-label>{{ 'services.Namespace' | translate }}</mat-label>
             <input matInput />
           </mat-form-field>
           <mat-form-field>
-            <mat-label>Label</mat-label>
+            <mat-label>{{ 'services.Label' | translate }}</mat-label>
             <input matInput />
           </mat-form-field>
           <mat-form-field>
-            <mat-label>Description</mat-label>
+            <mat-label>{{ 'services.Description' | translate }}</mat-label>
             <input matInput />
           </mat-form-field>
           <div>
@@ -70,9 +69,3 @@
     </mat-horizontal-stepper>
   </div>
 </div>
-<!-- <div mat-dialog-actions>
-  <button mat-button (click)="onClose()">
-    {{ 'services.close' | translate }}
-  </button>
-  <button mat-button cdkFocusInitial>{{ 'services.next' | translate }}</button>
-</div> -->

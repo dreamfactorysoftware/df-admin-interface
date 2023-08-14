@@ -4,6 +4,7 @@ import { ROUTES } from './core/constants/routes';
 import { loggedInGuard } from './core/guards/logged-in.guard';
 import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
 import { DfServiceComponent } from './adf-services/df-service/df-service.component';
+import { getSystemServiceDataResolver } from './core/resolvers/manage-service.resolver';
 
 const routes: Routes = [
   {
@@ -29,6 +30,7 @@ const routes: Routes = [
     path: ROUTES.SERVICES,
     component: DfServiceComponent,
     canActivate: [loggedInGuard],
+    resolve: { data: getSystemServiceDataResolver },
   },
 ];
 

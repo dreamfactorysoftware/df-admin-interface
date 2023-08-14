@@ -25,13 +25,7 @@ export class DfServiceComponent implements OnDestroy {
       disableClose: true,
     });
 
-    dialogRef
-      .afterClosed()
-      .pipe(takeUntil(this.notifier))
-      .subscribe(result => {
-        console.log('The dialog was closed');
-        console.log(result);
-      });
+    dialogRef.afterClosed().pipe(takeUntil(this.notifier));
   }
 
   ngOnDestroy() {

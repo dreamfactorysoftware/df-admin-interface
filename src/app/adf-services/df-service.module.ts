@@ -21,8 +21,6 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { DfAlertComponent } from '../shared/components/df-alert/df-alert.component';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 
-// TODO: add translation to all components in this module
-
 @NgModule({
   declarations: [
     DfServiceComponent,

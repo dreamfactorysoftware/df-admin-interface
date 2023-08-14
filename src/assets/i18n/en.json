@@ -173,6 +173,11 @@
     "reset": "Reset",
     "selectServiceType": "Select Service Type",
     "controls": {},
-    "noDataMatchingTheFilter": "Aucune donnée correspondant au filtre"
+    "namespace": "Namespace",
+    "label": "Label",
+    "description": "Description",
+    "noDataMatchingTheFilter": "No data matching the filter",
+    "deleteError": "Error occurred with delete service",
+    "deleteSuccess": "Service successfully deleted"
   }
 }

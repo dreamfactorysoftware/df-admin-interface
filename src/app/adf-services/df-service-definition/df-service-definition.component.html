@@ -1,9 +1,7 @@
-<!-- eslint-disable @angular-eslint/template/label-has-associated-control -->
-<!-- TODO: remove above line -->
 <div class="col-xs-12" style="padding-bottom: 20px">
   <div data-ng-show="selectedSchema && selectedSchema.available">
     <div class="form-group ng-scope">
-      <label>Select Format</label>
+      <h3>Select Format</h3>
       <select
         class="form-control"
         data-ng-model="serviceDefinition.format"
@@ -14,9 +12,9 @@
     </div>
 
     <div class="form-group ng-scope">
-      <label>Import a script file</label>
+      <h3>Import a script file</h3>
       <div>
-        <label
+        <h3
           class="btn btn-default btn-file btn-sm"
           ng-disabled="!isServiceDefEditable">
           Select Desktop File...
@@ -28,7 +26,7 @@
             onchange="angular.element(this).scope().handleDefinitionFiles(this.files)"
             ng-model="filename"
             ng-disabled="!isServiceDefEditable" />
-        </label>
+        </h3>
         <button
           type="button"
           class="btn btn-default btn-sm"

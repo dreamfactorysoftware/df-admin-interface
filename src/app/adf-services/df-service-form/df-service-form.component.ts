@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-function */
 // TODO: remove above line
 import { Component, Inject } from '@angular/core';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
@@ -22,7 +21,7 @@ export type ServiceSchema = {
   styleUrls: ['./df-service-form.component.scss'],
 })
 export class DfServiceFormComponent {
-  isCreateServiceEnabled = true; // TODO: change to input() so that this form can be toggled between create and manage
+  isCreateServiceEnabled = true;
   selectedSchema: ServiceSchema;
 
   //Info
@@ -45,14 +44,10 @@ export class DfServiceFormComponent {
 
   constructor(
     public dialogRef: MatDialogRef<DfServiceFormComponent>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    // TODO: create dialog data object and remove the above eslint comment
     @Inject(MAT_DIALOG_DATA) public data: any,
     private _formBuilder: FormBuilder,
     private serviceDataService: ServiceDataService
-  ) {
-    console.log('constructor');
-  }
+  ) {}
 
   onClose(): void {
     this.dialogRef.close();
@@ -64,13 +59,13 @@ export class DfServiceFormComponent {
       : this.updateService();
   }
 
-  private createService(): void {}
+  private createService(): void {
+    console.log('service created!');
+  }
 
-  private updateService(): void {}
-
-  showAdvancedFields(): void {}
-
-  hideAdvancedFields(): void {}
+  private updateService(): void {
+    console.log('service updated!');
+  }
 
   isFieldsSeparated(schemaName: string): boolean {
     return (

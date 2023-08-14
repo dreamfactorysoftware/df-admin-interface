@@ -3,6 +3,7 @@ import { Subject, catchError, map, takeUntil, tap, throwError } from 'rxjs';
 import {
   GroupDeleteServiceResponse,
   ServiceDataService,
+  SystemServiceData,
   SystemServiceDataResponse,
 } from 'src/app/core/services/service-data.service';
 import { faTrash, faCheck } from '@fortawesome/free-solid-svg-icons';
@@ -13,6 +14,7 @@ import { SelectionModel } from '@angular/cdk/collections';
 import { ActivatedRoute } from '@angular/router';
 import { MatCheckboxChange } from '@angular/material/checkbox';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
+import { TranslateService } from '@ngx-translate/core';
 
 type ServiceTableData = {
   id: number;
@@ -62,19 +64,18 @@ export class DfManageServicesComponent implements OnInit, OnDestroy {
 
   constructor(
     private serviceDataService: ServiceDataService,
-    private activatedRoute: ActivatedRoute
+    private activatedRoute: ActivatedRoute,
+    private translateService: TranslateService
   ) {
     this.alertMsg = '';
     this.showAlert = false;
   }
 
   ngOnInit(): void {
-    // TODO: change all network calls in this component to have activated route
-    //this.activatedRoute.data
-    this.serviceDataService.systemServiceData$
+    this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.systemServiceData = data as SystemServiceDataResponse;
+      .subscribe((data: any) => {
+        this.systemServiceData = data.data as SystemServiceDataResponse;
         this.data = this.systemServiceData.resource.map(val => {
           return {
             id: val.id,
@@ -155,13 +156,15 @@ export class DfManageServicesComponent implements OnInit, OnDestroy {
       .deleteServiceData(row)
       .pipe(
         catchError(err => {
-          this.alertMsg = 'Error occurred with delete service';
+          this.alertMsg = this.translateService.instant('services.deleteError');
           return throwError(() => new Error(err));
         })
       )
       .subscribe(data => {
         if (data.id) {
-          this.alertMsg = 'Service successfully deleted';
+          this.alertMsg = this.translateService.instant(
+            'services.deleteSuccess'
+          );
           this.showAlert = true;
         }
       });
@@ -178,7 +181,7 @@ export class DfManageServicesComponent implements OnInit, OnDestroy {
       .deleteMultipleServiceData(rows)
       .pipe(
         catchError(err => {
-          this.alertMsg = 'Error occurred with delete service';
+          this.alertMsg = this.translateService.instant('services.deleteError');
           this.alertType = 'error';
           this.showAlert = true;
           return throwError(() => new Error(err));
@@ -186,7 +189,9 @@ export class DfManageServicesComponent implements OnInit, OnDestroy {
       )
       .subscribe((data: GroupDeleteServiceResponse) => {
         if (data.resource.length) {
-          this.alertMsg = 'Service successfully deleted';
+          this.alertMsg = this.translateService.instant(
+            'services.deleteSuccess'
+          );
           this.showAlert = true;
           this.alertType = 'success';
         }

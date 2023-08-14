@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, tap } from 'rxjs';
 import { URLS } from '../constants/urls';
 
 @Injectable({
@@ -17,7 +17,6 @@ export class ServiceDataService {
 
   constructor(private http: HttpClient) {}
 
-  // TODO: refactor this and the function below to include the tap operator and replace subscribe with pipe
   getSystemServiceData() {
     return this.http
       .get<SystemServiceDataResponse>(URLS.SYSTEM_SERVICE, {
@@ -27,19 +26,31 @@ export class ServiceDataService {
           related: 'service_doc_by_service_id',
         },
       })
-      .subscribe(data => {
-        this.systemServiceData = data;
-        return data;
-      });
+      .pipe(
+        tap(data => {
+          this.systemServiceData = data;
+          return data;
+        })
+      );
   }
 
   getServiceTypes() {
-    return this.http
-      .get<ServiceTypeResponse>(URLS.SERVICE_TYPE)
-      .subscribe(data => {
+    return this.http.get<ServiceTypeResponse>(URLS.SERVICE_TYPE).pipe(
+      tap(data => {
         this.serviceTypeData = data;
         return data;
-      });
+      })
+    );
+  }
+
+  updateServiceData(updatedObject: SystemServiceData) {
+    return this.http.put<SystemServiceData>(
+      `${URLS.SYSTEM_SERVICE}/${updatedObject.id}`,
+      updatedObject,
+      {
+        params: { fields: '*', related: 'service_doc_by_service_id' },
+      }
+    );
   }
 
   deleteServiceData(id: number) {
