@@ -18,6 +18,8 @@ import { MatSortModule } from '@angular/material/sort';
 import { TranslateModule } from '@ngx-translate/core';
 import { MatIconModule } from '@angular/material/icon';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { DfAlertComponent } from '../shared/components/df-alert/df-alert.component';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 // TODO: add translation to all components in this module
 
@@ -31,10 +33,12 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
   ],
   imports: [
     CommonModule,
+    DfAlertComponent,
     FontAwesomeModule,
     FormsModule,
     MatFormFieldModule,
     MatButtonModule,
+    MatCheckboxModule,
     MatIconModule,
     MatInputModule,
     MatTableModule,

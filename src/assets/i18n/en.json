@@ -172,6 +172,7 @@
     "close": "Close",
     "reset": "Reset",
     "selectServiceType": "Select Service Type",
-    "controls": {}
+    "controls": {},
+    "noDataMatchingTheFilter": "Aucune donnée correspondant au filtre"
   }
 }

@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { URLS } from '../constants/urls';
@@ -17,6 +17,7 @@ export class ServiceDataService {
 
   constructor(private http: HttpClient) {}
 
+  // TODO: refactor this and the function below to include the tap operator and replace subscribe with pipe
   getSystemServiceData() {
     return this.http
       .get<SystemServiceDataResponse>(URLS.SYSTEM_SERVICE, {
@@ -41,6 +42,20 @@ export class ServiceDataService {
       });
   }
 
+  deleteServiceData(id: number) {
+    return this.http.delete<DeleteServiceResponse>(
+      `${URLS.SYSTEM_SERVICE}/${id}`
+    );
+  }
+
+  deleteMultipleServiceData(ids: number[]) {
+    return this.http.delete<GroupDeleteServiceResponse>(URLS.SYSTEM_SERVICE, {
+      params: {
+        ids: ids.join(','),
+      },
+    });
+  }
+
   get serviceTypeData(): ServiceTypeResponse | null {
     return this.serviceTypeDataSubject.value;
   }
@@ -56,6 +71,14 @@ export class ServiceDataService {
   set systemServiceData(systemServiceData: SystemServiceDataResponse | null) {
     this.systemServiceDataSubject.next(systemServiceData);
   }
+}
+
+export interface DeleteServiceResponse {
+  id: number;
+}
+
+export interface GroupDeleteServiceResponse {
+  resource: { id: number }[];
 }
 
 export interface ServiceTypeResponse {
@@ -84,7 +107,7 @@ export interface SystemServiceData {
   name: string;
   label: string;
   description: string;
-  is_active: boolean;
+  isActive: boolean;
   type: string;
   mutable: boolean;
   deletable: boolean;
