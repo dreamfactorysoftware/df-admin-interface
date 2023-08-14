@@ -24,6 +24,12 @@ const routes: Routes = [
       import('./adf-home/adf-home.module').then(m => m.AdfHomeModule),
     canActivate: [loggedInGuard],
   },
+  {
+    path: ROUTES.APPS,
+    loadChildren: () =>
+      import('./adf-apps/adf-apps.module').then(m => m.AdfAppsModule),
+    canActivate: [loggedInGuard],
+  },
 ];
 
 @NgModule({
