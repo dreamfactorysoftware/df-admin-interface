@@ -15,7 +15,6 @@ import { AlertType } from '../../shared/components/df-alert/df-alert.component';
 import { TranslateService } from '@ngx-translate/core';
 import { UserProfile } from '../../adf-user-management/types';
 import { DfPasswordService } from '../../adf-user-management/services/df-password.service';
-import { DfUserDataService } from '../../core/services/df-user-data.service';
 
 @Component({
   selector: 'df-profile',
@@ -43,8 +42,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
     private systemConfigDataService: DfSystemConfigDataService,
     private breakPointService: DfBreakpointService,
     private translateService: TranslateService,
-    private passwordService: DfPasswordService,
-    private userDataService: DfUserDataService
+    private passwordService: DfPasswordService
   ) {
     this.profileForm = this.fb.group({
       userDetailsGroup: this.fb.group({
@@ -188,10 +186,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
       return;
     }
     this.passwordService
-      .updatePassword(
-        this.updatePasswordForm.value,
-        !!this.userDataService.userData?.isSysAdmin
-      )
+      .updatePassword(this.updatePasswordForm.value)
       .pipe(
         takeUntil(this.destroyed$),
         catchError(err => {

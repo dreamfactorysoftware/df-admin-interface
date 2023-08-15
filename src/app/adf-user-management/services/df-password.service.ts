@@ -23,7 +23,7 @@ export class DfPasswordService {
     private http: HttpClient,
     private userDataService: DfUserDataService
   ) {}
-  resetPassword(data: ResetFormData, isAdmin: boolean) {
+  resetPassword(data: ResetFormData, isAdmin = false) {
     const url = isAdmin ? URLS.ADMIN_PASSWORD : URLS.USER_PASSWORD;
     return this.http.post<GenericSuccessResponse>(
       url,
@@ -32,8 +32,10 @@ export class DfPasswordService {
     );
   }
 
-  updatePassword(data: UpdatePasswordRequest, isAdmin: boolean) {
-    const url = isAdmin ? URLS.ADMIN_PASSWORD : URLS.USER_PASSWORD;
+  updatePassword(data: UpdatePasswordRequest) {
+    const url = this.userDataService.userData?.isSysAdmin
+      ? URLS.ADMIN_PASSWORD
+      : URLS.USER_PASSWORD;
     return this.http
       .post<UpdatePasswordResponse>(url, data, {
         headers: SHOW_LOADING_HEADER,
