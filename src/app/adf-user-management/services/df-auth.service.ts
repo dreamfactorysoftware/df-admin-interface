@@ -12,7 +12,8 @@ import {
   DfUserDataService,
   UserData,
 } from '../../core/services/df-user-data.service';
-import { GenericSuccessResponse } from 'src/app/shared/types/generic-http';
+import { GenericSuccessResponse } from 'src/app/shared/types/generic-http.type';
+import { LoginCredentials, RegisterDetails } from '../types';
 
 @Injectable({
   providedIn: 'root',
@@ -117,20 +118,4 @@ export class DfAuthService {
       });
     this.userDataService.isLoggedIn = false;
   }
-}
-
-export interface LoginCredentials {
-  username?: string;
-  email?: string;
-  password: string;
-  rememberMe?: boolean;
-  service?: string;
-}
-
-export interface RegisterDetails {
-  username: string;
-  email: string;
-  name: string;
-  firstName: string;
-  lastName: string;
 }

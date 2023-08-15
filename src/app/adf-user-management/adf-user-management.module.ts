@@ -17,6 +17,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { DfForgotPasswordComponent } from './df-forgot-password/df-forgot-password.component';
 import { DfRegisterComponent } from './df-register/df-register.component';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { DfUserDetailsComponent } from '../shared/components/df-user-details/df-user-details.component';
+
 @NgModule({
   declarations: [
     DfPasswordResetComponent,
@@ -40,7 +42,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
     AdfUserManagementRoutingModule,
     MatSelectModule,
     FontAwesomeModule,
+    DfUserDetailsComponent,
   ],
-  exports: [DfPasswordResetComponent],
 })
 export class AdfUserManagementModule {}

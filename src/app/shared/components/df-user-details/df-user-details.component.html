@@ -1,0 +1,80 @@
+<ng-container name="user-details-form" [formGroup]="rootForm">
+  <ng-container formGroupName="userDetailsGroup">
+    <mat-form-field appearance="fill">
+      <mat-label
+        >{{ 'userManagement.controls.username.altLabel' | translate
+        }}{{
+          !isRequired('userDetailsGroup.username')
+            ? ' ' + ('userManagement.controls.username.optional' | translate)
+            : ''
+        }}</mat-label
+      >
+      <input matInput type="text" formControlName="username" />
+      <mat-error
+        *ngIf="rootForm.get('userDetailsGroup.username')?.errors?.['required']">
+        {{ 'userManagement.controls.username.errors.required' | translate }}
+      </mat-error>
+    </mat-form-field>
+    <mat-form-field appearance="fill">
+      <mat-label>
+        {{ 'userManagement.controls.email.label' | translate }}</mat-label
+      >
+      <input matInput type="email" formControlName="email" />
+      <mat-error
+        *ngIf="
+          rootForm.get('userDetailsGroup.email')?.errors?.['email'] &&
+          !rootForm.get('userDetailsGroup.email')?.errors?.['required']
+        ">
+        {{ 'userManagement.controls.email.errors.invalid' | translate }}
+      </mat-error>
+      <mat-error
+        *ngIf="
+          !rootForm.get('userDetailsGroup.email')?.errors?.['email'] &&
+          rootForm.get('userDetailsGroup.email')?.errors?.['required']
+        ">
+        {{ 'userManagement.controls.email.errors.required' | translate }}
+      </mat-error>
+    </mat-form-field>
+    <mat-form-field appearance="fill">
+      <mat-label>
+        {{ 'userManagement.controls.firstName.label' | translate }}</mat-label
+      >
+      <input matInput type="text" formControlName="firstName" />
+      <mat-error
+        *ngIf="
+          rootForm.get('userDetailsGroup.firstName')?.errors?.['required']
+        ">
+        {{ 'userManagement.controls.firstName.errors.required' | translate }}
+      </mat-error>
+    </mat-form-field>
+    <mat-form-field appearance="fill">
+      <mat-label>{{
+        'userManagement.controls.lastName.label' | translate
+      }}</mat-label>
+      <input matInput formControlName="lastName" />
+      <mat-error
+        *ngIf="rootForm.get('userDetailsGroup.lastName')?.errors?.['required']">
+        {{ 'userManagement.controls.lastName.errors.required' | translate }}
+      </mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="fill">
+      <mat-label>{{
+        'userManagement.controls.displayName.label' | translate
+      }}</mat-label>
+      <input matInput formControlName="name" />
+      <mat-error
+        *ngIf="rootForm.get('userDetailsGroup.name')?.errors?.['required']">
+        {{ 'userManagement.controls.displayName.errors.required' | translate }}
+      </mat-error>
+    </mat-form-field>
+    <mat-form-field
+      appearance="fill"
+      *ngIf="controlExists('userDetailsGroup.phone')">
+      <mat-label>{{
+        'userManagement.controls.phone.label' | translate
+      }}</mat-label>
+      <input matInput formControlName="phone" />
+    </mat-form-field>
+  </ng-container>
+</ng-container>

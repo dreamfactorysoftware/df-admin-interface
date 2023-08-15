@@ -1,19 +1,19 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Location } from '@angular/common';
-import { UserParams } from './types/df-password-reset.types';
-import { DfPasswordResetService } from '../services/df-password.service';
+import { UserParams, LoginCredentials } from '../types';
+import { DfPasswordService } from '../services/df-password.service';
 import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
 import { matchValidator } from '../../shared/validators/match.validator';
 import { Subject, catchError, switchMap, takeUntil, throwError } from 'rxjs';
 import { AlertType } from '../../shared/components/df-alert/df-alert.component';
-import { DfAuthService, LoginCredentials } from '../services/df-auth.service';
+import { DfAuthService } from '../services/df-auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'df-password-reset',
   templateUrl: './df-password-reset.component.html',
-  providers: [DfPasswordResetService],
+  providers: [DfPasswordService],
   styleUrls: ['../adf-user-management.scss'],
 })
 export class DfPasswordResetComponent implements OnInit, OnDestroy {
@@ -29,7 +29,7 @@ export class DfPasswordResetComponent implements OnInit, OnDestroy {
   constructor(
     private fb: FormBuilder,
     private location: Location,
-    private passwordResetService: DfPasswordResetService,
+    private passwordResetService: DfPasswordService,
     private systemConfigDataService: DfSystemConfigDataService,
     private authService: DfAuthService,
     private router: Router,
