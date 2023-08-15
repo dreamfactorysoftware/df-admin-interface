@@ -1,0 +1,16 @@
+.form-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  .large & {
+    width: 100%;
+  }
+
+  .large & {
+    width: 50%;
+  }
+}
+mat-form-field {
+  width: 100%;
+}

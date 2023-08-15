@@ -8,4 +8,6 @@ export enum URLS {
   USER_PASSWORD = `${BASE_URL}/user/password`,
   ADMIN_PASSWORD = `${BASE_URL}/system/admin/password`,
   REGISTER = `${BASE_URL}/user/register`,
+  ADMIN_PROFILE = `${BASE_URL}/system/admin/profile`,
+  USER_PROFILE = `${BASE_URL}/user/profile`,
 }

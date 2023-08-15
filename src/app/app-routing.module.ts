@@ -4,7 +4,6 @@ import { ROUTES } from './core/constants/routes';
 import { loggedInGuard } from './core/guards/logged-in.guard';
 import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
 import { HashLocationStrategy, LocationStrategy } from '@angular/common';
-
 const routes: Routes = [
   {
     path: '',
@@ -23,6 +22,12 @@ const routes: Routes = [
     path: ROUTES.HOME,
     loadChildren: () =>
       import('./adf-home/adf-home.module').then(m => m.AdfHomeModule),
+    canActivate: [loggedInGuard],
+  },
+  {
+    path: ROUTES.PROFILE,
+    loadChildren: () =>
+      import('./adf-profile/adf-profile.module').then(m => m.AdfProfileModule),
     canActivate: [loggedInGuard],
   },
 ];

@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
-import { DfAuthService, LoginCredentials } from '../services/df-auth.service';
+import { DfAuthService } from '../services/df-auth.service';
 import {
   AuthService,
   DfSystemConfigDataService,
@@ -11,6 +11,7 @@ import { AlertType } from '../../shared/components/df-alert/df-alert.component';
 import { Router } from '@angular/router';
 import { ROUTES } from '../../core/constants/routes';
 import { getIcon, iconExist } from '../../shared/utilities/icons';
+import { LoginCredentials } from '../types';
 
 @Component({
   selector: 'df-user-login',
