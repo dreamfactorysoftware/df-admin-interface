@@ -7,9 +7,10 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatPaginatorModule } from '@angular/material/paginator';
 import { CommonModule } from '@angular/common';
 import { MatSortModule } from '@angular/material/sort';
+import { DfAdminDetailsComponent } from './df-admin-details/df-admin-details.component';
 
 @NgModule({
-  declarations: [DfManageAdminsComponent],
+  declarations: [DfManageAdminsComponent, DfAdminDetailsComponent],
   imports: [
     AdfAdminsRoutingModule,
     MatTableModule,

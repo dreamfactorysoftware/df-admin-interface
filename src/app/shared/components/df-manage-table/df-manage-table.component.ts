@@ -7,6 +7,7 @@ import {
   OnInit,
   ViewChild,
 } from '@angular/core';
+import { PageEvent } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { ActivatedRoute } from '@angular/router';
@@ -18,7 +19,7 @@ import { Subject, takeUntil } from 'rxjs';
 export abstract class DFManageTableComponent<T>
   implements OnInit, AfterViewInit, OnDestroy
 {
-  private destroyed$ = new Subject<void>();
+  destroyed$ = new Subject<void>();
   dataSource = new MatTableDataSource<T>();
   selection = new SelectionModel<T>(true, []);
   tableLength = 0;
@@ -29,6 +30,7 @@ export abstract class DFManageTableComponent<T>
     sortActionDescription?: string;
   }> = [];
   @ViewChild(MatSort) sort: MatSort;
+  _activatedRoute = this.activatedRoute;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -53,6 +55,7 @@ export abstract class DFManageTableComponent<T>
   }
 
   abstract mapDataToTable(data: any): Array<T>;
+  abstract changePage(event: PageEvent): void;
 
   isAllSelected() {
     const numSelected = this.selection.selected.length;

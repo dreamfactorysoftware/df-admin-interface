@@ -41,7 +41,7 @@
   <tr
     mat-row
     *matRowDef="let row; columns: displayedColumns"
-    (click)="selection.toggle(row)"></tr>
+    (click)="editRow(row)"></tr>
 </table>
 <mat-paginator
   [pageSizeOptions]="[10, 50, 100]"

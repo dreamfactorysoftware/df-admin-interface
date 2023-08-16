@@ -22,4 +22,19 @@ export class DfAdminService {
       }
     );
   }
+
+  getAdmin(id: string | number) {
+    return this.http.get<AdminType>(`${URLS.SYSTEM_ADMIN}/${id}`, {
+      headers: SHOW_LOADING_HEADER,
+      params: {
+        related: 'lookup_by_user_id',
+      },
+    });
+  }
+
+  deleteAdmin(id: string | number) {
+    return this.http.delete(`${URLS.SYSTEM_ADMIN}/${id}`, {
+      headers: SHOW_LOADING_HEADER,
+    });
+  }
 }
