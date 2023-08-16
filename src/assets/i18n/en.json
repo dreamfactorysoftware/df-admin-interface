@@ -16,9 +16,9 @@
       "welcomeHeading": "Welcome to DreamFactory!",
       "welcomeSubHeading": "DreamFactory provides all of the backend services that you need to build great mobile, web, and IoT applications. Follow the links below to get started:",
       "ossUsersHeading": "Attention OSS users",
-      "ossUsersText": "Did you know DreamFactory’s commercial solutions include connectors for Microsoft SQL Server, Oracle, SOAP-to-REST, API limiting, ELK stack integration, and much more? Contact Us at sales@dreamfactory.com to arrange a demo with our engineering team!",
+      "ossUsersText": "Did you know DreamFactory’s commercial solutions include connectors for Microsoft SQL Server, Oracle, SOAP-to-REST, API limiting, ELK stack integration, and much more? Contact Us at <a href=\"mailto:sales@dreamfactory.com\">sales@dreamfactory.com</a> to arrange a demo with our engineering team!",
       "hearFromYouHeading": "We want to hear from you!",
-      "hearFromYouText": "Has DreamFactory made a difference in your organization? Are you doing something novel and interesting with our software? We’d love to add your story to the Dreamfactory.com user showcase! E-mail us at info@dreamfactory.com with your project details and we’ll add your organization name, URL, and story to our site!",
+      "hearFromYouText": "Has DreamFactory made a difference in your organization? Are you doing something novel and interesting with our software? We’d love to add your story to the Dreamfactory.com user showcase! E-mail us at <a href=\"mailto:info@dreamfactory.com\">info@dreamfactory.com</a> with your project details and we’ll add your organization name, URL, and story to our site!",
       "clientPlatformHeading": "Click on a client platform below to download a sample application and learn how to make API calls:",
       "nativeExamplesHeading": "Native Examples",
       "javaScriptExamplesHeading": "JavaScript Examples"
@@ -178,6 +178,14 @@
     "description": "Description",
     "noDataMatchingTheFilter": "No data matching the filter",
     "deleteError": "Error occurred with delete service",
-    "deleteSuccess": "Service successfully deleted"
+    "deleteSuccess": "Service successfully deleted",
+    "serviceLinks": {
+      "quickLinksHeading": "Quick Links",
+      "scriptedEndpoints": "Scripted endpoints associated with system",
+      "apiDocumentation": "See API documentation",
+      "rolesHeading": "Roles Associated with this Service",
+      "noRolesText": "You haven't assigned any roles to this service",
+      "createRoleCta": "Create role-based access to this service"
+    }
   }
 }

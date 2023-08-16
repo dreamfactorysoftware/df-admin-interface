@@ -1,0 +1,18 @@
+<mat-card>
+  <h3 id="quick-links-heading">{{ 'services.serviceLinks.quickLinksHeading' | translate }}</h3>
+  <mat-nav-list aria-labelledby="quick-links-heading">
+    <mat-list-item><a href="">{{ 'services.serviceLinks.scriptedEndpoints' | translate }}</a></mat-list-item>
+    <mat-list-item><a href="">{{ 'services.serviceLinks.apiDocumentation' | translate }}</a></mat-list-item>
+  </mat-nav-list>
+  <h3 id="associated-roles-heading">{{ 'services.serviceLinks.rolesHeading' | translate }}</h3>
+  <div *ngIf="serviceInfo.roles.length === 0">
+    <p >{{ 'services.serviceLinks.noRolesText' | translate }}</p>
+  </div>
+  <mat-nav-list aria-labelledby="associated-roles-heading" *ngIf="serviceInfo.relatedRoles.length > 0">
+    <mat-list-item *ngFor="let role of serviceInfo.relatedRoles">
+      <a href="">{{ role.name }}</a>
+    </mat-list-item>
+  </mat-nav-list>
+  <button mat-flat-button color="primary">{{ 'services.serviceLinks.createRoleCta' | translate }}</button>
+</mat-card>
+

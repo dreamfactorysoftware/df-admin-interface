@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 
 @Component({
   selector: 'df-download-page',
@@ -6,6 +7,8 @@ import { Component } from '@angular/core';
   styleUrls: ['./df-download-page.component.scss'],
 })
 export class DfDownloadPageComponent {
+  constructor(public breakpointService: DfBreakpointService) {}
+
   cloudInstallerLinks = [
     {
       name: 'home.brandNames.oracleCloud',

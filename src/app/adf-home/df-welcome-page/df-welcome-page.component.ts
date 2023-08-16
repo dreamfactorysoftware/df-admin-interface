@@ -10,6 +10,7 @@ import {
   nativeExampleLinks,
   welcomePageResources,
 } from '../constants';
+import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 
 @Component({
   selector: 'df-welcome-page',
@@ -24,4 +25,6 @@ export class DfWelcomePageComponent {
   welcomePageResources = welcomePageResources;
   nativeExampleLinks = nativeExampleLinks;
   javaScriptExampleLinks = javaScriptExampleLinks;
+
+  constructor(public breakpointService: DfBreakpointService) {}
 }

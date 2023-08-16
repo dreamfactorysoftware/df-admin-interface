@@ -30,7 +30,7 @@ describe('DfBreakpointService', () => {
 
   it('should return false for non-small screens', () => {
     service = TestBed.inject(DfBreakpointService);
-    service.isSmalllScreen.subscribe((isSmallScreen: boolean) => {
+    service.isSmallScreen.subscribe((isSmallScreen: boolean) => {
       expect(isSmallScreen).toBeFalsy();
     });
   });
@@ -45,7 +45,7 @@ describe('DfBreakpointService', () => {
       })
     );
     service = TestBed.inject(DfBreakpointService);
-    service.isSmalllScreen.subscribe((isSmallScreen: boolean) => {
+    service.isSmallScreen.subscribe((isSmallScreen: boolean) => {
       expect(isSmallScreen).toBeTruthy();
     });
   });
@@ -61,7 +61,7 @@ describe('DfBreakpointService', () => {
       })
     );
     service = TestBed.inject(DfBreakpointService);
-    service.isSmalllScreen.subscribe((isSmallScreen: boolean) => {
+    service.isSmallScreen.subscribe((isSmallScreen: boolean) => {
       expect(isSmallScreen).toBeTruthy();
     });
   });

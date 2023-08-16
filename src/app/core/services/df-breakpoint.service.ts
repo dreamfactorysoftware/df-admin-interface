@@ -8,9 +8,15 @@ import { map } from 'rxjs';
 export class DfBreakpointService {
   constructor(private breakpointObserver: BreakpointObserver) {}
 
-  get isSmalllScreen() {
+  get isSmallScreen() {
     return this.breakpointObserver
       .observe([Breakpoints.XSmall, Breakpoints.Small])
+      .pipe(map(result => result.matches));
+  }
+
+  get isXSmallScreen() {
+    return this.breakpointObserver
+      .observe([Breakpoints.XSmall])
       .pipe(map(result => result.matches));
   }
 

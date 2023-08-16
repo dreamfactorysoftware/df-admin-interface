@@ -1,9 +1,8 @@
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { Subject, catchError, map, takeUntil, tap, throwError } from 'rxjs';
+import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import {
   GroupDeleteServiceResponse,
   ServiceDataService,
-  SystemServiceData,
   SystemServiceDataResponse,
 } from 'src/app/core/services/service-data.service';
 import { faTrash, faCheck } from '@fortawesome/free-solid-svg-icons';

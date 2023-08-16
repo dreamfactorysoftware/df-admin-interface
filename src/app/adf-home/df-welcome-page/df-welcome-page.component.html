@@ -1,14 +1,13 @@
-<section class="two-column-flex-container">
+<section
+  class="two-column-flex-container"
+  [class.mobile]="breakpointService.isSmallScreen | async">
   <article class="flex-column">
     <div class="video-link">
       <a
         href="https://youtu.be/FOSOm88RxPw"
         target="_blank"
         aria-labelledby="video-link-description">
-        <img
-          class="video-image"
-          src="assets/img/macbook-hp-df-1.png"
-          alt="placeholder for now" />
+        <img class="video-image" src="assets/img/macbook-hp-df-1.png" alt="" />
         <div class="video-overlay">
           <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
           <span id="video-link-description">{{
@@ -19,13 +18,13 @@
     </div>
 
     <article>
-      <h2 class="mat-h2">
+      <h2>
         {{ 'home.welcomePage.welcomeHeading' | translate }}
       </h2>
-      <p class="mat-body">
+      <p id="get-started-links">
         {{ 'home.welcomePage.welcomeSubHeading' | translate }}
       </p>
-      <ul>
+      <ul aria-labelledby="get-started-links">
         <li *ngFor="let resource of welcomePageResources">
           <df-icon-link [linkItem]="resource"></df-icon-link>
         </li>
@@ -35,22 +34,25 @@
 
   <aside class="flex-column">
     <mat-card class="notice-card">
-      <h3 class="mat-h3">
-        <fa-icon [icon]="faHeart" class="pre-heading-icon"></fa-icon
+      <h3>
+        <fa-icon
+          [icon]="faHeart"
+          class="pre-heading-icon"
+          aria-hidden="true"></fa-icon
         >{{ 'home.welcomePage.ossUsersHeading' | translate }}
       </h3>
-      <p class="mat-body">
-        {{ 'home.welcomePage.ossUsersText' | translate }}
-      </p>
+      <p [innerHtml]="'home.welcomePage.ossUsersText' | translate"></p>
     </mat-card>
+
     <mat-card class="notice-card">
-      <h3 class="mat-h3">
-        <fa-icon [icon]="faComment" class="pre-heading-icon"></fa-icon
+      <h3>
+        <fa-icon
+          [icon]="faComment"
+          class="pre-heading-icon"
+          aria-hidden="true"></fa-icon
         >{{ 'home.welcomePage.hearFromYouHeading' | translate }}
       </h3>
-      <p class="mat-body">
-        {{ 'home.welcomePage.hearFromYouText' | translate }}
-      </p>
+      <p [innerHtml]="'home.welcomePage.hearFromYouText' | translate"></p>
     </mat-card>
   </aside>
 </section>
@@ -58,16 +60,19 @@
 <mat-divider></mat-divider>
 
 <section class="platforms-section">
-  <h3 class="mat-h3">
+  <h3>
     {{ 'home.welcomePage.clientPlatformHeading' | translate }}
   </h3>
 
   <article>
-    <h4 class="mat-h4">
+    <h4 id="native-examples-heading">
       {{ 'home.welcomePage.nativeExamplesHeading' | translate }}
     </h4>
 
-    <ul class="flex-list-container">
+    <ul
+      class="flex-list-container"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
+      aria-labelledby="native-examples-heading">
       <li *ngFor="let link of nativeExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>
@@ -75,11 +80,14 @@
   </article>
 
   <article>
-    <h4 class="mat-h4">
+    <h4 id="javascript-examples-heading">
       {{ 'home.welcomePage.javaScriptExamplesHeading' | translate }}
     </h4>
 
-    <ul class="flex-list-container">
+    <ul
+      class="flex-list-container"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
+      aria-labelledby="javascript-examples-heading">
       <li *ngFor="let link of javaScriptExampleLinks">
         <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
       </li>
