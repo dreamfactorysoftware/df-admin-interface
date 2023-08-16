@@ -1,9 +1,9 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { UserProfile } from '../../adf-user-management/types';
 import { URLS } from 'src/app/core/constants/urls';
 import { DfUserDataService } from 'src/app/core/services/df-user-data.service';
 import { SHOW_LOADING_HEADER } from 'src/app/core/constants/http-headers';
+import { UserProfile } from '../types';
 
 @Injectable()
 export class DfProfileService {

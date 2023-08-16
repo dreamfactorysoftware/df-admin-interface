@@ -13,8 +13,8 @@ import { matchValidator } from '../../shared/validators/match.validator';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
 import { AlertType } from '../../shared/components/df-alert/df-alert.component';
 import { TranslateService } from '@ngx-translate/core';
-import { UserProfile } from '../../adf-user-management/types';
 import { DfPasswordService } from '../../adf-user-management/services/df-password.service';
+import { UserProfile } from '../types';
 
 @Component({
   selector: 'df-profile',
