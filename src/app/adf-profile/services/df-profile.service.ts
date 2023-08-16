@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { URLS } from 'src/app/core/constants/urls';
 import { DfUserDataService } from 'src/app/core/services/df-user-data.service';
 import { SHOW_LOADING_HEADER } from 'src/app/core/constants/http-headers';
-import { UserProfile } from '../types';
+import { UserProfile } from '../../shared/types/user';
 
 @Injectable()
 export class DfProfileService {

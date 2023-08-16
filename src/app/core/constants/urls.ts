@@ -10,4 +10,5 @@ export enum URLS {
   REGISTER = `${BASE_URL}/user/register`,
   ADMIN_PROFILE = `${BASE_URL}/system/admin/profile`,
   USER_PROFILE = `${BASE_URL}/user/profile`,
+  SYSTEM_ADMIN = `${BASE_URL}/system/admin`,
 }
