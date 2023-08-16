@@ -1,53 +1,77 @@
 import { SelectionModel } from '@angular/cdk/collections';
-import { AfterViewInit, Component, ViewChild } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Subject, takeUntil } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
 
+import { DfAppsService } from '../services/df-apps.service';
 import { MatTableDataSource } from '@angular/material/table';
-import { MatPaginator } from '@angular/material/paginator';
-import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import { MatPaginator, PageEvent } from '@angular/material/paginator';
+import { faTrash, faCheck, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { MatSort } from '@angular/material/sort';
+import { TranslateService } from '@ngx-translate/core';
+import { AppType, AppRow } from '../types/df-apps.types';
 
-interface AppElement {
-  position: number;
-  id: number;
-  name: string;
-  role: string;
-  apiKey: string;
-}
-const MOCK_DATA: AppElement[] = [
-  {
-    position: 1,
-    id: 1,
-    name: 'App 1',
-    role: 'Admin',
-    apiKey: '1234567890',
-  },
-  {
-    position: 2,
-    id: 2,
-    name: 'App 2',
-    role: '',
-    apiKey: '0987654321',
-  },
-];
 @Component({
   selector: 'df-df-manage-apps',
   templateUrl: './df-manage-apps.component.html',
   styleUrls: ['./df-manage-apps.component.scss'],
 })
-export class DfManageAppsComponent implements AfterViewInit {
-  faTrash = faTrash;
+export class DfManageAppsComponent implements OnInit {
+  private destroyed$ = new Subject<void>();
+
   displayedColumns: string[] = ['select', 'id', 'name', 'role', 'apiKey'];
-  dataSource = new MatTableDataSource<AppElement>(MOCK_DATA);
-  selection = new SelectionModel<AppElement>(true, []);
-  hasSelectedRows = true;
+  dataSource = new MatTableDataSource<AppRow>();
+  data: AppRow[];
+  selection = new SelectionModel<AppRow>(true, []);
+
+  resultsLength = 0;
+  pageIndex = 0;
+
+  faTrash = faTrash;
+  faCheck = faCheck;
+  faPlus = faPlus;
+
+  isGroupDeleteIconVisible: boolean;
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
+  @ViewChild(MatSort) sort: MatSort;
 
-  ngAfterViewInit(): void {
-    this.dataSource.paginator = this.paginator;
-    // this.selection.changed.subscribe(change => {
-    //   console.log('selection changed', change);
-    //   this.hasSelectedRows = change.source.selected.length > 0;
-    // });
+  constructor(
+    private dfAppsService: DfAppsService,
+    private activatedRoute: ActivatedRoute,
+    private translateService: TranslateService
+  ) {}
+
+  ngOnInit(): void {
+    /**
+     * todo:
+     * update pagniator length, pageIndex
+     * paginator length = Response.meta.count
+     * pageinator pageIndex = offset / limit
+     */
+    this.activatedRoute.data
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe((data: any) => {
+        console.log(data);
+        this.resultsLength = data.data.meta.count;
+        this.data = this.mapDataToTable(data.data.resource);
+        this.dataSource = new MatTableDataSource(this.data);
+        console.log('this.data', this.data);
+      });
+  }
+
+  mapDataToTable(appTypes: AppType[]): AppRow[] {
+    console.log('mapDataToTable', appTypes);
+    return appTypes.map((appType: AppType) => {
+      return {
+        id: appType.id,
+        name: appType.name,
+        role: appType.roleByRoleId?.description || '',
+        apiKey: appType.apiKey,
+        description: appType.description,
+        active: appType.isActive,
+      };
+    });
   }
 
   /** Whether the number of selected elements matches the total number of rows. */
@@ -69,12 +93,13 @@ export class DfManageAppsComponent implements AfterViewInit {
   }
 
   /** The label for the checkbox on the passed row */
-  checkboxLabel(row?: AppElement): string {
+  checkboxLabel(row?: AppRow): string {
     if (!row) {
       return `${this.isAllSelected() ? 'deselect' : 'select'} all`;
     }
+
     return `${this.selection.isSelected(row) ? 'deselect' : 'select'} row ${
-      row.position + 1
+      row.id + 1
     }`;
   }
 
@@ -83,30 +108,22 @@ export class DfManageAppsComponent implements AfterViewInit {
     this.dataSource.filter = filterValue.trim().toLowerCase();
   }
 
+  changePage(event: PageEvent): void {
+    console.log(event);
+  }
+
+  openCreateAppDialog() {
+    // show create app screen
+  }
+
+  // POST /api/v2/system/app
+
+  // DELETE /api/v1/apps/{id}
+  // show confirmation dialog before deleting
+
+  // edit view same as create view but with API key
+
   onMassDelete() {
     console.log('mass delete', this.selection.selected);
-    //   const rows = this.selection.selected
-    //     .filter(val => {
-    //       return val.deletable;
-    //     })
-    //     .map(val => val.id);
-
-    //   return this.serviceDataService
-    //     .deleteMultipleServiceData(rows)
-    //     .pipe(
-    //       catchError(err => {
-    //         this.alertMsg = 'Error occurred with delete service';
-    //         this.alertType = 'error';
-    //         this.showAlert = true;
-    //         return throwError(() => new Error(err));
-    //       })
-    //     )
-    //     .subscribe((data: GroupDeleteServiceResponse) => {
-    //       if (data.resource.length) {
-    //         this.alertMsg = 'Service successfully deleted';
-    //         this.showAlert = true;
-    //         this.alertType = 'success';
-    //       }
-    //     });
   }
 }

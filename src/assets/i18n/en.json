@@ -190,7 +190,9 @@
       "id": "ID",
       "name": "Name",
       "role": "Role",
-      "apiKey": "API Key"
+      "apiKey": "API Key",
+      "description": "Description",
+      "active": "Active"
     },
     "createApp": {
       "label": "Create Application",

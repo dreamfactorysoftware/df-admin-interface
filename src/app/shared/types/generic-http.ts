@@ -10,3 +10,10 @@ export interface GenericErrorResponse {
     status_code: number;
   };
 }
+
+export interface GenericListResponse<T> {
+  resource: T;
+  meta: {
+    count: number;
+  };
+}
