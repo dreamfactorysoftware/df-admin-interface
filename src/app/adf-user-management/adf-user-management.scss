@@ -1,0 +1,30 @@
+.user-management-card {
+  position: relative;
+  padding: 16px 16px;
+  margin: 70px auto 0;
+  min-width: 300px;
+  max-width: 445px;
+  mat-card-header {
+    padding-bottom: 16px;
+  }
+  mat-card-content {
+    padding-top: 16px;
+    .services-section {
+      padding-top: 32px;
+      .services-container {
+        display: flex;
+        flex-wrap: wrap;
+        padding-top: 16px;
+        gap: 16px;
+      }
+    }
+  }
+  mat-form-field,
+  button {
+    width: 100%;
+  }
+  .action-links {
+    display: flex;
+    justify-content: flex-end;
+  }
+}

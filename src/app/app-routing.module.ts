@@ -6,6 +6,7 @@ import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
 import { DfServiceComponent } from './adf-services/df-service/df-service.component';
 import { getSystemServiceDataResolver } from './adf-services/resolvers/manage-service.resolver';
 
+import { HashLocationStrategy, LocationStrategy } from '@angular/common';
 const routes: Routes = [
   {
     path: '',
@@ -32,10 +33,28 @@ const routes: Routes = [
     canActivate: [loggedInGuard],
     resolve: { data: getSystemServiceDataResolver },
   },
+  {
+    path: ROUTES.PROFILE,
+    loadChildren: () =>
+      import('./adf-profile/adf-profile.module').then(m => m.AdfProfileModule),
+    canActivate: [loggedInGuard],
+  },
+  {
+    path: ROUTES.ADMINS,
+    loadChildren: () =>
+      import('./adf-admins/adf-admins.module').then(m => m.AdfAdminsModule),
+    canActivate: [loggedInGuard],
+  },
 ];
 
 @NgModule({
-  imports: [RouterModule.forRoot(routes)],
+  imports: [RouterModule.forRoot(routes, { useHash: true })],
   exports: [RouterModule],
+  providers: [
+    {
+      provide: LocationStrategy,
+      useClass: HashLocationStrategy,
+    },
+  ],
 })
 export class AppRoutingModule {}

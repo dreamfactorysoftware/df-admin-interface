@@ -1,0 +1,27 @@
+@use '@angular/material' as mat;
+
+$deep-purple-palette: mat.define-palette(mat.$deep-purple-palette);
+$green-palette: mat.define-palette(mat.$green-palette);
+$red-palette: mat.define-palette(mat.$red-palette);
+
+.mat-mdc-row .mat-mdc-cell {
+  border-bottom: 1px solid transparent;
+  border-top: 1px solid transparent;
+  cursor: pointer;
+}
+
+.mat-mdc-row:hover .mat-mdc-cell {
+  border-color: mat.get-color-from-palette($deep-purple-palette, 300);
+}
+
+.selected {
+  background-color: mat.get-color-from-palette($deep-purple-palette, 100);
+}
+
+.active {
+  color: mat.get-color-from-palette($green-palette, 500);
+}
+
+.inactive {
+  color: mat.get-color-from-palette($red-palette, 500);
+}

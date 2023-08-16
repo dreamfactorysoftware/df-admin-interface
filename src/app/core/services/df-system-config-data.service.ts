@@ -8,7 +8,6 @@ import {
   retry,
   throwError,
 } from 'rxjs';
-import { DfAuthService } from '../../adf-user-management/services/df-auth.service';
 import { URLS } from '../constants/urls';
 import { SHOW_LOADING_HEADER } from '../constants/http-headers';
 import { DfUserDataService } from './df-user-data.service';
@@ -24,6 +23,8 @@ export class DfSystemConfigDataService {
       allowForeverSessions: false,
       loginAttribute: 'email',
       adldap: [],
+      oauth: [],
+      saml: [],
     },
     platform: {
       rootAdminExists: false,
@@ -36,7 +37,6 @@ export class DfSystemConfigDataService {
   system$: Observable<System> = this.systemSubject.asObservable();
   constructor(
     private http: HttpClient,
-    private authService: DfAuthService,
     private userDataService: DfUserDataService
   ) {}
 
@@ -85,6 +85,8 @@ export interface Environment {
     allowForeverSessions: boolean;
     loginAttribute: string;
     adldap: Array<LdapService>;
+    oauth: Array<AuthService>;
+    saml: Array<AuthService>;
   };
   platform: {
     rootAdminExists: boolean;
@@ -99,4 +101,12 @@ export interface System {
 export interface LdapService {
   name: string;
   label: string;
+}
+
+export interface AuthService {
+  iconClass: string;
+  label: string;
+  name: string;
+  type: string;
+  path: string;
 }

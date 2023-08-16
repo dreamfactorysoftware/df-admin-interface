@@ -12,7 +12,7 @@
   <mat-divider></mat-divider>
   <mat-card-content>
     <form name="login-form" [formGroup]="loginForm" (ngSubmit)="login()">
-      <mat-form-field appearance="fill" *ngIf="ldapAvailable">
+      <mat-form-field appearance="fill" *ngIf="ldapServices.length">
         <mat-label>
           {{ 'userManagement.controls.services.label' | translate }}</mat-label
         >
@@ -65,10 +65,26 @@
           {{ 'userManagement.controls.password.errors.required' | translate }}
         </mat-error>
       </mat-form-field>
-      <button mat-button color="primary" type="submit">
+      <button mat-flat-button color="primary" type="submit">
         {{ 'userManagement.login' | translate }}
       </button>
     </form>
+    <ng-container
+      *ngTemplateOutlet="
+        authServices;
+        context: {
+          services: oauthServices,
+          title: ('userManagement.oAuth' | translate)
+        }
+      " />
+    <ng-container
+      *ngTemplateOutlet="
+        authServices;
+        context: {
+          services: samlServices,
+          title: ('userManagement.saml' | translate)
+        }
+      " />
     <div class="action-links">
       <a mat-button [routerLink]="fpRoute" target="_self">{{
         'userManagement.forgotPassword' | translate
@@ -76,3 +92,33 @@
     </div>
   </mat-card-content>
 </mat-card>
+<ng-template #authServices let-services="services" let-title="title">
+  <div class="services-section" *ngIf="services.length">
+    <h3>{{ title }}</h3>
+    <mat-divider></mat-divider>
+    <div class="services-container">
+      <ng-container *ngFor="let service of services">
+        <a
+          mat-flat-button
+          color="primary"
+          [href]="'/' + service.path"
+          *ngIf="iconExist(service.iconClass)"
+          [attr.aria-label]="service.label">
+          <fa-icon
+            *ngIf="iconExist(service.iconClass)"
+            [icon]="getIcon(service.iconClass)"
+            size="2x"
+            >{{ service.label }}</fa-icon
+          >
+        </a>
+        <a
+          mat-flat-button
+          color="primary"
+          [href]="'/' + service.path"
+          *ngIf="!iconExist(service.iconClass)">
+          {{ service.label }}
+        </a>
+      </ng-container>
+    </div>
+  </div>
+</ng-template>

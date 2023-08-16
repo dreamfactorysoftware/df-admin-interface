@@ -10,4 +10,7 @@ export enum URLS {
   REGISTER = `${BASE_URL}/user/register`,
   SYSTEM_SERVICE = `${BASE_URL}/system/service`,
   SERVICE_TYPE = `${BASE_URL}/system/service_type`,
+  ADMIN_PROFILE = `${BASE_URL}/system/admin/profile`,
+  USER_PROFILE = `${BASE_URL}/user/profile`,
+  SYSTEM_ADMIN = `${BASE_URL}/system/admin`,
 }

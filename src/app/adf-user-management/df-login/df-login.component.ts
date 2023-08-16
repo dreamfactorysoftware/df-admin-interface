@@ -1,18 +1,22 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
-import { DfAuthService, LoginCredentials } from '../services/df-auth.service';
+import { DfAuthService } from '../services/df-auth.service';
 import {
+  AuthService,
   DfSystemConfigDataService,
   LdapService,
 } from '../../core/services/df-system-config-data.service';
 import { AlertType } from '../../shared/components/df-alert/df-alert.component';
 import { Router } from '@angular/router';
 import { ROUTES } from '../../core/constants/routes';
+import { getIcon, iconExist } from '../../shared/utilities/icons';
+import { LoginCredentials } from '../types';
 
 @Component({
   selector: 'df-user-login',
   templateUrl: './df-login.component.html',
+  styleUrls: ['../adf-user-management.scss'],
 })
 export class DfLoginComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();
@@ -21,8 +25,9 @@ export class DfLoginComponent implements OnInit, OnDestroy {
   alertType: AlertType = 'error';
   envloginAttribute = 'email';
   loginAttribute = 'email';
-  ldapAvailable = false;
   ldapServices: LdapService[] = [];
+  oauthServices: AuthService[] = [];
+  samlServices: AuthService[] = [];
 
   fpRoute = `/${ROUTES.AUTH}/${ROUTES.FORGOT_PASSWORD}`;
 
@@ -41,14 +46,18 @@ export class DfLoginComponent implements OnInit, OnDestroy {
     });
   }
 
+  iconExist = iconExist;
+  getIcon = getIcon;
+
   ngOnInit() {
     this.systemConfigDataService.environment$
       .pipe(takeUntil(this.destroyed$))
       .subscribe(env => {
         this.envloginAttribute = env.authentication.loginAttribute;
         this.setLoginAttribute(env.authentication.loginAttribute);
-        this.ldapAvailable = env.authentication.adldap.length > 0;
         this.ldapServices = env.authentication.adldap;
+        this.oauthServices = env.authentication.oauth;
+        this.samlServices = env.authentication.saml;
       });
 
     this.loginForm.controls['services'].valueChanges.subscribe(
@@ -90,7 +99,7 @@ export class DfLoginComponent implements OnInit, OnDestroy {
     const credentials: LoginCredentials = {
       password: this.loginForm.value.password,
     };
-    if (this.ldapAvailable && this.loginForm.value.services !== '') {
+    if (this.ldapServices.length && this.loginForm.value.services !== '') {
       credentials.service = this.loginForm.value.services;
     }
     if (this.loginAttribute === 'username') {

@@ -85,6 +85,8 @@
       "title": "Thanks For Registering!",
       "message": "A confirmation email has been sent to the email address that you registered with. Upon confirmation you will be able to login to the application. Thanks!"
     },
+    "oAuth": "OAuth Login",
+    "saml": "SAML 2.0 Login",
     "controls": {
       "username": {
         "label": "Choose Username",
@@ -119,11 +121,17 @@
           "required": "Display name is required"
         }
       },
+      "oldPassword": {
+        "label": "Enter Old Password",
+        "errors": {
+          "required": "Old password is required"
+        }
+      },
       "password": {
         "label": "Enter Password",
         "altLabel": "Confirm new password",
         "errors": {
-          "required": "New password is required",
+          "required": "Password is required",
           "length": "Password must be at least 5 characters long"
         }
       },
@@ -141,12 +149,18 @@
         "label": "Confirm Password",
         "altLabel": "Confirm new password",
         "errors": {
-          "label": "Confirm password is required",
+          "required": "Confirm password is required",
           "match": "Passwords do not match"
         }
       },
       "services": {
         "label": "Services"
+      },
+      "setSecurityQuestion": {
+        "label": "Set Security Question"
+      },
+      "setPassword": {
+        "label": "Set Password"
       },
       "securityQuestion": {
         "label": "Security Question"
@@ -156,10 +170,32 @@
         "errors": {
           "required": "Security answer is required"
         }
+      },
+      "phone": {
+        "label": "Enter telephone number"
+      },
+      "currentPassword": {
+        "label": "Enter current password",
+        "errors": {
+          "required": "Required if Changing Email"
+        }
       }
     },
     "alerts": {
-      "resetEmailSent": "A password reset email has been sent to the user's email address."
+      "resetEmailSent": "A password reset email has been sent to the user's email address.",
+      "close": "Close alert"
+    },
+    "profile": {
+      "tabs": {
+        "details": "Details",
+        "securityQuestion": "Security Question",
+        "password": "Password"
+      },
+      "alerts": {
+        "detailsUpdated": "Profile updated successfully",
+        "securtyQuestionUpdated": "Security question updated successfully",
+        "passwordUpdated": "Password updated successfully"
+      }
     }
   },
   "services": {
@@ -187,5 +223,20 @@
       "noRolesText": "You haven't assigned any roles to this service",
       "createRoleCta": "Create role-based access to this service"
     }
-  }
+  },
+  "user": {
+    "tableHeaders": {
+      "id": "ID",
+      "email": "Email",
+      "name": "Display Name",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "active": "Active",
+      "registration": "Registration"
+    }
+  },
+  "save": "Save",
+  "update": "Update",
+  "confirmed": "Confirmed",
+  "pending": "Pending"
 }

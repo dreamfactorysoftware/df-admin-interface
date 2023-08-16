@@ -5,15 +5,16 @@ import { DfSystemConfigDataService } from '../../core/services/df-system-config-
 import { AlertType } from '../../shared/components/df-alert/df-alert.component';
 import { matchValidator } from '../../shared/validators/match.validator';
 import { ROUTES } from '../../core/constants/routes';
-import { DfPasswordResetService } from '../services/df-password.service';
+import { DfPasswordService } from '../services/df-password.service';
 import { TranslateService } from '@ngx-translate/core';
 import { Router } from '@angular/router';
-import { DfAuthService, LoginCredentials } from '../services/df-auth.service';
+import { DfAuthService } from '../services/df-auth.service';
+import { LoginCredentials } from '../types';
 
 @Component({
   selector: 'df-forgot-password',
   templateUrl: './df-forgot-password.component.html',
-  providers: [DfPasswordResetService],
+  styleUrls: ['../adf-user-management.scss'],
 })
 export class DfForgotPasswordComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();
@@ -30,7 +31,7 @@ export class DfForgotPasswordComponent implements OnInit, OnDestroy {
   constructor(
     private fb: FormBuilder,
     private systemConfigDataService: DfSystemConfigDataService,
-    private passwordService: DfPasswordResetService,
+    private passwordService: DfPasswordService,
     private translateService: TranslateService,
     private router: Router,
     private authService: DfAuthService
