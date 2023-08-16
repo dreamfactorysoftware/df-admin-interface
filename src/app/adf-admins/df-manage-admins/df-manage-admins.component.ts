@@ -1,24 +1,31 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Component } from '@angular/core';
-import { PageEvent } from '@angular/material/paginator';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DFManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import { UserRow } from 'src/app/shared/types/user';
+import { AdminType, UserRow } from 'src/app/shared/types/user';
 import { DfAdminService } from '../services/df-admin.service';
 import { takeUntil } from 'rxjs';
+import {
+  faCheckCircle,
+  faXmarkCircle,
+} from '@fortawesome/free-solid-svg-icons';
+import { IconProp } from '@fortawesome/fontawesome-svg-core';
 
 @Component({
   selector: 'df-manage-admins',
   templateUrl: './df-manage-admins.component.html',
+  styleUrls: [
+    '../../shared/components/df-manage-table/df-manage-table.component.scss',
+  ],
 })
 export class DfManageAdminsComponent extends DFManageTableComponent<UserRow> {
   constructor(
-    private router: Router,
     private adminService: DfAdminService,
+    router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer
   ) {
-    super(activatedRoute, liveAnnouncer);
+    super(router, activatedRoute, liveAnnouncer);
   }
   override columns = [
     {
@@ -27,58 +34,62 @@ export class DfManageAdminsComponent extends DFManageTableComponent<UserRow> {
     {
       columnDef: 'active',
       cell: (row: UserRow) => `${row.active}`,
-      header: 'Active',
+      header: 'active',
       sortActionDescription: 'active',
     },
     {
       columnDef: 'id',
       cell: (row: UserRow) => `${row.id}`,
-      header: 'ID',
+      header: 'id',
       sortActionDescription: 'id',
     },
     {
       columnDef: 'email',
       cell: (row: UserRow) => `${row.email}`,
-      header: 'Email',
+      header: 'email',
       sortActionDescription: 'email',
     },
     {
       columnDef: 'displayName',
       cell: (row: UserRow) => `${row.displayName}`,
-      header: 'Display Name',
+      header: 'name',
       sortActionDescription: 'displayName',
     },
     {
       columnDef: 'firstName',
       cell: (row: UserRow) => `${row.firstName}`,
-      header: 'First Name',
+      header: 'firstName',
       sortActionDescription: 'firstName',
     },
     {
       columnDef: 'lastName',
       cell: (row: UserRow) => `${row.lastName}`,
-      header: 'Last Name',
+      header: 'lastName',
       sortActionDescription: 'lastName',
     },
     {
       columnDef: 'registration',
       cell: (row: UserRow) => `${row.registration}`,
-      header: 'Registration',
+      header: 'registration',
       sortActionDescription: 'registration',
     },
   ];
 
+  activeIcon(active: boolean): IconProp {
+    return active ? faCheckCircle : faXmarkCircle;
+  }
+
   mapDataToTable(data: any): UserRow[] {
-    return data as UserRow[];
-  }
-
-  changePage(event: PageEvent): void {
-    console.log(event);
-  }
-
-  editRow(row: UserRow): void {
-    this.router.navigate(['edit', row.id], {
-      relativeTo: this._activatedRoute,
+    return data.map((user: AdminType) => {
+      return {
+        id: user.id,
+        email: user.email,
+        displayName: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        registration: user.confirmed,
+        active: user.isActive,
+      };
     });
   }
 
@@ -91,10 +102,14 @@ export class DfManageAdminsComponent extends DFManageTableComponent<UserRow> {
       });
   }
 
-  refreshTable(): void {
-    this.adminService.getAdmins().subscribe(data => {
-      this.dataSource.data = this.mapDataToTable(data.resource);
-      this.tableLength = data.meta.count;
-    });
+  refreshTable(limit?: number, offset?: number): void {
+    console.log(limit, offset);
+    this.adminService
+      .getAdmins(limit, offset)
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        this.dataSource.data = this.mapDataToTable(data.resource);
+        this.tableLength = data.meta.count;
+      });
   }
 }

@@ -6,8 +6,9 @@ import { IconProp } from '@fortawesome/fontawesome-svg-core';
 import {
   faXmark,
   faCheckCircle,
-  faCircleExclamation,
-  faCircleInfo,
+  faXmarkCircle,
+  faExclamationCircle,
+  faInfoCircle,
 } from '@fortawesome/free-solid-svg-icons';
 @Component({
   selector: 'df-alert',
@@ -33,13 +34,13 @@ export class DfAlertComponent {
       case 'success':
         return faCheckCircle;
       case 'error':
-        return faCircleExclamation;
+        return faXmarkCircle;
       case 'warning':
-        return faCircleExclamation;
+        return faExclamationCircle;
       case 'info':
-        return faCircleInfo;
+        return faInfoCircle;
       default:
-        return faCircleInfo;
+        return faInfoCircle;
     }
   }
 }

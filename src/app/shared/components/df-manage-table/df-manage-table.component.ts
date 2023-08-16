@@ -10,7 +10,7 @@ import {
 import { PageEvent } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 
 @Component({
@@ -33,6 +33,7 @@ export abstract class DFManageTableComponent<T>
   _activatedRoute = this.activatedRoute;
 
   constructor(
+    private router: Router,
     private activatedRoute: ActivatedRoute,
     private liveAnnouncer: LiveAnnouncer
   ) {}
@@ -55,7 +56,22 @@ export abstract class DFManageTableComponent<T>
   }
 
   abstract mapDataToTable(data: any): Array<T>;
-  abstract changePage(event: PageEvent): void;
+
+  abstract refreshTable(limit?: number, offset?: number): void;
+
+  changePage(event: PageEvent): void {
+    if (event.previousPageIndex !== event.pageIndex) {
+      this.refreshTable(event.pageSize, event.pageIndex * event.pageSize);
+    } else {
+      this.refreshTable(event.pageSize);
+    }
+  }
+
+  editRow(row: T): void {
+    this.router.navigate(['edit', (row as any).id], {
+      relativeTo: this._activatedRoute,
+    });
+  }
 
   isAllSelected() {
     const numSelected = this.selection.selected.length;
@@ -73,9 +89,9 @@ export abstract class DFManageTableComponent<T>
     if (!row) {
       return `${this.isAllSelected() ? 'deselect' : 'select'} all`;
     }
-    return `${
-      this.selection.isSelected(row) ? 'deselect' : 'select'
-    } row ${row}`;
+    return `${this.selection.isSelected(row) ? 'deselect' : 'select'} row ${
+      (row as any).id
+    }`;
   }
 
   announceSortChange(sortState: any) {

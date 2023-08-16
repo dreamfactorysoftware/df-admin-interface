@@ -8,6 +8,8 @@ import { MatPaginatorModule } from '@angular/material/paginator';
 import { CommonModule } from '@angular/common';
 import { MatSortModule } from '@angular/material/sort';
 import { DfAdminDetailsComponent } from './df-admin-details/df-admin-details.component';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { TranslateModule } from '@ngx-translate/core';
 
 @NgModule({
   declarations: [DfManageAdminsComponent, DfAdminDetailsComponent],
@@ -18,6 +20,8 @@ import { DfAdminDetailsComponent } from './df-admin-details/df-admin-details.com
     MatPaginatorModule,
     MatSortModule,
     CommonModule,
+    FontAwesomeModule,
+    TranslateModule,
   ],
   providers: [DfAdminService],
 })
