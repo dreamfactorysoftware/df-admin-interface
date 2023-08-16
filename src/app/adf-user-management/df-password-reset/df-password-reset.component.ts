@@ -13,7 +13,6 @@ import { ActivatedRoute, Router } from '@angular/router';
 @Component({
   selector: 'df-password-reset',
   templateUrl: './df-password-reset.component.html',
-  providers: [DfPasswordService],
   styleUrls: ['../adf-user-management.scss'],
 })
 export class DfPasswordResetComponent implements OnInit, OnDestroy {

@@ -11,6 +11,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { TranslateModule } from '@ngx-translate/core';
 import { DfUserDetailsComponent } from '../shared/components/df-user-details/df-user-details.component';
+import { DfProfileService } from './services/df-profile.service';
+import { DfPasswordService } from '../adf-user-management/services/df-password.service';
 
 @NgModule({
   declarations: [DfProfileComponent],
@@ -28,5 +30,6 @@ import { DfUserDetailsComponent } from '../shared/components/df-user-details/df-
     TranslateModule,
     DfUserDetailsComponent,
   ],
+  providers: [DfProfileService, DfPasswordService],
 })
 export class AdfProfileModule {}

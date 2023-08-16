@@ -20,7 +20,6 @@ import { UserProfile } from '../types';
   selector: 'df-profile',
   templateUrl: './df-profile.component.html',
   styleUrls: ['./df-profile.component.scss'],
-  providers: [DfProfileService, DfPasswordService],
 })
 export class DfProfileComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();

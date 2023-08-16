@@ -15,7 +15,6 @@ import { LoginCredentials } from '../types';
   selector: 'df-forgot-password',
   templateUrl: './df-forgot-password.component.html',
   styleUrls: ['../adf-user-management.scss'],
-  providers: [DfPasswordService],
 })
 export class DfForgotPasswordComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();

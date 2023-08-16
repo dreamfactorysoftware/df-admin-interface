@@ -18,6 +18,7 @@ import { DfForgotPasswordComponent } from './df-forgot-password/df-forgot-passwo
 import { DfRegisterComponent } from './df-register/df-register.component';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { DfUserDetailsComponent } from '../shared/components/df-user-details/df-user-details.component';
+import { DfPasswordService } from './services/df-password.service';
 
 @NgModule({
   declarations: [
@@ -44,5 +45,6 @@ import { DfUserDetailsComponent } from '../shared/components/df-user-details/df-
     FontAwesomeModule,
     DfUserDetailsComponent,
   ],
+  providers: [DfPasswordService],
 })
 export class AdfUserManagementModule {}
