@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { DfProfileService } from './df-profile.service';
+import { DfProfileService } from '../services/df-profile.service';
 import {
   FormBuilder,
   FormControl,
