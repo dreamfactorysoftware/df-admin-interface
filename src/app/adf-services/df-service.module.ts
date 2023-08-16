@@ -24,6 +24,7 @@ import { DfAlertComponent } from '../shared/components/df-alert/df-alert.compone
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { DfServiceLinksCardComponent } from './df-service-definition/df-service-links-card/df-service-links-card.component';
 import { MatCardModule } from '@angular/material/card';
+import { DfCreateServiceComponent } from './df-create-service/df-create-service.component';
 
 @NgModule({
   declarations: [
@@ -33,6 +34,7 @@ import { MatCardModule } from '@angular/material/card';
     DfManageServicesComponent,
     DfServiceFormComponent,
     DfServiceLinksCardComponent,
+    DfCreateServiceComponent,
   ],
   imports: [
     CommonModule,

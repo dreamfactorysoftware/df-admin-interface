@@ -7,11 +7,16 @@ import { DfServiceComponent } from './adf-services/df-service/df-service.compone
 import { getSystemServiceDataResolver } from './adf-services/resolvers/manage-service.resolver';
 
 import { HashLocationStrategy, LocationStrategy } from '@angular/common';
+import { DfCreateServiceComponent } from './adf-services/df-create-service/df-create-service.component';
 const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
     redirectTo: ROUTES.HOME,
+  },
+  {
+    path: 'services',
+    redirectTo: ROUTES.MANAGE_SERVICES,
   },
   {
     path: ROUTES.AUTH,
@@ -28,7 +33,12 @@ const routes: Routes = [
     canActivate: [loggedInGuard],
   },
   {
-    path: ROUTES.SERVICES,
+    path: ROUTES.CREATE_SERVICES,
+    component: DfCreateServiceComponent,
+    canActivate: [loggedInGuard],
+  },
+  {
+    path: ROUTES.MANAGE_SERVICES,
     component: DfServiceComponent,
     canActivate: [loggedInGuard],
     resolve: { data: getSystemServiceDataResolver },
