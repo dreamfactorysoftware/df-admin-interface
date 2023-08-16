@@ -1,46 +1,30 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, tap } from 'rxjs';
 import { URLS } from 'src/app/core/constants/urls';
+import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ServiceDataService {
-  private systemServiceDataSubject =
-    new BehaviorSubject<SystemServiceDataResponse | null>(null);
-  systemServiceData$ = this.systemServiceDataSubject.asObservable();
-
-  private serviceTypeDataSubject =
-    new BehaviorSubject<ServiceTypeResponse | null>(null);
-  serviceTypeData$ = this.serviceTypeDataSubject.asObservable();
-
   constructor(private http: HttpClient) {}
 
-  getSystemServiceData() {
-    return this.http
-      .get<SystemServiceDataResponse>(URLS.SYSTEM_SERVICE, {
+  getSystemServiceData(limit = 10, offset = 0) {
+    return this.http.get<GenericListResponse<Array<SystemServiceData>>>(
+      URLS.SYSTEM_SERVICE,
+      {
         params: {
+          limit,
+          offset,
           include_count: true,
-          limit: 100,
           related: 'service_doc_by_service_id',
         },
-      })
-      .pipe(
-        tap(data => {
-          this.systemServiceData = data;
-          return data;
-        })
-      );
+      }
+    );
   }
 
   getServiceTypes() {
-    return this.http.get<ServiceTypeResponse>(URLS.SERVICE_TYPE).pipe(
-      tap(data => {
-        this.serviceTypeData = data;
-        return data;
-      })
-    );
+    return this.http.get<ServiceTypeResponse>(URLS.SERVICE_TYPE);
   }
 
   updateServiceData(updatedObject: SystemServiceData) {
@@ -66,22 +50,6 @@ export class ServiceDataService {
       },
     });
   }
-
-  get serviceTypeData(): ServiceTypeResponse | null {
-    return this.serviceTypeDataSubject.value;
-  }
-
-  set serviceTypeData(serviceTypeData: ServiceTypeResponse | null) {
-    this.serviceTypeDataSubject.next(serviceTypeData);
-  }
-
-  get systemServiceData(): SystemServiceDataResponse | null {
-    return this.systemServiceDataSubject.value;
-  }
-
-  set systemServiceData(systemServiceData: SystemServiceDataResponse | null) {
-    this.systemServiceDataSubject.next(systemServiceData);
-  }
 }
 
 export interface DeleteServiceResponse {
@@ -106,11 +74,6 @@ export interface ServiceType {
   singleton: boolean;
   subscription_required: string;
   config_schema: object[];
-}
-
-export interface SystemServiceDataResponse {
-  meta: { count: number };
-  resource: SystemServiceData[];
 }
 
 export interface SystemServiceData {

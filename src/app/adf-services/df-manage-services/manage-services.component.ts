@@ -1,19 +1,16 @@
-import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { Component } from '@angular/core';
+import { takeUntil } from 'rxjs';
 import { faTrash, faCheck } from '@fortawesome/free-solid-svg-icons';
-import { MatTableDataSource } from '@angular/material/table';
-import { MatPaginator } from '@angular/material/paginator';
-import { MatSort } from '@angular/material/sort';
-import { SelectionModel } from '@angular/cdk/collections';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatCheckboxChange } from '@angular/material/checkbox';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { TranslateService } from '@ngx-translate/core';
 import {
-  SystemServiceDataResponse,
   ServiceDataService,
-  GroupDeleteServiceResponse,
+  SystemServiceData,
 } from '../services/service-data.service';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
+import { DFManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 
 type ServiceTableData = {
   id: number;
@@ -30,91 +27,73 @@ type ServiceTableData = {
   templateUrl: './manage-services.component.html',
   styleUrls: ['./manage-services.component.scss'],
 })
-export class DfManageServicesComponent implements OnInit, OnDestroy {
-  private destroyed$ = new Subject<void>();
-
-  displayedColumns: string[] = [
-    'select',
-    'id',
-    'name',
-    'label',
-    'description',
-    'type',
-    'active',
-    'deletable',
+export class DfManageServicesComponent extends DFManageTableComponent<ServiceTableData> {
+  override columns = [
+    {
+      columnDef: 'select',
+    },
+    {
+      columnDef: 'id',
+      cell: (row: ServiceTableData) => `${row.id}`,
+      header: 'id',
+      sortActionDescription: 'id',
+    },
+    {
+      columnDef: 'name',
+      cell: (row: ServiceTableData) => `${row.name}`,
+      header: 'name',
+      sortActionDescription: 'name',
+    },
+    {
+      columnDef: 'label',
+      cell: (row: ServiceTableData) => `${row.label}`,
+      header: 'label',
+      sortActionDescription: 'label',
+    },
+    {
+      columnDef: 'description',
+      cell: (row: ServiceTableData) => `${row.description}`,
+      header: 'description',
+      sortActionDescription: 'description',
+    },
+    {
+      columnDef: 'type',
+      cell: (row: ServiceTableData) => `${row.type}`,
+      header: 'type',
+      sortActionDescription: 'type',
+    },
+    {
+      columnDef: 'active',
+      cell: (row: ServiceTableData) => `${row.active}`,
+      header: 'active',
+      sortActionDescription: 'active',
+    },
+    {
+      columnDef: 'deletable',
+      cell: (row: ServiceTableData) => `${row.deletable}`,
+      header: 'deletable',
+      sortActionDescription: 'deletable',
+    },
   ];
-  dataSource: MatTableDataSource<ServiceTableData>;
-  data: ServiceTableData[];
-  selection = new SelectionModel<ServiceTableData>(true, []);
-
-  systemServiceData: SystemServiceDataResponse | null;
 
   faTrash = faTrash;
   faCheck = faCheck;
 
+  // TODO: marked for removal
   alertMsg: string;
   showAlert: boolean;
   alertType: AlertType = 'success';
 
   isGroupDeleteIconVisible: boolean;
 
-  @ViewChild(MatPaginator) paginator: MatPaginator;
-  @ViewChild(MatSort) sort: MatSort;
-
   constructor(
     private serviceDataService: ServiceDataService,
-    private activatedRoute: ActivatedRoute,
-    private translateService: TranslateService
+    private translateService: TranslateService,
+    activatedRoute: ActivatedRoute,
+    router: Router,
+    liveAnnouncer: LiveAnnouncer
   ) {
-    this.alertMsg = '';
-    this.showAlert = false;
-  }
-
-  ngOnInit(): void {
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe((data: any) => {
-        this.systemServiceData = data.data as SystemServiceDataResponse;
-        this.data = this.systemServiceData.resource.map(val => {
-          return {
-            id: val.id,
-            name: val.name,
-            label: val.label,
-            description: val.description,
-            type: val.type,
-            active: val.isActive,
-            deletable: val.deletable,
-          };
-        });
-        this.dataSource = new MatTableDataSource(this.data);
-        this.dataSource.paginator = this.paginator;
-        this.dataSource.sort = this.sort;
-      });
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
-  }
-
-  /** Whether the number of selected elements matches the total number of rows. */
-  isAllSelected() {
-    if (!this.dataSource) return false;
-    const numSelected = this.selection.selected.length;
-    const numRows = this.dataSource.data.length;
-    return numSelected === numRows;
-  }
-
-  /** Selects all rows if they are not all selected; otherwise clear selection. */
-  toggleAllRows() {
-    if (this.isAllSelected()) {
-      this.isGroupDeleteIconVisible = false;
-      this.selection.clear();
-      return;
-    }
-
-    this.isGroupDeleteIconVisible = true;
-    this.selection.select(...this.dataSource.data);
+    super(router, activatedRoute, liveAnnouncer);
   }
 
   onCheckboxSelect(event: MatCheckboxChange, row: ServiceTableData) {
@@ -127,16 +106,6 @@ export class DfManageServicesComponent implements OnInit, OnDestroy {
     return null;
   }
 
-  /** The label for the checkbox on the passed row */
-  checkboxLabel(row?: ServiceTableData): string {
-    if (!row) {
-      return `${this.isAllSelected() ? 'deselect' : 'select'} all`;
-    }
-    return `${this.selection.isSelected(row) ? 'deselect' : 'select'} row ${
-      row.id + 1
-    }`;
-  }
-
   applyFilter(event: Event) {
     const filterValue = (event.target as HTMLInputElement).value;
     this.dataSource.filter = filterValue.trim().toLowerCase();
@@ -146,29 +115,44 @@ export class DfManageServicesComponent implements OnInit, OnDestroy {
     }
   }
 
+  mapDataToTable(data: any): ServiceTableData[] {
+    return data.map((val: SystemServiceData) => {
+      return {
+        id: val.id,
+        name: val.name,
+        label: val.label,
+        description: val.description,
+        type: val.type,
+        active: val.isActive,
+        deletable: val.deletable,
+      };
+    });
+  }
+
+  refreshTable(limit?: number, offset?: number): void {
+    this.serviceDataService
+      .getSystemServiceData(limit, offset)
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        this.dataSource.data = this.mapDataToTable(data.resource);
+        this.tableLength = data.meta.count;
+      });
+  }
+
   onRowClick(row: ServiceTableData): void {
     row;
   }
 
-  onDelete(row: number) {
-    return this.serviceDataService
+  deleteRow(row: any): void {
+    this.serviceDataService
       .deleteServiceData(row)
-      .pipe(
-        catchError(err => {
-          this.alertMsg = this.translateService.instant('services.deleteError');
-          return throwError(() => new Error(err));
-        })
-      )
-      .subscribe(data => {
-        if (data.id) {
-          this.alertMsg = this.translateService.instant(
-            'services.deleteSuccess'
-          );
-          this.showAlert = true;
-        }
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(() => {
+        this.refreshTable();
       });
   }
 
+  // TODO: marked for removal
   onMassDelete() {
     const rows = this.selection.selected
       .filter(val => {
@@ -178,22 +162,9 @@ export class DfManageServicesComponent implements OnInit, OnDestroy {
 
     return this.serviceDataService
       .deleteMultipleServiceData(rows)
-      .pipe(
-        catchError(err => {
-          this.alertMsg = this.translateService.instant('services.deleteError');
-          this.alertType = 'error';
-          this.showAlert = true;
-          return throwError(() => new Error(err));
-        })
-      )
-      .subscribe((data: GroupDeleteServiceResponse) => {
-        if (data.resource.length) {
-          this.alertMsg = this.translateService.instant(
-            'services.deleteSuccess'
-          );
-          this.showAlert = true;
-          this.alertType = 'success';
-        }
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(() => {
+        this.refreshTable();
       });
   }
 }

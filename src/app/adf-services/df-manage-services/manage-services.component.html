@@ -1,117 +1,110 @@
-<div class="manage-services-container">
-  <df-alert
-    [message]="alertMsg"
-    [showAlert]="showAlert"
-    (alertClosed)="showAlert = false"></df-alert>
+<mat-form-field>
+  <mat-label>Filter</mat-label>
+  <input
+    matInput
+    (keyup)="applyFilter($event)"
+    placeholder="Ex. System"
+    #input />
+</mat-form-field>
 
-  <mat-form-field>
-    <mat-label>Filter</mat-label>
-    <input
-      matInput
-      (keyup)="applyFilter($event)"
-      placeholder="Ex. System"
-      #input />
-  </mat-form-field>
+<table mat-table [dataSource]="dataSource" class="mat-elevation-z8" matSort>
+  <!-- Checkbox Column -->
+  <ng-container matColumnDef="select">
+    <th mat-header-cell *matHeaderCellDef>
+      <mat-checkbox
+        (change)="$event ? toggleAllRows() : null"
+        [checked]="selection.hasValue() && isAllSelected()"
+        [indeterminate]="selection.hasValue() && !isAllSelected()"
+        [aria-label]="checkboxLabel()">
+      </mat-checkbox>
+    </th>
+    <td mat-cell *matCellDef="let row">
+      <mat-checkbox
+        *ngIf="row.deletable"
+        (click)="$event.stopPropagation()"
+        (change)="onCheckboxSelect($event, row)"
+        [checked]="selection.isSelected(row)"
+        [aria-label]="checkboxLabel(row)">
+      </mat-checkbox>
+    </td>
+  </ng-container>
 
-  <table mat-table [dataSource]="dataSource" class="mat-elevation-z8" matSort>
-    <!-- Checkbox Column -->
-    <ng-container matColumnDef="select">
-      <th mat-header-cell *matHeaderCellDef>
-        <mat-checkbox
-          (change)="$event ? toggleAllRows() : null"
-          [checked]="selection.hasValue() && isAllSelected()"
-          [indeterminate]="selection.hasValue() && !isAllSelected()"
-          [aria-label]="checkboxLabel()">
-        </mat-checkbox>
-      </th>
-      <td mat-cell *matCellDef="let row">
-        <mat-checkbox
-          *ngIf="row.deletable"
-          (click)="$event.stopPropagation()"
-          (change)="onCheckboxSelect($event, row)"
-          [checked]="selection.isSelected(row)"
-          [aria-label]="checkboxLabel(row)">
-        </mat-checkbox>
-      </td>
-    </ng-container>
+  <!-- ID Column -->
+  <ng-container matColumnDef="id">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>ID</th>
+    <td mat-cell *matCellDef="let element">{{ element.id }}</td>
+  </ng-container>
 
-    <!-- ID Column -->
-    <ng-container matColumnDef="id">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header>ID</th>
-      <td mat-cell *matCellDef="let element">{{ element.id }}</td>
-    </ng-container>
+  <!-- Name Column -->
+  <ng-container matColumnDef="name">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+    <td mat-cell *matCellDef="let element">{{ element.name }}</td>
+  </ng-container>
 
-    <!-- Name Column -->
-    <ng-container matColumnDef="name">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
-      <td mat-cell *matCellDef="let element">{{ element.name }}</td>
-    </ng-container>
+  <!-- Label Column -->
+  <ng-container matColumnDef="label">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Label</th>
+    <td mat-cell *matCellDef="let element">{{ element.label }}</td>
+  </ng-container>
 
-    <!-- Label Column -->
-    <ng-container matColumnDef="label">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header>Label</th>
-      <td mat-cell *matCellDef="let element">{{ element.label }}</td>
-    </ng-container>
+  <!-- Description Column -->
+  <ng-container matColumnDef="description">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
+    <td mat-cell *matCellDef="let element">{{ element.description }}</td>
+  </ng-container>
 
-    <!-- Description Column -->
-    <ng-container matColumnDef="description">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
-      <td mat-cell *matCellDef="let element">{{ element.description }}</td>
-    </ng-container>
+  <!-- Type Column -->
+  <ng-container matColumnDef="type">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+    <td mat-cell *matCellDef="let element">{{ element.type }}</td>
+  </ng-container>
 
-    <!-- Type Column -->
-    <ng-container matColumnDef="type">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
-      <td mat-cell *matCellDef="let element">{{ element.type }}</td>
-    </ng-container>
+  <!-- Active Column -->
+  <ng-container matColumnDef="active">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header>Active</th>
+    <td mat-cell *matCellDef="let element">
+      <fa-icon [icon]="faCheck">check</fa-icon>
+    </td>
+  </ng-container>
 
-    <!-- Active Column -->
-    <ng-container matColumnDef="active">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header>Active</th>
-      <td mat-cell *matCellDef="let element">
-        <fa-icon [icon]="faCheck">check</fa-icon>
-      </td>
-    </ng-container>
+  <!-- Delete Column -->
+  <ng-container matColumnDef="deletable">
+    <th mat-header-cell *matHeaderCellDef>
+      <button
+        *ngIf="isGroupDeleteIconVisible"
+        mat-icon-button
+        color="primary"
+        aria-label="Group delete service icon"
+        (click)="onMassDelete()">
+        <fa-icon [icon]="faTrash">delete</fa-icon>
+      </button>
+    </th>
+    <td mat-cell *matCellDef="let element">
+      <button
+        *ngIf="element.deletable"
+        mat-icon-button
+        color="primary"
+        aria-label="Delete service icon"
+        (click)="deleteRow(element.id)">
+        <fa-icon [icon]="faTrash">delete</fa-icon>
+      </button>
+    </td>
+  </ng-container>
 
-    <!-- Delete Column -->
-    <ng-container matColumnDef="deletable">
-      <th mat-header-cell *matHeaderCellDef>
-        <button
-          *ngIf="isGroupDeleteIconVisible"
-          mat-icon-button
-          color="primary"
-          aria-label="Group delete service icon"
-          (click)="onMassDelete()">
-          <fa-icon [icon]="faTrash">delete</fa-icon>
-        </button>
-      </th>
-      <td mat-cell *matCellDef="let element">
-        <button
-          *ngIf="element.deletable"
-          mat-icon-button
-          color="primary"
-          aria-label="Delete service icon"
-          (click)="onDelete(element.id)">
-          <fa-icon [icon]="faTrash">delete</fa-icon>
-        </button>
-      </td>
-    </ng-container>
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr
+    mat-row
+    *matRowDef="let row; columns: displayedColumns"
+    (click)="onRowClick(row)"></tr>
 
-    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr
-      mat-row
-      *matRowDef="let row; columns: displayedColumns"
-      (click)="onRowClick(row)"></tr>
+  <!-- Row shown when there is no matching data. -->
+  <tr class="mat-row" *matNoDataRow>
+    <td class="mat-cell" colspan="4">
+      {{ 'services.noDataMatchingTheFilter' | translate }} "{{ input.value }}"
+    </td>
+  </tr>
+</table>
 
-    <!-- Row shown when there is no matching data. -->
-    <tr class="mat-row" *matNoDataRow>
-      <td class="mat-cell" colspan="4">
-        {{ 'services.noDataMatchingTheFilter' | translate }} "{{ input.value }}"
-      </td>
-    </tr>
-  </table>
-
-  <mat-paginator
-    [pageSizeOptions]="[5, 10, 25, 100]"
-    aria-label="Select page of services"></mat-paginator>
-</div>
+<mat-paginator
+  [pageSizeOptions]="[5, 10, 25, 100]"
+  aria-label="Select page of services"></mat-paginator>
