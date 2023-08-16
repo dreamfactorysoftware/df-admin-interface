@@ -1,10 +1,11 @@
 import { ResolveFn } from '@angular/router';
-import {
-  ServiceDataService,
-  SystemServiceDataResponse,
-} from '../services/service-data.service';
+
 import { inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import {
+  SystemServiceDataResponse,
+  ServiceDataService,
+} from '../services/service-data.service';
 
 export const getSystemServiceDataResolver: ResolveFn<
   Observable<SystemServiceDataResponse>

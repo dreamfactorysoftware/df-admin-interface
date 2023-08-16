@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, tap } from 'rxjs';
-import { URLS } from '../constants/urls';
+import { URLS } from 'src/app/core/constants/urls';
 
 @Injectable({
   providedIn: 'root',

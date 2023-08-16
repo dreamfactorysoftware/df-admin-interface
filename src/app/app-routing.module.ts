@@ -4,7 +4,7 @@ import { ROUTES } from './core/constants/routes';
 import { loggedInGuard } from './core/guards/logged-in.guard';
 import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
 import { DfServiceComponent } from './adf-services/df-service/df-service.component';
-import { getSystemServiceDataResolver } from './core/resolvers/manage-service.resolver';
+import { getSystemServiceDataResolver } from './adf-services/resolvers/manage-service.resolver';
 
 const routes: Routes = [
   {

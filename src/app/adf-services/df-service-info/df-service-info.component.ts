@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { FormControl } from '@angular/forms';
-import { SystemServiceData } from 'src/app/core/services/service-data.service';
+import { SystemServiceData } from '../services/service-data.service';
 
 type DfServiceInfoDataObj = {
   selectedServiceName: string;

@@ -1,8 +1,7 @@
-// TODO: remove above line
 import { Component, Inject } from '@angular/core';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { ServiceDataService } from 'src/app/core/services/service-data.service';
+import { ServiceDataService } from '../services/service-data.service';
 
 export type ServiceSchema = {
   id: number;

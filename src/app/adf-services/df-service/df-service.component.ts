@@ -2,7 +2,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { DfServiceFormComponent } from '../df-service-form/df-service-form.component';
 import { Subject, takeUntil } from 'rxjs';
-import { ServiceDataService } from 'src/app/core/services/service-data.service';
+import { ServiceDataService } from '../services/service-data.service';
 
 @Component({
   selector: 'df-service',

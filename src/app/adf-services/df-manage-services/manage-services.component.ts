@@ -1,10 +1,5 @@
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
-import {
-  GroupDeleteServiceResponse,
-  ServiceDataService,
-  SystemServiceDataResponse,
-} from 'src/app/core/services/service-data.service';
 import { faTrash, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { MatTableDataSource } from '@angular/material/table';
 import { MatPaginator } from '@angular/material/paginator';
@@ -14,6 +9,11 @@ import { ActivatedRoute } from '@angular/router';
 import { MatCheckboxChange } from '@angular/material/checkbox';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { TranslateService } from '@ngx-translate/core';
+import {
+  SystemServiceDataResponse,
+  ServiceDataService,
+  GroupDeleteServiceResponse,
+} from '../services/service-data.service';
 
 type ServiceTableData = {
   id: number;
