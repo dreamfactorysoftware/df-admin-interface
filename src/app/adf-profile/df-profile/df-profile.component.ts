@@ -70,20 +70,20 @@ export class DfProfileComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ profile }) => {
-        this.currentProfile = profile;
+      .subscribe(({ data }) => {
+        this.currentProfile = data;
         this.profileForm.patchValue({
           userDetailsGroup: {
-            username: profile.username,
-            email: profile.email,
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            name: profile.name,
-            phone: profile.phone,
+            username: data.username,
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            name: data.name,
+            phone: data.phone,
           },
         });
         this.securityQuestionForm.patchValue({
-          securityQuestion: profile.securityQuestion,
+          securityQuestion: data.securityQuestion,
         });
       });
     this.systemConfigDataService.environment$

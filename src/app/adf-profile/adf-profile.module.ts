@@ -1,7 +1,6 @@
 import { NgModule } from '@angular/core';
 import { DfProfileComponent } from './df-profile/df-profile.component';
 import { AdfProfileRoutingModule } from './adf-profile-routing.module';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
@@ -18,7 +17,6 @@ import { DfPasswordService } from '../adf-user-management/services/df-password.s
   declarations: [DfProfileComponent],
   imports: [
     AdfProfileRoutingModule,
-    MatCheckboxModule,
     MatTabsModule,
     CommonModule,
     ReactiveFormsModule,

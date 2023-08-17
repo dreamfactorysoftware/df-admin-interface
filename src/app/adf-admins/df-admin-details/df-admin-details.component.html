@@ -1,1 +1,6 @@
-{{ admin | json }}
+<form [formGroup]="adminForm">
+  <df-user-details formGroupName="userDetailsGroup" />
+  <mat-checkbox formControlName="isActive">{{
+    'active' | translate
+  }}</mat-checkbox>
+</form>
