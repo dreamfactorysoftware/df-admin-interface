@@ -2,7 +2,11 @@ import { Component, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Subject, takeUntil } from 'rxjs';
 import { DfServiceFormComponent } from '../df-service-form/df-service-form.component';
-import { ServiceDataService } from '../services/service-data.service';
+import {
+  ServiceDataService,
+  ServiceType,
+} from '../services/service-data.service';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'df-df-create-service',
@@ -10,26 +14,34 @@ import { ServiceDataService } from '../services/service-data.service';
   styleUrls: ['./df-create-service.component.scss'],
 })
 export class DfCreateServiceComponent implements OnDestroy {
-  notifier = new Subject<void>();
+  destroyer$ = new Subject<void>();
+  serviceTypes: ServiceType[];
 
   constructor(
     public dialog: MatDialog,
-    private service: ServiceDataService
+    service: ServiceDataService,
+    activatedRoute: ActivatedRoute
   ) {
-    this.service.getSystemServiceData();
+    activatedRoute.data
+      .pipe(takeUntil(this.destroyer$))
+      .subscribe((data: any) => {
+        this.serviceTypes = data.data.resource;
+      });
   }
 
   openCreateServiceDialog() {
     const dialogRef = this.dialog.open(DfServiceFormComponent, {
-      data: {},
+      data: {
+        serviceTypes: [...this.serviceTypes],
+      },
       disableClose: true,
     });
 
-    dialogRef.afterClosed().pipe(takeUntil(this.notifier));
+    dialogRef.afterClosed().pipe(takeUntil(this.destroyer$));
   }
 
   ngOnDestroy() {
-    this.notifier.next();
-    this.notifier.complete();
+    this.destroyer$.next();
+    this.destroyer$.complete();
   }
 }

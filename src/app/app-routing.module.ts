@@ -4,7 +4,10 @@ import { ROUTES } from './core/constants/routes';
 import { loggedInGuard } from './core/guards/logged-in.guard';
 import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
 import { DfServiceComponent } from './adf-services/df-service/df-service.component';
-import { getSystemServiceDataResolver } from './adf-services/resolvers/manage-service.resolver';
+import {
+  getServiceTypeDataResolver,
+  getSystemServiceDataResolver,
+} from './adf-services/resolvers/service-data-service.resolver';
 
 import { HashLocationStrategy, LocationStrategy } from '@angular/common';
 import { DfCreateServiceComponent } from './adf-services/df-create-service/df-create-service.component';
@@ -36,6 +39,7 @@ const routes: Routes = [
     path: ROUTES.CREATE_SERVICES,
     component: DfCreateServiceComponent,
     canActivate: [loggedInGuard],
+    resolve: { data: getServiceTypeDataResolver },
   },
   {
     path: ROUTES.MANAGE_SERVICES,

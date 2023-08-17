@@ -209,6 +209,7 @@
     "reset": "Reset",
     "selectServiceType": "Select Service Type",
     "controls": {},
+    "selectSpecificServiceType": "Select Specific Service",
     "namespace": "Namespace",
     "label": "Label",
     "description": "Description",

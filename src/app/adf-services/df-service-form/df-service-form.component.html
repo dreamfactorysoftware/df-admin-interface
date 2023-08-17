@@ -11,21 +11,42 @@
             <mat-label>{{
               'services.selectServiceType' | translate
             }}</mat-label>
-            <mat-select [disabled]="!isCreateServiceEnabled">
-              <mat-option></mat-option>
+            <mat-select
+              [disabled]="!isCreateServiceEnabled"
+              formControlName="selectedServiceName"
+              (valueChange)="onChangeSelectServiceName($event)">
+              <mat-option
+                *ngFor="let option of selectServiceDropdownOptions"
+                [value]="option"
+                >{{ option }}</mat-option
+              >
             </mat-select>
           </mat-form-field>
-          <mat-form-field>
-            <mat-label>{{ 'services.Namespace' | translate }}</mat-label>
-            <input matInput />
+          <mat-form-field *ngIf="selectServiceNameDropdownValue">
+            <mat-label>{{
+              'services.selectSpecificServiceType' | translate
+            }}</mat-label>
+            <mat-select
+              formControlName="selectedServiceType"
+              (valueChange)="onChangeSelectServiceType($event)">
+              <mat-option
+                *ngFor="let option of serviceTypeDropdownOptions"
+                [value]="option"
+                >{{ option }}</mat-option
+              >
+            </mat-select>
           </mat-form-field>
-          <mat-form-field>
-            <mat-label>{{ 'services.Label' | translate }}</mat-label>
-            <input matInput />
+          <mat-form-field *ngIf="selectServiceNameDropdownValue">
+            <mat-label>{{ 'services.namespace' | translate }}</mat-label>
+            <input formControlName="namespace" matInput />
           </mat-form-field>
-          <mat-form-field>
-            <mat-label>{{ 'services.Description' | translate }}</mat-label>
-            <input matInput />
+          <mat-form-field *ngIf="selectServiceNameDropdownValue">
+            <mat-label>{{ 'services.label' | translate }}</mat-label>
+            <input formControlName="label" matInput />
+          </mat-form-field>
+          <mat-form-field *ngIf="selectServiceNameDropdownValue">
+            <mat-label>{{ 'services.description' | translate }}</mat-label>
+            <input formControlName="description" matInput />
           </mat-form-field>
           <div>
             <button mat-button (click)="onClose()">
@@ -37,7 +58,45 @@
       </mat-step>
       <mat-step [stepControl]="secondFormGroup" label="Config">
         <form [formGroup]="secondFormGroup">
-          <p>Config Section</p>
+          <h2>Config Section</h2>
+          <div class="separated-fields">
+            <h3>Basic Config</h3>
+            <div
+              class="form-group"
+              data-ng-repeat="field in selectedSchema.config_schema"
+              ng-if="isBasic(field.name)"></div>
+
+            <h3>Caching</h3>
+            <div
+              class="form-group"
+              data-ng-repeat="field in selectedSchema.config_schema"
+              ng-if="isCaching(field.name)"></div>
+
+            <h3 class="ng-scope">Optional Advanced Settings</h3>
+            <div class="advanced-fields">
+              <div id="advanced-fields-wrapper">
+                <div
+                  class="form-group"
+                  data-ng-repeat="field in selectedSchema.config_schema"
+                  ng-if="!isBasic(field.name) && !isCaching(field.name)"
+                  ng-include="'admin_components/adf-services/views/df-service-config-fields.html'"></div>
+                <p class="less-fields">
+                  <a
+                    class="button btn btn-default btn-primary save-service-btn ng-scope"
+                    ng-click="hideAdvancedFields()"
+                    >Less...</a
+                  >
+                </p>
+              </div>
+              <p class="more-fields">
+                <a
+                  class="button btn btn-default btn-primary save-service-btn ng-scope"
+                  ng-click="showAdvancedFields()"
+                  >More...</a
+                >
+              </p>
+            </div>
+          </div>
           <div>
             <button mat-button matStepperPrevious>
               {{ 'services.back' | translate }}

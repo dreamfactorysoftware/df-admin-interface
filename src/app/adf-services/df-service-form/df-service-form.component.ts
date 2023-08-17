@@ -1,17 +1,13 @@
 import { Component, Inject } from '@angular/core';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { ServiceDataService } from '../services/service-data.service';
+import {
+  ServiceDataService,
+  ServiceType,
+} from '../services/service-data.service';
 
-export type ServiceSchema = {
-  id: number;
-  name: string;
-  label: string;
-  description: string;
-  isActive: boolean;
-  type: string;
-  config: object; // populated by secondFormGroup
-  service_doc_by_service_id: object | null; // populated by thirdFormGroup
+export type FormData = {
+  serviceTypes: ServiceType[];
 };
 
 @Component({
@@ -21,10 +17,17 @@ export type ServiceSchema = {
 })
 export class DfServiceFormComponent {
   isCreateServiceEnabled = true;
-  selectedSchema: ServiceSchema;
+  selectedService: ServiceType | undefined; // aka selectedSchema
+  selectServiceDropdownOptions: string[];
+  selectServiceNameDropdownValue: string | null;
+  selectServiceTypeDropdownValue: string | null;
+  serviceTypeDropdownOptions: string[];
+  private serviceTypeMap = new Map<string, string[]>();
 
   //Info
   firstFormGroup = this._formBuilder.group({
+    selectedServiceName: new FormControl('', Validators.required),
+    selectedServiceType: new FormControl('', Validators.required),
     namespace: new FormControl('', Validators.required),
     label: new FormControl('', Validators.required),
     description: new FormControl(''),
@@ -43,10 +46,46 @@ export class DfServiceFormComponent {
 
   constructor(
     public dialogRef: MatDialogRef<DfServiceFormComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: any,
+    @Inject(MAT_DIALOG_DATA) public data: FormData,
     private _formBuilder: FormBuilder,
     private serviceDataService: ServiceDataService
-  ) {}
+  ) {
+    this.selectServiceNameDropdownValue = null;
+    this.selectServiceDropdownOptions = data.serviceTypes
+      .map(val => val.group)
+      .filter((groupName, index, self) => {
+        const name = groupName.trim().toLowerCase();
+        if (name === 'api doc' || name === 'system' || name === 'user')
+          return false;
+        return index === self.indexOf(groupName);
+      });
+
+    data.serviceTypes.map(val => {
+      if (!this.serviceTypeMap.has(val.group)) {
+        this.serviceTypeMap.set(val.group, [val.label]);
+      } else {
+        const existingVal = this.serviceTypeMap.get(val.group) as string[];
+        this.serviceTypeMap.set(val.group, [...existingVal, val.label]);
+      }
+    });
+  }
+
+  onChangeSelectServiceName(event: string): void {
+    this.selectServiceNameDropdownValue = event;
+    this.firstFormGroup.value.selectedServiceName = event;
+
+    this.serviceTypeDropdownOptions = this.serviceTypeMap.get(
+      this.selectServiceNameDropdownValue
+    ) as string[];
+  }
+
+  onChangeSelectServiceType(event: string): void {
+    this.selectServiceTypeDropdownValue = event;
+    this.selectedService = this.data.serviceTypes.find(val => {
+      return val.label === this.selectServiceTypeDropdownValue;
+    });
+    console.log('selectedService: ', this.selectedService);
+  }
 
   onClose(): void {
     this.dialogRef.close();
@@ -86,7 +125,11 @@ export class DfServiceFormComponent {
     ]);
 
     // mysql exception for schema field
-    if (this.selectedSchema.name === 'mysql' && fieldName === 'schema') {
+    if (
+      this.selectedService &&
+      this.selectedService.name === 'mysql' &&
+      fieldName === 'schema'
+    ) {
       return false;
     }
 

@@ -24,7 +24,19 @@ export class ServiceDataService {
   }
 
   getServiceTypes() {
-    return this.http.get<ServiceTypeResponse>(URLS.SERVICE_TYPE);
+    return this.http.get<GenericListResponse<Array<ServiceType>>>(
+      URLS.SERVICE_TYPE
+    );
+  }
+
+  createService(newService: SystemServiceData) {
+    const body = JSON.stringify({
+      resource: [newService],
+    });
+
+    return this.http.post<SystemServiceData>(URLS.SYSTEM_SERVICE, body, {
+      params: { fields: '*', related: 'service_doc_by_service_id' },
+    });
   }
 
   updateServiceData(updatedObject: SystemServiceData) {
