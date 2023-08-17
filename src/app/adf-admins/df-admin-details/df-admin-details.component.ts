@@ -32,6 +32,7 @@ export class DfAdminDetailsComponent implements OnInit, OnDestroy {
       isActive: [false],
     });
   }
+
   ngOnInit(): void {
     this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
