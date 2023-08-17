@@ -5,7 +5,7 @@ import { takeUntil } from 'rxjs';
 import {
   faCheckCircle,
   faXmarkCircle,
-  faTrashCan
+  faTrashCan,
 } from '@fortawesome/free-solid-svg-icons';
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
 import { Component } from '@angular/core';
@@ -15,7 +15,7 @@ import { DfRoleService } from '../services/df-role.service';
 @Component({
   selector: 'df-manage-roles',
   templateUrl: './df-manage-roles.component.html',
-  styleUrls: ['./df-manage-roles.component.scss']
+  styleUrls: ['./df-manage-roles.component.scss'],
 })
 export class DfManageRolesComponent extends DFManageTableComponent<RoleRow> {
   constructor(

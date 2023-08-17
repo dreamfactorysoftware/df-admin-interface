@@ -76,7 +76,6 @@
       "description": "Description",
       "active": "Active"
     }
-
   },
   "userManagement": {
     "requiredForLogin": "Required for login",

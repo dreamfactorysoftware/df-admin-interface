@@ -42,7 +42,6 @@ const routes: Routes = [
       import('./adf-roles/adf-roles.module').then(m => m.AdfRolesModule),
     canActivate: [loggedInGuard],
   },
-
 ];
 
 @NgModule({

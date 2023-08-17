@@ -10,18 +10,15 @@ export class DfRoleService {
   constructor(private http: HttpClient) {}
 
   getRoles(limit = 10, offset = 0) {
-    return this.http.get<GenericListResponse<Array<RoleType>>>(
-      URLS.ROLES,
-      {
-        headers: SHOW_LOADING_HEADER,
-        params: {
-          limit,
-          offset,
-          include_count: true,
-          related: 'lookup_by_role_id',
-        },
-      }
-    );
+    return this.http.get<GenericListResponse<Array<RoleType>>>(URLS.ROLES, {
+      headers: SHOW_LOADING_HEADER,
+      params: {
+        limit,
+        offset,
+        include_count: true,
+        related: 'lookup_by_role_id',
+      },
+    });
   }
 
   getRole(id: string | number) {
