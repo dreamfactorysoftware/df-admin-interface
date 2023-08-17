@@ -68,9 +68,7 @@ export class DfManageRolesComponent extends DFManageTableComponent<RoleRow> {
   }
 
   mapDataToTable(data: any): RoleRow[] {
-    console.log('MAP TO TALBE', data)
     return data.map((role: RoleType) => {
-      console.log("REOLE", role)
       return {
         id: role.id,
         name: role.name,
@@ -90,9 +88,6 @@ export class DfManageRolesComponent extends DFManageTableComponent<RoleRow> {
   }
 
   refreshTable(limit?: number, offset?: number): void {
-
-    console.log("WE'RE DOING IT")
-    console.log(limit, offset);
     this.roleService
       .getRoles(limit, offset)
       .pipe(takeUntil(this.destroyed$))

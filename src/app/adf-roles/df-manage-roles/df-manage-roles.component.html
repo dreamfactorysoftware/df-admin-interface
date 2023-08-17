@@ -25,14 +25,10 @@
           [icon]="activeIcon(!!column?.cell(row))"
           size="lg"
           [class]="!!column?.cell(row) ? 'active' : 'inactive'"></fa-icon>
-        <ng-container
-          *ngIf="
-            column.columnDef !== 'active'
-          ">
+        <ng-container *ngIf="column.columnDef !== 'active'">
           {{ column?.cell(row) }}
         </ng-container>
       </td>
-
     </ng-container>
     <ng-container
       [matColumnDef]="column.columnDef"

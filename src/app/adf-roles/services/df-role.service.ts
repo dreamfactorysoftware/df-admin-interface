@@ -9,9 +9,7 @@ import { RoleType } from 'src/app/shared/types/role';
 export class DfRoleService {
   constructor(private http: HttpClient) {}
 
-
   getRoles(limit = 100, offset = 0, filter = '') {
-    console.log('getRoles');
     return this.http.get<GenericListResponse<Array<RoleType>>>(URLS.ROLES, {
       headers: SHOW_LOADING_HEADER,
       params: {
