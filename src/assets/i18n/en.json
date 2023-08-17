@@ -69,6 +69,14 @@
       "react": "React"
     }
   },
+  "roleManagement": {
+    "tableHeaders": {
+      "id": "ID",
+      "name": "Name",
+      "description": "Description",
+      "active": "Active"
+    }
+  },
   "userManagement": {
     "requiredForLogin": "Required for login",
     "resetPassword": "Reset Password",
