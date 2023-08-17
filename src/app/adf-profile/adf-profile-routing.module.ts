@@ -7,7 +7,7 @@ const routes: Routes = [
   {
     path: '',
     component: DfProfileComponent,
-    resolve: { profile: profileResolver },
+    resolve: { data: profileResolver },
   },
 ];
 

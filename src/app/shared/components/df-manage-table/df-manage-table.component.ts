@@ -23,6 +23,10 @@ export abstract class DFManageTableComponent<T>
   dataSource = new MatTableDataSource<T>();
   selection = new SelectionModel<T>(true, []);
   tableLength = 0;
+  pageSizes = [10, 50, 100];
+  currentPageSize = 10;
+  filter = '';
+
   columns: Array<{
     columnDef: string;
     cell?: (element: T) => string;
@@ -57,12 +61,15 @@ export abstract class DFManageTableComponent<T>
 
   abstract mapDataToTable(data: any): Array<T>;
 
-  abstract refreshTable(limit?: number, offset?: number): void;
+  abstract refreshTable(limit?: number, offset?: number, filter?: string): void;
+
+  abstract filterQuery(value: string): string;
 
   changePage(event: PageEvent): void {
     if (event.previousPageIndex !== event.pageIndex) {
-      this.refreshTable(event.pageSize, event.pageIndex * event.pageSize);
+      this.refreshTable(this.currentPageSize, event.pageIndex * event.pageSize);
     } else {
+      this.currentPageSize = event.pageSize;
       this.refreshTable(event.pageSize);
     }
   }
@@ -94,12 +101,25 @@ export abstract class DFManageTableComponent<T>
     }`;
   }
 
+  deleteLabel(row: T): string {
+    return `delete row ${(row as any).id}`;
+  }
+
+  editLabel(row: T): string {
+    return `edit row ${(row as any).id}`;
+  }
+
   announceSortChange(sortState: any) {
     if (sortState.direction) {
       this.liveAnnouncer.announce(`Sorted ${sortState.direction}ending`);
     } else {
       this.liveAnnouncer.announce('Sorting cleared');
     }
+  }
+
+  triggerSearch(event: Event) {
+    const filter = (event.target as HTMLInputElement).value;
+    this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter));
   }
 
   ngOnDestroy(): void {

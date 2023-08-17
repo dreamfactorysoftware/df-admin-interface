@@ -1,3 +1,7 @@
+<mat-form-field>
+  <mat-label>Filter</mat-label>
+  <input matInput (keyup)="triggerSearch($event)" #filter />
+</mat-form-field>
 <table
   mat-table
   [dataSource]="dataSource"
@@ -6,33 +10,13 @@
   <ng-container *ngFor="let column of columns">
     <ng-container
       [matColumnDef]="column.columnDef"
-      *ngIf="column.columnDef === 'select'">
-      <th mat-header-cell *matHeaderCellDef>
-        <mat-checkbox
-          (change)="$event ? toggleAllRows() : null"
-          [checked]="selection.hasValue() && isAllSelected()"
-          [indeterminate]="selection.hasValue() && !isAllSelected()"
-          [aria-label]="checkboxLabel()">
-        </mat-checkbox>
-      </th>
-      <td mat-cell *matCellDef="let row">
-        <mat-checkbox
-          (click)="$event.stopPropagation()"
-          (change)="$event ? selection.toggle(row) : null"
-          [checked]="selection.isSelected(row)"
-          [aria-label]="checkboxLabel(row)">
-        </mat-checkbox>
-      </td>
-    </ng-container>
-    <ng-container
-      [matColumnDef]="column.columnDef"
-      *ngIf="column.columnDef !== 'select'">
+      *ngIf="column.columnDef !== 'actions'">
       <th
         mat-header-cell
         *matHeaderCellDef
         mat-sort-header
         [attr.sortActionDescription]="column.sortActionDescription">
-        {{ 'user.tableHeaders.' + column.header | translate }}
+        {{ column.header! | translate }}
       </th>
       <td mat-cell *matCellDef="let row">
         <fa-icon
@@ -51,15 +35,31 @@
         </ng-container>
       </td>
     </ng-container>
+    <ng-container
+      [matColumnDef]="column.columnDef"
+      *ngIf="column.columnDef === 'actions'">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td class="actions" mat-cell *matCellDef="let row">
+        <button
+          mat-icon-button
+          (click)="editRow(row)"
+          [attr.aria-label]="editLabel(row)">
+          <fa-icon [icon]="faPenToSquare" size="xs"></fa-icon>
+        </button>
+        <button
+          mat-icon-button
+          (click)="deleteRow(row)"
+          [attr.aria-label]="deleteLabel(row)">
+          <fa-icon [icon]="faTrashCan" size="xs"></fa-icon>
+        </button>
+      </td>
+    </ng-container>
   </ng-container>
   <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-  <tr
-    mat-row
-    *matRowDef="let row; columns: displayedColumns"
-    (click)="editRow(row)"
-    [class.selected]="selection.isSelected(row)"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
 </table>
 <mat-paginator
+  *ngIf="tableLength > 10"
   [pageSizeOptions]="[10, 50, 100]"
   showFirstLastButtons
   aria-label="Select page"

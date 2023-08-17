@@ -198,19 +198,15 @@
       }
     }
   },
-  "user": {
-    "tableHeaders": {
-      "id": "ID",
-      "email": "Email",
-      "name": "Display Name",
-      "firstName": "First Name",
-      "lastName": "Last Name",
-      "active": "Active",
-      "registration": "Registration"
-    }
-  },
   "save": "Save",
   "update": "Update",
   "confirmed": "Confirmed",
-  "pending": "Pending"
+  "pending": "Pending",
+  "id": "ID",
+  "email": "Email",
+  "name": "Display Name",
+  "firstName": "First Name",
+  "lastName": "Last Name",
+  "active": "Active",
+  "registration": "Registration"
 }
