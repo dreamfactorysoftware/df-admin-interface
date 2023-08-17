@@ -4,6 +4,7 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import {
   ServiceDataService,
   ServiceType,
+  SystemServiceData,
 } from '../services/service-data.service';
 
 export type FormData = {
@@ -17,12 +18,17 @@ export type FormData = {
 })
 export class DfServiceFormComponent {
   isCreateServiceEnabled = true;
-  selectedService: ServiceType | undefined; // aka selectedSchema
+  selectedService: ServiceType; // aka selectedSchema
   selectServiceDropdownOptions: string[];
   selectServiceNameDropdownValue: string | null;
   selectServiceTypeDropdownValue: string | null;
   serviceTypeDropdownOptions: string[];
   private serviceTypeMap = new Map<string, string[]>();
+  formData: Partial<SystemServiceData> = {
+    config: {},
+  }; // dynamic formData object
+
+  httpVerbsDropdownOptions = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
   //Info
   firstFormGroup = this._formBuilder.group({
@@ -51,23 +57,8 @@ export class DfServiceFormComponent {
     private serviceDataService: ServiceDataService
   ) {
     this.selectServiceNameDropdownValue = null;
-    this.selectServiceDropdownOptions = data.serviceTypes
-      .map(val => val.group)
-      .filter((groupName, index, self) => {
-        const name = groupName.trim().toLowerCase();
-        if (name === 'api doc' || name === 'system' || name === 'user')
-          return false;
-        return index === self.indexOf(groupName);
-      });
-
-    data.serviceTypes.map(val => {
-      if (!this.serviceTypeMap.has(val.group)) {
-        this.serviceTypeMap.set(val.group, [val.label]);
-      } else {
-        const existingVal = this.serviceTypeMap.get(val.group) as string[];
-        this.serviceTypeMap.set(val.group, [...existingVal, val.label]);
-      }
-    });
+    this.populateSelectServiceDropdownOptions();
+    this.populateServiceTypeMap();
   }
 
   onChangeSelectServiceName(event: string): void {
@@ -83,8 +74,17 @@ export class DfServiceFormComponent {
     this.selectServiceTypeDropdownValue = event;
     this.selectedService = this.data.serviceTypes.find(val => {
       return val.label === this.selectServiceTypeDropdownValue;
-    });
+    }) as ServiceType;
     console.log('selectedService: ', this.selectedService);
+    console.log(
+      'selectedService config schema: ',
+      this.selectedService.configSchema
+    );
+
+    console.log(
+      'selectServiceTypeDropdownValue: ',
+      this.selectServiceTypeDropdownValue
+    );
   }
 
   onClose(): void {
@@ -103,6 +103,28 @@ export class DfServiceFormComponent {
 
   private updateService(): void {
     console.log('service updated!');
+  }
+
+  private populateServiceTypeMap(): void {
+    this.data.serviceTypes.forEach(val => {
+      if (!this.serviceTypeMap.has(val.group)) {
+        this.serviceTypeMap.set(val.group, [val.label]);
+      } else {
+        const existingVal = this.serviceTypeMap.get(val.group) as string[];
+        this.serviceTypeMap.set(val.group, [...existingVal, val.label]);
+      }
+    });
+  }
+
+  private populateSelectServiceDropdownOptions(): void {
+    this.selectServiceDropdownOptions = this.data.serviceTypes
+      .map(val => val.group)
+      .filter((groupName, index, self) => {
+        const name = groupName.trim().toLowerCase();
+        if (name === 'api doc' || name === 'system' || name === 'user')
+          return false;
+        return index === self.indexOf(groupName);
+      });
   }
 
   isFieldsSeparated(schemaName: string): boolean {

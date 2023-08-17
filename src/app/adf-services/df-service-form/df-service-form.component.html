@@ -57,46 +57,104 @@
         </form>
       </mat-step>
       <mat-step [stepControl]="secondFormGroup" label="Config">
-        <form [formGroup]="secondFormGroup">
+        <form #dynamicForm="ngForm">
           <h2>Config Section</h2>
-          <div class="separated-fields">
-            <h3>Basic Config</h3>
-            <div
-              class="form-group"
-              data-ng-repeat="field in selectedSchema.config_schema"
-              ng-if="isBasic(field.name)"></div>
-
-            <h3>Caching</h3>
-            <div
-              class="form-group"
-              data-ng-repeat="field in selectedSchema.config_schema"
-              ng-if="isCaching(field.name)"></div>
-
-            <h3 class="ng-scope">Optional Advanced Settings</h3>
-            <div class="advanced-fields">
-              <div id="advanced-fields-wrapper">
-                <div
-                  class="form-group"
-                  data-ng-repeat="field in selectedSchema.config_schema"
-                  ng-if="!isBasic(field.name) && !isCaching(field.name)"
-                  ng-include="'admin_components/adf-services/views/df-service-config-fields.html'"></div>
-                <p class="less-fields">
-                  <a
-                    class="button btn btn-default btn-primary save-service-btn ng-scope"
-                    ng-click="hideAdvancedFields()"
-                    >Less...</a
-                  >
-                </p>
-              </div>
-              <p class="more-fields">
-                <a
-                  class="button btn btn-default btn-primary save-service-btn ng-scope"
-                  ng-click="showAdvancedFields()"
-                  >More...</a
+          <div *ngIf="selectServiceTypeDropdownValue" class="config-fields">
+            <div *ngFor="let field of selectedService.configSchema">
+              <mat-form-field
+                *ngIf="
+                  field.type &&
+                  (field.type === 'string' || field.type === 'text')
+                ">
+                <mat-label>
+                  {{ field.label }}
+                </mat-label>
+                <input
+                  [(ngModel)]="formData['config'][field.name]"
+                  [name]="field.name"
+                  type="text"
+                  matInput />
+              </mat-form-field>
+              <mat-form-field *ngIf="field.type && field.type === 'password'">
+                <mat-label>
+                  {{ field.label }}
+                </mat-label>
+                <input
+                  [(ngModel)]="formData['config'][field.name]"
+                  [name]="field.name"
+                  type="password"
+                  matInput />
+              </mat-form-field>
+              <mat-form-field *ngIf="field.type && field.type === 'integer'">
+                <mat-label>
+                  {{ field.label }}
+                </mat-label>
+                <input
+                  [(ngModel)]="formData['config'][field.name]"
+                  [name]="field.name"
+                  type="number"
+                  matInput />
+              </mat-form-field>
+              <div *ngIf="field.type && field.type === 'boolean'">
+                <mat-checkbox
+                  [(ngModel)]="formData['config'][field.name]"
+                  [name]="field.name"
+                  >{{ field.label }}</mat-checkbox
                 >
-              </p>
+              </div>
+              <mat-form-field *ngIf="field.type && field.type === 'picklist'">
+                <mat-label>
+                  {{ field.label }}
+                </mat-label>
+                <mat-select>
+                  <mat-option
+                    *ngFor="let option of field.values"
+                    [(ngModel)]="formData['config'][option.name]"
+                    [name]="field.name"
+                    [value]="option.label">
+                    {{ option.label }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field
+                *ngIf="field.type && field.type === 'multi_picklist'">
+                <mat-label>
+                  {{ field.label }}
+                </mat-label>
+                <mat-select multiple>
+                  <mat-option
+                    *ngFor="let option of field.values"
+                    [(ngModel)]="formData['config'][option.name]"
+                    [name]="field.name"
+                    [value]="option.label">
+                    {{ option.label }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <div *ngIf="field.type && field.type === 'array'">
+                <mat-form-field *ngFor="let item of field.items">
+                  <input *ngIf="item.type === 'string'" matInput type="text" />
+                  <mat-checkbox *ngIf="item.type === 'boolean'">{{
+                    item.label
+                  }}</mat-checkbox>
+                  <mat-select *ngIf="item.type === 'verb_mask'" multiple>
+                    <mat-option
+                      *ngFor="let option of httpVerbsDropdownOptions"
+                      >{{ option }}</mat-option
+                    >
+                  </mat-select>
+                  <mat-select *ngIf="item.type === 'picklist'">
+                    <mat-option
+                      *ngFor="let option of item.values"
+                      [value]="option.label"
+                      >{{ option.label }}</mat-option
+                    >
+                  </mat-select>
+                </mat-form-field>
+              </div>
             </div>
           </div>
+
           <div>
             <button mat-button matStepperPrevious>
               {{ 'services.back' | translate }}
