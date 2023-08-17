@@ -216,5 +216,6 @@
   "firstName": "First Name",
   "lastName": "Last Name",
   "active": "Active",
-  "registration": "Registration"
+  "registration": "Registration",
+  "filter": "Filter"
 }

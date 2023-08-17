@@ -88,7 +88,6 @@ export class DfManageRolesComponent extends DFManageTableComponent<RoleRow> {
   }
 
   refreshTable(limit?: number, offset?: number): void {
-    console.log(limit, offset);
     this.roleService
       .getRoles(limit, offset)
       .pipe(takeUntil(this.destroyed$))
