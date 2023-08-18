@@ -3,7 +3,6 @@ import { takeUntil } from 'rxjs';
 import { faTrash, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatCheckboxChange } from '@angular/material/checkbox';
-import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { TranslateService } from '@ngx-translate/core';
 import {
   ServiceDataService,
@@ -12,8 +11,7 @@ import {
 } from '../services/service-data.service';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { DFManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import { MatDialog } from '@angular/material/dialog';
-import { DfServiceFormComponent } from '../df-service-form/df-service-form.component';
+import { ROUTES } from 'src/app/core/constants/routes';
 
 type ServiceTableData = {
   id: number;
@@ -82,26 +80,24 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
   faTrash = faTrash;
   faCheck = faCheck;
 
-  // TODO: marked for removal
-  alertMsg: string;
-  showAlert: boolean;
-  alertType: AlertType = 'success';
-
   isDeleteIconVisible: boolean;
 
   serviceTypes: ServiceType[];
   systemServiceData: SystemServiceData[];
   serviceToEdit: SystemServiceData;
 
+  _router: Router;
+
   constructor(
     private serviceDataService: ServiceDataService,
     private translateService: TranslateService,
     activatedRoute: ActivatedRoute,
     router: Router,
-    liveAnnouncer: LiveAnnouncer,
-    public dialog: MatDialog
+    liveAnnouncer: LiveAnnouncer
   ) {
     super(router, activatedRoute, liveAnnouncer);
+
+    this._router = router;
 
     this.serviceDataService
       .getServiceTypes()
@@ -156,7 +152,7 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
 
   refreshTable(limit?: number, offset?: number): void {
     this.serviceDataService
-      .getSystemServiceData(limit, offset)
+      .getSystemServiceDataList(limit, offset)
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
@@ -165,22 +161,8 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
   }
 
   onRowClick(row: ServiceTableData): void {
-    this.serviceToEdit = this.systemServiceData.find(systemServiceData => {
-      return systemServiceData.id === row.id;
-    }) as SystemServiceData;
-    this.openEditServiceDialog();
-  }
-
-  openEditServiceDialog() {
-    const dialogRef = this.dialog.open(DfServiceFormComponent, {
-      data: {
-        serviceTypes: [...this.serviceTypes],
-        selectedServiceToEdit: { ...this.serviceToEdit } as SystemServiceData,
-      },
-      disableClose: true,
-    });
-
-    dialogRef.afterClosed().pipe(takeUntil(this.destroyed$));
+    const url = ROUTES.MANAGE_SERVICES + `/${row.id}`;
+    this._router.navigate([url]);
   }
 
   onDelete() {

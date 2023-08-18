@@ -10,13 +10,20 @@ import {
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 
 export const getSystemServiceDataResolver: ResolveFn<
+  Observable<SystemServiceData>
+> = (route, _state) => {
+  const id = Number(route.paramMap.get('id'));
+  return inject(ServiceDataService).getSystemServiceData(id);
+};
+
+export const getSystemServiceDataListResolver: ResolveFn<
   Observable<GenericListResponse<Array<SystemServiceData>>>
-> = (route, state) => {
-  return inject(ServiceDataService).getSystemServiceData();
+> = (_route, _state) => {
+  return inject(ServiceDataService).getSystemServiceDataList();
 };
 
 export const getServiceTypeDataResolver: ResolveFn<
   Observable<GenericListResponse<Array<ServiceType>>>
-> = (route, state) => {
+> = (_route, _state) => {
   return inject(ServiceDataService).getServiceTypes();
 };

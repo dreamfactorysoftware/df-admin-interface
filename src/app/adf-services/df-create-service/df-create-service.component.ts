@@ -6,7 +6,8 @@ import {
   ServiceDataService,
   ServiceType,
 } from '../services/service-data.service';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { ROUTES } from 'src/app/core/constants/routes';
 
 @Component({
   selector: 'df-create-service',
@@ -23,7 +24,8 @@ export class DfCreateServiceComponent implements OnDestroy {
   constructor(
     public dialog: MatDialog,
     private service: ServiceDataService,
-    activatedRoute: ActivatedRoute
+    activatedRoute: ActivatedRoute,
+    private router: Router
   ) {
     activatedRoute.data
       .pipe(takeUntil(this.destroyer$))
@@ -41,6 +43,10 @@ export class DfCreateServiceComponent implements OnDestroy {
     });
 
     dialogRef.afterClosed().pipe(takeUntil(this.destroyer$));
+  }
+
+  onButtonClick() {
+    this.router.navigate([ROUTES.MANAGE_SERVICES]);
   }
 
   ngOnDestroy() {

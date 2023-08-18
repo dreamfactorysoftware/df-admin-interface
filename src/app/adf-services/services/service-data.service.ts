@@ -9,7 +9,12 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 export class ServiceDataService {
   constructor(private http: HttpClient) {}
 
-  getSystemServiceData(limit = 10, offset = 0) {
+  getSystemServiceData(id: number) {
+    const url = URLS.SYSTEM_SERVICE + `/${id}`;
+    return this.http.get<SystemServiceData>(url);
+  }
+
+  getSystemServiceDataList(limit = 10, offset = 0) {
     return this.http.get<GenericListResponse<Array<SystemServiceData>>>(
       URLS.SYSTEM_SERVICE,
       {

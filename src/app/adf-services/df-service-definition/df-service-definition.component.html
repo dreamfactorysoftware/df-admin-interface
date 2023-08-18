@@ -4,9 +4,7 @@
     <div class="form-group ng-scope">
       <h3>Select Format</h3>
       <mat-form-field>
-        <mat-select
-          [formControl]="serviceDefinitionFormat"
-          [disabled]="!isServiceEditable">
+        <mat-select [formControl]="serviceDefinitionFormat">
           <mat-option value="json" selected="selected">JSON</mat-option>
           <mat-option value="yaml">YAML</mat-option>
         </mat-select>
@@ -24,13 +22,12 @@
             (click)="this.desktopFile.setValue(null)"
             (change)="onDesktopFileChange($event)"
             [formControl]="desktopFile"
-            [disabled]="!isServiceEditable" />
+            [readonly]="!isServiceEditable" />
         </h3>
         <button
           type="button"
           (click)="displayGithubFields()"
-          [formControl]="githubFile"
-          [disabled]="!isServiceEditable">
+          [formControl]="githubFile">
           Select GitHub File...
         </button>
       </div>

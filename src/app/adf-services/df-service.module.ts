@@ -24,6 +24,8 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { DfServiceLinksCardComponent } from './df-service-definition/df-service-links-card/df-service-links-card.component';
 import { MatCardModule } from '@angular/material/card';
 import { DfCreateServiceComponent } from './df-create-service/df-create-service.component';
+import { DfServiceRoutingModule } from './df-service-routing.module';
+import { DfEditServiceComponent } from './df-edit-service/df-edit-service.component';
 
 @NgModule({
   declarations: [
@@ -33,10 +35,12 @@ import { DfCreateServiceComponent } from './df-create-service/df-create-service.
     DfServiceFormComponent,
     DfServiceLinksCardComponent,
     DfCreateServiceComponent,
+    DfEditServiceComponent,
   ],
   imports: [
     CommonModule,
     DfAlertComponent,
+    DfServiceRoutingModule,
     FontAwesomeModule,
     FormsModule,
     MatFormFieldModule,

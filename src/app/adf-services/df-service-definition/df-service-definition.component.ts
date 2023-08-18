@@ -13,16 +13,41 @@ export class DfServiceDefinitionComponent {
   @Input() selectedService: ServiceType | null;
 
   githubFormGroup = new FormGroup({
-    githubURL: new FormControl<string>('', Validators.required),
-    githubUsername: new FormControl<string>('', Validators.required),
-    githubPassword: new FormControl<string>('', Validators.required),
+    githubURL: new FormControl(
+      {
+        value: '',
+        disabled: this.isServiceEditable,
+      },
+      Validators.required
+    ),
+    githubUsername: new FormControl(
+      {
+        value: '',
+        disabled: this.isServiceEditable,
+      },
+      Validators.required
+    ),
+    githubPassword: new FormControl(
+      {
+        value: '',
+        disabled: this.isServiceEditable,
+      },
+      Validators.required
+    ),
   });
 
-  selectedDesktopFile: File | null;
-
-  desktopFile = new FormControl<File | null>(null);
-  githubFile = new FormControl<File | null>(null);
-  serviceDefinitionFormat = new FormControl<string>('');
+  desktopFile = new FormControl<File | null>({
+    value: null,
+    disabled: false,
+  });
+  githubFile = new FormControl<File | null>({
+    value: null,
+    disabled: false,
+  });
+  serviceDefinitionFormat = new FormControl<string>({
+    value: '',
+    disabled: false,
+  });
 
   isGithubFormsVisible = false;
 
@@ -42,7 +67,6 @@ export class DfServiceDefinitionComponent {
 
   onDesktopFileChange(event: Event) {
     const files = (event.target as HTMLInputElement).files as FileList;
-    this.selectedDesktopFile = files[0];
     this.desktopFile.setValue(files[0]);
   }
 }

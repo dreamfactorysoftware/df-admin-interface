@@ -1,12 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { ResolveFn } from '@angular/router';
 
-import { getSystemServiceDataResolver } from './service-data-service.resolver';
+import { getSystemServiceDataListResolver } from './service-data-service.resolver';
 
 describe('manageServiceResolver', () => {
   const executeResolver: ResolveFn<boolean> = (...resolverParameters) =>
     TestBed.runInInjectionContext(() =>
-      getSystemServiceDataResolver(...resolverParameters)
+      getSystemServiceDataListResolver(...resolverParameters)
     );
 
   beforeEach(() => {

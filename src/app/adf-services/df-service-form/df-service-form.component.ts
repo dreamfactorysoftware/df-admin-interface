@@ -1,6 +1,13 @@
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import {
+  Component,
+  Inject,
+  Input,
+  OnDestroy,
+  OnInit,
+  Optional,
+} from '@angular/core';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
-import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import {
   ServiceDataService,
   ServiceType,
@@ -24,6 +31,9 @@ export type FormData = {
   styleUrls: ['./df-service-form.component.scss'],
 })
 export class DfServiceFormComponent implements OnDestroy, OnInit {
+  @Input() serviceData: SystemServiceData;
+  @Input() serviceTypeData: ServiceType[];
+
   isCreateServiceEnabled = true;
   selectedService: ServiceType; // aka selectedSchema
   selectServiceDropdownOptions: string[];
@@ -59,20 +69,28 @@ export class DfServiceFormComponent implements OnDestroy, OnInit {
     thirdCtrl: ['', Validators.required],
   });
 
+  data: FormData;
+
   constructor(
-    public dialogRef: MatDialogRef<DfServiceFormComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: FormData,
+    @Optional() public dialogRef: MatDialogRef<DfServiceFormComponent>,
+    @Optional()
+    @Inject(MAT_DIALOG_DATA)
+    public dialogData: Pick<FormData, 'serviceTypes'>,
     private _formBuilder: FormBuilder,
     private serviceDataService: ServiceDataService,
     private router: Router,
     private snackBar: MatSnackBar,
     private translateService: TranslateService
-  ) {
-    this.populateSelectServiceDropdownOptions();
-    this.populateServiceTypeMap();
-  }
+  ) {}
 
   ngOnInit(): void {
+    this.data = {
+      serviceTypes: this.serviceTypeData ?? this.dialogData.serviceTypes,
+      selectedServiceToEdit: this.serviceData,
+    };
+    this.populateSelectServiceDropdownOptions();
+    this.populateServiceTypeMap();
+
     if (this.data.selectedServiceToEdit) {
       // setup edit mode
 
@@ -266,8 +284,8 @@ export class DfServiceFormComponent implements OnDestroy, OnInit {
         )
         .subscribe(_response => {
           this.openSuccessSnackBarNotification();
-          this.onClose();
-          window.location.reload();
+          if (this.isCreateServiceEnabled) this.onClose();
+          this.router.navigate([ROUTES.MANAGE_SERVICES]);
         });
     } else {
       this.openInvalidSnackBarNotification();

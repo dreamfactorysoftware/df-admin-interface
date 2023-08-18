@@ -3,23 +3,12 @@ import { RouterModule, Routes } from '@angular/router';
 import { ROUTES } from './core/constants/routes';
 import { loggedInGuard } from './core/guards/logged-in.guard';
 import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
-import { DfServiceComponent } from './adf-services/df-service/df-service.component';
-import {
-  getServiceTypeDataResolver,
-  getSystemServiceDataResolver,
-} from './adf-services/resolvers/service-data-service.resolver';
-
 import { HashLocationStrategy, LocationStrategy } from '@angular/common';
-import { DfCreateServiceComponent } from './adf-services/df-create-service/df-create-service.component';
 const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
     redirectTo: ROUTES.HOME,
-  },
-  {
-    path: 'services',
-    redirectTo: ROUTES.MANAGE_SERVICES,
   },
   {
     path: ROUTES.AUTH,
@@ -36,16 +25,10 @@ const routes: Routes = [
     canActivate: [loggedInGuard],
   },
   {
-    path: ROUTES.CREATE_SERVICES,
-    component: DfCreateServiceComponent,
+    path: ROUTES.SERVICES,
+    loadChildren: () =>
+      import('./adf-services/df-service.module').then(m => m.DfServiceModule),
     canActivate: [loggedInGuard],
-    resolve: { data: getServiceTypeDataResolver },
-  },
-  {
-    path: ROUTES.MANAGE_SERVICES,
-    component: DfServiceComponent,
-    canActivate: [loggedInGuard],
-    resolve: { data: getSystemServiceDataResolver },
   },
   {
     path: ROUTES.PROFILE,

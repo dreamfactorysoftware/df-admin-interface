@@ -59,7 +59,10 @@
             <input formControlName="description" matInput />
           </mat-form-field>
           <div>
-            <button mat-button (click)="onClose()">
+            <button
+              *ngIf="isCreateServiceEnabled"
+              mat-button
+              (click)="onClose()">
               {{ 'services.close' | translate }}
             </button>
             <button mat-button matStepperNext>Next</button>
