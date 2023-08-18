@@ -21,7 +21,7 @@
           <input
             type="file"
             accept=".json,.yml,.yaml"
-            (click)="this.selectedDesktopFile = null"
+            (click)="this.desktopFile.setValue(null)"
             (change)="onDesktopFileChange($event)"
             [formControl]="desktopFile"
             [disabled]="!isServiceEditable" />

@@ -1,10 +1,7 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Subject, takeUntil } from 'rxjs';
-import {
-  DfServiceFormComponent,
-  FormData,
-} from '../df-service-form/df-service-form.component';
+import { DfServiceFormComponent } from '../df-service-form/df-service-form.component';
 import {
   ServiceDataService,
   ServiceType,

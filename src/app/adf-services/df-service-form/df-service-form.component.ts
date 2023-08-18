@@ -96,10 +96,6 @@ export class DfServiceFormComponent implements OnDestroy, OnInit {
       this.selectServiceTypeDropdownValue = this.selectedService.label;
 
       this.selectedService.configSchema.forEach(field => {
-        console.log('field obj: ', field);
-
-        console.log('config obj: ', this.data.selectedServiceToEdit?.config);
-
         if (field.type === 'array') {
           if (Array.isArray(field.items)) {
             field.items.forEach((fieldArrayItem: any) => {
@@ -118,8 +114,6 @@ export class DfServiceFormComponent implements OnDestroy, OnInit {
             this.data.selectedServiceToEdit?.config[fieldName];
         }
       });
-
-      console.log('configSchema form version: ', this.serviceConfigFormData);
 
       this.isCreateServiceEnabled = false;
     } else {
@@ -261,8 +255,6 @@ export class DfServiceFormComponent implements OnDestroy, OnInit {
         config: this.serviceConfigFormData.config,
       };
 
-      console.log('payload in update: ', payload);
-
       this.serviceDataService
         .updateServiceData(payload)
         .pipe(
@@ -273,7 +265,6 @@ export class DfServiceFormComponent implements OnDestroy, OnInit {
           })
         )
         .subscribe(_response => {
-          console.log('response: ', _response);
           this.openSuccessSnackBarNotification();
           this.onClose();
           window.location.reload();

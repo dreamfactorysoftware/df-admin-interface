@@ -87,7 +87,7 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
   showAlert: boolean;
   alertType: AlertType = 'success';
 
-  isGroupDeleteIconVisible: boolean;
+  isDeleteIconVisible: boolean;
 
   serviceTypes: ServiceType[];
   systemServiceData: SystemServiceData[];
@@ -124,7 +124,7 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
   onCheckboxSelect(event: MatCheckboxChange, row: ServiceTableData) {
     if (event) {
       const toggle = this.selection.toggle(row);
-      this.isGroupDeleteIconVisible = this.selection.selected.length > 1;
+      this.isDeleteIconVisible = this.selection.selected.length > 0;
       return toggle;
     }
 
@@ -183,7 +183,20 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
     dialogRef.afterClosed().pipe(takeUntil(this.destroyed$));
   }
 
-  deleteRow(row: any): void {
+  onDelete() {
+    if (this.selection.selected.length === 1) {
+      this.deleteRow(this.selection.selected[0].id);
+    } else if (this.selection.selected.length > 1) {
+      this.onMassDelete();
+    }
+  }
+
+  onToggleAllRowSelection() {
+    this.toggleAllRows();
+    this.isDeleteIconVisible = this.isAllSelected();
+  }
+
+  private deleteRow(row: any): void {
     this.serviceDataService
       .deleteServiceData(row)
       .pipe(takeUntil(this.destroyed$))
@@ -192,7 +205,7 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
       });
   }
 
-  onMassDelete() {
+  private onMassDelete() {
     const rows = this.selection.selected
       .filter(val => {
         return val.deletable;

@@ -43,6 +43,6 @@ export class DfServiceDefinitionComponent {
   onDesktopFileChange(event: Event) {
     const files = (event.target as HTMLInputElement).files as FileList;
     this.selectedDesktopFile = files[0];
-    console.log('files: ', this.selectedDesktopFile);
+    this.desktopFile.setValue(files[0]);
   }
 }

@@ -12,7 +12,7 @@
   <ng-container matColumnDef="select">
     <th mat-header-cell *matHeaderCellDef>
       <mat-checkbox
-        (change)="$event ? toggleAllRows() : null"
+        (change)="$event ? onToggleAllRowSelection() : null"
         [checked]="selection.hasValue() && isAllSelected()"
         [indeterminate]="selection.hasValue() && !isAllSelected()"
         [aria-label]="checkboxLabel()">
@@ -71,24 +71,15 @@
   <ng-container matColumnDef="deletable">
     <th mat-header-cell *matHeaderCellDef>
       <button
-        *ngIf="isGroupDeleteIconVisible"
-        mat-icon-button
-        color="primary"
-        aria-label="Group delete service icon"
-        (click)="onMassDelete()">
-        <fa-icon [icon]="faTrash">delete</fa-icon>
-      </button>
-    </th>
-    <td mat-cell *matCellDef="let element">
-      <button
-        *ngIf="element.deletable"
+        *ngIf="isDeleteIconVisible"
         mat-icon-button
         color="primary"
         aria-label="Delete service icon"
-        (click)="deleteRow(element.id)">
+        (click)="onDelete()">
         <fa-icon [icon]="faTrash">delete</fa-icon>
       </button>
-    </td>
+    </th>
+    <td mat-cell *matCellDef="let element"></td>
   </ng-container>
 
   <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
