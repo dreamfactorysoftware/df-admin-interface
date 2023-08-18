@@ -108,6 +108,7 @@
               <div *ngIf="field.type && field.type === 'boolean'">
                 <mat-checkbox
                   [(ngModel)]="serviceConfigFormData['config'][field.name]"
+                  [checked]="serviceConfigFormData['config'][field.name]"
                   [name]="field.name"
                   >{{ field.label }}</mat-checkbox
                 >

@@ -7,7 +7,7 @@ import { DfManageServicesComponent } from './df-manage-services/manage-services.
 import { MatTableModule } from '@angular/material/table';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatListModule } from '@angular/material/list';
-
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { DfServiceFormComponent } from './df-service-form/df-service-form.component';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatInputModule } from '@angular/material/input';
@@ -51,6 +51,7 @@ import { DfCreateServiceComponent } from './df-create-service/df-create-service.
     MatTableModule,
     MatDialogModule,
     MatSelectModule,
+    MatSnackBarModule,
     MatStepperModule,
     MatSortModule,
     MatPaginatorModule,

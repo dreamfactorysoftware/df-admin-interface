@@ -114,8 +114,11 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
       .pipe(takeUntil(this.destroyed$))
       .subscribe((data: any) => {
         this.systemServiceData = data.data.resource;
-        console.log('systemserviceData: ', this.systemServiceData);
       });
+  }
+
+  override filterQuery(value: string): string {
+    return `(id like "%${value}%") or (name like "%${value}%") or (description like "%${value}%") or (label like "%${value}%") or (type like "%${value}%")`;
   }
 
   onCheckboxSelect(event: MatCheckboxChange, row: ServiceTableData) {
@@ -162,11 +165,9 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
   }
 
   onRowClick(row: ServiceTableData): void {
-    console.log('row clicked: ', row);
     this.serviceToEdit = this.systemServiceData.find(systemServiceData => {
       return systemServiceData.id === row.id;
     }) as SystemServiceData;
-    console.log('serviceToEdit: ', this.serviceToEdit);
     this.openEditServiceDialog();
   }
 

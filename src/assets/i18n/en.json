@@ -222,6 +222,11 @@
     "label": "Label",
     "description": "Description",
     "noDataMatchingTheFilter": "No data matching the filter",
+    "createSuccess": "Service successfully created",
+    "createError": "Error occurred with create service",
+    "updateSuccess": "Service successfully updated",
+    "updateError": "Error occurred with update service",
+    "invalidFormMessage": "The form is invalid",
     "deleteError": "Error occurred with delete service",
     "deleteSuccess": "Service successfully deleted",
     "serviceLinks": {
