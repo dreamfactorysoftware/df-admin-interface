@@ -8,6 +8,10 @@ body {
   margin: 0;
   font-family: Roboto, 'Helvetica Neue', sans-serif;
 }
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
 
 .user-management-card {
   position: relative;

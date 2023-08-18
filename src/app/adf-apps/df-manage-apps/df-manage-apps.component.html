@@ -20,7 +20,8 @@
     </mat-form-field>
   </div>
   <table mat-table [dataSource]="dataSource" matSort>
-    <!-- (matSortChange)="announceSortChange($event)" -->
+    <!-- todo: add to <table> (matSortChange)="announceSortChange($event)" -->
+
     <!-- Checkbox Column -->
     <ng-container matColumnDef="select">
       <th mat-header-cell *matHeaderCellDef>
@@ -91,13 +92,16 @@
       </td>
     </ng-container>
 
-    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    <tr mat-header-row *matHeaderRowDef="columns"></tr>
+    <tr mat-row *matRowDef="let row; columns: columns"></tr>
 
     <!-- Row shown when there is no matching data. -->
     <tr class="mat-row" *matNoDataRow>
       <td class="mat-cell" colspan="4">
-        No data matching the filter "{{ input.value }}"
+        <span *ngIf="resultsLength">
+          No data matching the filter "{{ input.value }}"
+        </span>
+        <span *ngIf="!resultsLength"> Create a new app to get started </span>
       </td>
     </tr>
   </table>

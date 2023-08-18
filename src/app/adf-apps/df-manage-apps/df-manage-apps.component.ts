@@ -1,25 +1,33 @@
 import { SelectionModel } from '@angular/cdk/collections';
-import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 
 import { DfAppsService } from '../services/df-apps.service';
 import { MatTableDataSource } from '@angular/material/table';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
-import { faTrash, faCheck, faPlus } from '@fortawesome/free-solid-svg-icons';
+import {
+  faTrash,
+  faCheck,
+  faPlus,
+  faCheckCircle,
+  faXmarkCircle,
+} from '@fortawesome/free-solid-svg-icons';
 import { MatSort } from '@angular/material/sort';
 import { TranslateService } from '@ngx-translate/core';
 import { AppType, AppRow } from '../types/df-apps.types';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 
 @Component({
   selector: 'df-df-manage-apps',
   templateUrl: './df-manage-apps.component.html',
   styleUrls: ['./df-manage-apps.component.scss'],
 })
+
+// todo: extends DFManageTableComponent<AppRow>
 export class DfManageAppsComponent implements OnInit {
   private destroyed$ = new Subject<void>();
 
-  displayedColumns: string[] = ['select', 'id', 'name', 'role', 'apiKey'];
   dataSource = new MatTableDataSource<AppRow>();
   data: AppRow[];
   selection = new SelectionModel<AppRow>(true, []);
@@ -30,6 +38,8 @@ export class DfManageAppsComponent implements OnInit {
   faTrash = faTrash;
   faCheck = faCheck;
   faPlus = faPlus;
+  faCheckCircle = faCheckCircle;
+  faXmarkCircle = faXmarkCircle;
 
   isGroupDeleteIconVisible: boolean;
 
@@ -37,10 +47,53 @@ export class DfManageAppsComponent implements OnInit {
   @ViewChild(MatSort) sort: MatSort;
 
   constructor(
-    private dfAppsService: DfAppsService,
+    private appsService: DfAppsService,
     private activatedRoute: ActivatedRoute,
     private translateService: TranslateService
   ) {}
+
+  // displayedColumns: string[] = ['select', 'id', 'name', 'role', 'apiKey'];
+  // todo: convert const to override
+  columns = [
+    {
+      columnDef: 'select',
+    },
+    {
+      columnDef: 'active',
+      cell: (row: AppRow) => `${row.active}`,
+      header: 'active',
+      sortActionDescription: 'active',
+    },
+    {
+      columnDef: 'id',
+      cell: (row: AppRow) => `${row.id}`,
+      header: 'id',
+      sortActionDescription: 'id',
+    },
+    {
+      columnDef: 'name',
+      cell: (row: AppRow) => `${row.name}`,
+      header: 'name',
+      sortActionDescription: 'name',
+    },
+    {
+      columnDef: 'role',
+      cell: (row: AppRow) => `${row.role}`,
+      header: 'role',
+      sortActionDescription: 'role',
+    },
+    {
+      columnDef: 'apiKey',
+      cell: (row: AppRow) => `${row.apiKey}`,
+      header: 'apiKey',
+      sortActionDescription: 'apiKey',
+    },
+  ];
+
+  // todo: change any to IconProp
+  activeIcon(active: boolean): any {
+    return active ? faCheckCircle : faXmarkCircle;
+  }
 
   ngOnInit(): void {
     /**
@@ -52,7 +105,6 @@ export class DfManageAppsComponent implements OnInit {
     this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
       .subscribe((data: any) => {
-        console.log(data);
         this.resultsLength = data.data.meta.count;
         this.data = this.mapDataToTable(data.data.resource);
         this.dataSource = new MatTableDataSource(this.data);
@@ -61,7 +113,6 @@ export class DfManageAppsComponent implements OnInit {
   }
 
   mapDataToTable(appTypes: AppType[]): AppRow[] {
-    console.log('mapDataToTable', appTypes);
     return appTypes.map((appType: AppType) => {
       return {
         id: appType.id,
@@ -108,8 +159,26 @@ export class DfManageAppsComponent implements OnInit {
     this.dataSource.filter = filterValue.trim().toLowerCase();
   }
 
+  // editRow(row: AppRow): void {}
+
+  // deleteRow(row: AppRow): void {
+  //   this.dfAppsService
+  //     .deleteAdmin(row.id)
+  //     .pipe(takeUntil(this.destroyed$))
+  //     .subscribe(() => {
+  //       this.refreshTable();
+  //     });
+  // }
+
   changePage(event: PageEvent): void {
-    console.log(event);
+    const offset = event.pageSize * event.pageIndex;
+    this.appsService
+      .getApps(event.pageSize, offset)
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe((data: GenericListResponse<AppType[]>) => {
+        this.data = this.mapDataToTable(data.resource);
+        this.dataSource = new MatTableDataSource(this.data);
+      });
   }
 
   openCreateAppDialog() {

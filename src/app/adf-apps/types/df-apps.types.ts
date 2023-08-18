@@ -15,7 +15,7 @@ export interface RoleByRoleId {
   createdDate: string;
   lastModifiedDate: string;
   createdById: number;
-  lastModifiedById: number | null;
+  lastModifiedById?: number;
 }
 
 export interface AppType {
@@ -25,27 +25,34 @@ export interface AppType {
   description: string;
   isActive: boolean;
   type: number;
-  path: string | null;
-  url: string | null;
-  storageServiceId: number | null;
-  storageContainer: string | null;
+  path?: string;
+  url?: string;
+  storageServiceId?: number;
+  storageContainer?: string;
   requiresFullscreen: boolean;
   allowFullscreenToggle: boolean;
   toggleLocation: string;
-  roleId: number | null;
+  roleId?: number;
   createdDate: string;
   lastModifiedDate: string;
   createdById: number;
-  lastModifiedById: number | null;
+  lastModifiedById?: number;
   launchUrl: string;
-  roleByRoleId: RoleByRoleId | null;
+  roleByRoleId?: RoleByRoleId;
 }
 
-export interface NewAppType {
+export interface AppPayload {
   name: string;
-  description: string;
-  type: number;
-  roleId: number | null;
-  isActive: boolean;
-  url: string | undefined;
+  description?: string;
+  type: number; // app location (0,1,2,3)
+  role_id?: number;
+  is_active: boolean;
+  url?: string;
+  storage_service_id?: number;
+  storage_container?: string;
+  path?: string;
+}
+
+export interface EditAppPayload extends AppPayload {
+  id: number;
 }

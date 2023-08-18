@@ -1,4 +1,12 @@
 {
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "create": "Create",
+    "delete": "Delete",
+    "edit": "Edit"
+  },
   "home": {
     "resourceLinks": {
       "gettingStartedGuide": "Getting Started Guide",
@@ -165,7 +173,6 @@
   "apps": {
     "manageApplications": "Manage Applications",
     "manage": "Manage",
-    "create": "Create",
     "import": "Import",
     "search": "Search",
     "deleteApp": "Delete app",
@@ -201,9 +208,10 @@
         "tooltip": {
           "label": "Display Name",
           "text": "The display name or label for your app, seen by users of the app in the LaunchPad UI."
-        }
+        },
+        "error": "Application name required"
       },
-      "defaultRoleFilter": "Assign a Default Role Filter",
+      "defaultRoleFilter": "Default Role Filter",
       "description": {
         "label": "Description",
         "tooltip": {
@@ -216,7 +224,7 @@
           "text": "Unauthenticated or guest users of the app will have this role."
         },
         "options": {
-          "noRole": "-- No Role Selected --"
+          "noRole": "-- No available filtered roles --"
         }
       },
       "active": "Active",
@@ -227,9 +235,42 @@
         },
         "options": {
           "noStorage": "No Storage Required - remote device, client, or desktop.",
-          "fileStorage": "On a provisioned file storage service.",
-          "webServer": "On this web server.",
-          "remoteUrl": "On a remote URL."
+          "fileStorage": {
+            "label": "On a provisioned file storage service.",
+            "storageService": {
+              "label": "Storage Service",
+              "tooltip": "Where to store the files for your app.",
+              "options": {
+                "file": "Local File Storage",
+                "log": "Local Log Storage"
+              }
+            },
+            "storageFolder": {
+              "label": "Storage Folder",
+              "tooltip": "The folder on the selected storage service.",
+              "placeholder": "Enter Storage Container"
+            },
+            "launchPath": {
+              "label": "Launch Path",
+              "tooltip": "The is the file to load when your app is run. Default is index.html.",
+              "placeholder": "Enter default path and file to launch."
+            }
+          },
+          "webServer": {
+            "label": "On this web server.",
+            "pathToApp": {
+              "label": "Path to Application",
+              "tooltip": "The is the file to load when your app is run. Default is index.html."
+            }
+          },
+          "remoteUrl": {
+            "label": "On a remote URL.",
+            "url": {
+              "label": "URL to Application",
+              "tooltip": "Applications can consist of only a URL. This could be an app on some other server or a web site URL."
+            }
+          },
+          "urlPath": "The URL for this app is:"
         }
       }
     },
