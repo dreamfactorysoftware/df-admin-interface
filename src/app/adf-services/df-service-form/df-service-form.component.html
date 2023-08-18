@@ -7,7 +7,7 @@
       <mat-step [stepControl]="firstFormGroup">
         <form [formGroup]="firstFormGroup">
           <ng-template matStepLabel>Info</ng-template>
-          <mat-form-field>
+          <mat-form-field *ngIf="isCreateServiceEnabled">
             <mat-label>{{
               'services.selectServiceType' | translate
             }}</mat-label>
@@ -22,13 +22,20 @@
               >
             </mat-select>
           </mat-form-field>
-          <mat-form-field *ngIf="selectServiceNameDropdownValue">
+          <mat-form-field
+            *ngIf="selectServiceNameDropdownValue || !isCreateServiceEnabled">
             <mat-label>{{
               'services.selectSpecificServiceType' | translate
             }}</mat-label>
+            <input
+              *ngIf="!isCreateServiceEnabled"
+              formControlName="selectedServiceType"
+              matInput
+              [readonly]="true" />
             <mat-select
               formControlName="selectedServiceType"
-              (valueChange)="onChangeSelectServiceType($event)">
+              (valueChange)="onChangeSelectServiceType($event)"
+              *ngIf="isCreateServiceEnabled">
               <mat-option
                 *ngFor="let option of serviceTypeDropdownOptions"
                 [value]="option"
@@ -36,15 +43,18 @@
               >
             </mat-select>
           </mat-form-field>
-          <mat-form-field *ngIf="selectServiceNameDropdownValue">
+          <mat-form-field
+            *ngIf="selectServiceNameDropdownValue || !isCreateServiceEnabled">
             <mat-label>{{ 'services.namespace' | translate }}</mat-label>
             <input formControlName="namespace" matInput />
           </mat-form-field>
-          <mat-form-field *ngIf="selectServiceNameDropdownValue">
+          <mat-form-field
+            *ngIf="selectServiceNameDropdownValue || !isCreateServiceEnabled">
             <mat-label>{{ 'services.label' | translate }}</mat-label>
             <input formControlName="label" matInput />
           </mat-form-field>
-          <mat-form-field *ngIf="selectServiceNameDropdownValue">
+          <mat-form-field
+            *ngIf="selectServiceNameDropdownValue || !isCreateServiceEnabled">
             <mat-label>{{ 'services.description' | translate }}</mat-label>
             <input formControlName="description" matInput />
           </mat-form-field>
@@ -198,8 +208,7 @@
         <ng-template matStepLabel>Definition</ng-template>
         <df-service-definition
           [isServiceEditable]="
-            (selectedService && selectedService.service_definition_editable) ||
-            false
+            selectedService && selectedService.service_definition_editable
           "></df-service-definition>
         <div>
           <button mat-button matStepperPrevious>

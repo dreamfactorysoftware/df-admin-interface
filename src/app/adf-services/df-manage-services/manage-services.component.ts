@@ -7,10 +7,13 @@ import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component
 import { TranslateService } from '@ngx-translate/core';
 import {
   ServiceDataService,
+  ServiceType,
   SystemServiceData,
 } from '../services/service-data.service';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { DFManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
+import { MatDialog } from '@angular/material/dialog';
+import { DfServiceFormComponent } from '../df-service-form/df-service-form.component';
 
 type ServiceTableData = {
   id: number;
@@ -86,14 +89,33 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
 
   isGroupDeleteIconVisible: boolean;
 
+  serviceTypes: ServiceType[];
+  systemServiceData: SystemServiceData[];
+  serviceToEdit: SystemServiceData;
+
   constructor(
     private serviceDataService: ServiceDataService,
     private translateService: TranslateService,
     activatedRoute: ActivatedRoute,
     router: Router,
-    liveAnnouncer: LiveAnnouncer
+    liveAnnouncer: LiveAnnouncer,
+    public dialog: MatDialog
   ) {
     super(router, activatedRoute, liveAnnouncer);
+
+    this.serviceDataService
+      .getServiceTypes()
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(serviceTypes => {
+        this.serviceTypes = serviceTypes.resource;
+      });
+
+    this._activatedRoute.data
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe((data: any) => {
+        this.systemServiceData = data.data.resource;
+        console.log('systemserviceData: ', this.systemServiceData);
+      });
   }
 
   onCheckboxSelect(event: MatCheckboxChange, row: ServiceTableData) {
@@ -140,7 +162,24 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
   }
 
   onRowClick(row: ServiceTableData): void {
-    row;
+    console.log('row clicked: ', row);
+    this.serviceToEdit = this.systemServiceData.find(systemServiceData => {
+      return systemServiceData.id === row.id;
+    }) as SystemServiceData;
+    console.log('serviceToEdit: ', this.serviceToEdit);
+    this.openEditServiceDialog();
+  }
+
+  openEditServiceDialog() {
+    const dialogRef = this.dialog.open(DfServiceFormComponent, {
+      data: {
+        serviceTypes: [...this.serviceTypes],
+        selectedServiceToEdit: { ...this.serviceToEdit } as SystemServiceData,
+      },
+      disableClose: true,
+    });
+
+    dialogRef.afterClosed().pipe(takeUntil(this.destroyed$));
   }
 
   deleteRow(row: any): void {

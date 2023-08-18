@@ -1,4 +1,4 @@
-import { Component, Inject, OnDestroy } from '@angular/core';
+import { Component, Inject, Input, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import {
@@ -6,12 +6,13 @@ import {
   ServiceType,
   SystemServiceData,
 } from '../services/service-data.service';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, catchError, takeUntil } from 'rxjs';
 import { Router } from '@angular/router';
 import { ROUTES } from 'src/app/core/constants/routes';
 
 export type FormData = {
   serviceTypes: ServiceType[];
+  selectedServiceToEdit?: SystemServiceData;
 };
 
 @Component({
@@ -19,7 +20,7 @@ export type FormData = {
   templateUrl: './df-service-form.component.html',
   styleUrls: ['./df-service-form.component.scss'],
 })
-export class DfServiceFormComponent implements OnDestroy {
+export class DfServiceFormComponent implements OnDestroy, OnInit {
   isCreateServiceEnabled = true;
   selectedService: ServiceType; // aka selectedSchema
   selectServiceDropdownOptions: string[];
@@ -62,9 +63,54 @@ export class DfServiceFormComponent implements OnDestroy {
     private serviceDataService: ServiceDataService,
     private router: Router
   ) {
-    this.selectServiceNameDropdownValue = null;
     this.populateSelectServiceDropdownOptions();
     this.populateServiceTypeMap();
+  }
+
+  ngOnInit(): void {
+    if (this.data.selectedServiceToEdit) {
+      // setup edit mode
+
+      this.setSelectedService(this.data.selectedServiceToEdit.type);
+
+      this.firstFormGroup.value.selectedServiceType =
+        this.selectedService.label;
+
+      this.firstFormGroup.setValue(
+        {
+          selectedServiceName: null,
+          selectedServiceType: this.selectedService.label,
+          namespace: this.data.selectedServiceToEdit.name,
+          label: this.data.selectedServiceToEdit.label,
+          description: this.data.selectedServiceToEdit.description,
+          isActive: this.data.selectedServiceToEdit.isActive,
+        },
+        { emitEvent: true }
+      );
+
+      this.selectServiceTypeDropdownValue = this.selectedService.label;
+
+      this.selectedService.configSchema.forEach(field => {
+        if (field.type.trim() === 'array') {
+          if (Array.isArray(field.items)) {
+            field.items.forEach((fieldArrayItem: any) => {
+              this.serviceConfigFormData.config[field.name] =
+                fieldArrayItem.name;
+            });
+          } else
+            this.serviceConfigFormData.config[field.name] =
+              this.data.selectedServiceToEdit?.config[field.items];
+        } else {
+          this.serviceConfigFormData.config[field.name] =
+            this.data.selectedServiceToEdit?.config[field.name];
+        }
+      });
+
+      this.isCreateServiceEnabled = false;
+    } else {
+      // setup create mode
+      this.selectServiceNameDropdownValue = null;
+    }
   }
 
   ngOnDestroy(): void {
@@ -85,6 +131,12 @@ export class DfServiceFormComponent implements OnDestroy {
     this.selectServiceTypeDropdownValue = event;
     this.selectedService = this.data.serviceTypes.find(val => {
       return val.label === this.selectServiceTypeDropdownValue;
+    }) as ServiceType;
+  }
+
+  private setSelectedService(type: string) {
+    this.selectedService = this.data.serviceTypes.find(val => {
+      return val.name === type;
     }) as ServiceType;
   }
 
@@ -110,18 +162,14 @@ export class DfServiceFormComponent implements OnDestroy {
         config: this.serviceConfigFormData.config,
       };
 
-      console.log('create payload: ', payload);
       this.serviceDataService
         .createService(payload)
         .pipe(takeUntil(this.destroyer$))
-        .subscribe(response => {
-          console.log('response: ', response);
+        .subscribe(_response => {
           this.onClose();
           this.router.navigate([ROUTES.MANAGE_SERVICES]);
         });
     }
-
-    return Error('Form input is invalid');
   }
 
   private updateService(): void {

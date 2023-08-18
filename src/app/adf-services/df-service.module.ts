@@ -2,7 +2,6 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DfServiceComponent } from './df-service/df-service.component';
 import { DfServiceDefinitionComponent } from './df-service-definition/df-service-definition.component';
-import { DfServiceInfoComponent } from './df-service-info/df-service-info.component';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { DfManageServicesComponent } from './df-manage-services/manage-services.component';
 import { MatTableModule } from '@angular/material/table';
@@ -30,7 +29,6 @@ import { DfCreateServiceComponent } from './df-create-service/df-create-service.
   declarations: [
     DfServiceComponent,
     DfServiceDefinitionComponent,
-    DfServiceInfoComponent,
     DfManageServicesComponent,
     DfServiceFormComponent,
     DfServiceLinksCardComponent,

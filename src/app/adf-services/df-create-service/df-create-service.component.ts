@@ -1,7 +1,10 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Subject, takeUntil } from 'rxjs';
-import { DfServiceFormComponent } from '../df-service-form/df-service-form.component';
+import {
+  DfServiceFormComponent,
+  FormData,
+} from '../df-service-form/df-service-form.component';
 import {
   ServiceDataService,
   ServiceType,
@@ -9,17 +12,20 @@ import {
 import { ActivatedRoute } from '@angular/router';
 
 @Component({
-  selector: 'df-df-create-service',
+  selector: 'df-create-service',
   templateUrl: './df-create-service.component.html',
   styleUrls: ['./df-create-service.component.scss'],
 })
 export class DfCreateServiceComponent implements OnDestroy {
+  //TODO: change component name
   destroyer$ = new Subject<void>();
   serviceTypes: ServiceType[];
 
+  isEditServiceMode = false;
+
   constructor(
     public dialog: MatDialog,
-    service: ServiceDataService,
+    private service: ServiceDataService,
     activatedRoute: ActivatedRoute
   ) {
     activatedRoute.data
