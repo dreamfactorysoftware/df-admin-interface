@@ -9,12 +9,13 @@ import { AdminType } from 'src/app/shared/types/user';
 export class DfAdminService {
   constructor(private http: HttpClient) {}
 
-  getAdmins(limit = 10, offset = 0) {
+  getAdmins(limit = 10, offset = 0, filter = '') {
     return this.http.get<GenericListResponse<Array<AdminType>>>(
       URLS.SYSTEM_ADMIN,
       {
         headers: SHOW_LOADING_HEADER,
         params: {
+          filter,
           limit,
           offset,
           include_count: true,

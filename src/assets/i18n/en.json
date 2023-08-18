@@ -69,6 +69,14 @@
       "react": "React"
     }
   },
+  "roleManagement": {
+    "tableHeaders": {
+      "id": "ID",
+      "name": "Name",
+      "description": "Description",
+      "active": "Active"
+    }
+  },
   "userManagement": {
     "requiredForLogin": "Required for login",
     "resetPassword": "Reset Password",
@@ -239,5 +247,13 @@
   "save": "Save",
   "update": "Update",
   "confirmed": "Confirmed",
-  "pending": "Pending"
+  "pending": "Pending",
+  "id": "ID",
+  "email": "Email",
+  "name": "Display Name",
+  "firstName": "First Name",
+  "lastName": "Last Name",
+  "active": "Active",
+  "registration": "Registration",
+  "filter": "Filter"
 }

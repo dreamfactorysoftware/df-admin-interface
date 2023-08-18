@@ -59,6 +59,12 @@ const routes: Routes = [
       import('./adf-admins/adf-admins.module').then(m => m.AdfAdminsModule),
     canActivate: [loggedInGuard],
   },
+  {
+    path: ROUTES.ROLES,
+    loadChildren: () =>
+      import('./adf-roles/adf-roles.module').then(m => m.AdfRolesModule),
+    canActivate: [loggedInGuard],
+  },
 ];
 
 @NgModule({

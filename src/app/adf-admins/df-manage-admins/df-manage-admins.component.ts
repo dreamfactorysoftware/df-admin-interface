@@ -10,6 +10,7 @@ import {
   faXmarkCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
+import { faTrashCan, faPenToSquare } from '@fortawesome/free-regular-svg-icons';
 
 @Component({
   selector: 'df-manage-admins',
@@ -19,6 +20,8 @@ import { IconProp } from '@fortawesome/fontawesome-svg-core';
   ],
 })
 export class DfManageAdminsComponent extends DFManageTableComponent<UserRow> {
+  faTrashCan = faTrashCan;
+  faPenToSquare = faPenToSquare;
   constructor(
     private adminService: DfAdminService,
     router: Router,
@@ -28,9 +31,6 @@ export class DfManageAdminsComponent extends DFManageTableComponent<UserRow> {
     super(router, activatedRoute, liveAnnouncer);
   }
   override columns = [
-    {
-      columnDef: 'select',
-    },
     {
       columnDef: 'active',
       cell: (row: UserRow) => `${row.active}`,
@@ -73,6 +73,9 @@ export class DfManageAdminsComponent extends DFManageTableComponent<UserRow> {
       header: 'registration',
       sortActionDescription: 'registration',
     },
+    {
+      columnDef: 'actions',
+    },
   ];
 
   activeIcon(active: boolean): IconProp {
@@ -93,6 +96,10 @@ export class DfManageAdminsComponent extends DFManageTableComponent<UserRow> {
     });
   }
 
+  filterQuery(value: string): string {
+    return `(first_name like "%${value}%") or (last_name like "%${value}%") or (name like "%${value}%") or (email like "%${value}%")`;
+  }
+
   deleteRow(row: UserRow): void {
     this.adminService
       .deleteAdmin(row.id)
@@ -102,10 +109,9 @@ export class DfManageAdminsComponent extends DFManageTableComponent<UserRow> {
       });
   }
 
-  refreshTable(limit?: number, offset?: number): void {
-    console.log(limit, offset);
+  refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.adminService
-      .getAdmins(limit, offset)
+      .getAdmins(limit, offset, filter)
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
