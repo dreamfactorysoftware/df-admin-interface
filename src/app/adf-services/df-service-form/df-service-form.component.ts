@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnDestroy } from '@angular/core';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import {
@@ -6,6 +6,9 @@ import {
   ServiceType,
   SystemServiceData,
 } from '../services/service-data.service';
+import { Subject, takeUntil } from 'rxjs';
+import { Router } from '@angular/router';
+import { ROUTES } from 'src/app/core/constants/routes';
 
 export type FormData = {
   serviceTypes: ServiceType[];
@@ -16,7 +19,7 @@ export type FormData = {
   templateUrl: './df-service-form.component.html',
   styleUrls: ['./df-service-form.component.scss'],
 })
-export class DfServiceFormComponent {
+export class DfServiceFormComponent implements OnDestroy {
   isCreateServiceEnabled = true;
   selectedService: ServiceType; // aka selectedSchema
   selectServiceDropdownOptions: string[];
@@ -24,9 +27,11 @@ export class DfServiceFormComponent {
   selectServiceTypeDropdownValue: string | null;
   serviceTypeDropdownOptions: string[];
   private serviceTypeMap = new Map<string, string[]>();
-  formData: Partial<SystemServiceData> = {
+  serviceConfigFormData: Partial<SystemServiceData> = {
     config: {},
   }; // dynamic formData object
+
+  destroyer$ = new Subject<void>();
 
   httpVerbsDropdownOptions = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
@@ -54,11 +59,17 @@ export class DfServiceFormComponent {
     public dialogRef: MatDialogRef<DfServiceFormComponent>,
     @Inject(MAT_DIALOG_DATA) public data: FormData,
     private _formBuilder: FormBuilder,
-    private serviceDataService: ServiceDataService
+    private serviceDataService: ServiceDataService,
+    private router: Router
   ) {
     this.selectServiceNameDropdownValue = null;
     this.populateSelectServiceDropdownOptions();
     this.populateServiceTypeMap();
+  }
+
+  ngOnDestroy(): void {
+    this.destroyer$.next();
+    this.destroyer$.complete();
   }
 
   onChangeSelectServiceName(event: string): void {
@@ -75,30 +86,42 @@ export class DfServiceFormComponent {
     this.selectedService = this.data.serviceTypes.find(val => {
       return val.label === this.selectServiceTypeDropdownValue;
     }) as ServiceType;
-    console.log('selectedService: ', this.selectedService);
-    console.log(
-      'selectedService config schema: ',
-      this.selectedService.configSchema
-    );
-
-    console.log(
-      'selectServiceTypeDropdownValue: ',
-      this.selectServiceTypeDropdownValue
-    );
   }
 
   onClose(): void {
     this.dialogRef.close();
   }
 
-  onSubmit(): void {
+  onSubmit() {
     return this.isCreateServiceEnabled
       ? this.createService()
       : this.updateService();
   }
 
-  private createService(): void {
-    console.log('service created!');
+  private createService() {
+    if (this.firstFormGroup.valid) {
+      const payload: Partial<SystemServiceData> = {
+        name: this.firstFormGroup.value.namespace as string,
+        label: this.firstFormGroup.value.label as string,
+        description: this.firstFormGroup.value.description ?? '',
+        isActive: this.firstFormGroup.value.isActive ?? false,
+        type: this.selectedService.name,
+        service_doc_by_service_id: null,
+        config: this.serviceConfigFormData.config,
+      };
+
+      console.log('create payload: ', payload);
+      this.serviceDataService
+        .createService(payload)
+        .pipe(takeUntil(this.destroyer$))
+        .subscribe(response => {
+          console.log('response: ', response);
+          this.onClose();
+          this.router.navigate([ROUTES.MANAGE_SERVICES]);
+        });
+    }
+
+    return Error('Form input is invalid');
   }
 
   private updateService(): void {
@@ -125,40 +148,5 @@ export class DfServiceFormComponent {
           return false;
         return index === self.indexOf(groupName);
       });
-  }
-
-  isFieldsSeparated(schemaName: string): boolean {
-    return (
-      schemaName === 'mysql' ||
-      schemaName === 'sqlsrv' ||
-      schemaName === 'oracle' ||
-      schemaName === 'pgsql'
-    );
-  }
-
-  isBasic(fieldName: string): boolean {
-    const basicFieldsNames = new Set([
-      'host',
-      'port',
-      'database',
-      'username',
-      'password',
-      'schema',
-    ]);
-
-    // mysql exception for schema field
-    if (
-      this.selectedService &&
-      this.selectedService.name === 'mysql' &&
-      fieldName === 'schema'
-    ) {
-      return false;
-    }
-
-    return basicFieldsNames.has(fieldName);
-  }
-
-  isCaching(fieldName: string): boolean {
-    return fieldName.includes('cache') || fieldName.includes('caching');
   }
 }

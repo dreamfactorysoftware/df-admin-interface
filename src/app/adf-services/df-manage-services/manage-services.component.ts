@@ -152,7 +152,6 @@ export class DfManageServicesComponent extends DFManageTableComponent<ServiceTab
       });
   }
 
-  // TODO: marked for removal
   onMassDelete() {
     const rows = this.selection.selected
       .filter(val => {

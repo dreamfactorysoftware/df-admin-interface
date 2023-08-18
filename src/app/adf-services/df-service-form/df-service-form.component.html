@@ -70,7 +70,7 @@
                   {{ field.label }}
                 </mat-label>
                 <input
-                  [(ngModel)]="formData['config'][field.name]"
+                  [(ngModel)]="serviceConfigFormData['config'][field.name]"
                   [name]="field.name"
                   type="text"
                   matInput />
@@ -80,7 +80,7 @@
                   {{ field.label }}
                 </mat-label>
                 <input
-                  [(ngModel)]="formData['config'][field.name]"
+                  [(ngModel)]="serviceConfigFormData['config'][field.name]"
                   [name]="field.name"
                   type="password"
                   matInput />
@@ -90,14 +90,14 @@
                   {{ field.label }}
                 </mat-label>
                 <input
-                  [(ngModel)]="formData['config'][field.name]"
+                  [(ngModel)]="serviceConfigFormData['config'][field.name]"
                   [name]="field.name"
                   type="number"
                   matInput />
               </mat-form-field>
               <div *ngIf="field.type && field.type === 'boolean'">
                 <mat-checkbox
-                  [(ngModel)]="formData['config'][field.name]"
+                  [(ngModel)]="serviceConfigFormData['config'][field.name]"
                   [name]="field.name"
                   >{{ field.label }}</mat-checkbox
                 >
@@ -106,12 +106,12 @@
                 <mat-label>
                   {{ field.label }}
                 </mat-label>
-                <mat-select>
+                <mat-select
+                  [(ngModel)]="serviceConfigFormData['config'][field.name]"
+                  [name]="field.name">
                   <mat-option
                     *ngFor="let option of field.values"
-                    [(ngModel)]="formData['config'][option.name]"
-                    [name]="field.name"
-                    [value]="option.label">
+                    [value]="option.name">
                     {{ option.label }}
                   </mat-option>
                 </mat-select>
@@ -121,36 +121,65 @@
                 <mat-label>
                   {{ field.label }}
                 </mat-label>
-                <mat-select multiple>
+                <mat-select
+                  [(ngModel)]="serviceConfigFormData['config'][field.name]"
+                  [name]="field.name"
+                  multiple>
                   <mat-option
                     *ngFor="let option of field.values"
-                    [(ngModel)]="formData['config'][option.name]"
-                    [name]="field.name"
                     [value]="option.label">
                     {{ option.label }}
                   </mat-option>
                 </mat-select>
               </mat-form-field>
               <div *ngIf="field.type && field.type === 'array'">
-                <mat-form-field *ngFor="let item of field.items">
-                  <input *ngIf="item.type === 'string'" matInput type="text" />
-                  <mat-checkbox *ngIf="item.type === 'boolean'">{{
-                    item.label
-                  }}</mat-checkbox>
-                  <mat-select *ngIf="item.type === 'verb_mask'" multiple>
-                    <mat-option
-                      *ngFor="let option of httpVerbsDropdownOptions"
-                      >{{ option }}</mat-option
+                <div *ngFor="let item of field.items">
+                  <mat-form-field
+                    *ngIf="item.type === 'string' || item.type === 'text'">
+                    <mat-label>
+                      {{ item.label }}
+                    </mat-label>
+                    <input
+                      matInput
+                      type="text"
+                      [(ngModel)]="serviceConfigFormData['config'][item.name]"
+                      [name]="field.name" />
+                  </mat-form-field>
+                  <div *ngIf="item.type === 'boolean'">
+                    <mat-checkbox
+                      [(ngModel)]="serviceConfigFormData['config'][item.name]"
+                      [name]="field.name"
+                      >{{ item.label }}</mat-checkbox
                     >
-                  </mat-select>
-                  <mat-select *ngIf="item.type === 'picklist'">
-                    <mat-option
-                      *ngFor="let option of item.values"
-                      [value]="option.label"
-                      >{{ option.label }}</mat-option
-                    >
-                  </mat-select>
-                </mat-form-field>
+                  </div>
+                  <mat-form-field *ngIf="item.type === 'verb_mask'">
+                    <mat-label>
+                      {{ item.label }}
+                    </mat-label>
+                    <mat-select multiple>
+                      <mat-option
+                        *ngFor="let option of httpVerbsDropdownOptions"
+                        [(ngModel)]="serviceConfigFormData['config'][item.name]"
+                        [name]="field.name"
+                        >{{ option }}</mat-option
+                      >
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field *ngIf="item.type === 'picklist'">
+                    <mat-label>
+                      {{ item.label }}
+                    </mat-label>
+                    <mat-select multiple>
+                      <mat-option
+                        *ngFor="let option of item.values"
+                        [(ngModel)]="serviceConfigFormData['config'][item.name]"
+                        [name]="field.name"
+                        [value]="option.label"
+                        >{{ option.label }}</mat-option
+                      >
+                    </mat-select>
+                  </mat-form-field>
+                </div>
               </div>
             </div>
           </div>
@@ -167,7 +196,11 @@
       </mat-step>
       <mat-step>
         <ng-template matStepLabel>Definition</ng-template>
-        <df-service-definition></df-service-definition>
+        <df-service-definition
+          [isServiceEditable]="
+            (selectedService && selectedService.service_definition_editable) ||
+            false
+          "></df-service-definition>
         <div>
           <button mat-button matStepperPrevious>
             {{ 'services.back' | translate }}

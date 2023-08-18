@@ -29,10 +29,10 @@ export class ServiceDataService {
     );
   }
 
-  createService(newService: SystemServiceData) {
-    const body = JSON.stringify({
+  createService(newService: Partial<SystemServiceData>) {
+    const body = {
       resource: [newService],
-    });
+    };
 
     return this.http.post<SystemServiceData>(URLS.SYSTEM_SERVICE, body, {
       params: { fields: '*', related: 'service_doc_by_service_id' },
@@ -85,7 +85,7 @@ export interface ServiceType {
   service_definition_editable: boolean;
   singleton: boolean;
   subscription_required: string;
-  config_schema: object[];
+  configSchema: any[];
 }
 
 export interface SystemServiceData {
@@ -101,6 +101,6 @@ export interface SystemServiceData {
   last_modified_date: string;
   created_by_id: number | null;
   last_modified_by_id: number | null;
-  config: object;
+  config: any;
   service_doc_by_service_id: number | null;
 }
