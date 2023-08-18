@@ -113,7 +113,7 @@ export class DfAppsFormComponent implements OnInit {
       name: this.appForm.value.name,
       description: this.appForm.value.description,
       type: parseInt(this.appForm.value.appLocation),
-      role_id: this.appForm.value.defaultRole.id,
+      role_id: this.appForm.value.defaultRole,
       is_active: this.appForm.value.active,
       url:
         this.appForm.value.appLocation === '2' ? this.appForm.value.url : null,
