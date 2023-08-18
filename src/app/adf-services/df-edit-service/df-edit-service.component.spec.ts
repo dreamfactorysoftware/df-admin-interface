@@ -8,7 +8,7 @@ describe('DfEditServiceComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfEditServiceComponent]
+      declarations: [DfEditServiceComponent],
     });
     fixture = TestBed.createComponent(DfEditServiceComponent);
     component = fixture.componentInstance;

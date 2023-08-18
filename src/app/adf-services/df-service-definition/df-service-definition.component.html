@@ -2,7 +2,7 @@
   <!-- TODO: add the following to the DIV below *ngIf="selectedService && selectedService.service_definition_editable" -->
   <div>
     <div class="form-group ng-scope">
-      <h3>Select Format</h3>
+      <h3>{{ 'services.selectFormat' | translate }}</h3>
       <mat-form-field>
         <mat-select [formControl]="serviceDefinitionFormat">
           <mat-option value="json" selected="selected">JSON</mat-option>
@@ -12,10 +12,10 @@
     </div>
 
     <div class="form-group">
-      <h2>Import a script file</h2>
+      <h2>{{ 'services.importScriptFile' | translate }}</h2>
       <div>
         <h3>
-          Select Desktop File...
+          {{ 'services.selectDesktopFile' | translate }}...
           <input
             type="file"
             accept=".json,.yml,.yaml"

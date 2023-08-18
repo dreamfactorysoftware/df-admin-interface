@@ -8,7 +8,7 @@ describe('DfServiceLinksCardComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfServiceLinksCardComponent]
+      declarations: [DfServiceLinksCardComponent],
     });
     fixture = TestBed.createComponent(DfServiceLinksCardComponent);
     component = fixture.componentInstance;
