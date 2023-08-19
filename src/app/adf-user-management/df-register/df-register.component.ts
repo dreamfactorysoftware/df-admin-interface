@@ -9,6 +9,7 @@ import { ROUTES } from 'src/app/core/constants/routes';
 @Component({
   selector: 'df-register',
   templateUrl: './df-register.component.html',
+  styleUrls: ['../adf-user-management.scss'],
 })
 export class DfRegisterComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();
@@ -25,11 +26,13 @@ export class DfRegisterComponent implements OnInit, OnDestroy {
     private authService: DfAuthService
   ) {
     this.registerForm = this.fb.group({
-      username: [''],
-      email: ['', [Validators.email]],
-      firstName: ['', [Validators.required]],
-      lastName: ['', [Validators.required]],
-      name: ['', [Validators.required]],
+      userDetailsGroup: this.fb.group({
+        username: [''],
+        email: ['', [Validators.email]],
+        firstName: ['', [Validators.required]],
+        lastName: ['', [Validators.required]],
+        name: ['', [Validators.required]],
+      }),
     });
   }
 
@@ -39,13 +42,13 @@ export class DfRegisterComponent implements OnInit, OnDestroy {
       .subscribe(env => {
         this.loginAttribute = env.authentication.loginAttribute;
         if (this.loginAttribute === 'username') {
-          this.registerForm.controls['username'].setValidators([
-            Validators.required,
-          ]);
+          this.registerForm
+            .get('userDetailsGroup.username')
+            ?.setValidators([Validators.required]);
         } else {
-          this.registerForm.controls['email'].addValidators([
-            Validators.required,
-          ]);
+          this.registerForm
+            .get('userDetailsGroup.email')
+            ?.addValidators([Validators.required]);
         }
       });
   }
@@ -55,7 +58,7 @@ export class DfRegisterComponent implements OnInit, OnDestroy {
       return;
     }
     this.authService
-      .register(this.registerForm.value)
+      .register(this.registerForm.controls['userDetailsGroup'].value)
       .pipe(
         takeUntil(this.destroyed$),
         catchError(err => {

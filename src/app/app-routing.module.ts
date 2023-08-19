@@ -3,7 +3,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { ROUTES } from './core/constants/routes';
 import { loggedInGuard } from './core/guards/logged-in.guard';
 import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
-
+import { HashLocationStrategy, LocationStrategy } from '@angular/common';
 const routes: Routes = [
   {
     path: '',
@@ -30,10 +30,34 @@ const routes: Routes = [
       import('./adf-apps/adf-apps.module').then(m => m.AdfAppsModule),
     canActivate: [loggedInGuard],
   },
+  {
+    path: ROUTES.PROFILE,
+    loadChildren: () =>
+      import('./adf-profile/adf-profile.module').then(m => m.AdfProfileModule),
+    canActivate: [loggedInGuard],
+  },
+  {
+    path: ROUTES.ADMINS,
+    loadChildren: () =>
+      import('./adf-admins/adf-admins.module').then(m => m.AdfAdminsModule),
+    canActivate: [loggedInGuard],
+  },
+  {
+    path: ROUTES.ROLES,
+    loadChildren: () =>
+      import('./adf-roles/adf-roles.module').then(m => m.AdfRolesModule),
+    canActivate: [loggedInGuard],
+  },
 ];
 
 @NgModule({
-  imports: [RouterModule.forRoot(routes)],
+  imports: [RouterModule.forRoot(routes, { useHash: true })],
   exports: [RouterModule],
+  providers: [
+    {
+      provide: LocationStrategy,
+      useClass: HashLocationStrategy,
+    },
+  ],
 })
 export class AppRoutingModule {}

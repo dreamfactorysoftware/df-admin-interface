@@ -1,0 +1,25 @@
+@use '@angular/material' as mat;
+
+$deep-purple-palette: mat.define-palette(mat.$deep-purple-palette);
+$green-palette: mat.define-palette(mat.$green-palette);
+$red-palette: mat.define-palette(mat.$red-palette);
+
+.selected {
+  background-color: mat.get-color-from-palette($deep-purple-palette, 100);
+}
+
+.active {
+  color: mat.get-color-from-palette($green-palette, 500);
+}
+
+.inactive {
+  color: mat.get-color-from-palette($red-palette, 500);
+}
+
+.actions {
+  display: flex;
+  flex-direction: row;
+  button {
+    height: 100%;
+  }
+}

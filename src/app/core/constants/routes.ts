@@ -29,4 +29,5 @@ export enum ROUTES {
   REGISTER_CONFIRM = 'register-confirm',
   MANAGE = 'manage',
   IMPORT = 'import',
+  PROFILE = 'profile',
 }
