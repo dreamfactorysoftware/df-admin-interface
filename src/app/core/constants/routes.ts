@@ -27,5 +27,7 @@ export enum ROUTES {
   RESOURCES = 'resources',
   DOWNLOAD = 'download',
   REGISTER_CONFIRM = 'register-confirm',
+  MANAGE = 'manage',
+  IMPORT = 'import',
   PROFILE = 'profile',
 }
