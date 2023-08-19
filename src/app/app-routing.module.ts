@@ -25,12 +25,6 @@ const routes: Routes = [
     canActivate: [loggedInGuard],
   },
   {
-    path: ROUTES.APPS,
-    loadChildren: () =>
-      import('./adf-apps/adf-apps.module').then(m => m.AdfAppsModule),
-    canActivate: [loggedInGuard],
-  },
-  {
     path: ROUTES.PROFILE,
     loadChildren: () =>
       import('./adf-profile/adf-profile.module').then(m => m.AdfProfileModule),

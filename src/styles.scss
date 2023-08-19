@@ -8,29 +8,3 @@ body {
   margin: 0;
   font-family: Roboto, 'Helvetica Neue', sans-serif;
 }
-.flex-col {
-  display: flex;
-  flex-direction: column;
-}
-
-.user-management-card {
-  position: relative;
-  padding: 16px 16px;
-  margin: 70px auto 0;
-  min-width: 300px;
-  max-width: 445px;
-  mat-card-header {
-    padding-bottom: 16px;
-  }
-  mat-card-content {
-    padding-top: 16px;
-  }
-  mat-form-field,
-  button {
-    width: 100%;
-  }
-  .action-links {
-    display: flex;
-    justify-content: flex-end;
-  }
-}
