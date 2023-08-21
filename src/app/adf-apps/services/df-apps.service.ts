@@ -62,7 +62,7 @@ export class DfAppsService {
       .subscribe(data => console.log(data));
   }
 
-  deleteApps(id: string | number) {
+  deleteApp(id: string | number) {
     return this.http.delete(`${URLS.APP}/${id}`, {
       headers: SHOW_LOADING_HEADER,
       params: {

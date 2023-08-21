@@ -6,6 +6,7 @@ import { AdfAppsRoutingModule } from './adf-apps-routing.module';
 import { DfManageAppsComponent } from './df-manage-apps/df-manage-apps.component';
 import { DfAppsFormComponent } from './df-apps-form/df-apps-form.component';
 import { DfImportAppComponent } from './df-import-app/df-import-app.component';
+import { DfManageAppsTableComponent } from './df-manage-apps/df-manage-apps-table.component';
 import { DfAppsService } from './services/df-apps.service';
 
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
@@ -19,10 +20,12 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatMenuModule } from '@angular/material/menu';
 
 @NgModule({
   declarations: [
     DfManageAppsComponent,
+    DfManageAppsTableComponent,
     DfAppsFormComponent,
     DfImportAppComponent,
   ],
@@ -42,6 +45,7 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
     MatSelectModule,
     MatCardModule,
     MatAutocompleteModule,
+    MatMenuModule,
   ],
   providers: [DfAppsService],
 })
