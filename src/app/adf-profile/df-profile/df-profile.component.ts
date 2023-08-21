@@ -44,7 +44,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
     private passwordService: DfPasswordService
   ) {
     this.profileForm = this.fb.group({
-      userDetailsGroup: this.fb.group({
+      profileDetailsGroup: this.fb.group({
         username: [''],
         email: ['', Validators.email],
         firstName: [''],
@@ -73,7 +73,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
       .subscribe(({ data }) => {
         this.currentProfile = data;
         this.profileForm.patchValue({
-          userDetailsGroup: {
+          profileDetailsGroup: {
             username: data.username,
             email: data.email,
             firstName: data.firstName,
@@ -92,16 +92,16 @@ export class DfProfileComponent implements OnInit, OnDestroy {
         this.loginAttribute = env.authentication.loginAttribute;
         if (this.loginAttribute === 'username') {
           this.profileForm
-            .get('userDetailsGroup.username')
+            .get('profileDetailsGroup.username')
             ?.addValidators([Validators.required]);
         } else {
           this.profileForm
-            .get('userDetailsGroup.email')
+            .get('profileDetailsGroup.email')
             ?.addValidators([Validators.required]);
         }
       });
     this.profileForm
-      .get('userDetailsGroup.email')
+      .get('profileDetailsGroup.email')
       ?.valueChanges.subscribe(val => {
         if (this.currentProfile.email !== val) {
           this.needPassword = true;
@@ -122,7 +122,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
     }
     const body: UserProfile = {
       ...this.currentProfile,
-      ...this.profileForm.controls['userDetailsGroup'].value,
+      ...this.profileForm.controls['profileDetailsGroup'].value,
     };
     if (this.needPassword) {
       body.currentPassword = this.profileForm.controls['currentPassword'].value;

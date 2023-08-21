@@ -15,7 +15,7 @@
         name="user-profile-form"
         [formGroup]="profileForm"
         (ngSubmit)="updateProfile()">
-        <df-user-details formGroupName="userDetailsGroup" />
+        <df-profile-details formGroupName="profileDetailsGroup" />
         <mat-form-field appearance="fill" *ngIf="needPassword">
           <mat-label>{{
             'userManagement.controls.currentPassword.label' | translate
