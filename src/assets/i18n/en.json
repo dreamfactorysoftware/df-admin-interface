@@ -77,14 +77,6 @@
       "react": "React"
     }
   },
-  "roleManagement": {
-    "tableHeaders": {
-      "id": "ID",
-      "name": "Name",
-      "description": "Description",
-      "active": "Active"
-    }
-  },
   "userManagement": {
     "requiredForLogin": "Required for login",
     "resetPassword": "Reset Password",
@@ -339,6 +331,15 @@
       "storageFolder": "Storage Folder (optional)"
     }
   },
+  "nav": {
+    "home": "Home",
+    "admins": "Admins",
+    "welcome": "Welcome",
+    "resources": "Resources",
+    "quickstart": "Quickstart",
+    "download": "Download",
+    "profile": "Profile"
+  },
   "save": "Save",
   "update": "Update",
   "confirmed": "Confirmed",
@@ -350,5 +351,21 @@
   "lastName": "Last Name",
   "active": "Active",
   "registration": "Registration",
-  "filter": "Filter"
+  "filter": "Filter",
+  "edit": "Edit",
+  "delete": "Delete",
+  "editRow": "Edit row {{id}}",
+  "deleteRow": "Delete row {{id}}",
+  "selectRow": "Select row {{id}}",
+  "selectAll": "Select All",
+  "deselectRow": "Deselect row {{id}}",
+  "deselectAll": "Deselect all",
+  "sortCleared": "Sorting cleared",
+  "sortedAsc": "Sorted ascending",
+  "sortedDesc": "Sorted descending",
+  "search": "Search",
+  "newEntry": "Create a new entry",
+  "exportList": "Export list",
+  "importList": "Import list",
+  "description": "Description"
 }

@@ -1,8 +1,9 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { DfManageAdminsComponent } from './df-manage-admins/df-manage-admins.component';
 import { adminResolver } from './resolvers/admin.resolver';
 import { DfAdminDetailsComponent } from './df-admin-details/df-admin-details.component';
+import { ROUTES } from '../core/constants/routes';
+import { DfManageAdminsComponent } from './df-manage-admins/df-manage-admins.component';
 
 const routes: Routes = [
   {
@@ -11,9 +12,15 @@ const routes: Routes = [
     resolve: { data: adminResolver },
   },
   {
-    path: 'edit/:id',
+    path: `${ROUTES.EDIT}/:id`,
     component: DfAdminDetailsComponent,
     resolve: { data: adminResolver },
+    data: { type: 'edit' },
+  },
+  {
+    path: ROUTES.CREATE,
+    component: DfAdminDetailsComponent,
+    data: { type: 'create' },
   },
 ];
 

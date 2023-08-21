@@ -30,4 +30,6 @@ export enum ROUTES {
   MANAGE = 'manage',
   IMPORT = 'import',
   PROFILE = 'profile',
+  EDIT = 'edit',
+  CREATE = 'create',
 }

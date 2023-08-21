@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { TranslateModule } from '@ngx-translate/core';
-import { DfUserDetailsComponent } from '../shared/components/df-user-details/df-user-details.component';
+import { DfProfileDetailsComponent } from '../shared/components/df-profile-details/df-profile-details.component';
 import { DfProfileService } from './services/df-profile.service';
 import { DfPasswordService } from '../adf-user-management/services/df-password.service';
 
@@ -26,7 +26,7 @@ import { DfPasswordService } from '../adf-user-management/services/df-password.s
     MatButtonModule,
     MatFormFieldModule,
     TranslateModule,
-    DfUserDetailsComponent,
+    DfProfileDetailsComponent,
   ],
   providers: [DfProfileService, DfPasswordService],
 })
