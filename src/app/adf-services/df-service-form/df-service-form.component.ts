@@ -238,7 +238,7 @@ export class DfServiceFormComponent implements OnDestroy, OnInit {
         .subscribe(_response => {
           this.openSuccessSnackBarNotification();
           this.onClose();
-          this.router.navigate([ROUTES.MANAGE_SERVICES]);
+          this.router.navigate([ROUTES.EDIT_SERVICES]);
         });
     } else {
       this.openInvalidSnackBarNotification();
@@ -285,7 +285,7 @@ export class DfServiceFormComponent implements OnDestroy, OnInit {
         .subscribe(_response => {
           this.openSuccessSnackBarNotification();
           if (this.isCreateServiceEnabled) this.onClose();
-          this.router.navigate([ROUTES.MANAGE_SERVICES]);
+          this.router.navigate([ROUTES.EDIT_SERVICES]);
         });
     } else {
       this.openInvalidSnackBarNotification();

@@ -4,7 +4,7 @@ export enum ROUTES {
   LOGIN = 'login',
   LAUNCHPAD = 'launchpad',
   CREATE_SERVICES = 'services/create',
-  MANAGE_SERVICES = 'services/manage',
+  EDIT_SERVICES = 'services/edit',
   SERVICES = 'services',
   APPS = 'apps',
   ADMINS = 'admins',

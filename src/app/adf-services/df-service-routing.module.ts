@@ -19,13 +19,13 @@ const routes: Routes = [
     resolve: { data: getServiceTypeDataResolver },
   },
   {
-    path: ROUTES.MANAGE_SERVICES,
+    path: ROUTES.EDIT_SERVICES,
     component: DfServiceComponent,
     canActivate: [loggedInGuard],
     resolve: { data: getSystemServiceDataListResolver },
   },
   {
-    path: ROUTES.MANAGE_SERVICES + '/:id',
+    path: ROUTES.EDIT_SERVICES + '/edit/:id',
     component: DfEditServiceComponent,
     canActivate: [loggedInGuard],
     resolve: {

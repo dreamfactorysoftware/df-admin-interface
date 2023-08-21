@@ -16,6 +16,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatStepperModule } from '@angular/material/stepper';
 import { MatPaginatorModule } from '@angular/material/paginator';
 import { MatSortModule } from '@angular/material/sort';
+import { MatMenuModule } from '@angular/material/menu';
 import { TranslateModule } from '@ngx-translate/core';
 import { MatIconModule } from '@angular/material/icon';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
@@ -26,6 +27,7 @@ import { MatCardModule } from '@angular/material/card';
 import { DfCreateServiceComponent } from './df-create-service/df-create-service.component';
 import { DfServiceRoutingModule } from './df-service-routing.module';
 import { DfEditServiceComponent } from './df-edit-service/df-edit-service.component';
+import { DfManageServicesTableComponent } from './df-manage-services-table/manage-services-table.component';
 
 @NgModule({
   declarations: [
@@ -36,6 +38,7 @@ import { DfEditServiceComponent } from './df-edit-service/df-edit-service.compon
     DfServiceLinksCardComponent,
     DfCreateServiceComponent,
     DfEditServiceComponent,
+    DfManageServicesTableComponent,
   ],
   imports: [
     CommonModule,
@@ -53,6 +56,7 @@ import { DfEditServiceComponent } from './df-edit-service/df-edit-service.compon
     MatInputModule,
     MatListModule,
     MatTableModule,
+    MatMenuModule,
     MatDialogModule,
     MatSelectModule,
     MatSnackBarModule,

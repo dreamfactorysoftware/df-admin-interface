@@ -14,13 +14,14 @@ export class ServiceDataService {
     return this.http.get<SystemServiceData>(url);
   }
 
-  getSystemServiceDataList(limit = 10, offset = 0) {
+  getSystemServiceDataList(limit = 10, offset = 0, filter = '') {
     return this.http.get<GenericListResponse<Array<SystemServiceData>>>(
       URLS.SYSTEM_SERVICE,
       {
         params: {
           limit,
           offset,
+          filter,
           include_count: true,
           related: 'service_doc_by_service_id',
         },

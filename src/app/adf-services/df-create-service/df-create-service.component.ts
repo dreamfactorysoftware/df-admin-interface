@@ -41,7 +41,7 @@ export class DfCreateServiceComponent implements OnDestroy {
   }
 
   onButtonClick() {
-    this.router.navigate([ROUTES.MANAGE_SERVICES]);
+    this.router.navigate([ROUTES.EDIT_SERVICES]);
   }
 
   ngOnDestroy() {
