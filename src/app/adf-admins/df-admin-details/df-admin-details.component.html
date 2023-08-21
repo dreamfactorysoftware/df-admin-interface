@@ -1,6 +1,54 @@
 <form [formGroup]="adminForm">
-  <df-user-details formGroupName="userDetailsGroup" />
-  <mat-checkbox formControlName="isActive">{{
-    'active' | translate
-  }}</mat-checkbox>
+  <div class="user-details" [class.small]="isSmallScreen | async">
+    <df-profile-details formGroupName="profileDetailsGroup" />
+    <div class="additional-info">
+      <span *ngIf="type === 'edit'"
+        >Confirmed: {{ currentProfile.confirmed ? 'Yes' : 'No' }}</span
+      >
+      <button
+        mat-flat-button
+        color="primary"
+        (click)="sendInvite()"
+        *ngIf="type === 'edit' && !currentProfile.confirmed">
+        Send Invite <fa-icon [icon]="faEnvelope"></fa-icon>
+      </button>
+      <mat-checkbox formControlName="setPassword"
+        >{{ 'userManagement.controls.setPassword.label' | translate }}
+      </mat-checkbox>
+      <ng-container *ngIf="adminForm.controls['setPassword'].value">
+        <mat-form-field appearance="fill">
+          <mat-label>{{
+            'userManagement.controls.password.label' | translate
+          }}</mat-label>
+          <input matInput type="password" formControlName="password" />
+          <mat-error *ngIf="adminForm.get('password')?.errors?.['required']">
+            {{ 'userManagement.controls.password.errors.required' | translate }}
+          </mat-error>
+          <mat-error *ngIf="adminForm.get('password')?.errors?.['minlength']">
+            {{ 'userManagement.controls.password.errors.length' | translate }}
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="fill">
+          <mat-label>{{
+            'userManagement.controls.confirmPassword.label' | translate
+          }}</mat-label>
+
+          <input matInput type="password" formControlName="confirmPassword" />
+          <mat-error
+            *ngIf="adminForm.get('confirmPassword')?.hasError('doesNotMatch')">
+            {{
+              'userManagement.controls.confirmPassword.errors.match' | translate
+            }}
+          </mat-error>
+        </mat-form-field>
+      </ng-container>
+      <mat-divider></mat-divider>
+      <mat-slide-toggle formControlName="isActive">{{
+        'active' | translate
+      }}</mat-slide-toggle>
+    </div>
+  </div>
+  <button mat-flat-button color="primary" type="submit">
+    {{ 'save' | translate }}
+  </button>
 </form>

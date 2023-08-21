@@ -12,9 +12,9 @@ import { MatInputModule } from '@angular/material/input';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'df-user-details',
-  templateUrl: './df-user-details.component.html',
-  styleUrls: ['./df-user-details.component.scss'],
+  selector: 'df-profile-details',
+  templateUrl: './df-profile-details.component.html',
+  styleUrls: ['./df-profile-details.component.scss'],
   standalone: true,
   imports: [
     MatFormFieldModule,
@@ -25,7 +25,7 @@ import { TranslateModule } from '@ngx-translate/core';
     CommonModule,
   ],
 })
-export class DfUserDetailsComponent implements OnInit {
+export class DfProfileDetailsComponent implements OnInit {
   rootForm: FormGroup;
   constructor(private rootFormGroup: FormGroupDirective) {}
 

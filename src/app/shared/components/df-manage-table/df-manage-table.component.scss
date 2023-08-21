@@ -23,3 +23,23 @@ $red-palette: mat.define-palette(mat.$red-palette);
     height: 100%;
   }
 }
+
+.top-action-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  .spacer {
+    flex: 1 1 auto;
+  }
+  .search-input {
+    min-width: 300px !important;
+  }
+}
+
+.bottom-action-bar {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}

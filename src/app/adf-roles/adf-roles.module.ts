@@ -1,35 +1,29 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DfManageRolesComponent } from './df-manage-roles/df-manage-roles.component';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { TranslateModule } from '@ngx-translate/core';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSortModule } from '@angular/material/sort';
-import { MatTableModule } from '@angular/material/table';
 import { AdfRolesRoutingModule } from './adf-roles-routing.module';
 import { DfRoleService } from './services/df-role.service';
 import { DfCreateRoleComponent } from './df-create-role/df-create-role.component';
+import { DfManageRolesTableComponent } from './df-manage-roles/df-manage-roles-table.component';
+import { DfManageTableModule } from '../shared/components/df-manage-table/df-manage-table.module';
 
 @NgModule({
-  declarations: [DfManageRolesComponent, DfCreateRoleComponent],
+  declarations: [
+    DfManageRolesComponent,
+    DfCreateRoleComponent,
+    DfManageRolesTableComponent,
+  ],
   imports: [
     CommonModule,
-    MatPaginatorModule,
-    TranslateModule,
-    FontAwesomeModule,
     FormsModule,
     MatFormFieldModule,
-    MatButtonModule,
     MatInputModule,
-    MatTableModule,
-    MatSortModule,
-    MatPaginatorModule,
     ReactiveFormsModule,
     AdfRolesRoutingModule,
+    DfManageTableModule,
   ],
   providers: [DfRoleService],
 })

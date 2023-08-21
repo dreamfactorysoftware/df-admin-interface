@@ -30,4 +30,6 @@ export enum ROUTES {
   DOWNLOAD = 'download',
   REGISTER_CONFIRM = 'register-confirm',
   PROFILE = 'profile',
+  EDIT = 'edit',
+  CREATE = 'create',
 }

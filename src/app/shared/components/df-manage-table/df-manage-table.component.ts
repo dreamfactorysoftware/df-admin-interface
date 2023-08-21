@@ -11,10 +11,23 @@ import { PageEvent } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
+import { TranslateService } from '@ngx-translate/core';
 import { Subject, takeUntil } from 'rxjs';
+import { ROUTES } from 'src/app/core/constants/routes';
+import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
+import {
+  faCheckCircle,
+  faXmarkCircle,
+  faPlus,
+  faEllipsisV,
+} from '@fortawesome/free-solid-svg-icons';
+import { faTrashCan, faPenToSquare } from '@fortawesome/free-regular-svg-icons';
+import { IconProp } from '@fortawesome/fontawesome-svg-core';
 
 @Component({
+  selector: 'df-manage-table',
   template: '',
+  standalone: true,
 })
 export abstract class DFManageTableComponent<T>
   implements OnInit, AfterViewInit, OnDestroy
@@ -24,14 +37,17 @@ export abstract class DFManageTableComponent<T>
   selection = new SelectionModel<T>(true, []);
   tableLength = 0;
   pageSizes = [10, 50, 100];
-  currentPageSize = 10;
-  filter = '';
+  currentPageSize = this.defaultPageSize;
+  isSmallScreen = this.breakpointService.isSmallScreen;
+  faTrashCan = faTrashCan;
+  faPenToSquare = faPenToSquare;
+  faPlus = faPlus;
+  faEllipsisV = faEllipsisV;
 
   columns: Array<{
     columnDef: string;
-    cell?: (element: T) => string;
+    cell?: (element: T) => any;
     header?: string;
-    sortActionDescription?: string;
   }> = [];
   @ViewChild(MatSort) sort: MatSort;
   _activatedRoute = this.activatedRoute;
@@ -39,7 +55,9 @@ export abstract class DFManageTableComponent<T>
   constructor(
     private router: Router,
     private activatedRoute: ActivatedRoute,
-    private liveAnnouncer: LiveAnnouncer
+    private liveAnnouncer: LiveAnnouncer,
+    private breakpointService: DfBreakpointService,
+    private translateService: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -55,15 +73,27 @@ export abstract class DFManageTableComponent<T>
     this.dataSource.sort = this.sort;
   }
 
+  activeIcon(active: boolean): IconProp {
+    return active ? faCheckCircle : faXmarkCircle;
+  }
+
   get displayedColumns() {
     return this.columns.map(c => c.columnDef);
   }
 
-  abstract mapDataToTable(data: any): Array<T>;
+  get defaultPageSize() {
+    return this.pageSizes[0];
+  }
+
+  abstract mapDataToTable(data: Array<T>): Array<T>;
 
   abstract refreshTable(limit?: number, offset?: number, filter?: string): void;
 
   abstract filterQuery(value: string): string;
+
+  deleteRow(row: T): void {
+    //intentionally left blank
+  }
 
   changePage(event: PageEvent): void {
     if (event.previousPageIndex !== event.pageIndex) {
@@ -74,8 +104,12 @@ export abstract class DFManageTableComponent<T>
     }
   }
 
+  createRow(): void {
+    this.router.navigate([ROUTES.CREATE], { relativeTo: this._activatedRoute });
+  }
+
   editRow(row: T): void {
-    this.router.navigate(['edit', (row as any).id], {
+    this.router.navigate([ROUTES.EDIT, (row as any).id], {
       relativeTo: this._activatedRoute,
     });
   }
@@ -94,32 +128,43 @@ export abstract class DFManageTableComponent<T>
 
   checkboxLabel(row?: T): string {
     if (!row) {
-      return `${this.isAllSelected() ? 'deselect' : 'select'} all`;
+      return this.translateService.instant(
+        this.isAllSelected() ? 'deselectAll' : 'selectAll'
+      );
     }
-    return `${this.selection.isSelected(row) ? 'deselect' : 'select'} row ${
-      (row as any).id
-    }`;
+    return this.translateService.instant(
+      this.selection.isSelected(row) ? 'deselect' : 'select',
+      { id: (row as any).id }
+    );
   }
 
   deleteLabel(row: T): string {
-    return `delete row ${(row as any).id}`;
+    return this.translateService.instant('deleteRow', { id: (row as any).id });
   }
 
   editLabel(row: T): string {
-    return `edit row ${(row as any).id}`;
+    return this.translateService.instant('editRow', { id: (row as any).id });
   }
 
   announceSortChange(sortState: any) {
     if (sortState.direction) {
-      this.liveAnnouncer.announce(`Sorted ${sortState.direction}ending`);
+      this.liveAnnouncer.announce(
+        this.translateService.instant(
+          sortState.direction === 'asc' ? 'sortAsc' : 'sortDesc'
+        )
+      );
     } else {
-      this.liveAnnouncer.announce('Sorting cleared');
+      this.liveAnnouncer.announce(this.translateService.instant('sortCleared'));
     }
   }
 
   triggerSearch(event: Event) {
     const filter = (event.target as HTMLInputElement).value;
     this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter));
+  }
+
+  sortDescription(header: string) {
+    return this.translateService.instant('sortDescription', { header });
   }
 
   ngOnDestroy(): void {

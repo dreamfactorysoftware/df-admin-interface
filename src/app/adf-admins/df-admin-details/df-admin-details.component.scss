@@ -1,0 +1,18 @@
+.user-details {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  &.small {
+    flex-direction: column;
+  }
+  > * {
+    flex: 1;
+  }
+  .additional-info {
+    display: flex;
+    flex-direction: column;
+    button {
+      width: fit-content;
+    }
+  }
+}
