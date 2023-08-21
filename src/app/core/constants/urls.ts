@@ -12,4 +12,5 @@ export enum URLS {
   USER_PROFILE = `${BASE_URL}/user/profile`,
   SYSTEM_ADMIN = `${BASE_URL}/system/admin`,
   ROLES = `${BASE_URL}/system/role`,
+  LIMITS = `${BASE_URL}/system/limit`,
 }
