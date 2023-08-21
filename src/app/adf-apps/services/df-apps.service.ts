@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { URLS } from '../../core/constants/urls';
-import { GenericListResponse } from 'src/app/shared/types/generic-http';
+import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { SHOW_LOADING_HEADER } from 'src/app/core/constants/http-headers';
 import { AppType, EditAppPayload, AppPayload } from '../types/df-apps.types';
 

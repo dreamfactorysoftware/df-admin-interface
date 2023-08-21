@@ -16,7 +16,7 @@ import {
 import { MatSort } from '@angular/material/sort';
 import { TranslateService } from '@ngx-translate/core';
 import { AppType, AppRow } from '../types/df-apps.types';
-import { GenericListResponse } from 'src/app/shared/types/generic-http';
+import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 
 @Component({
   selector: 'df-df-manage-apps',
@@ -113,6 +113,7 @@ export class DfManageAppsComponent implements OnInit {
   }
 
   mapDataToTable(appTypes: AppType[]): AppRow[] {
+    console.log('mapDataToTable', appTypes);
     return appTypes.map((appType: AppType) => {
       return {
         id: appType.id,
