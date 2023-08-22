@@ -96,7 +96,7 @@ export class DfManageLimitsTableComponent extends DFManageTableComponent<LimitTa
   ];
 
   mapDataToTable(data: any): LimitTableRowData[] {
-    console.log('data in table: ', data);
+    console.log('data in table: ', data); // TODO: remove this line when ready
     return data.map((limit: LimitType) => {
       return {
         id: limit.id,
@@ -118,13 +118,10 @@ export class DfManageLimitsTableComponent extends DFManageTableComponent<LimitTa
   }
 
   override deleteRow(row: LimitTableRowData): void {
-    // TODO: implement delete
-    // this.adminService
-    //   .deleteAdmin(row.id)
-    //   .pipe(takeUntil(this.destroyed$))
-    //   .subscribe(() => {
-    //     this.refreshTable();
-    //   });
+    this.limitService
+      .deleteLimit(row.id.toString())
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(() => this.refreshTable());
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
