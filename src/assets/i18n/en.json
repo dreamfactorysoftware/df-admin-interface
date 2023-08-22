@@ -5,7 +5,10 @@
     "close": "Close",
     "create": "Create",
     "delete": "Delete",
-    "edit": "Edit"
+    "edit": "Edit",
+    "select": "Select",
+    "submit": "Submit",
+    "browse": "Browse"
   },
   "home": {
     "resourceLinks": {
@@ -311,8 +314,8 @@
       }
     },
     "importApp": {
-      "label": "Import Application",
-      "title": "Select App Package File",
+      "title": "Import Application",
+      "subtitle": "Select App Package File",
       "description": "Select one of the sample apps below, enter the URL for a package file, or browse for a local package file. Click 'Import' to add the app to your DreamFactory instance.",
       "options": {
         "android": "Address Book for Android",
@@ -326,9 +329,16 @@
         "reactJs": "Address Book for ReactJS",
         "dotnet": "Address Book for .NET"
       },
-      "browse": "Browse",
+      "url": {
+        "label": "Package URL",
+        "placeholder": "Enter URL to package file"
+      },
+      "optionsPrefix": "Address Book for ",
       "storageService": "Storage Service (optional)",
-      "storageFolder": "Storage Folder (optional)"
+      "storageFolder": "Storage Folder (optional)",
+      "files": "Files",
+      "logs": "Logs",
+      "error": "File or File URL Required"
     }
   },
   "nav": {

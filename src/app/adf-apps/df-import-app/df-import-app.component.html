@@ -1,0 +1,75 @@
+<div class="container">
+  <h1>{{ 'apps.importApp.title' | translate }}</h1>
+  <p>
+    <strong>{{ 'apps.importApp.subtitle' | translate }}</strong>
+  </p>
+  <p>{{ 'apps.importApp.description' | translate }}</p>
+  <div class="sample-apps-container">
+    <div *ngFor="let sample of sampleApps">
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="selectApp(sample.packageUrl)">
+        {{ 'common.select' | translate }}
+      </button>
+      <a [href]="sample.repoUrl" target="_blank">
+        {{ 'apps.importApp.optionsPrefix' | translate }}
+        {{ sample.name }}
+      </a>
+    </div>
+  </div>
+  <form [formGroup]="importForm" (ngSubmit)="onSubmit()" class="form-container">
+    <input
+      type="file"
+      accept=".dfpkg"
+      #fileInput
+      (change)="fileInputChange($event)"
+      style="display: none" />
+    <div class="file-select">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [attr.aria-label]="'common.browse' | translate"
+        (click)="fileInput.click()">
+        {{ 'common.browse' | translate }}
+      </button>
+
+      <mat-form-field>
+        <input
+          matInput
+          formControlName="filePath"
+          required
+          placeholder="{{ 'apps.importApp.url.placeholder' | translate }}" />
+        <mat-error *ngIf="importForm.controls['filePath'].hasError('required')">
+          {{ 'apps.importApp.error' | translate }}
+        </mat-error>
+      </mat-form-field>
+    </div>
+    <mat-form-field>
+      <mat-label>{{ 'apps.importApp.storageService' | translate }}</mat-label>
+      <mat-select formControlName="storageService">
+        <mat-option value="0">-</mat-option>
+        <mat-option value="3">{{
+          'apps.importApp.files' | translate
+        }}</mat-option>
+        <mat-option value="4">{{
+          'apps.importApp.logs' | translate
+        }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <input
+        matInput
+        placeholder="{{ 'apps.importApp.storageFolder' | translate }}"
+        formControlName="storageFolder" />
+    </mat-form-field>
+    <button
+      mat-flat-button
+      color="primary"
+      type="submit"
+      [disabled]="!importForm.valid">
+      {{ 'common.submit' | translate }}
+    </button>
+  </form>
+</div>

@@ -1,10 +1,10 @@
 <df-manage-apps-table>
-  <button mat-button [matMenuTriggerFor]="menu">Sample Apps</button>
+  <button mat-stroked-button [matMenuTriggerFor]="menu">Sample Apps</button>
   <mat-menu #menu="matMenu">
     <button
       mat-menu-item
       *ngFor="let sample of sampleApps"
-      (click)="openSample(sample.url)">
+      (click)="openSample(sample.repoUrl)">
       {{ sample.name }}
     </button>
   </mat-menu>

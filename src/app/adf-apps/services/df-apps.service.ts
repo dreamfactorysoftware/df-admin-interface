@@ -10,7 +10,6 @@ export class DfAppsService {
   constructor(private http: HttpClient) {}
 
   getApps(limit = 100, offset = 0, filter = '') {
-    console.log('getApps', limit, offset, filter);
     return this.http.get<GenericListResponse<Array<AppType>>>(URLS.APP, {
       headers: SHOW_LOADING_HEADER,
       params: {
@@ -83,6 +82,40 @@ export class DfAppsService {
         related: 'role_service_access_by_role_id,lookup_by_role_id',
       },
     });
+  }
+
+  importApp(
+    import_url: string,
+    storageService: number,
+    storageFolder: string,
+    file?: string
+  ) {
+    if (file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('storage_container', storageFolder);
+      formData.append('storage_service_id', storageService.toString());
+
+      // TODO figure out why formData is not being populated
+      return this.http.post(URLS.APP, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        ...SHOW_LOADING_HEADER,
+      });
+    }
+
+    return this.http.post(
+      URLS.APP,
+      {
+        import_url,
+        storage_container: storageFolder,
+        storage_service_id: storageService,
+      },
+      {
+        headers: SHOW_LOADING_HEADER,
+      }
+    );
   }
 
   deleteMultipleApps(ids: string[] | number[]) {

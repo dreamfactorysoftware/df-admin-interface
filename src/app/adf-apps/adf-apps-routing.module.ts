@@ -17,7 +17,7 @@ const routes: Routes = [
     },
   },
   {
-    path: 'edit/:id',
+    path: `${ROUTES.EDIT}/:id`,
     component: DfAppsFormComponent,
     resolve: {
       roles: rolesResolver,
@@ -25,7 +25,7 @@ const routes: Routes = [
     },
   },
   {
-    path: 'create',
+    path: ROUTES.CREATE,
     component: DfAppsFormComponent,
     resolve: {
       roles: rolesResolver,
