@@ -11,9 +11,19 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { DfLimitComponent } from './df-limit/df-limit.component';
+import { TranslateModule } from '@ngx-translate/core';
+import { MatSelectModule } from '@angular/material/select';
+import { DfRoleService } from '../adf-roles/services/df-role.service';
+import { DfUserDataService } from '../core/services/df-user-data.service';
+import { DfServiceDataService } from '../adf-services/services/service-data.service';
 
 @NgModule({
-  declarations: [DfManageLimitsComponent, DfManageLimitsTableComponent],
+  declarations: [
+    DfManageLimitsComponent,
+    DfManageLimitsTableComponent,
+    DfLimitComponent,
+  ],
   imports: [
     CommonModule,
     AdfLimitsRoutingModule,
@@ -25,7 +35,14 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
     MatInputModule,
     MatDividerModule,
     MatSlideToggleModule,
+    MatSelectModule,
+    TranslateModule,
   ],
-  providers: [DfLimitsService],
+  providers: [
+    DfLimitsService,
+    DfRoleService,
+    DfUserDataService,
+    DfServiceDataService,
+  ],
 })
 export class AdfLimitsModule {}

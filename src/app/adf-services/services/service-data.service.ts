@@ -4,7 +4,7 @@ import { URLS } from 'src/app/core/constants/urls';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 
 @Injectable()
-export class ServiceDataService {
+export class DfServiceDataService {
   constructor(private http: HttpClient) {}
 
   getSystemServiceData(id: number) {

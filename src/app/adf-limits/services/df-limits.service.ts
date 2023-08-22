@@ -1,73 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
 import { URLS } from 'src/app/core/constants/urls';
+import { SystemUserType } from 'src/app/core/services/df-user-data.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-
-type CacheLimitType = {
-  id: number;
-  key: string;
-  max: number;
-  attempts: number;
-  remaining: number;
-};
-
-export type LimitType = {
-  created_date: string;
-  description: string;
-  endpoint: string | null;
-  id: number;
-  isActive: boolean;
-  keyText: string;
-  lastModifiedDate: string;
-  limitCacheByLimitId: CacheLimitType[];
-  name: string;
-  period: string;
-  rate: number;
-  roleByRoleId: number | null;
-  roleId: number | null;
-  serviceByServiceId: any | null; // TODO: add system service data object from services module here as a type
-  serviceId: number | null;
-  type: string;
-  userByUserId: number | null;
-  userId: number | null;
-  verb: string | null;
-};
-
-type CreateLimitPayload = {
-  cacheData: object;
-  description: string;
-  endpoint: string | null;
-  is_active: boolean;
-  name: string;
-  period: string;
-  rate: number;
-  role_id: number | null;
-  service_id: number | null;
-  type: string;
-  user_id: number | null;
-};
-
-type UpdateLimitPayload = {
-  id: number;
-  created_date: string;
-  description: string;
-  endpoint: string | null;
-  is_active: boolean;
-  last_modified_date: string;
-  name: string;
-  period: string;
-  rate: number;
-  role_id: number | null;
-  service_id: number | null;
-  type: string;
-  user_id: number | null;
-  verb: string;
-};
-
-export type DeleteLimitResponse = {
-  id: number;
-};
+import { RoleType } from 'src/app/shared/types/role';
 
 @Injectable()
 export class DfLimitsService {
@@ -109,8 +47,13 @@ export class DfLimitsService {
       'limit_cache_by_limit_id',
     ];
 
-    return this.http.post<LimitType>(URLS.LIMITS, data, {
+    const payload = {
+      resource: [data],
+    };
+
+    return this.http.post<LimitType>(URLS.LIMITS, payload, {
       params: {
+        fields: '*',
         related: relatedParams.join(','),
       },
     });
@@ -136,3 +79,73 @@ export class DfLimitsService {
     return this.http.delete<DeleteLimitResponse>(url);
   }
 }
+
+type CacheLimitType = {
+  id: number;
+  key: string;
+  max: number;
+  attempts: number;
+  remaining: number;
+};
+
+export type LimitType = {
+  created_date: string;
+  description: string;
+  endpoint: string | null;
+  id: number;
+  isActive: boolean;
+  keyText: string;
+  lastModifiedDate: string;
+  limitCacheByLimitId: CacheLimitType[];
+  name: string;
+  period: string;
+  rate: number;
+  roleByRoleId: RoleType | null;
+  roleId: number | null;
+  serviceByServiceId: SystemServiceData | null;
+  serviceId: number | null;
+  type: string;
+  userByUserId: SystemUserType | null;
+  userId: number | null;
+  verb: string | null;
+};
+
+// TODO: refactor and combine this with update
+export type CreateLimitPayload = {
+  cacheData: any;
+  description: string | null;
+  endpoint: string | null;
+  is_active: boolean;
+  name: string;
+  period: string;
+  rate: string;
+  role_id: number | null;
+  service_id: number | null;
+  type: string;
+  user_id: number | null;
+  verb: string | null;
+};
+
+export type UpdateLimitPayload = {
+  id: number;
+  created_date: string;
+  description: string;
+  endpoint: string | null;
+  is_active: boolean;
+  last_modified_date: string;
+  name: string;
+  period: string;
+  rate: number;
+  role_id: number | null;
+  service_id: number | null;
+  service_by_service_id: SystemServiceData | null;
+  user_by_user_id: SystemUserType | null;
+  role_by_role_id: RoleType | null;
+  type: string;
+  user_id: number | null;
+  verb: string;
+};
+
+export type DeleteLimitResponse = {
+  id: number;
+};

@@ -96,7 +96,6 @@ export class DfManageLimitsTableComponent extends DFManageTableComponent<LimitTa
   ];
 
   mapDataToTable(data: any): LimitTableRowData[] {
-    console.log('data in table: ', data); // TODO: remove this line when ready
     return data.map((limit: LimitType) => {
       return {
         id: limit.id,
