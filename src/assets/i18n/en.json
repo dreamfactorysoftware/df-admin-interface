@@ -199,17 +199,38 @@
     }
   },
   "nav": {
-    "home": "Home",
-    "admins": "Admins",
-    "welcome": "Welcome",
-    "resources": "Resources",
-    "quickstart": "Quickstart",
-    "download": "Download",
-    "profile": "Profile"
+    "home": {
+      "header": "Home",
+      "welcome": { "header": "Welcome" },
+      "resources": { "header": "Resources" },
+      "quickstart": { "header": "Quickstart" },
+      "download": { "header": "Download" }
+    },
+    "admins": {
+      "nav": "Admins",
+      "header": "Manage Admins",
+      "create": { "header": "Create a new admin" },
+      "edit": { "header": "Edit" }
+    },
+    "profile": { "header": "Profile" },
+    "logout": { "header": "Logout" },
+    "roles": { "header": "Roles" },
+    "services": { "header": "Services" },
+    "apps": { "header": "Apps" },
+    "users": { "header": "Users" },
+    "api-docs": { "header": "API Docs" },
+    "schema": { "header": "Schema" },
+    "data": { "header": "Data" },
+    "files": { "header": "Files" },
+    "scripts": { "header": "Scripts" },
+    "config": { "header": "Config" },
+    "package-manager": { "header": "Packages" },
+    "limits": { "header": "Limits" },
+    "scheduler": { "header": "Scheduler" },
+    "reports": { "header": "Reports" }
   },
   "save": "Save",
   "update": "Update",
-  "cancel": "Cancel",
   "confirmed": "Confirmed",
   "pending": "Pending",
   "id": "ID",
@@ -248,5 +269,6 @@
     "user": "User",
     "verb": "Verb",
     "active": "Active"
-  }
+  },
+  "cancel": "Cancel"
 }

@@ -1,97 +1,101 @@
-<mat-card class="user-management-card">
-  <df-alert
-    [message]="alertMsg"
-    [showAlert]="showAlert"
-    [alertType]="alertType"
-    (alertClosed)="showAlert = false"></df-alert>
-  <mat-card-header>
-    <mat-card-title>
-      {{ 'userManagement.login' | translate }}
-    </mat-card-title>
-  </mat-card-header>
-  <mat-divider></mat-divider>
-  <mat-card-content>
-    <form name="login-form" [formGroup]="loginForm" (ngSubmit)="login()">
-      <mat-form-field appearance="fill" *ngIf="ldapServices.length">
-        <mat-label>
-          {{ 'userManagement.controls.services.label' | translate }}</mat-label
-        >
-        <mat-select formControlName="services">
-          <mat-option></mat-option>
-          <mat-option
-            *ngFor="let service of ldapServices"
-            [value]="service.name">
-            {{ service.label }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-      <mat-form-field appearance="fill" *ngIf="loginAttribute === 'email'">
-        <mat-label>
-          {{ 'userManagement.controls.email.label' | translate }}</mat-label
-        >
-        <input matInput type="email" formControlName="email" />
-        <mat-error
-          *ngIf="
-            loginForm.get('email')?.errors?.['email'] &&
-            !loginForm.get('email')?.errors?.['required']
-          ">
-          {{ 'userManagement.controls.email.errors.invalid' | translate }}
-        </mat-error>
-        <mat-error
-          *ngIf="
-            !loginForm.get('email')?.errors?.['email'] &&
-            loginForm.get('email')?.errors?.['required']
-          ">
-          {{ 'userManagement.controls.email.errors.required' | translate }}
-        </mat-error>
-      </mat-form-field>
-
-      <mat-form-field appearance="fill" *ngIf="loginAttribute === 'username'">
-        <mat-label>{{
-          'userManagement.controls.username.altLabel' | translate
-        }}</mat-label>
-        <input matInput type="text" formControlName="username" />
-        <mat-error *ngIf="loginForm.get('username')?.errors?.['required']">
-          {{ 'userManagement.controls.username.errors.required' | translate }}
-        </mat-error>
-      </mat-form-field>
-
-      <mat-form-field appearance="fill">
-        <mat-label>{{
-          'userManagement.controls.password.label' | translate
-        }}</mat-label>
-        <input matInput type="password" formControlName="password" />
-        <mat-error *ngIf="loginForm.get('password')?.errors?.['required']">
-          {{ 'userManagement.controls.password.errors.required' | translate }}
-        </mat-error>
-      </mat-form-field>
-      <button mat-flat-button color="primary" type="submit">
+<div class="user-management-card-container">
+  <mat-card class="user-management-card">
+    <df-alert
+      [message]="alertMsg"
+      [showAlert]="showAlert"
+      [alertType]="alertType"
+      (alertClosed)="showAlert = false"></df-alert>
+    <mat-card-header>
+      <mat-card-title>
         {{ 'userManagement.login' | translate }}
-      </button>
-    </form>
-    <ng-container
-      *ngTemplateOutlet="
-        authServices;
-        context: {
-          services: oauthServices,
-          title: ('userManagement.oAuth' | translate)
-        }
-      " />
-    <ng-container
-      *ngTemplateOutlet="
-        authServices;
-        context: {
-          services: samlServices,
-          title: ('userManagement.saml' | translate)
-        }
-      " />
-    <div class="action-links">
-      <a mat-button [routerLink]="fpRoute" target="_self">{{
-        'userManagement.forgotPassword' | translate
-      }}</a>
-    </div>
-  </mat-card-content>
-</mat-card>
+      </mat-card-title>
+    </mat-card-header>
+    <mat-divider></mat-divider>
+    <mat-card-content>
+      <form name="login-form" [formGroup]="loginForm" (ngSubmit)="login()">
+        <mat-form-field appearance="fill" *ngIf="ldapServices.length">
+          <mat-label>
+            {{
+              'userManagement.controls.services.label' | translate
+            }}</mat-label
+          >
+          <mat-select formControlName="services">
+            <mat-option></mat-option>
+            <mat-option
+              *ngFor="let service of ldapServices"
+              [value]="service.name">
+              {{ service.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="fill" *ngIf="loginAttribute === 'email'">
+          <mat-label>
+            {{ 'userManagement.controls.email.label' | translate }}</mat-label
+          >
+          <input matInput type="email" formControlName="email" />
+          <mat-error
+            *ngIf="
+              loginForm.get('email')?.errors?.['email'] &&
+              !loginForm.get('email')?.errors?.['required']
+            ">
+            {{ 'userManagement.controls.email.errors.invalid' | translate }}
+          </mat-error>
+          <mat-error
+            *ngIf="
+              !loginForm.get('email')?.errors?.['email'] &&
+              loginForm.get('email')?.errors?.['required']
+            ">
+            {{ 'userManagement.controls.email.errors.required' | translate }}
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" *ngIf="loginAttribute === 'username'">
+          <mat-label>{{
+            'userManagement.controls.username.altLabel' | translate
+          }}</mat-label>
+          <input matInput type="text" formControlName="username" />
+          <mat-error *ngIf="loginForm.get('username')?.errors?.['required']">
+            {{ 'userManagement.controls.username.errors.required' | translate }}
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="fill">
+          <mat-label>{{
+            'userManagement.controls.password.label' | translate
+          }}</mat-label>
+          <input matInput type="password" formControlName="password" />
+          <mat-error *ngIf="loginForm.get('password')?.errors?.['required']">
+            {{ 'userManagement.controls.password.errors.required' | translate }}
+          </mat-error>
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="submit">
+          {{ 'userManagement.login' | translate }}
+        </button>
+      </form>
+      <ng-container
+        *ngTemplateOutlet="
+          authServices;
+          context: {
+            services: oauthServices,
+            title: ('userManagement.oAuth' | translate)
+          }
+        " />
+      <ng-container
+        *ngTemplateOutlet="
+          authServices;
+          context: {
+            services: samlServices,
+            title: ('userManagement.saml' | translate)
+          }
+        " />
+      <div class="action-links">
+        <a mat-button [routerLink]="fpRoute" target="_self">{{
+          'userManagement.forgotPassword' | translate
+        }}</a>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
 <ng-template #authServices let-services="services" let-title="title">
   <div class="services-section" *ngIf="services.length">
     <h3>{{ title }}</h3>
