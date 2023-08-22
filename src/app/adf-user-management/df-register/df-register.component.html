@@ -1,41 +1,43 @@
-<mat-card class="user-management-card" *ngIf="!complete">
-  <df-alert
-    [message]="alertMsg"
-    [showAlert]="showAlert"
-    [alertType]="alertType"
-    (alertClosed)="showAlert = false"></df-alert>
-  <mat-card-header>
-    <mat-card-title>
-      {{ 'userManagement.register' | translate }}
-    </mat-card-title>
-  </mat-card-header>
-  <mat-divider></mat-divider>
-  <mat-card-content>
-    <form
-      name="self-register-form"
-      [formGroup]="registerForm"
-      (ngSubmit)="register()">
-      <df-user-details formGroupName="userDetailsGroup" />
-      <button mat-flat-button color="primary" type="submit">
+<div class="user-management-card-container">
+  <mat-card class="user-management-card" *ngIf="!complete">
+    <df-alert
+      [message]="alertMsg"
+      [showAlert]="showAlert"
+      [alertType]="alertType"
+      (alertClosed)="showAlert = false"></df-alert>
+    <mat-card-header>
+      <mat-card-title>
         {{ 'userManagement.register' | translate }}
-      </button>
-    </form>
-  </mat-card-content>
-</mat-card>
-<mat-card class="user-management-card" *ngIf="complete">
-  <mat-card-header>
-    <mat-card-title>
-      {{ 'userManagement.registerSuccess.header' | translate }}
-    </mat-card-title>
-  </mat-card-header>
-  <mat-divider></mat-divider>
-  <mat-card-content>
-    <h2>{{ 'userManagement.registerSuccess.title' | translate }}</h2>
-    <p>{{ 'userManagement.registerSuccess.message' | translate }}</p>
-    <div class="action-links">
-      <a mat-button [routerLink]="loginRoute" target="_self">{{
-        'userManagement.login' | translate
-      }}</a>
-    </div>
-  </mat-card-content>
-</mat-card>
+      </mat-card-title>
+    </mat-card-header>
+    <mat-divider></mat-divider>
+    <mat-card-content>
+      <form
+        name="self-register-form"
+        [formGroup]="registerForm"
+        (ngSubmit)="register()">
+        <df-profile-details formGroupName="profileDetailsGroup" />
+        <button mat-flat-button color="primary" type="submit">
+          {{ 'userManagement.register' | translate }}
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+  <mat-card class="user-management-card" *ngIf="complete">
+    <mat-card-header>
+      <mat-card-title>
+        {{ 'userManagement.registerSuccess.header' | translate }}
+      </mat-card-title>
+    </mat-card-header>
+    <mat-divider></mat-divider>
+    <mat-card-content>
+      <h2>{{ 'userManagement.registerSuccess.title' | translate }}</h2>
+      <p>{{ 'userManagement.registerSuccess.message' | translate }}</p>
+      <div class="action-links">
+        <a mat-button [routerLink]="loginRoute" target="_self">{{
+          'userManagement.login' | translate
+        }}</a>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

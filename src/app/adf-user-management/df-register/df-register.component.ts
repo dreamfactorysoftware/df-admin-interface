@@ -26,7 +26,7 @@ export class DfRegisterComponent implements OnInit, OnDestroy {
     private authService: DfAuthService
   ) {
     this.registerForm = this.fb.group({
-      userDetailsGroup: this.fb.group({
+      profileDetailsGroup: this.fb.group({
         username: [''],
         email: ['', [Validators.email]],
         firstName: ['', [Validators.required]],
@@ -43,11 +43,11 @@ export class DfRegisterComponent implements OnInit, OnDestroy {
         this.loginAttribute = env.authentication.loginAttribute;
         if (this.loginAttribute === 'username') {
           this.registerForm
-            .get('userDetailsGroup.username')
+            .get('profileDetailsGroup.username')
             ?.setValidators([Validators.required]);
         } else {
           this.registerForm
-            .get('userDetailsGroup.email')
+            .get('profileDetailsGroup.email')
             ?.addValidators([Validators.required]);
         }
       });
@@ -58,7 +58,7 @@ export class DfRegisterComponent implements OnInit, OnDestroy {
       return;
     }
     this.authService
-      .register(this.registerForm.controls['userDetailsGroup'].value)
+      .register(this.registerForm.controls['profileDetailsGroup'].value)
       .pipe(
         takeUntil(this.destroyed$),
         catchError(err => {

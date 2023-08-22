@@ -1,0 +1,78 @@
+@use '@angular/material' as mat;
+
+$deep-purple-palette: mat.define-palette(mat.$deep-purple-palette);
+
+.logo {
+  height: 30px;
+}
+
+.app-container {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidenav-container {
+  height: 100%;
+  .sidenav {
+    background-color: mat.get-color-from-palette($deep-purple-palette, 500);
+    min-width: 30%;
+    border: none;
+    transition: min-width 0.3s ease-out;
+    .small & {
+      min-width: 0;
+    }
+    .logged-in & {
+      min-width: 20%;
+      background-color: white;
+    }
+    .logged-in.small & {
+      min-width: 40%;
+    }
+    .parent-route {
+      font-size: 16px;
+      font-weight: 400;
+      height: 48px;
+      padding: 0 16px;
+    }
+    ::ng-deep {
+      .mat-expansion-panel-body {
+        padding: 0 0 0 16px !important;
+      }
+    }
+    mat-nav-list {
+      a {
+        &.active {
+          background-color: mat.get-color-from-palette(
+            $deep-purple-palette,
+            200
+          );
+        }
+      }
+    }
+  }
+  .sidenav-content {
+    .banner {
+      height: 150px;
+      width: 100%;
+      background-color: mat.get-color-from-palette($deep-purple-palette, 500);
+      .page-header {
+        color: white;
+        padding: 32px;
+      }
+    }
+    .main {
+      height: 100%;
+      .logged-in & {
+        margin: -60px 32px 0 32px;
+        padding: 32px 32px 0 32px;
+        background-color: white;
+      }
+    }
+  }
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
