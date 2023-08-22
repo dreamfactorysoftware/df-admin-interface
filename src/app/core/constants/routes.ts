@@ -1,3 +1,5 @@
+import { Nav } from 'src/app/shared/types/nav';
+
 export enum ROUTES {
   AUTH = 'auth',
   HOME = 'home',
@@ -8,7 +10,7 @@ export enum ROUTES {
   ADMINS = 'admins',
   USERS = 'users',
   ROLES = 'roles',
-  APIDOCS = 'apidocs',
+  APIDOCS = 'api-docs',
   SCHEMAS = 'schema',
   DATA = 'data',
   FILES = 'files',
@@ -33,3 +35,68 @@ export enum ROUTES {
   EDIT = 'edit',
   CREATE = 'create',
 }
+
+export const NAV: Array<Nav> = [
+  {
+    route: ROUTES.HOME,
+    subRoutes: [
+      {
+        route: ROUTES.WELCOME,
+      },
+      {
+        route: ROUTES.QUICKSTART,
+      },
+      {
+        route: ROUTES.RESOURCES,
+      },
+      {
+        route: ROUTES.DOWNLOAD,
+      },
+    ],
+  },
+  {
+    route: ROUTES.SERVICES,
+  },
+  {
+    route: ROUTES.APPS,
+  },
+  {
+    route: ROUTES.ADMINS,
+  },
+  {
+    route: ROUTES.USERS,
+  },
+  {
+    route: ROUTES.ROLES,
+  },
+  {
+    route: ROUTES.APIDOCS,
+  },
+  {
+    route: ROUTES.SCHEMAS,
+  },
+  {
+    route: ROUTES.DATA,
+  },
+  {
+    route: ROUTES.FILES,
+  },
+  {
+    route: ROUTES.SCRIPTS,
+  },
+  {
+    route: ROUTES.CONFIG,
+  },
+  {
+    route: ROUTES.PACKAGES,
+  },
+  {
+    route: ROUTES.LIMITS,
+  },
+  {
+    route: ROUTES.SCHEDULER,
+  },
+  {
+    route: ROUTES.REPORTS,
+  },
+];

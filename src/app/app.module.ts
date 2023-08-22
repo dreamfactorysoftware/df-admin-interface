@@ -16,6 +16,7 @@ import { CaseInterceptor } from './core/interceptors/case.interceptor';
 import { LoadingInterceptor } from './core/interceptors/loading.interceptor';
 import { SessionTokenInterceptor } from './core/interceptors/session-token.interceptor';
 import { DfSystemConfigDataService } from './core/services/df-system-config-data.service';
+import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.component';
 
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
@@ -44,6 +45,7 @@ export function initEnvironment(
     }),
     HttpClientModule,
     MatProgressSpinnerModule,
+    DfSideNavComponent,
   ],
   providers: [
     {

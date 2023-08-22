@@ -34,3 +34,10 @@ body {
     justify-content: flex-end;
   }
 }
+
+.action-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+}
