@@ -17,6 +17,9 @@ import { LoadingInterceptor } from './core/interceptors/loading.interceptor';
 import { SessionTokenInterceptor } from './core/interceptors/session-token.interceptor';
 import { DfSystemConfigDataService } from './core/services/df-system-config-data.service';
 import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.component';
+import { SnackbarInterceptor } from './core/interceptors/snackbar.interceptor';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { DfSnackbarComponent } from './shared/components/df-snackbar/df-snackbar.component';
 
 export function createTranslateLoader(http: HttpClient) {
   return new TranslateHttpLoader(http, './assets/i18n/', '.json');
@@ -46,6 +49,8 @@ export function initEnvironment(
     HttpClientModule,
     MatProgressSpinnerModule,
     DfSideNavComponent,
+    MatSnackBarModule,
+    DfSnackbarComponent,
   ],
   providers: [
     {
@@ -67,6 +72,11 @@ export function initEnvironment(
     {
       provide: HTTP_INTERCEPTORS,
       useClass: SessionTokenInterceptor,
+      multi: true,
+    },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: SnackbarInterceptor,
       multi: true,
     },
   ],

@@ -5,7 +5,9 @@ export interface GenericSuccessResponse {
 export interface GenericErrorResponse {
   error: {
     code: string;
-    context: string;
+    context:
+      | string
+      | { error: Array<any>; resource: Array<GenericErrorResponse> };
     message: string;
     status_code: number;
   };

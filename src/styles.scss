@@ -14,4 +14,34 @@ body {
   flex-direction: row;
   align-items: flex-start;
   gap: 16px;
+  padding-top: 32px;
+}
+.tab-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  mat-divider {
+    margin: 16px 0;
+  }
+  .large & {
+    width: 100%;
+  }
+
+  .large & {
+    width: 50%;
+  }
+}
+mat-form-field {
+  width: 100%;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+.mdc-snackbar {
+  > * {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
 }

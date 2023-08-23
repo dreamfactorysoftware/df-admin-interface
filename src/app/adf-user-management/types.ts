@@ -1,4 +1,3 @@
-import { FormControl } from '@angular/forms';
 import { GenericSuccessResponse } from '../shared/types/generic-http.type';
 
 export interface LoginCredentials {

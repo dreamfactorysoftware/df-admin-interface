@@ -18,9 +18,9 @@ import {
   imports: [CommonModule, MatButtonModule, FontAwesomeModule],
 })
 export class DfAlertComponent {
-  @Input() message: string;
   @Input() alertType: AlertType = 'success';
   @Input() showAlert = false;
+  @Input() dismissible = true;
   @Output() alertClosed = new EventEmitter<void>();
 
   faXmark = faXmark;

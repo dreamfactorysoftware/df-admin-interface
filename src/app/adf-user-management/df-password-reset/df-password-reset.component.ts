@@ -38,8 +38,11 @@ export class DfPasswordResetComponent implements OnInit, OnDestroy {
       username: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
       code: ['', [Validators.required]],
-      newPassword: ['', [Validators.required, Validators.minLength(5)]],
-      confirmPassword: ['', [matchValidator('newPassword')]],
+      newPassword: ['', [Validators.required, Validators.minLength(6)]],
+      confirmPassword: [
+        '',
+        [Validators.required, matchValidator('newPassword')],
+      ],
     });
   }
 
