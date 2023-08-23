@@ -15,6 +15,10 @@ const routes: Routes = [
     path: ROUTES.CREATE,
     component: DfLimitComponent,
   },
+  {
+    path: `${ROUTES.EDIT}/:id`,
+    component: DfLimitComponent,
+  },
 ];
 
 @NgModule({

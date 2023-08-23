@@ -4,9 +4,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import {
   CreateLimitPayload,
   DfLimitsService,
+  LimitType,
+  UpdateLimitPayload,
 } from '../services/df-limits.service';
-import { TranslateService } from '@ngx-translate/core';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { DfRoleService } from 'src/app/adf-roles/services/df-role.service';
 import {
   DfUserDataService,
@@ -71,6 +72,8 @@ export class DfLimitComponent implements OnInit, OnDestroy {
   destroyed$ = new Subject<void>();
   isEditMode = false;
 
+  limitTypeToEdit: LimitType | null = null;
+
   hiddenFields = {
     displayServiceField: false,
     displayRoleField: false,
@@ -88,18 +91,41 @@ export class DfLimitComponent implements OnInit, OnDestroy {
     private userService: DfUserDataService,
     private serviceDataService: DfServiceDataService,
     private router: Router,
-    translateService: TranslateService,
-    activatedRoute: ActivatedRoute
-  ) {
-    const id = activatedRoute.snapshot.paramMap.get('id');
-
-    if (id) this.isEditMode = true;
-  }
+    private activatedRoute: ActivatedRoute
+  ) {}
 
   ngOnInit(): void {
-    if (this.isEditMode) {
-      // TODO: add network call here (fetch specified limit using id)
-      // fills formGroup with retrieved data
+    const id = this.activatedRoute.snapshot.paramMap.get('id');
+
+    if (id) {
+      this.isEditMode = true;
+
+      this.limitService
+        .getLimit(id)
+        .pipe(
+          takeUntil(this.destroyed$),
+          catchError(error => {
+            console.error(error);
+            this.router.navigate([ROUTES.LIMITS]);
+            return throwError(() => new Error(error));
+          })
+        )
+        .subscribe(data => {
+          this.limitTypeToEdit = data;
+          this.formGroup.setValue({
+            limitName: data.name,
+            limitType: data.type,
+            service: data.serviceId,
+            role: data.roleId,
+            user: data.userId,
+            limitRate: data.rate,
+            limitPeriod: data.period,
+            active: data.isActive,
+            description: data.description,
+            endpoint: data.endpoint,
+            verb: data.verb ?? this.verbs[0],
+          });
+        });
     }
 
     this.serviceDataService
@@ -224,45 +250,74 @@ export class DfLimitComponent implements OnInit, OnDestroy {
   onSubmit() {
     if (this.formGroup.valid) {
       if (!this.isEditMode) {
-        let verb: string | null = this.formGroup.value.verb ?? null;
-
-        if (verb && verb.toLowerCase() === 'any') {
-          // Verb is null when the user selects any http verb
-          verb = null;
-        }
-
-        const payload: CreateLimitPayload = {
-          cacheData: {},
-          description: this.formGroup.value.description ?? null,
-          endpoint: this.formGroup.value.endpoint ?? null,
-          is_active: this.formGroup.value.active as boolean,
-          name: this.formGroup.value.limitName as string,
-          period: this.formGroup.value.limitPeriod as string,
-          rate: this.formGroup.value.limitRate
-            ? this.formGroup.value.limitRate.toString()
-            : '1',
-          role_id: this.formGroup.value.role ?? null,
-          service_id: this.formGroup.value.service ?? null,
-          user_id: this.formGroup.value.user ?? null,
-          type: this.formGroup.value.limitType as string,
-          verb: verb,
-        };
+        const payload = this.assembleLimitPayload() as CreateLimitPayload;
 
         this.limitService
           .createLimit(payload)
           .pipe(takeUntil(this.destroyed$))
           .subscribe(data => {
             // TODO: add success and error notifications
-            console.log('create limit response', data);
+            console.log('CREATE limit response', data);
           });
       } else {
         // edit mode
+        const payload = this.assembleLimitPayload() as UpdateLimitPayload;
+
+        this.limitService
+          .updateLimit(payload)
+          .pipe(takeUntil(this.destroyed$))
+          .subscribe(data => {
+            // TODO: add snackbar notification
+            console.log('UPDATE limit response', data);
+          });
       }
+    } else {
+      // TODO: add error alert notifying user of invalid input
     }
   }
 
   onCancel(): void {
     this.router.navigate([ROUTES.LIMITS]);
+  }
+
+  private assembleLimitPayload(): CreateLimitPayload | UpdateLimitPayload {
+    let verb: string | null = this.formGroup.value.verb ?? null;
+
+    if (verb && verb.toLowerCase() === 'any') {
+      // Verb is null when the user selects any http verb
+      verb = null;
+    }
+
+    const data = {
+      description: this.formGroup.value.description ?? null,
+      endpoint: this.formGroup.value.endpoint ?? null,
+      is_active: this.formGroup.value.active as boolean,
+      name: this.formGroup.value.limitName as string,
+      period: this.formGroup.value.limitPeriod as string,
+      role_id: this.formGroup.value.role ?? null,
+      service_id: this.formGroup.value.service ?? null,
+      user_id: this.formGroup.value.user ?? null,
+      type: this.formGroup.value.limitType as string,
+      verb: verb,
+    };
+
+    if (this.isEditMode) {
+      return {
+        id: this.limitTypeToEdit?.id,
+        created_date: this.limitTypeToEdit?.created_date,
+        last_modified_date: this.limitTypeToEdit?.lastModifiedDate,
+        rate: this.formGroup.value.limitRate ?? null,
+        ...data,
+      } as UpdateLimitPayload;
+    } else {
+      return {
+        cacheData: {},
+        rate: this.formGroup.value.limitRate
+          ? this.formGroup.value.limitRate.toString()
+          : '1',
+        ...data,
+      } as CreateLimitPayload;
+    }
   }
 
   private resetHiddenFields(): void {

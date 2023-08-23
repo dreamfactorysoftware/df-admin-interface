@@ -67,7 +67,11 @@ export class DfLimitsService {
       'limit_cache_by_limit_id',
     ];
 
-    return this.http.put<LimitType>(URLS.LIMITS, data, {
+    console.log('data in update limit service: ', data);
+
+    const url = `${URLS.LIMITS}/${data.id}`;
+
+    return this.http.put<LimitType>(url, data, {
       params: {
         related: relatedParams.join(','),
       },
@@ -110,9 +114,8 @@ export type LimitType = {
   verb: string | null;
 };
 
-// TODO: refactor and combine this with update
 export type CreateLimitPayload = {
-  cacheData: any;
+  cacheData: object;
   description: string | null;
   endpoint: string | null;
   is_active: boolean;
@@ -126,24 +129,14 @@ export type CreateLimitPayload = {
   verb: string | null;
 };
 
-export type UpdateLimitPayload = {
+export type UpdateLimitPayload = Omit<
+  CreateLimitPayload,
+  'cacheData' | 'rate'
+> & {
   id: number;
   created_date: string;
-  description: string;
-  endpoint: string | null;
-  is_active: boolean;
   last_modified_date: string;
-  name: string;
-  period: string;
   rate: number;
-  role_id: number | null;
-  service_id: number | null;
-  service_by_service_id: SystemServiceData | null;
-  user_by_user_id: SystemUserType | null;
-  role_by_role_id: RoleType | null;
-  type: string;
-  user_id: number | null;
-  verb: string;
 };
 
 export type DeleteLimitResponse = {
