@@ -1,5 +1,7 @@
 import { RoleType } from './role';
 
+export type UserProfileType = 'users' | 'admins';
+
 export interface UserProfile {
   adldap: string;
   defaultAppId: number;
@@ -13,6 +15,27 @@ export interface UserProfile {
   securityQuestion: string;
   securityAnswer?: string;
   currentPassword?: string;
+  id: number;
+  confirmed: boolean;
+  createdById?: number;
+  createdDate: string;
+  expired: boolean;
+  isActive: boolean;
+  isRootAdmin: number;
+  lastLoginDate: string;
+  lastModifiedDate: string;
+  lastModifiedById: number;
+  ldapUsername: string;
+  lookupByUserId: Array<any>;
+  saml: string;
+  userToAppToRoleByUserId: Array<{
+    id: number;
+    userId: number;
+    appId: number;
+    roleId: number;
+  }>;
+  role?: RoleType;
+  password?: string;
 }
 
 export interface UserRow {
@@ -24,47 +47,7 @@ export interface UserRow {
   lastName: string;
   registration: string;
 }
-
-export interface AdminType extends UserProfile {
-  id: number;
-  ldapUsername: string;
-  lastLoginDate: string;
-  isActive: boolean;
-  phone: string;
-  saml: string;
-  createdDate: string;
-  lastModifiedDate: string;
-  createdById: number;
-  lastModifiedById: number;
-  isRootAdmin: number;
-  confirmed: boolean;
-  expired: boolean;
-  lookupByUserId: Array<any>;
-  userToAppToRoleByUserId: Array<{
-    id: number;
-    userId: number;
-    appId: number;
-    roleId: number;
-  }>;
-  role?: RoleType;
-}
-
-export interface CreateAdmin {
-  confirmed: boolean;
-  email: string;
-  firstName: string;
-  isActive: boolean;
-  isRestrictedAdmin: boolean;
-  lastName: string;
-  lookupByUserId: Array<any>;
-  name: string;
-  password: string;
-  phone: string;
-  userData: Array<any>;
-  userSource: number;
-  username: string;
-}
-
-export interface CreateAdminRequest {
-  resource: Array<CreateAdmin>;
+export interface CreateAdmin extends UserProfile {
+  isRestrictedAdmin?: boolean;
+  accessByTabs?: string[];
 }

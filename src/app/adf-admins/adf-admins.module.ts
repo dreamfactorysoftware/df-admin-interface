@@ -2,21 +2,13 @@ import { NgModule } from '@angular/core';
 import { DfManageAdminsTableComponent } from './df-manage-admins/df-manage-admins-table.component';
 import { AdfAdminsRoutingModule } from './adf-admins-routing.module';
 import { DfAdminService } from './services/df-admin.service';
-import { MatCheckboxModule } from '@angular/material/checkbox';
-import { CommonModule } from '@angular/common';
 import { DfAdminDetailsComponent } from './df-admin-details/df-admin-details.component';
-import { DfProfileDetailsComponent } from '../shared/components/df-profile-details/df-profile-details.component';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { DfManageAdminsComponent } from './df-manage-admins/df-manage-admins.component';
-import { DfManageTableModule } from '../shared/components/df-manage-table/df-manage-table.module';
+import { AdfManageTableModule } from '../shared/components/df-manage-table/adf-manage-table.module';
 import { MatDividerModule } from '@angular/material/divider';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTabsModule } from '@angular/material/tabs';
-import { DfAlertComponent } from '../shared/components/df-alert/df-alert.component';
 import { DfRoleService } from '../adf-roles/services/df-role.service';
-import { MatRadioModule } from '@angular/material/radio';
+import { AdfUserDetailsModule } from '../shared/components/df-user-details/adf-user-details.module';
 @NgModule({
   declarations: [
     DfManageAdminsComponent,
@@ -25,20 +17,10 @@ import { MatRadioModule } from '@angular/material/radio';
   ],
   imports: [
     AdfAdminsRoutingModule,
-    MatCheckboxModule,
-    CommonModule,
-    DfProfileDetailsComponent,
-    FormsModule,
-    ReactiveFormsModule,
-    MatCheckboxModule,
-    MatFormFieldModule,
-    MatInputModule,
-    DfManageTableModule,
+    AdfManageTableModule,
     MatDividerModule,
-    MatSlideToggleModule,
     MatTabsModule,
-    DfAlertComponent,
-    MatRadioModule,
+    AdfUserDetailsModule,
   ],
   providers: [DfAdminService, DfRoleService],
 })

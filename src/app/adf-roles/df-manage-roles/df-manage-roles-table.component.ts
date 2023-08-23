@@ -1,6 +1,6 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DFManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
+import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { takeUntil } from 'rxjs';
 import { Component } from '@angular/core';
 import { RoleRow, RoleType } from 'src/app/shared/types/role';
@@ -16,7 +16,7 @@ import { TranslateService } from '@ngx-translate/core';
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
 })
-export class DfManageRolesTableComponent extends DFManageTableComponent<RoleRow> {
+export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow> {
   constructor(
     private roleService: DfRoleService,
     router: Router,

@@ -1,7 +1,7 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Component } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DFManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
+import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { AppType, AppRow } from '../types/df-apps.types';
 import { DfAppsService } from '../services/df-apps.service';
 import { takeUntil } from 'rxjs';
@@ -16,7 +16,7 @@ import { TranslateService } from '@ngx-translate/core';
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
 })
-export class DfManageAppsTableComponent extends DFManageTableComponent<AppRow> {
+export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
   constructor(
     private appsService: DfAppsService,
     router: Router,

@@ -362,7 +362,12 @@
     "roles": { "header": "Roles" },
     "services": { "header": "Services" },
     "apps": { "header": "Apps" },
-    "users": { "header": "Users" },
+    "users": {
+      "nav": "Users",
+      "header": "Manage Users",
+      "create": { "header": "Create a new user" },
+      "edit": { "header": "Edit" }
+    },
     "api-docs": { "header": "API Docs" },
     "schema": { "header": "Schema" },
     "data": { "header": "Data" },
@@ -377,12 +382,27 @@
   "admins": {
     "accessByTabs": "Access by Tabs",
     "alerts": {
-      "newAdmin": "For new Admins you can send an email invite so they can set their own password, or set a password for them now.",
+      "new": "For new Admins you can send an email invite so they can set their own password, or set a password for them now.",
       "restrictedAdmin": "Restricted admin",
       "autoRole": "An auto-generated role will be created for this admin.",
       "roleId": "Role id: {{roleId}}",
       "createdSuccess": "Admin created successfully",
-      "updateSuccess": "Admin updated successfully"
+      "updateSuccess": "Admin updated successfully",
+      "deleteSuccess": "Admin deleted successfully",
+      "importSuccess": "Admin imported successfully",
+      "exportSuccess": "Admin exported successfully",
+      "inviteSent": "An email invite has been sent."
+    }
+  },
+  "users": {
+    "alerts": {
+      "new": "For new Users you can send an email invite so they can set their own password, or set a password for them now.",
+      "createdSuccess": "User created successfully",
+      "updateSuccess": "User updated successfully",
+      "deleteSuccess": "User deleted successfully",
+      "importSuccess": "User imported successfully",
+      "exportSuccess": "User exported successfully",
+      "inviteSent": "An email invite has been sent."
     }
   },
   "alerts": {

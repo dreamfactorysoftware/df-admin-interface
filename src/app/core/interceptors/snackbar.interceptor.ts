@@ -37,7 +37,7 @@ export class SnackbarInterceptor implements HttpInterceptor {
       req.headers.has('snackbar-error')
     ) {
       const success = req.headers.get('snackbar-success');
-      const error = req.headers.get('snackbar-error');
+      let error = req.headers.get('snackbar-error');
       req = req.clone({
         headers: req.headers
           .delete('snackbar-success')
@@ -52,7 +52,11 @@ export class SnackbarInterceptor implements HttpInterceptor {
           },
           error: err => {
             if (err instanceof HttpErrorResponse && error) {
-              this.openSnackBar(error, 'error');
+              const serverError = err.error.error;
+              if (error === 'server' && serverError) {
+                error = serverError.message;
+              }
+              this.openSnackBar(error ?? 'defaultError', 'error');
             }
           },
         })

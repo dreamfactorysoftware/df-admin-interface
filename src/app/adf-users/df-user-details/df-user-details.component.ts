@@ -3,28 +3,24 @@ import { FormBuilder } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, takeUntil, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from 'src/app/core/services/df-system-config-data.service';
-import {
-  UserProfile,
-  CreateAdmin,
-  UserProfileType,
-} from 'src/app/shared/types/user';
+import { UserProfile, UserProfileType } from 'src/app/shared/types/user';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { ROUTES } from 'src/app/core/constants/routes';
 import { TranslateService } from '@ngx-translate/core';
 import { parseError } from 'src/app/shared/utilities/parse-errors';
 import { DfUserDetailsBaseComponent } from 'src/app/shared/components/df-user-details/df-user-details-base.component';
-import { DfAdminService } from '../services/df-admin.service';
+import { DfUserService } from '../services/df-user.service';
 
 @Component({
-  selector: 'df-admin-details',
+  selector: 'df-user-details',
   templateUrl:
     '../../shared/components/df-user-details/df-user-details-base.component.html',
   styleUrls: [
     '../../shared/components/df-user-details/df-user-details-base.component.scss',
   ],
 })
-export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProfile> {
-  userType: UserProfileType = 'admins';
+export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<any> {
+  userType: UserProfileType = 'users';
 
   constructor(
     fb: FormBuilder,
@@ -32,34 +28,30 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
     systemConfigDataService: DfSystemConfigDataService,
     breakpointService: DfBreakpointService,
     private translateService: TranslateService,
-    private adminService: DfAdminService,
+    private userService: DfUserService,
     private router: Router
   ) {
     super(fb, activatedRoute, systemConfigDataService, breakpointService);
   }
 
   sendInvite() {
-    this.adminService.sendInvite(this.currentProfile.id).subscribe();
+    this.userService.sendInvite(this.currentProfile.id).subscribe();
   }
 
   submit() {
     if (this.userForm.invalid || this.userForm.pristine) {
       return;
     }
-    const data: CreateAdmin = {
+    const data: UserProfile = {
       ...this.userForm.value.profileDetailsGroup,
       isActive: this.userForm.value.isActive,
-      accessByTabs: this.tabs.controls
-        .filter(c => c.value.checked)
-        .map(c => c.value.name),
-      isRestrictedAdmin: this.tabs.controls.some(c => !c.value.checked),
     };
     if (this.type === 'create') {
       const sendInvite = this.userForm.value['pass-invite'] === 'invite';
       if (!sendInvite) {
         data.password = this.userForm.value.password;
       }
-      this.adminService
+      this.userService
         .create({ resource: [data] }, sendInvite)
         .pipe(
           takeUntil(this.destroyed$),
@@ -74,13 +66,13 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
           })
         )
         .subscribe(() => {
-          this.router.navigate([ROUTES.ADMINS]);
+          this.router.navigate([ROUTES.USERS]);
         });
     } else {
       if (this.userForm.value.setPassword) {
         data.password = this.userForm.value.password;
       }
-      this.adminService
+      this.userService
         .update(this.currentProfile.id, data)
         .pipe(
           takeUntil(this.destroyed$),
@@ -90,7 +82,7 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
           })
         )
         .subscribe(() => {
-          this.router.navigate([ROUTES.ADMINS]);
+          this.router.navigate([ROUTES.USERS]);
         });
     }
   }

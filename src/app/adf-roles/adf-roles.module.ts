@@ -8,7 +8,7 @@ import { AdfRolesRoutingModule } from './adf-roles-routing.module';
 import { DfRoleService } from './services/df-role.service';
 import { DfCreateRoleComponent } from './df-create-role/df-create-role.component';
 import { DfManageRolesTableComponent } from './df-manage-roles/df-manage-roles-table.component';
-import { DfManageTableModule } from '../shared/components/df-manage-table/df-manage-table.module';
+import { AdfManageTableModule } from '../shared/components/df-manage-table/adf-manage-table.module';
 
 @NgModule({
   declarations: [
@@ -23,7 +23,7 @@ import { DfManageTableModule } from '../shared/components/df-manage-table/df-man
     MatInputModule,
     ReactiveFormsModule,
     AdfRolesRoutingModule,
-    DfManageTableModule,
+    AdfManageTableModule,
   ],
   providers: [DfRoleService],
 })
