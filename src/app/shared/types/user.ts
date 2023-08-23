@@ -1,3 +1,5 @@
+import { RoleType } from './role';
+
 export interface UserProfile {
   adldap: string;
   defaultAppId: number;
@@ -44,4 +46,25 @@ export interface AdminType extends UserProfile {
     appId: number;
     roleId: number;
   }>;
+  role?: RoleType;
+}
+
+export interface CreateAdmin {
+  confirmed: boolean;
+  email: string;
+  firstName: string;
+  isActive: boolean;
+  isRestrictedAdmin: boolean;
+  lastName: string;
+  lookupByUserId: Array<any>;
+  name: string;
+  password: string;
+  phone: string;
+  userData: Array<any>;
+  userSource: number;
+  username: string;
+}
+
+export interface CreateAdminRequest {
+  resource: Array<CreateAdmin>;
 }

@@ -5,7 +5,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
 $orange-palette: mat.define-palette(mat.$orange-palette);
 $blue-palette: mat.define-palette(mat.$blue-palette);
 
-.alert-container{
+.alert-container {
   display: flex;
   flex-direction: row;
   align-items: center;

@@ -3,7 +3,11 @@ import { Injectable } from '@angular/core';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { URLS } from 'src/app/core/constants/urls';
 import { SHOW_LOADING_HEADER } from 'src/app/core/constants/http-headers';
-import { AdminType } from 'src/app/shared/types/user';
+import {
+  AdminType,
+  CreateAdmin,
+  CreateAdminRequest,
+} from 'src/app/shared/types/user';
 import { readAsText } from 'src/app/shared/utilities/file';
 import { switchMap } from 'rxjs';
 
@@ -31,6 +35,33 @@ export class DfAdminService {
       headers: SHOW_LOADING_HEADER,
       params: {
         related: 'user_to_app_to_role_by_user_id',
+      },
+    });
+  }
+
+  createAdmin(data: CreateAdminRequest, sendInvite = false) {
+    return this.http.post<AdminType>(URLS.SYSTEM_ADMIN, data, {
+      headers: {
+        ...SHOW_LOADING_HEADER,
+        'snackbar-success': 'admins.alerts.createdSuccess',
+      },
+      params: {
+        fields: '*',
+        related: 'lookup_by_user_id',
+        send_invite: sendInvite,
+      },
+    });
+  }
+
+  updateAdmin(id: string | number, data: Partial<CreateAdmin>) {
+    return this.http.put<AdminType>(`${URLS.SYSTEM_ADMIN}/${id}`, data, {
+      headers: {
+        ...SHOW_LOADING_HEADER,
+        'snackbar-success': 'admins.alerts.updateSuccess',
+      },
+      params: {
+        fields: '*',
+        related: 'lookup_by_user_id',
       },
     });
   }

@@ -13,7 +13,10 @@ import { DfManageAdminsComponent } from './df-manage-admins/df-manage-admins.com
 import { DfManageTableModule } from '../shared/components/df-manage-table/df-manage-table.module';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-
+import { MatTabsModule } from '@angular/material/tabs';
+import { DfAlertComponent } from '../shared/components/df-alert/df-alert.component';
+import { DfRoleService } from '../adf-roles/services/df-role.service';
+import { MatRadioModule } from '@angular/material/radio';
 @NgModule({
   declarations: [
     DfManageAdminsComponent,
@@ -33,7 +36,10 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
     DfManageTableModule,
     MatDividerModule,
     MatSlideToggleModule,
+    MatTabsModule,
+    DfAlertComponent,
+    MatRadioModule,
   ],
-  providers: [DfAdminService],
+  providers: [DfAdminService, DfRoleService],
 })
 export class AdfAdminsModule {}
