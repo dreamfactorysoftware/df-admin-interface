@@ -46,6 +46,11 @@ export class DfManageLimitsTableComponent extends DFManageTableComponent<LimitTa
   }
   override columns = [
     {
+      columnDef: 'active',
+      cell: (row: LimitTableRowData) => row.active,
+      header: 'Active',
+    },
+    {
       columnDef: 'id',
       cell: (row: LimitTableRowData) => row.id,
       header: 'id',
@@ -84,11 +89,6 @@ export class DfManageLimitsTableComponent extends DFManageTableComponent<LimitTa
       columnDef: 'role',
       cell: (row: LimitTableRowData) => row.role,
       header: 'Role',
-    },
-    {
-      columnDef: 'active',
-      cell: (row: LimitTableRowData) => row.active,
-      header: 'Active',
     },
     {
       columnDef: 'actions',
