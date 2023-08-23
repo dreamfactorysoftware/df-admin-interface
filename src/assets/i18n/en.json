@@ -179,11 +179,13 @@
         "errors": {
           "required": "Required if Changing Email"
         }
+      },
+      "sendInvite": {
+        "label": "Send Email Invite"
       }
     },
     "alerts": {
-      "resetEmailSent": "A password reset email has been sent to the user's email address.",
-      "close": "Close alert"
+      "resetEmailSent": "A password reset email has been sent to the user's email address."
     },
     "profile": {
       "tabs": {
@@ -229,6 +231,21 @@
     "scheduler": { "header": "Scheduler" },
     "reports": { "header": "Reports" }
   },
+  "admins": {
+    "accessByTabs": "Access by Tabs",
+    "alerts": {
+      "newAdmin": "For new Admins you can send an email invite so they can set their own password, or set a password for them now.",
+      "restrictedAdmin": "Restricted admin",
+      "autoRole": "An auto-generated role will be created for this admin.",
+      "roleId": "Role id: {{roleId}}",
+      "createdSuccess": "Admin created successfully",
+      "updateSuccess": "Admin updated successfully"
+    }
+  },
+  "alerts": {
+    "duplicateEmail": "Email address already exists",
+    "close": "Close alert"
+  },
   "save": "Save",
   "update": "Update",
   "confirmed": "Confirmed",
@@ -257,5 +274,8 @@
   "exportList": "Export list",
   "importList": "Import list",
   "description": "Description",
-  "cancel": "Cancel"
+  "cancel": "Cancel",
+  "basic": "Basic",
+  "lookupKeys": "Lookup Keys",
+  "selectAnOption": "Select an option"
 }

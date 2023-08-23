@@ -4,13 +4,14 @@
   mat-stretch-tabs="false"
   mat-align-tabs="start"
   (selectedTabChange)="showAlert = false">
-  <mat-tab label="{{ 'userManagement.profile.tabs.details' | translate }}">
-    <div class="form-container">
+  <mat-tab [label]="'userManagement.profile.tabs.details' | translate">
+    <div class="tab-container">
       <df-alert
-        [message]="alertMsg"
         [showAlert]="showAlert"
         [alertType]="alertType"
-        (alertClosed)="showAlert = false" />
+        (alertClosed)="showAlert = false"
+        >{{ alertMsg }}</df-alert
+      >
       <form
         name="user-profile-form"
         [formGroup]="profileForm"
@@ -35,14 +36,14 @@
       </form>
     </div>
   </mat-tab>
-  <mat-tab
-    label="{{ 'userManagement.profile.tabs.securityQuestion' | translate }}">
-    <div class="form-container">
+  <mat-tab [label]="'userManagement.profile.tabs.securityQuestion' | translate">
+    <div class="tab-container">
       <df-alert
-        [message]="alertMsg"
         [showAlert]="showAlert"
         [alertType]="alertType"
-        (alertClosed)="showAlert = false" />
+        (alertClosed)="showAlert = false"
+        >{{ alertMsg }}</df-alert
+      >
       <form
         name="security-question-form"
         [formGroup]="securityQuestionForm"
@@ -65,22 +66,24 @@
       </form>
     </div>
   </mat-tab>
-  <mat-tab label="{{ 'userManagement.profile.tabs.password' | translate }}">
-    <div class="form-container">
+  <mat-tab [label]="'userManagement.profile.tabs.password' | translate">
+    <div class="tab-container">
       <df-alert
-        [message]="alertMsg"
         [showAlert]="showAlert"
         [alertType]="alertType"
-        (alertClosed)="showAlert = false" />
+        (alertClosed)="showAlert = false"
+        >{{ alertMsg }}</df-alert
+      >
       <form
         name="update-password-form"
         [formGroup]="updatePasswordForm"
         (ngSubmit)="updatePassword()">
         <df-alert
-          [message]="alertMsg"
           [showAlert]="showAlert"
           [alertType]="alertType"
-          (alertClosed)="showAlert = false" />
+          (alertClosed)="showAlert = false"
+          >{{ alertMsg }}</df-alert
+        >
         <mat-form-field appearance="fill">
           <mat-label>{{
             'userManagement.controls.oldPassword.label' | translate

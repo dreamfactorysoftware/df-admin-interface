@@ -7,7 +7,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { Subject, catchError, takeUntil } from 'rxjs';
+import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
 import { matchValidator } from '../../shared/validators/match.validator';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
@@ -19,7 +19,6 @@ import { UserProfile } from '../../shared/types/user';
 @Component({
   selector: 'df-profile',
   templateUrl: './df-profile.component.html',
-  styleUrls: ['./df-profile.component.scss'],
 })
 export class DfProfileComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();
@@ -59,7 +58,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
     });
     this.updatePasswordForm = this.fb.group({
       oldPassword: ['', Validators.required],
-      newPassword: ['', [Validators.required, Validators.minLength(5)]],
+      newPassword: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: [
         '',
         [Validators.required, matchValidator('newPassword')],
@@ -102,7 +101,8 @@ export class DfProfileComponent implements OnInit, OnDestroy {
       });
     this.profileForm
       .get('profileDetailsGroup.email')
-      ?.valueChanges.subscribe(val => {
+      ?.valueChanges.pipe(takeUntil(this.destroyed$))
+      .subscribe(val => {
         if (this.currentProfile.email !== val) {
           this.needPassword = true;
           this.profileForm.addControl(
@@ -117,7 +117,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
   }
 
   updateProfile() {
-    if (!this.profileForm.valid || this.profileForm.pristine) {
+    if (this.profileForm.invalid || this.profileForm.pristine) {
       return;
     }
     const body: UserProfile = {
@@ -133,7 +133,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
         takeUntil(this.destroyed$),
         catchError(err => {
           this.triggerAlert('error', err.error.error.message);
-          return err;
+          return throwError(() => new Error(err));
         })
       )
       .subscribe(() => {
@@ -154,7 +154,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
 
   updateSecurityQuestion() {
     if (
-      !this.securityQuestionForm.valid ||
+      this.securityQuestionForm.invalid ||
       this.securityQuestionForm.pristine
     ) {
       return;
@@ -166,7 +166,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
         takeUntil(this.destroyed$),
         catchError(err => {
           this.triggerAlert('error', err.error.error.message);
-          return err;
+          return throwError(() => new Error(err));
         })
       )
       .subscribe(() => {
@@ -181,7 +181,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
   }
 
   updatePassword() {
-    if (!this.updatePasswordForm.valid || this.updatePasswordForm.pristine) {
+    if (this.updatePasswordForm.invalid || this.updatePasswordForm.pristine) {
       return;
     }
     this.passwordService
@@ -190,7 +190,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
         takeUntil(this.destroyed$),
         catchError(err => {
           this.triggerAlert('error', err.error.error.message);
-          return err;
+          return throwError(() => new Error(err));
         })
       )
       .subscribe(() => {
