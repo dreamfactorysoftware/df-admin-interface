@@ -15,4 +15,5 @@ export interface RoleType {
   lastModifiedDate: string;
   lookupByRoleId: number[];
   name: string;
+  accessibleTabs?: Array<string>;
 }

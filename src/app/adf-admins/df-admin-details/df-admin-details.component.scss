@@ -1,7 +1,7 @@
 .user-details {
   display: flex;
   flex-direction: row;
-  gap: 16px;
+  gap: 32px;
   &.small {
     flex-direction: column;
   }
@@ -14,5 +14,11 @@
     button {
       width: fit-content;
     }
+  }
+  .access-tabs {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    max-height: 240px;
   }
 }

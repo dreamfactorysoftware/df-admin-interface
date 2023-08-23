@@ -22,11 +22,12 @@ export class DfRoleService {
     });
   }
 
-  getRole(id: string | number) {
+  getRole(id: string | number, tabs = false) {
     return this.http.get<RoleType>(`${URLS.ROLES}/${id}`, {
       headers: SHOW_LOADING_HEADER,
       params: {
         related: 'lookup_by_role_id',
+        accessible_tabs: tabs,
       },
     });
   }
