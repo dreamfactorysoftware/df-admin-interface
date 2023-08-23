@@ -1,4 +1,10 @@
 <div class="df-limit-form-container">
+  <df-alert
+    [showAlert]="showAlert"
+    [alertType]="alertType"
+    (alertClosed)="showAlert = false"
+    >{{ alertMsg }}</df-alert
+  >
   <form [formGroup]="formGroup">
     <mat-form-field>
       <mat-label>{{ 'limits.name' | translate }}</mat-label>

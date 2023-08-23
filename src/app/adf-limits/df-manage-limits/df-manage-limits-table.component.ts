@@ -12,7 +12,7 @@ type LimitTableRowData = {
   name: string;
   limitType: string;
   limitRate: string;
-  limitCounter: string; // TODO: look into this
+  limitCounter: string;
   user: number | null;
   service: number | null;
   role: number | null;
@@ -111,9 +111,8 @@ export class DfManageLimitsTableComponent extends DFManageTableComponent<LimitTa
     });
   }
 
-  //TODO: adapt this to the component
   filterQuery(value: string): string {
-    return `(first_name like "%${value}%") or (last_name like "%${value}%") or (name like "%${value}%") or (email like "%${value}%")`;
+    return `(name like "%${value}%")`;
   }
 
   override deleteRow(row: LimitTableRowData): void {

@@ -17,6 +17,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { DfRoleService } from '../adf-roles/services/df-role.service';
 import { DfUserDataService } from '../core/services/df-user-data.service';
 import { DfServiceDataService } from '../adf-services/services/service-data.service';
+import { DfAlertComponent } from '../shared/components/df-alert/df-alert.component';
 
 @NgModule({
   declarations: [
@@ -27,6 +28,7 @@ import { DfServiceDataService } from '../adf-services/services/service-data.serv
   imports: [
     CommonModule,
     AdfLimitsRoutingModule,
+    DfAlertComponent,
     DfManageTableModule,
     FormsModule,
     ReactiveFormsModule,

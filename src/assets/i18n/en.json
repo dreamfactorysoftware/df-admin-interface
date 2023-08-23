@@ -370,7 +370,15 @@
     "scripts": { "header": "Scripts" },
     "config": { "header": "Config" },
     "package-manager": { "header": "Packages" },
-    "limits": { "header": "Limits" },
+    "limits": {
+      "header": "Limits",
+      "create": {
+        "header": "Create Limit"
+      },
+      "edit": {
+        "header": "Edit Limit"
+      }
+    },
     "scheduler": { "header": "Scheduler" },
     "reports": { "header": "Reports" }
   },
@@ -428,7 +436,10 @@
     "endpoint": "Endpoint",
     "user": "User",
     "verb": "Verb",
-    "active": "Active"
+    "active": "Active",
+    "invalidForm": "Invalid Form Input",
+    "createSuccessMessage": "Limit successfully created",
+    "updateSuccessMessage": "Limit successfully updated"
   },
   "cancel": "Cancel",
   "basic": "Basic",

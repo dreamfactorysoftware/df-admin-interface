@@ -19,6 +19,8 @@ import {
   SystemServiceData,
 } from 'src/app/adf-services/services/service-data.service';
 import { ROUTES } from 'src/app/core/constants/routes';
+import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'df-limit',
@@ -56,7 +58,7 @@ export class DfLimitComponent implements OnInit, OnDestroy {
     limitName: new FormControl<string>('', Validators.required),
     description: new FormControl<string | null>(''),
     limitType: new FormControl<string>(
-      this.limitTypes[0].name,
+      this.limitTypes[0].value,
       Validators.required
     ),
     service: new FormControl<number | null>(null), // serviceId
@@ -64,7 +66,10 @@ export class DfLimitComponent implements OnInit, OnDestroy {
     user: new FormControl<number | null>(null), // userId
     endpoint: new FormControl<string | null>(null),
     limitRate: new FormControl<number | null>(null, Validators.required),
-    limitPeriod: new FormControl<string>('', Validators.required),
+    limitPeriod: new FormControl<string>(
+      this.limitPeriods[0].value,
+      Validators.required
+    ),
     verb: new FormControl<string>(this.verbs[0], Validators.required),
     active: new FormControl<boolean>(true),
   });
@@ -85,13 +90,18 @@ export class DfLimitComponent implements OnInit, OnDestroy {
   userDropdownOptions: SystemUserType[] = [];
   serviceDropdownOptions: SystemServiceData[] = [];
 
+  alertMsg = '';
+  showAlert = false;
+  alertType: AlertType = 'error';
+
   constructor(
     private limitService: DfLimitsService,
     private roleService: DfRoleService,
     private userService: DfUserDataService,
     private serviceDataService: DfServiceDataService,
     private router: Router,
-    private activatedRoute: ActivatedRoute
+    private activatedRoute: ActivatedRoute,
+    private translateService: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -105,7 +115,6 @@ export class DfLimitComponent implements OnInit, OnDestroy {
         .pipe(
           takeUntil(this.destroyed$),
           catchError(error => {
-            console.error(error);
             this.router.navigate([ROUTES.LIMITS]);
             return throwError(() => new Error(error));
           })
@@ -139,7 +148,7 @@ export class DfLimitComponent implements OnInit, OnDestroy {
       .getSystemUsers()
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
-        if (data) this.userDropdownOptions = data.resource;
+        this.userDropdownOptions = data.resource;
       });
 
     this.roleService
@@ -249,15 +258,23 @@ export class DfLimitComponent implements OnInit, OnDestroy {
 
   onSubmit() {
     if (this.formGroup.valid) {
+      this.showAlert = false;
       if (!this.isEditMode) {
         const payload = this.assembleLimitPayload() as CreateLimitPayload;
 
         this.limitService
           .createLimit(payload)
-          .pipe(takeUntil(this.destroyed$))
+          .pipe(
+            takeUntil(this.destroyed$),
+            catchError(err => {
+              this.alertMsg = err.error.error.message;
+              this.showAlert = true;
+              return throwError(() => new Error(err));
+            })
+          )
           .subscribe(data => {
-            // TODO: add success and error notifications
-            console.log('CREATE limit response', data);
+            this.limitTypeToEdit = data;
+            this.isEditMode = true;
           });
       } else {
         // edit mode
@@ -265,14 +282,22 @@ export class DfLimitComponent implements OnInit, OnDestroy {
 
         this.limitService
           .updateLimit(payload)
-          .pipe(takeUntil(this.destroyed$))
+          .pipe(
+            takeUntil(this.destroyed$),
+            catchError(err => {
+              this.alertMsg = err.error.error.message;
+              this.showAlert = true;
+              return throwError(() => new Error(err));
+            })
+          )
           .subscribe(data => {
-            // TODO: add snackbar notification
-            console.log('UPDATE limit response', data);
+            this.limitTypeToEdit = data;
+            this.isEditMode = true;
           });
       }
     } else {
-      // TODO: add error alert notifying user of invalid input
+      this.alertMsg = this.translateService.instant('limits.invalidForm');
+      this.showAlert = true;
     }
   }
 

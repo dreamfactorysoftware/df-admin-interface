@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { TranslateService } from '@ngx-translate/core';
 import { Observable } from 'rxjs';
 import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
 import { URLS } from 'src/app/core/constants/urls';
@@ -9,7 +10,10 @@ import { RoleType } from 'src/app/shared/types/role';
 
 @Injectable()
 export class DfLimitsService {
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private translateService: TranslateService
+  ) {}
 
   getLimits(
     limit = 10,
@@ -51,10 +55,17 @@ export class DfLimitsService {
       resource: [data],
     };
 
+    const successMsg = this.translateService.instant(
+      'limits.createSuccessMessage'
+    );
+
     return this.http.post<LimitType>(URLS.LIMITS, payload, {
       params: {
         fields: '*',
         related: relatedParams.join(','),
+      },
+      headers: {
+        'snackbar-success': successMsg,
       },
     });
   }
@@ -67,13 +78,18 @@ export class DfLimitsService {
       'limit_cache_by_limit_id',
     ];
 
-    console.log('data in update limit service: ', data);
-
     const url = `${URLS.LIMITS}/${data.id}`;
+
+    const successMsg = this.translateService.instant(
+      'limits.updateSuccessMessage'
+    );
 
     return this.http.put<LimitType>(url, data, {
       params: {
         related: relatedParams.join(','),
+      },
+      headers: {
+        'snackbar-success': successMsg,
       },
     });
   }
