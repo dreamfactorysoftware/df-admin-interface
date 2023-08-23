@@ -1,0 +1,30 @@
+.sample-apps-container {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+
+  a {
+    text-decoration: none;
+
+    span {
+      margin-left: 10px;
+      text-decoration: underline;
+    }
+  }
+}
+.form-container {
+  display: flex;
+  flex-direction: column;
+  max-width: 400px;
+  margin-top: 20px;
+
+  .file-select {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+
+    mat-form-field {
+      width: 100%;
+    }
+  }
+}
