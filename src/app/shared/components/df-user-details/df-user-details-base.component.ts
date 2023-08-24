@@ -16,6 +16,7 @@ import { matchValidator } from '../../validators/match.validator';
 import { MatCheckboxChange } from '@angular/material/checkbox';
 import { UserProfileType } from '../../types/user';
 import { ROUTES } from 'src/app/core/constants/routes';
+import { uniqueNameValidator } from '../../validators/unique-name.validator';
 
 @Component({
   selector: 'df-user-details',
@@ -67,6 +68,7 @@ export abstract class DfUserDetailsBaseComponent<T>
       }),
       isActive: [false],
       tabs: this.buildTabs(),
+      lookupKeys: this.fb.array([], [uniqueNameValidator]),
     });
   }
 
@@ -82,7 +84,7 @@ export abstract class DfUserDetailsBaseComponent<T>
   }
 
   abstract sendInvite(): void;
-  abstract submit(): void;
+  abstract save(): void;
 
   ngOnInit(): void {
     this.activatedRoute.data
@@ -127,6 +129,17 @@ export abstract class DfUserDetailsBaseComponent<T>
                 }
               });
             }
+          }
+          if (data.lookupByUserId.length > 0) {
+            data.lookupByUserId.forEach((item: any) => {
+              (this.userForm.controls['lookupKeys'] as FormArray).push(
+                new FormGroup({
+                  name: new FormControl(item.name, [Validators.required]),
+                  value: new FormControl(item.value),
+                  private: new FormControl(item.private),
+                })
+              );
+            });
           }
         } else {
           this.userForm.addControl(

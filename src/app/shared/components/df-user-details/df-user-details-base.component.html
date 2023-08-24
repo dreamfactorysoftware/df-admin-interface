@@ -4,10 +4,13 @@
   (alertClosed)="showAlert = false">
   {{ alertMsg }}
 </df-alert>
-<form name="admin-form" [formGroup]="userForm" (ngSubmit)="submit()">
+<form name="admin-form" [formGroup]="userForm" (ngSubmit)="save()">
   <div class="user-details" [class.small]="isSmallScreen | async">
     <df-profile-details formGroupName="profileDetailsGroup" />
     <div class="additional-info">
+      <mat-slide-toggle formControlName="isActive">{{
+        'active' | translate
+      }}</mat-slide-toggle>
       <ng-container *ngIf="type === 'create'; else editMode">
         <df-alert
           [alertType]="
@@ -76,58 +79,57 @@
           </mat-error>
         </mat-form-field>
       </ng-container>
-      <mat-divider></mat-divider>
       <ng-container
         *ngIf="
           userType === 'admins' &&
           (type === 'create' ||
             (type === 'edit' && !currentProfile.isRootAdmin))
         ">
-        <h3>{{ userType + '.accessByTabs' | translate }}</h3>
-        <df-alert
-          alertType="warning"
-          [showAlert]="!allTabsSelected"
-          [dismissible]="false">
-          {{ userType + '.alerts.restrictedAdmin' | translate }}
-          <ng-container
-            *ngIf="
-              type === 'create' ||
-                currentProfile.userToAppToRoleByUserId.length === 0;
-              else hasRole
-            "
-            >{{ userType + '.alerts.autoRole' | translate }}</ng-container
-          >
-          <ng-template #hasRole>{{
-            userType + '.alerts.roleId'
-              | translate
-                : {
-                    roleId: currentProfile.userToAppToRoleByUserId[0].roleId
-                  }
-          }}</ng-template>
-        </df-alert>
-        <mat-checkbox
-          [checked]="allTabsSelected"
-          (change)="selectAllTabs($event)">
-          Select all</mat-checkbox
-        >
-        <div class="access-tabs" formArrayName="tabs">
-          <ng-container
-            *ngFor="let tab of tabs.controls; let i = index"
-            [formGroupName]="i">
-            <mat-checkbox formControlName="checked">
-              {{
-                'nav.' + tab.value.title + '.header' | translate
-              }}</mat-checkbox
+        <div>
+          <h3>{{ userType + '.accessByTabs' | translate }}</h3>
+          <df-alert
+            alertType="warning"
+            [showAlert]="!allTabsSelected"
+            [dismissible]="false">
+            {{ userType + '.alerts.restrictedAdmin' | translate }}
+            <ng-container
+              *ngIf="
+                type === 'create' ||
+                  currentProfile.userToAppToRoleByUserId.length === 0;
+                else hasRole
+              "
+              >{{ userType + '.alerts.autoRole' | translate }}</ng-container
             >
-          </ng-container>
+            <ng-template #hasRole>{{
+              userType + '.alerts.roleId'
+                | translate
+                  : {
+                      roleId: currentProfile.userToAppToRoleByUserId[0].roleId
+                    }
+            }}</ng-template>
+          </df-alert>
+
+          <mat-checkbox
+            [checked]="allTabsSelected"
+            (change)="selectAllTabs($event)">
+            Select all</mat-checkbox
+          >
+          <div class="access-tabs" formArrayName="tabs">
+            <ng-container
+              *ngFor="let tab of tabs.controls; let i = index"
+              [formGroupName]="i">
+              <mat-checkbox formControlName="checked">
+                {{
+                  'nav.' + tab.value.title + '.header' | translate
+                }}</mat-checkbox
+              >
+            </ng-container>
+          </div>
         </div>
-        <mat-divider></mat-divider>
       </ng-container>
-      <mat-slide-toggle formControlName="isActive">{{
-        'active' | translate
-      }}</mat-slide-toggle>
     </div>
   </div>
+  <df-lookup-keys formArrayName="lookupKeys"></df-lookup-keys>
   <div class="action-bar">
     <button mat-flat-button color="primary" type="submit">
       {{ 'save' | translate }}

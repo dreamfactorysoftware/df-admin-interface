@@ -1,15 +1,16 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import { UserProfile, UserRow } from 'src/app/shared/types/user';
-import { DfAdminService } from '../services/df-admin.service';
+import { CreateAdmin, UserProfile, UserRow } from 'src/app/shared/types/user';
 import { takeUntil } from 'rxjs';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { TranslateService } from '@ngx-translate/core';
 import { saveAsFile } from 'src/app/shared/utilities/file';
 import { USER_COLUMNS } from 'src/app/core/constants/table-columns';
 import { userFilterQuery } from 'src/app/shared/utilities/filter-queries';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { DF_ADMIN_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 
 @Component({
   selector: 'df-manage-admins-table',
@@ -21,12 +22,13 @@ import { userFilterQuery } from 'src/app/shared/utilities/filter-queries';
 })
 export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow> {
   constructor(
-    private adminService: DfAdminService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslateService
+    translateService: TranslateService,
+    @Inject(DF_ADMIN_SERVICE_TOKEN)
+    private adminService: DfBaseCrudService<UserProfile, CreateAdmin>
   ) {
     super(
       router,
