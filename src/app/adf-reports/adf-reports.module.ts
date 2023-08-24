@@ -1,18 +1,33 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { DfManageServiceReportComponent } from './df-manage-service-report/df-manage-service-report.component';
 import { DfManageServiceReportTableComponent } from './df-manage-service-report/df-manage-service-report-table.component';
-import { TranslateService } from '@ngx-translate/core';
 import { AdfReportsRoutingModule } from './adf-reports-routing.module';
-import { DfServiceReportService } from './services/service-report.service';
 import { AdfManageTableModule } from '../shared/components/df-manage-table/adf-manage-table.module';
+import {
+  DF_REPORT_SERVICE_TOKEN,
+  MESSAGE_PREFIX_TOKEN,
+  RELATED_TOKEN,
+  URL_TOKEN,
+} from '../core/constants/tokens';
+import { URLS } from '../core/constants/urls';
+import { DfBaseCrudServiceFactory } from '../core/services/df-base-crud.service';
+import { HttpClient } from '@angular/common/http';
 
 @NgModule({
-  declarations: [
-    DfManageServiceReportComponent,
-    DfManageServiceReportTableComponent,
-  ],
+  declarations: [DfManageServiceReportTableComponent],
   imports: [CommonModule, AdfManageTableModule, AdfReportsRoutingModule],
-  providers: [TranslateService, DfServiceReportService],
+  providers: [
+    { provide: URL_TOKEN, useValue: URLS.SERVICE_REPORT },
+    {
+      provide: RELATED_TOKEN,
+      useValue: '',
+    },
+    { provide: MESSAGE_PREFIX_TOKEN, useValue: 'admins' },
+    {
+      provide: DF_REPORT_SERVICE_TOKEN,
+      useFactory: DfBaseCrudServiceFactory,
+      deps: [URL_TOKEN, RELATED_TOKEN, MESSAGE_PREFIX_TOKEN, HttpClient],
+    },
+  ],
 })
 export class AdfReportsModule {}

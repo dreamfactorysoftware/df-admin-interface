@@ -1,12 +1,12 @@
 import { NgModule } from '@angular/core';
-import { DfManageServiceReportComponent } from './df-manage-service-report/df-manage-service-report.component';
 import { RouterModule } from '@angular/router';
 import { serviceReportsResolver } from './resolvers/service-report.resolver';
+import { DfManageServiceReportTableComponent } from './df-manage-service-report/df-manage-service-report-table.component';
 
 const routes = [
   {
     path: '',
-    component: DfManageServiceReportComponent,
+    component: DfManageServiceReportTableComponent,
     resolve: { data: serviceReportsResolver },
   },
 ];

@@ -42,6 +42,7 @@ export abstract class DfManageTableComponent<T>
   faPenToSquare = faPenToSquare;
   faPlus = faPlus;
   faEllipsisV = faEllipsisV;
+  allowCreate: boolean;
 
   columns: Array<{
     columnDef: string;
@@ -159,7 +160,9 @@ export abstract class DfManageTableComponent<T>
 
   triggerSearch(event: Event) {
     const filter = (event.target as HTMLInputElement).value;
-    this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter));
+    filter
+      ? this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter))
+      : this.refreshTable();
   }
 
   sortDescription(header: string) {

@@ -1,13 +1,12 @@
 import { inject } from '@angular/core';
-import { ResolveFn, ActivatedRouteSnapshot } from '@angular/router';
+import { ResolveFn } from '@angular/router';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-import {
-  ServiceReportData,
-  DfServiceReportService,
-} from '../services/service-report.service';
+
+import { DF_REPORT_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { ServiceReportData } from 'src/app/core/constants/reports';
 
 export const serviceReportsResolver: ResolveFn<
   GenericListResponse<Array<ServiceReportData>>
-> = (route: ActivatedRouteSnapshot) => {
-  return inject(DfServiceReportService).getServiceReports();
+> = () => {
+  return inject(DF_REPORT_SERVICE_TOKEN).getAll();
 };

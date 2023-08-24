@@ -1,14 +1,13 @@
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import {
-  ServiceReportData,
-  DfServiceReportService,
-} from '../services/service-report.service';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { takeUntil } from 'rxjs';
+import { DF_REPORT_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { ServiceReportData } from 'src/app/core/constants/reports';
 
 @Component({
   selector: 'df-manage-service-report-table',
@@ -19,8 +18,10 @@ import { takeUntil } from 'rxjs';
   ],
 })
 export class DfManageServiceReportTableComponent extends DfManageTableComponent<ServiceReportData> {
+  override allowCreate = false;
   constructor(
-    private service: DfServiceReportService,
+    @Inject(DF_REPORT_SERVICE_TOKEN)
+    private service: DfBaseCrudService<ServiceReportData, any>,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -79,12 +80,12 @@ export class DfManageServiceReportTableComponent extends DfManageTableComponent<
   }
 
   override refreshTable(
-    limit?: number | undefined,
-    offset?: number | undefined,
-    filter?: string | undefined
+    limit?: number,
+    offset?: number,
+    filter?: string
   ): void {
     this.service
-      .getServiceReports(limit, offset, filter)
+      .getAll(limit, offset, filter)
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
@@ -93,6 +94,6 @@ export class DfManageServiceReportTableComponent extends DfManageTableComponent<
   }
 
   override filterQuery(value: string): string {
-    return `(service_name like "%${value}%") or (user_email like "%${value}%") or (action like "%${value}%") or (request_verb like "%${value}%")`;
+    return `(id like ${value}) or (service_id like ${value}) or (service_name like "%${value}%") or (user_email like "%${value}%") or (action like "%${value}%") or (request_verb like "%${value}%")`;
   }
 }
