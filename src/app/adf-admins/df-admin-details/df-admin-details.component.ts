@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { FormBuilder } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, takeUntil, throwError } from 'rxjs';
@@ -13,7 +13,8 @@ import { ROUTES } from 'src/app/core/constants/routes';
 import { TranslateService } from '@ngx-translate/core';
 import { parseError } from 'src/app/shared/utilities/parse-errors';
 import { DfUserDetailsBaseComponent } from 'src/app/shared/components/df-user-details/df-user-details-base.component';
-import { DfAdminService } from '../services/df-admin.service';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { DF_ADMIN_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 
 @Component({
   selector: 'df-admin-details',
@@ -32,7 +33,8 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
     systemConfigDataService: DfSystemConfigDataService,
     breakpointService: DfBreakpointService,
     private translateService: TranslateService,
-    private adminService: DfAdminService,
+    @Inject(DF_ADMIN_SERVICE_TOKEN)
+    private adminService: DfBaseCrudService<UserProfile, CreateAdmin>,
     private router: Router
   ) {
     super(fb, activatedRoute, systemConfigDataService, breakpointService);
@@ -42,7 +44,7 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
     this.adminService.sendInvite(this.currentProfile.id).subscribe();
   }
 
-  submit() {
+  save() {
     if (this.userForm.invalid || this.userForm.pristine) {
       return;
     }
@@ -89,9 +91,7 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
             return throwError(() => new Error(err));
           })
         )
-        .subscribe(() => {
-          this.router.navigate([ROUTES.ADMINS]);
-        });
+        .subscribe();
     }
   }
 }

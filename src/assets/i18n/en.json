@@ -423,7 +423,7 @@
   "pending": "Pending",
   "id": "ID",
   "email": "Email",
-  "name": "Display Name",
+  "displayName": "Display Name",
   "firstName": "First Name",
   "lastName": "Last Name",
   "active": "Active",
@@ -464,6 +464,11 @@
   },
   "cancel": "Cancel",
   "basic": "Basic",
-  "lookupKeys": "Lookup Keys",
-  "selectAnOption": "Select an option"
+  "selectAnOption": "Select an option",
+  "label": "Lookup Keys",
+  "name": "Name",
+  "value": "Value",
+  "private": "Private",
+  "desc": "Lookup keys for service configuration and credentials must be made private.",
+  "noKeys": "No lookup keys."
 }

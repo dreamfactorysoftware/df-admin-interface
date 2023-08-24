@@ -7,12 +7,16 @@ import { DfAlertComponent } from '../df-alert/df-alert.component';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatRadioModule } from '@angular/material/radio';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { DfLookupKeysComponent } from '../df-lookup-keys/df-lookup-keys.component';
 
-const shared = [DfProfileDetailsComponent, DfAlertComponent];
+const shared = [
+  DfProfileDetailsComponent,
+  DfAlertComponent,
+  DfLookupKeysComponent,
+];
 
 @NgModule({
   imports: shared,
@@ -26,7 +30,6 @@ const shared = [DfProfileDetailsComponent, DfAlertComponent];
     FontAwesomeModule,
     MatFormFieldModule,
     MatInputModule,
-    MatDividerModule,
     MatCheckboxModule,
     MatSlideToggleModule,
   ],

@@ -34,7 +34,7 @@ export class DfUserDataService {
   }
 
   clearToken() {
-    sessionStorage.removeItem(this.TOKEN_KEY);
+    document.cookie = `${this.TOKEN_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`;
   }
 
   get userData(): UserData | null {
@@ -54,11 +54,24 @@ export class DfUserDataService {
   }
 
   get token(): string | null {
-    return sessionStorage.getItem(this.TOKEN_KEY);
+    const name = `${this.TOKEN_KEY}=`;
+    const decodedCookie = decodeURIComponent(document.cookie);
+    const ca = decodedCookie.split(';');
+
+    for (let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) === ' ') {
+        c = c.substring(1);
+      }
+      if (c.indexOf(name) === 0) {
+        return c.substring(name.length, c.length);
+      }
+    }
+    return null;
   }
 
   set token(token: string) {
-    sessionStorage.setItem(this.TOKEN_KEY, token);
+    document.cookie = `${this.TOKEN_KEY}=${token};expires=Session;path=/;SameSite=Strict`;
   }
 }
 
@@ -101,5 +114,5 @@ export interface UserData {
   name: string;
   sessionId: string;
   sessionToken: string;
-  tokenExpiryDate: string;
+  tokenExpiryDate: Date;
 }

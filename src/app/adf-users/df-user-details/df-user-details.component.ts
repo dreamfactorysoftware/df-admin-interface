@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { FormBuilder } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, takeUntil, throwError } from 'rxjs';
@@ -9,7 +9,8 @@ import { ROUTES } from 'src/app/core/constants/routes';
 import { TranslateService } from '@ngx-translate/core';
 import { parseError } from 'src/app/shared/utilities/parse-errors';
 import { DfUserDetailsBaseComponent } from 'src/app/shared/components/df-user-details/df-user-details-base.component';
-import { DfUserService } from '../services/df-user.service';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { DF_USER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 
 @Component({
   selector: 'df-user-details',
@@ -19,7 +20,7 @@ import { DfUserService } from '../services/df-user.service';
     '../../shared/components/df-user-details/df-user-details-base.component.scss',
   ],
 })
-export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<any> {
+export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfile> {
   userType: UserProfileType = 'users';
 
   constructor(
@@ -28,7 +29,8 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<any> {
     systemConfigDataService: DfSystemConfigDataService,
     breakpointService: DfBreakpointService,
     private translateService: TranslateService,
-    private userService: DfUserService,
+    @Inject(DF_USER_SERVICE_TOKEN)
+    private userService: DfBaseCrudService<UserProfile, UserProfile>,
     private router: Router
   ) {
     super(fb, activatedRoute, systemConfigDataService, breakpointService);
@@ -38,7 +40,7 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<any> {
     this.userService.sendInvite(this.currentProfile.id).subscribe();
   }
 
-  submit() {
+  save() {
     if (this.userForm.invalid || this.userForm.pristine) {
       return;
     }
@@ -52,7 +54,7 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<any> {
         data.password = this.userForm.value.password;
       }
       this.userService
-        .create({ resource: [data] }, sendInvite)
+        .create({ resource: [data] }, { send_invite: sendInvite })
         .pipe(
           takeUntil(this.destroyed$),
           catchError(err => {
@@ -81,9 +83,7 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<any> {
             return throwError(() => new Error(err));
           })
         )
-        .subscribe(() => {
-          this.router.navigate([ROUTES.USERS]);
-        });
+        .subscribe();
     }
   }
 }
