@@ -4,6 +4,7 @@ import { UserProfile, CreateAdmin } from 'src/app/shared/types/user';
 import { AppPayload, AppType } from 'src/app/adf-apps/types/df-apps.types';
 import { ServiceReportData } from './reports';
 
+
 export const URL_TOKEN = new InjectionToken<string>('URL_TOKEN');
 export const RELATED_TOKEN = new InjectionToken<string>('RELATED_TOKEN');
 export const MESSAGE_PREFIX_TOKEN = new InjectionToken<string>(
