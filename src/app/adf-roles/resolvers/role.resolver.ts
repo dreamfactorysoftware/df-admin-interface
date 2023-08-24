@@ -14,3 +14,10 @@ export const roleResolver: ResolveFn<
   }
   return roleService.getRole(id);
 };
+
+export const getRolesResolver: ResolveFn<
+  GenericListResponse<Array<RoleType>>
+> = () => {
+  const roleService = inject(DfRoleService);
+  return roleService.getRoles();
+};

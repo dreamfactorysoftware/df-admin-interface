@@ -1,0 +1,103 @@
+<div class="df-limit-form-container">
+  <df-alert
+    [showAlert]="showAlert"
+    [alertType]="alertType"
+    (alertClosed)="showAlert = false"
+    >{{ alertMsg }}</df-alert
+  >
+  <form [formGroup]="formGroup">
+    <mat-form-field>
+      <mat-label>{{ 'limits.name' | translate }}</mat-label>
+      <input matInput type="text" formControlName="limitName" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>{{ 'limits.description' | translate }}</mat-label>
+      <input matInput type="text" formControlName="description" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>{{ 'limits.limitType' | translate }}</mat-label>
+      <mat-select formControlName="limitType">
+        <mat-option
+          *ngFor="let limitType of limitTypes"
+          [value]="limitType.value"
+          >{{ limitType.name }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <ng-container *ngIf="this.formGroup.controls['serviceId']">
+      <mat-form-field>
+        <mat-label>{{ 'limits.service' | translate }}</mat-label>
+        <mat-select formControlName="serviceId">
+          <mat-option
+            *ngFor="let service of serviceDropdownOptions"
+            [value]="service.id"
+            >{{ service.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </ng-container>
+    <ng-container *ngIf="this.formGroup.controls['roleId']">
+      <mat-form-field>
+        <mat-label>{{ 'limits.role' | translate }}</mat-label>
+        <mat-select formControlName="roleId">
+          <mat-option *ngFor="let role of roleDropdownOptions" [value]="role.id"
+            >{{ role.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </ng-container>
+    <ng-container *ngIf="this.formGroup.controls['userId']">
+      <mat-form-field>
+        <mat-label>{{ 'limits.user' | translate }}</mat-label>
+        <mat-select formControlName="userId">
+          <mat-option *ngFor="let user of userDropdownOptions" [value]="user.id"
+            >{{ user.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </ng-container>
+    <ng-container *ngIf="this.formGroup.controls['endpoint']">
+      <mat-form-field>
+        <!-- TODO: add tooltip here -->
+        <mat-label>{{ 'limits.endpoint' | translate }}</mat-label>
+        <input matInput type="text" formControlName="endpoint" />
+      </mat-form-field>
+    </ng-container>
+    <mat-form-field>
+      <mat-label>{{ 'limits.limitRate' | translate }}</mat-label>
+      <input matInput type="number" formControlName="limitRate" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>{{ 'limits.limitPeriod' | translate }}</mat-label>
+      <mat-select formControlName="limitPeriod">
+        <mat-option
+          *ngFor="let limitPeriod of limitPeriods"
+          [value]="limitPeriod.value"
+          >{{ limitPeriod.name }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <!-- TODO: add tooltip here -->
+      <mat-label>{{ 'limits.verb' | translate }}</mat-label>
+      <mat-select formControlName="verb">
+        <mat-option *ngFor="let verb of verbs" [value]="verb">
+          {{ verb }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <ng-container>
+      <mat-slide-toggle formControlName="active">{{
+        'limits.active' | translate
+      }}</mat-slide-toggle>
+    </ng-container>
+    <div>
+      <button mat-raised-button color="primary" (click)="onSubmit()">
+        {{ 'save' | translate }}
+      </button>
+      <button mat-raised-button (click)="onCancel()">
+        {{ 'cancel' | translate }}
+      </button>
+    </div>
+  </form>
+</div>

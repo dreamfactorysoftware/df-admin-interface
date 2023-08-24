@@ -49,6 +49,11 @@ const routes: Routes = [
     canActivate: [loggedInGuard],
   },
   {
+    path: ROUTES.LIMITS,
+    loadChildren: () =>
+      import('./adf-limits/adf-limits.module').then(m => m.AdfLimitsModule),
+  },
+  {
     path: ROUTES.USERS,
     loadChildren: () =>
       import('./adf-users/adf-users.module').then(m => m.AdfUsersModule),

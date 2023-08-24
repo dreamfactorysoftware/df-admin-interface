@@ -7,7 +7,7 @@ export interface RoleRow {
 
 export interface RoleType {
   description: string;
-  id: string;
+  id: number;
   isActive: boolean;
   createdById: number;
   createdDate: string;

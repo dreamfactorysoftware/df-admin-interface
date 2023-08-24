@@ -375,7 +375,15 @@
     "scripts": { "header": "Scripts" },
     "config": { "header": "Config" },
     "package-manager": { "header": "Packages" },
-    "limits": { "header": "Limits" },
+    "limits": {
+      "header": "Limits",
+      "create": {
+        "header": "Create Limit"
+      },
+      "edit": {
+        "header": "Edit Limit"
+      }
+    },
     "scheduler": { "header": "Scheduler" },
     "reports": { "header": "Reports" }
   },
@@ -437,6 +445,23 @@
   "exportList": "Export list",
   "importList": "Import list",
   "description": "Description",
+  "limits": {
+    "name": "Limit Name",
+    "description": "Description",
+    "limitType": "Limit Type",
+    "limitRate": "Limit Rate",
+    "limitPeriod": "Limit Period",
+    "role": "Role",
+    "service": "Service",
+    "endpoint": "Endpoint",
+    "user": "User",
+    "verb": "Verb",
+    "active": "Active",
+    "invalidForm": "Invalid Form Input",
+    "createSuccessMessage": "Limit successfully created",
+    "updateSuccessMessage": "Limit successfully updated",
+    "deleteSuccessMessage": "Limit successfully deleted"
+  },
   "cancel": "Cancel",
   "basic": "Basic",
   "selectAnOption": "Select an option",
