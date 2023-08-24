@@ -52,42 +52,26 @@
       stickyEnd>
       <th mat-header-cell *matHeaderCellDef></th>
       <td class="actions" mat-cell *matCellDef="let row">
-        <ng-container *ngIf="(isSmallScreen | async) === false">
+        <button
+          mat-icon-button
+          [matMenuTriggerFor]="actionsMenu"
+          aria-label="Actions">
+          <fa-icon [icon]="faEllipsisV" size="xs"></fa-icon>
+        </button>
+        <mat-menu #actionsMenu="matMenu">
           <button
-            mat-icon-button
+            mat-menu-item
             (click)="editRow(row)"
             [attr.aria-label]="editLabel(row)">
-            <fa-icon [icon]="faPenToSquare" size="xs"></fa-icon>
+            {{ 'edit' | translate }}
           </button>
           <button
-            mat-icon-button
+            mat-menu-item
             (click)="deleteRow(row)"
             [attr.aria-label]="deleteLabel(row)">
-            <fa-icon [icon]="faTrashCan" size="xs"></fa-icon>
+            {{ 'delete' | translate }}
           </button>
-        </ng-container>
-        <ng-container *ngIf="(isSmallScreen | async) === true">
-          <button
-            mat-icon-button
-            [matMenuTriggerFor]="actionsMenu"
-            aria-label="Actions">
-            <fa-icon [icon]="faEllipsisV" size="xs"></fa-icon>
-          </button>
-          <mat-menu #actionsMenu="matMenu">
-            <button
-              mat-menu-item
-              (click)="editRow(row)"
-              [attr.aria-label]="editLabel(row)">
-              {{ 'edit' | translate }}
-            </button>
-            <button
-              mat-menu-item
-              (click)="deleteRow(row)"
-              [attr.aria-label]="deleteLabel(row)">
-              {{ 'delete' | translate }}
-            </button>
-          </mat-menu>
-        </ng-container>
+        </mat-menu>
       </td>
     </ng-container>
   </ng-container>

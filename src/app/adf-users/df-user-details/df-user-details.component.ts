@@ -47,6 +47,7 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
     const data: UserProfile = {
       ...this.userForm.value.profileDetailsGroup,
       isActive: this.userForm.value.isActive,
+      lookupByUserId: this.userForm.value.lookupKeys,
     };
     if (this.type === 'create') {
       const sendInvite = this.userForm.value['pass-invite'] === 'invite';
