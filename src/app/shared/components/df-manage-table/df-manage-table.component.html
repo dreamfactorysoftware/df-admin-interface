@@ -48,7 +48,8 @@
     </ng-container>
     <ng-container
       [matColumnDef]="column.columnDef"
-      *ngIf="column.columnDef === 'actions'">
+      *ngIf="column.columnDef === 'actions'"
+      stickyEnd>
       <th mat-header-cell *matHeaderCellDef></th>
       <td class="actions" mat-cell *matCellDef="let row">
         <ng-container *ngIf="(isSmallScreen | async) === false">
