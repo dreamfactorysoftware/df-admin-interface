@@ -86,11 +86,11 @@
         </mat-option>
       </mat-select>
     </mat-form-field>
-    <div>
-      <mat-checkbox formControlName="active">
-        {{ 'limits.active' | translate }}
-      </mat-checkbox>
-    </div>
+    <ng-container>
+      <mat-slide-toggle formControlName="active">{{
+        'limits.active' | translate
+      }}</mat-slide-toggle>
+    </ng-container>
     <div>
       <button mat-raised-button color="primary" (click)="onSubmit()">
         {{ 'save' | translate }}
