@@ -1,7 +1,8 @@
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-import { DfLimitsService, LimitType } from '../services/df-limits.service';
+import { DfLimitsService } from '../services/df-limits.service';
 import { inject } from '@angular/core';
+import { LimitType } from 'src/app/shared/types/limit';
 
 export const limitsResolver: ResolveFn<
   GenericListResponse<Array<LimitType>> | LimitType

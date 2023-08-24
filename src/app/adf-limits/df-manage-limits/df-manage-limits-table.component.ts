@@ -5,7 +5,8 @@ import { DfManageTableComponent } from 'src/app/shared/components/df-manage-tabl
 import { takeUntil } from 'rxjs';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { TranslateService } from '@ngx-translate/core';
-import { DfLimitsService, LimitType } from '../services/df-limits.service';
+import { DfLimitsService } from '../services/df-limits.service';
+import { LimitType } from 'src/app/shared/types/limit';
 
 type LimitTableRowData = {
   id: number;

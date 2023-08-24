@@ -1,12 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import {
-  CreateLimitPayload,
-  DfLimitsService,
-  LimitType,
-  UpdateLimitPayload,
-} from '../services/df-limits.service';
+import { DfLimitsService } from '../services/df-limits.service';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { DfRoleService } from 'src/app/adf-roles/services/df-role.service';
 import {
@@ -21,6 +16,11 @@ import {
 import { ROUTES } from 'src/app/core/constants/routes';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { TranslateService } from '@ngx-translate/core';
+import {
+  LimitType,
+  CreateLimitPayload,
+  UpdateLimitPayload,
+} from 'src/app/shared/types/limit';
 
 @Component({
   selector: 'df-limit',

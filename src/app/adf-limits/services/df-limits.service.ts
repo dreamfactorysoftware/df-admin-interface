@@ -2,11 +2,14 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 import { Observable } from 'rxjs';
-import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
 import { URLS } from 'src/app/core/constants/urls';
-import { SystemUserType } from 'src/app/core/services/df-user-data.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-import { RoleType } from 'src/app/shared/types/role';
+import {
+  LimitType,
+  CreateLimitPayload,
+  UpdateLimitPayload,
+  DeleteLimitResponse,
+} from 'src/app/shared/types/limit';
 
 @Injectable()
 export class DfLimitsService {
@@ -98,62 +101,3 @@ export class DfLimitsService {
     });
   }
 }
-
-type CacheLimitType = {
-  id: number;
-  key: string;
-  max: number;
-  attempts: number;
-  remaining: number;
-};
-
-export type LimitType = {
-  created_date: string;
-  description: string;
-  endpoint: string | null;
-  id: number;
-  isActive: boolean;
-  keyText: string;
-  lastModifiedDate: string;
-  limitCacheByLimitId: CacheLimitType[];
-  name: string;
-  period: string;
-  rate: number;
-  roleByRoleId: RoleType | null;
-  roleId: number | null;
-  serviceByServiceId: SystemServiceData | null;
-  serviceId: number | null;
-  type: string;
-  userByUserId: SystemUserType | null;
-  userId: number | null;
-  verb: string | null;
-};
-
-export type CreateLimitPayload = {
-  cacheData: object;
-  description: string | null;
-  endpoint: string | null;
-  is_active: boolean;
-  name: string;
-  period: string;
-  rate: string;
-  role_id: number | null;
-  service_id: number | null;
-  type: string;
-  user_id: number | null;
-  verb: string | null;
-};
-
-export type UpdateLimitPayload = Omit<
-  CreateLimitPayload,
-  'cacheData' | 'rate'
-> & {
-  id: number;
-  created_date: string;
-  last_modified_date: string;
-  rate: number;
-};
-
-export type DeleteLimitResponse = {
-  id: number;
-};
