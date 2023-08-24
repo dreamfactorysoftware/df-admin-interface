@@ -56,7 +56,7 @@ export class DfSideNavComponent {
   }
 
   isActive(nav: Nav) {
-    return this.router.url.startsWith(nav.route);
+    return this.router.url.startsWith('/' + nav.route);
   }
 
   navLabel(route: string): string {

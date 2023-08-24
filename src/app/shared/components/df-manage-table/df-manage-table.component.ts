@@ -42,7 +42,7 @@ export abstract class DfManageTableComponent<T>
   faPenToSquare = faPenToSquare;
   faPlus = faPlus;
   faEllipsisV = faEllipsisV;
-  allowCreate: boolean;
+  allowCreate = true;
 
   columns: Array<{
     columnDef: string;
