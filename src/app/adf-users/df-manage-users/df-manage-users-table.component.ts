@@ -1,5 +1,5 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { UserProfile, UserRow } from 'src/app/shared/types/user';
@@ -9,7 +9,8 @@ import { TranslateService } from '@ngx-translate/core';
 import { saveAsFile } from 'src/app/shared/utilities/file';
 import { USER_COLUMNS } from 'src/app/core/constants/table-columns';
 import { userFilterQuery } from 'src/app/shared/utilities/filter-queries';
-import { DfUserService } from '../services/df-user.service';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { DF_USER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 
 @Component({
   selector: 'df-manage-users-table',
@@ -21,7 +22,8 @@ import { DfUserService } from '../services/df-user.service';
 })
 export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow> {
   constructor(
-    private userService: DfUserService,
+    @Inject(DF_USER_SERVICE_TOKEN)
+    private userService: DfBaseCrudService<UserProfile, UserProfile>,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,

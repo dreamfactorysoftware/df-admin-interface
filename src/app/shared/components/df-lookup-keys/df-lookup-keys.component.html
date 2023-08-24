@@ -1,0 +1,85 @@
+<div class="lookup-keys-accordion">
+  <mat-accordion>
+    <mat-expansion-panel [expanded]="hasLookupKeys">
+      <mat-expansion-panel-header>
+        <mat-panel-title> {{ 'label' | translate }}</mat-panel-title>
+        <mat-panel-description>{{ 'desc' | translate }}</mat-panel-description>
+      </mat-expansion-panel-header>
+      <ng-container [formGroup]="rootForm">
+        <ng-container formArrayName="lookupKeys">
+          <table mat-table [dataSource]="dataSource">
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef>
+                {{ 'name' | translate }}
+              </th>
+              <td
+                mat-cell
+                *matCellDef="let row; let i = index"
+                [formGroupName]="i">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>{{ 'name' | translate }}</mat-label>
+                  <input matInput formControlName="name" />
+                </mat-form-field>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="value">
+              <th mat-header-cell *matHeaderCellDef>
+                {{ 'value' | translate }}
+              </th>
+              <td
+                mat-cell
+                *matCellDef="let row; let i = index"
+                [formGroupName]="i">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>{{ 'value' | translate }}</mat-label>
+                  <input matInput formControlName="value" />
+                </mat-form-field>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="private">
+              <th mat-header-cell *matHeaderCellDef>
+                {{ 'private' | translate }}
+              </th>
+              <td
+                mat-cell
+                *matCellDef="let row; let i = index"
+                [formGroupName]="i">
+                <mat-slide-toggle
+                  formControlName="private"
+                  [attr.aria-label]="'name' | translate"></mat-slide-toggle>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef>
+                <button
+                  mat-mini-fab
+                  color="primary"
+                  [attr.aria-label]="'newEntry' | translate"
+                  (click)="add()">
+                  <fa-icon [icon]="faPlus" size="xl"></fa-icon>
+                </button>
+              </th>
+              <td
+                mat-cell
+                *matCellDef="let row; let i = index"
+                [formGroupName]="i">
+                <button mat-icon-button (click)="remove(i)">
+                  <fa-icon [icon]="faTrashCan" size="xs"></fa-icon>
+                </button>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+            <tr class="mat-row" *matNoDataRow>
+              <td class="mat-cell" colspan="4">
+                {{ 'noKeys' | translate }}
+              </td>
+            </tr>
+          </table>
+        </ng-container>
+      </ng-container>
+    </mat-expansion-panel>
+  </mat-accordion>
+</div>

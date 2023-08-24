@@ -40,7 +40,7 @@ body {
   flex-direction: row;
   align-items: flex-start;
   gap: 16px;
-  padding-top: 32px;
+  padding: 16px 0;
 }
 .tab-container {
   padding: 16px;
@@ -67,8 +67,4 @@ mat-form-field {
     background: transparent !important;
     box-shadow: none !important;
   }
-}
-
-mat-divider {
-  margin: 16px 0 !important;
 }

@@ -51,3 +51,9 @@ export interface CreateAdmin extends UserProfile {
   isRestrictedAdmin?: boolean;
   accessByTabs?: string[];
 }
+
+export interface LookupKey {
+  name: string;
+  value: string;
+  private: boolean;
+}

@@ -3,13 +3,30 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { SHOW_LOADING_HEADER } from 'src/app/core/constants/http-headers';
 import { readAsText } from 'src/app/shared/utilities/file';
 import { switchMap } from 'rxjs';
+import { Inject, Injectable } from '@angular/core';
+import {
+  MESSAGE_PREFIX_TOKEN,
+  RELATED_TOKEN,
+  URL_TOKEN,
+} from '../constants/tokens';
 
-export abstract class DfBaseUserService<T, C> {
-  abstract url: string;
-  abstract related: string;
-  abstract messagePrefix: string;
+export function DfBaseCrudServiceFactory<T, C>(
+  url: string,
+  related: string,
+  messagePrefix: string,
+  http: HttpClient
+) {
+  return new DfBaseCrudService<T, C>(url, related, messagePrefix, http);
+}
 
-  constructor(private http: HttpClient) {}
+@Injectable()
+export class DfBaseCrudService<T, C> {
+  constructor(
+    @Inject(URL_TOKEN) private url: string,
+    @Inject(RELATED_TOKEN) private related: string,
+    @Inject(MESSAGE_PREFIX_TOKEN) private messagePrefix: string,
+    private http: HttpClient
+  ) {}
 
   getAll(limit = 10, offset = 0, filter = '') {
     return this.http.get<GenericListResponse<Array<T>>>(this.url, {
@@ -36,7 +53,7 @@ export abstract class DfBaseUserService<T, C> {
     data: {
       resource: Array<C>;
     },
-    sendInvite = false
+    params?: any
   ) {
     return this.http.post<T>(this.url, data, {
       headers: {
@@ -46,7 +63,7 @@ export abstract class DfBaseUserService<T, C> {
       params: {
         fields: '*',
         related: this.related,
-        send_invite: sendInvite,
+        ...params,
       },
     });
   }
