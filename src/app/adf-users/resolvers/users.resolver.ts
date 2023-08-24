@@ -15,3 +15,10 @@ export const usersResolver: ResolveFn<
   }
   return userService.get(id);
 };
+
+export const getUsersResolver: ResolveFn<
+  GenericListResponse<Array<UserProfile>> | UserProfile
+> = (route: ActivatedRouteSnapshot) => {
+  const userService = inject(DF_USER_SERVICE_TOKEN);
+  return userService.getAll();
+};

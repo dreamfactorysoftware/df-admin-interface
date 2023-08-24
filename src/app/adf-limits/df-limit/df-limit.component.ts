@@ -110,8 +110,7 @@ export class DfLimitComponent implements OnInit, OnDestroy {
     if (id) {
       this.isEditMode = true;
 
-      this.limitService
-        .getLimit(id)
+      this.activatedRoute.data
         .pipe(
           takeUntil(this.destroyed$),
           catchError(error => {
@@ -119,43 +118,40 @@ export class DfLimitComponent implements OnInit, OnDestroy {
             return throwError(() => new Error(error));
           })
         )
-        .subscribe(data => {
-          this.limitTypeToEdit = data;
+        .subscribe(resp => {
+          this.limitTypeToEdit = resp['data'] as LimitType;
           this.formGroup.setValue({
-            limitName: data.name,
-            limitType: data.type,
-            service: data.serviceId,
-            role: data.roleId,
-            user: data.userId,
-            limitRate: data.rate,
-            limitPeriod: data.period,
-            active: data.isActive,
-            description: data.description,
-            endpoint: data.endpoint,
-            verb: data.verb ?? this.verbs[0],
+            limitName: this.limitTypeToEdit.name,
+            limitType: this.limitTypeToEdit.type,
+            service: this.limitTypeToEdit.serviceId,
+            role: this.limitTypeToEdit.roleId,
+            user: this.limitTypeToEdit.userId,
+            limitRate: this.limitTypeToEdit.rate,
+            limitPeriod: this.limitTypeToEdit.period,
+            active: this.limitTypeToEdit.isActive,
+            description: this.limitTypeToEdit.description,
+            endpoint: this.limitTypeToEdit.endpoint,
+            verb: this.limitTypeToEdit.verb ?? this.verbs[0],
           });
         });
     }
 
-    this.serviceDataService
-      .getSystemServiceDataList()
+    this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
-        this.serviceDropdownOptions = data.resource;
+        this.serviceDropdownOptions = data['services'].resource;
       });
 
-    this.userService
-      .getSystemUsers()
+    this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
-        this.userDropdownOptions = data.resource;
+        this.userDropdownOptions = data['users'].resource;
       });
 
-    this.roleService
-      .getRoles()
+    this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
-        this.roleDropdownOptions = data.resource;
+        this.roleDropdownOptions = data['roles'].resource;
       });
 
     this.formGroup
