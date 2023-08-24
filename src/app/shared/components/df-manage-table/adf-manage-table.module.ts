@@ -6,17 +6,14 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { TranslateModule } from '@ngx-translate/core';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatButtonModule } from '@angular/material/button';
+import { DfAlertComponent } from '../df-alert/df-alert.component';
+
+const shared = [DfAlertComponent];
 
 @NgModule({
-  imports: [
-    MatTableModule,
-    FontAwesomeModule,
-    TranslateModule,
-    MatFormFieldModule,
-    MatMenuModule,
-    MatPaginatorModule,
-  ],
+  imports: shared,
   exports: [
+    ...shared,
     MatTableModule,
     FontAwesomeModule,
     TranslateModule,
@@ -24,6 +21,7 @@ import { MatButtonModule } from '@angular/material/button';
     MatMenuModule,
     MatPaginatorModule,
     MatButtonModule,
+    DfAlertComponent,
   ],
 })
-export class DfManageTableModule {}
+export class AdfManageTableModule {}

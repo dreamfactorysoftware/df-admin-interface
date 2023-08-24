@@ -47,9 +47,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  mat-divider {
-    margin: 16px 0;
-  }
   .large & {
     width: 100%;
   }
@@ -70,4 +67,8 @@ mat-form-field {
     background: transparent !important;
     box-shadow: none !important;
   }
+}
+
+mat-divider {
+  margin: 16px 0 !important;
 }

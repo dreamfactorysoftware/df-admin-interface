@@ -16,5 +16,5 @@ export enum URLS {
   LIMITS = `${BASE_URL}/system/limit`,
   SYSTEM_SERVICE = `${BASE_URL}/system/service`,
   SERVICE_TYPE = `${BASE_URL}/system/service_type`,
-  SYSTEM_USERS = `${BASE_URL}/system/user`,
+  SYSTEM_USER = `${BASE_URL}/system/user`,
 }

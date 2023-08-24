@@ -27,9 +27,8 @@ import { IconProp } from '@fortawesome/fontawesome-svg-core';
 @Component({
   selector: 'df-manage-table',
   template: '',
-  standalone: true,
 })
-export abstract class DFManageTableComponent<T>
+export abstract class DfManageTableComponent<T>
   implements OnInit, AfterViewInit, OnDestroy
 {
   destroyed$ = new Subject<void>();

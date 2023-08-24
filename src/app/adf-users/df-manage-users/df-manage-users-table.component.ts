@@ -3,25 +3,25 @@ import { Component } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { UserProfile, UserRow } from 'src/app/shared/types/user';
-import { DfAdminService } from '../services/df-admin.service';
 import { takeUntil } from 'rxjs';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { TranslateService } from '@ngx-translate/core';
 import { saveAsFile } from 'src/app/shared/utilities/file';
 import { USER_COLUMNS } from 'src/app/core/constants/table-columns';
 import { userFilterQuery } from 'src/app/shared/utilities/filter-queries';
+import { DfUserService } from '../services/df-user.service';
 
 @Component({
-  selector: 'df-manage-admins-table',
+  selector: 'df-manage-users-table',
   templateUrl:
     '../../shared/components/df-manage-table/df-manage-table.component.html',
   styleUrls: [
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
 })
-export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow> {
+export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow> {
   constructor(
-    private adminService: DfAdminService,
+    private userService: DfUserService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -55,16 +55,16 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
   filterQuery = userFilterQuery;
 
   override deleteRow(row: UserRow): void {
-    this.adminService
-      .delete(row.id)
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(() => {
-        this.refreshTable();
-      });
+    // this.userService
+    //   .deleteAdmin(row.id)
+    //   .pipe(takeUntil(this.destroyed$))
+    //   .subscribe(() => {
+    //     this.refreshTable();
+    //   });
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    this.adminService
+    this.userService
       .getAll(limit, offset, filter)
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
@@ -73,15 +73,15 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
       });
   }
 
-  uploadAdminList(files: FileList) {
-    this.adminService.uploadList(files[0]).subscribe(() => {
-      this.refreshTable();
-    });
+  uploadUserList(files: FileList) {
+    // this.userService.uploadAdminList(files[0]).subscribe(() => {
+    //   this.refreshTable();
+    // });
   }
 
-  downloadAdminList(type: string) {
-    this.adminService.downloadlist(type).subscribe(data => {
-      saveAsFile(data, `admin.${type}`, type);
-    });
+  downloadUserList(type: string) {
+    // this.userService.downloadAdminlist(type).subscribe(data => {
+    //   saveAsFile(data, `admin.${type}`, type);
+    // });
   }
 }
