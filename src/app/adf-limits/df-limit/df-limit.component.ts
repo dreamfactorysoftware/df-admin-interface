@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { FormControl, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DfLimitsService } from '../services/df-limits.service';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
@@ -54,25 +54,7 @@ export class DfLimitComponent implements OnInit, OnDestroy {
 
   verbs = ['ANY', 'GET', 'PUT', 'POST', 'PATCH', 'DELETE'];
 
-  formGroup = new FormGroup({
-    limitName: new FormControl<string>('', Validators.required),
-    description: new FormControl<string | null>(''),
-    limitType: new FormControl<string>(
-      this.limitTypes[0].value,
-      Validators.required
-    ),
-    service: new FormControl<number | null>(null), // serviceId
-    role: new FormControl<number | null>(null), // roleId
-    user: new FormControl<number | null>(null), // userId
-    endpoint: new FormControl<string | null>(null),
-    limitRate: new FormControl<number | null>(null, Validators.required),
-    limitPeriod: new FormControl<string>(
-      this.limitPeriods[0].value,
-      Validators.required
-    ),
-    verb: new FormControl<string>(this.verbs[0], Validators.required),
-    active: new FormControl<boolean>(true),
-  });
+  formGroup: FormGroup;
 
   destroyed$ = new Subject<void>();
   isEditMode = false;
@@ -101,8 +83,23 @@ export class DfLimitComponent implements OnInit, OnDestroy {
     private serviceDataService: DfServiceDataService,
     private router: Router,
     private activatedRoute: ActivatedRoute,
-    private translateService: TranslateService
-  ) {}
+    private translateService: TranslateService,
+    private formBuilder: FormBuilder
+  ) {
+    this.formGroup = this.formBuilder.group({
+      limitName: ['', Validators.required],
+      description: [''],
+      limitType: [this.limitTypes[0].value, Validators.required],
+      serviceId: [],
+      roleId: [],
+      userId: [],
+      endpoint: [],
+      limitRate: [null, Validators.required],
+      limitPeriod: [this.limitPeriods[0].value, Validators.required],
+      verb: [this.verbs[0], Validators.required],
+      active: [true],
+    });
+  }
 
   ngOnInit(): void {
     const id = this.activatedRoute.snapshot.paramMap.get('id');
@@ -120,12 +117,13 @@ export class DfLimitComponent implements OnInit, OnDestroy {
         )
         .subscribe(resp => {
           this.limitTypeToEdit = resp['data'] as LimitType;
+
           this.formGroup.setValue({
             limitName: this.limitTypeToEdit.name,
             limitType: this.limitTypeToEdit.type,
-            service: this.limitTypeToEdit.serviceId,
-            role: this.limitTypeToEdit.roleId,
-            user: this.limitTypeToEdit.userId,
+            serviceId: this.limitTypeToEdit.serviceId,
+            roleId: this.limitTypeToEdit.roleId,
+            userId: this.limitTypeToEdit.userId,
             limitRate: this.limitTypeToEdit.rate,
             limitPeriod: this.limitTypeToEdit.period,
             active: this.limitTypeToEdit.isActive,
@@ -133,7 +131,19 @@ export class DfLimitComponent implements OnInit, OnDestroy {
             endpoint: this.limitTypeToEdit.endpoint,
             verb: this.limitTypeToEdit.verb ?? this.verbs[0],
           });
+
+          if (!this.formGroup.value.serviceId)
+            this.removeFormField('serviceId');
+
+          if (!this.formGroup.value.roleId) this.removeFormField('roleId');
+
+          if (!this.formGroup.value.userId) this.removeFormField('userId');
+
+          if (!this.formGroup.value.endpoint) this.removeFormField('endpoint');
         });
+    } else {
+      this.removeFormField();
+      this.renderCorrectHiddenFields(this.limitTypes[0].value);
     }
 
     this.activatedRoute.data
@@ -159,90 +169,8 @@ export class DfLimitComponent implements OnInit, OnDestroy {
       ?.valueChanges.pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         if (data) {
-          this.resetHiddenFields();
-          switch (data) {
-            case 'instance':
-            case 'instance.each_user':
-              this.hiddenFields = {
-                displayServiceField: false,
-                displayRoleField: false,
-                displayUserField: false,
-                displayEndpointField: false,
-              };
-              break;
-
-            case 'instance.each_user.service':
-              this.hiddenFields = {
-                displayServiceField: true,
-                displayRoleField: false,
-                displayUserField: false,
-                displayEndpointField: false,
-              };
-              break;
-
-            case 'instance.user.service':
-              this.hiddenFields = {
-                displayServiceField: true,
-                displayRoleField: false,
-                displayUserField: true,
-                displayEndpointField: false,
-              };
-              break;
-
-            case 'instance.service':
-              this.hiddenFields = {
-                displayServiceField: true,
-                displayRoleField: false,
-                displayUserField: false,
-                displayEndpointField: false,
-              };
-              break;
-
-            case 'instance.role':
-              this.hiddenFields = {
-                displayServiceField: false,
-                displayRoleField: true,
-                displayUserField: false,
-                displayEndpointField: false,
-              };
-              break;
-
-            case 'instance.user':
-              this.hiddenFields = {
-                displayServiceField: false,
-                displayRoleField: false,
-                displayUserField: true,
-                displayEndpointField: false,
-              };
-              break;
-
-            case 'instance.user.service.endpoint':
-              this.hiddenFields = {
-                displayRoleField: false,
-                displayServiceField: true,
-                displayUserField: true,
-                displayEndpointField: true,
-              };
-              break;
-
-            case 'instance.service.endpoint':
-            case 'instance.each_user.service.endpoint':
-              this.hiddenFields = {
-                displayServiceField: true,
-                displayRoleField: false,
-                displayUserField: false,
-                displayEndpointField: true,
-              };
-              break;
-
-            default:
-              this.hiddenFields = {
-                displayServiceField: false,
-                displayRoleField: false,
-                displayUserField: false,
-                displayEndpointField: false,
-              };
-          }
+          this.removeFormField();
+          this.renderCorrectHiddenFields(data);
         }
       });
   }
@@ -313,9 +241,9 @@ export class DfLimitComponent implements OnInit, OnDestroy {
       is_active: this.formGroup.value.active as boolean,
       name: this.formGroup.value.limitName as string,
       period: this.formGroup.value.limitPeriod as string,
-      role_id: this.formGroup.value.role ?? null,
-      service_id: this.formGroup.value.service ?? null,
-      user_id: this.formGroup.value.user ?? null,
+      role_id: this.formGroup.value.roleId ?? null,
+      service_id: this.formGroup.value.serviceId ?? null,
+      user_id: this.formGroup.value.userId ?? null,
       type: this.formGroup.value.limitType as string,
       verb: verb,
     };
@@ -339,12 +267,83 @@ export class DfLimitComponent implements OnInit, OnDestroy {
     }
   }
 
-  private resetHiddenFields(): void {
-    this.formGroup.patchValue({
-      service: null,
-      user: null,
-      role: null,
-      endpoint: null,
-    });
+  private renderCorrectHiddenFields(data: string): void {
+    switch (data) {
+      case 'instance':
+      case 'instance.each_user':
+        break;
+
+      case 'instance.user.service':
+        this.formGroup.addControl(
+          'serviceId',
+          this.formBuilder.control('', [Validators.required])
+        );
+        this.formGroup.addControl(
+          'userId',
+          this.formBuilder.control('', [Validators.required])
+        );
+        break;
+
+      case 'instance.each_user.service':
+      case 'instance.service':
+        this.formGroup.addControl(
+          'serviceId',
+          this.formBuilder.control('', [Validators.required])
+        );
+        break;
+
+      case 'instance.role':
+        this.formGroup.addControl(
+          'roleId',
+          this.formBuilder.control('', [Validators.required])
+        );
+        break;
+
+      case 'instance.user':
+        this.formGroup.addControl(
+          'userId',
+          this.formBuilder.control('', [Validators.required])
+        );
+        break;
+
+      case 'instance.user.service.endpoint':
+        this.formGroup.addControl(
+          'userId',
+          this.formBuilder.control('', [Validators.required])
+        );
+        this.formGroup.addControl(
+          'serviceId',
+          this.formBuilder.control('', [Validators.required])
+        );
+        this.formGroup.addControl(
+          'endpoint',
+          this.formBuilder.control('', [Validators.required])
+        );
+        break;
+
+      case 'instance.service.endpoint':
+      case 'instance.each_user.service.endpoint':
+        this.formGroup.addControl(
+          'serviceId',
+          this.formBuilder.control('', [Validators.required])
+        );
+        this.formGroup.addControl(
+          'endpoint',
+          this.formBuilder.control('', [Validators.required])
+        );
+        break;
+
+      default:
+        this.removeFormField();
+    }
+  }
+
+  private removeFormField(fieldName?: string): void {
+    if (!fieldName) {
+      this.formGroup.removeControl('serviceId');
+      this.formGroup.removeControl('roleId');
+      this.formGroup.removeControl('userId');
+      this.formGroup.removeControl('endpoint');
+    } else this.formGroup.removeControl(fieldName);
   }
 }

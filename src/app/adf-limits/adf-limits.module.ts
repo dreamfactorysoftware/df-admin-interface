@@ -55,7 +55,6 @@ import { URLS } from '../core/constants/urls';
     DfRoleService,
     DfUserDataService,
     DfServiceDataService,
-    DfAppsService, // TODO: refactor and move roles resolver to another file,
     { provide: USER_URL_TOKEN, useValue: URLS.SYSTEM_USER },
     { provide: USER_RELATED_TOKEN, useValue: 'lookup_by_user_id' },
     { provide: USER_MESSAGE_PREFIX_TOKEN, useValue: 'users' },
