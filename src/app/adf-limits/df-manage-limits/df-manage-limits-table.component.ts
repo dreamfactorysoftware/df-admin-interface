@@ -1,7 +1,7 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Component } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DFManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
+import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { takeUntil } from 'rxjs';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -27,7 +27,7 @@ type LimitTableRowData = {
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
 })
-export class DfManageLimitsTableComponent extends DFManageTableComponent<LimitTableRowData> {
+export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTableRowData> {
   constructor(
     private limitService: DfLimitsService,
     router: Router,

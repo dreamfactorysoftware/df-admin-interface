@@ -272,9 +272,8 @@ export class DfLimitComponent implements OnInit, OnDestroy {
               return throwError(() => new Error(err));
             })
           )
-          .subscribe(data => {
-            this.limitTypeToEdit = data;
-            this.isEditMode = true;
+          .subscribe(() => {
+            this.router.navigate([ROUTES.LIMITS]);
           });
       } else {
         // edit mode
@@ -290,9 +289,8 @@ export class DfLimitComponent implements OnInit, OnDestroy {
               return throwError(() => new Error(err));
             })
           )
-          .subscribe(data => {
-            this.limitTypeToEdit = data;
-            this.isEditMode = true;
+          .subscribe(() => {
+            this.router.navigate([ROUTES.LIMITS]);
           });
       }
     } else {

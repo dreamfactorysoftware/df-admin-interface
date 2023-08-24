@@ -24,7 +24,7 @@ export class DfUserDataService {
     ];
 
     return this.http.get<GenericListResponse<Array<SystemUserType>>>(
-      URLS.SYSTEM_USERS,
+      URLS.SYSTEM_USER,
       {
         params: {
           related: relatedParams.join(','),

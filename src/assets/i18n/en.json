@@ -459,7 +459,8 @@
     "active": "Active",
     "invalidForm": "Invalid Form Input",
     "createSuccessMessage": "Limit successfully created",
-    "updateSuccessMessage": "Limit successfully updated"
+    "updateSuccessMessage": "Limit successfully updated",
+    "deleteSuccessMessage": "Limit successfully deleted"
   },
   "cancel": "Cancel",
   "basic": "Basic",

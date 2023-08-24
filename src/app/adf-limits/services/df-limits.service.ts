@@ -55,17 +55,14 @@ export class DfLimitsService {
       resource: [data],
     };
 
-    const successMsg = this.translateService.instant(
-      'limits.createSuccessMessage'
-    );
-
     return this.http.post<LimitType>(URLS.LIMITS, payload, {
       params: {
         fields: '*',
         related: relatedParams.join(','),
       },
       headers: {
-        'snackbar-success': successMsg,
+        'snackbar-success': 'limits.createSuccessMessage',
+        'snackbar-error': 'server',
       },
     });
   }
@@ -80,23 +77,25 @@ export class DfLimitsService {
 
     const url = `${URLS.LIMITS}/${data.id}`;
 
-    const successMsg = this.translateService.instant(
-      'limits.updateSuccessMessage'
-    );
-
     return this.http.put<LimitType>(url, data, {
       params: {
         related: relatedParams.join(','),
       },
       headers: {
-        'snackbar-success': successMsg,
+        'snackbar-success': 'limits.updateSuccessMessage',
+        'snackbar-error': 'server',
       },
     });
   }
 
   deleteLimit(id: string): Observable<DeleteLimitResponse> {
     const url = URLS.LIMITS + `/${id}`;
-    return this.http.delete<DeleteLimitResponse>(url);
+    return this.http.delete<DeleteLimitResponse>(url, {
+      headers: {
+        'snackbar-success': 'limits.deleteSuccessMessage',
+        'snackbar-error': 'server',
+      },
+    });
   }
 }
 

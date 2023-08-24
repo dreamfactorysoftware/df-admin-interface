@@ -51,6 +51,7 @@
       </mat-select>
     </mat-form-field>
     <mat-form-field *ngIf="hiddenFields.displayEndpointField">
+      <!-- TODO: add tooltip here -->
       <mat-label>{{ 'limits.endpoint' | translate }}</mat-label>
       <input matInput type="text" formControlName="endpoint" />
     </mat-form-field>
@@ -69,6 +70,7 @@
       </mat-select>
     </mat-form-field>
     <mat-form-field>
+      <!-- TODO: add tooltip here -->
       <mat-label>{{ 'limits.verb' | translate }}</mat-label>
       <mat-select formControlName="verb">
         <mat-option *ngFor="let verb of verbs" [value]="verb">

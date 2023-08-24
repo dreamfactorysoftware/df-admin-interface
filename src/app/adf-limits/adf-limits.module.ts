@@ -4,7 +4,7 @@ import { DfManageLimitsComponent } from './df-manage-limits/df-manage-limits.com
 import { DfManageLimitsTableComponent } from './df-manage-limits/df-manage-limits-table.component';
 import { AdfLimitsRoutingModule } from './adf-limits-routing.module';
 import { DfLimitsService } from './services/df-limits.service';
-import { DfManageTableModule } from '../shared/components/df-manage-table/df-manage-table.module';
+import { AdfManageTableModule } from '../shared/components/df-manage-table/adf-manage-table.module';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -29,7 +29,7 @@ import { DfAlertComponent } from '../shared/components/df-alert/df-alert.compone
     CommonModule,
     AdfLimitsRoutingModule,
     DfAlertComponent,
-    DfManageTableModule,
+    AdfManageTableModule,
     FormsModule,
     ReactiveFormsModule,
     MatCheckboxModule,
