@@ -3,16 +3,8 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DfLimitsService } from '../services/df-limits.service';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
-import { DfRoleService } from 'src/app/adf-roles/services/df-role.service';
-import {
-  DfUserDataService,
-  SystemUserType,
-} from 'src/app/core/services/df-user-data.service';
 import { RoleType } from 'src/app/shared/types/role';
-import {
-  DfServiceDataService,
-  SystemServiceData,
-} from 'src/app/adf-services/services/service-data.service';
+import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
 import { ROUTES } from 'src/app/core/constants/routes';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { TranslateService } from '@ngx-translate/core';
@@ -21,6 +13,7 @@ import {
   CreateLimitPayload,
   UpdateLimitPayload,
 } from 'src/app/shared/types/limit';
+import { UserProfile } from 'src/app/shared/types/user';
 
 @Component({
   selector: 'df-limit',
@@ -61,15 +54,8 @@ export class DfLimitComponent implements OnInit, OnDestroy {
 
   limitTypeToEdit: LimitType | null = null;
 
-  hiddenFields = {
-    displayServiceField: false,
-    displayRoleField: false,
-    displayUserField: false,
-    displayEndpointField: false,
-  };
-
   roleDropdownOptions: RoleType[] = [];
-  userDropdownOptions: SystemUserType[] = [];
+  userDropdownOptions: UserProfile[] = [];
   serviceDropdownOptions: SystemServiceData[] = [];
 
   alertMsg = '';
@@ -78,9 +64,6 @@ export class DfLimitComponent implements OnInit, OnDestroy {
 
   constructor(
     private limitService: DfLimitsService,
-    private roleService: DfRoleService,
-    private userService: DfUserDataService,
-    private serviceDataService: DfServiceDataService,
     private router: Router,
     private activatedRoute: ActivatedRoute,
     private translateService: TranslateService,

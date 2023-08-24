@@ -1,6 +1,6 @@
 import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
-import { SystemUserType } from 'src/app/core/services/df-user-data.service';
 import { RoleType } from './role';
+import { UserProfile } from './user';
 
 interface CacheLimitType {
   id: number;
@@ -27,7 +27,7 @@ export interface LimitType {
   serviceByServiceId: SystemServiceData | null;
   serviceId: number | null;
   type: string;
-  userByUserId: SystemUserType | null;
+  userByUserId: UserProfile | null;
   userId: number | null;
   verb: string | null;
 }

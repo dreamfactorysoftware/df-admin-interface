@@ -1,8 +1,5 @@
-import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { URLS } from '../constants/urls';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { BehaviorSubject } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
@@ -14,24 +11,6 @@ export class DfUserDataService {
   userData$ = this.userDataSubject.asObservable();
 
   private TOKEN_KEY = 'session_token';
-
-  constructor(private http: HttpClient) {}
-
-  getSystemUsers(): Observable<GenericListResponse<Array<SystemUserType>>> {
-    const relatedParams = [
-      'lookup_by_user_id',
-      'user_to_app_to_role_by_user_id',
-    ];
-
-    return this.http.get<GenericListResponse<Array<SystemUserType>>>(
-      URLS.SYSTEM_USER,
-      {
-        params: {
-          related: relatedParams.join(','),
-        },
-      }
-    );
-  }
 
   clearToken() {
     document.cookie = `${this.TOKEN_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`;
@@ -73,33 +52,6 @@ export class DfUserDataService {
   set token(token: string) {
     document.cookie = `${this.TOKEN_KEY}=${token};expires=Session;path=/;SameSite=Strict`;
   }
-}
-
-export interface SystemUserType {
-  id: number;
-  name: string;
-  username: string;
-  ldapUsername: string | null;
-  firstName: string;
-  lastName: string;
-  lastLoginDate: string | null;
-  email: string;
-  isActive: boolean;
-  phone: string | null;
-  securityQuestion: string | null;
-  defaultAppId: number | null;
-  adldap: string | null;
-  oauthProvider: string | null;
-  saml: string | null;
-  createdDate: string;
-  lastModifiedDate: string;
-  createdById: number;
-  lastModifiedById: number;
-  isRootAdmin: number;
-  confirmed: boolean;
-  expired: boolean;
-  lookupByUserId: any[];
-  userToAppToRoleByUserId: Record<string, number>[];
 }
 
 export interface UserData {
