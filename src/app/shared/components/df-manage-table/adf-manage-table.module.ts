@@ -7,6 +7,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatButtonModule } from '@angular/material/button';
 import { DfAlertComponent } from '../df-alert/df-alert.component';
+import { MatInputModule } from '@angular/material/input';
 
 const shared = [DfAlertComponent];
 
@@ -15,6 +16,7 @@ const shared = [DfAlertComponent];
   exports: [
     ...shared,
     MatTableModule,
+    MatInputModule,
     FontAwesomeModule,
     TranslateModule,
     MatFormFieldModule,

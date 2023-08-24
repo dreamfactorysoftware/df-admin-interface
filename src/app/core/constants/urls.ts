@@ -14,4 +14,5 @@ export enum URLS {
   SYSTEM_ADMIN = `${BASE_URL}/system/admin`,
   ROLES = `${BASE_URL}/system/role`,
   SYSTEM_USER = `${BASE_URL}/system/user`,
+  SERVICE_REPORT = `${BASE_URL}/system/service_report`,
 }

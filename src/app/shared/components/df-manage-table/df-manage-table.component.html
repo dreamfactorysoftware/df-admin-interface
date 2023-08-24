@@ -1,5 +1,6 @@
 <div class="top-action-bar">
   <button
+    *ngIf="allowCreate"
     mat-mini-fab
     color="primary"
     [attr.aria-label]="'newEntry' | translate"
