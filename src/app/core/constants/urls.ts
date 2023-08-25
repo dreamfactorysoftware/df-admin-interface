@@ -1,5 +1,8 @@
 export const BASE_URL = '/api/v2';
 
+// change this url to the address of the instance
+export const INSTANCE_BASE_URL = 'http://localhost';
+
 export enum URLS {
   SYSTEM = `${BASE_URL}/system`,
   ENVIRONMENT = `${BASE_URL}/system/environment`,

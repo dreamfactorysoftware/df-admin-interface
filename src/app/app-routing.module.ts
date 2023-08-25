@@ -65,6 +65,12 @@ const routes: Routes = [
       import('./adf-reports/adf-reports.module').then(m => m.AdfReportsModule),
     canActivate: [loggedInGuard],
   },
+  {
+    path: ROUTES.APIDOCS,
+    loadChildren: () =>
+      import('./adf-api-docs/df-api-docs.module').then(m => m.DfApiDocsModule),
+    canActivate: [loggedInGuard],
+  },
 ];
 
 @NgModule({
