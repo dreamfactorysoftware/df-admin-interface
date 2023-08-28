@@ -43,6 +43,7 @@ export abstract class DfManageTableComponent<T>
   faPlus = faPlus;
   faEllipsisV = faEllipsisV;
   allowCreate = true;
+  allowFilter = true;
 
   columns: Array<{
     columnDef: string;
