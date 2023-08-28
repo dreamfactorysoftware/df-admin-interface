@@ -40,6 +40,11 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
 
   override columns = [
     {
+      columnDef: 'active',
+      cell: (row: RoleRow) => `${row.active}`,
+      header: 'active',
+    },
+    {
       columnDef: 'id',
       cell: (row: RoleRow) => `${row.id}`,
       header: 'id',
@@ -53,11 +58,6 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
       columnDef: 'description',
       cell: (row: RoleRow) => `${row.description}`,
       header: 'description',
-    },
-    {
-      columnDef: 'active',
-      cell: (row: RoleRow) => `${row.active}`,
-      header: 'active',
     },
     {
       columnDef: 'actions',

@@ -4,9 +4,7 @@ import { AppType } from '../types/df-apps.types';
 import { DfAppsService } from 'src/app/adf-apps/services/df-apps.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 
-export const appsResolver: ResolveFn<
-  GenericListResponse<Array<AppType>>
-> = () => {
+export const appsResolver: ResolveFn<GenericListResponse<AppType>> = () => {
   const appsService = inject(DfAppsService);
   return appsService.getApps();
 };

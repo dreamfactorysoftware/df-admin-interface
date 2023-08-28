@@ -44,11 +44,11 @@ export abstract class DfManageTableComponent<T>
   faEllipsisV = faEllipsisV;
   allowCreate = true;
 
-  columns: Array<{
+  abstract columns: Array<{
     columnDef: string;
     cell?: (element: T) => any;
     header?: string;
-  }> = [];
+  }>;
   @ViewChild(MatSort) sort: MatSort;
   _activatedRoute = this.activatedRoute;
 
@@ -85,7 +85,7 @@ export abstract class DfManageTableComponent<T>
     return this.pageSizes[0];
   }
 
-  abstract mapDataToTable(data: Array<T>): Array<T>;
+  abstract mapDataToTable(data: Array<any>): Array<T>;
 
   abstract refreshTable(limit?: number, offset?: number, filter?: string): void;
 

@@ -22,7 +22,7 @@ export class DfLimitsService {
     limit = 10,
     offset = 0,
     filter = ''
-  ): Observable<GenericListResponse<Array<LimitType>>> {
+  ): Observable<GenericListResponse<LimitType>> {
     const relatedParams = [
       'service_by_service_id',
       'role_by_role_id',
@@ -30,7 +30,7 @@ export class DfLimitsService {
       'limit_cache_by_limit_id',
     ];
 
-    return this.http.get<GenericListResponse<Array<LimitType>>>(URLS.LIMITS, {
+    return this.http.get<GenericListResponse<LimitType>>(URLS.LIMITS, {
       params: {
         filter,
         limit,

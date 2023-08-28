@@ -17,6 +17,8 @@ import { MatCheckboxChange } from '@angular/material/checkbox';
 import { UserProfileType } from '../../types/user';
 import { ROUTES } from 'src/app/core/constants/routes';
 import { uniqueNameValidator } from '../../validators/unique-name.validator';
+import { AppType } from 'src/app/adf-apps/types/df-apps.types';
+import { RoleType } from '../../types/role';
 
 @Component({
   selector: 'df-user-details',
@@ -36,6 +38,8 @@ export abstract class DfUserDetailsBaseComponent<T>
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
+  apps: Array<AppType>;
+  roles: Array<RoleType>;
 
   accessByTabs = [
     { control: 'apps' },
@@ -66,9 +70,10 @@ export abstract class DfUserDetailsBaseComponent<T>
         name: ['', Validators.required],
         phone: [''],
       }),
-      isActive: [false],
+      isActive: [true],
       tabs: this.buildTabs(),
       lookupKeys: this.fb.array([], [uniqueNameValidator]),
+      appRoles: this.fb.array([]),
     });
   }
 
@@ -89,8 +94,12 @@ export abstract class DfUserDetailsBaseComponent<T>
   ngOnInit(): void {
     this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ type, data }) => {
+      .subscribe(({ type, data, apps, roles }) => {
         this.type = type;
+        if (this.userType === 'users') {
+          this.apps = apps.resource;
+          this.roles = roles.resource;
+        }
         if (type === 'edit') {
           this.currentProfile = data;
           this.userForm.patchValue({
@@ -127,6 +136,24 @@ export abstract class DfUserDetailsBaseComponent<T>
                 if (control) {
                   control.patchValue({ checked: true });
                 }
+              });
+            }
+          }
+          if (this.userType === 'users') {
+            if (data.userToAppToRoleByUserId.length > 0) {
+              data.userToAppToRoleByUserId.forEach((item: any) => {
+                (this.userForm.controls['appRoles'] as FormArray).push(
+                  new FormGroup({
+                    app: new FormControl(
+                      this.apps.find(app => app.id === item.appId)?.name,
+                      [Validators.required]
+                    ),
+                    role: new FormControl(
+                      this.roles.find(role => role.id === item.roleId)?.name,
+                      [Validators.required]
+                    ),
+                  })
+                );
               });
             }
           }

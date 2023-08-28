@@ -18,13 +18,10 @@ import { DfRoleService } from '../adf-roles/services/df-role.service';
 import { DfUserDataService } from '../core/services/df-user-data.service';
 import { DfServiceDataService } from '../adf-services/services/service-data.service';
 import { DfAlertComponent } from '../shared/components/df-alert/df-alert.component';
-import { DfAppsService } from '../adf-apps/services/df-apps.service';
 import { HttpClient } from '@angular/common/http';
 import {
-  DF_USER_SERVICE_TOKEN,
-  USER_URL_TOKEN,
-  USER_RELATED_TOKEN,
-  USER_MESSAGE_PREFIX_TOKEN,
+  DF_LIMIT_SERVICE_TOKEN,
+  LIMIT_URL_TOKEN,
 } from '../core/constants/tokens';
 import { DfBaseCrudServiceFactory } from '../core/services/df-base-crud.service';
 import { URLS } from '../core/constants/urls';
@@ -55,18 +52,11 @@ import { URLS } from '../core/constants/urls';
     DfRoleService,
     DfUserDataService,
     DfServiceDataService,
-    { provide: USER_URL_TOKEN, useValue: URLS.SYSTEM_USER },
-    { provide: USER_RELATED_TOKEN, useValue: 'lookup_by_user_id' },
-    { provide: USER_MESSAGE_PREFIX_TOKEN, useValue: 'users' },
+    { provide: LIMIT_URL_TOKEN, useValue: URLS.LIMITS },
     {
-      provide: DF_USER_SERVICE_TOKEN,
+      provide: DF_LIMIT_SERVICE_TOKEN,
       useFactory: DfBaseCrudServiceFactory,
-      deps: [
-        USER_URL_TOKEN,
-        USER_RELATED_TOKEN,
-        USER_MESSAGE_PREFIX_TOKEN,
-        HttpClient,
-      ],
+      deps: [LIMIT_URL_TOKEN, HttpClient],
     },
   ],
 })

@@ -2,7 +2,7 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Component, Inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import { CreateAdmin, UserProfile, UserRow } from 'src/app/shared/types/user';
+import { UserProfile, UserRow } from 'src/app/shared/types/user';
 import { takeUntil } from 'rxjs';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -11,6 +11,7 @@ import { USER_COLUMNS } from 'src/app/core/constants/table-columns';
 import { userFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { DF_ADMIN_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 
 @Component({
   selector: 'df-manage-admins-table',
@@ -28,7 +29,7 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
     breakpointService: DfBreakpointService,
     translateService: TranslateService,
     @Inject(DF_ADMIN_SERVICE_TOKEN)
-    private adminService: DfBaseCrudService<UserProfile, CreateAdmin>
+    private adminService: DfBaseCrudService
   ) {
     super(
       router,
@@ -40,8 +41,8 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
   }
   override columns = USER_COLUMNS;
 
-  mapDataToTable(data: any): UserRow[] {
-    return data.map((user: UserProfile) => {
+  mapDataToTable(data: Array<UserProfile>): UserRow[] {
+    return data.map(user => {
       return {
         id: user.id,
         email: user.email,
@@ -58,7 +59,7 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
 
   override deleteRow(row: UserRow): void {
     this.adminService
-      .delete(row.id)
+      .delete(row.id, { snackbarSccess: 'admins.alerts.deleteSuccess' })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
         this.refreshTable();
@@ -67,7 +68,7 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.adminService
-      .getAll(limit, offset, filter)
+      .getAll<GenericListResponse<UserProfile>>({ limit, offset, filter })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
@@ -76,14 +77,18 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
   }
 
   uploadAdminList(files: FileList) {
-    this.adminService.uploadList(files[0]).subscribe(() => {
-      this.refreshTable();
-    });
+    this.adminService
+      .uploadFile(files[0], { snackbarSccess: 'admins.alerts.importSuccess' })
+      .subscribe(() => {
+        this.refreshTable();
+      });
   }
 
   downloadAdminList(type: string) {
-    this.adminService.downloadlist(type).subscribe(data => {
-      saveAsFile(data, `admin.${type}`, type);
-    });
+    this.adminService
+      .downloadFile(type, { snackbarSccess: 'admins.alerts.exportSuccess' })
+      .subscribe(data => {
+        saveAsFile(data, `admin.${type}`, type);
+      });
   }
 }

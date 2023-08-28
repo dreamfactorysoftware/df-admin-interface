@@ -1,58 +1,70 @@
-<div class="lookup-keys-accordion">
+<div class="app-roles-keys-accordion">
   <mat-accordion>
     <mat-expansion-panel>
       <mat-expansion-panel-header>
-        <mat-panel-title> {{ 'lookupKeys.label' | translate }}</mat-panel-title>
+        <mat-panel-title> {{ 'roles.label' | translate }}</mat-panel-title>
         <mat-panel-description>{{
-          'lookupKeys.desc' | translate
+          'roles.appRoleAssigned'
+            | translate
+              : {
+                  assigned: apps.length - availableApps.length,
+                  total: apps.length
+                }
         }}</mat-panel-description>
       </mat-expansion-panel-header>
       <ng-container [formGroup]="rootForm">
-        <ng-container formArrayName="lookupKeys">
+        <ng-container formArrayName="appRoles">
           <mat-table [dataSource]="dataSource">
-            <ng-container matColumnDef="name">
+            <ng-container matColumnDef="app">
               <mat-header-cell *matHeaderCellDef>
-                {{ 'name' | translate }}
+                {{ 'roles.app' | translate }}
               </mat-header-cell>
               <mat-cell
                 *matCellDef="let row; let i = index"
                 [formGroupName]="i">
                 <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>{{ 'name' | translate }}</mat-label>
-                  <input matInput formControlName="name" />
+                  <mat-label>{{ 'roles.app' | translate }}</mat-label>
+                  <input
+                    matInput
+                    formControlName="app"
+                    [matAutocomplete]="auto" />
+                  <mat-autocomplete requireSelection #auto="matAutocomplete">
+                    <mat-option
+                      *ngFor="let app of availableApps"
+                      [value]="app.name">
+                      {{ app.name }}
+                    </mat-option>
+                  </mat-autocomplete>
                 </mat-form-field>
               </mat-cell>
             </ng-container>
 
-            <ng-container matColumnDef="value">
+            <ng-container matColumnDef="role">
               <mat-header-cell *matHeaderCellDef>
-                {{ 'value' | translate }}
+                {{ 'roles.role' | translate }}
               </mat-header-cell>
               <mat-cell
                 *matCellDef="let row; let i = index"
                 [formGroupName]="i">
                 <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>{{ 'value' | translate }}</mat-label>
-                  <input matInput formControlName="value" />
+                  <mat-label>{{ 'roles.role' | translate }}</mat-label>
+                  <input
+                    matInput
+                    formControlName="role"
+                    [matAutocomplete]="auto" />
+                  <mat-autocomplete requireSelection #auto="matAutocomplete">
+                    <mat-option *ngFor="let role of roles" [value]="role.name">
+                      {{ role.name }}
+                    </mat-option>
+                  </mat-autocomplete>
                 </mat-form-field>
               </mat-cell>
             </ng-container>
 
-            <ng-container matColumnDef="private">
-              <mat-header-cell *matHeaderCellDef>
-                {{ 'private' | translate }}
-              </mat-header-cell>
-              <mat-cell
-                *matCellDef="let row; let i = index"
-                [formGroupName]="i">
-                <mat-slide-toggle
-                  formControlName="private"
-                  [attr.aria-label]="'name' | translate"></mat-slide-toggle>
-              </mat-cell>
-            </ng-container>
-            <ng-container matColumnDef="actions" stickyEnd>
+            <ng-container matColumnDef="actions">
               <mat-header-cell *matHeaderCellDef>
                 <button
+                  *ngIf="showAddButton"
                   mat-mini-fab
                   color="primary"
                   [attr.aria-label]="'newEntry' | translate"
@@ -74,7 +86,7 @@
             <mat-row *matRowDef="let row; columns: displayedColumns"></mat-row>
             <tr class="mat-row" *matNoDataRow>
               <td class="mat-cell" colspan="4">
-                {{ 'lookupKeys.noKeys' | translate }}
+                {{ 'roles.noRoles' | translate }}
               </td>
             </tr>
           </mat-table>

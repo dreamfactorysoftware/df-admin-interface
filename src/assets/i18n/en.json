@@ -398,8 +398,7 @@
       "updateSuccess": "Admin updated successfully",
       "deleteSuccess": "Admin deleted successfully",
       "importSuccess": "Admin imported successfully",
-      "exportSuccess": "Admin exported successfully",
-      "inviteSent": "An email invite has been sent."
+      "exportSuccess": "Admin exported successfully"
     }
   },
   "users": {
@@ -409,8 +408,7 @@
       "updateSuccess": "User updated successfully",
       "deleteSuccess": "User deleted successfully",
       "importSuccess": "User imported successfully",
-      "exportSuccess": "User exported successfully",
-      "inviteSent": "An email invite has been sent."
+      "exportSuccess": "User exported successfully"
     }
   },
   "alerts": {
@@ -462,13 +460,23 @@
     "updateSuccessMessage": "Limit successfully updated",
     "deleteSuccessMessage": "Limit successfully deleted"
   },
+  "lookupKeys": {
+    "label": "Lookup Keys",
+    "desc": "Lookup keys for service configuration and credentials must be made private.",
+    "noKeys": "No lookup keys."
+  },
   "cancel": "Cancel",
   "basic": "Basic",
   "selectAnOption": "Select an option",
-  "label": "Lookup Keys",
   "name": "Name",
   "value": "Value",
   "private": "Private",
-  "desc": "Lookup keys for service configuration and credentials must be made private.",
-  "noKeys": "No lookup keys."
+  "inviteSent": "An email invite has been sent.",
+  "roles": {
+    "label": "Roles",
+    "role": "Role",
+    "app": "App",
+    "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
+    "noRoles": "No roles assigned."
+  }
 }

@@ -34,14 +34,18 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
     breakpointService: DfBreakpointService,
     private translateService: TranslateService,
     @Inject(DF_ADMIN_SERVICE_TOKEN)
-    private adminService: DfBaseCrudService<UserProfile, CreateAdmin>,
+    private adminService: DfBaseCrudService,
     private router: Router
   ) {
     super(fb, activatedRoute, systemConfigDataService, breakpointService);
   }
 
   sendInvite() {
-    this.adminService.sendInvite(this.currentProfile.id).subscribe();
+    this.adminService
+      .patch(this.currentProfile.id, {
+        snackbarSccess: 'inviteSent',
+      })
+      .subscribe();
   }
 
   save() {
@@ -63,7 +67,13 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
         data.password = this.userForm.value.password;
       }
       this.adminService
-        .create({ resource: [data] }, sendInvite)
+        .create(
+          { resource: [data] },
+          {
+            snackbarSccess: 'admins.alerts.createdSuccess',
+            additionalParams: [{ key: 'send_invite', value: sendInvite }],
+          }
+        )
         .pipe(
           takeUntil(this.destroyed$),
           catchError(err => {
@@ -84,7 +94,9 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
         data.password = this.userForm.value.password;
       }
       this.adminService
-        .update(this.currentProfile.id, data)
+        .update(this.currentProfile.id, data, {
+          snackbarSccess: 'admins.alerts.updateSuccess',
+        })
         .pipe(
           takeUntil(this.destroyed$),
           catchError(err => {

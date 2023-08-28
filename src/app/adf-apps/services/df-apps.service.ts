@@ -10,7 +10,7 @@ export class DfAppsService {
   constructor(private http: HttpClient) {}
 
   getApps(limit = 100, offset = 0, filter = '') {
-    return this.http.get<GenericListResponse<Array<AppType>>>(URLS.APP, {
+    return this.http.get<GenericListResponse<AppType>>(URLS.APP, {
       headers: SHOW_LOADING_HEADER,
       params: {
         include_count: true,
@@ -23,16 +23,13 @@ export class DfAppsService {
   }
 
   getApp(id: string | number) {
-    return this.http.get<GenericListResponse<Array<AppType>>>(
-      `${URLS.APP}/${id}`,
-      {
-        headers: SHOW_LOADING_HEADER,
-        params: {
-          fields: '*',
-          related: 'role_by_role_id',
-        },
-      }
-    );
+    return this.http.get<GenericListResponse<AppType>>(`${URLS.APP}/${id}`, {
+      headers: SHOW_LOADING_HEADER,
+      params: {
+        fields: '*',
+        related: 'role_by_role_id',
+      },
+    });
   }
 
   createApp(app: AppPayload) {

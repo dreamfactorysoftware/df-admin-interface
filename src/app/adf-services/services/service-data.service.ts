@@ -13,7 +13,7 @@ export class DfServiceDataService {
   }
 
   getSystemServiceDataList(limit = 10, offset = 0, filter = '') {
-    return this.http.get<GenericListResponse<Array<SystemServiceData>>>(
+    return this.http.get<GenericListResponse<SystemServiceData>>(
       URLS.SYSTEM_SERVICE,
       {
         params: {
@@ -28,9 +28,7 @@ export class DfServiceDataService {
   }
 
   getServiceTypes() {
-    return this.http.get<GenericListResponse<Array<ServiceType>>>(
-      URLS.SERVICE_TYPE
-    );
+    return this.http.get<GenericListResponse<ServiceType>>(URLS.SERVICE_TYPE);
   }
 
   createService(newService: Partial<SystemServiceData>) {
