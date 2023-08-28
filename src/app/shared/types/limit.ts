@@ -11,7 +11,7 @@ interface CacheLimitType {
 }
 
 export interface LimitType {
-  created_date: string;
+  createdDate: string;
   description: string;
   endpoint: string | null;
   id: number;
@@ -36,14 +36,14 @@ export type CreateLimitPayload = {
   cacheData: object;
   description: string | null;
   endpoint: string | null;
-  is_active: boolean;
+  isActive: boolean;
   name: string;
   period: string;
   rate: string;
-  role_id: number | null;
-  service_id: number | null;
+  roleId: number | null;
+  serviceId: number | null;
   type: string;
-  user_id: number | null;
+  userId: number | null;
   verb: string | null;
 };
 
@@ -52,8 +52,8 @@ export type UpdateLimitPayload = Omit<
   'cacheData' | 'rate'
 > & {
   id: number;
-  created_date: string;
-  last_modified_date: string;
+  createdDate: string;
+  lastModifiedDate: string;
   rate: number;
 };
 
