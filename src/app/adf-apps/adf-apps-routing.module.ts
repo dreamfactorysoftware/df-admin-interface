@@ -3,7 +3,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { ROUTES } from '../core/constants/routes';
 import { DfManageAppsComponent } from './df-manage-apps/df-manage-apps.component';
 import { DfImportAppComponent } from './df-import-app/df-import-app.component';
-import { DfAppsFormComponent } from './df-apps-form/df-apps-form.component';
+import { DfAppDetailsComponent } from './df-app-details/df-app-details.component';
 import { appsResolver } from './resolvers/manage-apps.resolver';
 import { rolesResolver } from './resolvers/roles.resolver';
 import { editAppResolver } from './resolvers/edit-app.resolver';
@@ -18,7 +18,7 @@ const routes: Routes = [
   },
   {
     path: `${ROUTES.EDIT}/:id`,
-    component: DfAppsFormComponent,
+    component: DfAppDetailsComponent,
     resolve: {
       roles: rolesResolver,
       appData: editAppResolver,
@@ -26,7 +26,7 @@ const routes: Routes = [
   },
   {
     path: ROUTES.CREATE,
-    component: DfAppsFormComponent,
+    component: DfAppDetailsComponent,
     resolve: {
       roles: rolesResolver,
     },

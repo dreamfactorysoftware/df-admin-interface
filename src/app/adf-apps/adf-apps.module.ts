@@ -4,7 +4,7 @@ import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 
 import { AdfAppsRoutingModule } from './adf-apps-routing.module';
 import { DfManageAppsComponent } from './df-manage-apps/df-manage-apps.component';
-import { DfAppsFormComponent } from './df-apps-form/df-apps-form.component';
+import { DfAppDetailsComponent } from './df-app-details/df-app-details.component';
 import { DfImportAppComponent } from './df-import-app/df-import-app.component';
 import { DfManageAppsTableComponent } from './df-manage-apps/df-manage-apps-table.component';
 import { DfAppsService } from './services/df-apps.service';
@@ -21,12 +21,14 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 @NgModule({
   declarations: [
     DfManageAppsComponent,
     DfManageAppsTableComponent,
-    DfAppsFormComponent,
+    DfAppDetailsComponent,
     DfImportAppComponent,
   ],
   imports: [
@@ -46,6 +48,8 @@ import { MatMenuModule } from '@angular/material/menu';
     MatCardModule,
     MatAutocompleteModule,
     MatMenuModule,
+    MatSlideToggleModule,
+    MatTooltipModule,
   ],
   providers: [DfAppsService],
 })

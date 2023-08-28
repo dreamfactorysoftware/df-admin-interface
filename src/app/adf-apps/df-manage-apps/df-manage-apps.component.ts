@@ -1,7 +1,6 @@
 import { Component, ViewChild } from '@angular/core';
-import { faDownload, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faFileImport } from '@fortawesome/free-solid-svg-icons';
 import { DfManageAppsTableComponent } from './df-manage-apps-table.component';
-import { EXPORT_TYPES } from 'src/app/core/constants/supported-extensions';
 import { SampleApps } from '../df-apps.consts';
 
 @Component({
@@ -10,9 +9,7 @@ import { SampleApps } from '../df-apps.consts';
   styleUrls: ['./df-manage-apps.component.scss'],
 })
 export class DfManageAppsComponent {
-  faUpload = faUpload;
-  faDownload = faDownload;
-  exportTypes = EXPORT_TYPES;
+  faFileImport = faFileImport;
   @ViewChild(DfManageAppsTableComponent)
   manageAppsTableComponent!: DfManageAppsTableComponent;
 

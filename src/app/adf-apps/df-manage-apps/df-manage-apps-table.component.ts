@@ -48,22 +48,22 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
     {
       columnDef: 'name',
       cell: (row: AppRow) => row.name,
-      header: 'name',
+      header: 'Name',
     },
     {
       columnDef: 'role',
       cell: (row: AppRow) => row.role,
-      header: 'role',
+      header: 'Role',
     },
     {
       columnDef: 'apiKey',
       cell: (row: AppRow) => row.apiKey,
-      header: 'apiKey',
+      header: 'API Key',
     },
     {
       columnDef: 'description',
       cell: (row: AppRow) => row.description,
-      header: 'description',
+      header: 'Description',
     },
     {
       columnDef: 'actions',

@@ -42,20 +42,24 @@ export class DfAppsService {
             fields: '*',
             related: 'role_by_role_id',
           },
+          headers: {
+            'snackbar-success': 'apps.createSuccess',
+          },
         }
       )
       .subscribe(data => console.log('create response', data));
   }
 
   editApp(app: EditAppPayload) {
-    this.http
-      .put(`${URLS.APP}/${app.id}`, app, {
-        params: {
-          fields: '*',
-          related: 'role_by_role_id',
-        },
-      })
-      .subscribe(data => console.log(data));
+    return this.http.put(`${URLS.APP}/${app.id}`, app, {
+      params: {
+        fields: '*',
+        related: 'role_by_role_id',
+      },
+      headers: {
+        'snackbar-success': 'apps.updateSuccess',
+      },
+    });
   }
 
   deleteApp(id: string | number) {
