@@ -221,12 +221,12 @@ export class DfLimitComponent implements OnInit, OnDestroy {
     const data = {
       description: this.formGroup.value.description ?? null,
       endpoint: this.formGroup.value.endpoint ?? null,
-      is_active: this.formGroup.value.active as boolean,
+      isActive: this.formGroup.value.active as boolean,
       name: this.formGroup.value.limitName as string,
       period: this.formGroup.value.limitPeriod as string,
-      role_id: this.formGroup.value.roleId ?? null,
-      service_id: this.formGroup.value.serviceId ?? null,
-      user_id: this.formGroup.value.userId ?? null,
+      roleId: this.formGroup.value.roleId ?? null,
+      serviceId: this.formGroup.value.serviceId ?? null,
+      userId: this.formGroup.value.userId ?? null,
       type: this.formGroup.value.limitType as string,
       verb: verb,
     };
@@ -234,8 +234,8 @@ export class DfLimitComponent implements OnInit, OnDestroy {
     if (this.isEditMode) {
       return {
         id: this.limitTypeToEdit?.id,
-        created_date: this.limitTypeToEdit?.created_date,
-        last_modified_date: this.limitTypeToEdit?.lastModifiedDate,
+        createdDate: this.limitTypeToEdit?.createdDate,
+        lastModifiedDate: this.limitTypeToEdit?.lastModifiedDate,
         rate: this.formGroup.value.limitRate ?? null,
         ...data,
       } as UpdateLimitPayload;
