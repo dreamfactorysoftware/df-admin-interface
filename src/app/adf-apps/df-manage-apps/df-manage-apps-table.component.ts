@@ -14,6 +14,7 @@ import { TranslateService } from '@ngx-translate/core';
     '../../shared/components/df-manage-table/df-manage-table.component.html',
   styleUrls: [
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
+    './df-manage-apps-table.component.scss',
   ],
 })
 export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
@@ -48,22 +49,22 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
     {
       columnDef: 'name',
       cell: (row: AppRow) => row.name,
-      header: 'name',
+      header: 'Name',
     },
     {
       columnDef: 'role',
       cell: (row: AppRow) => row.role,
-      header: 'role',
+      header: 'Role',
     },
     {
       columnDef: 'apiKey',
       cell: (row: AppRow) => row.apiKey,
-      header: 'apiKey',
+      header: 'API Key',
     },
     {
       columnDef: 'description',
       cell: (row: AppRow) => row.description,
-      header: 'description',
+      header: 'Description',
     },
     {
       columnDef: 'actions',

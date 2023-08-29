@@ -1,9 +1,11 @@
 <div class="apps-container">
-  <h1>{{ 'apps.createApp.label' | translate }}</h1>
-
   <form [formGroup]="appForm" (ngSubmit)="onSubmit()" class="form-container">
-    <div>
+    <div class="app-info">
       <mat-form-field>
+        <!-- TODO add into tooltip -->
+        <mat-label>
+          {{ 'apps.createApp.applicationName.label' | translate }}
+        </mat-label>
         <input
           matInput
           placeholder="{{ 'apps.createApp.applicationName.label' | translate }}"
@@ -14,12 +16,17 @@
         </mat-error>
       </mat-form-field>
       <mat-form-field>
+        <!-- TODO add into tooltip -->
+        <mat-label>{{
+          'apps.createApp.description.label' | translate
+        }}</mat-label>
         <input
           matInput
           placeholder="{{ 'apps.createApp.description.label' | translate }}"
           formControlName="description" />
       </mat-form-field>
       <mat-form-field>
+        <!-- TODO add into tooltip -->
         <mat-label>{{
           'apps.createApp.defaultRole.label' | translate
         }}</mat-label>
@@ -41,12 +48,31 @@
           </mat-option>
         </mat-autocomplete>
       </mat-form-field>
-      <mat-checkbox formControlName="active">{{
+      <mat-slide-toggle formControlName="active">{{
         'apps.createApp.active' | translate
-      }}</mat-checkbox>
+      }}</mat-slide-toggle>
     </div>
+    <!-- API Card -->
+    <mat-card *ngIf="apiKey">
+      <mat-card-header>
+        <mat-card-subtitle>{{
+          'apps.createApp.apiKey.label' | translate
+        }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        {{ apiKey }}
+      </mat-card-content>
+      <mat-card-actions>
+        <button mat-button type="button" (click)="copyApiKey()">
+          <fa-icon [icon]="faCopy" class="copy-icon"></fa-icon>
+
+          {{ 'apps.createApp.apiKey.copy' | translate }}
+        </button>
+      </mat-card-actions>
+    </mat-card>
     <!-- app location -->
     <div class="flex-col">
+      <!-- TODO add into tooltip -->
       <p>{{ 'apps.createApp.appLocation.label' | translate }}</p>
       <mat-radio-group
         class="flex-col"
@@ -112,12 +138,14 @@
           appForm.controls['appLocation'].value === '1' ||
           appForm.controls['appLocation'].value === '3'
         ">
+        <!-- TODO add into tooltip -->
         <mat-label *ngIf="appForm.controls['appLocation'].value === '1'">
           {{
             'apps.createApp.appLocation.options.fileStorage.launchPath.label'
               | translate
           }}
         </mat-label>
+        <!-- TODO add into tooltip -->
         <mat-label *ngIf="appForm.controls['appLocation'].value === '3'">
           {{
             'apps.createApp.appLocation.options.webServer.pathToApp.label'
@@ -133,6 +161,7 @@
           formControlName="path" />
       </mat-form-field>
       <mat-form-field *ngIf="appForm.controls['appLocation'].value === '2'">
+        <!-- TODO add into tooltip -->
         <mat-label>
           {{ 'apps.createApp.appLocation.options.remoteUrl.label' | translate }}
         </mat-label>
@@ -151,8 +180,9 @@
           appForm.controls['appLocation'].value === '3'
         ">
         <mat-card-header>
+          <!-- TODO add into tooltip -->
           <mat-card-subtitle>{{
-            'apps.createApp.appLocation.options.urlPath' | translate
+            'apps.createApp.appLocation.options.urlPath.label' | translate
           }}</mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
@@ -161,17 +191,18 @@
         <mat-card-actions>
           <button mat-button type="button" (click)="copyAppUrl()">
             <fa-icon [icon]="faCopy" class="copy-icon"></fa-icon>
+
+            {{ 'apps.createApp.appLocation.options.urlPath.copy' | translate }}
           </button>
         </mat-card-actions>
       </mat-card>
     </div>
     <!-- submit -->
     <div>
-      <button
-        mat-raised-button
-        color="primary"
-        type="submit"
-        [disabled]="!appForm.valid">
+      <button mat-flat-button type="button" (click)="goBack()">
+        {{ 'cancel' | translate }}
+      </button>
+      <button mat-raised-button color="primary" type="submit">
         <span *ngIf="this.editApp">{{ 'common.save' | translate }}</span>
         <span *ngIf="!this.editApp">{{ 'common.create' | translate }}</span>
       </button>

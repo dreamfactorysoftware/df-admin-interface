@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { SampleApps } from '../df-apps.consts';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { DfAppsService } from '../services/df-apps.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'df-df-import-app',
@@ -14,7 +15,8 @@ export class DfImportAppComponent {
 
   constructor(
     private fb: FormBuilder,
-    private appsService: DfAppsService
+    private appsService: DfAppsService,
+    private router: Router
   ) {
     this.importForm = this.fb.group({
       file: [null],
@@ -34,6 +36,10 @@ export class DfImportAppComponent {
     if (file) {
       this.importForm.patchValue({ file: file, filePath: file.name });
     }
+  }
+
+  goBack() {
+    this.router.navigate(['/apps']);
   }
 
   onSubmit() {
