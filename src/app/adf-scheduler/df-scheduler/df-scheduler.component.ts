@@ -8,9 +8,9 @@ import { JsonValidator } from 'src/app/shared/validators/json.validator';
 import { DfAccessListService } from '../services/access-list.service';
 import { DF_SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { SchedulerTaskData } from '../df-manage-scheduler/df-manage-scheduler-table.component';
 import {
   CreateSchedulePayload,
+  SchedulerTaskData,
   UpdateSchedulePayload,
 } from '../types/df-scheduler.types';
 
@@ -151,8 +151,6 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         .subscribe(data => {
           this.router.navigate([ROUTES.SCHEDULER]);
         });
-    } else {
-      // TODO: add error message about invalid form
     }
   }
 

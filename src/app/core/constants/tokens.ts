@@ -3,7 +3,10 @@ import { DfBaseCrudService } from '../services/df-base-crud.service';
 import { UserProfile, CreateAdmin } from 'src/app/shared/types/user';
 import { AppPayload, AppType } from 'src/app/adf-apps/types/df-apps.types';
 import { ServiceReportData } from './reports';
-import { SchedulerTaskData } from 'src/app/adf-scheduler/df-manage-scheduler/df-manage-scheduler-table.component';
+import {
+  CreateSchedulePayload,
+  SchedulerTaskData,
+} from 'src/app/adf-scheduler/types/df-scheduler.types';
 
 export const URL_TOKEN = new InjectionToken<string>('URL_TOKEN');
 export const RELATED_TOKEN = new InjectionToken<string>('RELATED_TOKEN');
@@ -49,5 +52,5 @@ export const DF_REPORT_SERVICE_TOKEN = new InjectionToken<
 >('DF_REPORT_SERVICE_TOKEN');
 
 export const DF_SCHEDULER_SERVICE_TOKEN = new InjectionToken<
-  DfBaseCrudService<SchedulerTaskData, any> // TODO: add the create payload
+  DfBaseCrudService<SchedulerTaskData, CreateSchedulePayload>
 >('DF_SCHEDULER_SERVICE_TOKEN');
