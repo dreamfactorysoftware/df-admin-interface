@@ -1,0 +1,76 @@
+<mat-tab-group>
+  <mat-tab label="First">
+    <h1>{{ 'scheduler.taskOverview' | translate }}</h1>
+    <h4>{{ 'scheduler.taskOverviewSubtitle' | translate }}</h4>
+    <form [formGroup]="formGroup" (ngSubmit)="onSubmit()">
+      <mat-form-field>
+        <mat-label>Name</mat-label>
+        <input matInput placeholder="Name" formControlName="name" />
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Description</mat-label>
+        <input
+          matInput
+          placeholder="Description"
+          formControlName="description" />
+      </mat-form-field>
+      <mat-slide-toggle formControlName="active">Active</mat-slide-toggle>
+      <mat-form-field>
+        <mat-label>Service</mat-label>
+        <mat-select formControlName="serviceId">
+          <mat-option
+            *ngFor="let service of userServicesDropdownOptions"
+            [value]="service.id">
+            {{ service.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field *ngIf="componentDropdownOptions.length">
+        <mat-label>Component</mat-label>
+        <mat-select formControlName="component">
+          <mat-option
+            *ngFor="let item of componentDropdownOptions"
+            [value]="item"
+            >{{ item }}</mat-option
+          >
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Method</mat-label>
+        <mat-select formControlName="method">
+          <mat-option
+            *ngFor="let verb of verbDropdownOptions"
+            [value]="verb.value"
+            >{{ verb.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Frequency (defined in minutes)</mat-label>
+        <input matInput type="number" formControlName="frequency" />
+      </mat-form-field>
+      <ng-container *ngIf="this.formGroup.controls['payload']">
+        <mat-form-field>
+          <mat-label>Payload (JSON)</mat-label>
+          <textarea matInput formControlName="payload"></textarea>
+          <!-- TODO: in the original app, this was an ace editor component so something to consider -->
+        </mat-form-field>
+      </ng-container>
+      <div>
+        <button mat-raised-button (click)="onCancel()">
+          {{ 'cancel' | translate }}
+        </button>
+        <button mat-raised-button color="primary" type="submit">
+          {{ 'save' | translate }}
+        </button>
+      </div>
+    </form>
+  </mat-tab>
+  <mat-tab label="Second">
+    <h1>{{ 'scheduler.logPageTitle' | translate }}</h1>
+    <h4>{{ 'scheduler.logPageSubtitle' | translate }}</h4>
+    <p>Status Code:</p>
+    <p>Error:</p>
+    <!-- TODO: Add ace editor here for the error log -->
+  </mat-tab>
+</mat-tab-group>

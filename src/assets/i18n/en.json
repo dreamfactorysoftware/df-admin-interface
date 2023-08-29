@@ -462,6 +462,12 @@
     "updateSuccessMessage": "Limit successfully updated",
     "deleteSuccessMessage": "Limit successfully deleted"
   },
+  "scheduler": {
+    "logPageTitle": "Scheduler Task Log",
+    "logPageSubtitle": "This interface displays the scheduler task error log.",
+    "taskOverview": "Scheduler Task Overview",
+    "taskOverviewSubtitle": "Scheduler task provide a way to schedule requests to the platform."
+  },
   "cancel": "Cancel",
   "basic": "Basic",
   "selectAnOption": "Select an option",

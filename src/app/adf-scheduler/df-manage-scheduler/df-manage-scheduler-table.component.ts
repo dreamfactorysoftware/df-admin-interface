@@ -7,6 +7,7 @@ import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service
 import { TranslateService } from '@ngx-translate/core';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { DF_SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { CreateSchedulePayload } from '../df-scheduler/df-scheduler.component';
 
 export type SchedulerTaskData = {
   id: number;
@@ -37,7 +38,10 @@ export type SchedulerTaskData = {
 export class DfManageSchedulerTableComponent extends DfManageTableComponent<SchedulerTaskData> {
   constructor(
     @Inject(DF_SCHEDULER_SERVICE_TOKEN)
-    private service: DfBaseCrudService<SchedulerTaskData, any>, // TODO: add create payload here
+    private service: DfBaseCrudService<
+      SchedulerTaskData,
+      CreateSchedulePayload
+    >,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -107,7 +111,6 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
   ];
 
   mapDataToTable(data: any): SchedulerTaskData[] {
-    console.log('data: ', data);
     return data.map((val: SchedulerTaskData) => {
       return {
         id: val.id,

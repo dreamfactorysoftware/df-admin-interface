@@ -55,16 +55,24 @@ export class DfBaseCrudService<T, C> {
     },
     params?: any
   ) {
+    const requestParams =
+      this.related === ''
+        ? {
+            fields: '*',
+            ...params,
+          }
+        : {
+            fields: '*',
+            related: this.related,
+            ...params,
+          };
+
     return this.http.post<T>(this.url, data, {
       headers: {
         ...SHOW_LOADING_HEADER,
         'snackbar-success': `${this.messagePrefix}.alerts.createdSuccess`,
       },
-      params: {
-        fields: '*',
-        related: this.related,
-        ...params,
-      },
+      params: requestParams,
     });
   }
 
