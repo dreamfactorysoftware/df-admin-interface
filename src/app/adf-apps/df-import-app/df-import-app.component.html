@@ -64,12 +64,13 @@
         placeholder="{{ 'apps.importApp.storageFolder' | translate }}"
         formControlName="storageFolder" />
     </mat-form-field>
-    <button
-      mat-flat-button
-      color="primary"
-      type="submit"
-      [disabled]="!importForm.valid">
-      {{ 'common.submit' | translate }}
-    </button>
+    <div>
+      <button mat-flat-button type="button" (click)="goBack()">
+        {{ 'cancel' | translate }}
+      </button>
+      <button mat-flat-button color="primary" type="submit">
+        {{ 'common.submit' | translate }}
+      </button>
+    </div>
   </form>
 </div>
