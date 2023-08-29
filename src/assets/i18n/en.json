@@ -466,7 +466,11 @@
     "logPageTitle": "Scheduler Task Log",
     "logPageSubtitle": "This interface displays the scheduler task error log.",
     "taskOverview": "Scheduler Task Overview",
-    "taskOverviewSubtitle": "Scheduler task provide a way to schedule requests to the platform."
+    "taskOverviewSubtitle": "Scheduler task provide a way to schedule requests to the platform.",
+    "alerts": {
+      "createdSuccess": "Scheduled task created successfully",
+      "updateSuccess": "Scheduled task updated successfully"
+    }
   },
   "cancel": "Cancel",
   "basic": "Basic",

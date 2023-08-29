@@ -41,11 +41,16 @@ export class DfBaseCrudService<T, C> {
   }
 
   get(id: string | number) {
+    const requestParams: any =
+      this.related === ''
+        ? {}
+        : {
+            related: this.related,
+          };
+
     return this.http.get<T>(`${this.url}/${id}`, {
       headers: SHOW_LOADING_HEADER,
-      params: {
-        related: this.related,
-      },
+      params: requestParams,
     });
   }
 
@@ -77,15 +82,22 @@ export class DfBaseCrudService<T, C> {
   }
 
   update(id: string | number, data: Partial<C>) {
+    const requestParams: any =
+      this.related === ''
+        ? {
+            fields: '*',
+          }
+        : {
+            fields: '*',
+            related: this.related,
+          };
+
     return this.http.put<T>(`${this.url}/${id}`, data, {
       headers: {
         ...SHOW_LOADING_HEADER,
         'snackbar-success': `${this.messagePrefix}.alerts.updateSuccess`,
       },
-      params: {
-        fields: '*',
-        related: this.related,
-      },
+      params: requestParams,
     });
   }
 

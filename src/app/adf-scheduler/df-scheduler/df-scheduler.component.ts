@@ -9,56 +9,10 @@ import { DfAccessListService } from '../services/access-list.service';
 import { DF_SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { SchedulerTaskData } from '../df-manage-scheduler/df-manage-scheduler-table.component';
-
-// TODO: potentially move this
-export type UpdateSchedulePayload = {
-  component: string;
-  createdById: number;
-  createdDate: string;
-  description: string;
-  frequency: number;
-  hasLog: boolean;
-  id: number;
-  isActive: boolean;
-  lastModifiedById: number | null;
-  lastModifiedDate: string;
-  name: string;
-  payload: string;
-  service: {
-    id: number;
-    name: string;
-    label: string;
-    description: string;
-    type: string;
-    components: string[];
-  };
-  serviceId: number;
-  serviceName: string;
-  verb: string;
-  verbMask: number;
-};
-
-export type CreateSchedulePayload = {
-  component: string;
-  description: string;
-  frequency: number;
-  id: null;
-  isActive: boolean;
-  name: string;
-  payload: string;
-  service: {
-    id: number;
-    name: string;
-    label: string;
-    description: string;
-    type: string;
-    components: string[];
-  };
-  serviceId: number;
-  serviceName: string;
-  verb: string;
-  verbMask: number;
-};
+import {
+  CreateSchedulePayload,
+  UpdateSchedulePayload,
+} from '../types/df-scheduler.types';
 
 @Component({
   selector: 'df-scheduler',
@@ -72,6 +26,8 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
   selectedService: SystemServiceData | undefined;
 
   componentDropdownOptions: string[] = [];
+
+  scheduleToEdit: SchedulerTaskData | null;
 
   verbDropdownOptions = [
     {
@@ -125,6 +81,32 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         this.userServicesDropdownOptions = data.data.resource;
       });
 
+    const id = this.activatedRoute.snapshot.paramMap.get('id');
+
+    if (id) {
+      this.activatedRoute.data
+        .pipe(takeUntil(this.destroyed$))
+        .subscribe((data: any) => {
+          this.scheduleToEdit = data.schedulerObject;
+
+          this.formGroup.setValue({
+            name: this.scheduleToEdit?.name,
+            description: this.scheduleToEdit?.description,
+            active: this.scheduleToEdit?.isActive,
+            serviceId: this.scheduleToEdit?.serviceId,
+            component: this.scheduleToEdit?.component,
+            method: this.scheduleToEdit?.verb,
+            frequency: this.scheduleToEdit?.frequency,
+          });
+
+          this.getServiceAccessList(this.scheduleToEdit?.serviceId as number);
+
+          if (this.scheduleToEdit?.verb !== 'GET') {
+            this.addPayloadField(this.scheduleToEdit?.payload as string);
+          }
+        });
+    }
+
     this.formGroup
       .get('method')
       ?.valueChanges.pipe(takeUntil(this.destroyed$))
@@ -137,19 +119,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
       .get('serviceId')
       ?.valueChanges.pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
-        const service = this.userServicesDropdownOptions.find(val => {
-          return val.id === data;
-        });
-        this.selectedService = service;
-
-        if (service) {
-          this.accessListService
-            .getServiceAccessList(service.name)
-            .pipe(takeUntil(this.destroyed$))
-            .subscribe(data => {
-              this.componentDropdownOptions = data.resource;
-            });
-        }
+        this.getServiceAccessList(data);
       });
   }
 
@@ -163,14 +133,23 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
   }
 
   onSubmit() {
-    const createPayload = this.assembleCreatePayload();
-    if (this.formGroup.valid && createPayload) {
+    if (this.formGroup.valid && this.scheduleToEdit === null) {
+      const payload = this.assemblePayload() as CreateSchedulePayload;
+
       this.service
-        .create({ resource: [createPayload] })
+        .create({ resource: [payload] })
         .pipe(takeUntil(this.destroyed$))
         .subscribe(data => {
-          // TODO: remove the line below
-          console.log('create schedule response: ', data);
+          this.router.navigate([ROUTES.SCHEDULER]);
+        });
+    } else if (this.formGroup.valid && this.scheduleToEdit) {
+      const payload = this.assemblePayload() as UpdateSchedulePayload;
+
+      this.service
+        .update(this.scheduleToEdit.id, payload)
+        .pipe(takeUntil(this.destroyed$))
+        .subscribe(data => {
+          this.router.navigate([ROUTES.SCHEDULER]);
         });
     } else {
       // TODO: add error message about invalid form
@@ -186,6 +165,22 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
 
   removePayloadField() {
     this.formGroup.removeControl('payload');
+  }
+
+  private getServiceAccessList(serviceId: number) {
+    const service = this.userServicesDropdownOptions.find(val => {
+      return val.id === serviceId;
+    });
+    this.selectedService = service;
+
+    if (service) {
+      this.accessListService
+        .getServiceAccessList(service.name)
+        .pipe(takeUntil(this.destroyed$))
+        .subscribe(data => {
+          this.componentDropdownOptions = data.resource;
+        });
+    }
   }
 
   private getVerbMask(verb: string): number {
@@ -209,13 +204,16 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
     }
   }
 
-  private assembleCreatePayload(): CreateSchedulePayload | null {
+  private assemblePayload():
+    | UpdateSchedulePayload
+    | CreateSchedulePayload
+    | null {
     if (this.selectedService) {
-      return {
+      // eslint-disable-next-line prefer-const
+      let payload = {
         component: this.formGroup.value.component,
         description: this.formGroup.value.description,
         frequency: this.formGroup.value.frequency,
-        id: null,
         isActive: this.formGroup.value.active,
         name: this.formGroup.value.name,
         payload: this.formGroup.value.payload ?? null,
@@ -232,6 +230,22 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         },
         verbMask: this.getVerbMask(this.formGroup.value.method),
       };
+
+      if (this.scheduleToEdit) {
+        // edit mode
+        return {
+          lastModifiedDate: this.scheduleToEdit?.lastModifiedDate as string,
+          lastModifiedById: this.scheduleToEdit?.lastModifiedById as number,
+          hasLog: false, // TODO: change
+          createdDate: this.scheduleToEdit?.createdDate as string,
+          createdById: this.scheduleToEdit?.createdById as number,
+          id: this.scheduleToEdit.id,
+          ...payload,
+        } as UpdateSchedulePayload;
+      }
+
+      // create mode
+      return { ...payload, id: null } as CreateSchedulePayload;
     }
 
     return null;

@@ -7,7 +7,7 @@ import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service
 import { TranslateService } from '@ngx-translate/core';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { DF_SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
-import { CreateSchedulePayload } from '../df-scheduler/df-scheduler.component';
+import { CreateSchedulePayload } from '../types/df-scheduler.types';
 
 export type SchedulerTaskData = {
   id: number;
@@ -19,7 +19,7 @@ export type SchedulerTaskData = {
   verbMask: number;
   frequency: number;
   payload: string | null;
-  createDate: string;
+  createdDate: string;
   lastModifiedDate: string;
   createdById: number;
   lastModifiedById: number | null;
@@ -82,7 +82,7 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
     },
     {
       columnDef: 'service',
-      cell: (row: SchedulerTaskData) => row.serviceId, // TODO: this needs to be changed from serviceId to serviceName
+      cell: (row: SchedulerTaskData) => row.serviceId, // TODO: this needs to be mapped from serviceId to serviceName
       header: 'Service',
     },
     {
@@ -117,7 +117,7 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
         name: val.name,
         description: val.description,
         active: val.isActive,
-        serviceId: val.serviceId,
+        serviceId: val.serviceId, // TODO: related to the above todo, aka mapping serviceId to service name
         component: val.component,
         verb: val.verb,
         frequency: val.frequency,

@@ -1,11 +1,15 @@
 import { inject } from '@angular/core';
-import { ResolveFn } from '@angular/router';
+import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { DF_SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { SchedulerTaskData } from '../df-manage-scheduler/df-manage-scheduler-table.component';
 
 export const schedulerResolver: ResolveFn<
-  GenericListResponse<Array<SchedulerTaskData>>
-> = () => {
+  GenericListResponse<Array<SchedulerTaskData>> | SchedulerTaskData
+> = (route: ActivatedRouteSnapshot) => {
+  const id = route.paramMap.get('id');
+
+  if (id) return inject(DF_SCHEDULER_SERVICE_TOKEN).get(id);
+
   return inject(DF_SCHEDULER_SERVICE_TOKEN).getAll();
 };

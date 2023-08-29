@@ -17,6 +17,14 @@ const routes: Routes = [
     component: DfSchedulerComponent,
     resolve: { data: getSystemServiceDataListResolver },
   },
+  {
+    path: `${ROUTES.EDIT}/:id`,
+    component: DfSchedulerComponent,
+    resolve: {
+      data: getSystemServiceDataListResolver,
+      schedulerObject: schedulerResolver,
+    },
+  },
 ];
 
 @NgModule({
