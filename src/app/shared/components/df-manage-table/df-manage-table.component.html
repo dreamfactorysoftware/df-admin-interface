@@ -7,7 +7,7 @@
     (click)="createRow()">
     <fa-icon [icon]="faPlus" size="xl"></fa-icon>
   </button>
-  <ng-content></ng-content>
+  <ng-content select="[topActions]"></ng-content>
   <div class="spacer"></div>
   <mat-form-field class="search-input" subscriptSizing="dynamic">
     <mat-label>{{ 'search' | translate }}</mat-label>
@@ -72,6 +72,11 @@
             [attr.aria-label]="deleteLabel(row)">
             {{ 'delete' | translate }}
           </button>
+          <ng-container
+            *ngTemplateOutlet="
+              itemActions;
+              context: { $implicit: row }
+            "></ng-container>
         </mat-menu>
       </td>
     </ng-container>

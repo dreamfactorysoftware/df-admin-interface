@@ -5,6 +5,7 @@ export interface AppRow {
   apiKey: string;
   description?: string;
   active: boolean;
+  launchUrl: string;
 }
 
 export interface RoleByRoleId {

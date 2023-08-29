@@ -1,8 +1,7 @@
-import { Component, ViewChild } from '@angular/core';
-import { faFileImport } from '@fortawesome/free-solid-svg-icons';
-import { DfManageAppsTableComponent } from './df-manage-apps-table.component';
-import { SampleApps } from '../df-apps.consts';
+import { Component } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { faUpload } from '@fortawesome/free-solid-svg-icons';
+import { ROUTES } from 'src/app/core/constants/routes';
 
 @Component({
   selector: 'df-df-manage-apps',
@@ -10,22 +9,15 @@ import { ActivatedRoute, Router } from '@angular/router';
   styleUrls: ['./df-manage-apps.component.scss'],
 })
 export class DfManageAppsComponent {
-  faFileImport = faFileImport;
-  @ViewChild(DfManageAppsTableComponent)
-  manageAppsTableComponent!: DfManageAppsTableComponent;
-
-  sampleApps = SampleApps;
-
+  faUpload = faUpload;
   constructor(
-    private router: Router,
-    private activatedRoute: ActivatedRoute
+    private activatedRoute: ActivatedRoute,
+    private router: Router
   ) {}
 
-  openSample = (url: string) => {
-    window.open(url, '_blank');
-  };
-
-  gotoImport(): void {
-    this.router.navigate(['import'], { relativeTo: this.activatedRoute });
+  import() {
+    this.router.navigate([ROUTES.IMPORT], {
+      relativeTo: this.activatedRoute,
+    });
   }
 }

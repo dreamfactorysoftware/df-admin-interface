@@ -1,12 +1,14 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { AppType, AppRow } from '../types/df-apps.types';
-import { DfAppsService } from '../services/df-apps.service';
 import { takeUntil } from 'rxjs';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { TranslateService } from '@ngx-translate/core';
+import { DF_APPS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 
 @Component({
   selector: 'df-manage-apps-table',
@@ -19,7 +21,8 @@ import { TranslateService } from '@ngx-translate/core';
 })
 export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
   constructor(
-    private appsService: DfAppsService,
+    @Inject(DF_APPS_SERVICE_TOKEN)
+    private appsService: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -80,6 +83,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
         apiKey: app.apiKey,
         description: app.description,
         active: app.isActive,
+        launchUrl: app.launchUrl,
       };
     });
   }
@@ -90,7 +94,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
 
   override deleteRow(row: AppRow): void {
     this.appsService
-      .deleteApp(row.id)
+      .delete(row.id)
       .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
         this.refreshTable();
@@ -99,7 +103,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.appsService
-      .getApps(limit, offset, filter)
+      .getAll<GenericListResponse<AppType>>({ limit, offset, filter })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);

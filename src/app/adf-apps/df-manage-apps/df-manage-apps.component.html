@@ -1,22 +1,20 @@
 <df-manage-apps-table>
-  <button
-    mat-mini-fab
-    type="button"
-    color="primary"
-    [attr.aria-label]="'apps.importApp.title' | translate"
-    (click)="gotoImport()">
-    <fa-icon [icon]="faFileImport" size="xl"></fa-icon>
-  </button>
-  <button mat-stroked-button [matMenuTriggerFor]="menu">
-    {{ 'apps.sampleApps.label' | translate }}
-  </button>
-
-  <mat-menu #menu="matMenu">
+  <ng-container topActions>
     <button
-      mat-menu-item
-      *ngFor="let sample of sampleApps"
-      (click)="openSample(sample.repoUrl)">
-      {{ sample.name }}
+      mat-mini-fab
+      color="primary"
+      [attr.aria-label]="'importList' | translate"
+      (click)="import()">
+      <fa-icon [icon]="faUpload" size="xl"></fa-icon>
     </button>
-  </mat-menu>
+  </ng-container>
+  <ng-template let-row #itemActions>
+    <a
+      *ngIf="row.launchUrl"
+      mat-menu-item
+      [href]="row.launchUrl"
+      [attr.aria-label]="'launchApp' | translate: { appName: row.name }">
+      {{ 'launch' | translate }}
+    </a>
+  </ng-template>
 </df-manage-apps-table>

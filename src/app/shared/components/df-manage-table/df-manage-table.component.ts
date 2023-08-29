@@ -3,8 +3,10 @@ import { SelectionModel } from '@angular/cdk/collections';
 import {
   AfterViewInit,
   Component,
+  ContentChild,
   OnDestroy,
   OnInit,
+  TemplateRef,
   ViewChild,
 } from '@angular/core';
 import { PageEvent } from '@angular/material/paginator';
@@ -31,6 +33,7 @@ import { IconProp } from '@fortawesome/fontawesome-svg-core';
 export abstract class DfManageTableComponent<T>
   implements OnInit, AfterViewInit, OnDestroy
 {
+  @ContentChild('itemActions') itemActions: TemplateRef<any>;
   destroyed$ = new Subject<void>();
   dataSource = new MatTableDataSource<T>();
   selection = new SelectionModel<T>(true, []);
@@ -53,7 +56,7 @@ export abstract class DfManageTableComponent<T>
   _activatedRoute = this.activatedRoute;
 
   constructor(
-    private router: Router,
+    protected router: Router,
     private activatedRoute: ActivatedRoute,
     private liveAnnouncer: LiveAnnouncer,
     private breakpointService: DfBreakpointService,

@@ -360,7 +360,8 @@
     "apps": {
       "header": "Apps",
       "create": { "header": "Create Application" },
-      "edit": { "header": "Edit Application" }
+      "edit": { "header": "Edit Application" },
+      "import": { "header": "Import Application" }
     },
     "users": {
       "nav": "Users",
@@ -478,5 +479,7 @@
     "app": "App",
     "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
     "noRoles": "No roles assigned."
-  }
+  },
+  "launch": "Launch",
+  "launchApp": "Launch {{appName}}"
 }
