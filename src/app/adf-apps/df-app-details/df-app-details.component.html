@@ -2,14 +2,9 @@
   <form [formGroup]="appForm" (ngSubmit)="onSubmit()" class="form-container">
     <div class="app-info">
       <mat-form-field>
-        <fa-icon [icon]="faCircleInfo"></fa-icon>
+        <!-- TODO add into tooltip -->
         <mat-label>
-          <button
-            mat-raised-button
-            matTooltip="Info about the action"
-            aria-label="Button that displays a tooltip when focused or hovered over">
-            {{ 'apps.createApp.applicationName.label' | translate }}
-          </button>
+          {{ 'apps.createApp.applicationName.label' | translate }}
         </mat-label>
         <input
           matInput
@@ -21,6 +16,7 @@
         </mat-error>
       </mat-form-field>
       <mat-form-field>
+        <!-- TODO add into tooltip -->
         <mat-label>{{
           'apps.createApp.description.label' | translate
         }}</mat-label>
@@ -30,6 +26,7 @@
           formControlName="description" />
       </mat-form-field>
       <mat-form-field>
+        <!-- TODO add into tooltip -->
         <mat-label>{{
           'apps.createApp.defaultRole.label' | translate
         }}</mat-label>
@@ -75,6 +72,7 @@
     </mat-card>
     <!-- app location -->
     <div class="flex-col">
+      <!-- TODO add into tooltip -->
       <p>{{ 'apps.createApp.appLocation.label' | translate }}</p>
       <mat-radio-group
         class="flex-col"
@@ -140,12 +138,14 @@
           appForm.controls['appLocation'].value === '1' ||
           appForm.controls['appLocation'].value === '3'
         ">
+        <!-- TODO add into tooltip -->
         <mat-label *ngIf="appForm.controls['appLocation'].value === '1'">
           {{
             'apps.createApp.appLocation.options.fileStorage.launchPath.label'
               | translate
           }}
         </mat-label>
+        <!-- TODO add into tooltip -->
         <mat-label *ngIf="appForm.controls['appLocation'].value === '3'">
           {{
             'apps.createApp.appLocation.options.webServer.pathToApp.label'
@@ -161,6 +161,7 @@
           formControlName="path" />
       </mat-form-field>
       <mat-form-field *ngIf="appForm.controls['appLocation'].value === '2'">
+        <!-- TODO add into tooltip -->
         <mat-label>
           {{ 'apps.createApp.appLocation.options.remoteUrl.label' | translate }}
         </mat-label>
@@ -179,6 +180,7 @@
           appForm.controls['appLocation'].value === '3'
         ">
         <mat-card-header>
+          <!-- TODO add into tooltip -->
           <mat-card-subtitle>{{
             'apps.createApp.appLocation.options.urlPath.label' | translate
           }}</mat-card-subtitle>
