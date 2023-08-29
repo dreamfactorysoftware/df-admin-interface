@@ -10,7 +10,10 @@ const routes: Routes = [
   {
     path: '',
     component: DfManageSchedulerTableComponent,
-    resolve: { data: schedulerResolver },
+    resolve: {
+      data: schedulerResolver,
+      services: getSystemServiceDataListResolver,
+    },
   },
   {
     path: ROUTES.CREATE,

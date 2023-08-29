@@ -7,25 +7,11 @@ import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service
 import { TranslateService } from '@ngx-translate/core';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { DF_SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
-import { CreateSchedulePayload } from '../types/df-scheduler.types';
-
-export type SchedulerTaskData = {
-  id: number;
-  name: string;
-  description: string;
-  isActive: boolean;
-  serviceId: number;
-  component: string;
-  verbMask: number;
-  frequency: number;
-  payload: string | null;
-  createdDate: string;
-  lastModifiedDate: string;
-  createdById: number;
-  lastModifiedById: number | null;
-  verb: string;
-  taskLogByTaskId: number | null;
-};
+import {
+  CreateSchedulePayload,
+  SchedulerTaskData,
+} from '../types/df-scheduler.types';
+import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
 
 @Component({
   selector: 'df-manage-scheduler-table',
@@ -36,6 +22,8 @@ export type SchedulerTaskData = {
   ],
 })
 export class DfManageSchedulerTableComponent extends DfManageTableComponent<SchedulerTaskData> {
+  userServices: SystemServiceData[];
+
   constructor(
     @Inject(DF_SCHEDULER_SERVICE_TOKEN)
     private service: DfBaseCrudService<
@@ -55,6 +43,12 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
       breakpointService,
       translateService
     );
+
+    this._activatedRoute.data
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        this.userServices = data['services'].resource;
+      });
   }
 
   override allowFilter = false;
@@ -82,7 +76,12 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
     },
     {
       columnDef: 'service',
-      cell: (row: SchedulerTaskData) => row.serviceId, // TODO: this needs to be mapped from serviceId to serviceName
+      cell: (row: SchedulerTaskData) => {
+        const service = this.userServices.find(val => {
+          return val.id === row.serviceId;
+        });
+        return service?.name ?? '';
+      },
       header: 'Service',
     },
     {
@@ -116,8 +115,8 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
         id: val.id,
         name: val.name,
         description: val.description,
-        active: val.isActive,
-        serviceId: val.serviceId, // TODO: related to the above todo, aka mapping serviceId to service name
+        isActive: val.isActive,
+        serviceId: val.serviceId,
         component: val.component,
         verb: val.verb,
         frequency: val.frequency,

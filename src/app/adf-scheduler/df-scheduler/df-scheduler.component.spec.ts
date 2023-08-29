@@ -8,7 +8,7 @@ describe('DfSchedulerComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfSchedulerComponent]
+      declarations: [DfSchedulerComponent],
     });
     fixture = TestBed.createComponent(DfSchedulerComponent);
     component = fixture.componentInstance;

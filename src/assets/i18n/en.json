@@ -469,7 +469,8 @@
     "taskOverviewSubtitle": "Scheduler task provide a way to schedule requests to the platform.",
     "alerts": {
       "createdSuccess": "Scheduled task created successfully",
-      "updateSuccess": "Scheduled task updated successfully"
+      "updateSuccess": "Scheduled task updated successfully",
+      "deleteSuccess": "Scheduled task deleted successfully"
     }
   },
   "cancel": "Cancel",
