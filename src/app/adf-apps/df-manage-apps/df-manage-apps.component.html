@@ -1,5 +1,16 @@
 <df-manage-apps-table>
-  <button mat-stroked-button [matMenuTriggerFor]="menu">Sample Apps</button>
+  <button
+    mat-mini-fab
+    type="button"
+    color="primary"
+    [attr.aria-label]="'apps.importApp.title' | translate"
+    (click)="gotoImport()">
+    <fa-icon [icon]="faFileImport" size="xl"></fa-icon>
+  </button>
+  <button mat-stroked-button [matMenuTriggerFor]="menu">
+    {{ 'apps.sampleApps.label' | translate }}
+  </button>
+
   <mat-menu #menu="matMenu">
     <button
       mat-menu-item
