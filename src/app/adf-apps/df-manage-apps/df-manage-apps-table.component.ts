@@ -14,6 +14,7 @@ import { TranslateService } from '@ngx-translate/core';
     '../../shared/components/df-manage-table/df-manage-table.component.html',
   styleUrls: [
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
+    './df-manage-apps-table.component.scss',
   ],
 })
 export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
