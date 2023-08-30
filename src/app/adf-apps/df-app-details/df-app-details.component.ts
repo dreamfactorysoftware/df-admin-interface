@@ -1,17 +1,24 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Inject,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { DfAppsService } from '../services/df-apps.service';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
-import { faCopy } from '@fortawesome/free-solid-svg-icons';
+import { faCircleInfo, faCopy } from '@fortawesome/free-solid-svg-icons';
 import { AppPayload, AppType } from '../types/df-apps.types';
+import { DF_APPS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 
 @Component({
-  selector: 'df-apps-form',
-  templateUrl: './df-apps-form.component.html',
-  styleUrls: ['./df-apps-form.component.scss'],
+  selector: 'df-app-details',
+  templateUrl: './df-app-details.component.html',
+  styleUrls: ['./df-app-details.component.scss'],
 })
-export class DfAppsFormComponent implements OnInit {
+export class DfAppDetailsComponent implements OnInit {
   @ViewChild('rolesInput') rolesInput: ElementRef<HTMLInputElement>;
   private destroyed$ = new Subject<void>();
   appForm: FormGroup;
@@ -20,11 +27,15 @@ export class DfAppsFormComponent implements OnInit {
   editApp: AppType;
   urlOrigin: string;
   faCopy = faCopy;
+  faCircleInfo = faCircleInfo;
+  apiKey: string;
 
   constructor(
     private fb: FormBuilder,
-    private appsService: DfAppsService,
-    private activatedRoute: ActivatedRoute
+    @Inject(DF_APPS_SERVICE_TOKEN)
+    private appsService: DfBaseCrudService,
+    private activatedRoute: ActivatedRoute,
+    private router: Router
   ) {
     this.urlOrigin = window.location.origin;
 
@@ -62,6 +73,8 @@ export class DfAppsFormComponent implements OnInit {
         path: this.editApp.path,
         url: this.editApp.url,
       });
+
+      this.apiKey = this.editApp.apiKey;
     }
 
     this.appForm.controls['storageServiceId'].updateValueAndValidity();
@@ -100,12 +113,23 @@ export class DfAppsFormComponent implements OnInit {
     ${this.appForm.value.path}`.replaceAll(/\s/g, '');
   }
 
+  copyApiKey() {
+    navigator.clipboard
+      .writeText(this.apiKey)
+      .then()
+      .catch(error => console.error('Failed to copy to clipboard:', error));
+  }
+
   copyAppUrl() {
     const url = this.getAppLocationUrl();
     navigator.clipboard
       .writeText(url)
       .then()
       .catch(error => console.error('Failed to copy to clipboard:', error));
+  }
+
+  goBack() {
+    this.router.navigate(['/apps']);
   }
 
   onSubmit() {
@@ -132,23 +156,10 @@ export class DfAppsFormComponent implements OnInit {
           : null,
     };
     if (this.editApp) {
-      this.appsService.editApp({ ...payload, id: this.editApp.id });
+      // TODO include snackbardSuccess and error
+      this.appsService.update(this.editApp.id, payload).subscribe();
     } else {
-      this.appsService.createApp(payload);
+      this.appsService.create({ resource: [payload] }).subscribe();
     }
   }
-}
-
-// role_by_role_id:
-interface RoleType {
-  id: number;
-  name: string;
-  description: string;
-  isActive: boolean;
-  createdDate: string;
-  lastModifiedDate: string;
-  createdById: number;
-  lastModifiedById: number | null;
-  roleServiceAccessByRoleId: any[];
-  lookupByRoleId: any[];
 }

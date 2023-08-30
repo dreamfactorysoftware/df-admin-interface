@@ -11,11 +11,13 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { DfLookupKeysComponent } from '../df-lookup-keys/df-lookup-keys.component';
+import { DfUserAppRolesComponent } from '../df-user-app-roles/df-user-app-roles.component';
 
 const shared = [
   DfProfileDetailsComponent,
   DfAlertComponent,
   DfLookupKeysComponent,
+  DfUserAppRolesComponent,
 ];
 
 @NgModule({

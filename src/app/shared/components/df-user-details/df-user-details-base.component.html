@@ -129,6 +129,10 @@
       </ng-container>
     </div>
   </div>
+  <df-user-app-roles
+    formArrayName="appRoles"
+    [apps]="apps"
+    [roles]="roles"></df-user-app-roles>
   <df-lookup-keys formArrayName="lookupKeys"></df-lookup-keys>
   <div class="action-bar">
     <button mat-flat-button color="primary" type="submit">

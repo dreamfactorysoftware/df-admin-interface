@@ -11,6 +11,7 @@ import { USER_COLUMNS } from 'src/app/core/constants/table-columns';
 import { userFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { DF_USER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 
 @Component({
   selector: 'df-manage-users-table',
@@ -23,7 +24,7 @@ import { DF_USER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow> {
   constructor(
     @Inject(DF_USER_SERVICE_TOKEN)
-    private userService: DfBaseCrudService<UserProfile, UserProfile>,
+    private userService: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -40,7 +41,7 @@ export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow>
   }
   override columns = USER_COLUMNS;
 
-  mapDataToTable(data: any): UserRow[] {
+  mapDataToTable(data: Array<UserProfile>): UserRow[] {
     return data.map((user: UserProfile) => {
       return {
         id: user.id,
@@ -57,17 +58,17 @@ export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow>
   filterQuery = userFilterQuery;
 
   override deleteRow(row: UserRow): void {
-    // this.userService
-    //   .deleteAdmin(row.id)
-    //   .pipe(takeUntil(this.destroyed$))
-    //   .subscribe(() => {
-    //     this.refreshTable();
-    //   });
+    this.userService
+      .delete(row.id, { snackbarSccess: 'users.alerts.deleteSuccess' })
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(() => {
+        this.refreshTable();
+      });
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.userService
-      .getAll(limit, offset, filter)
+      .getAll<GenericListResponse<UserProfile>>({ limit, offset, filter })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
@@ -76,14 +77,18 @@ export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow>
   }
 
   uploadUserList(files: FileList) {
-    // this.userService.uploadAdminList(files[0]).subscribe(() => {
-    //   this.refreshTable();
-    // });
+    this.userService
+      .uploadFile(files[0], { snackbarSccess: 'users.alerts.importSuccess' })
+      .subscribe(() => {
+        this.refreshTable();
+      });
   }
 
   downloadUserList(type: string) {
-    // this.userService.downloadAdminlist(type).subscribe(data => {
-    //   saveAsFile(data, `admin.${type}`, type);
-    // });
+    this.userService
+      .downloadFile(type, { snackbarSccess: 'users.alerts.exportSuccess' })
+      .subscribe(data => {
+        saveAsFile(data, `admin.${type}`, type);
+      });
   }
 }

@@ -14,8 +14,28 @@ export interface GenericErrorResponse {
 }
 
 export interface GenericListResponse<T> {
-  resource: T;
+  resource: Array<T>;
   meta: {
     count: number;
   };
+}
+
+export interface KeyValuePair {
+  key: string;
+  value: any;
+}
+export interface RequestOptions {
+  showSpinner: boolean;
+  filter: string;
+  sort: string;
+  fields: string;
+  related: string;
+  limit: number;
+  offset: number;
+  includeCount: boolean;
+  snackbarSccess: string;
+  snackbarError: string;
+  contentType: string;
+  additionalParams: KeyValuePair[];
+  additionalHeaders: KeyValuePair[];
 }

@@ -10,7 +10,7 @@ export class DfRoleService {
   constructor(private http: HttpClient) {}
 
   getRoles(limit = 100, offset = 0, filter = '') {
-    return this.http.get<GenericListResponse<Array<RoleType>>>(URLS.ROLES, {
+    return this.http.get<GenericListResponse<RoleType>>(URLS.ROLES, {
       headers: SHOW_LOADING_HEADER,
       params: {
         include_count: true,

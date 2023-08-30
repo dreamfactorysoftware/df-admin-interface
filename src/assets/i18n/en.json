@@ -219,6 +219,8 @@
     "deleteApp": "Delete app",
     "deleteSelectedApps": "Delete selected apps",
     "launchApp": "Launch app",
+    "createSuccess": "App created successfully",
+    "updateSuccess": "App successfully updated",
     "sampleApps": {
       "label": "Sample Apps",
       "options": {
@@ -243,7 +245,6 @@
       "active": "Active"
     },
     "createApp": {
-      "label": "Create Application",
       "applicationName": {
         "label": "Application Name",
         "tooltip": {
@@ -269,6 +270,10 @@
         }
       },
       "active": "Active",
+      "apiKey": {
+        "label": "The API key for this app is",
+        "copy": "Copy API Key"
+      },
       "appLocation": {
         "label": "App Location",
         "tooltip": {
@@ -311,7 +316,10 @@
               "tooltip": "Applications can consist of only a URL. This could be an app on some other server or a web site URL."
             }
           },
-          "urlPath": "The URL for this app is:"
+          "urlPath": {
+            "label": "The URL for this app is:",
+            "copy": "Copy URL"
+          }
         }
       }
     },
@@ -319,18 +327,6 @@
       "title": "Import Application",
       "subtitle": "Select App Package File",
       "description": "Select one of the sample apps below, enter the URL for a package file, or browse for a local package file. Click 'Import' to add the app to your DreamFactory instance.",
-      "options": {
-        "android": "Address Book for Android",
-        "iosObjectiveC": "Address Book for iOS Objective-C",
-        "iosSwift": "Address Book for iOS Swift",
-        "javascript": "Address Book for JavaScript",
-        "angularJs": "Address Book for AngularJS",
-        "angular2": "Address Book for Angular 2",
-        "ionic": "Address Book for Ionic",
-        "titanium": "Address Book for Titanium",
-        "reactJs": "Address Book for ReactJS",
-        "dotnet": "Address Book for .NET"
-      },
       "url": {
         "label": "Package URL",
         "placeholder": "Enter URL to package file"
@@ -361,7 +357,12 @@
     "logout": { "header": "Logout" },
     "roles": { "header": "Roles" },
     "services": { "header": "Services" },
-    "apps": { "header": "Apps" },
+    "apps": {
+      "header": "Apps",
+      "create": { "header": "Create Application" },
+      "edit": { "header": "Edit Application" },
+      "import": { "header": "Import Application" }
+    },
     "users": {
       "nav": "Users",
       "header": "Manage Users",
@@ -406,8 +407,7 @@
       "updateSuccess": "Admin updated successfully",
       "deleteSuccess": "Admin deleted successfully",
       "importSuccess": "Admin imported successfully",
-      "exportSuccess": "Admin exported successfully",
-      "inviteSent": "An email invite has been sent."
+      "exportSuccess": "Admin exported successfully"
     }
   },
   "users": {
@@ -417,8 +417,7 @@
       "updateSuccess": "User updated successfully",
       "deleteSuccess": "User deleted successfully",
       "importSuccess": "User imported successfully",
-      "exportSuccess": "User exported successfully",
-      "inviteSent": "An email invite has been sent."
+      "exportSuccess": "User exported successfully"
     }
   },
   "alerts": {
@@ -479,15 +478,27 @@
       "createdSuccess": "Scheduled task created successfully",
       "updateSuccess": "Scheduled task updated successfully",
       "deleteSuccess": "Scheduled task deleted successfully"
-    }
-  },
-  "cancel": "Cancel",
-  "basic": "Basic",
-  "selectAnOption": "Select an option",
-  "label": "Lookup Keys",
-  "name": "Name",
-  "value": "Value",
-  "private": "Private",
-  "desc": "Lookup keys for service configuration and credentials must be made private.",
-  "noKeys": "No lookup keys."
+    },
+    "lookupKeys": {
+      "label": "Lookup Keys",
+      "desc": "Lookup keys for service configuration and credentials must be made private.",
+      "noKeys": "No lookup keys."
+    },
+    "cancel": "Cancel",
+    "basic": "Basic",
+    "selectAnOption": "Select an option",
+    "name": "Name",
+    "value": "Value",
+    "private": "Private",
+    "inviteSent": "An email invite has been sent.",
+    "roles": {
+      "label": "Roles",
+      "role": "Role",
+      "app": "App",
+      "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
+      "noRoles": "No roles assigned."
+    },
+    "launch": "Launch",
+    "launchApp": "Launch {{appName}}"
+  }
 }

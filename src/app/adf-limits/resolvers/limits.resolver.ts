@@ -5,7 +5,7 @@ import { inject } from '@angular/core';
 import { LimitType } from 'src/app/shared/types/limit';
 
 export const limitsResolver: ResolveFn<
-  GenericListResponse<Array<LimitType>> | LimitType
+  GenericListResponse<LimitType> | LimitType
 > = (route: ActivatedRouteSnapshot) => {
   const limitsService = inject(DfLimitsService);
   const id = route.paramMap.get('id');

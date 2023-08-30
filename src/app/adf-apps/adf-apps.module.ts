@@ -4,10 +4,9 @@ import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 
 import { AdfAppsRoutingModule } from './adf-apps-routing.module';
 import { DfManageAppsComponent } from './df-manage-apps/df-manage-apps.component';
-import { DfAppsFormComponent } from './df-apps-form/df-apps-form.component';
+import { DfAppDetailsComponent } from './df-app-details/df-app-details.component';
 import { DfImportAppComponent } from './df-import-app/df-import-app.component';
 import { DfManageAppsTableComponent } from './df-manage-apps/df-manage-apps-table.component';
-import { DfAppsService } from './services/df-apps.service';
 
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { TranslateModule } from '@ngx-translate/core';
@@ -21,12 +20,23 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import {
+  APPS_URL_TOKEN,
+  DF_APPS_SERVICE_TOKEN,
+  DF_ROLE_SERVICE_TOKEN,
+  ROLE_URL_TOKEN,
+} from '../core/constants/tokens';
+import { DfBaseCrudServiceFactory } from '../core/services/df-base-crud.service';
+import { HttpClient } from '@angular/common/http';
+import { URLS } from '../core/constants/urls';
 
 @NgModule({
   declarations: [
     DfManageAppsComponent,
     DfManageAppsTableComponent,
-    DfAppsFormComponent,
+    DfAppDetailsComponent,
     DfImportAppComponent,
   ],
   imports: [
@@ -46,7 +56,28 @@ import { MatMenuModule } from '@angular/material/menu';
     MatCardModule,
     MatAutocompleteModule,
     MatMenuModule,
+    MatSlideToggleModule,
+    MatTooltipModule,
   ],
-  providers: [DfAppsService],
+  providers: [
+    {
+      provide: APPS_URL_TOKEN,
+      useValue: URLS.APP,
+    },
+    {
+      provide: DF_APPS_SERVICE_TOKEN,
+      useFactory: DfBaseCrudServiceFactory,
+      deps: [APPS_URL_TOKEN, HttpClient],
+    },
+    {
+      provide: ROLE_URL_TOKEN,
+      useValue: URLS.ROLES,
+    },
+    {
+      provide: DF_ROLE_SERVICE_TOKEN,
+      useFactory: DfBaseCrudServiceFactory,
+      deps: [ROLE_URL_TOKEN, HttpClient],
+    },
+  ],
 })
 export class AdfAppsModule {}

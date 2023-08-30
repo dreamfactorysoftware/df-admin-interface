@@ -7,11 +7,6 @@ export const USER_COLUMNS = [
     header: 'active',
   },
   {
-    columnDef: 'id',
-    cell: (row: UserRow) => row.id,
-    header: 'id',
-  },
-  {
     columnDef: 'email',
     cell: (row: UserRow) => row.email,
     header: 'email',

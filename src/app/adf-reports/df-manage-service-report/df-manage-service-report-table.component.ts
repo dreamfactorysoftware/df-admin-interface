@@ -8,6 +8,7 @@ import { takeUntil } from 'rxjs';
 import { DF_REPORT_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { ServiceReportData } from 'src/app/core/constants/reports';
+import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 
 @Component({
   selector: 'df-manage-service-report-table',
@@ -21,7 +22,7 @@ export class DfManageServiceReportTableComponent extends DfManageTableComponent<
   override allowCreate = false;
   constructor(
     @Inject(DF_REPORT_SERVICE_TOKEN)
-    private service: DfBaseCrudService<ServiceReportData, any>,
+    private service: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -37,7 +38,7 @@ export class DfManageServiceReportTableComponent extends DfManageTableComponent<
     );
   }
 
-  override columns = [
+  columns = [
     {
       columnDef: 'id',
       cell: (row: ServiceReportData) => row.id,
@@ -75,17 +76,13 @@ export class DfManageServiceReportTableComponent extends DfManageTableComponent<
     },
   ];
 
-  override mapDataToTable(data: ServiceReportData[]): ServiceReportData[] {
+  mapDataToTable(data: ServiceReportData[]): ServiceReportData[] {
     return data;
   }
 
-  override refreshTable(
-    limit?: number,
-    offset?: number,
-    filter?: string
-  ): void {
+  refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.service
-      .getAll(limit, offset, filter)
+      .getAll<GenericListResponse<ServiceReportData>>({ limit, offset, filter })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);

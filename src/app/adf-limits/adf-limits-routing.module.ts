@@ -8,8 +8,8 @@ import {
   roleResolver,
   getRolesResolver,
 } from '../adf-roles/resolvers/role.resolver';
-import { getUsersResolver } from '../adf-users/resolvers/users.resolver';
 import { getSystemServiceDataListResolver } from '../adf-services/resolvers/service-data-service.resolver';
+import { usersResolver } from '../adf-users/resolvers/users.resolver';
 
 const routes: Routes = [
   {
@@ -22,7 +22,7 @@ const routes: Routes = [
     component: DfLimitComponent,
     resolve: {
       data: limitsResolver,
-      users: getUsersResolver,
+      users: usersResolver,
       roles: roleResolver,
       services: getSystemServiceDataListResolver,
     },
@@ -32,7 +32,7 @@ const routes: Routes = [
     component: DfLimitComponent,
     resolve: {
       data: limitsResolver,
-      users: getUsersResolver,
+      users: usersResolver,
       roles: getRolesResolver,
       services: getSystemServiceDataListResolver,
     },

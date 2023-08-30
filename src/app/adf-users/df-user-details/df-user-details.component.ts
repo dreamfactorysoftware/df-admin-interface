@@ -30,24 +30,74 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
     breakpointService: DfBreakpointService,
     private translateService: TranslateService,
     @Inject(DF_USER_SERVICE_TOKEN)
-    private userService: DfBaseCrudService<UserProfile, UserProfile>,
+    private userService: DfBaseCrudService,
     private router: Router
   ) {
     super(fb, activatedRoute, systemConfigDataService, breakpointService);
   }
 
   sendInvite() {
-    this.userService.sendInvite(this.currentProfile.id).subscribe();
+    this.userService
+      .patch(this.currentProfile.id, {
+        snackbarSccess: 'inviteSent',
+      })
+      .subscribe();
+  }
+
+  get userAppRoles() {
+    const userAppRoles = this.userForm.value.appRoles.map((item: any) => {
+      const appRole = {
+        userId: this.currentProfile.id,
+        appId: this.apps.find(app => app.name === item.app)?.id,
+        roleId: this.roles.find(role => role.name === item.role)?.id,
+      };
+      if (this.type === 'create') {
+        return appRole;
+      }
+      const modified = this.currentProfile.userToAppToRoleByUserId.find(
+        userApp =>
+          userApp.appId === appRole.appId && userApp.roleId === appRole.roleId
+      );
+      if (modified) {
+        return {
+          ...appRole,
+          id: modified.id,
+        };
+      }
+      return appRole;
+    });
+
+    if (this.type === 'create') {
+      return userAppRoles;
+    }
+
+    this.currentProfile.userToAppToRoleByUserId
+      .filter(
+        userApp =>
+          !userAppRoles.find(
+            (appRole: any) =>
+              appRole.appId === userApp.appId &&
+              appRole.roleId === userApp.roleId
+          )
+      )
+      .forEach(userApp => {
+        userAppRoles.push({
+          ...userApp,
+          userId: null,
+        });
+      });
+    return userAppRoles;
   }
 
   save() {
-    if (this.userForm.invalid || this.userForm.pristine) {
+    if (this.userForm.invalid) {
       return;
     }
     const data: UserProfile = {
       ...this.userForm.value.profileDetailsGroup,
       isActive: this.userForm.value.isActive,
       lookupByUserId: this.userForm.value.lookupKeys,
+      userToAppToRoleByUserId: this.userAppRoles,
     };
     if (this.type === 'create') {
       const sendInvite = this.userForm.value['pass-invite'] === 'invite';
@@ -55,7 +105,13 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
         data.password = this.userForm.value.password;
       }
       this.userService
-        .create({ resource: [data] }, { send_invite: sendInvite })
+        .create(
+          { resource: [data] },
+          {
+            snackbarSccess: 'admins.alerts.createdSuccess',
+            additionalParams: [{ key: 'send_invite', value: sendInvite }],
+          }
+        )
         .pipe(
           takeUntil(this.destroyed$),
           catchError(err => {
@@ -76,7 +132,9 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
         data.password = this.userForm.value.password;
       }
       this.userService
-        .update(this.currentProfile.id, data)
+        .update(this.currentProfile.id, data, {
+          snackbarSccess: 'admins.alerts.updateSuccess',
+        })
         .pipe(
           takeUntil(this.destroyed$),
           catchError(err => {

@@ -11,8 +11,6 @@ import { URLS } from '../core/constants/urls';
 import { HttpClient } from '@angular/common/http';
 import { DfManageAdminsTableComponent } from './df-manage-admins/df-manage-admins-table.component';
 import {
-  ADMIN_MESSAGE_PREFIX_TOKEN,
-  ADMIN_RELATED_TOKEN,
   ADMIN_URL_TOKEN,
   DF_ADMIN_SERVICE_TOKEN,
 } from '../core/constants/tokens';
@@ -34,19 +32,9 @@ import { DfRoleService } from '../adf-roles/services/df-role.service';
   providers: [
     { provide: ADMIN_URL_TOKEN, useValue: URLS.SYSTEM_ADMIN },
     {
-      provide: ADMIN_RELATED_TOKEN,
-      useValue: 'user_to_app_to_role_by_user_id,lookup_by_user_id',
-    },
-    { provide: ADMIN_MESSAGE_PREFIX_TOKEN, useValue: 'admins' },
-    {
       provide: DF_ADMIN_SERVICE_TOKEN,
       useFactory: DfBaseCrudServiceFactory,
-      deps: [
-        ADMIN_URL_TOKEN,
-        ADMIN_RELATED_TOKEN,
-        ADMIN_MESSAGE_PREFIX_TOKEN,
-        HttpClient,
-      ],
+      deps: [ADMIN_URL_TOKEN, HttpClient],
     },
     DfRoleService,
   ],

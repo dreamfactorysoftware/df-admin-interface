@@ -1,8 +1,7 @@
-import { Component, ViewChild } from '@angular/core';
-import { faDownload, faUpload } from '@fortawesome/free-solid-svg-icons';
-import { DfManageAppsTableComponent } from './df-manage-apps-table.component';
-import { EXPORT_TYPES } from 'src/app/core/constants/supported-extensions';
-import { SampleApps } from '../df-apps.consts';
+import { Component } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { faUpload } from '@fortawesome/free-solid-svg-icons';
+import { ROUTES } from 'src/app/core/constants/routes';
 
 @Component({
   selector: 'df-df-manage-apps',
@@ -11,14 +10,14 @@ import { SampleApps } from '../df-apps.consts';
 })
 export class DfManageAppsComponent {
   faUpload = faUpload;
-  faDownload = faDownload;
-  exportTypes = EXPORT_TYPES;
-  @ViewChild(DfManageAppsTableComponent)
-  manageAppsTableComponent!: DfManageAppsTableComponent;
+  constructor(
+    private activatedRoute: ActivatedRoute,
+    private router: Router
+  ) {}
 
-  sampleApps = SampleApps;
-
-  openSample = (url: string) => {
-    window.open(url, '_blank');
-  };
+  import() {
+    this.router.navigate([ROUTES.IMPORT], {
+      relativeTo: this.activatedRoute,
+    });
+  }
 }

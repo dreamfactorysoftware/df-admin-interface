@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import {
   FormArray,
   FormControl,
@@ -9,42 +9,44 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { Subject, takeUntil } from 'rxjs';
 import { MatInputModule } from '@angular/material/input';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { TranslateModule } from '@ngx-translate/core';
 import { MatExpansionModule } from '@angular/material/expansion';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { AppType } from 'src/app/adf-apps/types/df-apps.types';
+import { RoleType } from '../../types/role';
 
 @Component({
-  selector: 'df-lookup-keys',
-  templateUrl: './df-lookup-keys.component.html',
-  styleUrls: ['./df-lookup-keys.component.scss'],
+  selector: 'df-user-app-roles',
+  templateUrl: './df-user-app-roles.component.html',
+  styleUrls: ['./df-user-app-roles.component.scss'],
   standalone: true,
   imports: [
     FormsModule,
     ReactiveFormsModule,
     CommonModule,
-    MatFormFieldModule,
+    MatAutocompleteModule,
     MatButtonModule,
     MatTableModule,
     MatInputModule,
-    MatSlideToggleModule,
     FontAwesomeModule,
     TranslateModule,
     MatExpansionModule,
   ],
 })
-export class DfLookupKeysComponent implements OnInit, OnDestroy {
+export class DfUserAppRolesComponent implements OnInit, OnDestroy {
+  @Input() apps: Array<AppType> = [];
+  @Input() roles: Array<RoleType> = [];
   destroyed$ = new Subject<void>();
   rootForm: FormGroup;
-  lookupKeys: FormArray;
+  appRoles: FormArray;
   dataSource: MatTableDataSource<any>;
-  displayedColumns = ['name', 'value', 'private', 'actions'];
+  displayedColumns = ['app', 'role', 'actions'];
   faTrashCan = faTrashCan;
   faPlus = faPlus;
 
@@ -55,29 +57,43 @@ export class DfLookupKeysComponent implements OnInit, OnDestroy {
     this.rootFormGroup.ngSubmit
       .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
-        this.lookupKeys.markAllAsTouched();
+        this.rootForm.markAllAsTouched();
       });
-    this.lookupKeys = this.rootForm.get('lookupKeys') as FormArray;
+    this.appRoles = this.rootForm.get('appRoles') as FormArray;
     this.updateDataSource();
   }
 
   updateDataSource() {
-    this.dataSource = new MatTableDataSource(this.lookupKeys.controls);
+    this.dataSource = new MatTableDataSource(this.appRoles.controls);
+  }
+
+  get availableApps() {
+    return this.apps.filter(
+      app =>
+        !this.appRoles.value.find((appRole: any) => appRole.app === app.name)
+    );
+  }
+
+  get showAddButton() {
+    return this.appRoles.length < this.apps.length;
+  }
+
+  get assignedApps() {
+    return this.apps.length - this.appRoles.length;
   }
 
   add() {
-    this.lookupKeys.push(
+    this.appRoles.push(
       new FormGroup({
-        name: new FormControl('', Validators.required),
-        value: new FormControl(''),
-        private: new FormControl(false),
+        app: new FormControl('', Validators.required),
+        role: new FormControl('', Validators.required),
       })
     );
     this.updateDataSource();
   }
 
   remove(index: number) {
-    this.lookupKeys.removeAt(index);
+    this.appRoles.removeAt(index);
     this.updateDataSource();
   }
 

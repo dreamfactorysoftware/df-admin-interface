@@ -45,7 +45,7 @@ export interface UserRow {
   displayName: string;
   firstName: string;
   lastName: string;
-  registration: string;
+  registration: boolean;
 }
 export interface CreateAdmin extends UserProfile {
   isRestrictedAdmin?: boolean;

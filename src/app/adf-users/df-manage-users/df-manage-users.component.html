@@ -1,31 +1,33 @@
 <df-manage-users-table>
-  <input
-    type="file"
-    accept=".csv, application/json, .xml"
-    #fileInput
-    (change)="uploadUserList($event)"
-    style="display: none" />
-  <button
-    mat-mini-fab
-    color="primary"
-    [attr.aria-label]="'importList' | translate"
-    (click)="fileInput.click()">
-    <fa-icon [icon]="faUpload" size="xl"></fa-icon>
-  </button>
-  <button
-    mat-mini-fab
-    color="primary"
-    [attr.aria-label]="'exportList' | translate"
-    [matMenuTriggerFor]="exportMenu">
-    <fa-icon [icon]="faDownload" size="xl"></fa-icon>
-  </button>
-
-  <mat-menu #exportMenu="matMenu">
+  <ng-container topActions>
+    <input
+      type="file"
+      accept=".csv, application/json, .xml"
+      #fileInput
+      (change)="uploadUserList($event)"
+      style="display: none" />
     <button
-      *ngFor="let exportType of exportTypes"
-      mat-menu-item
-      (click)="downLoadUserList(exportType)">
-      {{ exportType | uppercase }}
+      mat-mini-fab
+      color="primary"
+      [attr.aria-label]="'importList' | translate"
+      (click)="fileInput.click()">
+      <fa-icon [icon]="faUpload" size="xl"></fa-icon>
     </button>
-  </mat-menu>
+    <button
+      mat-mini-fab
+      color="primary"
+      [attr.aria-label]="'exportList' | translate"
+      [matMenuTriggerFor]="exportMenu">
+      <fa-icon [icon]="faDownload" size="xl"></fa-icon>
+    </button>
+
+    <mat-menu #exportMenu="matMenu">
+      <button
+        *ngFor="let exportType of exportTypes"
+        mat-menu-item
+        (click)="downLoadUserList(exportType)">
+        {{ exportType | uppercase }}
+      </button>
+    </mat-menu>
+  </ng-container>
 </df-manage-users-table>

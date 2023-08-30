@@ -15,7 +15,7 @@ export class CaseInterceptor implements HttpInterceptor {
     req: HttpRequest<any>,
     next: HttpHandler
   ): Observable<HttpEvent<any>> {
-    if (req.url.startsWith('/api')) {
+    if (req.url.startsWith('/api') && !(req.body instanceof FormData)) {
       const transformedRequest = req.clone({
         body: this.mapCamelToSnake(req.body),
       });

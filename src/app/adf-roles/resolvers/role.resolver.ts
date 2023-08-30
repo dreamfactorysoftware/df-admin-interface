@@ -5,7 +5,7 @@ import { DfRoleService } from '../services/df-role.service';
 import { RoleType } from 'src/app/shared/types/role';
 
 export const roleResolver: ResolveFn<
-  GenericListResponse<Array<RoleType>> | RoleType
+  GenericListResponse<RoleType> | RoleType
 > = (route: ActivatedRouteSnapshot) => {
   const roleService = inject(DfRoleService);
   const id = route.paramMap.get('id');
@@ -16,7 +16,7 @@ export const roleResolver: ResolveFn<
 };
 
 export const getRolesResolver: ResolveFn<
-  GenericListResponse<Array<RoleType>>
+  GenericListResponse<RoleType>
 > = () => {
   const roleService = inject(DfRoleService);
   return roleService.getRoles();
