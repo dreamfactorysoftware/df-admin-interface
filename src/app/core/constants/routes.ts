@@ -42,4 +42,5 @@ export enum ROUTES {
   LAUNCHPAD = 'launchpad',
   DATA = 'data',
   PACKAGES = 'package-manager',
+  SYSTEM_INFO = 'system-info',
 }

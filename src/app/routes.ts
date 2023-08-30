@@ -29,6 +29,7 @@ import { DfPasswordService } from './adf-user-management/services/df-password.se
 import { profileResolver } from './adf-profile/resolvers/profile.resolver';
 import { DfServiceDataService } from './adf-services/services/service-data.service';
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
+import { systemInfoResolver } from './adf-system-info/resolvers/df-system-info.resolver';
 
 export const routes: Routes = [
   {
@@ -297,7 +298,18 @@ export const routes: Routes = [
       { path: '', redirectTo: ROUTES.CONFIG, pathMatch: 'full' },
       {
         path: ROUTES.CONFIG,
-        component: DfPlaceHolderComponent,
+        children: [
+          {
+            path: ROUTES.SYSTEM_INFO,
+            loadComponent: () =>
+              import(
+                './adf-system-info/df-system-info/df-system-info.component'
+              ).then(m => m.DfSystemInfoComponent),
+            resolve: {
+              data: systemInfoResolver,
+            },
+          },
+        ],
       },
       {
         path: ROUTES.SCHEDULER,

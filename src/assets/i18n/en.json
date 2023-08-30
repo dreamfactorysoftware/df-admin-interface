@@ -60,6 +60,7 @@
   "data": "Data",
   "packages": "Packages",
   "launchpad": "LaunchPad",
+  "version": "Version",
   "home": {
     "resourceLinks": {
       "gettingStartedGuide": "Getting Started Guide",
@@ -466,7 +467,11 @@
       "nav": "System Settings",
       "config": {
         "nav": "Config",
-        "header": "{{nav.system-settings.config.nav}}"
+        "header": "{{nav.system-settings.config.nav}}",
+        "system-info": {
+          "nav": "System Info",
+          "header": "{{nav.system-settings.config.system-info.nav}}"
+        }
       },
       "scheduler": {
         "nav": "Scheduler",
@@ -570,5 +575,38 @@
     "app": "App",
     "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
     "noRoles": "No roles assigned."
+  },
+  "system-info": {
+    "subheading": "Displays current system information.",
+    "instance": {
+      "instance": "Instance",
+      "licenseLevel": "License Level",
+      "licenseKey": "License Key",
+      "subscriptionStatus": "Subscription Status",
+      "subscriptionExpirationDate": "Subscription Expiration Date",
+      "systemDatabase": "System Database",
+      "installPath": "Install Path",
+      "logPath": "Log Path",
+      "logMode": "Log Mode",
+      "logLevel": "Log Level",
+      "cacheDriver": "Cache Driver",
+      "demo": "Demo",
+      "instanceId": "Instance ID"
+    },
+    "packages": "Installed Packages",
+    "server": {
+      "heading": "Server",
+      "os": "Operating System",
+      "release": "Release",
+      "host": "Host",
+      "machine": "Machine",
+      "serverApi": "Server API"
+    },
+    "client": {
+      "heading": "Client",
+      "userAgent": "User Agent",
+      "ipAddress": "IP Address",
+      "Locale": "Locale"
+    }
   }
 }
