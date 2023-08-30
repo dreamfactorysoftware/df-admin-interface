@@ -89,6 +89,8 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         .subscribe((data: any) => {
           this.scheduleToEdit = data.schedulerObject;
 
+          this.getServiceAccessList(this.scheduleToEdit?.serviceId as number);
+
           this.formGroup.setValue({
             name: this.scheduleToEdit?.name,
             description: this.scheduleToEdit?.description,
@@ -98,8 +100,6 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
             method: this.scheduleToEdit?.verb,
             frequency: this.scheduleToEdit?.frequency,
           });
-
-          this.getServiceAccessList(this.scheduleToEdit?.serviceId as number);
 
           if (this.scheduleToEdit?.verb !== 'GET') {
             this.addPayloadField(this.scheduleToEdit?.payload as string);
@@ -157,7 +157,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
   addPayloadField(payloadInput?: string) {
     this.formGroup.addControl(
       'payload',
-      this.formBuilder.control(payloadInput ?? '', [JsonValidator]) // TODO: fix json validator function, it is not working at all
+      this.formBuilder.control(payloadInput ?? '', [JsonValidator])
     );
   }
 

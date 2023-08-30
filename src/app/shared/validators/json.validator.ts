@@ -1,19 +1,13 @@
-import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
+import { AbstractControl, ValidationErrors } from '@angular/forms';
 
-export function JsonValidator(): ValidatorFn {
-  return (control: AbstractControl): ValidationErrors | null => {
-    const error: ValidationErrors = { jsonInvalid: true };
+export function JsonValidator(
+  control: AbstractControl
+): ValidationErrors | null {
+  try {
+    JSON.parse(control.value);
+  } catch (e) {
+    return { jsonInvalid: true };
+  }
 
-    const value = control.value;
-
-    try {
-      JSON.parse(value);
-    } catch (e) {
-      control.setErrors(error);
-      return error;
-    }
-
-    control.setErrors(null);
-    return null;
-  };
+  return null;
 }

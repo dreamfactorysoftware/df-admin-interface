@@ -384,7 +384,15 @@
         "header": "Edit Limit"
       }
     },
-    "scheduler": { "header": "Scheduler" },
+    "scheduler": {
+      "header": "Scheduler",
+      "create": {
+        "header": "Create a new Scheduled Task"
+      },
+      "edit": {
+        "header": "Manage Scheduled Task"
+      }
+    },
     "reports": { "header": "Reports" }
   },
   "admins": {
