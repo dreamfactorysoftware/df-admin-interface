@@ -5,13 +5,22 @@ import { DfManageTableComponent } from 'src/app/shared/components/df-manage-tabl
 import { UserProfile, UserRow } from 'src/app/shared/types/user';
 import { takeUntil } from 'rxjs';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { TranslateService } from '@ngx-translate/core';
+
 import { saveAsFile } from 'src/app/shared/utilities/file';
 import { USER_COLUMNS } from 'src/app/core/constants/table-columns';
 import { userFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { DF_USER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { USER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatTableModule } from '@angular/material/table';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { MatButtonModule } from '@angular/material/button';
+import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-manage-users-table',
@@ -20,16 +29,31 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
   styleUrls: [
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
+  standalone: true,
+  imports: [
+    NgIf,
+    MatButtonModule,
+    FontAwesomeModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatTableModule,
+    NgFor,
+    MatMenuModule,
+    NgTemplateOutlet,
+    MatPaginatorModule,
+    TranslocoPipe,
+    AsyncPipe,
+  ],
 })
 export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow> {
   constructor(
-    @Inject(DF_USER_SERVICE_TOKEN)
+    @Inject(USER_SERVICE_TOKEN)
     private userService: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslateService
+    translateService: TranslocoService
   ) {
     super(
       router,

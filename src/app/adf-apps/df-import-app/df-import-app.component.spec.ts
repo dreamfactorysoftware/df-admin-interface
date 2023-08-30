@@ -8,7 +8,7 @@ describe('DfImportAppComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfImportAppComponent],
+      imports: [DfImportAppComponent],
     });
     fixture = TestBed.createComponent(DfImportAppComponent);
     component = fixture.componentInstance;

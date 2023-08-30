@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
@@ -8,13 +7,15 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { Router, RouterModule } from '@angular/router';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faAngleDown, faBars } from '@fortawesome/free-solid-svg-icons';
-import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { DfAuthService } from 'src/app/adf-user-management/services/df-auth.service';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { DfUserDataService } from 'src/app/core/services/df-user-data.service';
+import { faAngleDown, faBars } from '@fortawesome/free-solid-svg-icons';
+import { routes } from 'src/app/routes';
+import { transformRoutes } from '../../utilities/route';
 import { Nav } from '../../types/nav';
-import { NAV } from 'src/app/core/constants/routes';
+import { TranslocoPipe } from '@ngneat/transloco';
+import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 
 @Component({
   selector: 'df-side-nav',
@@ -28,10 +29,13 @@ import { NAV } from 'src/app/core/constants/routes';
     MatToolbarModule,
     MatButtonModule,
     MatExpansionModule,
-    CommonModule,
     RouterModule,
-    TranslateModule,
     MatMenuModule,
+    TranslocoPipe,
+    AsyncPipe,
+    NgIf,
+    NgFor,
+    NgTemplateOutlet,
   ],
 })
 export class DfSideNavComponent {
@@ -41,14 +45,13 @@ export class DfSideNavComponent {
   faAngleDown = faAngleDown;
   faBars = faBars;
 
-  nav = NAV;
+  nav = transformRoutes(routes);
 
   constructor(
     private breakpointService: DfBreakpointService,
     private userDataService: DfUserDataService,
     private authService: DfAuthService,
-    private router: Router,
-    private translateService: TranslateService
+    private router: Router
   ) {}
 
   logout() {
@@ -56,24 +59,19 @@ export class DfSideNavComponent {
   }
 
   isActive(nav: Nav) {
-    return this.router.url.startsWith('/' + nav.route);
+    return this.router.url.startsWith(nav.route);
   }
 
-  navLabel(route: string): string {
-    const segments = route.split('/').join('.');
-    let label = this.translateService.instant(`nav.${segments}.nav`);
-    if (typeof label !== 'string' || label === `nav.${segments}.nav`) {
-      label = this.translateService.instant(`nav.${segments}.header`);
-    }
-    return label;
+  navLabel(route: string) {
+    const segments = route.replace('/', '').split('/').join('.');
+    return `nav.${segments}.nav`;
   }
 
-  pageHeader(): string {
+  pageHeader() {
     const segments = this.router.url.replace('/', '').split('/');
-    // Remove the last segment if it is a number  (e.g. /admins/edit/1)
     if (/^[+-]?\d+$/.test(segments[segments.length - 1])) {
       segments.pop();
     }
-    return this.translateService.instant(`nav.${segments.join('.')}.header`);
+    return `nav.${segments.join('.')}.header`;
   }
 }

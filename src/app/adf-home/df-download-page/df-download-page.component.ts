@@ -1,10 +1,16 @@
 import { Component } from '@angular/core';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 
+import { DfIconCardLinkComponent } from '../df-icon-card-link/df-icon-card-link.component';
+import { NgFor, AsyncPipe } from '@angular/common';
+import { TranslocoPipe } from '@ngneat/transloco';
+
 @Component({
   selector: 'df-download-page',
   templateUrl: './df-download-page.component.html',
   styleUrls: ['./df-download-page.component.scss'],
+  standalone: true,
+  imports: [NgFor, DfIconCardLinkComponent, AsyncPipe, TranslocoPipe],
 })
 export class DfDownloadPageComponent {
   constructor(public breakpointService: DfBreakpointService) {}

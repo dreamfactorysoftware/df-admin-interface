@@ -5,20 +5,44 @@ import {
   FormControl,
   FormGroup,
   Validators,
+  ReactiveFormsModule,
 } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
 import { matchValidator } from '../../shared/validators/match.validator';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
-import { AlertType } from '../../shared/components/df-alert/df-alert.component';
-import { TranslateService } from '@ngx-translate/core';
+import {
+  AlertType,
+  DfAlertComponent,
+} from '../../shared/components/df-alert/df-alert.component';
+
 import { DfPasswordService } from '../../adf-user-management/services/df-password.service';
 import { UserProfile } from '../../shared/types/user';
+import { MatButtonModule } from '@angular/material/button';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { NgIf, AsyncPipe } from '@angular/common';
+import { DfProfileDetailsComponent } from '../../shared/components/df-profile-details/df-profile-details.component';
+import { MatTabsModule } from '@angular/material/tabs';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-profile',
   templateUrl: './df-profile.component.html',
+  standalone: true,
+  imports: [
+    MatTabsModule,
+    DfAlertComponent,
+    ReactiveFormsModule,
+    DfProfileDetailsComponent,
+    NgIf,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    AsyncPipe,
+    TranslocoPipe,
+  ],
 })
 export class DfProfileComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();
@@ -39,7 +63,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
     private activatedRoute: ActivatedRoute,
     private systemConfigDataService: DfSystemConfigDataService,
     private breakPointService: DfBreakpointService,
-    private translateService: TranslateService,
+    private translateService: TranslocoService,
     private passwordService: DfPasswordService
   ) {
     this.profileForm = this.fb.group({
@@ -139,7 +163,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
       .subscribe(() => {
         this.triggerAlert(
           'success',
-          this.translateService.instant(
+          this.translateService.translate(
             'userManagement.profile.alerts.detailsUpdated'
           )
         );
@@ -172,7 +196,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
       .subscribe(() => {
         this.triggerAlert(
           'success',
-          this.translateService.instant(
+          this.translateService.translate(
             'userManagement.profile.alerts.securtyQuestionUpdated'
           )
         );
@@ -196,7 +220,7 @@ export class DfProfileComponent implements OnInit, OnDestroy {
       .subscribe(() => {
         this.triggerAlert(
           'success',
-          this.translateService.instant(
+          this.translateService.translate(
             'userManagement.profile.alerts.passwordUpdated'
           )
         );

@@ -1,15 +1,65 @@
 {
-  "common": {
-    "save": "Save",
-    "cancel": "Cancel",
-    "close": "Close",
-    "create": "Create",
-    "delete": "Delete",
-    "edit": "Edit",
-    "select": "Select",
-    "submit": "Submit",
-    "browse": "Browse"
-  },
+  "save": "Save",
+  "close": "Close",
+  "create": "Create",
+  "delete": "Delete",
+  "edit": "Edit",
+  "select": "Select",
+  "submit": "Submit",
+  "browse": "Browse",
+  "launch": "Launch",
+  "launchApp": "Launch {{appName}}",
+  "cancel": "Cancel",
+  "basic": "Basic",
+  "selectAnOption": "Select an option",
+  "name": "Name",
+  "value": "Value",
+  "private": "Private",
+  "inviteSent": "An email invite has been sent.",
+  "update": "Update",
+  "confirmed": "Confirmed",
+  "pending": "Pending",
+  "id": "ID",
+  "email": "Email",
+  "displayName": "Display Name",
+  "firstName": "First Name",
+  "lastName": "Last Name",
+  "active": "Active",
+  "registration": "Registration",
+  "filter": "Filter",
+  "editRow": "Edit row {{id}}",
+  "deleteRow": "Delete row {{id}}",
+  "selectRow": "Select row {{id}}",
+  "selectAll": "Select All",
+  "deselectRow": "Deselect row {{id}}",
+  "deselectAll": "Deselect all",
+  "sortCleared": "Sorting cleared",
+  "sortedAsc": "Sorted ascending",
+  "sortedDesc": "Sorted descending",
+  "search": "Search",
+  "newEntry": "Create a new entry",
+  "exportList": "Export list",
+  "importList": "Import list",
+  "description": "Description",
+  "sortDescription": "Sort by {{header}}",
+  "selectPage": "Select Page",
+  "role": "Role",
+  "apiKey": "API Key",
+  "type": "Type",
+  "rate": "Rate",
+  "counter": "Counter",
+  "user": "User",
+  "service": "Service",
+  "time": "Time",
+  "serviceId": "Service ID",
+  "serviceName": "Service Name",
+  "userEmail": "User Email",
+  "action": "Action",
+  "request": "Request",
+  "files": "Files",
+  "data": "Data",
+  "packages": "Packages",
+  "launchpad": "LaunchPad",
   "home": {
     "resourceLinks": {
       "gettingStartedGuide": "Getting Started Guide",
@@ -236,14 +286,6 @@
         "dotnet": ".NET"
       }
     },
-    "tableHeadings": {
-      "id": "ID",
-      "name": "Name",
-      "role": "Role",
-      "apiKey": "API Key",
-      "description": "Description",
-      "active": "Active"
-    },
     "createApp": {
       "applicationName": {
         "label": "Application Name",
@@ -341,52 +383,136 @@
   },
   "nav": {
     "home": {
-      "header": "Home",
-      "welcome": { "header": "Welcome" },
-      "resources": { "header": "Resources" },
-      "quickstart": { "header": "Quickstart" },
-      "download": { "header": "Download" }
+      "nav": "Home",
+      "welcome": { "nav": "Welcome", "header": "{{nav.home.welcome.nav}}" },
+      "resources": {
+        "nav": "Resources",
+        "header": "{{nav.home.resources.nav}}"
+      },
+      "quickstart": {
+        "nav": "Quickstart",
+        "header": "{{nav.home.quickstart.nav}}"
+      },
+      "download": { "nav": "Download", "header": "{{nav.home.download.nav}}" }
     },
-    "admins": {
-      "nav": "Admins",
-      "header": "Manage Admins",
-      "create": { "header": "Create a new admin" },
-      "edit": { "header": "Edit" }
+    "api-connections": {
+      "nav": "API Connections",
+      "api-types": {
+        "nav": "API Types",
+        "database": {
+          "nav": "Database",
+          "header": "{{nav.api-connections.api-types.database.nav}}"
+        },
+        "custom": {
+          "nav": "Custom",
+          "header": "{{nav.api-connections.api-types.custom.nav}}"
+        },
+        "file": {
+          "nav": "File",
+          "header": "{{nav.api-connections.api-types.file.nav}}"
+        },
+        "utility": {
+          "nav": "Utility",
+          "header": "{{nav.api-connections.api-types.utility.nav}}"
+        }
+      },
+      "role-based-access": {
+        "nav": "Role Based Access",
+        "header": "nav.api-connections.role-based-access"
+      },
+      "api-keys": {
+        "nav": "API Keys",
+        "header": "{{nav.api-connections.api-keys.nav}}",
+        "create": {
+          "nav": "Create Application",
+          "header": "{{nav.api-connections.api-keys.create.nav}}"
+        },
+        "edit": {
+          "header": "Edit Application"
+        },
+        "import": {
+          "nav": "Import Application",
+          "header": "{{nav.api-connections.api-keys.import.nav}}"
+        }
+      },
+      "scripts": {
+        "nav": "Scripts",
+        "header": "{{nav.api-connections.scripts.nav}}"
+      },
+      "api-docs": {
+        "nav": "API Docs",
+        "header": "{{nav.api-connections.api-docs.nav}}"
+      }
+    },
+    "api-security": {
+      "nav": "Security",
+      "rate-limiting": {
+        "nav": "Rate Limiting",
+        "header": "{{nav.api-security.rate-limiting.nav}}",
+        "create": {
+          "nav": "Create Limit",
+          "header": "{{nav.api-security.rate-limiting.create.nav}}"
+        },
+        "edit": {
+          "header": "Edit Limit"
+        }
+      },
+      "authentication": {
+        "nav": "Authentication",
+        "header": "{{nav.api-security.authentication.nav}}"
+      }
+    },
+    "system-settings": {
+      "nav": "System Settings",
+      "config": {
+        "nav": "Config",
+        "header": "{{nav.system-settings.config.nav}}"
+      },
+      "scheduler": {
+        "nav": "Scheduler",
+        "header": "{{nav.system-settings.scheduler.nav}}"
+      },
+      "logs": { "nav": "Logs", "header": "{{nav.system-settings.logs.nav}}" },
+      "reporting": {
+        "nav": "Reporting",
+        "header": "{{nav.system-settings.reporting.nav}}"
+      },
+      "df-platform-apis": {
+        "nav": "DreamFactory Platform APIs",
+        "header": "{{nav.system-settings.df-platform-apis.nav}}"
+      }
+    },
+    "admin-settings": {
+      "nav": "Admin Settings",
+      "admins": {
+        "nav": "Admins",
+        "header": "Manage Admins",
+        "create": {
+          "nav": "Create a new admin",
+          "header": "{{nav.admin-settings.admins.create.nav}}"
+        },
+        "edit": { "header": "{{edit}}" }
+      },
+      "schema": {
+        "nav": "Schema",
+        "header": "{{nav.admin-settings.schema.nav}}"
+      },
+      "users": {
+        "nav": "Users",
+        "header": "Manage Users",
+        "create": {
+          "nav": "Create a new user",
+          "header": "{{nav.admin-settings.users.create.nav}}"
+        },
+        "edit": { "header": "{{edit}}" }
+      },
+      "files": { "nav": "{{files}}", "header": "{{files}}" }
     },
     "profile": { "header": "Profile" },
     "logout": { "header": "Logout" },
-    "roles": { "header": "Roles" },
-    "services": { "header": "Services" },
-    "apps": {
-      "header": "Apps",
-      "create": { "header": "Create Application" },
-      "edit": { "header": "Edit Application" },
-      "import": { "header": "Import Application" }
-    },
-    "users": {
-      "nav": "Users",
-      "header": "Manage Users",
-      "create": { "header": "Create a new user" },
-      "edit": { "header": "Edit" }
-    },
-    "api-docs": { "header": "API Docs" },
-    "schema": { "header": "Schema" },
-    "data": { "header": "Data" },
-    "files": { "header": "Files" },
-    "scripts": { "header": "Scripts" },
-    "config": { "header": "Config" },
-    "package-manager": { "header": "Packages" },
-    "limits": {
-      "header": "Limits",
-      "create": {
-        "header": "Create Limit"
-      },
-      "edit": {
-        "header": "Edit Limit"
-      }
-    },
-    "scheduler": { "header": "Scheduler" },
-    "reports": { "header": "Reports" }
+    "data": { "nav": "{{data}}", "header": "{{data}}" },
+    "package-manager": { "nav": "{{packages}}", "header": "{{packages}}" },
+    "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" }
   },
   "admins": {
     "accessByTabs": "Access by Tabs",
@@ -416,34 +542,6 @@
     "duplicateEmail": "Email address already exists",
     "close": "Close alert"
   },
-  "save": "Save",
-  "update": "Update",
-  "confirmed": "Confirmed",
-  "pending": "Pending",
-  "id": "ID",
-  "email": "Email",
-  "displayName": "Display Name",
-  "firstName": "First Name",
-  "lastName": "Last Name",
-  "active": "Active",
-  "registration": "Registration",
-  "filter": "Filter",
-  "edit": "Edit",
-  "delete": "Delete",
-  "editRow": "Edit row {{id}}",
-  "deleteRow": "Delete row {{id}}",
-  "selectRow": "Select row {{id}}",
-  "selectAll": "Select All",
-  "deselectRow": "Deselect row {{id}}",
-  "deselectAll": "Deselect all",
-  "sortCleared": "Sorting cleared",
-  "sortedAsc": "Sorted ascending",
-  "sortedDesc": "Sorted descending",
-  "search": "Search",
-  "newEntry": "Create a new entry",
-  "exportList": "Export list",
-  "importList": "Import list",
-  "description": "Description",
   "limits": {
     "name": "Limit Name",
     "description": "Description",
@@ -466,20 +564,11 @@
     "desc": "Lookup keys for service configuration and credentials must be made private.",
     "noKeys": "No lookup keys."
   },
-  "cancel": "Cancel",
-  "basic": "Basic",
-  "selectAnOption": "Select an option",
-  "name": "Name",
-  "value": "Value",
-  "private": "Private",
-  "inviteSent": "An email invite has been sent.",
   "roles": {
     "label": "Roles",
     "role": "Role",
     "app": "App",
     "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
     "noRoles": "No roles assigned."
-  },
-  "launch": "Launch",
-  "launchApp": "Launch {{appName}}"
+  }
 }

@@ -4,7 +4,7 @@
   mat-stretch-tabs="false"
   mat-align-tabs="start"
   (selectedTabChange)="showAlert = false">
-  <mat-tab [label]="'userManagement.profile.tabs.details' | translate">
+  <mat-tab [label]="'userManagement.profile.tabs.details' | transloco">
     <div class="tab-container">
       <df-alert
         [showAlert]="showAlert"
@@ -19,24 +19,24 @@
         <df-profile-details formGroupName="profileDetailsGroup" />
         <mat-form-field appearance="fill" *ngIf="needPassword">
           <mat-label>{{
-            'userManagement.controls.currentPassword.label' | translate
+            'userManagement.controls.currentPassword.label' | transloco
           }}</mat-label>
           <input matInput type="password" formControlName="currentPassword" />
           <mat-error
             *ngIf="profileForm.get('currentPassword')?.errors?.['required']">
             {{
               'userManagement.controls.currentPassword.errors.required'
-                | translate
+                | transloco
             }}
           </mat-error>
         </mat-form-field>
         <button mat-flat-button color="primary" type="submit">
-          {{ 'save' | translate }}
+          {{ 'save' | transloco }}
         </button>
       </form>
     </div>
   </mat-tab>
-  <mat-tab [label]="'userManagement.profile.tabs.securityQuestion' | translate">
+  <mat-tab [label]="'userManagement.profile.tabs.securityQuestion' | transloco">
     <div class="tab-container">
       <df-alert
         [showAlert]="showAlert"
@@ -50,23 +50,23 @@
         (ngSubmit)="updateSecurityQuestion()">
         <mat-form-field appearance="fill">
           <mat-label>{{
-            'userManagement.controls.securityQuestion.label' | translate
+            'userManagement.controls.securityQuestion.label' | transloco
           }}</mat-label>
           <input matInput formControlName="securityQuestion" />
         </mat-form-field>
         <mat-form-field appearance="fill">
           <mat-label>{{
-            'userManagement.controls.securityAnswer.label' | translate
+            'userManagement.controls.securityAnswer.label' | transloco
           }}</mat-label>
           <input matInput formControlName="securityAnswer" />
         </mat-form-field>
         <button mat-flat-button color="primary" type="submit">
-          {{ 'save' | translate }}
+          {{ 'save' | transloco }}
         </button>
       </form>
     </div>
   </mat-tab>
-  <mat-tab [label]="'userManagement.profile.tabs.password' | translate">
+  <mat-tab [label]="'userManagement.profile.tabs.password' | transloco">
     <div class="tab-container">
       <df-alert
         [showAlert]="showAlert"
@@ -86,35 +86,35 @@
         >
         <mat-form-field appearance="fill">
           <mat-label>{{
-            'userManagement.controls.oldPassword.label' | translate
+            'userManagement.controls.oldPassword.label' | transloco
           }}</mat-label>
           <input matInput type="password" formControlName="oldPassword" />
           <mat-error
             *ngIf="updatePasswordForm.get('oldPassword')?.errors?.['required']">
             {{
-              'userManagement.controls.oldPassword.errors.required' | translate
+              'userManagement.controls.oldPassword.errors.required' | transloco
             }}
           </mat-error>
         </mat-form-field>
         <mat-form-field appearance="fill">
           <mat-label>{{
-            'userManagement.controls.password.label' | translate
+            'userManagement.controls.password.label' | transloco
           }}</mat-label>
           <input matInput type="password" formControlName="newPassword" />
           <mat-error
             *ngIf="updatePasswordForm.get('newPassword')?.errors?.['required']">
-            {{ 'userManagement.controls.password.errors.required' | translate }}
+            {{ 'userManagement.controls.password.errors.required' | transloco }}
           </mat-error>
           <mat-error
             *ngIf="
               updatePasswordForm.get('newPassword')?.errors?.['minlength']
             ">
-            {{ 'userManagement.controls.password.errors.length' | translate }}
+            {{ 'userManagement.controls.password.errors.length' | transloco }}
           </mat-error>
         </mat-form-field>
         <mat-form-field appearance="fill">
           <mat-label>{{
-            'userManagement.controls.confirmPassword.label' | translate
+            'userManagement.controls.confirmPassword.label' | transloco
           }}</mat-label>
 
           <input matInput type="password" formControlName="confirmPassword" />
@@ -125,12 +125,12 @@
                 ?.hasError('doesNotMatch')
             ">
             {{
-              'userManagement.controls.confirmPassword.errors.match' | translate
+              'userManagement.controls.confirmPassword.errors.match' | transloco
             }}
           </mat-error>
         </mat-form-field>
         <button mat-flat-button color="primary" type="submit">
-          {{ 'save' | translate }}
+          {{ 'save' | transloco }}
         </button>
       </form>
     </div>

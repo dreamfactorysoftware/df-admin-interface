@@ -8,7 +8,7 @@ describe('DfManageLimitsComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfManageLimitsComponent],
+      imports: [DfManageLimitsComponent],
     });
     fixture = TestBed.createComponent(DfManageLimitsComponent);
     component = fixture.componentInstance;

@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { NgIf } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import {
   FormArray,
@@ -16,9 +16,10 @@ import { Subject, takeUntil } from 'rxjs';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
-import { TranslateModule } from '@ngx-translate/core';
+
 import { MatExpansionModule } from '@angular/material/expansion';
+import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
+import { TranslocoPipe } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-lookup-keys',
@@ -28,15 +29,15 @@ import { MatExpansionModule } from '@angular/material/expansion';
   imports: [
     FormsModule,
     ReactiveFormsModule,
-    CommonModule,
+    NgIf,
     MatFormFieldModule,
     MatButtonModule,
     MatTableModule,
     MatInputModule,
     MatSlideToggleModule,
     FontAwesomeModule,
-    TranslateModule,
     MatExpansionModule,
+    TranslocoPipe,
   ],
 })
 export class DfLookupKeysComponent implements OnInit, OnDestroy {

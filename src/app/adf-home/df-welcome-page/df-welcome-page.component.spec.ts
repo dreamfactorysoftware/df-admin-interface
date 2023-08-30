@@ -8,7 +8,7 @@ describe('WelcomePageComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfWelcomePageComponent],
+      imports: [DfWelcomePageComponent],
     });
     fixture = TestBed.createComponent(DfWelcomePageComponent);
     component = fixture.componentInstance;

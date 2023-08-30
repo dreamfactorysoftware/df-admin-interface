@@ -1,32 +1,26 @@
-import { Injectable } from '@angular/core';
 import {
-  HttpEvent,
-  HttpHandler,
-  HttpInterceptor,
+  HttpHandlerFn,
+  HttpInterceptorFn,
   HttpRequest,
 } from '@angular/common/http';
-import { Observable } from 'rxjs';
 import { DfUserDataService } from '../services/df-user-data.service';
+import { inject } from '@angular/core';
 
-@Injectable()
-export class SessionTokenInterceptor implements HttpInterceptor {
-  constructor(private userDataService: DfUserDataService) {}
-
-  intercept(
-    req: HttpRequest<any>,
-    next: HttpHandler
-  ): Observable<HttpEvent<any>> {
-    if (req.url.startsWith('/api')) {
-      const token = this.userDataService.token;
-      if (token) {
-        req = req.clone({
-          setHeaders: {
-            'X-Dreamfactory-Session-Token': token,
-          },
-        });
-      }
-      return next.handle(req);
+export const sessionTokenInterceptor: HttpInterceptorFn = (
+  req: HttpRequest<unknown>,
+  next: HttpHandlerFn
+) => {
+  if (req.url.startsWith('/api')) {
+    const userDataService = inject(DfUserDataService);
+    const token = userDataService.token;
+    if (token) {
+      req = req.clone({
+        setHeaders: {
+          'X-Dreamfactory-Session-Token': token,
+        },
+      });
     }
-    return next.handle(req);
+    return next(req);
   }
-}
+  return next(req);
+};

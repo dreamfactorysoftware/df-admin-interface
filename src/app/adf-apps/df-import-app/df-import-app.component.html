@@ -1,19 +1,19 @@
 <div class="container">
-  <h1>{{ 'apps.importApp.title' | translate }}</h1>
+  <h1>{{ 'apps.importApp.title' | transloco }}</h1>
   <p>
-    <strong>{{ 'apps.importApp.subtitle' | translate }}</strong>
+    <strong>{{ 'apps.importApp.subtitle' | transloco }}</strong>
   </p>
-  <p>{{ 'apps.importApp.description' | translate }}</p>
+  <p>{{ 'apps.importApp.description' | transloco }}</p>
   <div class="sample-apps-container">
     <div *ngFor="let sample of sampleApps">
       <button
         mat-stroked-button
         type="button"
         (click)="selectApp(sample.packageUrl)">
-        {{ 'common.select' | translate }}
+        {{ 'select' | transloco }}
       </button>
       <a [href]="sample.repoUrl" target="_blank">
-        {{ 'apps.importApp.optionsPrefix' | translate }}
+        {{ 'apps.importApp.optionsPrefix' | transloco }}
         {{ sample.name }}
       </a>
     </div>
@@ -30,9 +30,9 @@
         mat-flat-button
         color="primary"
         type="button"
-        [attr.aria-label]="'common.browse' | translate"
+        [attr.aria-label]="'browse' | transloco"
         (click)="fileInput.click()">
-        {{ 'common.browse' | translate }}
+        {{ 'browse' | transloco }}
       </button>
 
       <mat-form-field>
@@ -40,36 +40,36 @@
           matInput
           formControlName="filePath"
           required
-          placeholder="{{ 'apps.importApp.url.placeholder' | translate }}" />
+          placeholder="{{ 'apps.importApp.url.placeholder' | transloco }}" />
         <mat-error *ngIf="importForm.controls['filePath'].hasError('required')">
-          {{ 'apps.importApp.error' | translate }}
+          {{ 'apps.importApp.error' | transloco }}
         </mat-error>
       </mat-form-field>
     </div>
     <mat-form-field>
-      <mat-label>{{ 'apps.importApp.storageService' | translate }}</mat-label>
+      <mat-label>{{ 'apps.importApp.storageService' | transloco }}</mat-label>
       <mat-select formControlName="storageService">
         <mat-option value="0">-</mat-option>
         <mat-option value="3">{{
-          'apps.importApp.files' | translate
+          'apps.importApp.files' | transloco
         }}</mat-option>
         <mat-option value="4">{{
-          'apps.importApp.logs' | translate
+          'apps.importApp.logs' | transloco
         }}</mat-option>
       </mat-select>
     </mat-form-field>
     <mat-form-field>
       <input
         matInput
-        placeholder="{{ 'apps.importApp.storageFolder' | translate }}"
+        placeholder="{{ 'apps.importApp.storageFolder' | transloco }}"
         formControlName="storageFolder" />
     </mat-form-field>
     <div>
       <button mat-flat-button type="button" (click)="goBack()">
-        {{ 'cancel' | translate }}
+        {{ 'cancel' | transloco }}
       </button>
       <button mat-flat-button color="primary" type="submit">
-        {{ 'common.submit' | translate }}
+        {{ 'submit' | transloco }}
       </button>
     </div>
   </form>

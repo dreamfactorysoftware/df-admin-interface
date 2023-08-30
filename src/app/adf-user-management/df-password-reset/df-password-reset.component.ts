@@ -1,19 +1,46 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { Location } from '@angular/common';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  ReactiveFormsModule,
+} from '@angular/forms';
+import { Location, NgIf } from '@angular/common';
 import { UserParams, LoginCredentials } from '../types';
 import { DfPasswordService } from '../services/df-password.service';
 import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
 import { matchValidator } from '../../shared/validators/match.validator';
 import { Subject, catchError, switchMap, takeUntil, throwError } from 'rxjs';
-import { AlertType } from '../../shared/components/df-alert/df-alert.component';
+import {
+  AlertType,
+  DfAlertComponent,
+} from '../../shared/components/df-alert/df-alert.component';
 import { DfAuthService } from '../services/df-auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
+
+import { MatButtonModule } from '@angular/material/button';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatCardModule } from '@angular/material/card';
+import { TranslocoPipe } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-password-reset',
   templateUrl: './df-password-reset.component.html',
   styleUrls: ['../adf-user-management.scss'],
+  standalone: true,
+  imports: [
+    MatCardModule,
+    DfAlertComponent,
+    MatDividerModule,
+    ReactiveFormsModule,
+    NgIf,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    TranslocoPipe,
+  ],
 })
 export class DfPasswordResetComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();

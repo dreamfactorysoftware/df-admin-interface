@@ -2,11 +2,11 @@ import { faTwitter } from '@fortawesome/free-brands-svg-icons';
 import {
   faBook,
   faBug,
-  faComments,
   faFileLines,
+  faVideo,
+  faComments,
   faLifeRing,
   faPenToSquare,
-  faVideo,
 } from '@fortawesome/free-solid-svg-icons';
 
 const gettingStartedGuide = {

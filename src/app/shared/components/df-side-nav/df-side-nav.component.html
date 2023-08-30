@@ -10,35 +10,11 @@
       [mode]="(isSmallScreen | async) ? 'over' : 'side'">
       <mat-nav-list *ngIf="isLoggedIn$ | async">
         <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
-        <ng-container *ngFor="let item of nav">
-          <a
-            *ngIf="!item.subRoutes; else subRoutes"
-            mat-list-item
-            [routerLink]="item.route"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: true }">
-            <span>{{ navLabel(item.route) }}</span>
-          </a>
-          <ng-template #subRoutes>
-            <mat-expansion-panel
-              [class.mat-elevation-z0]="true"
-              [expanded]="isActive(item)">
-              <mat-expansion-panel-header class="parent-route">
-                {{ navLabel(item.route) }}
-              </mat-expansion-panel-header>
-              <mat-nav-list>
-                <a
-                  *ngFor="let subRoute of item.subRoutes"
-                  mat-list-item
-                  [routerLink]="item.route + '/' + subRoute.route"
-                  routerLinkActive="active"
-                  [routerLinkActiveOptions]="{ exact: true }">
-                  <span>{{ navLabel(item.route + '/' + subRoute.route) }}</span>
-                </a>
-              </mat-nav-list>
-            </mat-expansion-panel>
-          </ng-template>
-        </ng-container>
+        <ng-container
+          *ngTemplateOutlet="
+            navList;
+            context: { $implicit: nav }
+          "></ng-container>
       </mat-nav-list>
     </mat-sidenav>
     <mat-sidenav-content class="sidenav-content">
@@ -56,15 +32,15 @@
           </button>
           <mat-menu #profileMenu="matMenu">
             <button mat-menu-item [routerLink]="['/profile']">
-              {{ 'nav.profile.header' | translate }}
+              {{ 'nav.profile.header' | transloco }}
             </button>
             <button mat-menu-item (click)="logout()">
-              {{ 'nav.logout.header' | translate }}
+              {{ 'nav.logout.header' | transloco }}
             </button>
           </mat-menu>
         </mat-toolbar>
         <div class="banner">
-          <h1 class="page-header">{{ pageHeader() }}</h1>
+          <h1 class="page-header">{{ pageHeader() | transloco }}</h1>
         </div>
       </ng-container>
       <div class="main">
@@ -73,3 +49,32 @@
     </mat-sidenav-content>
   </mat-sidenav-container>
 </div>
+
+<ng-template #navList let-nav>
+  <ng-container *ngFor="let item of nav">
+    <a
+      *ngIf="!item.subRoutes; else subRoutes"
+      mat-list-item
+      [routerLink]="item.route"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }">
+      <span>{{ navLabel(item.route) | transloco }}</span>
+    </a>
+    <ng-template #subRoutes>
+      <mat-expansion-panel
+        [class.mat-elevation-z0]="true"
+        [expanded]="isActive(item)">
+        <mat-expansion-panel-header class="parent-route">
+          {{ navLabel(item.route) | transloco }}
+        </mat-expansion-panel-header>
+        <mat-nav-list>
+          <ng-container
+            *ngTemplateOutlet="
+              navList;
+              context: { $implicit: item.subRoutes }
+            "></ng-container>
+        </mat-nav-list>
+      </mat-expansion-panel>
+    </ng-template>
+  </ng-container>
+</ng-template>
