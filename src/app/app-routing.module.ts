@@ -4,6 +4,8 @@ import { ROUTES } from './core/constants/routes';
 import { loggedInGuard } from './core/guards/logged-in.guard';
 import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
 import { HashLocationStrategy, LocationStrategy } from '@angular/common';
+import { DfSystemInfoComponent } from './afd-system-info/df-system-info.component';
+import { systemInfoResolver } from './afd-system-info/df-system-info.resolver';
 const routes: Routes = [
   {
     path: '',
@@ -64,6 +66,14 @@ const routes: Routes = [
     loadChildren: () =>
       import('./adf-reports/adf-reports.module').then(m => m.AdfReportsModule),
     canActivate: [loggedInGuard],
+  },
+  {
+    path: ROUTES.SYSTEM_INFO,
+    component: DfSystemInfoComponent,
+    canActivate: [loggedInGuard],
+    resolve: {
+      data: systemInfoResolver,
+    },
   },
 ];
 

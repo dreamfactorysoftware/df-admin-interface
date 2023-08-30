@@ -1,0 +1,117 @@
+<div class="system-info-container">
+  <p>
+    {{ 'system-info.subheading' | translate }}
+  </p>
+  <h2>DreamFactory {{ 'system-info.instance.instance' | translate }}</h2>
+  <div
+    class="system-info-instance"
+    [class.x-small]="breakpointService.isXSmallScreen | async">
+    <div class="system-info-platform">
+      <ul>
+        <li>
+          {{ 'system-info.instance.licenseLevel' | translate }}:
+          {{ platform.license }}
+        </li>
+        <li>
+          {{ 'system-info.instance.licenseKey' | translate }}:
+          {{ platform.licenseKey }}
+        </li>
+        <li>
+          {{ 'system-info.instance.subscriptionStatus' | translate }}:
+          <!-- TODO missing data {{subscriptionData.msg}} -->
+        </li>
+
+        <li>
+          {{ 'system-info.instance.subscriptionExpirationDate' | translate }}:
+          <!-- TODO missing data {{subscriptionData.renewal_date}} -->
+        </li>
+        <li>
+          DreamFactory
+          {{ 'common.version' | translate }}:
+          {{ platform.version }}
+        </li>
+        <li>
+          {{ 'system-info.instance.systemDatabase' | translate }}:
+          {{ platform.dbDriver }}
+        </li>
+        <li>
+          {{ 'system-info.instance.installPath' | translate }}:
+          {{ platform.installPath }}
+        </li>
+        <li>
+          {{ 'system-info.instance.logPath' | translate }}:
+          {{ platform.logPath }}
+        </li>
+        <li>
+          {{ 'system-info.instance.logMode' | translate }}:
+          {{ platform.logMode }}
+        </li>
+        <li>
+          {{ 'system-info.instance.logLevel' | translate }}:
+          {{ platform.logLevel }}
+        </li>
+        <li>
+          {{ 'system-info.instance.cacheDriver' | translate }}:
+          {{ platform.cacheDriver }}
+        </li>
+        <li>
+          {{ 'system-info.instance.demo' | translate }}:
+          {{ platform.isTrial }}
+        </li>
+        <li>
+          DreamFactory
+          {{ 'system-info.instance.instanceId' | translate }}:
+          <!-- TODO - missing key {{ platform.df_instance_id }} -->
+        </li>
+      </ul>
+    </div>
+    <div class="system-info-packages">
+      <h3>{{ 'system-info.packages.heading' | translate }}</h3>
+      <div class="package-header">
+        <span>{{ 'common.name' | translate }}</span
+        ><span>{{ 'common.version' | translate }}</span>
+      </div>
+      <div class="overflow-scroll">
+        <ul>
+          <li *ngFor="let package of platform.packages">
+            <span>{{ package.name }}</span>
+            <span>{{ package.version }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <h2>{{ 'system-info.server.heading' | translate }}</h2>
+  <div class="system-info-server">
+    <ul>
+      <li>{{ 'system-info.server.os' | translate }}: {{ server.serverOs }}</li>
+      <li>
+        {{ 'system-info.server.release' | translate }}: {{ server.release }}
+      </li>
+      <li>{{ 'common.version' | translate }}: {{ server.version }}</li>
+      <li>{{ 'system-info.server.host' | translate }}: {{ server.host }}</li>
+      <li>
+        {{ 'system-info.server.machine' | translate }}: {{ server.machine }}
+      </li>
+      <li>PHP {{ 'common.version' | translate }}: {{ php.phpVersion }}</li>
+      <li>
+        PHP {{ 'system-info.server.serverApi' | translate }}:
+        {{ php.serverApi }}
+      </li>
+    </ul>
+  </div>
+  <h2>{{ 'system-info.client.heading' | translate }}</h2>
+  <div class="system-info-client">
+    <ul>
+      <li>
+        {{ 'system-info.client.userAgent' | translate }}: {{ client.userAgent }}
+      </li>
+      <li>
+        {{ 'system-info.client.ipAddress' | translate }}: {{ client.ipAddress }}
+      </li>
+      <li>
+        {{ 'system-info.client.Locale' | translate }}: {{ client.locale }}
+      </li>
+    </ul>
+  </div>
+</div>

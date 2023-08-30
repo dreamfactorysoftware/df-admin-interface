@@ -8,7 +8,9 @@
     "edit": "Edit",
     "select": "Select",
     "submit": "Submit",
-    "browse": "Browse"
+    "browse": "Browse",
+    "version": "Version",
+    "name": "Name"
   },
   "home": {
     "resourceLinks": {
@@ -386,7 +388,8 @@
       }
     },
     "scheduler": { "header": "Scheduler" },
-    "reports": { "header": "Reports" }
+    "reports": { "header": "Reports" },
+    "system-info": { "header": "System Info" }
   },
   "admins": {
     "accessByTabs": "Access by Tabs",
@@ -481,5 +484,38 @@
     "noRoles": "No roles assigned."
   },
   "launch": "Launch",
-  "launchApp": "Launch {{appName}}"
+  "launchApp": "Launch {{appName}}",
+  "system-info": {
+    "subheading": "Displays current system information.",
+    "instance": {
+      "instance": "Instance",
+      "licenseLevel": "License Level",
+      "licenseKey": "License Key",
+      "subscriptionStatus": "Subscription Status",
+      "subscriptionExpirationDate": "Subscription Expiration Date",
+      "systemDatabase": "System Database",
+      "installPath": "Install Path",
+      "logPath": "Log Path",
+      "logMode": "Log Mode",
+      "logLevel": "Log Level",
+      "cacheDriver": "Cache Driver",
+      "demo": "Demo",
+      "instanceId": "Instance ID"
+    },
+    "packages": "Installed Packages",
+    "server": {
+      "heading": "Server",
+      "os": "Operating System",
+      "release": "Release",
+      "host": "Host",
+      "machine": "Machine",
+      "serverApi": "Server API"
+    },
+    "client": {
+      "heading": "Client",
+      "userAgent": "User Agent",
+      "ipAddress": "IP Address",
+      "Locale": "Locale"
+    }
+  }
 }

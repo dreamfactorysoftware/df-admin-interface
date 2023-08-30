@@ -34,6 +34,7 @@ export enum ROUTES {
   PROFILE = 'profile',
   EDIT = 'edit',
   CREATE = 'create',
+  SYSTEM_INFO = 'system-info',
 }
 
 export const NAV: Array<Nav> = [
