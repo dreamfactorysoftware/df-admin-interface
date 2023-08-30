@@ -467,7 +467,11 @@
       "nav": "System Settings",
       "config": {
         "nav": "Config",
-        "header": "{{nav.system-settings.config.nav}}"
+        "header": "{{nav.system-settings.config.nav}}",
+        "system-info": {
+          "nav": "System Info",
+          "header": "{{nav.system-settings.config.system-info.nav}}"
+        }
       },
       "scheduler": {
         "nav": "Scheduler",
@@ -513,8 +517,7 @@
     "logout": { "header": "Logout" },
     "data": { "nav": "{{data}}", "header": "{{data}}" },
     "package-manager": { "nav": "{{packages}}", "header": "{{packages}}" },
-    "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" },
-    "system-info": { "header": "System Info" }
+    "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" }
   },
   "admins": {
     "accessByTabs": "Access by Tabs",

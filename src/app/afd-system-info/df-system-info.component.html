@@ -27,7 +27,7 @@
         </li>
         <li>
           DreamFactory
-          {{ 'common.version' | transloco }}:
+          {{ 'version' | transloco }}:
           {{ platform.version }}
         </li>
         <li>
@@ -66,10 +66,10 @@
       </ul>
     </div>
     <div class="system-info-packages">
-      <h3>{{ 'system-info.packages.heading' | transloco }}</h3>
+      <h3>{{ 'system-info.packages' | transloco }}</h3>
       <div class="package-header">
-        <span>{{ 'common.name' | transloco }}</span
-        ><span>{{ 'common.version' | transloco }}</span>
+        <span>{{ 'name' | transloco }}</span
+        ><span>{{ 'version' | transloco }}</span>
       </div>
       <div class="overflow-scroll">
         <ul>
@@ -88,12 +88,12 @@
       <li>
         {{ 'system-info.server.release' | transloco }}: {{ server.release }}
       </li>
-      <li>{{ 'common.version' | transloco }}: {{ server.version }}</li>
+      <li>{{ 'version' | transloco }}: {{ server.version }}</li>
       <li>{{ 'system-info.server.host' | transloco }}: {{ server.host }}</li>
       <li>
         {{ 'system-info.server.machine' | transloco }}: {{ server.machine }}
       </li>
-      <li>PHP {{ 'common.version' | transloco }}: {{ php.phpVersion }}</li>
+      <li>PHP {{ 'version' | transloco }}: {{ php.phpVersion }}</li>
       <li>
         PHP {{ 'system-info.server.serverApi' | transloco }}:
         {{ php.serverApi }}

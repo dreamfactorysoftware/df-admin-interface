@@ -299,7 +299,18 @@ export const routes: Routes = [
       { path: '', redirectTo: ROUTES.CONFIG, pathMatch: 'full' },
       {
         path: ROUTES.CONFIG,
-        component: DfPlaceHolderComponent,
+        children: [
+          {
+            path: ROUTES.SYSTEM_INFO,
+            loadComponent: () =>
+              import('./afd-system-info/df-system-info.component').then(
+                m => m.DfSystemInfoComponent
+              ),
+            resolve: {
+              data: systemInfoResolver,
+            },
+          },
+        ],
       },
       {
         path: ROUTES.SCHEDULER,
@@ -438,13 +449,5 @@ export const routes: Routes = [
     path: ROUTES.LAUNCHPAD,
     component: DfPlaceHolderComponent,
     canActivate: [loggedInGuard],
-  },
-  {
-    path: ROUTES.SYSTEM_INFO,
-    component: DfSystemInfoComponent,
-    canActivate: [loggedInGuard],
-    resolve: {
-      data: systemInfoResolver,
-    },
   },
 ];
