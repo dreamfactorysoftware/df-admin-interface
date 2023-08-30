@@ -8,7 +8,7 @@ describe('DfSystemInfoComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfSystemInfoComponent]
+      declarations: [DfSystemInfoComponent],
     });
     fixture = TestBed.createComponent(DfSystemInfoComponent);
     component = fixture.componentInstance;
