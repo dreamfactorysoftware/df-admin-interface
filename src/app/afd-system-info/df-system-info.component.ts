@@ -3,7 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { DfBreakpointService } from '../core/services/df-breakpoint.service';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslocoPipe } from '@ngneat/transloco';
 import { Client, Php, Platform, Server } from './df-system-info.typs';
 
 @Component({
@@ -11,7 +11,7 @@ import { Client, Php, Platform, Server } from './df-system-info.typs';
   templateUrl: './df-system-info.component.html',
   styleUrls: ['./df-system-info.component.scss'],
   standalone: true,
-  imports: [CommonModule, TranslateModule],
+  imports: [CommonModule, TranslocoPipe],
 })
 export class DfSystemInfoComponent implements OnInit {
   private destroyed$ = new Subject<void>();
