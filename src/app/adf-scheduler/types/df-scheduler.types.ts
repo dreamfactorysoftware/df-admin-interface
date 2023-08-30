@@ -1,33 +1,21 @@
-export type UpdateSchedulePayload = {
-  component: string;
+export type UpdateSchedulePayload = CreateSchedulePayload & {
   createdById: number;
   createdDate: string;
-  description: string;
-  frequency: number;
   hasLog: boolean;
-  id: number;
-  isActive: boolean;
   lastModifiedById: number | null;
   lastModifiedDate: string;
-  name: string;
-  payload: string;
-  service: {
-    id: number;
-    name: string;
-    label: string;
-    description: string;
-    type: string;
-    components: string[];
-  };
-  serviceId: number;
-  serviceName: string;
-  verb: string;
-  verbMask: number;
+  taskLogByTaskId: {
+    taskId: number;
+    statusCode: number;
+    lastModifiedDate: string;
+    createdData: string;
+    content: string;
+  } | null;
 };
 
 export type CreateSchedulePayload = {
   component: string;
-  description: string;
+  description: string | null;
   frequency: number;
   id: number | null;
   isActive: boolean;
