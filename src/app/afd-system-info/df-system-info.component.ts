@@ -1,4 +1,4 @@
-import { AsyncPipe } from '@angular/common';
+import { AsyncPipe, NgFor } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
@@ -11,7 +11,7 @@ import { Client, Php, Platform, Server } from './df-system-info.typs';
   templateUrl: './df-system-info.component.html',
   styleUrls: ['./df-system-info.component.scss'],
   standalone: true,
-  imports: [AsyncPipe, TranslocoPipe],
+  imports: [AsyncPipe, NgFor, TranslocoPipe],
 })
 export class DfSystemInfoComponent implements OnInit {
   private destroyed$ = new Subject<void>();
