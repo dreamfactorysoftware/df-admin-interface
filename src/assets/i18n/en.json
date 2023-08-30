@@ -419,7 +419,7 @@
       },
       "role-based-access": {
         "nav": "Role Based Access",
-        "header": "nav.api-connections.role-based-access"
+        "header": "{{nav.api-connections.role-based-access.nav}}"
       },
       "api-keys": {
         "nav": "API Keys",
