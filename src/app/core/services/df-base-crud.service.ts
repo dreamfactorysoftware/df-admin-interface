@@ -99,8 +99,8 @@ export class DfBaseCrudService {
     if (options.showSpinner !== false) {
       headers['show-loading'] = '';
     }
-    if (options.snackbarSccess) {
-      headers['snackbar-success'] = options.snackbarSccess;
+    if (options.snackbarSuccess) {
+      headers['snackbar-success'] = options.snackbarSuccess;
     }
     if (options.snackbarError) {
       headers['snackbar-error'] = options.snackbarError;

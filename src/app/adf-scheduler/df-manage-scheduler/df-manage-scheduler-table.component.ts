@@ -7,10 +7,7 @@ import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service
 import { TranslateService } from '@ngx-translate/core';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { DF_SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
-import {
-  CreateSchedulePayload,
-  SchedulerTaskData,
-} from '../types/df-scheduler.types';
+import { SchedulerTaskData } from '../types/df-scheduler.types';
 import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
 
 @Component({
@@ -26,10 +23,7 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
 
   constructor(
     @Inject(DF_SCHEDULER_SERVICE_TOKEN)
-    private service: DfBaseCrudService<
-      SchedulerTaskData,
-      CreateSchedulePayload
-    >,
+    private service: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -139,9 +133,9 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.service
-      .getAll(limit, offset, filter)
+      .getAll({ limit: limit, offset: offset, filter: filter })
       .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
+      .subscribe((data: any) => {
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;
       });

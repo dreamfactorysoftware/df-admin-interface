@@ -59,7 +59,7 @@ export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow>
 
   override deleteRow(row: UserRow): void {
     this.userService
-      .delete(row.id, { snackbarSccess: 'users.alerts.deleteSuccess' })
+      .delete(row.id, { snackbarSuccess: 'users.alerts.deleteSuccess' })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
         this.refreshTable();
@@ -78,7 +78,7 @@ export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow>
 
   uploadUserList(files: FileList) {
     this.userService
-      .uploadFile(files[0], { snackbarSccess: 'users.alerts.importSuccess' })
+      .uploadFile(files[0], { snackbarSuccess: 'users.alerts.importSuccess' })
       .subscribe(() => {
         this.refreshTable();
       });
@@ -86,7 +86,7 @@ export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow>
 
   downloadUserList(type: string) {
     this.userService
-      .downloadFile(type, { snackbarSccess: 'users.alerts.exportSuccess' })
+      .downloadFile(type, { snackbarSuccess: 'users.alerts.exportSuccess' })
       .subscribe(data => {
         saveAsFile(data, `admin.${type}`, type);
       });

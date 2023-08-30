@@ -59,7 +59,7 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
 
   override deleteRow(row: UserRow): void {
     this.adminService
-      .delete(row.id, { snackbarSccess: 'admins.alerts.deleteSuccess' })
+      .delete(row.id, { snackbarSuccess: 'admins.alerts.deleteSuccess' })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
         this.refreshTable();
@@ -78,7 +78,7 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
 
   uploadAdminList(files: FileList) {
     this.adminService
-      .uploadFile(files[0], { snackbarSccess: 'admins.alerts.importSuccess' })
+      .uploadFile(files[0], { snackbarSuccess: 'admins.alerts.importSuccess' })
       .subscribe(() => {
         this.refreshTable();
       });
@@ -86,7 +86,7 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
 
   downloadAdminList(type: string) {
     this.adminService
-      .downloadFile(type, { snackbarSccess: 'admins.alerts.exportSuccess' })
+      .downloadFile(type, { snackbarSuccess: 'admins.alerts.exportSuccess' })
       .subscribe(data => {
         saveAsFile(data, `admin.${type}`, type);
       });

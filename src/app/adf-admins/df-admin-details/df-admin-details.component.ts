@@ -43,7 +43,7 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
   sendInvite() {
     this.adminService
       .patch(this.currentProfile.id, {
-        snackbarSccess: 'inviteSent',
+        snackbarSuccess: 'inviteSent',
       })
       .subscribe();
   }
@@ -70,7 +70,7 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
         .create(
           { resource: [data] },
           {
-            snackbarSccess: 'admins.alerts.createdSuccess',
+            snackbarSuccess: 'admins.alerts.createdSuccess',
             additionalParams: [{ key: 'send_invite', value: sendInvite }],
           }
         )
@@ -95,7 +95,7 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
       }
       this.adminService
         .update(this.currentProfile.id, data, {
-          snackbarSccess: 'admins.alerts.updateSuccess',
+          snackbarSuccess: 'admins.alerts.updateSuccess',
         })
         .pipe(
           takeUntil(this.destroyed$),

@@ -11,5 +11,7 @@ export const schedulerResolver: ResolveFn<
 
   if (id) return inject(DF_SCHEDULER_SERVICE_TOKEN).get(id);
 
-  return inject(DF_SCHEDULER_SERVICE_TOKEN).getAll();
+  return inject(DF_SCHEDULER_SERVICE_TOKEN).getAll({
+    related: 'task_log_by_task_id',
+  });
 };

@@ -25,6 +25,8 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
   userServicesDropdownOptions: SystemServiceData[];
   selectedService: SystemServiceData | undefined;
 
+  relatedParam = 'task_log_by_task_id';
+
   componentDropdownOptions: string[] = [];
 
   scheduleToEdit: SchedulerTaskData | undefined;
@@ -54,10 +56,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
 
   constructor(
     @Inject(DF_SCHEDULER_SERVICE_TOKEN)
-    private service: DfBaseCrudService<
-      SchedulerTaskData,
-      CreateSchedulePayload
-    >,
+    private service: DfBaseCrudService,
     private formBuilder: FormBuilder,
     private activatedRoute: ActivatedRoute,
     private router: Router,
@@ -137,18 +136,31 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
       const payload = this.assemblePayload() as CreateSchedulePayload;
 
       this.service
-        .create({ resource: [payload] })
+        .create(
+          { resource: [payload] },
+          {
+            snackbarSuccess: 'scheduler.alerts.createdSuccess',
+            snackbarError: 'server',
+            fields: '*',
+            related: this.relatedParam,
+          }
+        )
         .pipe(takeUntil(this.destroyed$))
-        .subscribe(data => {
+        .subscribe(() => {
           this.router.navigate([ROUTES.SCHEDULER]);
         });
     } else if (this.formGroup.valid && this.scheduleToEdit) {
       const payload = this.assemblePayload() as UpdateSchedulePayload;
 
       this.service
-        .update(this.scheduleToEdit.id, payload)
+        .update(this.scheduleToEdit.id, payload, {
+          snackbarSuccess: 'scheduler.alerts.updateSuccess',
+          snackbarError: 'server',
+          fields: '*',
+          related: this.relatedParam,
+        })
         .pipe(takeUntil(this.destroyed$))
-        .subscribe(data => {
+        .subscribe(() => {
           this.router.navigate([ROUTES.SCHEDULER]);
         });
     }
