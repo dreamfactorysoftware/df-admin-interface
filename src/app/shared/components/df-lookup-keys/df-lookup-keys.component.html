@@ -2,9 +2,9 @@
   <mat-accordion>
     <mat-expansion-panel>
       <mat-expansion-panel-header>
-        <mat-panel-title> {{ 'lookupKeys.label' | translate }}</mat-panel-title>
+        <mat-panel-title> {{ 'lookupKeys.label' | transloco }}</mat-panel-title>
         <mat-panel-description>{{
-          'lookupKeys.desc' | translate
+          'lookupKeys.desc' | transloco
         }}</mat-panel-description>
       </mat-expansion-panel-header>
       <ng-container [formGroup]="rootForm">
@@ -12,13 +12,13 @@
           <mat-table [dataSource]="dataSource">
             <ng-container matColumnDef="name">
               <mat-header-cell *matHeaderCellDef>
-                {{ 'name' | translate }}
+                {{ 'name' | transloco }}
               </mat-header-cell>
               <mat-cell
                 *matCellDef="let row; let i = index"
                 [formGroupName]="i">
                 <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>{{ 'name' | translate }}</mat-label>
+                  <mat-label>{{ 'name' | transloco }}</mat-label>
                   <input matInput formControlName="name" />
                 </mat-form-field>
               </mat-cell>
@@ -26,13 +26,13 @@
 
             <ng-container matColumnDef="value">
               <mat-header-cell *matHeaderCellDef>
-                {{ 'value' | translate }}
+                {{ 'value' | transloco }}
               </mat-header-cell>
               <mat-cell
                 *matCellDef="let row; let i = index"
                 [formGroupName]="i">
                 <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>{{ 'value' | translate }}</mat-label>
+                  <mat-label>{{ 'value' | transloco }}</mat-label>
                   <input matInput formControlName="value" />
                 </mat-form-field>
               </mat-cell>
@@ -40,14 +40,14 @@
 
             <ng-container matColumnDef="private">
               <mat-header-cell *matHeaderCellDef>
-                {{ 'private' | translate }}
+                {{ 'private' | transloco }}
               </mat-header-cell>
               <mat-cell
                 *matCellDef="let row; let i = index"
                 [formGroupName]="i">
                 <mat-slide-toggle
                   formControlName="private"
-                  [attr.aria-label]="'name' | translate"></mat-slide-toggle>
+                  [attr.aria-label]="'name' | transloco"></mat-slide-toggle>
               </mat-cell>
             </ng-container>
             <ng-container matColumnDef="actions" stickyEnd>
@@ -55,7 +55,7 @@
                 <button
                   mat-mini-fab
                   color="primary"
-                  [attr.aria-label]="'newEntry' | translate"
+                  [attr.aria-label]="'newEntry' | transloco"
                   type="button"
                   (click)="add()">
                   <fa-icon [icon]="faPlus" size="xl"></fa-icon>
@@ -74,7 +74,7 @@
             <mat-row *matRowDef="let row; columns: displayedColumns"></mat-row>
             <tr class="mat-row" *matNoDataRow>
               <td class="mat-cell" colspan="4">
-                {{ 'lookupKeys.noKeys' | translate }}
+                {{ 'lookupKeys.noKeys' | transloco }}
               </td>
             </tr>
           </mat-table>

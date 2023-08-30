@@ -1,5 +1,10 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  ReactiveFormsModule,
+} from '@angular/forms';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { DfAuthService } from '../services/df-auth.service';
 import {
@@ -7,16 +12,48 @@ import {
   DfSystemConfigDataService,
   LdapService,
 } from '../../core/services/df-system-config-data.service';
-import { AlertType } from '../../shared/components/df-alert/df-alert.component';
-import { Router } from '@angular/router';
+import {
+  AlertType,
+  DfAlertComponent,
+} from '../../shared/components/df-alert/df-alert.component';
+import { Router, RouterLink } from '@angular/router';
 import { ROUTES } from '../../core/constants/routes';
 import { getIcon, iconExist } from '../../shared/utilities/icons';
 import { LoginCredentials } from '../types';
+
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { MatButtonModule } from '@angular/material/button';
+import { MatInputModule } from '@angular/material/input';
+import { MatOptionModule } from '@angular/material/core';
+import { MatSelectModule } from '@angular/material/select';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { NgIf, NgFor, NgTemplateOutlet } from '@angular/common';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatCardModule } from '@angular/material/card';
+import { TranslocoPipe } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-user-login',
   templateUrl: './df-login.component.html',
   styleUrls: ['../adf-user-management.scss'],
+  standalone: true,
+  imports: [
+    MatCardModule,
+    DfAlertComponent,
+    MatDividerModule,
+    ReactiveFormsModule,
+    NgIf,
+    MatFormFieldModule,
+    MatSelectModule,
+    MatOptionModule,
+    NgFor,
+    MatInputModule,
+    MatButtonModule,
+    NgTemplateOutlet,
+    RouterLink,
+    FontAwesomeModule,
+    TranslocoPipe,
+  ],
 })
 export class DfLoginComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();

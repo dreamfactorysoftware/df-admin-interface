@@ -3,7 +3,7 @@
     <button
       mat-mini-fab
       color="primary"
-      [attr.aria-label]="'importList' | translate"
+      [attr.aria-label]="'importList' | transloco"
       (click)="import()">
       <fa-icon [icon]="faUpload" size="xl"></fa-icon>
     </button>
@@ -13,8 +13,8 @@
       *ngIf="row.launchUrl"
       mat-menu-item
       [href]="row.launchUrl"
-      [attr.aria-label]="'launchApp' | translate: { appName: row.name }">
-      {{ 'launch' | translate }}
+      [attr.aria-label]="'launchApp' | transloco: { appName: row.name }">
+      {{ 'launch' | transloco }}
     </a>
   </ng-template>
 </df-manage-apps-table>

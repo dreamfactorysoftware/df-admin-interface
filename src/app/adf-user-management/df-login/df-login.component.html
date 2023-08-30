@@ -8,7 +8,7 @@
     >
     <mat-card-header>
       <mat-card-title>
-        {{ 'userManagement.login' | translate }}
+        {{ 'userManagement.login' | transloco }}
       </mat-card-title>
     </mat-card-header>
     <mat-divider></mat-divider>
@@ -17,7 +17,7 @@
         <mat-form-field appearance="fill" *ngIf="ldapServices.length">
           <mat-label>
             {{
-              'userManagement.controls.services.label' | translate
+              'userManagement.controls.services.label' | transloco
             }}</mat-label
           >
           <mat-select formControlName="services">
@@ -31,7 +31,7 @@
         </mat-form-field>
         <mat-form-field appearance="fill" *ngIf="loginAttribute === 'email'">
           <mat-label>
-            {{ 'userManagement.controls.email.label' | translate }}</mat-label
+            {{ 'userManagement.controls.email.label' | transloco }}</mat-label
           >
           <input matInput type="email" formControlName="email" />
           <mat-error
@@ -39,38 +39,38 @@
               loginForm.get('email')?.errors?.['email'] &&
               !loginForm.get('email')?.errors?.['required']
             ">
-            {{ 'userManagement.controls.email.errors.invalid' | translate }}
+            {{ 'userManagement.controls.email.errors.invalid' | transloco }}
           </mat-error>
           <mat-error
             *ngIf="
               !loginForm.get('email')?.errors?.['email'] &&
               loginForm.get('email')?.errors?.['required']
             ">
-            {{ 'userManagement.controls.email.errors.required' | translate }}
+            {{ 'userManagement.controls.email.errors.required' | transloco }}
           </mat-error>
         </mat-form-field>
 
         <mat-form-field appearance="fill" *ngIf="loginAttribute === 'username'">
           <mat-label>{{
-            'userManagement.controls.username.altLabel' | translate
+            'userManagement.controls.username.altLabel' | transloco
           }}</mat-label>
           <input matInput type="text" formControlName="username" />
           <mat-error *ngIf="loginForm.get('username')?.errors?.['required']">
-            {{ 'userManagement.controls.username.errors.required' | translate }}
+            {{ 'userManagement.controls.username.errors.required' | transloco }}
           </mat-error>
         </mat-form-field>
 
         <mat-form-field appearance="fill">
           <mat-label>{{
-            'userManagement.controls.password.label' | translate
+            'userManagement.controls.password.label' | transloco
           }}</mat-label>
           <input matInput type="password" formControlName="password" />
           <mat-error *ngIf="loginForm.get('password')?.errors?.['required']">
-            {{ 'userManagement.controls.password.errors.required' | translate }}
+            {{ 'userManagement.controls.password.errors.required' | transloco }}
           </mat-error>
         </mat-form-field>
         <button mat-flat-button color="primary" type="submit">
-          {{ 'userManagement.login' | translate }}
+          {{ 'userManagement.login' | transloco }}
         </button>
       </form>
       <ng-container
@@ -78,7 +78,7 @@
           authServices;
           context: {
             services: oauthServices,
-            title: ('userManagement.oAuth' | translate)
+            title: ('userManagement.oAuth' | transloco)
           }
         " />
       <ng-container
@@ -86,12 +86,12 @@
           authServices;
           context: {
             services: samlServices,
-            title: ('userManagement.saml' | translate)
+            title: ('userManagement.saml' | transloco)
           }
         " />
       <div class="action-links">
         <a mat-button [routerLink]="fpRoute" target="_self">{{
-          'userManagement.forgotPassword' | translate
+          'userManagement.forgotPassword' | transloco
         }}</a>
       </div>
     </mat-card-content>

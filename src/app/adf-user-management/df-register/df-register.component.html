@@ -8,7 +8,7 @@
     >
     <mat-card-header>
       <mat-card-title>
-        {{ 'userManagement.register' | translate }}
+        {{ 'userManagement.register' | transloco }}
       </mat-card-title>
     </mat-card-header>
     <mat-divider></mat-divider>
@@ -19,7 +19,7 @@
         (ngSubmit)="register()">
         <df-profile-details formGroupName="profileDetailsGroup" />
         <button mat-flat-button color="primary" type="submit">
-          {{ 'userManagement.register' | translate }}
+          {{ 'userManagement.register' | transloco }}
         </button>
       </form>
     </mat-card-content>
@@ -27,16 +27,16 @@
   <mat-card class="user-management-card" *ngIf="complete">
     <mat-card-header>
       <mat-card-title>
-        {{ 'userManagement.registerSuccess.header' | translate }}
+        {{ 'userManagement.registerSuccess.header' | transloco }}
       </mat-card-title>
     </mat-card-header>
     <mat-divider></mat-divider>
     <mat-card-content>
-      <h2>{{ 'userManagement.registerSuccess.title' | translate }}</h2>
-      <p>{{ 'userManagement.registerSuccess.message' | translate }}</p>
+      <h2>{{ 'userManagement.registerSuccess.title' | transloco }}</h2>
+      <p>{{ 'userManagement.registerSuccess.message' | transloco }}</p>
       <div class="action-links">
         <a mat-button [routerLink]="loginRoute" target="_self">{{
-          'userManagement.login' | translate
+          'userManagement.login' | transloco
         }}</a>
       </div>
     </mat-card-content>

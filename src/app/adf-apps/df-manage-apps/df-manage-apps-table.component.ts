@@ -5,10 +5,19 @@ import { DfManageTableComponent } from 'src/app/shared/components/df-manage-tabl
 import { AppType, AppRow } from '../types/df-apps.types';
 import { takeUntil } from 'rxjs';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { TranslateService } from '@ngx-translate/core';
-import { DF_APPS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+
+import { APP_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatTableModule } from '@angular/material/table';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { MatButtonModule } from '@angular/material/button';
+import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-manage-apps-table',
@@ -18,16 +27,31 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
     './df-manage-apps-table.component.scss',
   ],
+  standalone: true,
+  imports: [
+    NgIf,
+    MatButtonModule,
+    FontAwesomeModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatTableModule,
+    NgFor,
+    MatMenuModule,
+    NgTemplateOutlet,
+    MatPaginatorModule,
+    TranslocoPipe,
+    AsyncPipe,
+  ],
 })
 export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
   constructor(
-    @Inject(DF_APPS_SERVICE_TOKEN)
+    @Inject(APP_SERVICE_TOKEN)
     private appsService: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslateService
+    translateService: TranslocoService
   ) {
     super(
       router,
@@ -52,22 +76,22 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
     {
       columnDef: 'name',
       cell: (row: AppRow) => row.name,
-      header: 'Name',
+      header: 'name',
     },
     {
       columnDef: 'role',
       cell: (row: AppRow) => row.role,
-      header: 'Role',
+      header: 'role',
     },
     {
       columnDef: 'apiKey',
       cell: (row: AppRow) => row.apiKey,
-      header: 'API Key',
+      header: 'apiKey',
     },
     {
       columnDef: 'description',
       cell: (row: AppRow) => row.description,
-      header: 'Description',
+      header: 'description',
     },
     {
       columnDef: 'actions',

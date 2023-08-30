@@ -9,7 +9,7 @@
     <df-profile-details formGroupName="profileDetailsGroup" />
     <div class="additional-info">
       <mat-slide-toggle formControlName="isActive">{{
-        'active' | translate
+        'active' | transloco
       }}</mat-slide-toggle>
       <ng-container *ngIf="type === 'create'; else editMode">
         <df-alert
@@ -21,17 +21,17 @@
           "
           [showAlert]="true"
           [dismissible]="false">
-          {{ userType + '.alerts.new' | translate }}
+          {{ userType + '.alerts.new' | transloco }}
         </df-alert>
         <mat-radio-group
-          [attr.aria-label]="'selectAnOption' | translate"
+          [attr.aria-label]="'selectAnOption' | transloco"
           formControlName="pass-invite"
           class="pass-invite">
           <mat-radio-button value="invite">{{
-            'userManagement.controls.sendInvite.label' | translate
+            'userManagement.controls.sendInvite.label' | transloco
           }}</mat-radio-button>
           <mat-radio-button value="password">{{
-            'userManagement.controls.setPassword.label' | translate
+            'userManagement.controls.setPassword.label' | transloco
           }}</mat-radio-button>
         </mat-radio-group>
       </ng-container>
@@ -45,7 +45,7 @@
           Send Invite <fa-icon [icon]="faEnvelope"></fa-icon>
         </button>
         <mat-checkbox formControlName="setPassword"
-          >{{ 'userManagement.controls.setPassword.label' | translate }}
+          >{{ 'userManagement.controls.setPassword.label' | transloco }}
         </mat-checkbox>
       </ng-template>
       <ng-container
@@ -55,26 +55,26 @@
         ">
         <mat-form-field appearance="fill">
           <mat-label>{{
-            'userManagement.controls.password.label' | translate
+            'userManagement.controls.password.label' | transloco
           }}</mat-label>
           <input matInput type="password" formControlName="password" />
           <mat-error *ngIf="userForm.get('password')?.errors?.['required']">
-            {{ 'userManagement.controls.password.errors.required' | translate }}
+            {{ 'userManagement.controls.password.errors.required' | transloco }}
           </mat-error>
           <mat-error *ngIf="userForm.get('password')?.errors?.['minlength']">
-            {{ 'userManagement.controls.password.errors.length' | translate }}
+            {{ 'userManagement.controls.password.errors.length' | transloco }}
           </mat-error>
         </mat-form-field>
         <mat-form-field appearance="fill">
           <mat-label>{{
-            'userManagement.controls.confirmPassword.label' | translate
+            'userManagement.controls.confirmPassword.label' | transloco
           }}</mat-label>
 
           <input matInput type="password" formControlName="confirmPassword" />
           <mat-error
             *ngIf="userForm.get('confirmPassword')?.hasError('doesNotMatch')">
             {{
-              'userManagement.controls.confirmPassword.errors.match' | translate
+              'userManagement.controls.confirmPassword.errors.match' | transloco
             }}
           </mat-error>
         </mat-form-field>
@@ -86,23 +86,23 @@
             (type === 'edit' && !currentProfile.isRootAdmin))
         ">
         <div>
-          <h3>{{ userType + '.accessByTabs' | translate }}</h3>
+          <h3>{{ userType + '.accessByTabs' | transloco }}</h3>
           <df-alert
             alertType="warning"
             [showAlert]="!allTabsSelected"
             [dismissible]="false">
-            {{ userType + '.alerts.restrictedAdmin' | translate }}
+            {{ userType + '.alerts.restrictedAdmin' | transloco }}
             <ng-container
               *ngIf="
                 type === 'create' ||
                   currentProfile.userToAppToRoleByUserId.length === 0;
                 else hasRole
               "
-              >{{ userType + '.alerts.autoRole' | translate }}</ng-container
+              >{{ userType + '.alerts.autoRole' | transloco }}</ng-container
             >
             <ng-template #hasRole>{{
               userType + '.alerts.roleId'
-                | translate
+                | transloco
                   : {
                       roleId: currentProfile.userToAppToRoleByUserId[0].roleId
                     }
@@ -120,7 +120,7 @@
               [formGroupName]="i">
               <mat-checkbox formControlName="checked">
                 {{
-                  'nav.' + tab.value.title + '.header' | translate
+                  'nav.' + tab.value.title + '.header' | transloco
                 }}</mat-checkbox
               >
             </ng-container>
@@ -130,16 +130,17 @@
     </div>
   </div>
   <df-user-app-roles
+    *ngIf="userType === 'users'"
     formArrayName="appRoles"
     [apps]="apps"
     [roles]="roles"></df-user-app-roles>
   <df-lookup-keys formArrayName="lookupKeys"></df-lookup-keys>
   <div class="action-bar">
     <button mat-flat-button color="primary" type="submit">
-      {{ 'save' | translate }}
+      {{ 'save' | transloco }}
     </button>
     <a mat-flat-button color="primary" [routerLink]="cancelRoute">
-      {{ 'cancel' | translate }}
+      {{ 'cancel' | transloco }}
     </a>
   </div>
 </form>

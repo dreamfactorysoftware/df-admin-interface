@@ -1,19 +1,35 @@
-import * as RegularIcons from '@fortawesome/free-regular-svg-icons';
-import * as SolidIcons from '@fortawesome/free-solid-svg-icons';
-import * as BrandIcons from '@fortawesome/free-brands-svg-icons';
+import {
+  faGithub,
+  faGoogle,
+  faMicrosoft,
+  faAmazon,
+  faApple,
+  faLinkedin,
+  faBitbucket,
+  faFacebook,
+  faSalesforce,
+  faTwitch,
+  faOpenid,
+} from '@fortawesome/free-brands-svg-icons';
+
+const supportedIcons = {
+  google: faGoogle,
+  github: faGithub,
+  microsoft: faMicrosoft,
+  amazon: faAmazon,
+  apple: faApple,
+  linkedin: faLinkedin,
+  bitbucket: faBitbucket,
+  facebook: faFacebook,
+  salesforce: faSalesforce,
+  twitch: faTwitch,
+  openid: faOpenid,
+};
 
 export function iconExist(icon: string) {
-  return (
-    Object.keys(RegularIcons).includes(icon) ||
-    Object.keys(SolidIcons).includes(icon) ||
-    Object.keys(BrandIcons).includes(icon)
-  );
+  return Object.keys(supportedIcons).includes(icon);
 }
 
 export function getIcon(icon: string) {
-  return (
-    (BrandIcons as any)[icon] ||
-    (SolidIcons as any)[icon] ||
-    (RegularIcons as any)[icon]
-  );
+  return (supportedIcons as any)[icon];
 }

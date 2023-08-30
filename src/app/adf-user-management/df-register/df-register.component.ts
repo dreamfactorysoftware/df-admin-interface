@@ -1,15 +1,41 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  ReactiveFormsModule,
+} from '@angular/forms';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from 'src/app/core/services/df-system-config-data.service';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { DfAuthService } from '../services/df-auth.service';
 import { ROUTES } from 'src/app/core/constants/routes';
 
+import { RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { DfProfileDetailsComponent } from '../../shared/components/df-profile-details/df-profile-details.component';
+import { MatDividerModule } from '@angular/material/divider';
+import { DfAlertComponent } from '../../shared/components/df-alert/df-alert.component';
+import { MatCardModule } from '@angular/material/card';
+import { NgIf } from '@angular/common';
+import { TranslocoPipe } from '@ngneat/transloco';
+
 @Component({
   selector: 'df-register',
   templateUrl: './df-register.component.html',
   styleUrls: ['../adf-user-management.scss'],
+  standalone: true,
+  imports: [
+    NgIf,
+    MatCardModule,
+    DfAlertComponent,
+    MatDividerModule,
+    ReactiveFormsModule,
+    DfProfileDetailsComponent,
+    MatButtonModule,
+    RouterLink,
+    TranslocoPipe,
+  ],
 })
 export class DfRegisterComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();

@@ -1,24 +1,58 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  ReactiveFormsModule,
+} from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DfLimitsService } from '../services/df-limits.service';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { RoleType } from 'src/app/shared/types/role';
 import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
 import { ROUTES } from 'src/app/core/constants/routes';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
-import { TranslateService } from '@ngx-translate/core';
+
 import {
   LimitType,
   CreateLimitPayload,
   UpdateLimitPayload,
 } from 'src/app/shared/types/limit';
 import { UserProfile } from 'src/app/shared/types/user';
+import { MatButtonModule } from '@angular/material/button';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatOptionModule } from '@angular/material/core';
+import { NgFor, NgIf } from '@angular/common';
+import { MatSelectModule } from '@angular/material/select';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { DfAlertComponent } from '../../shared/components/df-alert/df-alert.component';
+import { LIMIT_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import {
+  TranslocoDirective,
+  TranslocoPipe,
+  TranslocoService,
+} from '@ngneat/transloco';
 
 @Component({
   selector: 'df-limit',
   templateUrl: './df-limit.component.html',
   styleUrls: ['./df-limit.component.scss'],
+  standalone: true,
+  imports: [
+    DfAlertComponent,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    NgFor,
+    MatOptionModule,
+    NgIf,
+    MatSlideToggleModule,
+    MatButtonModule,
+    TranslocoDirective,
+    TranslocoPipe,
+  ],
 })
 export class DfLimitComponent implements OnInit, OnDestroy {
   limitTypes = [
@@ -63,10 +97,11 @@ export class DfLimitComponent implements OnInit, OnDestroy {
   alertType: AlertType = 'error';
 
   constructor(
-    private limitService: DfLimitsService,
+    @Inject(LIMIT_SERVICE_TOKEN)
+    private limitService: DfBaseCrudService,
     private router: Router,
     private activatedRoute: ActivatedRoute,
-    private translateService: TranslateService,
+    private translateService: TranslocoService,
     private formBuilder: FormBuilder
   ) {
     this.formGroup = this.formBuilder.group({
@@ -94,7 +129,7 @@ export class DfLimitComponent implements OnInit, OnDestroy {
         .pipe(
           takeUntil(this.destroyed$),
           catchError(error => {
-            this.router.navigate([ROUTES.LIMITS]);
+            this.router.navigate([ROUTES.RATE_LIMITING]);
             return throwError(() => new Error(error));
           })
         )
@@ -170,7 +205,7 @@ export class DfLimitComponent implements OnInit, OnDestroy {
         const payload = this.assembleLimitPayload() as CreateLimitPayload;
 
         this.limitService
-          .createLimit(payload)
+          .create({ resource: [payload] })
           .pipe(
             takeUntil(this.destroyed$),
             catchError(err => {
@@ -180,14 +215,14 @@ export class DfLimitComponent implements OnInit, OnDestroy {
             })
           )
           .subscribe(() => {
-            this.router.navigate([ROUTES.LIMITS]);
+            this.router.navigate([ROUTES.RATE_LIMITING]);
           });
       } else {
         // edit mode
         const payload = this.assembleLimitPayload() as UpdateLimitPayload;
 
         this.limitService
-          .updateLimit(payload)
+          .update(payload.id, payload)
           .pipe(
             takeUntil(this.destroyed$),
             catchError(err => {
@@ -197,17 +232,17 @@ export class DfLimitComponent implements OnInit, OnDestroy {
             })
           )
           .subscribe(() => {
-            this.router.navigate([ROUTES.LIMITS]);
+            this.router.navigate([ROUTES.RATE_LIMITING]);
           });
       }
     } else {
-      this.alertMsg = this.translateService.instant('limits.invalidForm');
+      this.alertMsg = this.translateService.translate('limits.invalidForm');
       this.showAlert = true;
     }
   }
 
   onCancel(): void {
-    this.router.navigate([ROUTES.LIMITS]);
+    this.router.navigate([ROUTES.RATE_LIMITING]);
   }
 
   private assembleLimitPayload(): CreateLimitPayload | UpdateLimitPayload {

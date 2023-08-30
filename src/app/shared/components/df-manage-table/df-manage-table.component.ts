@@ -13,18 +13,19 @@ import { PageEvent } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
-import { TranslateService } from '@ngx-translate/core';
 import { Subject, takeUntil } from 'rxjs';
 import { ROUTES } from 'src/app/core/constants/routes';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
+import { IconProp } from '@fortawesome/fontawesome-svg-core';
 import {
-  faCheckCircle,
-  faXmarkCircle,
+  faTrashCan,
+  faPenToSquare,
   faPlus,
   faEllipsisV,
+  faCheckCircle,
+  faXmarkCircle,
 } from '@fortawesome/free-solid-svg-icons';
-import { faTrashCan, faPenToSquare } from '@fortawesome/free-regular-svg-icons';
-import { IconProp } from '@fortawesome/fontawesome-svg-core';
+import { TranslocoService } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-manage-table',
@@ -60,7 +61,7 @@ export abstract class DfManageTableComponent<T>
     private activatedRoute: ActivatedRoute,
     private liveAnnouncer: LiveAnnouncer,
     private breakpointService: DfBreakpointService,
-    private translateService: TranslateService
+    private translateService: TranslocoService
   ) {}
 
   ngOnInit(): void {
@@ -129,35 +130,41 @@ export abstract class DfManageTableComponent<T>
       : this.selection.select(...this.dataSource.data);
   }
 
-  checkboxLabel(row?: T): string {
+  checkboxLabel(row?: T) {
     if (!row) {
-      return this.translateService.instant(
-        this.isAllSelected() ? 'deselectAll' : 'selectAll'
+      return this.translateService.selectTranslate(
+        `${this.isAllSelected() ? 'deselectAll' : 'selectAll'}`
       );
     }
-    return this.translateService.instant(
-      this.selection.isSelected(row) ? 'deselect' : 'select',
+    return this.translateService.selectTranslate(
+      `${this.selection.isSelected(row) ? 'deselect' : 'select'}`,
       { id: (row as any).id }
     );
   }
 
-  deleteLabel(row: T): string {
-    return this.translateService.instant('deleteRow', { id: (row as any).id });
+  deleteLabel(row: T) {
+    return this.translateService.selectTranslate('deleteRow', {
+      id: (row as any).id,
+    });
   }
 
-  editLabel(row: T): string {
-    return this.translateService.instant('editRow', { id: (row as any).id });
+  editLabel(row: T) {
+    return this.translateService.selectTranslate('editRow', {
+      id: (row as any).id,
+    });
   }
 
   announceSortChange(sortState: any) {
     if (sortState.direction) {
       this.liveAnnouncer.announce(
-        this.translateService.instant(
-          sortState.direction === 'asc' ? 'sortAsc' : 'sortDesc'
+        this.translateService.translate(
+          `${sortState.direction === 'asc' ? 'sortAsc' : 'sortDesc'}`
         )
       );
     } else {
-      this.liveAnnouncer.announce(this.translateService.instant('sortCleared'));
+      this.liveAnnouncer.announce(
+        this.translateService.translate('sortCleared')
+      );
     }
   }
 
@@ -169,7 +176,9 @@ export abstract class DfManageTableComponent<T>
   }
 
   sortDescription(header: string) {
-    return this.translateService.instant('sortDescription', { header });
+    return this.translateService.selectTranslate('sortDescription', {
+      header,
+    });
   }
 
   ngOnDestroy(): void {

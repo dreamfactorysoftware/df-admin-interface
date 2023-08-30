@@ -5,18 +5,53 @@ import {
   OnInit,
   ViewChild,
 } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  ReactiveFormsModule,
+} from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
-import { faCircleInfo, faCopy } from '@fortawesome/free-solid-svg-icons';
 import { AppPayload, AppType } from '../types/df-apps.types';
-import { DF_APPS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { APP_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+
+import { MatSelectModule } from '@angular/material/select';
+import { MatRadioModule } from '@angular/material/radio';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatOptionModule } from '@angular/material/core';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { NgIf, NgFor } from '@angular/common';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { faCircleInfo, faCopy } from '@fortawesome/free-solid-svg-icons';
+import { TranslocoPipe } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-app-details',
   templateUrl: './df-app-details.component.html',
   styleUrls: ['./df-app-details.component.scss'],
+  standalone: true,
+  imports: [
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    NgIf,
+    MatAutocompleteModule,
+    NgFor,
+    MatOptionModule,
+    MatSlideToggleModule,
+    MatCardModule,
+    MatButtonModule,
+    FontAwesomeModule,
+    MatRadioModule,
+    MatSelectModule,
+    TranslocoPipe,
+  ],
 })
 export class DfAppDetailsComponent implements OnInit {
   @ViewChild('rolesInput') rolesInput: ElementRef<HTMLInputElement>;
@@ -32,7 +67,7 @@ export class DfAppDetailsComponent implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    @Inject(DF_APPS_SERVICE_TOKEN)
+    @Inject(APP_SERVICE_TOKEN)
     private appsService: DfBaseCrudService,
     private activatedRoute: ActivatedRoute,
     private router: Router

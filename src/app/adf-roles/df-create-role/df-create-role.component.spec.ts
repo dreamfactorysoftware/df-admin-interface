@@ -8,7 +8,7 @@ describe('DfCreateRoleComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfCreateRoleComponent],
+      imports: [DfCreateRoleComponent],
     });
     fixture = TestBed.createComponent(DfCreateRoleComponent);
     component = fixture.componentInstance;

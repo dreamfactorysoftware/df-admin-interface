@@ -1,14 +1,39 @@
 import { Component } from '@angular/core';
 import { SampleApps } from '../df-apps.consts';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  ReactiveFormsModule,
+} from '@angular/forms';
 import { DfAppsService } from '../services/df-apps.service';
 import { Router } from '@angular/router';
+
+import { MatOptionModule } from '@angular/material/core';
+import { MatSelectModule } from '@angular/material/select';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatButtonModule } from '@angular/material/button';
+import { NgFor, NgIf } from '@angular/common';
+import { TranslocoPipe } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-df-import-app',
   templateUrl: './df-import-app.component.html',
   styleUrls: ['./df-import-app.component.scss'],
   providers: [DfAppsService],
+  standalone: true,
+  imports: [
+    NgFor,
+    MatButtonModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    NgIf,
+    MatSelectModule,
+    MatOptionModule,
+    TranslocoPipe,
+  ],
 })
 export class DfImportAppComponent {
   sampleApps = SampleApps;
