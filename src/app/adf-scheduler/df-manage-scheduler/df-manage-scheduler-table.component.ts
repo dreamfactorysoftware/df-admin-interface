@@ -101,7 +101,7 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
     },
     {
       columnDef: 'log',
-      cell: (row: SchedulerTaskData) => row.taskLogByTaskId, // TODO: change this
+      cell: (row: SchedulerTaskData) => !!row.taskLogByTaskId,
       header: 'Log',
     },
     {
@@ -120,7 +120,7 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
         component: val.component,
         verb: val.verb,
         frequency: val.frequency,
-        log: '-', // TODO: update when ready
+        taskLogByTaskId: val.taskLogByTaskId,
       };
     });
   }

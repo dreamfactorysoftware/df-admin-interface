@@ -20,6 +20,7 @@ import {
   faXmarkCircle,
   faPlus,
   faEllipsisV,
+  faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 import { faTrashCan, faPenToSquare } from '@fortawesome/free-regular-svg-icons';
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
@@ -42,6 +43,7 @@ export abstract class DfManageTableComponent<T>
   faPenToSquare = faPenToSquare;
   faPlus = faPlus;
   faEllipsisV = faEllipsisV;
+  faTriangleExclamation = faTriangleExclamation;
   allowCreate = true;
   allowFilter = true;
 

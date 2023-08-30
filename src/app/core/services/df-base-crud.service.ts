@@ -36,21 +36,17 @@ export class DfBaseCrudService<T, C> {
         limit,
         offset,
         include_count: true,
+        related: this.related,
       },
     });
   }
 
   get(id: string | number) {
-    const requestParams: any =
-      this.related === ''
-        ? {}
-        : {
-            related: this.related,
-          };
-
     return this.http.get<T>(`${this.url}/${id}`, {
       headers: SHOW_LOADING_HEADER,
-      params: requestParams,
+      params: {
+        related: this.related,
+      },
     });
   }
 
@@ -60,44 +56,29 @@ export class DfBaseCrudService<T, C> {
     },
     params?: any
   ) {
-    const requestParams =
-      this.related === ''
-        ? {
-            fields: '*',
-            ...params,
-          }
-        : {
-            fields: '*',
-            related: this.related,
-            ...params,
-          };
-
     return this.http.post<T>(this.url, data, {
       headers: {
         ...SHOW_LOADING_HEADER,
         'snackbar-success': `${this.messagePrefix}.alerts.createdSuccess`,
       },
-      params: requestParams,
+      params: {
+        fields: '*',
+        related: this.related,
+        ...params,
+      },
     });
   }
 
   update(id: string | number, data: Partial<C>) {
-    const requestParams: any =
-      this.related === ''
-        ? {
-            fields: '*',
-          }
-        : {
-            fields: '*',
-            related: this.related,
-          };
-
     return this.http.put<T>(`${this.url}/${id}`, data, {
       headers: {
         ...SHOW_LOADING_HEADER,
         'snackbar-success': `${this.messagePrefix}.alerts.updateSuccess`,
       },
-      params: requestParams,
+      params: {
+        fields: '*',
+        related: this.related,
+      },
     });
   }
 

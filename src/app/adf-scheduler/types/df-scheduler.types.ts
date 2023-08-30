@@ -47,14 +47,13 @@ export type CreateSchedulePayload = {
   verbMask: number;
 };
 
-export type SchedulerTaskData = {
+export interface SchedulerTaskData {
   id: number;
   name: string;
   description: string;
   isActive: boolean;
   serviceId: number;
   component: string;
-  verbMask: number;
   frequency: number;
   payload: string | null;
   createdDate: string;
@@ -62,5 +61,12 @@ export type SchedulerTaskData = {
   createdById: number;
   lastModifiedById: number | null;
   verb: string;
-  taskLogByTaskId: object | null;
-};
+  verbMask: number;
+  taskLogByTaskId: {
+    taskId: number;
+    statusCode: number;
+    lastModifiedDate: string;
+    createdData: string;
+    content: string;
+  } | null;
+}

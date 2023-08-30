@@ -44,9 +44,19 @@
         </ng-container>
         <ng-container
           *ngIf="
-            column.columnDef !== 'active' && column.columnDef !== 'registration'
+            column.columnDef !== 'active' &&
+            column.columnDef !== 'registration' &&
+            column.columnDef !== 'log'
           ">
           {{ column?.cell(row) }}
+        </ng-container>
+        <ng-container *ngIf="column.columnDef === 'log'">
+          <fa-icon
+            *ngIf="!!column?.cell(row)"
+            [icon]="faTriangleExclamation"
+            size="lg"
+            style="color: red"></fa-icon>
+          <span *ngIf="!!column?.cell(row) === false">{{ '-' }}</span>
         </ng-container>
       </td>
     </ng-container>

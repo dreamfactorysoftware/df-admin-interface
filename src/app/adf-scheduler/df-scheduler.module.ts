@@ -44,7 +44,7 @@ import { DfAccessListService } from './services/access-list.service';
     { provide: URL_TOKEN, useValue: URLS.SCHEDULER },
     {
       provide: RELATED_TOKEN,
-      useValue: '',
+      useValue: 'task_log_by_task_id',
     },
     { provide: MESSAGE_PREFIX_TOKEN, useValue: 'scheduler' },
     {

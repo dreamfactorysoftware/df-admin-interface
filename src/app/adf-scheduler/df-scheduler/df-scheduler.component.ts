@@ -27,7 +27,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
 
   componentDropdownOptions: string[] = [];
 
-  scheduleToEdit: SchedulerTaskData | null;
+  scheduleToEdit: SchedulerTaskData | undefined;
 
   verbDropdownOptions = [
     {
@@ -133,7 +133,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
   }
 
   onSubmit() {
-    if (this.formGroup.valid && this.scheduleToEdit === null) {
+    if (this.formGroup.valid && typeof this.scheduleToEdit === 'undefined') {
       const payload = this.assemblePayload() as CreateSchedulePayload;
 
       this.service
@@ -234,7 +234,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         return {
           lastModifiedDate: this.scheduleToEdit?.lastModifiedDate as string,
           lastModifiedById: this.scheduleToEdit?.lastModifiedById as number,
-          hasLog: false, // TODO: change
+          hasLog: !!this.scheduleToEdit.taskLogByTaskId,
           createdDate: this.scheduleToEdit?.createdDate as string,
           createdById: this.scheduleToEdit?.createdById as number,
           id: this.scheduleToEdit.id,
