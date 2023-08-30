@@ -3,17 +3,14 @@
     *ngIf="allowCreate"
     mat-mini-fab
     color="primary"
-    [attr.aria-label]="'newEntry' | translate"
+    [attr.aria-label]="'newEntry' | transloco"
     (click)="createRow()">
     <fa-icon [icon]="faPlus" size="xl"></fa-icon>
   </button>
   <ng-content select="[topActions]"></ng-content>
   <div class="spacer"></div>
-  <mat-form-field
-    *ngIf="allowFilter"
-    class="search-input"
-    subscriptSizing="dynamic">
-    <mat-label>{{ 'search' | translate }}</mat-label>
+  <mat-form-field class="search-input" subscriptSizing="dynamic">
+    <mat-label>{{ 'search' | transloco }}</mat-label>
     <input matInput (keyup)="triggerSearch($event)" #search />
   </mat-form-field>
 </div>
@@ -30,8 +27,8 @@
         mat-header-cell
         *matHeaderCellDef
         mat-sort-header
-        [attr.sortActionDescription]="sortDescription(column.header!)">
-        {{ column.header! | translate }}
+        [attr.sortActionDescription]="sortDescription(column.header!) | async">
+        {{ column.header | transloco }}
       </th>
       <td mat-cell *matCellDef="let row">
         <fa-icon
@@ -40,7 +37,7 @@
           size="lg"
           [class]="!!column?.cell(row) ? 'active' : 'inactive'"></fa-icon>
         <ng-container *ngIf="column.columnDef === 'registration'">
-          {{ (!!column?.cell(row) ? 'confirmed' : 'pending') | translate }}
+          {{ (!!column?.cell(row) ? 'confirmed' : 'pending') | transloco }}
         </ng-container>
         <ng-container
           *ngIf="
@@ -76,14 +73,14 @@
           <button
             mat-menu-item
             (click)="editRow(row)"
-            [attr.aria-label]="editLabel(row)">
-            {{ 'edit' | translate }}
+            [attr.aria-label]="editLabel(row) | async">
+            {{ 'edit' | transloco }}
           </button>
           <button
             mat-menu-item
             (click)="deleteRow(row)"
-            [attr.aria-label]="deleteLabel(row)">
-            {{ 'delete' | translate }}
+            [attr.aria-label]="deleteLabel(row) | async">
+            {{ 'delete' | transloco }}
           </button>
           <ng-container
             *ngTemplateOutlet="
@@ -102,7 +99,7 @@
     *ngIf="tableLength > defaultPageSize"
     [pageSizeOptions]="pageSizes"
     showFirstLastButtons
-    aria-label="Select page"
+    aria-label="'selectPage' | transloco"
     [length]="tableLength"
     (page)="changePage($event)">
   </mat-paginator>

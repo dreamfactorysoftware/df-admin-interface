@@ -1,23 +1,36 @@
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { inject } from '@angular/core';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-import { DfRoleService } from '../services/df-role.service';
 import { RoleType } from 'src/app/shared/types/role';
+import { ROLE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 
-export const roleResolver: ResolveFn<
-  GenericListResponse<RoleType> | RoleType
-> = (route: ActivatedRouteSnapshot) => {
-  const roleService = inject(DfRoleService);
+export const roleResolver: ResolveFn<RoleType | undefined> = (
+  route: ActivatedRouteSnapshot
+) => {
+  const roleService = inject(ROLE_SERVICE_TOKEN);
   const id = route.paramMap.get('id');
   if (!id) {
-    return roleService.getRoles();
+    // TODO: add 404 page
+    return;
   }
-  return roleService.getRole(id);
+  return roleService.get<RoleType>(id, {
+    related: 'lookup_by_role_id',
+    additionalParams: [
+      {
+        key: 'accessible_tabs',
+        value: true,
+      },
+    ],
+  });
 };
 
-export const getRolesResolver: ResolveFn<
-  GenericListResponse<RoleType>
-> = () => {
-  const roleService = inject(DfRoleService);
-  return roleService.getRoles();
-};
+export const rolesResolver =
+  (limit?: number): ResolveFn<GenericListResponse<RoleType>> =>
+  () => {
+    const roleService = inject(ROLE_SERVICE_TOKEN);
+    return roleService.getAll<GenericListResponse<RoleType>>({
+      related: 'lookup_by_role_id',
+      limit,
+      sort: 'name',
+    });
+  };

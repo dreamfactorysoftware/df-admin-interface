@@ -11,7 +11,7 @@
         <div class="video-overlay">
           <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
           <span id="video-link-description">{{
-            'home.welcomePage.watchVideoCta' | translate
+            'home.welcomePage.watchVideoCta' | transloco
           }}</span>
         </div>
       </a>
@@ -19,10 +19,10 @@
 
     <article>
       <h2>
-        {{ 'home.welcomePage.welcomeHeading' | translate }}
+        {{ 'home.welcomePage.welcomeHeading' | transloco }}
       </h2>
       <p id="get-started-links">
-        {{ 'home.welcomePage.welcomeSubHeading' | translate }}
+        {{ 'home.welcomePage.welcomeSubHeading' | transloco }}
       </p>
       <ul aria-labelledby="get-started-links">
         <li *ngFor="let resource of welcomePageResources">
@@ -39,9 +39,9 @@
           [icon]="faHeart"
           class="pre-heading-icon"
           aria-hidden="true"></fa-icon
-        >{{ 'home.welcomePage.ossUsersHeading' | translate }}
+        >{{ 'home.welcomePage.ossUsersHeading' | transloco }}
       </h3>
-      <p [innerHtml]="'home.welcomePage.ossUsersText' | translate"></p>
+      <p [innerHtml]="'home.welcomePage.ossUsersText' | transloco"></p>
     </mat-card>
 
     <mat-card class="notice-card">
@@ -50,9 +50,9 @@
           [icon]="faComment"
           class="pre-heading-icon"
           aria-hidden="true"></fa-icon
-        >{{ 'home.welcomePage.hearFromYouHeading' | translate }}
+        >{{ 'home.welcomePage.hearFromYouHeading' | transloco }}
       </h3>
-      <p [innerHtml]="'home.welcomePage.hearFromYouText' | translate"></p>
+      <p [innerHtml]="'home.welcomePage.hearFromYouText' | transloco"></p>
     </mat-card>
   </aside>
 </section>
@@ -61,12 +61,12 @@
 
 <section class="platforms-section">
   <h3>
-    {{ 'home.welcomePage.clientPlatformHeading' | translate }}
+    {{ 'home.welcomePage.clientPlatformHeading' | transloco }}
   </h3>
 
   <article>
     <h4 id="native-examples-heading">
-      {{ 'home.welcomePage.nativeExamplesHeading' | translate }}
+      {{ 'home.welcomePage.nativeExamplesHeading' | transloco }}
     </h4>
 
     <ul
@@ -81,7 +81,7 @@
 
   <article>
     <h4 id="javascript-examples-heading">
-      {{ 'home.welcomePage.javaScriptExamplesHeading' | translate }}
+      {{ 'home.welcomePage.javaScriptExamplesHeading' | transloco }}
     </h4>
 
     <ul

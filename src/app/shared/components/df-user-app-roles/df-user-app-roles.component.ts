@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import {
   FormArray,
@@ -14,12 +13,14 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { Subject, takeUntil } from 'rxjs';
 import { MatInputModule } from '@angular/material/input';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
-import { TranslateModule } from '@ngx-translate/core';
+
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { AppType } from 'src/app/adf-apps/types/df-apps.types';
 import { RoleType } from '../../types/role';
+import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
+import { TranslocoPipe } from '@ngneat/transloco';
+import { NgIf } from '@angular/common';
 
 @Component({
   selector: 'df-user-app-roles',
@@ -29,14 +30,14 @@ import { RoleType } from '../../types/role';
   imports: [
     FormsModule,
     ReactiveFormsModule,
-    CommonModule,
     MatAutocompleteModule,
     MatButtonModule,
     MatTableModule,
     MatInputModule,
     FontAwesomeModule,
-    TranslateModule,
     MatExpansionModule,
+    TranslocoPipe,
+    NgIf,
   ],
 })
 export class DfUserAppRolesComponent implements OnInit, OnDestroy {

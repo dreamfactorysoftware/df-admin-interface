@@ -1,102 +1,45 @@
-import { Nav } from 'src/app/shared/types/nav';
-
 export enum ROUTES {
+  IMPORT = 'import',
+  EDIT = 'edit',
+  CREATE = 'create',
   AUTH = 'auth',
-  HOME = 'home',
   LOGIN = 'login',
-  LAUNCHPAD = 'launchpad',
-  SERVICES = 'services',
-  APPS = 'apps',
-  ADMINS = 'admins',
-  USERS = 'users',
-  ROLES = 'roles',
-  APIDOCS = 'api-docs',
-  SCHEMAS = 'schema',
-  DATA = 'data',
-  FILES = 'files',
-  SCRIPTS = 'scripts',
-  CONFIG = 'config',
-  PACKAGES = 'package-manager',
-  LIMITS = 'limits',
-  SCHEDULER = 'scheduler',
-  REPORTS = 'reports',
   RESET_PASSWORD = 'reset-password',
   FORGOT_PASSWORD = 'forgot-password',
   REGISTER = 'register',
   USER_INVITE = 'user-invite',
+  REGISTER_CONFIRM = 'register-confirm',
+  PROFILE = 'profile',
+  HOME = 'home',
   WELCOME = 'welcome',
   QUICKSTART = 'quickstart',
   RESOURCES = 'resources',
   DOWNLOAD = 'download',
-  REGISTER_CONFIRM = 'register-confirm',
-  MANAGE = 'manage',
-  IMPORT = 'import',
-  PROFILE = 'profile',
-  EDIT = 'edit',
-  CREATE = 'create',
+  API_CONNECTIONS = 'api-connections',
+  API_TYPES = 'api-types',
+  DATABASE = 'database',
+  CUSTOM = 'custom',
+  FILE = 'file',
+  UTILITY = 'utility',
+  ROLE_BASED_ACCESS = 'role-based-access',
+  API_KEYS = 'api-keys',
+  SCRIPTS = 'scripts',
+  API_DOCS = 'api-docs',
+  API_SECURITY = 'api-security',
+  RATE_LIMITING = 'rate-limiting',
+  AUTHENTICATION = 'authentication',
+  SYSTEM_SETTINGS = 'system-settings',
+  CONFIG = 'config',
+  SCHEDULER = 'scheduler',
+  LOGS = 'logs',
+  REPORTING = 'reporting',
+  DF_PLATFORM_APIS = 'df-platform-apis',
+  ADMIN_SETTINGS = 'admin-settings',
+  ADMINS = 'admins',
+  SCHEMA = 'schema',
+  USERS = 'users',
+  FILES = 'files',
+  LAUNCHPAD = 'launchpad',
+  DATA = 'data',
+  PACKAGES = 'package-manager',
 }
-
-export const NAV: Array<Nav> = [
-  {
-    route: ROUTES.HOME,
-    subRoutes: [
-      {
-        route: ROUTES.WELCOME,
-      },
-      {
-        route: ROUTES.QUICKSTART,
-      },
-      {
-        route: ROUTES.RESOURCES,
-      },
-      {
-        route: ROUTES.DOWNLOAD,
-      },
-    ],
-  },
-  {
-    route: ROUTES.SERVICES,
-  },
-  {
-    route: ROUTES.APPS,
-  },
-  {
-    route: ROUTES.ADMINS,
-  },
-  {
-    route: ROUTES.USERS,
-  },
-  {
-    route: ROUTES.ROLES,
-  },
-  {
-    route: ROUTES.APIDOCS,
-  },
-  {
-    route: ROUTES.SCHEMAS,
-  },
-  {
-    route: ROUTES.DATA,
-  },
-  {
-    route: ROUTES.FILES,
-  },
-  {
-    route: ROUTES.SCRIPTS,
-  },
-  {
-    route: ROUTES.CONFIG,
-  },
-  {
-    route: ROUTES.PACKAGES,
-  },
-  {
-    route: ROUTES.LIMITS,
-  },
-  {
-    route: ROUTES.SCHEDULER,
-  },
-  {
-    route: ROUTES.REPORTS,
-  },
-];

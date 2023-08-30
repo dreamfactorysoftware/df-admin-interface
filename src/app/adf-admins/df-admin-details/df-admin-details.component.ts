@@ -1,6 +1,6 @@
 import { Component, Inject } from '@angular/core';
-import { FormBuilder } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, takeUntil, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from 'src/app/core/services/df-system-config-data.service';
 import {
@@ -10,11 +10,24 @@ import {
 } from 'src/app/shared/types/user';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { ROUTES } from 'src/app/core/constants/routes';
-import { TranslateService } from '@ngx-translate/core';
+
 import { parseError } from 'src/app/shared/utilities/parse-errors';
 import { DfUserDetailsBaseComponent } from 'src/app/shared/components/df-user-details/df-user-details-base.component';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { DF_ADMIN_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { ADMIN_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfLookupKeysComponent } from '../../shared/components/df-lookup-keys/df-lookup-keys.component';
+import { DfUserAppRolesComponent } from '../../shared/components/df-user-app-roles/df-user-app-roles.component';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { MatButtonModule } from '@angular/material/button';
+import { MatRadioModule } from '@angular/material/radio';
+import { NgIf, NgFor, AsyncPipe } from '@angular/common';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { DfProfileDetailsComponent } from '../../shared/components/df-profile-details/df-profile-details.component';
+import { DfAlertComponent } from '../../shared/components/df-alert/df-alert.component';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-admin-details',
@@ -22,6 +35,26 @@ import { DF_ADMIN_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
     '../../shared/components/df-user-details/df-user-details-base.component.html',
   styleUrls: [
     '../../shared/components/df-user-details/df-user-details-base.component.scss',
+  ],
+  standalone: true,
+  imports: [
+    DfAlertComponent,
+    ReactiveFormsModule,
+    DfProfileDetailsComponent,
+    MatSlideToggleModule,
+    NgIf,
+    MatRadioModule,
+    MatButtonModule,
+    FontAwesomeModule,
+    MatCheckboxModule,
+    MatFormFieldModule,
+    MatInputModule,
+    NgFor,
+    DfUserAppRolesComponent,
+    DfLookupKeysComponent,
+    RouterLink,
+    AsyncPipe,
+    TranslocoPipe,
   ],
 })
 export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProfile> {
@@ -32,8 +65,8 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
     activatedRoute: ActivatedRoute,
     systemConfigDataService: DfSystemConfigDataService,
     breakpointService: DfBreakpointService,
-    private translateService: TranslateService,
-    @Inject(DF_ADMIN_SERVICE_TOKEN)
+    private translateService: TranslocoService,
+    @Inject(ADMIN_SERVICE_TOKEN)
     private adminService: DfBaseCrudService,
     private router: Router
   ) {
@@ -79,7 +112,7 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
           catchError(err => {
             this.triggerAlert(
               'error',
-              this.translateService.instant(
+              this.translateService.translate(
                 parseError(err.error.error.context.resource[0].message)
               )
             );

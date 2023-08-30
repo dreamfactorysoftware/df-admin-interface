@@ -2,13 +2,22 @@ import { Component, Inject } from '@angular/core';
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
-import { TranslateService } from '@ngx-translate/core';
+
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { takeUntil } from 'rxjs';
-import { DF_REPORT_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { REPORT_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { ServiceReportData } from 'src/app/core/constants/reports';
+import { ServiceReportData } from 'src/app/shared/types/reports';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatTableModule } from '@angular/material/table';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { MatButtonModule } from '@angular/material/button';
+import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-manage-service-report-table',
@@ -17,17 +26,32 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
   styleUrls: [
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
+  standalone: true,
+  imports: [
+    NgIf,
+    MatButtonModule,
+    FontAwesomeModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatTableModule,
+    NgFor,
+    MatMenuModule,
+    NgTemplateOutlet,
+    MatPaginatorModule,
+    TranslocoPipe,
+    AsyncPipe,
+  ],
 })
 export class DfManageServiceReportTableComponent extends DfManageTableComponent<ServiceReportData> {
   override allowCreate = false;
   constructor(
-    @Inject(DF_REPORT_SERVICE_TOKEN)
+    @Inject(REPORT_SERVICE_TOKEN)
     private service: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslateService
+    translateService: TranslocoService
   ) {
     super(
       router,
@@ -42,37 +66,37 @@ export class DfManageServiceReportTableComponent extends DfManageTableComponent<
     {
       columnDef: 'id',
       cell: (row: ServiceReportData) => row.id,
-      header: 'ID',
+      header: 'id',
     },
     {
       columnDef: 'time',
       cell: (row: ServiceReportData) => row.lastModifiedDate,
-      header: 'Time',
+      header: 'time',
     },
     {
       columnDef: 'serviceId',
       cell: (row: ServiceReportData) => row.serviceId,
-      header: 'Service Id',
+      header: 'serviceId',
     },
     {
       columnDef: 'serviceName',
       cell: (row: ServiceReportData) => row.serviceName,
-      header: 'Service Name',
+      header: 'serviceName',
     },
     {
       columnDef: 'userEmail',
       cell: (row: ServiceReportData) => row.userEmail,
-      header: 'User Email',
+      header: 'userEmail',
     },
     {
       columnDef: 'action',
       cell: (row: ServiceReportData) => row.action,
-      header: 'Action',
+      header: 'action',
     },
     {
       columnDef: 'request',
       cell: (row: ServiceReportData) => row.requestVerb,
-      header: 'Request',
+      header: 'request',
     },
   ];
 

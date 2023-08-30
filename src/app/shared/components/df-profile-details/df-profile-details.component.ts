@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { NgIf } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import {
   FormGroup,
@@ -9,7 +9,7 @@ import {
 } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslocoPipe } from '@ngneat/transloco';
 import { Subject, takeUntil } from 'rxjs';
 
 @Component({
@@ -19,10 +19,10 @@ import { Subject, takeUntil } from 'rxjs';
   imports: [
     MatFormFieldModule,
     MatInputModule,
-    TranslateModule,
     FormsModule,
     ReactiveFormsModule,
-    CommonModule,
+    TranslocoPipe,
+    NgIf,
   ],
 })
 export class DfProfileDetailsComponent implements OnInit, OnDestroy {

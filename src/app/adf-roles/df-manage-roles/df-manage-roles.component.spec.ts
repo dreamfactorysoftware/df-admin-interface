@@ -8,7 +8,7 @@ describe('DfManageRolesComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfManageRolesComponent],
+      imports: [DfManageRolesComponent],
     });
     fixture = TestBed.createComponent(DfManageRolesComponent);
     component = fixture.componentInstance;

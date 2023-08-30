@@ -2,10 +2,10 @@
   <mat-accordion>
     <mat-expansion-panel>
       <mat-expansion-panel-header>
-        <mat-panel-title> {{ 'roles.label' | translate }}</mat-panel-title>
+        <mat-panel-title> {{ 'roles.label' | transloco }}</mat-panel-title>
         <mat-panel-description>{{
           'roles.appRoleAssigned'
-            | translate
+            | transloco
               : {
                   assigned: apps.length - availableApps.length,
                   total: apps.length
@@ -17,13 +17,13 @@
           <mat-table [dataSource]="dataSource">
             <ng-container matColumnDef="app">
               <mat-header-cell *matHeaderCellDef>
-                {{ 'roles.app' | translate }}
+                {{ 'roles.app' | transloco }}
               </mat-header-cell>
               <mat-cell
                 *matCellDef="let row; let i = index"
                 [formGroupName]="i">
                 <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>{{ 'roles.app' | translate }}</mat-label>
+                  <mat-label>{{ 'roles.app' | transloco }}</mat-label>
                   <input
                     matInput
                     formControlName="app"
@@ -41,13 +41,13 @@
 
             <ng-container matColumnDef="role">
               <mat-header-cell *matHeaderCellDef>
-                {{ 'roles.role' | translate }}
+                {{ 'roles.role' | transloco }}
               </mat-header-cell>
               <mat-cell
                 *matCellDef="let row; let i = index"
                 [formGroupName]="i">
                 <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>{{ 'roles.role' | translate }}</mat-label>
+                  <mat-label>{{ 'roles.role' | transloco }}</mat-label>
                   <input
                     matInput
                     formControlName="role"
@@ -67,7 +67,7 @@
                   *ngIf="showAddButton"
                   mat-mini-fab
                   color="primary"
-                  [attr.aria-label]="'newEntry' | translate"
+                  [attr.aria-label]="'newEntry' | transloco"
                   type="button"
                   (click)="add()">
                   <fa-icon [icon]="faPlus" size="xl"></fa-icon>
@@ -86,7 +86,7 @@
             <mat-row *matRowDef="let row; columns: displayedColumns"></mat-row>
             <tr class="mat-row" *matNoDataRow>
               <td class="mat-cell" colspan="4">
-                {{ 'roles.noRoles' | translate }}
+                {{ 'roles.noRoles' | transloco }}
               </td>
             </tr>
           </mat-table>

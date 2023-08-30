@@ -1,20 +1,48 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  ReactiveFormsModule,
+} from '@angular/forms';
 import { Subject, catchError, switchMap, takeUntil, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
-import { AlertType } from '../../shared/components/df-alert/df-alert.component';
+import {
+  AlertType,
+  DfAlertComponent,
+} from '../../shared/components/df-alert/df-alert.component';
 import { matchValidator } from '../../shared/validators/match.validator';
 import { ROUTES } from '../../core/constants/routes';
 import { DfPasswordService } from '../services/df-password.service';
-import { TranslateService } from '@ngx-translate/core';
-import { Router } from '@angular/router';
+
+import { Router, RouterLink } from '@angular/router';
 import { DfAuthService } from '../services/df-auth.service';
 import { LoginCredentials } from '../types';
+import { MatButtonModule } from '@angular/material/button';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { NgIf } from '@angular/common';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatCardModule } from '@angular/material/card';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-forgot-password',
   templateUrl: './df-forgot-password.component.html',
   styleUrls: ['../adf-user-management.scss'],
+  standalone: true,
+  imports: [
+    MatCardModule,
+    DfAlertComponent,
+    MatDividerModule,
+    NgIf,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    RouterLink,
+    TranslocoPipe,
+  ],
 })
 export class DfForgotPasswordComponent implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();
@@ -32,7 +60,7 @@ export class DfForgotPasswordComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private systemConfigDataService: DfSystemConfigDataService,
     private passwordService: DfPasswordService,
-    private translateService: TranslateService,
+    private translateService: TranslocoService,
     private router: Router,
     private authService: DfAuthService
   ) {
@@ -95,7 +123,7 @@ export class DfForgotPasswordComponent implements OnInit, OnDestroy {
             res.securityQuestion
           );
         } else {
-          this.alertMsg = this.translateService.instant(
+          this.alertMsg = this.translateService.translate(
             'userManagement.alerts.resetEmailSent'
           );
           this.showAlert = true;

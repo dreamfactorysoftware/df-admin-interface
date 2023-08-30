@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import { Component, Inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import {
@@ -7,16 +6,17 @@ import {
   MatSnackBarRef,
 } from '@angular/material/snack-bar';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import {
-  faXmark,
-  faCheckCircle,
-  faXmarkCircle,
-  faExclamationCircle,
-  faInfoCircle,
-} from '@fortawesome/free-solid-svg-icons';
 import { AlertType } from '../df-alert/df-alert.component';
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
-import { TranslateModule } from '@ngx-translate/core';
+
+import {
+  faCheckCircle,
+  faExclamationCircle,
+  faInfoCircle,
+  faXmark,
+  faXmarkCircle,
+} from '@fortawesome/free-solid-svg-icons';
+import { TranslocoPipe } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-snackbar',
@@ -26,9 +26,8 @@ import { TranslateModule } from '@ngx-translate/core';
   imports: [
     MatButtonModule,
     MatSnackBarModule,
-    CommonModule,
     FontAwesomeModule,
-    TranslateModule,
+    TranslocoPipe,
   ],
 })
 export class DfSnackbarComponent {

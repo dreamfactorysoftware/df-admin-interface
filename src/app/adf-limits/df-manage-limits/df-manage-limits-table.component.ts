@@ -1,12 +1,23 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { takeUntil } from 'rxjs';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { TranslateService } from '@ngx-translate/core';
-import { DfLimitsService } from '../services/df-limits.service';
+
 import { LimitType } from 'src/app/shared/types/limit';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatTableModule } from '@angular/material/table';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { MatButtonModule } from '@angular/material/button';
+import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
+import { LIMIT_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 
 type LimitTableRowData = {
   id: number;
@@ -27,15 +38,31 @@ type LimitTableRowData = {
   styleUrls: [
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
+  standalone: true,
+  imports: [
+    NgIf,
+    MatButtonModule,
+    FontAwesomeModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatTableModule,
+    NgFor,
+    MatMenuModule,
+    NgTemplateOutlet,
+    MatPaginatorModule,
+    TranslocoPipe,
+    AsyncPipe,
+  ],
 })
 export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTableRowData> {
   constructor(
-    private limitService: DfLimitsService,
+    @Inject(LIMIT_SERVICE_TOKEN)
+    private limitService: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslateService
+    translateService: TranslocoService
   ) {
     super(
       router,
@@ -49,7 +76,7 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
     {
       columnDef: 'active',
       cell: (row: LimitTableRowData) => row.active,
-      header: 'Active',
+      header: 'active',
     },
     {
       columnDef: 'id',
@@ -57,39 +84,39 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
       header: 'id',
     },
     {
-      columnDef: 'limitName',
+      columnDef: 'name',
       cell: (row: LimitTableRowData) => row.name,
-      header: 'Limit Name',
+      header: 'name',
     },
     {
-      columnDef: 'limitType',
+      columnDef: 'type',
       cell: (row: LimitTableRowData) => row.limitType,
-      header: 'Limit Type',
+      header: 'type',
     },
     {
-      columnDef: 'limitRate',
+      columnDef: 'rate',
       cell: (row: LimitTableRowData) => row.limitRate,
-      header: 'Limit Rate',
+      header: 'rate',
     },
     {
-      columnDef: 'limitCounter',
+      columnDef: 'counter',
       cell: (row: LimitTableRowData) => row.limitCounter,
-      header: 'Limit Counter',
+      header: 'counter',
     },
     {
       columnDef: 'user',
       cell: (row: LimitTableRowData) => row.user,
-      header: 'User',
+      header: 'user',
     },
     {
       columnDef: 'service',
       cell: (row: LimitTableRowData) => row.service,
-      header: 'Service',
+      header: 'service',
     },
     {
       columnDef: 'role',
       cell: (row: LimitTableRowData) => row.role,
-      header: 'Role',
+      header: 'role',
     },
     {
       columnDef: 'actions',
@@ -118,14 +145,14 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
 
   override deleteRow(row: LimitTableRowData): void {
     this.limitService
-      .deleteLimit(row.id.toString())
+      .delete(row.id)
       .pipe(takeUntil(this.destroyed$))
       .subscribe(() => this.refreshTable());
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.limitService
-      .getLimits(limit, offset, filter)
+      .getAll<GenericListResponse<LimitType>>({ limit, offset, filter })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);

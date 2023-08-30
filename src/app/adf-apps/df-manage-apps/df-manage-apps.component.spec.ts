@@ -8,7 +8,7 @@ describe('DfManageAppsComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfManageAppsComponent],
+      imports: [DfManageAppsComponent],
     });
     fixture = TestBed.createComponent(DfManageAppsComponent);
     component = fixture.componentInstance;

@@ -5,7 +5,7 @@ import { switchMap } from 'rxjs';
 import { Inject, Injectable } from '@angular/core';
 import { URL_TOKEN } from '../constants/tokens';
 
-export function DfBaseCrudServiceFactory(url: string, http: HttpClient) {
+export function dfBaseCrudServiceFactory(url: string, http: HttpClient) {
   return new DfBaseCrudService(url, http);
 }
 
@@ -19,7 +19,12 @@ export class DfBaseCrudService {
   getAll<T>(options?: Partial<RequestOptions>) {
     return this.http.get<T>(
       this.url,
-      this.getOptions({ limit: 10, offset: 0, includeCount: true, ...options })
+      this.getOptions({
+        limit: 10,
+        offset: 0,
+        includeCount: true,
+        ...options,
+      })
     );
   }
 
