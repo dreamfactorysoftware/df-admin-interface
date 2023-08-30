@@ -4,11 +4,19 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { takeUntil } from 'rxjs';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { TranslateService } from '@ngx-translate/core';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { DF_SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { SchedulerTaskData } from '../types/df-scheduler.types';
 import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatMenuModule } from '@angular/material/menu';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { MatTableModule } from '@angular/material/table';
+import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 
 @Component({
   selector: 'df-manage-scheduler-table',
@@ -17,18 +25,33 @@ import { SystemServiceData } from 'src/app/adf-services/services/service-data.se
   styleUrls: [
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
+  standalone: true,
+  imports: [
+    AsyncPipe,
+    NgFor,
+    NgIf,
+    NgTemplateOutlet,
+    FontAwesomeModule,
+    MatPaginatorModule,
+    MatMenuModule,
+    MatInputModule,
+    MatFormFieldModule,
+    MatCheckboxModule,
+    MatTableModule,
+    TranslocoPipe,
+  ],
 })
 export class DfManageSchedulerTableComponent extends DfManageTableComponent<SchedulerTaskData> {
   userServices: SystemServiceData[];
 
   constructor(
-    @Inject(DF_SCHEDULER_SERVICE_TOKEN)
+    @Inject(SCHEDULER_SERVICE_TOKEN)
     private service: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslateService
+    translateService: TranslocoService
   ) {
     super(
       router,
@@ -51,22 +74,22 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
     {
       columnDef: 'active',
       cell: (row: SchedulerTaskData) => row.isActive,
-      header: 'Active',
+      header: 'nav.system-settings.scheduler.table.header.active',
     },
     {
       columnDef: 'id',
       cell: (row: SchedulerTaskData) => row.id,
-      header: 'Id',
+      header: 'nav.system-settings.scheduler.table.header.id',
     },
     {
       columnDef: 'name',
       cell: (row: SchedulerTaskData) => row.name,
-      header: 'Name',
+      header: 'nav.system-settings.scheduler.table.header.name',
     },
     {
       columnDef: 'description',
       cell: (row: SchedulerTaskData) => row.description,
-      header: 'Description',
+      header: 'nav.system-settings.scheduler.table.header.description',
     },
     {
       columnDef: 'service',
@@ -76,27 +99,27 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
         });
         return service?.name ?? '';
       },
-      header: 'Service',
+      header: 'nav.system-settings.scheduler.table.header.service',
     },
     {
       columnDef: 'component',
       cell: (row: SchedulerTaskData) => row.component,
-      header: 'Component',
+      header: 'nav.system-settings.scheduler.table.header.component',
     },
     {
       columnDef: 'method',
       cell: (row: SchedulerTaskData) => row.verb,
-      header: 'Method',
+      header: 'nav.system-settings.scheduler.table.header.method',
     },
     {
       columnDef: 'frequency',
       cell: (row: SchedulerTaskData) => row.frequency,
-      header: 'Frequency',
+      header: 'nav.system-settings.scheduler.table.header.frequency',
     },
     {
       columnDef: 'log',
       cell: (row: SchedulerTaskData) => !!row.taskLogByTaskId,
-      header: 'Log',
+      header: 'nav.system-settings.scheduler.table.header.log',
     },
     {
       columnDef: 'actions',

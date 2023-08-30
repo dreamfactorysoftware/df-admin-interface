@@ -6,18 +6,38 @@ import { SystemServiceData } from 'src/app/adf-services/services/service-data.se
 import { ROUTES } from 'src/app/core/constants/routes';
 import { JsonValidator } from 'src/app/shared/validators/json.validator';
 import { DfAccessListService } from '../services/access-list.service';
-import { DF_SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import {
   CreateSchedulePayload,
   SchedulerTaskData,
   UpdateSchedulePayload,
 } from '../types/df-scheduler.types';
+import { TranslocoPipe } from '@ngneat/transloco';
+import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { ReactiveFormsModule } from '@angular/forms';
 
 @Component({
   selector: 'df-scheduler',
   templateUrl: './df-scheduler.component.html',
   styleUrls: ['./df-scheduler.component.scss'],
+  standalone: true,
+  imports: [
+    AsyncPipe,
+    MatInputModule,
+    MatTabsModule,
+    MatSelectModule,
+    MatSlideToggleModule,
+    NgIf,
+    NgFor,
+    NgTemplateOutlet,
+    TranslocoPipe,
+    ReactiveFormsModule,
+  ],
 })
 export class DfSchedulerComponent implements OnInit, OnDestroy {
   destroyed$ = new Subject<void>();
@@ -55,7 +75,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
   ];
 
   constructor(
-    @Inject(DF_SCHEDULER_SERVICE_TOKEN)
+    @Inject(SCHEDULER_SERVICE_TOKEN)
     private service: DfBaseCrudService,
     private formBuilder: FormBuilder,
     private activatedRoute: ActivatedRoute,
@@ -128,7 +148,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
   }
 
   onCancel() {
-    this.router.navigate([ROUTES.SCHEDULER]);
+    this.router.navigate([`${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`]);
   }
 
   onSubmit() {
@@ -147,7 +167,9 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         )
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
-          this.router.navigate([ROUTES.SCHEDULER]);
+          this.router.navigate([
+            `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
+          ]);
         });
     } else if (this.formGroup.valid && this.scheduleToEdit) {
       const payload = this.assemblePayload() as UpdateSchedulePayload;
@@ -161,7 +183,9 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         })
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
-          this.router.navigate([ROUTES.SCHEDULER]);
+          this.router.navigate([
+            `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
+          ]);
         });
     }
   }

@@ -1,7 +1,7 @@
 <mat-tab-group>
   <mat-tab label="First">
-    <h1>{{ 'scheduler.taskOverview' | translate }}</h1>
-    <h4>{{ 'scheduler.taskOverviewSubtitle' | translate }}</h4>
+    <h1>{{ 'scheduler.taskOverview' | transloco }}</h1>
+    <h4>{{ 'scheduler.taskOverviewSubtitle' | transloco }}</h4>
     <form [formGroup]="formGroup" (ngSubmit)="onSubmit()">
       <mat-form-field>
         <mat-label>Name</mat-label>
@@ -58,17 +58,17 @@
       </ng-container>
       <div>
         <button mat-raised-button (click)="onCancel()">
-          {{ 'cancel' | translate }}
+          {{ 'cancel' | transloco }}
         </button>
         <button mat-raised-button color="primary" type="submit">
-          {{ 'save' | translate }}
+          {{ 'save' | transloco }}
         </button>
       </div>
     </form>
   </mat-tab>
   <mat-tab label="Second">
-    <h1>{{ 'scheduler.logPageTitle' | translate }}</h1>
-    <h4>{{ 'scheduler.logPageSubtitle' | translate }}</h4>
+    <h1>{{ 'scheduler.logPageTitle' | transloco }}</h1>
+    <h4>{{ 'scheduler.logPageSubtitle' | transloco }}</h4>
     <p>Status Code:</p>
     <p>Error:</p>
     <!-- TODO: Add ace editor here for the error log -->

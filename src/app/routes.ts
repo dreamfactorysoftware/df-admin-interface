@@ -21,6 +21,7 @@ import {
   LIMIT_SERVICE_PROVIDERS,
   REPORT_SERVICE_PROVIDERS,
   ROLE_SERVICE_PROVIDERS,
+  SCHEDULER_SERVICE_PROVIDER,
   USER_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
@@ -29,6 +30,8 @@ import { DfPasswordService } from './adf-user-management/services/df-password.se
 import { profileResolver } from './adf-profile/resolvers/profile.resolver';
 import { DfServiceDataService } from './adf-services/services/service-data.service';
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
+import { schedulerResolver } from './adf-scheduler/resolvers/scheduler.resolver';
+import { DfAccessListService } from './adf-scheduler/services/access-list.service';
 
 export const routes: Routes = [
   {
@@ -301,7 +304,45 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.SCHEDULER,
-        component: DfPlaceHolderComponent,
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import(
+                './adf-scheduler/df-manage-scheduler/df-manage-scheduler-table.component'
+              ).then(m => m.DfManageSchedulerTableComponent),
+            resolve: {
+              data: schedulerResolver,
+              services: getSystemServiceDataListResolver,
+            },
+          },
+          {
+            path: ROUTES.CREATE,
+            loadComponent: () =>
+              import(
+                './adf-scheduler/df-scheduler/df-scheduler.component'
+              ).then(m => m.DfSchedulerComponent),
+            resolve: {
+              data: getSystemServiceDataListResolver,
+            },
+          },
+          {
+            path: `${ROUTES.EDIT}/:id`,
+            loadComponent: () =>
+              import(
+                './adf-scheduler/df-scheduler/df-scheduler.component'
+              ).then(m => m.DfSchedulerComponent),
+            resolve: {
+              data: getSystemServiceDataListResolver,
+              schedulerObject: schedulerResolver,
+            },
+          },
+        ],
+        providers: [
+          DfServiceDataService,
+          DfAccessListService,
+          ...SCHEDULER_SERVICE_PROVIDER,
+        ],
       },
       {
         path: ROUTES.LOGS,

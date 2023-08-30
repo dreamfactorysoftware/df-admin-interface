@@ -470,7 +470,26 @@
       },
       "scheduler": {
         "nav": "Scheduler",
-        "header": "{{nav.system-settings.scheduler.nav}}"
+        "header": "{{nav.system-settings.scheduler.nav}}",
+        "create": {
+          "header": "Create a new Scheduled Task"
+        },
+        "edit": {
+          "header": "Update Scheduled Task"
+        },
+        "table": {
+          "header": {
+            "active": "Active",
+            "id": "ID",
+            "name": "Name",
+            "description": "Description",
+            "service": "Service",
+            "component": "Component",
+            "method": "Method",
+            "frequency": "Frequency",
+            "log": "Log"
+          }
+        }
       },
       "logs": { "nav": "Logs", "header": "{{nav.system-settings.logs.nav}}" },
       "reporting": {
