@@ -18,6 +18,7 @@ import { LIMIT_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { DfLimitCacheService } from '../services/limit-cache.service';
 
 type LimitTableRowData = {
   id: number;
@@ -58,6 +59,7 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
   constructor(
     @Inject(LIMIT_SERVICE_TOKEN)
     private limitService: DfBaseCrudService,
+    private limitCacheService: DfLimitCacheService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -71,6 +73,8 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
       breakpointService,
       translateService
     );
+
+    this.allowRefresh = true;
   }
   override columns = [
     {
@@ -141,6 +145,19 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
 
   filterQuery(value: string): string {
     return `(name like "%${value}%")`;
+  }
+
+  override refreshRows(id?: number): void {
+    const ids = id
+      ? [id.toString()]
+      : this.dataSource.data.map(row => {
+          return row.id.toString();
+        });
+
+    this.limitCacheService
+      .resetLimitCacheCounter(ids)
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(() => this.refreshTable());
   }
 
   override deleteRow(row: LimitTableRowData): void {

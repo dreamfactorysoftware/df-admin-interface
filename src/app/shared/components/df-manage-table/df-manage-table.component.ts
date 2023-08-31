@@ -24,6 +24,7 @@ import {
   faEllipsisV,
   faCheckCircle,
   faXmarkCircle,
+  faArrowsRotate,
 } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoService } from '@ngneat/transloco';
 
@@ -46,7 +47,9 @@ export abstract class DfManageTableComponent<T>
   faPenToSquare = faPenToSquare;
   faPlus = faPlus;
   faEllipsisV = faEllipsisV;
+  faArrowsRotate = faArrowsRotate;
   allowCreate = true;
+  allowRefresh = false;
 
   abstract columns: Array<{
     columnDef: string;
@@ -96,6 +99,10 @@ export abstract class DfManageTableComponent<T>
   abstract filterQuery(value: string): string;
 
   deleteRow(row: T): void {
+    //intentionally left blank
+  }
+
+  refreshRows(id?: number): void {
     //intentionally left blank
   }
 
@@ -150,6 +157,12 @@ export abstract class DfManageTableComponent<T>
 
   editLabel(row: T) {
     return this.translateService.selectTranslate('editRow', {
+      id: (row as any).id,
+    });
+  }
+
+  resetRowCounterLabel(row: T) {
+    return this.translateService.selectTranslate('resetRowCounter', {
       id: (row as any).id,
     });
   }

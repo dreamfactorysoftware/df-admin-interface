@@ -7,6 +7,14 @@
     (click)="createRow()">
     <fa-icon [icon]="faPlus" size="xl"></fa-icon>
   </button>
+  <button
+    *ngIf="allowRefresh"
+    mat-mini-fab
+    color="primary"
+    [attr.aria-label]="'clearLimitCounters' | transloco"
+    (click)="refreshRows()">
+    <fa-icon [icon]="faArrowsRotate" size="xl"></fa-icon>
+  </button>
   <ng-content select="[topActions]"></ng-content>
   <div class="spacer"></div>
   <mat-form-field class="search-input" subscriptSizing="dynamic">
@@ -60,6 +68,13 @@
           <fa-icon [icon]="faEllipsisV" size="xs"></fa-icon>
         </button>
         <mat-menu #actionsMenu="matMenu">
+          <button
+            *ngIf="allowRefresh"
+            mat-menu-item
+            (click)="refreshRows(row.id)"
+            [attr.aria-label]="resetRowCounterLabel(row) | async">
+            {{ 'clearLimitCounter' | transloco }}
+          </button>
           <button
             mat-menu-item
             (click)="editRow(row)"
