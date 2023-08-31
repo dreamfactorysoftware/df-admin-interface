@@ -32,6 +32,7 @@ import { DfServiceDataService } from './adf-services/services/service-data.servi
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
 import { schedulerResolver } from './adf-scheduler/resolvers/scheduler.resolver';
 import { DfAccessListService } from './adf-scheduler/services/access-list.service';
+import { systemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
 
 export const routes: Routes = [
   {
@@ -300,7 +301,18 @@ export const routes: Routes = [
       { path: '', redirectTo: ROUTES.CONFIG, pathMatch: 'full' },
       {
         path: ROUTES.CONFIG,
-        component: DfPlaceHolderComponent,
+        children: [
+          {
+            path: ROUTES.SYSTEM_INFO,
+            loadComponent: () =>
+              import(
+                './adf-config/df-system-info/df-system-info.component'
+              ).then(m => m.DfSystemInfoComponent),
+            resolve: {
+              data: systemInfoResolver,
+            },
+          },
+        ],
       },
       {
         path: ROUTES.SCHEDULER,
