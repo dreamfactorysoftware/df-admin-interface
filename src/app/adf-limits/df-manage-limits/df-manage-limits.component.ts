@@ -1,5 +1,4 @@
 import { Component, ViewChild } from '@angular/core';
-import { DfManageAdminsTableComponent } from 'src/app/adf-admins/df-manage-admins/df-manage-admins-table.component';
 import { DfManageLimitsTableComponent } from './df-manage-limits-table.component';
 
 @Component({
@@ -11,5 +10,5 @@ import { DfManageLimitsTableComponent } from './df-manage-limits-table.component
 })
 export class DfManageLimitsComponent {
   @ViewChild(DfManageLimitsTableComponent)
-  manageAdminTableComponent!: DfManageAdminsTableComponent;
+  manageLimitsTableComponent!: DfManageLimitsTableComponent;
 }
