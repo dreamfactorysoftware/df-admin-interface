@@ -14,6 +14,7 @@ export enum URLS {
   SYSTEM_ADMIN = `${BASE_URL}/system/admin`,
   ROLES = `${BASE_URL}/system/role`,
   LIMITS = `${BASE_URL}/system/limit`,
+  LIMIT_CACHE = `${BASE_URL}/system/limit_cache`,
   SYSTEM_SERVICE = `${BASE_URL}/system/service`,
   SERVICE_TYPE = `${BASE_URL}/system/service_type`,
   SYSTEM_USER = `${BASE_URL}/system/user`,

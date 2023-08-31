@@ -14,12 +14,15 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
 import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
-import { LIMIT_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import {
+  LIMIT_CACHE_SERVICE_TOKEN,
+  LIMIT_SERVICE_TOKEN,
+} from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 
-type LimitTableRowData = {
+export type LimitTableRowData = {
   id: number;
   name: string;
   limitType: string;
@@ -58,6 +61,8 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
   constructor(
     @Inject(LIMIT_SERVICE_TOKEN)
     private limitService: DfBaseCrudService,
+    @Inject(LIMIT_CACHE_SERVICE_TOKEN)
+    private limitCacheService: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -143,16 +148,28 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
     return `(name like "%${value}%")`;
   }
 
-  override deleteRow(row: LimitTableRowData): void {
-    this.limitService
-      .delete(row.id)
+  refreshRows(id?: number): void {
+    const ids = id
+      ? [id.toString()]
+      : this.dataSource.data.map(row => {
+          return row.id.toString();
+        });
+
+    this.limitCacheService
+      .delete(ids)
       .pipe(takeUntil(this.destroyed$))
       .subscribe(() => this.refreshTable());
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.limitService
-      .getAll<GenericListResponse<LimitType>>({ limit, offset, filter })
+      .getAll<GenericListResponse<LimitType>>({
+        limit,
+        offset,
+        filter,
+        related:
+          'service_by_service_id,role_by_role_id,user_by_user_id,limit_cache_by_limit_id',
+      })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);

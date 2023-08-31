@@ -13,6 +13,8 @@ import {
   REPORT_SERVICE_TOKEN,
   LIMIT_URL_TOKEN,
   LIMIT_SERVICE_TOKEN,
+  LIMIT_CACHE_URL_TOKEN,
+  LIMIT_CACHE_SERVICE_TOKEN,
 } from './tokens';
 import { URLS } from './urls';
 
@@ -85,5 +87,17 @@ export const LIMIT_SERVICE_PROVIDERS = [
     provide: LIMIT_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [LIMIT_URL_TOKEN, HttpClient],
+  },
+];
+
+export const LIMIT_CACHE_SERVICE_PROVIDERS = [
+  {
+    provide: LIMIT_CACHE_URL_TOKEN,
+    useValue: URLS.LIMIT_CACHE,
+  },
+  {
+    provide: LIMIT_CACHE_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [LIMIT_CACHE_URL_TOKEN, HttpClient],
   },
 ];

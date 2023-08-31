@@ -18,6 +18,7 @@ import { getSystemServiceDataListResolver } from './adf-services/resolvers/servi
 import {
   ADMIN_SERVICE_PROVIDERS,
   APP_SERVICE_PROVIDERS,
+  LIMIT_CACHE_SERVICE_PROVIDERS,
   LIMIT_SERVICE_PROVIDERS,
   REPORT_SERVICE_PROVIDERS,
   ROLE_SERVICE_PROVIDERS,
@@ -29,7 +30,7 @@ import { DfPasswordService } from './adf-user-management/services/df-password.se
 import { profileResolver } from './adf-profile/resolvers/profile.resolver';
 import { DfServiceDataService } from './adf-services/services/service-data.service';
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
-import { systemInfoResolver } from './adf-config/adf-system-info/resolvers/df-system-info.resolver';
+import { systemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
 
 export const routes: Routes = [
   {
@@ -282,6 +283,7 @@ export const routes: Routes = [
           ...LIMIT_SERVICE_PROVIDERS,
           ...USER_SERVICE_PROVIDERS,
           ...ROLE_SERVICE_PROVIDERS,
+          ...LIMIT_CACHE_SERVICE_PROVIDERS,
           DfServiceDataService,
         ],
       },
