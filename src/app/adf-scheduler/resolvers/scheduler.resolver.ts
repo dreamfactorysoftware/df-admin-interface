@@ -9,7 +9,10 @@ export const schedulerResolver: ResolveFn<
 > = (route: ActivatedRouteSnapshot) => {
   const id = route.paramMap.get('id');
 
-  if (id) return inject(SCHEDULER_SERVICE_TOKEN).get(id);
+  if (id)
+    return inject(SCHEDULER_SERVICE_TOKEN).get(id, {
+      related: 'task_log_by_task_id',
+    });
 
   return inject(SCHEDULER_SERVICE_TOKEN).getAll({
     related: 'task_log_by_task_id',

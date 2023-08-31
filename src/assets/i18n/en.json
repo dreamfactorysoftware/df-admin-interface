@@ -60,6 +60,14 @@
   "data": "Data",
   "packages": "Packages",
   "launchpad": "LaunchPad",
+  "goBack": "Go back",
+  "verbs": {
+    "get": "GET (read)",
+    "post": "POST (create)",
+    "put": "PUT (replace)",
+    "patch": "PATCH (update)",
+    "delete": "DELETE (remove)"
+  },
   "home": {
     "resourceLinks": {
       "gettingStartedGuide": "Getting Started Guide",

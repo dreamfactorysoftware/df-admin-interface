@@ -1,5 +1,11 @@
 import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormControl,
+  FormControlName,
+  FormGroup,
+  Validators,
+} from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
@@ -20,6 +26,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ReactiveFormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
 
 @Component({
   selector: 'df-scheduler',
@@ -28,6 +35,7 @@ import { ReactiveFormsModule } from '@angular/forms';
   standalone: true,
   imports: [
     AsyncPipe,
+    MatButtonModule,
     MatInputModule,
     MatTabsModule,
     MatSelectModule,
@@ -41,7 +49,8 @@ import { ReactiveFormsModule } from '@angular/forms';
 })
 export class DfSchedulerComponent implements OnInit, OnDestroy {
   destroyed$ = new Subject<void>();
-  formGroup: FormGroup;
+  formGroup: FormGroup; // basic form
+  logFormControl: FormControl;
   userServicesDropdownOptions: SystemServiceData[];
   selectedService: SystemServiceData | undefined;
 
@@ -54,23 +63,23 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
   verbDropdownOptions = [
     {
       value: 'GET',
-      name: 'GET (read)',
+      name: 'verbs.get',
     },
     {
       value: 'POST',
-      name: 'POST (create)',
+      name: 'verbs.post',
     },
     {
       value: 'PUT',
-      name: 'PUT (replace)',
+      name: 'verbs.put',
     },
     {
       value: 'PATCH',
-      name: 'PATCH (update)',
+      name: 'verbs.patch',
     },
     {
       value: 'DELETE',
-      name: 'DELETE (remove)',
+      name: 'verbs.delete',
     },
   ];
 
@@ -107,6 +116,10 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         .pipe(takeUntil(this.destroyed$))
         .subscribe((data: any) => {
           this.scheduleToEdit = data.schedulerObject;
+
+          this.logFormControl = new FormControl(
+            this.scheduleToEdit?.taskLogByTaskId?.content
+          );
 
           this.getServiceAccessList(this.scheduleToEdit?.serviceId as number);
 
@@ -166,11 +179,12 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
           }
         )
         .pipe(takeUntil(this.destroyed$))
-        .subscribe(() => {
+        .subscribe(() =>
+          // TODO: this call is made successfully but throws an injection context error
           this.router.navigate([
             `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
-          ]);
-        });
+          ])
+        );
     } else if (this.formGroup.valid && this.scheduleToEdit) {
       const payload = this.assemblePayload() as UpdateSchedulePayload;
 
@@ -182,11 +196,12 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
           related: this.relatedParam,
         })
         .pipe(takeUntil(this.destroyed$))
-        .subscribe(() => {
+        .subscribe(() =>
+          // TODO: this call is made successfully but throws an injection context error
           this.router.navigate([
             `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
-          ]);
-        });
+          ])
+        );
     }
   }
 

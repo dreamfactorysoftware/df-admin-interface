@@ -1,5 +1,5 @@
 <mat-tab-group>
-  <mat-tab label="First">
+  <mat-tab label="Basic">
     <h1>{{ 'scheduler.taskOverview' | transloco }}</h1>
     <h4>{{ 'scheduler.taskOverviewSubtitle' | transloco }}</h4>
     <form [formGroup]="formGroup" (ngSubmit)="onSubmit()">
@@ -41,7 +41,7 @@
           <mat-option
             *ngFor="let verb of verbDropdownOptions"
             [value]="verb.value"
-            >{{ verb.name }}
+            >{{ verb.name | transloco }}
           </mat-option>
         </mat-select>
       </mat-form-field>
@@ -53,7 +53,6 @@
         <mat-form-field>
           <mat-label>Payload (JSON)</mat-label>
           <textarea matInput formControlName="payload"></textarea>
-          <!-- TODO: in the original app, this was an ace editor component so something to consider -->
         </mat-form-field>
       </ng-container>
       <div>
@@ -66,11 +65,21 @@
       </div>
     </form>
   </mat-tab>
-  <mat-tab label="Second">
-    <h1>{{ 'scheduler.logPageTitle' | transloco }}</h1>
-    <h4>{{ 'scheduler.logPageSubtitle' | transloco }}</h4>
-    <p>Status Code:</p>
-    <p>Error:</p>
-    <!-- TODO: Add ace editor here for the error log -->
+  <mat-tab label="Log">
+    <div class="scheduler-log-container">
+      <h1>{{ 'scheduler.logPageTitle' | transloco }}</h1>
+      <h4>{{ 'scheduler.logPageSubtitle' | transloco }}</h4>
+      <p>Status Code: {{ scheduleToEdit?.taskLogByTaskId?.statusCode }}</p>
+      <p>Error:</p>
+      <textarea
+        rows="40"
+        cols="60"
+        matInput
+        [formControl]="logFormControl"
+        readonly></textarea>
+      <button mat-raised-button color="primary" (click)="onCancel()">
+        {{ 'goBack' | transloco }}
+      </button>
+    </div>
   </mat-tab>
 </mat-tab-group>

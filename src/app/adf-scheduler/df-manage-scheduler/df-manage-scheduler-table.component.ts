@@ -17,6 +17,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTableModule } from '@angular/material/table';
 import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
 
 @Component({
   selector: 'df-manage-scheduler-table',
@@ -33,6 +34,7 @@ import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
     NgTemplateOutlet,
     FontAwesomeModule,
     MatPaginatorModule,
+    MatButtonModule,
     MatMenuModule,
     MatInputModule,
     MatFormFieldModule,
