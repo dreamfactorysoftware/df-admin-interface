@@ -19,6 +19,7 @@ import {
   ADMIN_SERVICE_PROVIDERS,
   APP_SERVICE_PROVIDERS,
   LIMIT_CACHE_SERVICE_PROVIDERS,
+  CACHE_SERVICE_PROVIDERS,
   LIMIT_SERVICE_PROVIDERS,
   REPORT_SERVICE_PROVIDERS,
   ROLE_SERVICE_PROVIDERS,
@@ -30,7 +31,8 @@ import { DfPasswordService } from './adf-user-management/services/df-password.se
 import { profileResolver } from './adf-profile/resolvers/profile.resolver';
 import { DfServiceDataService } from './adf-services/services/service-data.service';
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
-import { systemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
+import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
+import { DfCacheResolver } from './adf-config/resolvers/df-cache.resolver';
 
 export const routes: Routes = [
   {
@@ -308,8 +310,19 @@ export const routes: Routes = [
                 './adf-config/df-system-info/df-system-info.component'
               ).then(m => m.DfSystemInfoComponent),
             resolve: {
-              data: systemInfoResolver,
+              data: DfSystemInfoResolver,
             },
+          },
+          {
+            path: ROUTES.CACHE,
+            loadComponent: () =>
+              import('./adf-config/df-cache/df-cache.component').then(
+                m => m.DfCacheComponent
+              ),
+            resolve: {
+              data: DfCacheResolver,
+            },
+            providers: [...CACHE_SERVICE_PROVIDERS],
           },
         ],
       },

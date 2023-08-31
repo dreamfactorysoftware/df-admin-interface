@@ -1,0 +1,26 @@
+<div class="cache-container">
+  <p>
+    {{ 'cache.description' | transloco }}
+  </p>
+  <df-cache-table>
+    <ng-container topActions
+      ><button
+        mat-flat-button
+        color="primary"
+        [attr.aria-label]="'importList' | transloco"
+        (click)="flushSystemCache()">
+        {{ 'cache.flushSystemCache' | transloco }}
+      </button></ng-container
+    >
+    <ng-template let-row #itemActions>
+      <button
+        mat-icon-button
+        (click)="flushServiceCache(row.name)"
+        [attr.aria-label]="
+          'cache.flushService' | transloco: { serviceName: row.label }
+        ">
+        <fa-icon [icon]="faRotate"></fa-icon>
+      </button>
+    </ng-template>
+  </df-cache-table>
+</div>
