@@ -16,6 +16,7 @@ import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { CorsConfigData } from '../types';
 import { takeUntil } from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
 
 @Component({
   selector: 'df-manage-cors-table',
@@ -47,6 +48,7 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
     translateService: TranslocoService,
+    dialog: MatDialog,
     @Inject(CONFIG_CORS_SERVICE_TOKEN)
     private corsService: DfBaseCrudService
   ) {
@@ -55,7 +57,8 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
       activatedRoute,
       liveAnnouncer,
       breakpointService,
-      translateService
+      translateService,
+      dialog
     );
 
     this.allowFilter = false;

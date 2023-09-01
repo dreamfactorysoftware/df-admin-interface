@@ -18,6 +18,7 @@ import { ROLE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 @Component({
   selector: 'df-manage-roles-table',
@@ -40,6 +41,7 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
     MatPaginatorModule,
     TranslocoPipe,
     AsyncPipe,
+    MatDialogModule,
   ],
 })
 export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow> {
@@ -50,14 +52,16 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslocoService
+    translateService: TranslocoService,
+    dialog: MatDialog
   ) {
     super(
       router,
       activatedRoute,
       liveAnnouncer,
       breakpointService,
-      translateService
+      translateService,
+      dialog
     );
   }
 

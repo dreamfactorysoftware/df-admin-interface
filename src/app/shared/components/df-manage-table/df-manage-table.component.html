@@ -71,7 +71,7 @@
           </button>
           <button
             mat-menu-item
-            (click)="deleteRow(row)"
+            (click)="confirmDelete(row)"
             [attr.aria-label]="deleteLabel(row) | async">
             {{ 'delete' | transloco }}
           </button>

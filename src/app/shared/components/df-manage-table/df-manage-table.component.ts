@@ -26,6 +26,8 @@ import {
   faXmarkCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoService } from '@ngneat/transloco';
+import { MatDialog } from '@angular/material/dialog';
+import { DfConfirmDialogComponent } from '../df-confirm-dialog/df-confirm-dialog.component';
 
 @Component({
   selector: 'df-manage-table',
@@ -62,7 +64,8 @@ export abstract class DfManageTableComponent<T>
     private activatedRoute: ActivatedRoute,
     private liveAnnouncer: LiveAnnouncer,
     private breakpointService: DfBreakpointService,
-    private translateService: TranslocoService
+    private translateService: TranslocoService,
+    private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -95,6 +98,20 @@ export abstract class DfManageTableComponent<T>
   abstract refreshTable(limit?: number, offset?: number, filter?: string): void;
 
   abstract filterQuery(value: string): string;
+
+  confirmDelete(row: T): void {
+    const dialogRef = this.dialog.open(DfConfirmDialogComponent, {
+      data: {
+        title: 'confirm',
+        message: 'confirmDelete',
+      },
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.deleteRow(row);
+      }
+    });
+  }
 
   deleteRow(row: T): void {
     //intentionally left blank

@@ -141,13 +141,8 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   toggleAllSelection() {
     if (this.allMethodsSelected) {
       this.select.options.forEach((item: MatOption) => item.select());
-      console.log('select options in all selected if : ', this.select.options);
     } else {
       this.select.options.forEach((item: MatOption) => item.deselect());
-      console.log(
-        'select options in all deselect else : ',
-        this.select.options
-      );
     }
   }
 
@@ -158,7 +153,6 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
         newStatus = false;
       }
     });
-    console.log('select options: ', this.select.options);
     this.allMethodsSelected = newStatus;
   }
 

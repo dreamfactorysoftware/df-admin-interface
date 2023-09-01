@@ -1,1 +1,19 @@
-<df-manage-limits-table></df-manage-limits-table>
+<df-manage-limits-table>
+  <ng-container topActions>
+    <button
+      mat-mini-fab
+      color="primary"
+      [attr.aria-label]="'clearLimitCounters' | transloco"
+      (click)="refreshRows()">
+      <fa-icon [icon]="faArrowsRotate" size="xl"></fa-icon>
+    </button>
+  </ng-container>
+  <ng-template let-row #itemActions>
+    <button
+      mat-menu-item
+      (click)="refreshRows(row.id)"
+      [attr.aria-label]="resetRowCounterLabel(row) | async">
+      {{ 'clearLimitCounter' | transloco }}
+    </button>
+  </ng-template>
+</df-manage-limits-table>

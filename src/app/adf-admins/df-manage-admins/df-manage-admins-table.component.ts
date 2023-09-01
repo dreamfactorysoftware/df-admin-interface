@@ -21,6 +21,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
 import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 @Component({
   selector: 'df-manage-admins-table',
@@ -43,6 +44,7 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
     MatPaginatorModule,
     TranslocoPipe,
     AsyncPipe,
+    MatDialogModule,
   ],
 })
 export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow> {
@@ -53,14 +55,16 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
     breakpointService: DfBreakpointService,
     translateService: TranslocoService,
     @Inject(ADMIN_SERVICE_TOKEN)
-    private adminService: DfBaseCrudService
+    private adminService: DfBaseCrudService,
+    dialog: MatDialog
   ) {
     super(
       router,
       activatedRoute,
       liveAnnouncer,
       breakpointService,
-      translateService
+      translateService,
+      dialog
     );
   }
   override columns = USER_COLUMNS;

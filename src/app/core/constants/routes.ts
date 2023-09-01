@@ -44,4 +44,5 @@ export enum ROUTES {
   PACKAGES = 'package-manager',
   SYSTEM_INFO = 'system-info',
   CORS = 'cors',
+  CACHE = 'cache',
 }
