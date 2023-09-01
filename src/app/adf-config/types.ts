@@ -15,6 +15,7 @@ export interface Platform {
   cacheDriver: string;
   packages: Package[];
   rootAdminExists: boolean;
+  dfInstanceId?: string;
 }
 
 export interface Package {

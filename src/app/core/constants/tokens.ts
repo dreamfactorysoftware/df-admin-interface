@@ -39,3 +39,8 @@ export const ROLE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'ROLE_SERVICE_TOKEN'
 );
 export const ROLE_URL_TOKEN = new InjectionToken<string>('ROLE_URL_TOKEN');
+
+export const CACHE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'CACHE_SERVICE_TOKEN'
+);
+export const CACHE_URL_TOKEN = new InjectionToken<string>('CACHE_URL_TOKEN');

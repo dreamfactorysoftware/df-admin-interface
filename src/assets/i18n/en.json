@@ -474,6 +474,10 @@
         "system-info": {
           "nav": "System Info",
           "header": "{{nav.system-settings.config.system-info.nav}}"
+        },
+        "cache": {
+          "nav": "Cache",
+          "header": "{{nav.system-settings.config.cache.nav}}"
         }
       },
       "scheduler": {
@@ -611,5 +615,13 @@
       "ipAddress": "IP Address",
       "Locale": "Locale"
     }
+  },
+  "cache": {
+    "cache": "Cache",
+    "overview": "Cache Overview",
+    "flushService": "Flush {{serviceName}} Cache",
+    "description": "Flush system-wide cache or per-service caches. Use the cache clearing buttons below to refresh any changes made to your system configuration values.",
+    "flushSystemCache": "Flush System-Wide Cache",
+    "perServiceCaches": "Per-Service Caches"
   }
 }
