@@ -313,14 +313,26 @@ export const routes: Routes = [
           },
           {
             path: ROUTES.CORS,
-            loadComponent: () =>
-              import(
-                './adf-config/df-cors/df-manage-cors-table.component'
-              ).then(m => m.DfManageCorsTableComponent),
-            resolve: {
-              data: corsConfigResolver,
-            },
             providers: [...CORS_CONFIG_SERVICE_PROVIDERS],
+            children: [
+              {
+                path: '',
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-cors/df-manage-cors-table.component'
+                  ).then(m => m.DfManageCorsTableComponent),
+                resolve: {
+                  data: corsConfigResolver,
+                },
+              },
+              {
+                path: ROUTES.CREATE,
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-cors/df-cors-config-details.component'
+                  ).then(m => m.DfCorsConfigDetailsComponent),
+              },
+            ],
           },
         ],
       },

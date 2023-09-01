@@ -61,6 +61,13 @@
   "packages": "Packages",
   "launchpad": "LaunchPad",
   "version": "Version",
+  "verbs": {
+    "get": "GET (read)",
+    "post": "POST (create)",
+    "put": "PUT (replace)",
+    "patch": "PATCH (update)",
+    "delete": "DELETE (remove)"
+  },
   "home": {
     "resourceLinks": {
       "gettingStartedGuide": "Getting Started Guide",
@@ -473,7 +480,13 @@
           "header": "{{nav.system-settings.config.system-info.nav}}"
         },
         "cors": {
-          "nav": "CORS"
+          "nav": "CORS",
+          "pageTitle": "CORS Overview",
+          "pageSubtitle": "Enter allowed hosts and HTTP verbs. You can enter * for all hosts. Use the * option for development to enable application code running locally on your computer to communicate directly with your DreamFactory instance.",
+          "create": {
+            "header": "Create Cors Configuration"
+          },
+          "formControls": {}
         }
       },
       "scheduler": {

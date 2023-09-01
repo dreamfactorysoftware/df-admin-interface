@@ -1,0 +1,56 @@
+<!-- TODO: change headers to be pulled from translation file -->
+<div class="df-cors-config-container">
+  <h1>{{ 'nav.system-settings.config.cors.nav' | transloco }}</h1>
+  <h1>{{ 'nav.system-settings.config.cors.pageTitle' | transloco }}</h1>
+  <h4>{{ 'nav.system-settings.config.cors.pageSubtitle' | transloco }}</h4>
+  <form [formGroup]="corsForm" (ngSubmit)="onSubmit()">
+    <mat-form-field>
+      <mat-label>Path</mat-label>
+      <input matInput type="url" formControlName="path" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Description</mat-label>
+      <input matInput type="text" formControlName="description" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Origins</mat-label>
+      <input matInput type="text" formControlName="origins" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Headers</mat-label>
+      <input matInput type="text" formControlName="headers" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Exposed Headers</mat-label>
+      <input matInput type="text" formControlName="exposedHeaders" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Max Age</mat-label>
+      <input matInput type="number" formControlName="maxAge" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Methods</mat-label>
+      <mat-select formControlName="methods" multiple>
+        <mat-option
+          *ngFor="let verb of verbDropdownOptions"
+          [value]="verb.value"
+          >{{ verb.name | transloco }}</mat-option
+        >
+      </mat-select>
+    </mat-form-field>
+    <div class="slide-toggle-container">
+      <ng-container>
+        <mat-slide-toggle formControlName="credentials">
+          Supports Credentials
+        </mat-slide-toggle>
+      </ng-container>
+      <ng-container>
+        <mat-slide-toggle formControlName="enabled"> Enabled </mat-slide-toggle>
+      </ng-container>
+    </div>
+    <div>
+      <button mat-raised-button (click)="onCancel()">Cancel</button>
+      <button mat-raised-button color="primary">Update</button>
+    </div>
+  </form>
+</div>
