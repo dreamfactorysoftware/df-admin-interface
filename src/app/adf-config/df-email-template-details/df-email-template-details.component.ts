@@ -1,11 +1,11 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
   Validators,
   ReactiveFormsModule,
 } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatOptionModule } from '@angular/material/core';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
@@ -14,7 +14,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
-import { EmailTemplatePayload } from '../df-email-templates/df-email-templates.types';
+import {
+  EmailTemplate,
+  EmailTemplatePayload,
+} from '../df-email-templates/df-email-templates.types';
 import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
@@ -38,17 +41,19 @@ import { ROUTES } from 'src/app/core/constants/routes';
     AsyncPipe,
   ],
 })
-export class DfEmailTemplateDetailsComponent {
+export class DfEmailTemplateDetailsComponent implements OnInit {
   emailTemplateForm: FormGroup;
   translateService: any;
   destroyed$ = new Subject<void>();
+  editApp: EmailTemplate;
 
   constructor(
     @Inject(EMAIL_TEMPLATES_SERVICE_TOKEN)
     private crudService: DfBaseCrudService,
     private fb: FormBuilder,
     private router: Router,
-    public breakpointService: DfBreakpointService
+    public breakpointService: DfBreakpointService,
+    private activatedRoute: ActivatedRoute
   ) {
     this.emailTemplateForm = this.fb.group({
       name: ['', Validators.required],
@@ -65,6 +70,32 @@ export class DfEmailTemplateDetailsComponent {
       replyToEmail: [''],
       id: [null],
     });
+  }
+
+  ngOnInit() {
+    this.activatedRoute.data
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe((data: any) => {
+        this.editApp = data?.data;
+      });
+
+    if (this.editApp) {
+      this.emailTemplateForm.patchValue({
+        name: this.editApp.name,
+        description: this.editApp.description,
+        to: this.editApp.to,
+        cc: this.editApp.cc,
+        bcc: this.editApp.bcc,
+        subject: this.editApp.subject,
+        attachment: this.editApp.attachment,
+        body: this.editApp.body_html,
+        senderName: this.editApp.from_name,
+        senderEmail: this.editApp.from_email,
+        replyToName: this.editApp.reply_to_name,
+        replyToEmail: this.editApp.reply_to_email,
+        id: this.editApp.id,
+      });
+    }
   }
 
   goBack() {
