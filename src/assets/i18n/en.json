@@ -471,6 +471,9 @@
         "system-info": {
           "nav": "System Info",
           "header": "{{nav.system-settings.config.system-info.nav}}"
+        },
+        "cors": {
+          "nav": "CORS"
         }
       },
       "scheduler": {

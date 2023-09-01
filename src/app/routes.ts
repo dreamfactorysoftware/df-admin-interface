@@ -18,6 +18,7 @@ import { getSystemServiceDataListResolver } from './adf-services/resolvers/servi
 import {
   ADMIN_SERVICE_PROVIDERS,
   APP_SERVICE_PROVIDERS,
+  CORS_CONFIG_SERVICE_PROVIDERS,
   LIMIT_SERVICE_PROVIDERS,
   REPORT_SERVICE_PROVIDERS,
   ROLE_SERVICE_PROVIDERS,
@@ -29,7 +30,8 @@ import { DfPasswordService } from './adf-user-management/services/df-password.se
 import { profileResolver } from './adf-profile/resolvers/profile.resolver';
 import { DfServiceDataService } from './adf-services/services/service-data.service';
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
-import { systemInfoResolver } from './adf-config/adf-system-info/resolvers/df-system-info.resolver';
+import { systemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
+import { corsConfigResolver } from './adf-config/resolvers/df-cors-config.resolver';
 
 export const routes: Routes = [
   {
@@ -308,6 +310,17 @@ export const routes: Routes = [
             resolve: {
               data: systemInfoResolver,
             },
+          },
+          {
+            path: ROUTES.CORS,
+            loadComponent: () =>
+              import(
+                './adf-config/df-cors/df-manage-cors-table.component'
+              ).then(m => m.DfManageCorsTableComponent),
+            resolve: {
+              data: corsConfigResolver,
+            },
+            providers: [...CORS_CONFIG_SERVICE_PROVIDERS],
           },
         ],
       },
