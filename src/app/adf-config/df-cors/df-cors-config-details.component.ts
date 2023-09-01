@@ -1,16 +1,17 @@
 import { NgFor, NgIf } from '@angular/common';
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
+  FormsModule,
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatOptionModule } from '@angular/material/core';
+import { MatOption, MatOptionModule } from '@angular/material/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
+import { MatSelect, MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Router, ActivatedRoute } from '@angular/router';
 import {
@@ -23,6 +24,7 @@ import { CONFIG_CORS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { CorsConfigData } from '../types';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 @Component({
   selector: 'df-cors-config-details',
@@ -31,7 +33,9 @@ import { Subject, catchError, takeUntil, throwError } from 'rxjs';
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    FormsModule,
     MatFormFieldModule,
+    MatCheckboxModule,
     MatInputModule,
     MatSelectModule,
     NgFor,
@@ -47,6 +51,8 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   destroyed$ = new Subject<void>();
   corsForm: FormGroup;
   corsConfigToEdit: CorsConfigData | undefined;
+  @ViewChild('select') select: MatSelect;
+  allMethodsSelected = false;
 
   // TODO: add functionality and option for select all/none
   verbDropdownOptions = [
@@ -120,6 +126,9 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
             credentials: this.corsConfigToEdit.supportsCredentials,
             enabled: this.corsConfigToEdit.enabled,
           });
+
+          if (this.corsConfigToEdit.method.length === 5)
+            this.allMethodsSelected = true;
         });
     }
   }
@@ -127,6 +136,30 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroyed$.next();
     this.destroyed$.complete();
+  }
+
+  toggleAllSelection() {
+    if (this.allMethodsSelected) {
+      this.select.options.forEach((item: MatOption) => item.select());
+      console.log('select options in all selected if : ', this.select.options);
+    } else {
+      this.select.options.forEach((item: MatOption) => item.deselect());
+      console.log(
+        'select options in all deselect else : ',
+        this.select.options
+      );
+    }
+  }
+
+  optionClick() {
+    let newStatus = true;
+    this.select.options.forEach((item: MatOption) => {
+      if (!item.selected) {
+        newStatus = false;
+      }
+    });
+    console.log('select options: ', this.select.options);
+    this.allMethodsSelected = newStatus;
   }
 
   private assemblePayload(): Partial<CorsConfigData> {
