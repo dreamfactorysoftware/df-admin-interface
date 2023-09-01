@@ -18,6 +18,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
 import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 @Component({
   selector: 'df-manage-apps-table',
@@ -41,6 +42,7 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
     MatPaginatorModule,
     TranslocoPipe,
     AsyncPipe,
+    MatDialogModule,
   ],
 })
 export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
@@ -51,14 +53,16 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslocoService
+    translateService: TranslocoService,
+    dialog: MatDialog
   ) {
     super(
       router,
       activatedRoute,
       liveAnnouncer,
       breakpointService,
-      translateService
+      translateService,
+      dialog
     );
   }
   // TODO add icon for "launch app"

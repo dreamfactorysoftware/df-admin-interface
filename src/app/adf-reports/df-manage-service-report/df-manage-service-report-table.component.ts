@@ -18,6 +18,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
 import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 @Component({
   selector: 'df-manage-service-report-table',
@@ -40,6 +41,7 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
     MatPaginatorModule,
     TranslocoPipe,
     AsyncPipe,
+    MatDialogModule,
   ],
 })
 export class DfManageServiceReportTableComponent extends DfManageTableComponent<ServiceReportData> {
@@ -51,14 +53,16 @@ export class DfManageServiceReportTableComponent extends DfManageTableComponent<
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslocoService
+    translateService: TranslocoService,
+    dialog: MatDialog
   ) {
     super(
       router,
       activatedRoute,
       liveAnnouncer,
       breakpointService,
-      translateService
+      translateService,
+      dialog
     );
   }
 

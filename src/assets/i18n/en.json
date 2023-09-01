@@ -64,6 +64,10 @@
   "packages": "Packages",
   "launchpad": "LaunchPad",
   "version": "Version",
+  "yes": "Yes",
+  "no": "No",
+  "confirm": "Confirm",
+  "confirmDelete": "Are you sure you want to delete this?",
   "home": {
     "resourceLinks": {
       "gettingStartedGuide": "Getting Started Guide",

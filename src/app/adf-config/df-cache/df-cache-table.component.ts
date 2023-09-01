@@ -17,6 +17,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 @Component({
   selector: 'df-cache-table',
@@ -39,6 +40,7 @@ import { MatButtonModule } from '@angular/material/button';
     MatMenuModule,
     MatFormFieldModule,
     MatInputModule,
+    MatDialogModule,
   ],
 })
 export class DfCacheTableComponent extends DfManageTableComponent<CacheRow> {
@@ -49,14 +51,16 @@ export class DfCacheTableComponent extends DfManageTableComponent<CacheRow> {
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslocoService
+    translateService: TranslocoService,
+    dialog: MatDialog
   ) {
     super(
       router,
       activatedRoute,
       liveAnnouncer,
       breakpointService,
-      translateService
+      translateService,
+      dialog
     );
   }
 

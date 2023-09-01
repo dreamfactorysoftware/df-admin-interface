@@ -21,6 +21,7 @@ import {
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 export type LimitTableRowData = {
   id: number;
@@ -55,6 +56,7 @@ export type LimitTableRowData = {
     MatPaginatorModule,
     TranslocoPipe,
     AsyncPipe,
+    MatDialogModule,
   ],
 })
 export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTableRowData> {
@@ -67,14 +69,16 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslocoService
+    translateService: TranslocoService,
+    dialog: MatDialog
   ) {
     super(
       router,
       activatedRoute,
       liveAnnouncer,
       breakpointService,
-      translateService
+      translateService,
+      dialog
     );
   }
   override columns = [
