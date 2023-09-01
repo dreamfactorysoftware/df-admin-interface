@@ -54,7 +54,6 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   @ViewChild('select') select: MatSelect;
   allMethodsSelected = false;
 
-  // TODO: add functionality and option for select all/none
   verbDropdownOptions = [
     {
       value: 'GET',
