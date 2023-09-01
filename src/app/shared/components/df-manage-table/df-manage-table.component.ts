@@ -47,6 +47,7 @@ export abstract class DfManageTableComponent<T>
   faPlus = faPlus;
   faEllipsisV = faEllipsisV;
   allowCreate = true;
+  allowFilter = true;
 
   abstract columns: Array<{
     columnDef: string;

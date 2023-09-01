@@ -57,6 +57,8 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
       breakpointService,
       translateService
     );
+
+    this.allowFilter = false;
   }
 
   override columns = [
@@ -90,8 +92,15 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
     },
   ];
 
-  override mapDataToTable(data: any[]): CorsConfigData[] {
+  override mapDataToTable(data: CorsConfigData[]): CorsConfigData[] {
     return data;
+  }
+
+  override deleteRow(row: CorsConfigData): void {
+    this.corsService
+      .delete(row.id, { fields: '*' })
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(() => this.refreshTable());
   }
 
   override refreshTable(
@@ -108,6 +117,7 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
       .pipe(takeUntil(this.destroyed$))
       .subscribe((data: any) => {
         this.dataSource = data.data.resource;
+        this.tableLength = data.meta.count;
       });
   }
 
