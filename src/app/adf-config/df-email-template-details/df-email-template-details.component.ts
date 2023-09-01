@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
@@ -41,7 +41,7 @@ import { ROUTES } from 'src/app/core/constants/routes';
     AsyncPipe,
   ],
 })
-export class DfEmailTemplateDetailsComponent implements OnInit {
+export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
   emailTemplateForm: FormGroup;
   translateService: any;
   destroyed$ = new Subject<void>();
@@ -98,8 +98,15 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
     }
   }
 
+  ngOnDestroy(): void {
+    this.destroyed$.next();
+    this.destroyed$.complete();
+  }
+
   goBack() {
-    this.router.navigate([ROUTES.EMAIL_TEMPLATES]);
+    this.router.navigate([
+      `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.EMAIL_TEMPLATES}`,
+    ]);
   }
 
   onSubmit() {
@@ -141,7 +148,7 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
           })
         )
         .subscribe(() => {
-          this.router.navigate([ROUTES.EMAIL_TEMPLATES]);
+          this.goBack();
         });
     } else {
       console.log('create', payload);
@@ -166,7 +173,7 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
           })
         )
         .subscribe(() => {
-          this.router.navigate([ROUTES.EMAIL_TEMPLATES]);
+          this.goBack();
         });
     }
   }
