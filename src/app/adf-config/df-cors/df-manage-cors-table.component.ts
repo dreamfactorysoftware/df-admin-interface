@@ -63,27 +63,27 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
     {
       columnDef: 'active',
       cell: (row: CorsConfigData) => row.enabled,
-      header: 'active',
+      header: 'nav.system-settings.config.cors.table.headers.active',
     },
     {
       columnDef: 'id',
       cell: (row: CorsConfigData) => row.id,
-      header: 'ID',
+      header: 'nav.system-settings.config.cors.table.headers.id',
     },
     {
       columnDef: 'path',
       cell: (row: CorsConfigData) => row.path,
-      header: 'Path',
+      header: 'nav.system-settings.config.cors.table.headers.path',
     },
     {
       columnDef: 'description',
       cell: (row: CorsConfigData) => row.description,
-      header: 'Description',
+      header: 'nav.system-settings.config.cors.table.headers.description',
     },
     {
       columnDef: 'maxAge',
       cell: (row: CorsConfigData) => row.maxAge,
-      header: 'Max Age',
+      header: 'nav.system-settings.config.cors.table.headers.maxAge',
     },
     {
       columnDef: 'actions',
@@ -111,6 +111,7 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
       });
   }
 
+  // this component has no filter
   override filterQuery(value: string): string {
     return '';
   }

@@ -22,7 +22,7 @@ import { ROUTES } from 'src/app/core/constants/routes';
 import { CONFIG_CORS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { CorsConfigData } from '../types';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 
 @Component({
   selector: 'df-cors-config-details',
@@ -46,6 +46,7 @@ import { Subject, takeUntil } from 'rxjs';
 export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   destroyed$ = new Subject<void>();
   corsForm: FormGroup;
+  corsConfigToEdit: CorsConfigData | undefined;
 
   // TODO: add functionality and option for select all/none
   verbDropdownOptions = [
@@ -85,7 +86,7 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
       origins: ['', Validators.required],
       headers: ['', Validators.required],
       exposedHeaders: ['', Validators.required],
-      maxAge: ['', Validators.required],
+      maxAge: [0, Validators.required],
       methods: ['', Validators.required],
       credentials: [true],
       enabled: [true],
@@ -93,8 +94,34 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // TODO:
-    console.log();
+    const id = this.activatedRoute.snapshot.paramMap.get('id');
+
+    if (id) {
+      this.activatedRoute.data
+        .pipe(
+          takeUntil(this.destroyed$),
+          catchError(error => {
+            this.router.navigate([
+              `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
+            ]);
+            return throwError(() => new Error(error));
+          })
+        )
+        .subscribe(data => {
+          this.corsConfigToEdit = data['data'] as CorsConfigData;
+          this.corsForm.setValue({
+            path: this.corsConfigToEdit.path,
+            description: this.corsConfigToEdit.description,
+            origins: this.corsConfigToEdit.origin,
+            headers: this.corsConfigToEdit.header,
+            exposedHeaders: this.corsConfigToEdit.exposedHeader,
+            maxAge: this.corsConfigToEdit.maxAge,
+            methods: this.corsConfigToEdit.method,
+            credentials: this.corsConfigToEdit.supportsCredentials,
+            enabled: this.corsConfigToEdit.enabled,
+          });
+        });
+    }
   }
 
   ngOnDestroy(): void {
@@ -103,7 +130,7 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   }
 
   private assemblePayload(): Partial<CorsConfigData> {
-    return {
+    const payload = {
       path: this.corsForm.value.path,
       description: this.corsForm.value.description,
       origin: this.corsForm.value.origins,
@@ -114,25 +141,51 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
       supportsCredentials: this.corsForm.value.credentials,
       enabled: this.corsForm.value.enabled,
     };
+
+    if (this.corsConfigToEdit) {
+      return {
+        ...payload,
+        createdById: this.corsConfigToEdit.createdById,
+        createdDate: this.corsConfigToEdit.createdDate,
+        lastModifiedById: this.corsConfigToEdit.lastModifiedById,
+        lastModifiedDate: this.corsConfigToEdit.lastModifiedDate,
+      };
+    }
+
+    return payload;
   }
 
   onSubmit() {
     if (this.corsForm.valid) {
-      const payload = this.assemblePayload();
+      if (!this.corsConfigToEdit) {
+        const payload = this.assemblePayload();
 
-      this.corsConfigService
-        .create(
-          { resource: [payload] },
-          {
-            fields: '*',
-          }
-        )
-        .pipe(takeUntil(this.destroyed$))
-        .subscribe(() => {
-          this.router.navigate([
-            `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
-          ]);
-        });
+        // create mode
+        this.corsConfigService
+          .create(
+            { resource: [payload] },
+            {
+              fields: '*',
+            }
+          )
+          .pipe(takeUntil(this.destroyed$))
+          .subscribe(() => {
+            this.router.navigate([
+              `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
+            ]);
+          });
+      } else {
+        // edit mode
+        const payload = this.assemblePayload();
+        this.corsConfigService
+          .update(this.corsConfigToEdit.id, payload)
+          .pipe(takeUntil(this.destroyed$))
+          .subscribe(() => {
+            this.router.navigate([
+              `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
+            ]);
+          });
+      }
     }
   }
 

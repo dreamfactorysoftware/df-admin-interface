@@ -1,35 +1,49 @@
-<!-- TODO: change headers to be pulled from translation file -->
 <div class="df-cors-config-container">
   <h1>{{ 'nav.system-settings.config.cors.nav' | transloco }}</h1>
   <h1>{{ 'nav.system-settings.config.cors.pageTitle' | transloco }}</h1>
   <h4>{{ 'nav.system-settings.config.cors.pageSubtitle' | transloco }}</h4>
   <form [formGroup]="corsForm" (ngSubmit)="onSubmit()">
     <mat-form-field>
-      <mat-label>Path</mat-label>
+      <mat-label>{{
+        'nav.system-settings.config.cors.formControls.path' | transloco
+      }}</mat-label>
       <input matInput type="url" formControlName="path" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Description</mat-label>
+      <mat-label>{{
+        'nav.system-settings.config.cors.formControls.description' | transloco
+      }}</mat-label>
       <input matInput type="text" formControlName="description" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Origins</mat-label>
+      <mat-label>{{
+        'nav.system-settings.config.cors.formControls.origins' | transloco
+      }}</mat-label>
       <input matInput type="text" formControlName="origins" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Headers</mat-label>
+      <mat-label>{{
+        'nav.system-settings.config.cors.formControls.headers' | transloco
+      }}</mat-label>
       <input matInput type="text" formControlName="headers" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Exposed Headers</mat-label>
+      <mat-label>{{
+        'nav.system-settings.config.cors.formControls.exposedHeaders'
+          | transloco
+      }}</mat-label>
       <input matInput type="text" formControlName="exposedHeaders" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Max Age</mat-label>
+      <mat-label>{{
+        'nav.system-settings.config.cors.formControls.maxAge' | transloco
+      }}</mat-label>
       <input matInput type="number" formControlName="maxAge" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Methods</mat-label>
+      <mat-label>{{
+        'nav.system-settings.config.cors.formControls.methods' | transloco
+      }}</mat-label>
       <mat-select formControlName="methods" multiple>
         <mat-option
           *ngFor="let verb of verbDropdownOptions"
@@ -41,16 +55,27 @@
     <div class="slide-toggle-container">
       <ng-container>
         <mat-slide-toggle formControlName="credentials">
-          Supports Credentials
+          {{
+            'nav.system-settings.config.cors.formControls.supportsCredentials'
+              | transloco
+          }}
         </mat-slide-toggle>
       </ng-container>
       <ng-container>
-        <mat-slide-toggle formControlName="enabled"> Enabled </mat-slide-toggle>
+        <mat-slide-toggle formControlName="enabled">
+          {{
+            'nav.system-settings.config.cors.formControls.enabled' | transloco
+          }}
+        </mat-slide-toggle>
       </ng-container>
     </div>
     <div>
-      <button mat-raised-button (click)="onCancel()">Cancel</button>
-      <button mat-raised-button color="primary">Update</button>
+      <button mat-raised-button (click)="onCancel()">
+        {{ 'cancel' | transloco }}
+      </button>
+      <button mat-raised-button color="primary">
+        {{ 'save' | transloco }}
+      </button>
     </div>
   </form>
 </div>

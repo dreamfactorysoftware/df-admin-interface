@@ -332,6 +332,16 @@ export const routes: Routes = [
                     './adf-config/df-cors/df-cors-config-details.component'
                   ).then(m => m.DfCorsConfigDetailsComponent),
               },
+              {
+                path: `${ROUTES.EDIT}/:id`,
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-cors/df-cors-config-details.component'
+                  ).then(m => m.DfCorsConfigDetailsComponent),
+                resolve: {
+                  data: corsConfigResolver,
+                },
+              },
             ],
           },
         ],
