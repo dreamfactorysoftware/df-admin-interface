@@ -16,7 +16,7 @@ import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { CorsConfigData } from '../types';
 import { takeUntil } from 'rxjs';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 @Component({
   selector: 'df-manage-cors-table',
@@ -30,6 +30,7 @@ import { MatDialog } from '@angular/material/dialog';
     NgIf,
     MatButtonModule,
     FontAwesomeModule,
+    MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
     MatTableModule,

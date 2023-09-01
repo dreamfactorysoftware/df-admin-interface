@@ -8,7 +8,7 @@ describe('DfCorsConfigDetailsComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfCorsConfigDetailsComponent]
+      declarations: [DfCorsConfigDetailsComponent],
     });
     fixture = TestBed.createComponent(DfCorsConfigDetailsComponent);
     component = fixture.componentInstance;
