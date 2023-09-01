@@ -17,6 +17,8 @@ import {
   LIMIT_CACHE_SERVICE_TOKEN,
   CACHE_URL_TOKEN,
   CACHE_SERVICE_TOKEN,
+  EMAIL_TEMPLATES_URL_TOKEN,
+  EMAIL_TEMPLATES_SERVICE_TOKEN,
 } from './tokens';
 import { URLS } from './urls';
 
@@ -113,5 +115,17 @@ export const CACHE_SERVICE_PROVIDERS = [
     provide: CACHE_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [CACHE_URL_TOKEN, HttpClient],
+  },
+];
+
+export const EMAIL_TEMPLATES_SERVICE_PROVIDERS = [
+  {
+    provide: EMAIL_TEMPLATES_URL_TOKEN,
+    useValue: URLS.EMAIL_TEMPLATES,
+  },
+  {
+    provide: EMAIL_TEMPLATES_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [EMAIL_TEMPLATES_URL_TOKEN, HttpClient],
   },
 ];

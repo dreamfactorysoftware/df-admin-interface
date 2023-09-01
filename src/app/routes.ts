@@ -24,6 +24,7 @@ import {
   REPORT_SERVICE_PROVIDERS,
   ROLE_SERVICE_PROVIDERS,
   USER_SERVICE_PROVIDERS,
+  EMAIL_TEMPLATES_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -33,6 +34,10 @@ import { DfServiceDataService } from './adf-services/services/service-data.servi
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
 import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
 import { DfCacheResolver } from './adf-config/resolvers/df-cache.resolver';
+import {
+  DfEmailTemplateDetailsResolver,
+  DfEmailTemplatesResolver,
+} from './adf-config/resolvers/df-email-templates.resolver';
 
 export const routes: Routes = [
   {
@@ -323,6 +328,39 @@ export const routes: Routes = [
               data: DfCacheResolver,
             },
             providers: [...CACHE_SERVICE_PROVIDERS],
+          },
+          {
+            path: ROUTES.EMAIL_TEMPLATES,
+            children: [
+              {
+                path: '',
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-email-templates/df-email-templates.component'
+                  ).then(m => m.DfEmailTemplatesComponent),
+                resolve: {
+                  data: DfEmailTemplatesResolver,
+                },
+              },
+              {
+                path: `${ROUTES.EDIT}/:id`,
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-email-template-details/df-email-template-details.component'
+                  ).then(m => m.DfEmailTemplateDetailsComponent),
+                resolve: { data: DfEmailTemplateDetailsResolver },
+                data: { type: 'edit' },
+              },
+              {
+                path: ROUTES.CREATE,
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-email-template-details/df-email-template-details.component'
+                  ).then(m => m.DfEmailTemplateDetailsComponent),
+                data: { type: 'create' },
+              },
+            ],
+            providers: [...EMAIL_TEMPLATES_SERVICE_PROVIDERS],
           },
         ],
       },

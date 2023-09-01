@@ -1,0 +1,138 @@
+<div class="email-template-details-container">
+  <form
+    [formGroup]="emailTemplateForm"
+    (ngSubmit)="onSubmit()"
+    class="form-container">
+    <!-- <div class="form-name-group"> -->
+    <mat-form-field>
+      <mat-label>{{
+        'emailTemplates.templateName.label' | transloco
+      }}</mat-label>
+      <input
+        matInput
+        formControlName="name"
+        required
+        placeholder="{{
+          'emailTemplates.templateName.placeholder' | transloco
+        }}" />
+      <mat-error
+        *ngIf="emailTemplateForm.controls['name'].hasError('required')">
+        {{ 'emailTemplates.templateName.error' | transloco }}
+      </mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>{{
+        'emailTemplates.templateDescription.label' | transloco
+      }}</mat-label>
+      <input
+        matInput
+        formControlName="description"
+        placeholder="{{
+          'emailTemplates.templateDescription.placeholder' | transloco
+        }}" />
+    </mat-form-field>
+    <!-- </div>
+    <div class="form-recipient-group"> -->
+    <mat-form-field>
+      <mat-label>{{ 'emailTemplates.recipient.label' | transloco }}</mat-label>
+      <input matInput formControlName="to" />
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>{{ 'emailTemplates.cc.label' | transloco }}</mat-label>
+      <input matInput formControlName="cc" />
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>{{ 'emailTemplates.bcc.label' | transloco }}</mat-label>
+      <input matInput formControlName="bcc" />
+    </mat-form-field>
+    <!-- </div>
+    <div class="form-body-group"> -->
+    <mat-form-field>
+      <mat-label>{{ 'emailTemplates.subject.label' | transloco }}</mat-label>
+      <input
+        matInput
+        formControlName="subject"
+        placeholder="{{ 'emailTemplates.subject.placeholder' | transloco }}" />
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>{{ 'emailTemplates.attachment.label' | transloco }}</mat-label>
+      <input
+        matInput
+        formControlName="attachment"
+        placeholder="{{
+          'emailTemplates.attachment.placeholder' | transloco
+        }}" />
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>{{ 'emailTemplates.body' | transloco }}</mat-label>
+      <textarea
+        matInput
+        formControlName="body"
+        class="email-template-body"
+        [class.x-small]="breakpointService.isXSmallScreen | async"></textarea>
+    </mat-form-field>
+    <!-- </div>
+    <div class="form-sender-group"> -->
+    <mat-form-field>
+      <mat-label>{{ 'emailTemplates.senderName.label' | transloco }}</mat-label>
+      <input
+        matInput
+        formControlName="senderName"
+        placeholder="{{
+          'emailTemplates.senderName.placeholder' | transloco
+        }}" />
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>{{
+        'emailTemplates.senderEmail.label' | transloco
+      }}</mat-label>
+      <input
+        matInput
+        formControlName="senderEmail"
+        placeholder="{{
+          'emailTemplates.senderEmail.placeholder' | transloco
+        }}" />
+    </mat-form-field>
+    <!-- </div>
+    <div class="form-reply-group"> -->
+    <mat-form-field>
+      <mat-label>{{
+        'emailTemplates.replyToName.label' | transloco
+      }}</mat-label>
+      <input
+        matInput
+        formControlName="replyToName"
+        placeholder="{{
+          'emailTemplates.replyToName.placeholder' | transloco
+        }}" />
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>{{
+        'emailTemplates.replyToEmail.label' | transloco
+      }}</mat-label>
+      <input
+        matInput
+        formControlName="replyToEmail"
+        placeholder="{{
+          'emailTemplates.replyToEmail.placeholder' | transloco
+        }}" />
+    </mat-form-field>
+    <!-- </div> -->
+
+    <div>
+      <button mat-flat-button type="button" (click)="goBack()">
+        {{ 'cancel' | transloco }}
+      </button>
+      <button mat-flat-button color="primary" type="submit">
+        {{ 'submit' | transloco }}
+      </button>
+    </div>
+  </form>
+</div>
