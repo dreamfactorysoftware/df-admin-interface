@@ -15,6 +15,10 @@ import {
   LIMIT_SERVICE_TOKEN,
   SCHEDULER_URL_TOKEN,
   SCHEDULER_SERVICE_TOKEN,
+  LIMIT_CACHE_URL_TOKEN,
+  LIMIT_CACHE_SERVICE_TOKEN,
+  CACHE_URL_TOKEN,
+  CACHE_SERVICE_TOKEN,
 } from './tokens';
 import { URLS } from './urls';
 
@@ -99,5 +103,29 @@ export const SCHEDULER_SERVICE_PROVIDER = [
     provide: SCHEDULER_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [SCHEDULER_URL_TOKEN, HttpClient],
+  },
+];
+
+export const LIMIT_CACHE_SERVICE_PROVIDERS = [
+  {
+    provide: LIMIT_CACHE_URL_TOKEN,
+    useValue: URLS.LIMIT_CACHE,
+  },
+  {
+    provide: LIMIT_CACHE_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [LIMIT_CACHE_URL_TOKEN, HttpClient],
+  },
+];
+
+export const CACHE_SERVICE_PROVIDERS = [
+  {
+    provide: CACHE_URL_TOKEN,
+    useValue: URLS.SYSTEM_CACHE,
+  },
+  {
+    provide: CACHE_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [CACHE_URL_TOKEN, HttpClient],
   },
 ];

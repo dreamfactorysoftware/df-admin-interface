@@ -18,6 +18,8 @@ import { getSystemServiceDataListResolver } from './adf-services/resolvers/servi
 import {
   ADMIN_SERVICE_PROVIDERS,
   APP_SERVICE_PROVIDERS,
+  LIMIT_CACHE_SERVICE_PROVIDERS,
+  CACHE_SERVICE_PROVIDERS,
   LIMIT_SERVICE_PROVIDERS,
   REPORT_SERVICE_PROVIDERS,
   ROLE_SERVICE_PROVIDERS,
@@ -32,7 +34,8 @@ import { DfServiceDataService } from './adf-services/services/service-data.servi
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
 import { schedulerResolver } from './adf-scheduler/resolvers/scheduler.resolver';
 import { DfAccessListService } from './adf-scheduler/services/access-list.service';
-import { systemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
+import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
+import { DfCacheResolver } from './adf-config/resolvers/df-cache.resolver';
 
 export const routes: Routes = [
   {
@@ -285,6 +288,7 @@ export const routes: Routes = [
           ...LIMIT_SERVICE_PROVIDERS,
           ...USER_SERVICE_PROVIDERS,
           ...ROLE_SERVICE_PROVIDERS,
+          ...LIMIT_CACHE_SERVICE_PROVIDERS,
           DfServiceDataService,
         ],
       },
@@ -309,8 +313,19 @@ export const routes: Routes = [
                 './adf-config/df-system-info/df-system-info.component'
               ).then(m => m.DfSystemInfoComponent),
             resolve: {
-              data: systemInfoResolver,
+              data: DfSystemInfoResolver,
             },
+          },
+          {
+            path: ROUTES.CACHE,
+            loadComponent: () =>
+              import('./adf-config/df-cache/df-cache.component').then(
+                m => m.DfCacheComponent
+              ),
+            resolve: {
+              data: DfCacheResolver,
+            },
+            providers: [...CACHE_SERVICE_PROVIDERS],
           },
         ],
       },

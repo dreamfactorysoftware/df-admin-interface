@@ -129,7 +129,9 @@ export class DfLimitComponent implements OnInit, OnDestroy {
         .pipe(
           takeUntil(this.destroyed$),
           catchError(error => {
-            this.router.navigate([ROUTES.RATE_LIMITING]);
+            this.router.navigate([
+              `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
+            ]);
             return throwError(() => new Error(error));
           })
         )
@@ -215,7 +217,9 @@ export class DfLimitComponent implements OnInit, OnDestroy {
             })
           )
           .subscribe(() => {
-            this.router.navigate([ROUTES.RATE_LIMITING]);
+            this.router.navigate([
+              `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
+            ]);
           });
       } else {
         // edit mode
@@ -232,7 +236,9 @@ export class DfLimitComponent implements OnInit, OnDestroy {
             })
           )
           .subscribe(() => {
-            this.router.navigate([ROUTES.RATE_LIMITING]);
+            this.router.navigate([
+              `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
+            ]);
           });
       }
     } else {
@@ -242,7 +248,7 @@ export class DfLimitComponent implements OnInit, OnDestroy {
   }
 
   onCancel(): void {
-    this.router.navigate([ROUTES.RATE_LIMITING]);
+    this.router.navigate([`${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`]);
   }
 
   private assembleLimitPayload(): CreateLimitPayload | UpdateLimitPayload {

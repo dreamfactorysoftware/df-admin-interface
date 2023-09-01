@@ -56,9 +56,15 @@ export class DfBaseCrudService {
     );
   }
 
-  delete(id: string | number, options?: Partial<RequestOptions>) {
+  delete(
+    id: string | number | Array<string | number>,
+    options?: Partial<RequestOptions>
+  ) {
+    const url = Array.isArray(id)
+      ? `${this.url}?ids=${id.join(',')}`
+      : `${this.url}/${id}`;
     return this.http.delete(
-      `${this.url}/${id}`,
+      url,
       this.getOptions({ snackbarError: 'server', ...options })
     );
   }
