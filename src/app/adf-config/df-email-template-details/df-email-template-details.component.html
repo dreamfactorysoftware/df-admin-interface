@@ -1,10 +1,11 @@
-<div class="email-template-details-container">
+<div
+  class="email-template-details-container"
+  [class.x-small]="breakpointService.isXSmallScreen | async">
   <form
     [formGroup]="emailTemplateForm"
     (ngSubmit)="onSubmit()"
     class="form-container">
-    <!-- <div class="form-name-group"> -->
-    <mat-form-field>
+    <mat-form-field class="flex-50">
       <mat-label>{{
         'emailTemplates.templateName.label' | transloco
       }}</mat-label>
@@ -21,7 +22,7 @@
       </mat-error>
     </mat-form-field>
 
-    <mat-form-field>
+    <mat-form-field class="flex-50">
       <mat-label>{{
         'emailTemplates.templateDescription.label' | transloco
       }}</mat-label>
@@ -32,24 +33,22 @@
           'emailTemplates.templateDescription.placeholder' | transloco
         }}" />
     </mat-form-field>
-    <!-- </div>
-    <div class="form-recipient-group"> -->
-    <mat-form-field>
+
+    <mat-form-field class="flex-33">
       <mat-label>{{ 'emailTemplates.recipient.label' | transloco }}</mat-label>
       <input matInput formControlName="to" />
     </mat-form-field>
 
-    <mat-form-field>
+    <mat-form-field class="flex-33">
       <mat-label>{{ 'emailTemplates.cc.label' | transloco }}</mat-label>
       <input matInput formControlName="cc" />
     </mat-form-field>
 
-    <mat-form-field>
+    <mat-form-field class="flex-33">
       <mat-label>{{ 'emailTemplates.bcc.label' | transloco }}</mat-label>
       <input matInput formControlName="bcc" />
     </mat-form-field>
-    <!-- </div>
-    <div class="form-body-group"> -->
+
     <mat-form-field>
       <mat-label>{{ 'emailTemplates.subject.label' | transloco }}</mat-label>
       <input
@@ -73,12 +72,10 @@
       <textarea
         matInput
         formControlName="body"
-        class="email-template-body"
-        [class.x-small]="breakpointService.isXSmallScreen | async"></textarea>
+        class="email-template-body"></textarea>
     </mat-form-field>
-    <!-- </div>
-    <div class="form-sender-group"> -->
-    <mat-form-field>
+
+    <mat-form-field class="flex-50">
       <mat-label>{{ 'emailTemplates.senderName.label' | transloco }}</mat-label>
       <input
         matInput
@@ -88,7 +85,7 @@
         }}" />
     </mat-form-field>
 
-    <mat-form-field>
+    <mat-form-field class="flex-50">
       <mat-label>{{
         'emailTemplates.senderEmail.label' | transloco
       }}</mat-label>
@@ -99,9 +96,8 @@
           'emailTemplates.senderEmail.placeholder' | transloco
         }}" />
     </mat-form-field>
-    <!-- </div>
-    <div class="form-reply-group"> -->
-    <mat-form-field>
+
+    <mat-form-field class="flex-50">
       <mat-label>{{
         'emailTemplates.replyToName.label' | transloco
       }}</mat-label>
@@ -113,7 +109,7 @@
         }}" />
     </mat-form-field>
 
-    <mat-form-field>
+    <mat-form-field class="flex-50">
       <mat-label>{{
         'emailTemplates.replyToEmail.label' | transloco
       }}</mat-label>
@@ -124,14 +120,14 @@
           'emailTemplates.replyToEmail.placeholder' | transloco
         }}" />
     </mat-form-field>
-    <!-- </div> -->
 
     <div>
       <button mat-flat-button type="button" (click)="goBack()">
         {{ 'cancel' | transloco }}
       </button>
       <button mat-flat-button color="primary" type="submit">
-        {{ 'submit' | transloco }}
+        <span *ngIf="editApp">{{ 'update' | transloco }}</span>
+        <span *ngIf="!editApp">{{ 'save' | transloco }}</span>
       </button>
     </div>
   </form>
