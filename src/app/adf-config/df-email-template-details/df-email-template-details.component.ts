@@ -134,19 +134,7 @@ export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
         .update(this.emailTemplateForm.value.id, payload, {
           snackbarSccess: 'emailTemplates.alerts.updateSuccess',
         })
-        .pipe(
-          takeUntil(this.destroyed$),
-          catchError(err => {
-            // TODO implement trigger alert
-            // this.triggerAlert(
-            //   'error',
-            //   this.translateService.translate(
-            //     parseError(err.error.error.context.resource[0].message)
-            //   )
-            // );
-            return throwError(() => new Error(err));
-          })
-        )
+        .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.goBack();
         });
@@ -159,19 +147,7 @@ export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
             snackbarSccess: 'emailTemplates.alerts.createSuccess',
           }
         )
-        .pipe(
-          takeUntil(this.destroyed$),
-          catchError(err => {
-            // TODO implement trigger alert
-            // this.triggerAlert(
-            //   'error',
-            //   this.translateService.translate(
-            //     parseError(err.error.error.context.resource[0].message)
-            //   )
-            // );
-            return throwError(() => new Error(err));
-          })
-        )
+        .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.goBack();
         });
