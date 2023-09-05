@@ -22,6 +22,7 @@ import {
   faPenToSquare,
   faPlus,
   faEllipsisV,
+  faTriangleExclamation,
   faCheckCircle,
   faXmarkCircle,
 } from '@fortawesome/free-solid-svg-icons';
@@ -48,7 +49,9 @@ export abstract class DfManageTableComponent<T>
   faPenToSquare = faPenToSquare;
   faPlus = faPlus;
   faEllipsisV = faEllipsisV;
+  faTriangleExclamation = faTriangleExclamation;
   allowCreate = true;
+  allowFilter = true;
 
   abstract columns: Array<{
     columnDef: string;
@@ -57,6 +60,7 @@ export abstract class DfManageTableComponent<T>
   }>;
   @ViewChild(MatSort) sort: MatSort;
   _activatedRoute = this.activatedRoute;
+  _translateService = this.translateService;
 
   constructor(
     protected router: Router,

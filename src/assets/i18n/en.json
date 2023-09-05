@@ -63,6 +63,14 @@
   "data": "Data",
   "packages": "Packages",
   "launchpad": "LaunchPad",
+  "goBack": "Go back",
+  "verbs": {
+    "get": "GET (read)",
+    "post": "POST (create)",
+    "put": "PUT (replace)",
+    "patch": "PATCH (update)",
+    "delete": "DELETE (remove)"
+  },
   "version": "Version",
   "yes": "Yes",
   "no": "No",
@@ -498,7 +506,38 @@
       },
       "scheduler": {
         "nav": "Scheduler",
-        "header": "{{nav.system-settings.scheduler.nav}}"
+        "header": "{{nav.system-settings.scheduler.nav}}",
+        "create": {
+          "header": "Create a new Scheduled Task"
+        },
+        "edit": {
+          "header": "Update Scheduled Task"
+        },
+        "form": {
+          "label": {
+            "name": "Name",
+            "description": "Description",
+            "active": "Active",
+            "service": "Service",
+            "component": "Component",
+            "method": "Method",
+            "frequency": "Frequency (defined in minutes)",
+            "payload": "Payload (JSON)"
+          }
+        },
+        "table": {
+          "header": {
+            "active": "Active",
+            "id": "ID",
+            "name": "Name",
+            "description": "Description",
+            "service": "Service",
+            "component": "Component",
+            "method": "Method",
+            "frequency": "Frequency",
+            "log": "Log"
+          }
+        }
       },
       "logs": { "nav": "Logs", "header": "{{nav.system-settings.logs.nav}}" },
       "reporting": {
@@ -538,6 +577,44 @@
     },
     "profile": { "header": "Profile" },
     "logout": { "header": "Logout" },
+    "roles": { "header": "Roles" },
+    "services": { "header": "Services" },
+    "apps": {
+      "header": "Apps",
+      "create": { "header": "Create Application" },
+      "edit": { "header": "Edit Application" },
+      "import": { "header": "Import Application" }
+    },
+    "users": {
+      "nav": "Users",
+      "header": "Manage Users",
+      "create": { "header": "Create a new user" },
+      "edit": { "header": "Edit" }
+    },
+    "api-docs": { "header": "API Docs" },
+    "schema": { "header": "Schema" },
+    "files": { "header": "Files" },
+    "scripts": { "header": "Scripts" },
+    "config": { "header": "Config" },
+    "limits": {
+      "header": "Limits",
+      "create": {
+        "header": "Create Limit"
+      },
+      "edit": {
+        "header": "Edit Limit"
+      }
+    },
+    "scheduler": {
+      "header": "Scheduler",
+      "create": {
+        "header": "Create a new Scheduled Task"
+      },
+      "edit": {
+        "header": "Manage Scheduled Task"
+      }
+    },
+    "reports": { "header": "Reports" },
     "data": { "nav": "{{data}}", "header": "{{data}}" },
     "package-manager": { "nav": "{{packages}}", "header": "{{packages}}" },
     "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" }
@@ -587,49 +664,69 @@
     "updateSuccessMessage": "Limit successfully updated",
     "deleteSuccessMessage": "Limit successfully deleted"
   },
-  "lookupKeys": {
-    "label": "Lookup Keys",
-    "desc": "Lookup keys for service configuration and credentials must be made private.",
-    "noKeys": "No lookup keys."
-  },
-  "roles": {
-    "label": "Roles",
-    "role": "Role",
-    "app": "App",
-    "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
-    "noRoles": "No roles assigned."
-  },
-  "system-info": {
-    "subheading": "Displays current system information.",
-    "instance": {
-      "instance": "Instance",
-      "licenseLevel": "License Level",
-      "licenseKey": "License Key",
-      "subscriptionStatus": "Subscription Status",
-      "subscriptionExpirationDate": "Subscription Expiration Date",
-      "systemDatabase": "System Database",
-      "installPath": "Install Path",
-      "logPath": "Log Path",
-      "logMode": "Log Mode",
-      "logLevel": "Log Level",
-      "cacheDriver": "Cache Driver",
-      "demo": "Demo",
-      "instanceId": "Instance ID"
+  "scheduler": {
+    "logPageTitle": "Scheduler Task Log",
+    "logPageSubtitle": "This interface displays the scheduler task error log.",
+    "taskOverview": "Scheduler Task Overview",
+    "taskOverviewSubtitle": "Scheduler task provide a way to schedule requests to the platform.",
+    "alerts": {
+      "createdSuccess": "Scheduled task created successfully",
+      "updateSuccess": "Scheduled task updated successfully",
+      "deleteSuccess": "Scheduled task deleted successfully"
     },
-    "packages": "Installed Packages",
-    "server": {
-      "heading": "Server",
-      "os": "Operating System",
-      "release": "Release",
-      "host": "Host",
-      "machine": "Machine",
-      "serverApi": "Server API"
+    "cancel": "Cancel",
+    "basic": "Basic",
+    "selectAnOption": "Select an option",
+    "name": "Name",
+    "value": "Value",
+    "private": "Private",
+    "inviteSent": "An email invite has been sent.",
+    "launch": "Launch",
+    "launchApp": "Launch {{appName}}",
+    "lookupKeys": {
+      "label": "Lookup Keys",
+      "desc": "Lookup keys for service configuration and credentials must be made private.",
+      "noKeys": "No lookup keys."
     },
-    "client": {
-      "heading": "Client",
-      "userAgent": "User Agent",
-      "ipAddress": "IP Address",
-      "Locale": "Locale"
+    "roles": {
+      "label": "Roles",
+      "role": "Role",
+      "app": "App",
+      "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
+      "noRoles": "No roles assigned."
+    },
+    "system-info": {
+      "subheading": "Displays current system information.",
+      "instance": {
+        "instance": "Instance",
+        "licenseLevel": "License Level",
+        "licenseKey": "License Key",
+        "subscriptionStatus": "Subscription Status",
+        "subscriptionExpirationDate": "Subscription Expiration Date",
+        "systemDatabase": "System Database",
+        "installPath": "Install Path",
+        "logPath": "Log Path",
+        "logMode": "Log Mode",
+        "logLevel": "Log Level",
+        "cacheDriver": "Cache Driver",
+        "demo": "Demo",
+        "instanceId": "Instance ID"
+      },
+      "packages": "Installed Packages",
+      "server": {
+        "heading": "Server",
+        "os": "Operating System",
+        "release": "Release",
+        "host": "Host",
+        "machine": "Machine",
+        "serverApi": "Server API"
+      },
+      "client": {
+        "heading": "Client",
+        "userAgent": "User Agent",
+        "ipAddress": "IP Address",
+        "Locale": "Locale"
+      }
     }
   },
   "cache": {

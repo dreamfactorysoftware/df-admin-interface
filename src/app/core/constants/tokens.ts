@@ -23,6 +23,14 @@ export const REPORT_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'REPORT_SERVICE_TOKEN'
 );
 
+export const SCHEDULER_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SCHEDULER_SERVICE_TOKEN'
+);
+
+export const SCHEDULER_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SCHEDULER_URL_TOKEN'
+);
+
 export const LIMIT_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'LIMIT_SERVICE_TOKEN'
 );

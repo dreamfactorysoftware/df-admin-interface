@@ -33,7 +33,7 @@ export interface RequestOptions {
   limit: number;
   offset: number;
   includeCount: boolean;
-  snackbarSccess: string;
+  snackbarSuccess: string;
   snackbarError: string;
   contentType: string;
   additionalParams: KeyValuePair[];
