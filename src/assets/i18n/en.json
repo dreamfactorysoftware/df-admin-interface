@@ -449,7 +449,16 @@
       },
       "api-docs": {
         "nav": "API Docs",
-        "header": "{{nav.api-connections.api-docs.nav}}"
+        "header": "{{nav.api-connections.api-docs.nav}}",
+        "table": {
+          "header": {
+            "name": "Service Name",
+            "label": "Label",
+            "description": "Description",
+            "group": "Group",
+            "type": "Type"
+          }
+        }
       }
     },
     "api-security": {

@@ -9,6 +9,8 @@ import {
 } from '../services/service-data.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 
+// TODO: refactor the service data service to extend the base crud service factory
+
 export const getSystemServiceDataResolver: ResolveFn<
   Observable<SystemServiceData>
 > = route => {

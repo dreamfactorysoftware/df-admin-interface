@@ -14,7 +14,10 @@ import { editAppResolver } from './adf-apps/resolvers/edit-app.resolver';
 import { adminsResolver } from './adf-admins/resolvers/admins.resolver';
 import { rolesResolver } from './adf-roles/resolvers/role.resolver';
 import { limitsResolver } from './adf-limits/resolvers/limits.resolver';
-import { getSystemServiceDataListResolver } from './adf-services/resolvers/service-data-service.resolver';
+import {
+  getServiceTypeDataResolver,
+  getSystemServiceDataListResolver,
+} from './adf-services/resolvers/service-data-service.resolver';
 import {
   ADMIN_SERVICE_PROVIDERS,
   APP_SERVICE_PROVIDERS,
@@ -24,6 +27,7 @@ import {
   REPORT_SERVICE_PROVIDERS,
   ROLE_SERVICE_PROVIDERS,
   USER_SERVICE_PROVIDERS,
+  API_DOCS_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -33,6 +37,8 @@ import { DfServiceDataService } from './adf-services/services/service-data.servi
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
 import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
 import { DfCacheResolver } from './adf-config/resolvers/df-cache.resolver';
+import { DfApiDocsTableComponent } from './adf-api-docs/df-api-docs/df-api-docs-table.component';
+import { apiDocsResolver } from './adf-api-docs/resolvers/api-docs.resolver';
 
 export const routes: Routes = [
   {
@@ -234,7 +240,20 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.API_DOCS,
-        component: DfPlaceHolderComponent,
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import(
+                './adf-api-docs/df-api-docs/df-api-docs-table.component'
+              ).then(m => m.DfApiDocsTableComponent),
+            resolve: {
+              data: apiDocsResolver,
+              serviceTypes: getServiceTypeDataResolver,
+            },
+          },
+        ],
+        providers: [...API_DOCS_SERVICE_PROVIDERS, DfServiceDataService],
       },
     ],
     canActivate: [loggedInGuard],

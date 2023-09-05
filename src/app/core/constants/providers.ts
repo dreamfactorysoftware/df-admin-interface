@@ -17,6 +17,10 @@ import {
   LIMIT_CACHE_SERVICE_TOKEN,
   CACHE_URL_TOKEN,
   CACHE_SERVICE_TOKEN,
+  API_DOCS_URL_TOKEN,
+  API_DOCS_SERVICE_TOKEN,
+  SERVICE_TYPE_URL_TOKEN,
+  SERVICE_TYPE_SERVICE_TOKEN,
 } from './tokens';
 import { URLS } from './urls';
 
@@ -65,6 +69,30 @@ export const APP_SERVICE_PROVIDERS = [
     provide: APP_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [APP_URL_TOKEN, HttpClient],
+  },
+];
+
+export const API_DOCS_SERVICE_PROVIDERS = [
+  {
+    provide: API_DOCS_URL_TOKEN,
+    useValue: URLS.SYSTEM_SERVICE,
+  },
+  {
+    provide: API_DOCS_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [API_DOCS_URL_TOKEN, HttpClient],
+  },
+];
+
+export const SERVICE_TYPE_SERVICE_PROVIDERS = [
+  {
+    provide: SERVICE_TYPE_URL_TOKEN,
+    useValue: URLS.SERVICE_TYPE,
+  },
+  {
+    provide: SERVICE_TYPE_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [SERVICE_TYPE_URL_TOKEN, HttpClient],
   },
 ];
 

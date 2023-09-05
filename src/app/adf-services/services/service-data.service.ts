@@ -79,14 +79,14 @@ export interface ServiceTypeResponse {
 }
 
 export interface ServiceType {
-  dependencies_required: null;
+  dependenciesRequired: null;
   description: string;
   group: string;
   label: string;
   name: string;
-  service_definition_editable: boolean;
+  serviceDefinitionEditable: boolean;
   singleton: boolean;
-  subscription_required: string;
+  subscriptionRequired: string;
   configSchema: any[];
 }
 
@@ -99,10 +99,10 @@ export interface SystemServiceData {
   type: string;
   mutable: boolean;
   deletable: boolean;
-  created_date: string;
-  last_modified_date: string;
-  created_by_id: number | null;
-  last_modified_by_id: number | null;
+  createdDate: string;
+  lastModifiedDate: string;
+  createdById: number | null;
+  lastModifiedById: number | null;
   config: any;
-  service_doc_by_service_id: number | null;
+  serviceDocByServiceId: number | null;
 }
