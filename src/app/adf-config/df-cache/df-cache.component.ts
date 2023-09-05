@@ -34,13 +34,13 @@ export class DfCacheComponent {
 
   flushSystemCache() {
     this.cacheService
-      .delete('system', { snackbarSccess: 'System-wide cache flushed.' })
+      .delete('system', { snackbarSuccess: 'System-wide cache flushed.' })
       .subscribe();
   }
 
   flushServiceCache = (name: string) => {
     this.cacheService
-      .delete(name, { snackbarSccess: `${name} cache flushed` })
+      .delete(name, { snackbarSuccess: `${name} cache flushed` })
       .subscribe();
   };
 }
