@@ -4,19 +4,27 @@
     <h4>{{ 'scheduler.taskOverviewSubtitle' | transloco }}</h4>
     <form [formGroup]="formGroup" (ngSubmit)="onSubmit()">
       <mat-form-field>
-        <mat-label>Name</mat-label>
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.name' | transloco
+        }}</mat-label>
         <input matInput placeholder="Name" formControlName="name" />
       </mat-form-field>
       <mat-form-field>
-        <mat-label>Description</mat-label>
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.description' | transloco
+        }}</mat-label>
         <input
           matInput
           placeholder="Description"
           formControlName="description" />
       </mat-form-field>
-      <mat-slide-toggle formControlName="active">Active</mat-slide-toggle>
+      <mat-slide-toggle formControlName="active">{{
+        'nav.system-settings.scheduler.form.label.active' | transloco
+      }}</mat-slide-toggle>
       <mat-form-field>
-        <mat-label>Service</mat-label>
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.service' | transloco
+        }}</mat-label>
         <mat-select formControlName="serviceId">
           <mat-option
             *ngFor="let service of userServicesDropdownOptions"
@@ -26,7 +34,9 @@
         </mat-select>
       </mat-form-field>
       <mat-form-field *ngIf="componentDropdownOptions.length">
-        <mat-label>Component</mat-label>
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.component' | transloco
+        }}</mat-label>
         <mat-select formControlName="component">
           <mat-option
             *ngFor="let item of componentDropdownOptions"
@@ -36,7 +46,9 @@
         </mat-select>
       </mat-form-field>
       <mat-form-field>
-        <mat-label>Method</mat-label>
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.method' | transloco
+        }}</mat-label>
         <mat-select formControlName="method">
           <mat-option
             *ngFor="let verb of verbDropdownOptions"
@@ -46,12 +58,16 @@
         </mat-select>
       </mat-form-field>
       <mat-form-field>
-        <mat-label>Frequency (defined in minutes)</mat-label>
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.frequency' | transloco
+        }}</mat-label>
         <input matInput type="number" formControlName="frequency" />
       </mat-form-field>
       <ng-container *ngIf="this.formGroup.controls['payload']">
         <mat-form-field>
-          <mat-label>Payload (JSON)</mat-label>
+          <mat-label>{{
+            'nav.system-settings.scheduler.form.label.payload' | transloco
+          }}</mat-label>
           <textarea matInput formControlName="payload"></textarea>
         </mat-form-field>
       </ng-container>

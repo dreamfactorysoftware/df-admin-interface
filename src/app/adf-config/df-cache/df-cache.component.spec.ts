@@ -8,7 +8,7 @@ describe('DfCacheComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfCacheComponent]
+      declarations: [DfCacheComponent],
     });
     fixture = TestBed.createComponent(DfCacheComponent);
     component = fixture.componentInstance;

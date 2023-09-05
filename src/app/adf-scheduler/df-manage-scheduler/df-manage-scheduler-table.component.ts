@@ -18,6 +18,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTableModule } from '@angular/material/table';
 import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 @Component({
   selector: 'df-manage-scheduler-table',
@@ -35,6 +36,7 @@ import { MatButtonModule } from '@angular/material/button';
     FontAwesomeModule,
     MatPaginatorModule,
     MatButtonModule,
+    MatDialogModule,
     MatMenuModule,
     MatInputModule,
     MatFormFieldModule,
@@ -53,14 +55,16 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     breakpointService: DfBreakpointService,
-    translateService: TranslocoService
+    translateService: TranslocoService,
+    dialog: MatDialog
   ) {
     super(
       router,
       activatedRoute,
       liveAnnouncer,
       breakpointService,
-      translateService
+      translateService,
+      dialog
     );
 
     this._activatedRoute.data

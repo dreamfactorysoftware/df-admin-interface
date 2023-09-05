@@ -501,6 +501,18 @@
         "edit": {
           "header": "Update Scheduled Task"
         },
+        "form": {
+          "label": {
+            "name": "Name",
+            "description": "Description",
+            "active": "Active",
+            "service": "Service",
+            "component": "Component",
+            "method": "Method",
+            "frequency": "Frequency (defined in minutes)",
+            "payload": "Payload (JSON)"
+          }
+        },
         "table": {
           "header": {
             "active": "Active",
