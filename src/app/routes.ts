@@ -194,7 +194,7 @@ export const routes: Routes = [
                 m => m.DfManageAppsComponent
               ),
             resolve: {
-              data: appsResolver,
+              data: appsResolver(0),
             },
           },
           {
