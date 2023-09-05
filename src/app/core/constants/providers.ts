@@ -13,6 +13,8 @@ import {
   REPORT_SERVICE_TOKEN,
   LIMIT_URL_TOKEN,
   LIMIT_SERVICE_TOKEN,
+  SCHEDULER_URL_TOKEN,
+  SCHEDULER_SERVICE_TOKEN,
   LIMIT_CACHE_URL_TOKEN,
   LIMIT_CACHE_SERVICE_TOKEN,
   CACHE_URL_TOKEN,
@@ -21,6 +23,8 @@ import {
   API_DOCS_SERVICE_TOKEN,
   SERVICE_TYPE_URL_TOKEN,
   SERVICE_TYPE_SERVICE_TOKEN,
+  EMAIL_TEMPLATES_URL_TOKEN,
+  EMAIL_TEMPLATES_SERVICE_TOKEN,
 } from './tokens';
 import { URLS } from './urls';
 
@@ -120,6 +124,18 @@ export const LIMIT_SERVICE_PROVIDERS = [
   },
 ];
 
+export const SCHEDULER_SERVICE_PROVIDER = [
+  {
+    provide: SCHEDULER_URL_TOKEN,
+    useValue: URLS.SCHEDULER,
+  },
+  {
+    provide: SCHEDULER_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [SCHEDULER_URL_TOKEN, HttpClient],
+  },
+];
+
 export const LIMIT_CACHE_SERVICE_PROVIDERS = [
   {
     provide: LIMIT_CACHE_URL_TOKEN,
@@ -141,5 +157,17 @@ export const CACHE_SERVICE_PROVIDERS = [
     provide: CACHE_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [CACHE_URL_TOKEN, HttpClient],
+  },
+];
+
+export const EMAIL_TEMPLATES_SERVICE_PROVIDERS = [
+  {
+    provide: EMAIL_TEMPLATES_URL_TOKEN,
+    useValue: URLS.EMAIL_TEMPLATES,
+  },
+  {
+    provide: EMAIL_TEMPLATES_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [EMAIL_TEMPLATES_URL_TOKEN, HttpClient],
   },
 ];

@@ -1,0 +1,101 @@
+<mat-tab-group>
+  <mat-tab label="Basic">
+    <h1>{{ 'scheduler.taskOverview' | transloco }}</h1>
+    <h4>{{ 'scheduler.taskOverviewSubtitle' | transloco }}</h4>
+    <form [formGroup]="formGroup" (ngSubmit)="onSubmit()">
+      <mat-form-field>
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.name' | transloco
+        }}</mat-label>
+        <input matInput placeholder="Name" formControlName="name" />
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.description' | transloco
+        }}</mat-label>
+        <input
+          matInput
+          placeholder="Description"
+          formControlName="description" />
+      </mat-form-field>
+      <mat-slide-toggle formControlName="active">{{
+        'nav.system-settings.scheduler.form.label.active' | transloco
+      }}</mat-slide-toggle>
+      <mat-form-field>
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.service' | transloco
+        }}</mat-label>
+        <mat-select formControlName="serviceId">
+          <mat-option
+            *ngFor="let service of userServicesDropdownOptions"
+            [value]="service.id">
+            {{ service.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field *ngIf="componentDropdownOptions.length">
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.component' | transloco
+        }}</mat-label>
+        <mat-select formControlName="component">
+          <mat-option
+            *ngFor="let item of componentDropdownOptions"
+            [value]="item"
+            >{{ item }}</mat-option
+          >
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.method' | transloco
+        }}</mat-label>
+        <mat-select formControlName="method">
+          <mat-option
+            *ngFor="let verb of verbDropdownOptions"
+            [value]="verb.value"
+            >{{ verb.name | transloco }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>{{
+          'nav.system-settings.scheduler.form.label.frequency' | transloco
+        }}</mat-label>
+        <input matInput type="number" formControlName="frequency" />
+      </mat-form-field>
+      <ng-container *ngIf="this.formGroup.controls['payload']">
+        <mat-form-field>
+          <mat-label>{{
+            'nav.system-settings.scheduler.form.label.payload' | transloco
+          }}</mat-label>
+          <textarea matInput formControlName="payload"></textarea>
+        </mat-form-field>
+      </ng-container>
+      <div>
+        <button mat-raised-button (click)="onCancel()">
+          {{ 'cancel' | transloco }}
+        </button>
+        <button mat-raised-button color="primary" type="submit">
+          {{ 'save' | transloco }}
+        </button>
+      </div>
+    </form>
+  </mat-tab>
+  <mat-tab label="Log">
+    <div class="scheduler-log-container">
+      <h1>{{ 'scheduler.logPageTitle' | transloco }}</h1>
+      <h4>{{ 'scheduler.logPageSubtitle' | transloco }}</h4>
+      <p>Status Code: {{ scheduleToEdit?.taskLogByTaskId?.statusCode }}</p>
+      <p>Error:</p>
+      <textarea
+        rows="40"
+        cols="60"
+        matInput
+        [formControl]="logFormControl"
+        readonly></textarea>
+      <button mat-raised-button color="primary" (click)="onCancel()">
+        {{ 'goBack' | transloco }}
+      </button>
+    </div>
+  </mat-tab>
+</mat-tab-group>

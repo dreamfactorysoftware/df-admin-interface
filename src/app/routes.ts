@@ -26,8 +26,10 @@ import {
   LIMIT_SERVICE_PROVIDERS,
   REPORT_SERVICE_PROVIDERS,
   ROLE_SERVICE_PROVIDERS,
+  SCHEDULER_SERVICE_PROVIDER,
   USER_SERVICE_PROVIDERS,
   API_DOCS_SERVICE_PROVIDERS,
+  EMAIL_TEMPLATES_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -35,10 +37,15 @@ import { DfPasswordService } from './adf-user-management/services/df-password.se
 import { profileResolver } from './adf-profile/resolvers/profile.resolver';
 import { DfServiceDataService } from './adf-services/services/service-data.service';
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
+import { schedulerResolver } from './adf-scheduler/resolvers/scheduler.resolver';
+import { DfAccessListService } from './adf-scheduler/services/access-list.service';
 import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
 import { DfCacheResolver } from './adf-config/resolvers/df-cache.resolver';
-import { DfApiDocsTableComponent } from './adf-api-docs/df-api-docs/df-api-docs-table.component';
 import { apiDocsResolver } from './adf-api-docs/resolvers/api-docs.resolver';
+import {
+  DfEmailTemplateDetailsResolver,
+  DfEmailTemplatesResolver,
+} from './adf-config/resolvers/df-email-templates.resolver';
 
 export const routes: Routes = [
   {
@@ -200,7 +207,7 @@ export const routes: Routes = [
                 m => m.DfManageAppsComponent
               ),
             resolve: {
-              data: appsResolver,
+              data: appsResolver(0),
             },
           },
           {
@@ -343,11 +350,82 @@ export const routes: Routes = [
             },
             providers: [...CACHE_SERVICE_PROVIDERS],
           },
+          {
+            path: ROUTES.EMAIL_TEMPLATES,
+            children: [
+              {
+                path: '',
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-email-templates/df-email-templates.component'
+                  ).then(m => m.DfEmailTemplatesComponent),
+                resolve: {
+                  data: DfEmailTemplatesResolver,
+                },
+              },
+              {
+                path: `${ROUTES.EDIT}/:id`,
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-email-template-details/df-email-template-details.component'
+                  ).then(m => m.DfEmailTemplateDetailsComponent),
+                resolve: { data: DfEmailTemplateDetailsResolver },
+                data: { type: 'edit' },
+              },
+              {
+                path: ROUTES.CREATE,
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-email-template-details/df-email-template-details.component'
+                  ).then(m => m.DfEmailTemplateDetailsComponent),
+                data: { type: 'create' },
+              },
+            ],
+            providers: [...EMAIL_TEMPLATES_SERVICE_PROVIDERS],
+          },
         ],
       },
       {
         path: ROUTES.SCHEDULER,
-        component: DfPlaceHolderComponent,
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import(
+                './adf-scheduler/df-manage-scheduler/df-manage-scheduler-table.component'
+              ).then(m => m.DfManageSchedulerTableComponent),
+            resolve: {
+              data: schedulerResolver,
+              services: getSystemServiceDataListResolver,
+            },
+          },
+          {
+            path: ROUTES.CREATE,
+            loadComponent: () =>
+              import(
+                './adf-scheduler/df-scheduler/df-scheduler.component'
+              ).then(m => m.DfSchedulerComponent),
+            resolve: {
+              data: getSystemServiceDataListResolver,
+            },
+          },
+          {
+            path: `${ROUTES.EDIT}/:id`,
+            loadComponent: () =>
+              import(
+                './adf-scheduler/df-scheduler/df-scheduler.component'
+              ).then(m => m.DfSchedulerComponent),
+            resolve: {
+              data: getSystemServiceDataListResolver,
+              schedulerObject: schedulerResolver,
+            },
+          },
+        ],
+        providers: [
+          DfServiceDataService,
+          DfAccessListService,
+          ...SCHEDULER_SERVICE_PROVIDER,
+        ],
       },
       {
         path: ROUTES.LOGS,

@@ -38,6 +38,14 @@ export const REPORT_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'REPORT_SERVICE_TOKEN'
 );
 
+export const SCHEDULER_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SCHEDULER_SERVICE_TOKEN'
+);
+
+export const SCHEDULER_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SCHEDULER_URL_TOKEN'
+);
+
 export const LIMIT_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'LIMIT_SERVICE_TOKEN'
 );
@@ -59,3 +67,9 @@ export const CACHE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'CACHE_SERVICE_TOKEN'
 );
 export const CACHE_URL_TOKEN = new InjectionToken<string>('CACHE_URL_TOKEN');
+
+export const EMAIL_TEMPLATES_SERVICE_TOKEN =
+  new InjectionToken<DfBaseCrudService>('EMAIL_TEMPLATES_SERVICE_TOKEN');
+export const EMAIL_TEMPLATES_URL_TOKEN = new InjectionToken<string>(
+  'EMAIL_TEMPLATES_URL_TOKEN'
+);

@@ -4,7 +4,6 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faRotate } from '@fortawesome/free-solid-svg-icons';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTableModule } from '@angular/material/table';
-import { CacheType } from './df-cache.types';
 import { NgFor } from '@angular/common';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { CACHE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
@@ -33,14 +32,16 @@ export class DfCacheComponent {
   ) {}
 
   flushSystemCache() {
+    // TODO move text to en.json
     this.cacheService
-      .delete('system', { snackbarSccess: 'System-wide cache flushed.' })
+      .delete('system', { snackbarSuccess: 'System-wide cache flushed.' })
       .subscribe();
   }
 
   flushServiceCache = (name: string) => {
+    // TODO move text to en.json
     this.cacheService
-      .delete(name, { snackbarSccess: `${name} cache flushed` })
+      .delete(name, { snackbarSuccess: `${name} cache flushed` })
       .subscribe();
   };
 }
