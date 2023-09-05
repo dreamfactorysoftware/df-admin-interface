@@ -24,6 +24,7 @@ import {
   LIMIT_SERVICE_PROVIDERS,
   REPORT_SERVICE_PROVIDERS,
   ROLE_SERVICE_PROVIDERS,
+  SCHEDULER_SERVICE_PROVIDER,
   USER_SERVICE_PROVIDERS,
   EMAIL_TEMPLATES_SERVICE_PROVIDERS,
 } from './core/constants/providers';
@@ -34,6 +35,8 @@ import { profileResolver } from './adf-profile/resolvers/profile.resolver';
 import { DfServiceDataService } from './adf-services/services/service-data.service';
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
 import { corsConfigResolver } from './adf-config/resolvers/df-cors-config.resolver';
+import { schedulerResolver } from './adf-scheduler/resolvers/scheduler.resolver';
+import { DfAccessListService } from './adf-scheduler/services/access-list.service';
 import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
 import { DfCacheResolver } from './adf-config/resolvers/df-cache.resolver';
 import {
@@ -401,7 +404,45 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.SCHEDULER,
-        component: DfPlaceHolderComponent,
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import(
+                './adf-scheduler/df-manage-scheduler/df-manage-scheduler-table.component'
+              ).then(m => m.DfManageSchedulerTableComponent),
+            resolve: {
+              data: schedulerResolver,
+              services: getSystemServiceDataListResolver,
+            },
+          },
+          {
+            path: ROUTES.CREATE,
+            loadComponent: () =>
+              import(
+                './adf-scheduler/df-scheduler/df-scheduler.component'
+              ).then(m => m.DfSchedulerComponent),
+            resolve: {
+              data: getSystemServiceDataListResolver,
+            },
+          },
+          {
+            path: `${ROUTES.EDIT}/:id`,
+            loadComponent: () =>
+              import(
+                './adf-scheduler/df-scheduler/df-scheduler.component'
+              ).then(m => m.DfSchedulerComponent),
+            resolve: {
+              data: getSystemServiceDataListResolver,
+              schedulerObject: schedulerResolver,
+            },
+          },
+        ],
+        providers: [
+          DfServiceDataService,
+          DfAccessListService,
+          ...SCHEDULER_SERVICE_PROVIDER,
+        ],
       },
       {
         path: ROUTES.LOGS,
