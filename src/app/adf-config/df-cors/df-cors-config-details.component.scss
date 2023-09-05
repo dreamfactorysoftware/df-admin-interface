@@ -1,0 +1,14 @@
+.df-cors-config-container {
+  form {
+    width: 60%;
+  }
+
+  .slide-toggle-container {
+    display: grid;
+    margin-bottom: 1rem;
+
+    .mat-mdc-slide-toggle {
+      padding-bottom: 10px;
+    }
+  }
+}

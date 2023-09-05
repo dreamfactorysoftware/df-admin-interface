@@ -18,6 +18,7 @@ import { getSystemServiceDataListResolver } from './adf-services/resolvers/servi
 import {
   ADMIN_SERVICE_PROVIDERS,
   APP_SERVICE_PROVIDERS,
+  CORS_CONFIG_SERVICE_PROVIDERS,
   LIMIT_CACHE_SERVICE_PROVIDERS,
   CACHE_SERVICE_PROVIDERS,
   LIMIT_SERVICE_PROVIDERS,
@@ -33,6 +34,7 @@ import { DfPasswordService } from './adf-user-management/services/df-password.se
 import { profileResolver } from './adf-profile/resolvers/profile.resolver';
 import { DfServiceDataService } from './adf-services/services/service-data.service';
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
+import { corsConfigResolver } from './adf-config/resolvers/df-cors-config.resolver';
 import { schedulerResolver } from './adf-scheduler/resolvers/scheduler.resolver';
 import { DfAccessListService } from './adf-scheduler/services/access-list.service';
 import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
@@ -320,6 +322,39 @@ export const routes: Routes = [
             resolve: {
               data: DfSystemInfoResolver,
             },
+          },
+          {
+            path: ROUTES.CORS,
+            providers: [...CORS_CONFIG_SERVICE_PROVIDERS],
+            children: [
+              {
+                path: '',
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-cors/df-manage-cors-table.component'
+                  ).then(m => m.DfManageCorsTableComponent),
+                resolve: {
+                  data: corsConfigResolver,
+                },
+              },
+              {
+                path: ROUTES.CREATE,
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-cors/df-cors-config-details.component'
+                  ).then(m => m.DfCorsConfigDetailsComponent),
+              },
+              {
+                path: `${ROUTES.EDIT}/:id`,
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-cors/df-cors-config-details.component'
+                  ).then(m => m.DfCorsConfigDetailsComponent),
+                resolve: {
+                  data: corsConfigResolver,
+                },
+              },
+            ],
           },
           {
             path: ROUTES.CACHE,

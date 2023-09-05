@@ -43,6 +43,7 @@ export enum ROUTES {
   DATA = 'data',
   PACKAGES = 'package-manager',
   SYSTEM_INFO = 'system-info',
+  CORS = 'cors',
   CACHE = 'cache',
   EMAIL_TEMPLATES = 'email-templates',
 }

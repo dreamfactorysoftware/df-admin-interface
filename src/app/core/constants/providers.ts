@@ -13,6 +13,8 @@ import {
   REPORT_SERVICE_TOKEN,
   LIMIT_URL_TOKEN,
   LIMIT_SERVICE_TOKEN,
+  CONFIG_CORS_URL_TOKEN,
+  CONFIG_CORS_SERVICE_TOKEN,
   SCHEDULER_URL_TOKEN,
   SCHEDULER_SERVICE_TOKEN,
   LIMIT_CACHE_URL_TOKEN,
@@ -81,6 +83,18 @@ export const REPORT_SERVICE_PROVIDERS = [
     provide: REPORT_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [REPORT_URL_TOKEN, HttpClient],
+  },
+];
+
+export const CORS_CONFIG_SERVICE_PROVIDERS = [
+  {
+    provide: CONFIG_CORS_URL_TOKEN,
+    useValue: URLS.SYSTEM_CORS,
+  },
+  {
+    provide: CONFIG_CORS_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [CONFIG_CORS_URL_TOKEN, HttpClient],
   },
 ];
 
