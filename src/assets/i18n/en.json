@@ -5,6 +5,7 @@
   "delete": "Delete",
   "edit": "Edit",
   "select": "Select",
+  "view": "View",
   "submit": "Submit",
   "browse": "Browse",
   "launch": "Launch",
@@ -29,6 +30,7 @@
   "filter": "Filter",
   "resetRowCounter": "Reset counter for row {{id}}",
   "editRow": "Edit row {{id}}",
+  "viewRow": "View row {{id}}",
   "deleteRow": "Delete row {{id}}",
   "selectRow": "Select row {{id}}",
   "selectAll": "Select All",
@@ -458,6 +460,11 @@
       "api-docs": {
         "nav": "API Docs",
         "header": "{{nav.api-connections.api-docs.nav}}",
+        "view": {
+          "system": {
+            "header": "{{nav.api-connections.api-docs.nav}}"
+          }
+        },
         "table": {
           "header": {
             "name": "Service Name",

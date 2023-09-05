@@ -41,11 +41,15 @@ import { schedulerResolver } from './adf-scheduler/resolvers/scheduler.resolver'
 import { DfAccessListService } from './adf-scheduler/services/access-list.service';
 import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
 import { DfCacheResolver } from './adf-config/resolvers/df-cache.resolver';
-import { apiDocsResolver } from './adf-api-docs/resolvers/api-docs.resolver';
+import {
+  apiDocsResolver,
+  systemServiceDataResolver,
+} from './adf-api-docs/resolvers/api-docs.resolver';
 import {
   DfEmailTemplateDetailsResolver,
   DfEmailTemplatesResolver,
 } from './adf-config/resolvers/df-email-templates.resolver';
+import { DfApiDocsService } from './adf-api-docs/services/df-api-docs.service';
 
 export const routes: Routes = [
   {
@@ -255,12 +259,26 @@ export const routes: Routes = [
                 './adf-api-docs/df-api-docs/df-api-docs-table.component'
               ).then(m => m.DfApiDocsTableComponent),
             resolve: {
-              data: apiDocsResolver,
+              data: systemServiceDataResolver,
               serviceTypes: getServiceTypeDataResolver,
             },
           },
+          {
+            path: `${ROUTES.VIEW}/:name`,
+            loadComponent: () =>
+              import('./adf-api-docs/df-api-docs/df-api-docs.component').then(
+                m => m.DfApiDocsComponent
+              ),
+            resolve: {
+              data: apiDocsResolver,
+            },
+          },
         ],
-        providers: [...API_DOCS_SERVICE_PROVIDERS, DfServiceDataService],
+        providers: [
+          ...API_DOCS_SERVICE_PROVIDERS,
+          DfServiceDataService,
+          DfApiDocsService,
+        ],
       },
     ],
     canActivate: [loggedInGuard],

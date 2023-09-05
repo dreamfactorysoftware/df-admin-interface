@@ -50,6 +50,7 @@ import { takeUntil } from 'rxjs';
 export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowData> {
   serviceTypes: ServiceType[];
   override allowCreate = false;
+  override readOnly = true;
 
   constructor(
     @Inject(API_DOCS_SERVICE_TOKEN)
