@@ -16,6 +16,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatButtonModule } from '@angular/material/button';
 import { NgFor, NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
+import { ROUTES } from 'src/app/core/constants/routes';
 
 @Component({
   selector: 'df-df-import-app',
@@ -68,7 +69,7 @@ export class DfImportAppComponent {
   }
 
   goBack() {
-    this.router.navigate(['/apps']);
+    this.router.navigate([`${ROUTES.API_CONNECTIONS}/${ROUTES.API_KEYS}`]);
   }
 
   onSubmit() {

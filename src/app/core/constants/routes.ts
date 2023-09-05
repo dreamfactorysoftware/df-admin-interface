@@ -45,4 +45,5 @@ export enum ROUTES {
   SYSTEM_INFO = 'system-info',
   CORS = 'cors',
   CACHE = 'cache',
+  EMAIL_TEMPLATES = 'email-templates',
 }

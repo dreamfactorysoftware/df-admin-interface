@@ -30,6 +30,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { faCircleInfo, faCopy } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
+import { ROUTES } from 'src/app/core/constants/routes';
 
 @Component({
   selector: 'df-app-details',
@@ -164,7 +165,7 @@ export class DfAppDetailsComponent implements OnInit {
   }
 
   goBack() {
-    this.router.navigate(['/apps']);
+    this.router.navigate([`${ROUTES.API_CONNECTIONS}/${ROUTES.API_KEYS}`]);
   }
 
   onSubmit() {

@@ -534,6 +534,22 @@
         "df-platform-apis": {
           "nav": "DreamFactory Platform APIs",
           "header": "{{nav.system-settings.df-platform-apis.nav}}"
+        },
+        "cache": {
+          "nav": "Cache",
+          "header": "{{nav.system-settings.config.cache.nav}}"
+        },
+        "email-templates": {
+          "nav": "Email Templates",
+          "header": "{{nav.system-settings.config.email-templates.nav}}",
+          "create": {
+            "nav": "Create Email Template",
+            "header": "{{nav.system-settings.config.email-templates.create.nav}}"
+          },
+          "edit": {
+            "nav": "Edit Email Template",
+            "header": "{{nav.system-settings.config.email-templates.edit.nav}}"
+          }
         }
       },
       "admin-settings": {
@@ -665,6 +681,65 @@
       "description": "Flush system-wide cache or per-service caches. Use the cache clearing buttons below to refresh any changes made to your system configuration values.",
       "flushSystemCache": "Flush System-Wide Cache",
       "perServiceCaches": "Per-Service Caches"
+    }
+  },
+  "cache": {
+    "cache": "Cache",
+    "overview": "Cache Overview",
+    "flushService": "Flush {{serviceName}} Cache",
+    "description": "Flush system-wide cache or per-service caches. Use the cache clearing buttons below to refresh any changes made to your system configuration values.",
+    "flushSystemCache": "Flush System-Wide Cache",
+    "perServiceCaches": "Per-Service Caches"
+  },
+  "emailTemplates": {
+    "description": "Create and edit email templates for User Registration, User Invite, Password Reset, and your custom email services.",
+    "templateName": {
+      "label": "Template Name",
+      "placeholder": "Enter template name",
+      "error": "Template name required"
+    },
+    "templateDescription": {
+      "label": "Template Description",
+      "placeholder": "Enter template description"
+    },
+    "recipient": {
+      "label": "Recipient",
+      "tooltip": "Enter recipient address. Enter multiple addresses separated by comma."
+    },
+    "cc": {
+      "label": "CC",
+      "tooltip": "Enter cc address. Enter multiple addresses separated by comma"
+    },
+    "bcc": {
+      "label": "BCC",
+      "tooltip": "Enter bcc address. Enter multiple addresses separated by comma."
+    },
+    "subject": { "label": "Subject", "placeholder": "Enter email subject" },
+    "attachment": {
+      "label": "Attachment",
+      "tooltip": "You can enter URL for attachment. Enter multiple URLs separated by comma. You can use lookup keys here too. Example: {key1},{key2}.",
+      "placeholder": "Enter email attachment"
+    },
+    "body": "Body",
+    "senderName": {
+      "label": "Sender Name",
+      "placeholder": "Enter sender name"
+    },
+    "senderEmail": {
+      "label": "Sender Email",
+      "placeholder": "Enter sender email"
+    },
+    "replyToName": {
+      "label": "Reply To Name",
+      "placeholder": "Enter reply to name"
+    },
+    "replyToEmail": {
+      "label": "Reply To Email",
+      "placeholder": "Enter reply to email"
+    },
+    "alerts": {
+      "createSuccess": "Email template successfully created",
+      "updateSuccess": "Email template successfully updated"
     }
   }
 }
