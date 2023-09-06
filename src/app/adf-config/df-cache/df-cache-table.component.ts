@@ -104,7 +104,6 @@ export class DfCacheTableComponent extends DfManageTableComponent<CacheRow> {
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.resource.length;
       });
   }
 }

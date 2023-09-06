@@ -18,9 +18,8 @@ import {
   EmailTemplate,
   EmailTemplatePayload,
 } from '../df-email-templates/df-email-templates.types';
-import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { Subject, takeUntil } from 'rxjs';
 import { ROUTES } from 'src/app/core/constants/routes';
 
 @Component({
@@ -131,7 +130,9 @@ export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
 
     if (this.emailTemplateForm.value.id) {
       this.crudService
-        .update(this.emailTemplateForm.value.id, payload)
+        .update(this.emailTemplateForm.value.id, payload, {
+          snackbarSuccess: 'emailTemplates.alerts.updateSuccess',
+        })
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.goBack();
@@ -139,7 +140,12 @@ export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
     } else {
       console.log('create', payload);
       this.crudService
-        .create({ resource: [payload] })
+        .create(
+          { resource: [payload] },
+          {
+            snackbarSuccess: 'emailTemplates.alerts.createSuccess',
+          }
+        )
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.goBack();

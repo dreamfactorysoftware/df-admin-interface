@@ -5,10 +5,12 @@
   "delete": "Delete",
   "edit": "Edit",
   "select": "Select",
+  "view": "View",
   "submit": "Submit",
   "browse": "Browse",
   "launch": "Launch",
   "launchApp": "Launch {{appName}}",
+  "downloadApiDoc": "Download Api Documentation",
   "cancel": "Cancel",
   "basic": "Basic",
   "selectAnOption": "Select an option",
@@ -29,6 +31,7 @@
   "filter": "Filter",
   "resetRowCounter": "Reset counter for row {{id}}",
   "editRow": "Edit row {{id}}",
+  "viewRow": "View row {{id}}",
   "deleteRow": "Delete row {{id}}",
   "selectRow": "Select row {{id}}",
   "selectAll": "Select All",
@@ -457,7 +460,27 @@
       },
       "api-docs": {
         "nav": "API Docs",
-        "header": "{{nav.api-connections.api-docs.nav}}"
+        "header": "{{nav.api-connections.api-docs.nav}}",
+        "view": {
+          "system": {
+            "header": "{{nav.api-connections.api-docs.nav}}"
+          },
+          ":name": {
+            "nav": "{{nav.api-connections.api-docs.nav}}"
+          },
+          "name": {
+            "header": "API Docs"
+          }
+        },
+        "table": {
+          "header": {
+            "name": "Service Name",
+            "label": "Label",
+            "description": "Description",
+            "group": "Group",
+            "type": "Type"
+          }
+        }
       }
     },
     "api-security": {

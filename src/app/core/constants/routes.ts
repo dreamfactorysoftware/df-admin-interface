@@ -2,6 +2,7 @@ export enum ROUTES {
   IMPORT = 'import',
   EDIT = 'edit',
   CREATE = 'create',
+  VIEW = 'view',
   AUTH = 'auth',
   LOGIN = 'login',
   RESET_PASSWORD = 'reset-password',

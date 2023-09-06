@@ -74,12 +74,21 @@
         </button>
         <mat-menu #actionsMenu="matMenu">
           <button
+            *ngIf="readOnly"
+            mat-menu-item
+            (click)="viewRow(row)"
+            [attr.aria-label]="viewLabel(row) | async">
+            {{ 'view' | transloco }}
+          </button>
+          <button
+            *ngIf="!readOnly"
             mat-menu-item
             (click)="editRow(row)"
             [attr.aria-label]="editLabel(row) | async">
             {{ 'edit' | transloco }}
           </button>
           <button
+            *ngIf="!readOnly"
             mat-menu-item
             (click)="confirmDelete(row)"
             [attr.aria-label]="deleteLabel(row) | async">
