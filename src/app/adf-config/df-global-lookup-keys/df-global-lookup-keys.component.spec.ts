@@ -8,7 +8,7 @@ describe('DfGlobalLookupKeysComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfGlobalLookupKeysComponent]
+      declarations: [DfGlobalLookupKeysComponent],
     });
     fixture = TestBed.createComponent(DfGlobalLookupKeysComponent);
     component = fixture.componentInstance;
