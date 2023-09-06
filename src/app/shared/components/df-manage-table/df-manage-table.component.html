@@ -9,7 +9,10 @@
   </button>
   <ng-content select="[topActions]"></ng-content>
   <div class="spacer"></div>
-  <mat-form-field class="search-input" subscriptSizing="dynamic">
+  <mat-form-field
+    *ngIf="allowFilter"
+    class="search-input"
+    subscriptSizing="dynamic">
     <mat-label>{{ 'search' | transloco }}</mat-label>
     <input matInput (keyup)="triggerSearch($event)" #search />
   </mat-form-field>

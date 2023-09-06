@@ -51,6 +51,7 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
   serviceTypes: ServiceType[];
   override allowCreate = false;
   override readOnly = true;
+  override allowFilter = false;
 
   constructor(
     @Inject(API_DOCS_SERVICE_TOKEN)

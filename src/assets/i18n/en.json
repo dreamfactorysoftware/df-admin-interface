@@ -10,6 +10,7 @@
   "browse": "Browse",
   "launch": "Launch",
   "launchApp": "Launch {{appName}}",
+  "downloadApiDoc": "Download Api Documentation",
   "cancel": "Cancel",
   "basic": "Basic",
   "selectAnOption": "Select an option",
@@ -463,6 +464,12 @@
         "view": {
           "system": {
             "header": "{{nav.api-connections.api-docs.nav}}"
+          },
+          ":name": {
+            "nav": "{{nav.api-connections.api-docs.nav}}"
+          },
+          "name": {
+            "header": "API Docs"
           }
         },
         "table": {
