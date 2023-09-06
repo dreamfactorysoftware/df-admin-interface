@@ -27,6 +27,8 @@ import {
   SERVICE_TYPE_SERVICE_TOKEN,
   EMAIL_TEMPLATES_URL_TOKEN,
   EMAIL_TEMPLATES_SERVICE_TOKEN,
+  LOOKUP_KEYS_URL_TOKEN,
+  LOOKUP_KEYS_SERVICE_TOKEN,
 } from './tokens';
 import { URLS } from './urls';
 
@@ -183,5 +185,17 @@ export const EMAIL_TEMPLATES_SERVICE_PROVIDERS = [
     provide: EMAIL_TEMPLATES_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [EMAIL_TEMPLATES_URL_TOKEN, HttpClient],
+  },
+];
+
+export const LOOKUP_KEYS_SERVICE_PROVIDERS = [
+  {
+    provide: LOOKUP_KEYS_URL_TOKEN,
+    useValue: URLS.LOOKUP_KEYS,
+  },
+  {
+    provide: LOOKUP_KEYS_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [LOOKUP_KEYS_URL_TOKEN, HttpClient],
   },
 ];

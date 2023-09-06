@@ -31,6 +31,7 @@ import {
   USER_SERVICE_PROVIDERS,
   API_DOCS_SERVICE_PROVIDERS,
   EMAIL_TEMPLATES_SERVICE_PROVIDERS,
+  LOOKUP_KEYS_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -51,6 +52,7 @@ import {
   DfEmailTemplateDetailsResolver,
   DfEmailTemplatesResolver,
 } from './adf-config/resolvers/df-email-templates.resolver';
+import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
 import { DfApiDocsService } from './adf-api-docs/services/df-api-docs.service';
 
 export const routes: Routes = [
@@ -435,6 +437,17 @@ export const routes: Routes = [
               },
             ],
             providers: [...EMAIL_TEMPLATES_SERVICE_PROVIDERS],
+          },
+          {
+            path: ROUTES.GLOBAL_LOOKUP_KEYS,
+            loadComponent: () =>
+              import(
+                './adf-config/df-global-lookup-keys/df-global-lookup-keys.component'
+              ).then(m => m.DfGlobalLookupKeysComponent),
+            resolve: {
+              data: DfGlobalLookupKeysResolver,
+            },
+            providers: [...LOOKUP_KEYS_SERVICE_PROVIDERS],
           },
         ],
       },

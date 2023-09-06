@@ -18,10 +18,10 @@ import {
   EmailTemplate,
   EmailTemplatePayload,
 } from '../df-email-templates/df-email-templates.types';
-import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { Subject, takeUntil } from 'rxjs';
 import { ROUTES } from 'src/app/core/constants/routes';
+import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 
 @Component({
   selector: 'df-email-template-details',
