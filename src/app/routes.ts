@@ -27,6 +27,8 @@ import {
   SCHEDULER_SERVICE_PROVIDER,
   USER_SERVICE_PROVIDERS,
   EMAIL_TEMPLATES_SERVICE_PROVIDERS,
+  SERVICES_SERVICE_PROVIDERS,
+  SERVICE_TYPES_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -43,6 +45,10 @@ import {
   DfEmailTemplateDetailsResolver,
   DfEmailTemplatesResolver,
 } from './adf-config/resolvers/df-email-templates.resolver';
+import {
+  schemaServiceResolver,
+  schemaServiceTypeResolver,
+} from './adf-schema/resolvers/df-schema.resolver';
 
 export const routes: Routes = [
   {
@@ -501,7 +507,23 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.SCHEMA,
-        component: DfPlaceHolderComponent,
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import(
+                './adf-schema/df-manage-databases-table/df-manage-databases-table.component'
+              ).then(m => m.DfManageDatabasesTableComponent),
+            resolve: {
+              data: schemaServiceResolver,
+              serviceTypes: schemaServiceTypeResolver,
+            },
+          },
+        ],
+        providers: [
+          ...SERVICES_SERVICE_PROVIDERS,
+          ...SERVICE_TYPES_SERVICE_PROVIDERS,
+        ],
       },
       {
         path: ROUTES.USERS,

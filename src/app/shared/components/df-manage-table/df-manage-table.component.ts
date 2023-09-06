@@ -52,6 +52,7 @@ export abstract class DfManageTableComponent<T>
   faTriangleExclamation = faTriangleExclamation;
   allowCreate = true;
   allowFilter = true;
+  allowDelete = true;
 
   abstract columns: Array<{
     columnDef: string;
