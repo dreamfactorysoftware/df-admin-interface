@@ -1,6 +1,9 @@
-<div>
-  <button mat-raised-button color="primary" (click)="goBackToList()">
+<div class="api-doc-button-container">
+  <button mat-raised-button (click)="goBackToList()">
     {{ 'goBack' | transloco }}
+  </button>
+  <button mat-raised-button color="primary" (click)="downloadApiDoc()">
+    {{ 'downloadApiDoc' | transloco }}
   </button>
 </div>
 <div #apiDocumentation class="swagger-ui"></div>

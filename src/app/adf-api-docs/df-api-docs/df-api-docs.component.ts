@@ -12,6 +12,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { TranslocoModule } from '@ngneat/transloco';
 import { ROUTES } from 'src/app/core/constants/routes';
+import { saveAsFile } from 'src/app/shared/utilities/file';
 
 @Component({
   selector: 'df-api-docs',
@@ -25,7 +26,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     | ElementRef
     | undefined;
 
-  apiDocJson: any; // TODO: change this from any
+  apiDocJson: object;
   destroyed$ = new Subject<void>();
 
   constructor(
@@ -56,5 +57,9 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   goBackToList(): void {
     this.router.navigate([`${ROUTES.API_CONNECTIONS}/${ROUTES.API_DOCS}`]);
+  }
+
+  downloadApiDoc() {
+    saveAsFile(JSON.stringify(this.apiDocJson), 'api-spec.json', 'json');
   }
 }
