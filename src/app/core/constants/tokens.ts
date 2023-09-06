@@ -64,3 +64,10 @@ export const EMAIL_TEMPLATES_SERVICE_TOKEN =
 export const EMAIL_TEMPLATES_URL_TOKEN = new InjectionToken<string>(
   'EMAIL_TEMPLATES_URL_TOKEN'
 );
+
+export const LOOKUP_KEYS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'LOOKUP_KEYS_SERVICE_TOKEN'
+);
+export const LOOKUP_KEYS_URL_TOKEN = new InjectionToken<string>(
+  'LOOKUP_KEYS_URL_TOKEN'
+);

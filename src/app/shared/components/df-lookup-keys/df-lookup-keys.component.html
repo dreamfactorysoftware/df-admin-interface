@@ -1,5 +1,5 @@
 <div class="lookup-keys-accordion">
-  <mat-accordion>
+  <mat-accordion *ngIf="showAccordion; else lookupKeys">
     <mat-expansion-panel>
       <mat-expansion-panel-header>
         <mat-panel-title> {{ 'lookupKeys.label' | transloco }}</mat-panel-title>
@@ -7,79 +7,79 @@
           'lookupKeys.desc' | transloco
         }}</mat-panel-description>
       </mat-expansion-panel-header>
-      <ng-container [formGroup]="rootForm">
-        <ng-container formArrayName="lookupKeys">
-          <mat-table [dataSource]="dataSource">
-            <ng-container matColumnDef="name">
-              <mat-header-cell *matHeaderCellDef>
-                {{ 'name' | transloco }}
-              </mat-header-cell>
-              <mat-cell
-                *matCellDef="let row; let i = index"
-                [formGroupName]="i">
-                <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>{{ 'name' | transloco }}</mat-label>
-                  <input matInput formControlName="name" />
-                </mat-form-field>
-              </mat-cell>
-            </ng-container>
-
-            <ng-container matColumnDef="value">
-              <mat-header-cell *matHeaderCellDef>
-                {{ 'value' | transloco }}
-              </mat-header-cell>
-              <mat-cell
-                *matCellDef="let row; let i = index"
-                [formGroupName]="i">
-                <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>{{ 'value' | transloco }}</mat-label>
-                  <input matInput formControlName="value" />
-                </mat-form-field>
-              </mat-cell>
-            </ng-container>
-
-            <ng-container matColumnDef="private">
-              <mat-header-cell *matHeaderCellDef>
-                {{ 'private' | transloco }}
-              </mat-header-cell>
-              <mat-cell
-                *matCellDef="let row; let i = index"
-                [formGroupName]="i">
-                <mat-slide-toggle
-                  formControlName="private"
-                  [attr.aria-label]="'name' | transloco"></mat-slide-toggle>
-              </mat-cell>
-            </ng-container>
-            <ng-container matColumnDef="actions" stickyEnd>
-              <mat-header-cell *matHeaderCellDef>
-                <button
-                  mat-mini-fab
-                  color="primary"
-                  [attr.aria-label]="'newEntry' | transloco"
-                  type="button"
-                  (click)="add()">
-                  <fa-icon [icon]="faPlus" size="xl"></fa-icon>
-                </button>
-              </mat-header-cell>
-              <mat-cell
-                *matCellDef="let row; let i = index"
-                [formGroupName]="i">
-                <button mat-icon-button (click)="remove(i)" type="button">
-                  <fa-icon [icon]="faTrashCan" size="xs"></fa-icon>
-                </button>
-              </mat-cell>
-            </ng-container>
-            <mat-header-row
-              *matHeaderRowDef="displayedColumns"></mat-header-row>
-            <mat-row *matRowDef="let row; columns: displayedColumns"></mat-row>
-            <tr class="mat-row" *matNoDataRow>
-              <td class="mat-cell" colspan="4">
-                {{ 'lookupKeys.noKeys' | transloco }}
-              </td>
-            </tr>
-          </mat-table>
-        </ng-container>
-      </ng-container>
+      <ng-container [ngTemplateOutlet]="lookupKeys"></ng-container>
     </mat-expansion-panel>
   </mat-accordion>
+
+  <ng-template #lookupKeys>
+    <ng-container [formGroup]="rootForm">
+      <ng-container formArrayName="lookupKeys">
+        <mat-table [dataSource]="dataSource">
+          <ng-container matColumnDef="name">
+            <mat-header-cell *matHeaderCellDef>
+              {{ 'name' | transloco }}
+            </mat-header-cell>
+            <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>{{ 'name' | transloco }}</mat-label>
+                <input matInput formControlName="name" />
+                <!-- TODO make name input disabled if an id exists -->
+                <!-- <input
+                  matInput
+                  [disabled]="rootForm.controls[i].id.value"
+                  formControlName="name" /> -->
+              </mat-form-field>
+            </mat-cell>
+          </ng-container>
+
+          <ng-container matColumnDef="value">
+            <mat-header-cell *matHeaderCellDef>
+              {{ 'value' | transloco }}
+            </mat-header-cell>
+            <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>{{ 'value' | transloco }}</mat-label>
+                <input matInput formControlName="value" />
+              </mat-form-field>
+            </mat-cell>
+          </ng-container>
+
+          <ng-container matColumnDef="private">
+            <mat-header-cell *matHeaderCellDef>
+              {{ 'private' | transloco }}
+            </mat-header-cell>
+            <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
+              <mat-slide-toggle
+                formControlName="private"
+                [attr.aria-label]="'name' | transloco"></mat-slide-toggle>
+            </mat-cell>
+          </ng-container>
+          <ng-container matColumnDef="actions" stickyEnd>
+            <mat-header-cell *matHeaderCellDef>
+              <button
+                mat-mini-fab
+                color="primary"
+                [attr.aria-label]="'newEntry' | transloco"
+                type="button"
+                (click)="add()">
+                <fa-icon [icon]="faPlus" size="xl"></fa-icon>
+              </button>
+            </mat-header-cell>
+            <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
+              <button mat-icon-button (click)="remove(i)" type="button">
+                <fa-icon [icon]="faTrashCan" size="xs"></fa-icon>
+              </button>
+            </mat-cell>
+          </ng-container>
+          <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+          <mat-row *matRowDef="let row; columns: displayedColumns"></mat-row>
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell" colspan="4">
+              {{ 'lookupKeys.noKeys' | transloco }}
+            </td>
+          </tr>
+        </mat-table>
+      </ng-container>
+    </ng-container>
+  </ng-template>
 </div>

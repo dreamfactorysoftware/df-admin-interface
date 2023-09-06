@@ -46,4 +46,5 @@ export enum ROUTES {
   CORS = 'cors',
   CACHE = 'cache',
   EMAIL_TEMPLATES = 'email-templates',
+  GLOBAL_LOOKUP_KEYS = 'global-lookup-keys',
 }
