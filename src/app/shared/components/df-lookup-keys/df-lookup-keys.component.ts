@@ -1,5 +1,5 @@
-import { NgIf } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { NgIf, NgTemplateOutlet } from '@angular/common';
+import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import {
   FormArray,
   FormControl,
@@ -30,6 +30,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
     FormsModule,
     ReactiveFormsModule,
     NgIf,
+    NgTemplateOutlet,
     MatFormFieldModule,
     MatButtonModule,
     MatTableModule,
@@ -48,6 +49,7 @@ export class DfLookupKeysComponent implements OnInit, OnDestroy {
   displayedColumns = ['name', 'value', 'private', 'actions'];
   faTrashCan = faTrashCan;
   faPlus = faPlus;
+  @Input() showAccordion = true;
 
   constructor(private rootFormGroup: FormGroupDirective) {}
 

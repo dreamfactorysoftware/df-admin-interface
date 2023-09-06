@@ -118,7 +118,7 @@ export class DfEmailTemplatesTableComponent extends DfManageTableComponent<any> 
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.resource.length;
+        this.tableLength = data.meta.count;
       });
   }
 }

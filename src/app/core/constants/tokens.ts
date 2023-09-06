@@ -18,6 +18,21 @@ export const APP_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
 );
 export const APP_URL_TOKEN = new InjectionToken<string>('APP_URL_TOKEN');
 
+export const API_DOCS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'API_DOCS_SERVICE_TOKEN'
+);
+export const API_DOCS_URL_TOKEN = new InjectionToken<string>(
+  'API_DOCS_URL_TOKEN'
+);
+
+export const SERVICE_TYPE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SERVICE_TYPE_SERVICE_TOKEN'
+);
+
+export const SERVICE_TYPE_URL_TOKEN = new InjectionToken<string>(
+  'SERVICE_TYPE_URL_TOKEN'
+);
+
 export const REPORT_URL_TOKEN = new InjectionToken<string>('REPORT_URL_TOKEN');
 export const REPORT_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'REPORT_SERVICE_TOKEN'
@@ -78,4 +93,11 @@ export const EMAIL_TEMPLATES_SERVICE_TOKEN =
   new InjectionToken<DfBaseCrudService>('EMAIL_TEMPLATES_SERVICE_TOKEN');
 export const EMAIL_TEMPLATES_URL_TOKEN = new InjectionToken<string>(
   'EMAIL_TEMPLATES_URL_TOKEN'
+);
+
+export const LOOKUP_KEYS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'LOOKUP_KEYS_SERVICE_TOKEN'
+);
+export const LOOKUP_KEYS_URL_TOKEN = new InjectionToken<string>(
+  'LOOKUP_KEYS_URL_TOKEN'
 );

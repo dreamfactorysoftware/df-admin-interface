@@ -14,7 +14,10 @@ import { editAppResolver } from './adf-apps/resolvers/edit-app.resolver';
 import { adminsResolver } from './adf-admins/resolvers/admins.resolver';
 import { rolesResolver } from './adf-roles/resolvers/role.resolver';
 import { limitsResolver } from './adf-limits/resolvers/limits.resolver';
-import { getSystemServiceDataListResolver } from './adf-services/resolvers/service-data-service.resolver';
+import {
+  getServiceTypeDataResolver,
+  getSystemServiceDataListResolver,
+} from './adf-services/resolvers/service-data-service.resolver';
 import {
   ADMIN_SERVICE_PROVIDERS,
   APP_SERVICE_PROVIDERS,
@@ -26,9 +29,11 @@ import {
   ROLE_SERVICE_PROVIDERS,
   SCHEDULER_SERVICE_PROVIDER,
   USER_SERVICE_PROVIDERS,
+  API_DOCS_SERVICE_PROVIDERS,
   EMAIL_TEMPLATES_SERVICE_PROVIDERS,
   SERVICES_SERVICE_PROVIDERS,
   SERVICE_TYPES_SERVICE_PROVIDERS,
+  LOOKUP_KEYS_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -42,6 +47,10 @@ import { DfAccessListService } from './adf-scheduler/services/access-list.servic
 import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
 import { DfCacheResolver } from './adf-config/resolvers/df-cache.resolver';
 import {
+  apiDocsResolver,
+  systemServiceDataResolver,
+} from './adf-api-docs/resolvers/api-docs.resolver';
+import {
   DfEmailTemplateDetailsResolver,
   DfEmailTemplatesResolver,
 } from './adf-config/resolvers/df-email-templates.resolver';
@@ -51,6 +60,8 @@ import {
   schemaServiceTypeResolver,
 } from './adf-schema/resolvers/df-schema.resolver';
 import { DfDatabaseSchemaService } from './adf-schema/services/df-database-schema.service';
+import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
+import { DfApiDocsService } from './adf-api-docs/services/df-api-docs.service';
 
 export const routes: Routes = [
   {
@@ -252,7 +263,34 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.API_DOCS,
-        component: DfPlaceHolderComponent,
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import(
+                './adf-api-docs/df-api-docs/df-api-docs-table.component'
+              ).then(m => m.DfApiDocsTableComponent),
+            resolve: {
+              data: systemServiceDataResolver,
+              serviceTypes: getServiceTypeDataResolver,
+            },
+          },
+          {
+            path: `${ROUTES.VIEW}/:name`,
+            loadComponent: () =>
+              import('./adf-api-docs/df-api-docs/df-api-docs.component').then(
+                m => m.DfApiDocsComponent
+              ),
+            resolve: {
+              data: apiDocsResolver,
+            },
+          },
+        ],
+        providers: [
+          ...API_DOCS_SERVICE_PROVIDERS,
+          DfServiceDataService,
+          DfApiDocsService,
+        ],
       },
     ],
     canActivate: [loggedInGuard],
@@ -407,6 +445,17 @@ export const routes: Routes = [
               },
             ],
             providers: [...EMAIL_TEMPLATES_SERVICE_PROVIDERS],
+          },
+          {
+            path: ROUTES.GLOBAL_LOOKUP_KEYS,
+            loadComponent: () =>
+              import(
+                './adf-config/df-global-lookup-keys/df-global-lookup-keys.component'
+              ).then(m => m.DfGlobalLookupKeysComponent),
+            resolve: {
+              data: DfGlobalLookupKeysResolver,
+            },
+            providers: [...LOOKUP_KEYS_SERVICE_PROVIDERS],
           },
         ],
       },

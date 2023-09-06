@@ -10,6 +10,7 @@
   "browse": "Browse",
   "launch": "Launch",
   "launchApp": "Launch {{appName}}",
+  "downloadApiDoc": "Download Api Documentation",
   "cancel": "Cancel",
   "basic": "Basic",
   "selectAnOption": "Select an option",
@@ -30,6 +31,7 @@
   "filter": "Filter",
   "resetRowCounter": "Reset counter for row {{id}}",
   "editRow": "Edit row {{id}}",
+  "viewRow": "View row {{id}}",
   "deleteRow": "Delete row {{id}}",
   "selectRow": "Select row {{id}}",
   "selectAll": "Select All",
@@ -464,7 +466,27 @@
       },
       "api-docs": {
         "nav": "API Docs",
-        "header": "{{nav.api-connections.api-docs.nav}}"
+        "header": "{{nav.api-connections.api-docs.nav}}",
+        "view": {
+          "system": {
+            "header": "{{nav.api-connections.api-docs.nav}}"
+          },
+          ":name": {
+            "nav": "{{nav.api-connections.api-docs.nav}}"
+          },
+          "name": {
+            "header": "API Docs"
+          }
+        },
+        "table": {
+          "header": {
+            "name": "Service Name",
+            "label": "Label",
+            "description": "Description",
+            "group": "Group",
+            "type": "Type"
+          }
+        }
       }
     },
     "api-security": {
@@ -524,28 +546,15 @@
             "methods": "Methods",
             "supportsCredentials": "Supports Credentials",
             "enabled": "Enabled"
-          },
-          "cache": {
-            "nav": "Cache",
-            "header": "{{nav.system-settings.config.cache.nav}}"
           }
-        },
-        "scheduler": {
-          "nav": "Scheduler",
-          "header": "{{nav.system-settings.scheduler.nav}}"
-        },
-        "logs": { "nav": "Logs", "header": "{{nav.system-settings.logs.nav}}" },
-        "reporting": {
-          "nav": "Reporting",
-          "header": "{{nav.system-settings.reporting.nav}}"
-        },
-        "df-platform-apis": {
-          "nav": "DreamFactory Platform APIs",
-          "header": "{{nav.system-settings.df-platform-apis.nav}}"
         },
         "cache": {
           "nav": "Cache",
           "header": "{{nav.system-settings.config.cache.nav}}"
+        },
+        "global-lookup-keys": {
+          "nav": "Global Lookup Keys",
+          "header": "{{nav.system-settings.config.global-lookup-keys.nav}}"
         },
         "email-templates": {
           "nav": "Email Templates",
@@ -560,157 +569,82 @@
           }
         }
       },
-      "admin-settings": {
-        "nav": "Admin Settings",
-        "admins": {
-          "nav": "Admins",
-          "header": "Manage Admins",
-          "create": {
-            "nav": "Create a new admin",
-            "header": "{{nav.admin-settings.admins.create.nav}}"
-          },
-          "edit": { "header": "{{edit}}" }
-        },
-        "schema": {
-          "nav": "Schema",
-          "header": "{{nav.admin-settings.schema.nav}}"
-        },
-        "users": {
-          "nav": "Users",
-          "header": "Manage Users",
-          "create": {
-            "nav": "Create a new user",
-            "header": "{{nav.admin-settings.users.create.nav}}"
-          },
-          "edit": { "header": "{{edit}}" }
-        },
-        "files": { "nav": "{{files}}", "header": "{{files}}" },
-        "scheduler": {
-          "nav": "Scheduler",
-          "header": "{{nav.system-settings.scheduler.nav}}",
-          "create": {
-            "header": "Create a new Scheduled Task"
-          },
-          "edit": {
-            "header": "Update Scheduled Task"
-          },
-          "form": {
-            "label": {
-              "name": "Name",
-              "description": "Description",
-              "active": "Active",
-              "service": "Service",
-              "component": "Component",
-              "method": "Method",
-              "frequency": "Frequency (defined in minutes)",
-              "payload": "Payload (JSON)"
-            }
-          },
-          "table": {
-            "header": {
-              "active": "Active",
-              "id": "ID",
-              "name": "Name",
-              "description": "Description",
-              "service": "Service",
-              "component": "Component",
-              "method": "Method",
-              "frequency": "Frequency",
-              "log": "Log"
-            }
-          }
-        },
-        "profile": { "header": "Profile" },
-        "logout": { "header": "Logout" },
-        "data": { "nav": "{{data}}", "header": "{{data}}" },
-        "package-manager": { "nav": "{{packages}}", "header": "{{packages}}" },
-        "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" }
+      "scheduler": {
+        "nav": "Scheduler",
+        "header": "{{nav.system-settings.scheduler.nav}}"
       },
+      "logs": { "nav": "Logs", "header": "{{nav.system-settings.logs.nav}}" },
+      "reporting": {
+        "nav": "Reporting",
+        "header": "{{nav.system-settings.reporting.nav}}"
+      },
+      "df-platform-apis": {
+        "nav": "DreamFactory Platform APIs",
+        "header": "{{nav.system-settings.df-platform-apis.nav}}"
+      }
+    },
+    "admin-settings": {
+      "nav": "Admin Settings",
       "admins": {
-        "accessByTabs": "Access by Tabs",
-        "alerts": {
-          "new": "For new Admins you can send an email invite so they can set their own password, or set a password for them now.",
-          "restrictedAdmin": "Restricted admin",
-          "autoRole": "An auto-generated role will be created for this admin.",
-          "roleId": "Role id: {{roleId}}",
-          "createdSuccess": "Admin created successfully",
-          "updateSuccess": "Admin updated successfully",
-          "deleteSuccess": "Admin deleted successfully",
-          "importSuccess": "Admin imported successfully",
-          "exportSuccess": "Admin exported successfully"
-        }
-      },
-      "alerts": {
-        "duplicateEmail": "Email address already exists",
-        "close": "Close alert"
-      },
-      "limits": {
-        "name": "Limit Name",
-        "description": "Description",
-        "limitType": "Limit Type",
-        "limitRate": "Limit Rate",
-        "limitPeriod": "Limit Period",
-        "role": "Role",
-        "service": "Service",
-        "endpoint": "Endpoint",
-        "user": "User",
-        "verb": "Verb",
-        "active": "Active",
-        "invalidForm": "Invalid Form Input",
-        "createSuccessMessage": "Limit successfully created",
-        "updateSuccessMessage": "Limit successfully updated",
-        "deleteSuccessMessage": "Limit successfully deleted",
-        "header": "Limits",
+        "nav": "Admins",
+        "header": "Manage Admins",
         "create": {
-          "header": "Create Limit"
+          "nav": "Create a new admin",
+          "header": "{{nav.admin-settings.admins.create.nav}}"
         },
-        "edit": {
-          "header": "Edit Limit"
-        }
+        "edit": { "header": "{{edit}}" }
       },
-      "lookupKeys": {
-        "label": "Lookup Keys",
-        "desc": "Lookup keys for service configuration and credentials must be made private.",
-        "noKeys": "No lookup keys."
-      },
-      "profile": { "header": "Profile" },
-      "logout": { "header": "Logout" },
-      "roles": { "header": "Roles" },
-      "services": { "header": "Services" },
-      "apps": {
-        "header": "Apps",
-        "create": { "header": "Create Application" },
-        "edit": { "header": "Edit Application" },
-        "import": { "header": "Import Application" }
+      "schema": {
+        "nav": "Schema",
+        "header": "{{nav.admin-settings.schema.nav}}"
       },
       "users": {
         "nav": "Users",
         "header": "Manage Users",
-        "create": { "header": "Create a new user" },
-        "edit": { "header": "Edit" },
-        "alerts": {
-          "new": "For new Users you can send an email invite so they can set their own password, or set a password for them now.",
-          "createdSuccess": "User created successfully",
-          "updateSuccess": "User updated successfully",
-          "deleteSuccess": "User deleted successfully",
-          "importSuccess": "User imported successfully",
-          "exportSuccess": "User exported successfully"
-        }
+        "create": {
+          "nav": "Create a new user",
+          "header": "{{nav.admin-settings.users.create.nav}}"
+        },
+        "edit": { "header": "{{edit}}" }
       },
-      "api-docs": { "header": "API Docs" },
-      "schema": { "header": "Schema" },
-      "files": { "header": "Files" },
-      "scripts": { "header": "Scripts" },
+      "files": { "nav": "{{files}}", "header": "{{files}}" },
       "scheduler": {
-        "header": "Scheduler",
+        "nav": "Scheduler",
+        "header": "{{nav.system-settings.scheduler.nav}}",
         "create": {
           "header": "Create a new Scheduled Task"
         },
         "edit": {
-          "header": "Manage Scheduled Task"
+          "header": "Update Scheduled Task"
+        },
+        "form": {
+          "label": {
+            "name": "Name",
+            "description": "Description",
+            "active": "Active",
+            "service": "Service",
+            "component": "Component",
+            "method": "Method",
+            "frequency": "Frequency (defined in minutes)",
+            "payload": "Payload (JSON)"
+          }
+        },
+        "table": {
+          "header": {
+            "active": "Active",
+            "id": "ID",
+            "name": "Name",
+            "description": "Description",
+            "service": "Service",
+            "component": "Component",
+            "method": "Method",
+            "frequency": "Frequency",
+            "log": "Log"
+          }
         }
       },
-      "reports": { "header": "Reports" },
+      "profile": { "header": "Profile" },
+      "logout": { "header": "Logout" },
       "data": { "nav": "{{data}}", "header": "{{data}}" },
       "package-manager": { "nav": "{{packages}}", "header": "{{packages}}" },
       "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" }
@@ -727,16 +661,6 @@
         "deleteSuccess": "Admin deleted successfully",
         "importSuccess": "Admin imported successfully",
         "exportSuccess": "Admin exported successfully"
-      }
-    },
-    "users": {
-      "alerts": {
-        "new": "For new Users you can send an email invite so they can set their own password, or set a password for them now.",
-        "createdSuccess": "User created successfully",
-        "updateSuccess": "User updated successfully",
-        "deleteSuccess": "User deleted successfully",
-        "importSuccess": "User imported successfully",
-        "exportSuccess": "User exported successfully"
       }
     },
     "alerts": {
@@ -758,131 +682,235 @@
       "invalidForm": "Invalid Form Input",
       "createSuccessMessage": "Limit successfully created",
       "updateSuccessMessage": "Limit successfully updated",
-      "deleteSuccessMessage": "Limit successfully deleted"
-    },
-    "scheduler": {
-      "logPageTitle": "Scheduler Task Log",
-      "logPageSubtitle": "This interface displays the scheduler task error log.",
-      "taskOverview": "Scheduler Task Overview",
-      "taskOverviewSubtitle": "Scheduler task provide a way to schedule requests to the platform.",
-      "alerts": {
-        "createdSuccess": "Scheduled task created successfully",
-        "updateSuccess": "Scheduled task updated successfully",
-        "deleteSuccess": "Scheduled task deleted successfully"
+      "deleteSuccessMessage": "Limit successfully deleted",
+      "header": "Limits",
+      "create": {
+        "header": "Create Limit"
       },
-      "cancel": "Cancel",
-      "basic": "Basic",
-      "selectAnOption": "Select an option",
-      "name": "Name",
-      "value": "Value",
-      "private": "Private",
-      "inviteSent": "An email invite has been sent.",
-      "launch": "Launch",
-      "launchApp": "Launch {{appName}}",
-      "lookupKeys": {
-        "label": "Lookup Keys",
-        "desc": "Lookup keys for service configuration and credentials must be made private.",
-        "noKeys": "No lookup keys."
-      },
-      "roles": {
-        "label": "Roles",
-        "role": "Role",
-        "app": "App",
-        "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
-        "noRoles": "No roles assigned."
-      },
-      "system-info": {
-        "subheading": "Displays current system information.",
-        "instance": {
-          "instance": "Instance",
-          "licenseLevel": "License Level",
-          "licenseKey": "License Key",
-          "subscriptionStatus": "Subscription Status",
-          "subscriptionExpirationDate": "Subscription Expiration Date",
-          "systemDatabase": "System Database",
-          "installPath": "Install Path",
-          "logPath": "Log Path",
-          "logMode": "Log Mode",
-          "logLevel": "Log Level",
-          "cacheDriver": "Cache Driver",
-          "demo": "Demo",
-          "instanceId": "Instance ID"
-        },
-        "packages": "Installed Packages",
-        "server": {
-          "heading": "Server",
-          "os": "Operating System",
-          "release": "Release",
-          "host": "Host",
-          "machine": "Machine",
-          "serverApi": "Server API"
-        },
-        "client": {
-          "heading": "Client",
-          "userAgent": "User Agent",
-          "ipAddress": "IP Address",
-          "Locale": "Locale"
-        }
+      "edit": {
+        "header": "Edit Limit"
       }
     },
-    "cache": {
-      "cache": "Cache",
-      "overview": "Cache Overview",
-      "flushService": "Flush {{serviceName}} Cache",
-      "description": "Flush system-wide cache or per-service caches. Use the cache clearing buttons below to refresh any changes made to your system configuration values.",
-      "flushSystemCache": "Flush System-Wide Cache",
-      "perServiceCaches": "Per-Service Caches"
+    "lookupKeys": {
+      "label": "Lookup Keys",
+      "desc": "Lookup keys for service configuration and credentials must be made private.",
+      "noKeys": "No lookup keys."
     },
-    "emailTemplates": {
-      "description": "Create and edit email templates for User Registration, User Invite, Password Reset, and your custom email services.",
-      "templateName": {
-        "label": "Template Name",
-        "placeholder": "Enter template name",
-        "error": "Template name required"
-      },
-      "templateDescription": {
-        "label": "Template Description",
-        "placeholder": "Enter template description"
-      },
-      "recipient": {
-        "label": "Recipient",
-        "tooltip": "Enter recipient address. Enter multiple addresses separated by comma."
-      },
-      "cc": {
-        "label": "CC",
-        "tooltip": "Enter cc address. Enter multiple addresses separated by comma"
-      },
-      "bcc": {
-        "label": "BCC",
-        "tooltip": "Enter bcc address. Enter multiple addresses separated by comma."
-      },
-      "subject": { "label": "Subject", "placeholder": "Enter email subject" },
-      "attachment": {
-        "label": "Attachment",
-        "tooltip": "You can enter URL for attachment. Enter multiple URLs separated by comma. You can use lookup keys here too. Example: {key1},{key2}.",
-        "placeholder": "Enter email attachment"
-      },
-      "body": "Body",
-      "senderName": {
-        "label": "Sender Name",
-        "placeholder": "Enter sender name"
-      },
-      "senderEmail": {
-        "label": "Sender Email",
-        "placeholder": "Enter sender email"
-      },
-      "replyToName": {
-        "label": "Reply To Name",
-        "placeholder": "Enter reply to name"
-      },
-      "replyToEmail": {
-        "label": "Reply To Email",
-        "placeholder": "Enter reply to email"
-      },
+    "profile": { "header": "Profile" },
+    "logout": { "header": "Logout" },
+    "roles": { "header": "Roles" },
+    "services": { "header": "Services" },
+    "apps": {
+      "header": "Apps",
+      "create": { "header": "Create Application" },
+      "edit": { "header": "Edit Application" },
+      "import": { "header": "Import Application" }
+    },
+    "users": {
+      "nav": "Users",
+      "header": "Manage Users",
+      "create": { "header": "Create a new user" },
+      "edit": { "header": "Edit" },
       "alerts": {
-        "createSuccess": "Email template successfully created",
-        "updateSuccess": "Email template successfully updated"
+        "new": "For new Users you can send an email invite so they can set their own password, or set a password for them now.",
+        "createdSuccess": "User created successfully",
+        "updateSuccess": "User updated successfully",
+        "deleteSuccess": "User deleted successfully",
+        "importSuccess": "User imported successfully",
+        "exportSuccess": "User exported successfully"
+      }
+    },
+    "api-docs": { "header": "API Docs" },
+    "schema": { "header": "Schema" },
+    "files": { "header": "Files" },
+    "scripts": { "header": "Scripts" },
+    "scheduler": {
+      "header": "Scheduler",
+      "create": {
+        "header": "Create a new Scheduled Task"
+      },
+      "edit": {
+        "header": "Manage Scheduled Task"
+      }
+    },
+    "reports": { "header": "Reports" },
+    "data": { "nav": "{{data}}", "header": "{{data}}" },
+    "package-manager": { "nav": "{{packages}}", "header": "{{packages}}" },
+    "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" }
+  },
+  "admins": {
+    "accessByTabs": "Access by Tabs",
+    "alerts": {
+      "new": "For new Admins you can send an email invite so they can set their own password, or set a password for them now.",
+      "restrictedAdmin": "Restricted admin",
+      "autoRole": "An auto-generated role will be created for this admin.",
+      "roleId": "Role id: {{roleId}}",
+      "createdSuccess": "Admin created successfully",
+      "updateSuccess": "Admin updated successfully",
+      "deleteSuccess": "Admin deleted successfully",
+      "importSuccess": "Admin imported successfully",
+      "exportSuccess": "Admin exported successfully"
+    }
+  },
+  "users": {
+    "alerts": {
+      "new": "For new Users you can send an email invite so they can set their own password, or set a password for them now.",
+      "createdSuccess": "User created successfully",
+      "updateSuccess": "User updated successfully",
+      "deleteSuccess": "User deleted successfully",
+      "importSuccess": "User imported successfully",
+      "exportSuccess": "User exported successfully"
+    }
+  },
+  "alerts": {
+    "duplicateEmail": "Email address already exists",
+    "close": "Close alert"
+  },
+  "limits": {
+    "name": "Limit Name",
+    "description": "Description",
+    "limitType": "Limit Type",
+    "limitRate": "Limit Rate",
+    "limitPeriod": "Limit Period",
+    "role": "Role",
+    "service": "Service",
+    "endpoint": "Endpoint",
+    "user": "User",
+    "verb": "Verb",
+    "active": "Active",
+    "invalidForm": "Invalid Form Input",
+    "createSuccessMessage": "Limit successfully created",
+    "updateSuccessMessage": "Limit successfully updated",
+    "deleteSuccessMessage": "Limit successfully deleted"
+  },
+  "scheduler": {
+    "logPageTitle": "Scheduler Task Log",
+    "logPageSubtitle": "This interface displays the scheduler task error log.",
+    "taskOverview": "Scheduler Task Overview",
+    "taskOverviewSubtitle": "Scheduler task provide a way to schedule requests to the platform.",
+    "alerts": {
+      "createdSuccess": "Scheduled task created successfully",
+      "updateSuccess": "Scheduled task updated successfully",
+      "deleteSuccess": "Scheduled task deleted successfully"
+    },
+    "cancel": "Cancel",
+    "basic": "Basic",
+    "selectAnOption": "Select an option",
+    "name": "Name",
+    "value": "Value",
+    "private": "Private",
+    "inviteSent": "An email invite has been sent.",
+    "launch": "Launch",
+    "launchApp": "Launch {{appName}}",
+    "lookupKeys": {
+      "label": "Lookup Keys",
+      "desc": "Lookup keys for service configuration and credentials must be made private.",
+      "noKeys": "No lookup keys."
+    },
+    "roles": {
+      "label": "Roles",
+      "role": "Role",
+      "app": "App",
+      "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
+      "noRoles": "No roles assigned."
+    },
+    "system-info": {
+      "subheading": "Displays current system information.",
+      "instance": {
+        "instance": "Instance",
+        "licenseLevel": "License Level",
+        "licenseKey": "License Key",
+        "subscriptionStatus": "Subscription Status",
+        "subscriptionExpirationDate": "Subscription Expiration Date",
+        "systemDatabase": "System Database",
+        "installPath": "Install Path",
+        "logPath": "Log Path",
+        "logMode": "Log Mode",
+        "logLevel": "Log Level",
+        "cacheDriver": "Cache Driver",
+        "demo": "Demo",
+        "instanceId": "Instance ID"
+      },
+      "packages": "Installed Packages",
+      "server": {
+        "heading": "Server",
+        "os": "Operating System",
+        "release": "Release",
+        "host": "Host",
+        "machine": "Machine",
+        "serverApi": "Server API"
+      },
+      "client": {
+        "heading": "Client",
+        "userAgent": "User Agent",
+        "ipAddress": "IP Address",
+        "Locale": "Locale"
       }
     }
+  },
+  "cache": {
+    "cache": "Cache",
+    "overview": "Cache Overview",
+    "flushService": "Flush {{serviceName}} Cache",
+    "description": "Flush system-wide cache or per-service caches. Use the cache clearing buttons below to refresh any changes made to your system configuration values.",
+    "flushSystemCache": "Flush System-Wide Cache",
+    "perServiceCaches": "Per-Service Caches"
+  },
+  "emailTemplates": {
+    "description": "Create and edit email templates for User Registration, User Invite, Password Reset, and your custom email services.",
+    "templateName": {
+      "label": "Template Name",
+      "placeholder": "Enter template name",
+      "error": "Template name required"
+    },
+    "templateDescription": {
+      "label": "Template Description",
+      "placeholder": "Enter template description"
+    },
+    "recipient": {
+      "label": "Recipient",
+      "tooltip": "Enter recipient address. Enter multiple addresses separated by comma."
+    },
+    "cc": {
+      "label": "CC",
+      "tooltip": "Enter cc address. Enter multiple addresses separated by comma"
+    },
+    "bcc": {
+      "label": "BCC",
+      "tooltip": "Enter bcc address. Enter multiple addresses separated by comma."
+    },
+    "subject": { "label": "Subject", "placeholder": "Enter email subject" },
+    "attachment": {
+      "label": "Attachment",
+      "tooltip": "You can enter URL for attachment. Enter multiple URLs separated by comma. You can use lookup keys here too. Example: {key1},{key2}.",
+      "placeholder": "Enter email attachment"
+    },
+    "body": "Body",
+    "senderName": {
+      "label": "Sender Name",
+      "placeholder": "Enter sender name"
+    },
+    "senderEmail": {
+      "label": "Sender Email",
+      "placeholder": "Enter sender email"
+    },
+    "replyToName": {
+      "label": "Reply To Name",
+      "placeholder": "Enter reply to name"
+    },
+    "replyToEmail": {
+      "label": "Reply To Email",
+      "placeholder": "Enter reply to email"
+    },
+    "alerts": {
+      "createSuccess": "Email template successfully created",
+      "updateSuccess": "Email template successfully updated"
+    }
+  },
+  "lookupKeys": {
+    "label": "Lookup Keys",
+    "desc": "Lookup keys for service configuration and credentials must be made private.",
+    "noKeys": "No lookup keys.",
+    "fullDesc": "An administrator can create any number of 'key value' pairs attached to DreamFactory. The key values are automatically substituted on the server. For example, you can use Lookup Keys in Email Templates, as parameters in external REST Services, and in the username and password fields to connect to a SQL or NoSQL database. Mark any Lookup Key as private to securely encrypt the key value on the server and hide it in the user interface. Note that Lookup Keys for REST service configuration and credentials must be private."
   }
 }

@@ -164,6 +164,7 @@ export abstract class DfUserDetailsBaseComponent<T>
                   name: new FormControl(item.name, [Validators.required]),
                   value: new FormControl(item.value),
                   private: new FormControl(item.private),
+                  id: new FormControl(item.id),
                 })
               );
             });
