@@ -132,7 +132,7 @@ export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
     if (this.emailTemplateForm.value.id) {
       this.crudService
         .update(this.emailTemplateForm.value.id, payload, {
-          snackbarSccess: 'emailTemplates.alerts.updateSuccess',
+          snackbarSuccess: 'emailTemplates.alerts.updateSuccess',
         })
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
@@ -144,7 +144,7 @@ export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
         .create(
           { resource: [payload] },
           {
-            snackbarSccess: 'emailTemplates.alerts.createSuccess',
+            snackbarSuccess: 'emailTemplates.alerts.createSuccess',
           }
         )
         .pipe(takeUntil(this.destroyed$))

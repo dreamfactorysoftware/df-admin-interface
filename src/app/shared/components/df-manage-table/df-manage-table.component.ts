@@ -52,6 +52,7 @@ export abstract class DfManageTableComponent<T>
   faTriangleExclamation = faTriangleExclamation;
   allowCreate = true;
   allowFilter = true;
+  readOnly = false;
 
   abstract columns: Array<{
     columnDef: string;
@@ -139,6 +140,12 @@ export abstract class DfManageTableComponent<T>
     });
   }
 
+  viewRow(row: T): void {
+    this.router.navigate([ROUTES.VIEW, (row as any).name], {
+      relativeTo: this._activatedRoute,
+    });
+  }
+
   isAllSelected() {
     const numSelected = this.selection.selected.length;
     const numRows = this.dataSource.data.length;
@@ -161,6 +168,12 @@ export abstract class DfManageTableComponent<T>
       `${this.selection.isSelected(row) ? 'deselect' : 'select'}`,
       { id: (row as any).id }
     );
+  }
+
+  viewLabel(row: T) {
+    return this.translateService.selectTranslate('viewRow', {
+      id: (row as any).id,
+    });
   }
 
   deleteLabel(row: T) {
