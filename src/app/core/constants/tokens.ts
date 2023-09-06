@@ -38,6 +38,21 @@ export const REPORT_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'REPORT_SERVICE_TOKEN'
 );
 
+export const SERVICES_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SERVICES_SERVICE_TOKEN'
+);
+
+export const SERVICES_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SERVICES_URL_TOKEN'
+);
+
+export const SERVICE_TYPES_SERVICE_TOKEN =
+  new InjectionToken<DfBaseCrudService>('SERVICE_TYPES_SERVICE_TOKEN');
+
+export const SERVICE_TYPES_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SERVICE_TYPES_URL_TOKEN'
+);
+
 export const SCHEDULER_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'SCHEDULER_SERVICE_TOKEN'
 );

@@ -31,6 +31,8 @@ import {
   USER_SERVICE_PROVIDERS,
   API_DOCS_SERVICE_PROVIDERS,
   EMAIL_TEMPLATES_SERVICE_PROVIDERS,
+  SERVICES_SERVICE_PROVIDERS,
+  SERVICE_TYPES_SERVICE_PROVIDERS,
   LOOKUP_KEYS_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
@@ -52,6 +54,12 @@ import {
   DfEmailTemplateDetailsResolver,
   DfEmailTemplatesResolver,
 } from './adf-config/resolvers/df-email-templates.resolver';
+import {
+  schemaResolver,
+  schemaServiceResolver,
+  schemaServiceTypeResolver,
+} from './adf-schema/resolvers/df-schema.resolver';
+import { DfDatabaseSchemaService } from './adf-schema/services/df-database-schema.service';
 import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
 import { DfApiDocsService } from './adf-api-docs/services/df-api-docs.service';
 
@@ -550,7 +558,34 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.SCHEMA,
-        component: DfPlaceHolderComponent,
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import(
+                './adf-schema/df-manage-databases-table/df-manage-databases-table.component'
+              ).then(m => m.DfManageDatabasesTableComponent),
+            resolve: {
+              data: schemaServiceResolver,
+              serviceTypes: schemaServiceTypeResolver,
+            },
+          },
+          {
+            path: `${ROUTES.VIEW}/:name`,
+            loadComponent: () =>
+              import(
+                './adf-schema/df-manage-tables-table/df-manage-tables-table.component'
+              ).then(m => m.DfManageTablesTableComponent),
+            resolve: {
+              data: schemaResolver,
+            },
+          },
+        ],
+        providers: [
+          ...SERVICES_SERVICE_PROVIDERS,
+          ...SERVICE_TYPES_SERVICE_PROVIDERS,
+          DfDatabaseSchemaService,
+        ],
       },
       {
         path: ROUTES.USERS,

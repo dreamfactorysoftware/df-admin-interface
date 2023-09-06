@@ -414,6 +414,12 @@
       },
       "download": { "nav": "Download", "header": "{{nav.home.download.nav}}" }
     },
+    "admin-settings": {
+      "schema": {
+        "header": "Databases",
+        "nav": "Schema"
+      }
+    },
     "api-connections": {
       "nav": "API Connections",
       "api-types": {

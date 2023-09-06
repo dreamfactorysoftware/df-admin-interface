@@ -53,6 +53,7 @@ export abstract class DfManageTableComponent<T>
   allowCreate = true;
   allowFilter = true;
   readOnly = false;
+  allowDelete = true;
 
   abstract columns: Array<{
     columnDef: string;
@@ -152,6 +153,12 @@ export abstract class DfManageTableComponent<T>
     return numSelected === numRows;
   }
 
+  viewLabel(row: T) {
+    return this.translateService.selectTranslate('viewRow', {
+      id: (row as any).id,
+    });
+  }
+
   toggleAllRows() {
     this.isAllSelected()
       ? this.selection.clear()
@@ -168,12 +175,6 @@ export abstract class DfManageTableComponent<T>
       `${this.selection.isSelected(row) ? 'deselect' : 'select'}`,
       { id: (row as any).id }
     );
-  }
-
-  viewLabel(row: T) {
-    return this.translateService.selectTranslate('viewRow', {
-      id: (row as any).id,
-    });
   }
 
   deleteLabel(row: T) {
