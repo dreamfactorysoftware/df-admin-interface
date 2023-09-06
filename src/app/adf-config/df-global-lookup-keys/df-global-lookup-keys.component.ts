@@ -48,7 +48,6 @@ export class DfGlobalLookupKeysComponent implements OnInit, OnDestroy {
     this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
       .subscribe(({ data }) => {
-        console.log('lookup keys', data.resource);
         if (data.resource.length > 0) {
           data.resource.forEach((item: LookupKeyType) => {
             (this.lookupKeysForm.controls['lookupKeys'] as FormArray).push(
@@ -65,27 +64,24 @@ export class DfGlobalLookupKeysComponent implements OnInit, OnDestroy {
   }
 
   save() {
-    // if (this.lookupKeysForm.invalid || this.lookupKeysForm.pristine) {
-    //   return;
-    // }
+    if (this.lookupKeysForm.invalid || this.lookupKeysForm.pristine) {
+      return;
+    }
 
     const createKeys: LookupKeyType[] = [];
     const updateKeys: LookupKeyType[] = [];
 
-    console.log('test123', this.lookupKeysForm.controls['lookupKeys']);
+    const lookupKeysArray = this.lookupKeysForm.get('lookupKeys') as FormArray;
 
-    // this.lookupKeysForm.controls['lookupKeys'].forEach((item: any) => {
-    this.lookupKeysForm.controls['lookupKeys'].value.forEach((item: any) => {
-      console.log('item', item);
-      if (item.id) {
-        updateKeys.push(item);
-      } else {
-        createKeys.push({ ...item, id: null });
+    lookupKeysArray.controls.forEach((control: any) => {
+      if (!control.pristine) {
+        if (control.value.id) {
+          updateKeys.push(control.value);
+        } else {
+          createKeys.push({ ...control.value, id: null });
+        }
       }
     });
-
-    // console.log('createKeys', createKeys);
-    // console.log('updateKeys', updateKeys);
 
     if (createKeys.length > 0) {
       this.crudService
@@ -93,16 +89,13 @@ export class DfGlobalLookupKeysComponent implements OnInit, OnDestroy {
         .subscribe();
     }
 
-    // TODO how do I check to see if each item is dirty?
-    // Loop through each object and see if it matches the original data?
-
-    // if (updateKeys.length > 0) {
-    //   updateKeys.forEach((item: LookupKeyType) => {
-    //     if (item.id) {
-    //       this.crudService.update(item.id, item).subscribe();
-    //     }
-    //   });
-    // }
+    if (updateKeys.length > 0) {
+      updateKeys.forEach((item: LookupKeyType) => {
+        if (item.id) {
+          this.crudService.update(item.id, item).subscribe();
+        }
+      });
+    }
   }
 
   ngOnDestroy(): void {
