@@ -144,7 +144,7 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.resource.length;
+        this.tableLength = data.meta.count;
       });
   }
 
