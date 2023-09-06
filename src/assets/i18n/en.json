@@ -5,6 +5,7 @@
   "delete": "Delete",
   "edit": "Edit",
   "select": "Select",
+  "view": "View",
   "submit": "Submit",
   "browse": "Browse",
   "launch": "Launch",
@@ -410,6 +411,12 @@
         "header": "{{nav.home.quickstart.nav}}"
       },
       "download": { "nav": "Download", "header": "{{nav.home.download.nav}}" }
+    },
+    "admin-settings": {
+      "schema": {
+        "header": "Databases",
+        "nav": "Schema"
+      }
     },
     "api-connections": {
       "nav": "API Connections",

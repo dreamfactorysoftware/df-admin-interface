@@ -78,6 +78,7 @@ export interface ServiceTypeResponse {
   resource: ServiceType[];
 }
 
+// TODO: remove and refactor components that use this
 export interface ServiceType {
   dependenciesRequired: null;
   description: string;

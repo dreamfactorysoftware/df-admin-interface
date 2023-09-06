@@ -46,9 +46,11 @@ import {
   DfEmailTemplatesResolver,
 } from './adf-config/resolvers/df-email-templates.resolver';
 import {
+  schemaResolver,
   schemaServiceResolver,
   schemaServiceTypeResolver,
 } from './adf-schema/resolvers/df-schema.resolver';
+import { DfDatabaseSchemaService } from './adf-schema/services/df-database-schema.service';
 
 export const routes: Routes = [
   {
@@ -519,10 +521,21 @@ export const routes: Routes = [
               serviceTypes: schemaServiceTypeResolver,
             },
           },
+          {
+            path: `${ROUTES.VIEW}/:name`,
+            loadComponent: () =>
+              import(
+                './adf-schema/df-manage-tables-table/df-manage-tables-table.component'
+              ).then(m => m.DfManageTablesTableComponent),
+            resolve: {
+              data: schemaResolver,
+            },
+          },
         ],
         providers: [
           ...SERVICES_SERVICE_PROVIDERS,
           ...SERVICE_TYPES_SERVICE_PROVIDERS,
+          DfDatabaseSchemaService,
         ],
       },
       {
