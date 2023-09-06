@@ -21,6 +21,7 @@ import {
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { Subject, takeUntil } from 'rxjs';
 import { ROUTES } from 'src/app/core/constants/routes';
+import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 
 @Component({
   selector: 'df-email-template-details',
