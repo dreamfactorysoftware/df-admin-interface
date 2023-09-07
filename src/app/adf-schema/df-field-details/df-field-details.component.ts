@@ -1,5 +1,5 @@
 import { NgIf, NgFor, AsyncPipe } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
@@ -12,11 +12,14 @@ import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSelectModule } from '@angular/material/select';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfLookupKeysComponent } from 'src/app/shared/components/df-lookup-keys/df-lookup-keys.component';
 import { JsonValidator } from 'src/app/shared/validators/json.validator';
+import { Subject, takeUntil } from 'rxjs';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { API_DOCS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 
 @Component({
   selector: 'df-field-details',
@@ -40,8 +43,9 @@ import { JsonValidator } from 'src/app/shared/validators/json.validator';
     TranslocoPipe,
   ],
 })
-export class DfFieldDetailsComponent {
+export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   fieldDetailsForm: FormGroup;
+  destroyed$ = new Subject<void>();
 
   typeDropdownMenuOptions = [
     'I will manually enter a type',
@@ -66,32 +70,177 @@ export class DfFieldDetailsComponent {
     'timestamp_on_update',
   ];
 
-  constructor(private formBuilder: FormBuilder) {
+  referenceTableDropdownMenuOptions: { name: string }[] = [];
+
+  constructor(
+    @Inject(API_DOCS_SERVICE_TOKEN)
+    private service: DfBaseCrudService,
+    private formBuilder: FormBuilder,
+    private activatedRoute: ActivatedRoute
+  ) {
     this.fieldDetailsForm = this.formBuilder.group({
       name: ['', Validators.required],
       alias: [''],
       label: [''],
       isVirtual: [false],
-      isAggregate: [false],
-      type: [''],
-      databaseType: [''],
+      isAggregate: [{ value: false, disabled: true }],
+      type: ['', Validators.required],
+      databaseType: [{ value: '', disabled: true }],
       length: [],
-      precision: [],
-      scale: [],
-      fixedLength: [false],
-      supportsMultibyte: [false],
+      precision: [{ value: '', disabled: true }],
+      scale: [{ value: 0, disabled: true }],
+      fixedLength: [{ value: false, disabled: true }],
+      supportsMultibyte: [{ value: false, disabled: true }],
       allowNull: [false],
       autoIncrement: [false],
       defaultValue: [],
       indexed: [false],
       unique: [false],
-      primaryKey: [false],
+      primaryKey: [{ value: false, disabled: true }],
       foreignKey: [false],
-      referenceTable: [],
-      referenceField: [],
+      referenceTable: [{ value: '', disabled: true }],
+      referenceField: [{ value: '', disabled: true }],
       validation: ['', JsonValidator],
       dbFunctionUse: [],
       picklist: [],
     });
+
+    this.service
+      .get('')
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe((data: any) => {
+        console.log('data: ', data);
+        this.referenceTableDropdownMenuOptions = data['resource'];
+      });
+  }
+
+  ngOnInit(): void {
+    // this.fieldDetailsForm
+    //   .get('referenceTable')
+    //   ?.valueChanges.pipe(takeUntil(this.destroyed$)).subscribe;
+
+    this.fieldDetailsForm
+      .get('foreignKey')
+      ?.valueChanges.pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        if (data) {
+          this.enableFormField('referenceTable');
+        } else {
+          this.disableFormField('referenceTable');
+        }
+      });
+
+    this.fieldDetailsForm
+      .get('isVirtual')
+      ?.valueChanges.pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        if (data) {
+          this.disableFormField('databaseType');
+          this.enableFormField('isAggregate');
+        } else {
+          if (
+            this.fieldDetailsForm.get('type')?.value ===
+            this.typeDropdownMenuOptions[0]
+          )
+            this.enableFormField('databaseType');
+          this.disableFormField('isAggregate');
+        }
+      });
+
+    this.fieldDetailsForm
+      .get('type')
+      ?.valueChanges.pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        switch (data) {
+          case this.typeDropdownMenuOptions[0]:
+            if (this.fieldDetailsForm.get('isVirtual')?.value === false) {
+              this.enableFormField('databaseType');
+              this.disableFormField('length');
+              this.disableFormField('precision');
+              this.disableFormField('scale');
+            } else this.disableFormField('databaseType');
+            this.removeFormField('picklist');
+            this.disableFormField('fixedLength');
+            this.disableFormField('supportsMultibyte');
+            break;
+
+          case 'string':
+            this.addFormField('picklist');
+            this.disableFormField('databaseType');
+            this.enableFormField('length');
+            this.disableFormField('precision');
+            this.disableFormField('scale');
+            this.enableFormField('fixedLength');
+            this.enableFormField('supportsMultibyte');
+            break;
+
+          case 'integer':
+            this.addFormField('picklist');
+            this.disableFormField('databaseType');
+            this.enableFormField('length');
+            this.disableFormField('precision');
+            this.disableFormField('scale');
+            this.disableFormField('fixedLength');
+            this.disableFormField('supportsMultibyte');
+            break;
+
+          case 'text':
+          case 'binary':
+            this.disableFormField('databaseType');
+            this.enableFormField('length');
+            this.disableFormField('precision');
+            this.disableFormField('scale');
+            this.removeFormField('picklist');
+            this.disableFormField('fixedLength');
+            this.disableFormField('supportsMultibyte');
+            break;
+
+          case 'float':
+          case 'double':
+          case 'decimal':
+            this.disableFormField('databaseType');
+            this.disableFormField('length');
+            this.enableFormField('precision');
+            this.enableFormField('scale', 0);
+            this.removeFormField('picklist');
+            this.disableFormField('fixedLength');
+            this.disableFormField('supportsMultibyte');
+            break;
+
+          default:
+            this.disableFormField('databaseType');
+            this.disableFormField('length');
+            this.disableFormField('precision');
+            this.disableFormField('scale');
+            this.removeFormField('picklist');
+            this.disableFormField('fixedLength');
+            this.disableFormField('supportsMultibyte');
+        }
+      });
+  }
+
+  private addFormField(fieldName: string, required = false): void {
+    this.fieldDetailsForm.addControl(fieldName, this.formBuilder.control(''));
+  }
+
+  private removeFormField(fieldName: string): void {
+    this.fieldDetailsForm.removeControl(fieldName);
+  }
+
+  private disableFormField(fieldName: string): void {
+    this.fieldDetailsForm.controls[fieldName].setValue(null);
+    this.fieldDetailsForm.controls[fieldName].disable();
+  }
+
+  private enableFormField(fieldName: string, value?: any): void {
+    if (this.fieldDetailsForm.controls[fieldName].disabled)
+      this.fieldDetailsForm.controls[fieldName].enable();
+
+    if (value) this.fieldDetailsForm.controls[fieldName].setValue(value);
+  }
+
+  ngOnDestroy(): void {
+    this.destroyed$.next();
+    this.destroyed$.complete();
   }
 }

@@ -573,10 +573,21 @@ export const routes: Routes = [
               data: schemaResolver,
             },
           },
+          {
+            path: 'addFields', // TODO: this is a temporary route for dev, update when ready
+            loadComponent: () =>
+              import(
+                './adf-schema/df-field-details/df-field-details.component'
+              ).then(m => m.DfFieldDetailsComponent),
+            // resolve: {
+            //   data: schemaResolver,
+            // },
+          },
         ],
         providers: [
           ...SERVICES_SERVICE_PROVIDERS,
           ...SERVICE_TYPES_SERVICE_PROVIDERS,
+          ...API_DOCS_SERVICE_PROVIDERS, // TODO: update name accordingly
           DfDatabaseSchemaService,
         ],
       },
