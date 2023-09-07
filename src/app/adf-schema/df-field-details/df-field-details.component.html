@@ -1,0 +1,90 @@
+<!-- TODO: add translation to this file -->
+<div>
+  <form [formGroup]="fieldDetailsForm">
+    <mat-form-field>
+      <mat-label>Name</mat-label>
+      <input matInput formControlName="name" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Alias</mat-label>
+      <input matInput formControlName="alias" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Label</mat-label>
+      <input matInput formControlName="label" />
+    </mat-form-field>
+    <mat-slide-toggle formControlName="isVirtual">Is Virtual?</mat-slide-toggle>
+    <mat-slide-toggle formControlName="isAggregate"
+      >Is Aggregate?</mat-slide-toggle
+    >
+    <mat-form-field>
+      <mat-label>Type</mat-label>
+      <mat-select>
+        <mat-option
+          *ngFor="let option of typeDropdownMenuOptions"
+          [value]="option">
+          {{ option }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Database Type</mat-label>
+      <input matInput formControlName="databaseType" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Length</mat-label>
+      <input matInput formControlName="length" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Precision</mat-label>
+      <input matInput formControlName="precision" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Scale</mat-label>
+      <input matInput formControlName="scale" />
+    </mat-form-field>
+    <mat-slide-toggle formControlName="fixedLength"
+      >Fixed Length</mat-slide-toggle
+    >
+    <mat-slide-toggle formControlName="supportsMultibyte"
+      >Supports Multibyte</mat-slide-toggle
+    >
+    <mat-slide-toggle formControlName="allowNull">Allow Null</mat-slide-toggle>
+    <mat-slide-toggle formControlName="autoIncrement"
+      >Auto Increment</mat-slide-toggle
+    >
+    <mat-form-field>
+      <mat-label>Default Value</mat-label>
+      <input matInput formControlName="defaultValue" />
+    </mat-form-field>
+    <mat-slide-toggle formControlName="indexed">Indexed</mat-slide-toggle>
+    <mat-slide-toggle formControlName="unique">Unique</mat-slide-toggle>
+    <mat-slide-toggle formControlName="primaryKey"
+      >Primary Key</mat-slide-toggle
+    >
+    <mat-slide-toggle formControlName="foreignKey"
+      >Foreign Key</mat-slide-toggle
+    >
+    <mat-form-field>
+      <mat-label>Reference Table</mat-label>
+      <input matInput formControlName="referenceTable" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Reference Field</mat-label>
+      <input matInput formControlName="referenceField" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Validation</mat-label>
+      <input matInput formControlName="validation" />
+    </mat-form-field>
+    <!-- TODO: add field for db function use -->
+    <mat-form-field>
+      <mat-label>Picklist</mat-label>
+      <input matInput formControlName="picklist" />
+    </mat-form-field>
+  </form>
+  <div>
+    <button mat-raised-button color="primary">Add Field</button>
+    <button mat-raised-button>Cancel</button>
+  </div>
+</div>
