@@ -1,0 +1,17 @@
+{
+  "name": "Limit Name",
+  "description": "Description",
+  "limitType": "Limit Type",
+  "limitRate": "Limit Rate",
+  "limitPeriod": "Limit Period",
+  "role": "Role",
+  "service": "Service",
+  "endpoint": "Endpoint",
+  "user": "User",
+  "verb": "Verb",
+  "active": "Active",
+  "invalidForm": "Invalid Form Input",
+  "createSuccessMessage": "Limit successfully created",
+  "updateSuccessMessage": "Limit successfully updated",
+  "deleteSuccessMessage": "Limit successfully deleted"
+}

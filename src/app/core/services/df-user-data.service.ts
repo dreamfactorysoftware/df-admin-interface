@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
-
 @Injectable({
   providedIn: 'root',
 })
@@ -11,7 +10,6 @@ export class DfUserDataService {
   userData$ = this.userDataSubject.asObservable();
 
   private TOKEN_KEY = 'session_token';
-
   clearToken() {
     document.cookie = `${this.TOKEN_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`;
   }

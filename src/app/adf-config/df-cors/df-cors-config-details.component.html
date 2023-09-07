@@ -1,49 +1,34 @@
 <div class="df-cors-config-container">
-  <h1>{{ 'nav.system-settings.config.cors.nav' | transloco }}</h1>
-  <h1>{{ 'nav.system-settings.config.cors.pageTitle' | transloco }}</h1>
-  <h4>{{ 'nav.system-settings.config.cors.pageSubtitle' | transloco }}</h4>
+  <h4>{{ 'cors.pageSubtitle' | transloco }}</h4>
   <form [formGroup]="corsForm" (ngSubmit)="onSubmit()">
     <mat-form-field>
-      <mat-label>{{
-        'nav.system-settings.config.cors.formControls.path' | transloco
-      }}</mat-label>
+      <mat-label>{{ 'cors.formControls.path' | transloco }}</mat-label>
       <input matInput type="url" formControlName="path" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>{{
-        'nav.system-settings.config.cors.formControls.description' | transloco
-      }}</mat-label>
+      <mat-label>{{ 'cors.formControls.description' | transloco }}</mat-label>
       <input matInput type="text" formControlName="description" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>{{
-        'nav.system-settings.config.cors.formControls.origins' | transloco
-      }}</mat-label>
+      <mat-label>{{ 'cors.formControls.origins' | transloco }}</mat-label>
       <input matInput type="text" formControlName="origins" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>{{
-        'nav.system-settings.config.cors.formControls.headers' | transloco
-      }}</mat-label>
+      <mat-label>{{ 'cors.formControls.headers' | transloco }}</mat-label>
       <input matInput type="text" formControlName="headers" />
     </mat-form-field>
     <mat-form-field>
       <mat-label>{{
-        'nav.system-settings.config.cors.formControls.exposedHeaders'
-          | transloco
+        'cors.formControls.exposedHeaders' | transloco
       }}</mat-label>
       <input matInput type="text" formControlName="exposedHeaders" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>{{
-        'nav.system-settings.config.cors.formControls.maxAge' | transloco
-      }}</mat-label>
+      <mat-label>{{ 'cors.formControls.maxAge' | transloco }}</mat-label>
       <input matInput type="number" formControlName="maxAge" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>{{
-        'nav.system-settings.config.cors.formControls.methods' | transloco
-      }}</mat-label>
+      <mat-label>{{ 'cors.formControls.methods' | transloco }}</mat-label>
       <mat-select #select formControlName="methods" multiple>
         <div class="select-all">
           <mat-checkbox
@@ -65,17 +50,12 @@
     <div class="slide-toggle-container">
       <ng-container>
         <mat-slide-toggle formControlName="credentials">
-          {{
-            'nav.system-settings.config.cors.formControls.supportsCredentials'
-              | transloco
-          }}
+          {{ 'cors.formControls.supportsCredentials' | transloco }}
         </mat-slide-toggle>
       </ng-container>
       <ng-container>
         <mat-slide-toggle formControlName="enabled">
-          {{
-            'nav.system-settings.config.cors.formControls.enabled' | transloco
-          }}
+          {{ 'cors.formControls.enabled' | transloco }}
         </mat-slide-toggle>
       </ng-container>
     </div>

@@ -5,6 +5,7 @@
   <mat-sidenav-container class="sidenav-container" autosize>
     <mat-sidenav
       #sideNav
+      [disableClose]="(isSmallScreen | async) === false"
       [opened]="(isSmallScreen | async) === false"
       class="sidenav"
       [mode]="(isSmallScreen | async) ? 'over' : 'side'">
@@ -50,14 +51,13 @@
   </mat-sidenav-container>
 </div>
 
-<ng-template #navList let-nav>
-  <ng-container *ngFor="let item of nav">
+<ng-template #navList let-items>
+  <ng-container *ngFor="let item of items">
     <a
       *ngIf="!item.subRoutes; else subRoutes"
       mat-list-item
       [routerLink]="item.route"
-      routerLinkActive="active"
-      [routerLinkActiveOptions]="{ exact: true }">
+      [class.active]="isActive(item)">
       <span>{{ navLabel(item.route) | transloco }}</span>
     </a>
     <ng-template #subRoutes>

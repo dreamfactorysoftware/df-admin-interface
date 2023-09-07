@@ -2,9 +2,6 @@ import { Routes } from '@angular/router';
 import { ROUTES } from './core/constants/routes';
 import { loggedInGuard } from './core/guards/logged-in.guard';
 import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
-import { urlQueryLoginGuard } from './adf-user-management/guards/url-query-login.guard';
-import { oauthLoginGuard } from './adf-user-management/guards/oauth-login.guard';
-import { openRegisterGuard } from './adf-user-management/guards/open-register.guard';
 import { appsResolver } from './adf-apps/resolvers/manage-apps.resolver';
 import {
   userResolver,
@@ -12,12 +9,11 @@ import {
 } from './adf-users/resolvers/users.resolver';
 import { editAppResolver } from './adf-apps/resolvers/edit-app.resolver';
 import { adminsResolver } from './adf-admins/resolvers/admins.resolver';
-import { rolesResolver } from './adf-roles/resolvers/role.resolver';
-import { limitsResolver } from './adf-limits/resolvers/limits.resolver';
 import {
-  getServiceTypeDataResolver,
-  getSystemServiceDataListResolver,
-} from './adf-services/resolvers/service-data-service.resolver';
+  roleResolver,
+  rolesResolver,
+} from './adf-roles/resolvers/role.resolver';
+import { limitsResolver } from './adf-limits/resolvers/limits.resolver';
 import {
   ADMIN_SERVICE_PROVIDERS,
   APP_SERVICE_PROVIDERS,
@@ -34,22 +30,20 @@ import {
   SERVICES_SERVICE_PROVIDERS,
   SERVICE_TYPES_SERVICE_PROVIDERS,
   LOOKUP_KEYS_SERVICE_PROVIDERS,
+  SERVICE_TYPE_SERVICE_PROVIDERS,
+  BASE_SERVICE_PROVIDERS,
+  SERVICE_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
 import { DfPasswordService } from './adf-user-management/services/df-password.service';
 import { profileResolver } from './adf-profile/resolvers/profile.resolver';
-import { DfServiceDataService } from './adf-services/services/service-data.service';
 import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
 import { corsConfigResolver } from './adf-config/resolvers/df-cors-config.resolver';
 import { schedulerResolver } from './adf-scheduler/resolvers/scheduler.resolver';
-import { DfAccessListService } from './adf-scheduler/services/access-list.service';
 import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
 import { DfCacheResolver } from './adf-config/resolvers/df-cache.resolver';
-import {
-  apiDocsResolver,
-  systemServiceDataResolver,
-} from './adf-api-docs/resolvers/api-docs.resolver';
+import { apiDocResolver } from './adf-api-docs/resolvers/api-docs.resolver';
 import {
   DfEmailTemplateDetailsResolver,
   DfEmailTemplatesResolver,
@@ -61,7 +55,12 @@ import {
 } from './adf-schema/resolvers/df-schema.resolver';
 import { DfDatabaseSchemaService } from './adf-schema/services/df-database-schema.service';
 import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
-import { DfApiDocsService } from './adf-api-docs/services/df-api-docs.service';
+import { ServiceRoutes } from './adf-services/routes';
+import { servicesResolver } from './adf-services/resolvers/services.resolver';
+import { HomeRoutes } from './adf-home/routes';
+import { provideTranslocoScope } from '@ngneat/transloco';
+import { AuthRoutes } from './adf-user-management/routes';
+import { serviceTypesResolver } from './adf-services/resolvers/service-types.resolver';
 
 export const routes: Routes = [
   {
@@ -71,92 +70,15 @@ export const routes: Routes = [
   },
   {
     path: ROUTES.AUTH,
-    children: [
-      { path: '', redirectTo: ROUTES.LOGIN, pathMatch: 'full' },
-      {
-        path: ROUTES.LOGIN,
-        loadComponent: () =>
-          import('./adf-user-management/df-login/df-login.component').then(
-            m => m.DfLoginComponent
-          ),
-        canActivate: [urlQueryLoginGuard, oauthLoginGuard],
-      },
-      {
-        path: ROUTES.REGISTER,
-        loadComponent: () =>
-          import(
-            './adf-user-management/df-register/df-register.component'
-          ).then(m => m.DfRegisterComponent),
-        canActivate: [openRegisterGuard],
-      },
-      {
-        path: ROUTES.FORGOT_PASSWORD,
-        loadComponent: () =>
-          import(
-            './adf-user-management/df-forgot-password/df-forgot-password.component'
-          ).then(m => m.DfForgotPasswordComponent),
-      },
-      {
-        path: ROUTES.RESET_PASSWORD,
-        loadComponent: () =>
-          import(
-            './adf-user-management/df-password-reset/df-password-reset.component'
-          ).then(m => m.DfPasswordResetComponent),
-        data: { type: 'reset' },
-      },
-      {
-        path: ROUTES.USER_INVITE,
-        loadComponent: () =>
-          import(
-            './adf-user-management/df-password-reset/df-password-reset.component'
-          ).then(m => m.DfPasswordResetComponent),
-        data: { type: 'invite' },
-      },
-      {
-        path: ROUTES.REGISTER_CONFIRM,
-        loadComponent: () =>
-          import(
-            './adf-user-management/df-password-reset/df-password-reset.component'
-          ).then(m => m.DfPasswordResetComponent),
-        data: { type: 'register' },
-      },
-    ],
+    children: AuthRoutes,
     canActivate: [notLoggedInGuard],
+    providers: [provideTranslocoScope('userManagement')],
   },
   {
     path: ROUTES.HOME,
-    children: [
-      { path: '', redirectTo: ROUTES.WELCOME, pathMatch: 'full' },
-      {
-        path: ROUTES.WELCOME,
-        loadComponent: () =>
-          import('./adf-home/df-welcome-page/df-welcome-page.component').then(
-            m => m.DfWelcomePageComponent
-          ),
-      },
-      {
-        path: ROUTES.QUICKSTART,
-        loadComponent: () =>
-          import(
-            './adf-home/df-quickstart-page/df-quickstart-page.component'
-          ).then(m => m.DfQuickstartPageComponent),
-      },
-      {
-        path: ROUTES.RESOURCES,
-        loadComponent: () =>
-          import(
-            './adf-home/df-resources-page/df-resources-page.component'
-          ).then(m => m.DfResourcesPageComponent),
-      },
-      {
-        path: ROUTES.DOWNLOAD,
-        loadComponent: () =>
-          import('./adf-home/df-download-page/df-download-page.component').then(
-            m => m.DfDownloadPageComponent
-          ),
-      },
-    ],
+    children: HomeRoutes,
     canActivate: [loggedInGuard],
+    providers: [provideTranslocoScope('home')],
   },
   {
     path: ROUTES.API_CONNECTIONS,
@@ -176,20 +98,44 @@ export const routes: Routes = [
           },
           {
             path: ROUTES.DATABASE,
-            component: DfPlaceHolderComponent,
+            children: ServiceRoutes,
+            data: {
+              groups: ['Database', 'Big Data'],
+            },
           },
           {
             path: ROUTES.CUSTOM,
-            component: DfPlaceHolderComponent,
+            children: ServiceRoutes,
+            data: {
+              groups: ['Script', 'Remote Service'],
+            },
           },
           {
             path: ROUTES.FILE,
-            component: DfPlaceHolderComponent,
+            children: ServiceRoutes,
+            data: {
+              groups: ['File', 'Excel'],
+            },
           },
           {
             path: ROUTES.UTILITY,
-            component: DfPlaceHolderComponent,
+            children: ServiceRoutes,
+            data: {
+              groups: [
+                'Cache',
+                'Email',
+                'Notification',
+                'Log',
+                'Source Control',
+                'IoT',
+              ],
+            },
           },
+        ],
+        providers: [
+          ...SERVICE_SERVICE_PROVIDERS,
+          ...SERVICE_TYPE_SERVICE_PROVIDERS,
+          provideTranslocoScope('services'),
         ],
       },
       {
@@ -210,8 +156,16 @@ export const routes: Routes = [
                 './adf-roles/df-create-role/df-create-role.component'
               ).then(m => m.DfCreateRoleComponent),
           },
+          {
+            path: `${ROUTES.EDIT}/:id`,
+            loadComponent: () =>
+              import(
+                './adf-roles/df-create-role/df-create-role.component'
+              ).then(m => m.DfCreateRoleComponent),
+            resolve: { data: roleResolver },
+          },
         ],
-        providers: [...ROLE_SERVICE_PROVIDERS],
+        providers: [...ROLE_SERVICE_PROVIDERS, provideTranslocoScope('roles')],
       },
       {
         path: ROUTES.API_KEYS,
@@ -255,7 +209,11 @@ export const routes: Routes = [
               ),
           },
         ],
-        providers: [...APP_SERVICE_PROVIDERS, ...ROLE_SERVICE_PROVIDERS],
+        providers: [
+          ...APP_SERVICE_PROVIDERS,
+          ...ROLE_SERVICE_PROVIDERS,
+          provideTranslocoScope('apps'),
+        ],
       },
       {
         path: ROUTES.SCRIPTS,
@@ -271,9 +229,13 @@ export const routes: Routes = [
                 './adf-api-docs/df-api-docs/df-api-docs-table.component'
               ).then(m => m.DfApiDocsTableComponent),
             resolve: {
-              data: systemServiceDataResolver,
-              serviceTypes: getServiceTypeDataResolver,
+              data: servicesResolver(10, '(type not like "%swagger%")'),
+              serviceTypes: serviceTypesResolver,
             },
+            providers: [
+              ...SERVICE_TYPE_SERVICE_PROVIDERS,
+              ...SERVICE_SERVICE_PROVIDERS,
+            ],
           },
           {
             path: `${ROUTES.VIEW}/:name`,
@@ -282,15 +244,12 @@ export const routes: Routes = [
                 m => m.DfApiDocsComponent
               ),
             resolve: {
-              data: apiDocsResolver,
+              data: apiDocResolver,
             },
+            providers: [...API_DOCS_SERVICE_PROVIDERS],
           },
         ],
-        providers: [
-          ...API_DOCS_SERVICE_PROVIDERS,
-          DfServiceDataService,
-          DfApiDocsService,
-        ],
+        providers: [provideTranslocoScope('apiDocs')],
       },
     ],
     canActivate: [loggedInGuard],
@@ -320,7 +279,7 @@ export const routes: Routes = [
               data: limitsResolver(),
               users: usersResolver,
               roles: rolesResolver(0),
-              services: getSystemServiceDataListResolver,
+              services: servicesResolver(0),
             },
           },
           {
@@ -333,7 +292,7 @@ export const routes: Routes = [
               data: limitsResolver(),
               users: usersResolver,
               roles: rolesResolver(0),
-              services: getSystemServiceDataListResolver,
+              services: servicesResolver(0),
             },
           },
         ],
@@ -342,12 +301,22 @@ export const routes: Routes = [
           ...USER_SERVICE_PROVIDERS,
           ...ROLE_SERVICE_PROVIDERS,
           ...LIMIT_CACHE_SERVICE_PROVIDERS,
-          DfServiceDataService,
+          provideTranslocoScope('limits'),
+          ...SERVICE_SERVICE_PROVIDERS,
+          ...SERVICE_TYPE_SERVICE_PROVIDERS,
         ],
       },
       {
         path: ROUTES.AUTHENTICATION,
-        component: DfPlaceHolderComponent,
+        children: ServiceRoutes,
+        data: {
+          groups: ['LDAP', 'SSO', 'OAuth'],
+        },
+        providers: [
+          ...SERVICE_SERVICE_PROVIDERS,
+          ...SERVICE_TYPE_SERVICE_PROVIDERS,
+          provideTranslocoScope('services'),
+        ],
       },
     ],
     canActivate: [loggedInGuard],
@@ -368,10 +337,10 @@ export const routes: Routes = [
             resolve: {
               data: DfSystemInfoResolver,
             },
+            providers: [provideTranslocoScope('systemInfo')],
           },
           {
             path: ROUTES.CORS,
-            providers: [...CORS_CONFIG_SERVICE_PROVIDERS],
             children: [
               {
                 path: '',
@@ -401,6 +370,10 @@ export const routes: Routes = [
                 },
               },
             ],
+            providers: [
+              ...CORS_CONFIG_SERVICE_PROVIDERS,
+              provideTranslocoScope('cors'),
+            ],
           },
           {
             path: ROUTES.CACHE,
@@ -411,7 +384,10 @@ export const routes: Routes = [
             resolve: {
               data: DfCacheResolver,
             },
-            providers: [...CACHE_SERVICE_PROVIDERS],
+            providers: [
+              ...CACHE_SERVICE_PROVIDERS,
+              provideTranslocoScope('cache'),
+            ],
           },
           {
             path: ROUTES.EMAIL_TEMPLATES,
@@ -444,7 +420,10 @@ export const routes: Routes = [
                 data: { type: 'create' },
               },
             ],
-            providers: [...EMAIL_TEMPLATES_SERVICE_PROVIDERS],
+            providers: [
+              ...EMAIL_TEMPLATES_SERVICE_PROVIDERS,
+              provideTranslocoScope('emailTemplates'),
+            ],
           },
           {
             path: ROUTES.GLOBAL_LOOKUP_KEYS,
@@ -470,7 +449,6 @@ export const routes: Routes = [
               ).then(m => m.DfManageSchedulerTableComponent),
             resolve: {
               data: schedulerResolver,
-              services: getSystemServiceDataListResolver,
             },
           },
           {
@@ -480,7 +458,7 @@ export const routes: Routes = [
                 './adf-scheduler/df-scheduler/df-scheduler.component'
               ).then(m => m.DfSchedulerComponent),
             resolve: {
-              data: getSystemServiceDataListResolver,
+              data: servicesResolver(0),
             },
           },
           {
@@ -490,15 +468,17 @@ export const routes: Routes = [
                 './adf-scheduler/df-scheduler/df-scheduler.component'
               ).then(m => m.DfSchedulerComponent),
             resolve: {
-              data: getSystemServiceDataListResolver,
+              data: servicesResolver(0),
               schedulerObject: schedulerResolver,
             },
           },
         ],
         providers: [
-          DfServiceDataService,
-          DfAccessListService,
           ...SCHEDULER_SERVICE_PROVIDER,
+          ...SERVICE_TYPE_SERVICE_PROVIDERS,
+          ...SERVICE_SERVICE_PROVIDERS,
+          ...BASE_SERVICE_PROVIDERS,
+          provideTranslocoScope('scheduler'),
         ],
       },
       {
@@ -516,7 +496,15 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.DF_PLATFORM_APIS,
-        component: DfPlaceHolderComponent,
+        children: ServiceRoutes,
+        data: {
+          system: true,
+        },
+        providers: [
+          ...SERVICE_SERVICE_PROVIDERS,
+          ...SERVICE_TYPE_SERVICE_PROVIDERS,
+          provideTranslocoScope('services'),
+        ],
       },
     ],
     canActivate: [loggedInGuard],
@@ -554,7 +542,12 @@ export const routes: Routes = [
             data: { type: 'create' },
           },
         ],
-        providers: [...ADMIN_SERVICE_PROVIDERS, ...ROLE_SERVICE_PROVIDERS],
+        providers: [
+          ...ADMIN_SERVICE_PROVIDERS,
+          ...ROLE_SERVICE_PROVIDERS,
+          provideTranslocoScope('admins'),
+          provideTranslocoScope('userManagement'),
+        ],
       },
       {
         path: ROUTES.SCHEMA,
@@ -628,6 +621,9 @@ export const routes: Routes = [
           ...USER_SERVICE_PROVIDERS,
           ...APP_SERVICE_PROVIDERS,
           ...ROLE_SERVICE_PROVIDERS,
+          provideTranslocoScope('users'),
+          provideTranslocoScope('roles'),
+          provideTranslocoScope('userManagement'),
         ],
       },
       {
@@ -645,17 +641,11 @@ export const routes: Routes = [
       ),
     resolve: { data: profileResolver },
     canActivate: [loggedInGuard],
-    providers: [DfProfileService, DfPasswordService],
-  },
-  {
-    path: ROUTES.DATA,
-    component: DfPlaceHolderComponent,
-    canActivate: [loggedInGuard],
-  },
-  {
-    path: ROUTES.PACKAGES,
-    component: DfPlaceHolderComponent,
-    canActivate: [loggedInGuard],
+    providers: [
+      DfProfileService,
+      DfPasswordService,
+      provideTranslocoScope('userManagement'),
+    ],
   },
   {
     path: ROUTES.LAUNCHPAD,

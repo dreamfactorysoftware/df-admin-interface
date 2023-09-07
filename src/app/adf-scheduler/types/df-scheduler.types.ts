@@ -1,3 +1,5 @@
+import { Service } from 'src/app/shared/types/service';
+
 export type UpdateSchedulePayload = CreateSchedulePayload & {
   createdById: number;
   createdDate: string;
@@ -57,4 +59,5 @@ export interface SchedulerTaskData {
     createdData: string;
     content: string;
   } | null;
+  serviceByServiceId: Service;
 }

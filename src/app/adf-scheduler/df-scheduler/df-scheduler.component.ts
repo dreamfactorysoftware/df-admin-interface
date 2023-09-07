@@ -2,17 +2,17 @@ import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormControl,
-  FormControlName,
   FormGroup,
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
-import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
 import { ROUTES } from 'src/app/core/constants/routes';
 import { JsonValidator } from 'src/app/shared/validators/json.validator';
-import { DfAccessListService } from '../services/access-list.service';
-import { SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import {
+  BASE_SERVICE_TOKEN,
+  SCHEDULER_SERVICE_TOKEN,
+} from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import {
   CreateSchedulePayload,
@@ -27,6 +27,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { Service } from 'src/app/shared/types/service';
+import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 
 @Component({
   selector: 'df-scheduler',
@@ -50,15 +52,15 @@ import { MatButtonModule } from '@angular/material/button';
 export class DfSchedulerComponent implements OnInit, OnDestroy {
   destroyed$ = new Subject<void>();
   formGroup: FormGroup; // basic form
-  logFormControl: FormControl;
-  userServicesDropdownOptions: SystemServiceData[];
-  selectedService: SystemServiceData | undefined;
+  userServicesDropdownOptions: Service[];
+  selectedService: Service | undefined;
 
   relatedParam = 'task_log_by_task_id';
 
   componentDropdownOptions: string[] = [];
 
   scheduleToEdit: SchedulerTaskData | undefined;
+  log = '';
 
   verbDropdownOptions = [
     {
@@ -89,8 +91,11 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
     private formBuilder: FormBuilder,
     private activatedRoute: ActivatedRoute,
     private router: Router,
-    private accessListService: DfAccessListService
-  ) {
+    @Inject(BASE_SERVICE_TOKEN)
+    private accessListService: DfBaseCrudService
+  ) {}
+
+  ngOnInit(): void {
     this.formGroup = this.formBuilder.group({
       name: ['', Validators.required],
       description: [''],
@@ -100,9 +105,6 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
       method: [this.verbDropdownOptions[0].value, Validators.required],
       frequency: [],
     });
-  }
-
-  ngOnInit(): void {
     this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
       .subscribe((data: any) => {
@@ -117,9 +119,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         .subscribe((data: any) => {
           this.scheduleToEdit = data.schedulerObject;
 
-          this.logFormControl = new FormControl(
-            this.scheduleToEdit?.taskLogByTaskId?.content
-          );
+          this.log = this.scheduleToEdit?.taskLogByTaskId?.content ?? '';
 
           this.getServiceAccessList(this.scheduleToEdit?.serviceId as number);
 
@@ -224,7 +224,14 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
 
     if (service) {
       this.accessListService
-        .getServiceAccessList(service.name)
+        .get<GenericListResponse<string>>(service.name, {
+          additionalParams: [
+            {
+              key: 'as_access_list',
+              value: true,
+            },
+          ],
+        })
         .pipe(takeUntil(this.destroyed$))
         .subscribe(data => {
           this.componentDropdownOptions = data.resource;

@@ -1,0 +1,131 @@
+{
+  "requiredForLogin": "Required for login",
+  "resetPassword": "Reset Password",
+  "passwordReset": "Password Reset",
+  "login": "Login",
+  "forgotPassword": "Forgot Password",
+  "requestPasswordReset": "Request Password Reset",
+  "invitatonConfirmation": "Invitation Confirmation",
+  "registrationConfirmation": "Registration Confirmation",
+  "confirmUser": "Confirm User",
+  "register": "Register",
+  "registerSuccess": {
+    "header": "Registration Success",
+    "title": "Thanks For Registering!",
+    "message": "A confirmation email has been sent to the email address that you registered with. Upon confirmation you will be able to login to the application. Thanks!"
+  },
+  "oAuth": "OAuth Login",
+  "saml": "SAML 2.0 Login",
+  "controls": {
+    "username": {
+      "label": "Choose Username",
+      "altLabel": "Enter Username",
+      "optional": "(Optional, defaults to email address)",
+      "errors": {
+        "required": "Username is required"
+      }
+    },
+    "email": {
+      "label": "Enter Email",
+      "errors": {
+        "required": "Email is required",
+        "invalid": "Invalid email format"
+      }
+    },
+    "firstName": {
+      "label": "Enter First Name",
+      "errors": {
+        "required": "First name is required"
+      }
+    },
+    "lastName": {
+      "label": "Enter Last Name",
+      "errors": {
+        "required": "Last name is required"
+      }
+    },
+    "displayName": {
+      "label": "Enter Display Name",
+      "errors": {
+        "required": "Display name is required"
+      }
+    },
+    "oldPassword": {
+      "label": "Enter Old Password",
+      "errors": {
+        "required": "Old password is required"
+      }
+    },
+    "password": {
+      "label": "Enter Password",
+      "altLabel": "Confirm new password",
+      "errors": {
+        "required": "Password is required",
+        "length": "Password must be at least 5 characters long"
+      }
+    },
+    "verifyPassword": {
+      "label": "Verify Password",
+      "altLabel": "Verify new password"
+    },
+    "confirmationCode": {
+      "label": "Enter confirmation code",
+      "errors": {
+        "required": "Confirmation code is required"
+      }
+    },
+    "confirmPassword": {
+      "label": "Confirm Password",
+      "altLabel": "Confirm new password",
+      "errors": {
+        "required": "Confirm password is required",
+        "match": "Passwords do not match"
+      }
+    },
+    "services": {
+      "label": "Services"
+    },
+    "setSecurityQuestion": {
+      "label": "Set Security Question"
+    },
+    "setPassword": {
+      "label": "Set Password"
+    },
+    "securityQuestion": {
+      "label": "Security Question"
+    },
+    "securityAnswer": {
+      "label": "Enter security answer",
+      "errors": {
+        "required": "Security answer is required"
+      }
+    },
+    "phone": {
+      "label": "Enter telephone number"
+    },
+    "currentPassword": {
+      "label": "Enter current password",
+      "errors": {
+        "required": "Required if Changing Email"
+      }
+    },
+    "sendInvite": {
+      "label": "Send Email Invite"
+    }
+  },
+  "alerts": {
+    "resetEmailSent": "A password reset email has been sent to the user's email address."
+  },
+  "profile": {
+    "tabs": {
+      "details": "Details",
+      "securityQuestion": "Security Question",
+      "password": "Password"
+    },
+    "alerts": {
+      "detailsUpdated": "Profile updated successfully",
+      "securtyQuestionUpdated": "Security question updated successfully",
+      "passwordUpdated": "Password updated successfully"
+    }
+  }
+}

@@ -13,11 +13,13 @@ export interface GenericErrorResponse {
   };
 }
 
+export interface Meta {
+  count: number;
+}
+
 export interface GenericListResponse<T> {
   resource: Array<T>;
-  meta: {
-    count: number;
-  };
+  meta: Meta;
 }
 
 export interface KeyValuePair {

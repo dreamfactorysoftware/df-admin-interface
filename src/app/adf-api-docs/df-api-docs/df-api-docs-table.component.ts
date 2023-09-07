@@ -1,7 +1,7 @@
 import { Component, Inject } from '@angular/core';
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { ApiDocsRowData } from '../types';
-import { API_DOCS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { SERVICES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -16,12 +16,9 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatPaginatorModule } from '@angular/material/paginator';
 import { MatTableModule } from '@angular/material/table';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import {
-  ServiceType,
-  SystemServiceData,
-} from 'src/app/adf-services/services/service-data.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { takeUntil } from 'rxjs';
+import { Service, ServiceType } from 'src/app/shared/types/service';
 
 @Component({
   selector: 'df-api-docs-table',
@@ -51,11 +48,10 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
   serviceTypes: ServiceType[];
   override allowCreate = false;
   override readOnly = true;
-  override allowFilter = false;
 
   constructor(
-    @Inject(API_DOCS_SERVICE_TOKEN)
-    private apiDocsService: DfBaseCrudService,
+    @Inject(SERVICES_SERVICE_TOKEN)
+    private servicesService: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -74,35 +70,35 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
 
     this._activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.serviceTypes = data['serviceTypes'].resource;
+      .subscribe(({ serviceTypes }) => {
+        this.serviceTypes = serviceTypes;
       });
   }
 
   override columns = [
     {
       columnDef: 'name',
-      header: 'nav.api-connections.api-docs.table.header.name',
+      header: 'apiDocs.table.header.name',
       cell: (row: ApiDocsRowData) => row.name,
     },
     {
       columnDef: 'label',
-      header: 'nav.api-connections.api-docs.table.header.label',
+      header: 'apiDocs.table.header.label',
       cell: (row: ApiDocsRowData) => row.label,
     },
     {
       columnDef: 'description',
-      header: 'nav.api-connections.api-docs.table.header.description',
+      header: 'apiDocs.table.header.description',
       cell: (row: ApiDocsRowData) => row.description,
     },
     {
       columnDef: 'group',
-      header: 'nav.api-connections.api-docs.table.header.group',
+      header: 'apiDocs.table.header.group',
       cell: (row: ApiDocsRowData) => row.group,
     },
     {
       columnDef: 'type',
-      header: 'nav.api-connections.api-docs.table.header.type',
+      header: 'apiDocs.table.header.type',
       cell: (row: ApiDocsRowData) => row.type,
     },
     {
@@ -110,36 +106,33 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
     },
   ];
 
-  override mapDataToTable(data: SystemServiceData[]): ApiDocsRowData[] {
+  override mapDataToTable(data: Service[]): ApiDocsRowData[] {
     return data.map(val => {
+      const type = this.getServiceType(val.type);
       return {
         name: val.name,
         description: val.description,
-        group: this.getRelatedServiceTypeGroup(val.type),
+        group: type?.group ?? '',
         label: val.label,
-        type: val.type,
+        type: type?.label ?? '',
       };
     });
   }
 
-  private getRelatedServiceTypeGroup(serviceType: string) {
-    const service = this.serviceTypes.find(type => {
-      return type.name === serviceType;
-    }) as ServiceType;
-
-    return service.group;
+  getServiceType(type: string) {
+    return this.serviceTypes.find(val => val.name === type);
   }
 
   override refreshTable(
-    limit?: number | undefined,
-    offset?: number | undefined,
-    filter?: string | undefined
+    limit?: number,
+    offset?: number,
+    filter?: string
   ): void {
-    this.apiDocsService
-      .getAll<GenericListResponse<SystemServiceData>>({
+    this.servicesService
+      .getAll<GenericListResponse<Service>>({
         limit,
         offset,
-        filter,
+        filter: `(type not like "%swagger%")${filter ? ` and ${filter}` : ''}`,
       })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
@@ -149,6 +142,6 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
   }
 
   override filterQuery(value: string): string {
-    return '';
+    return `((name like "%${value}%") or (label like "%${value}%") or (description like "%${value}%"))`;
   }
 }

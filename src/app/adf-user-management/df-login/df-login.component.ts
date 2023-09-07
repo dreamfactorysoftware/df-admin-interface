@@ -7,11 +7,7 @@ import {
 } from '@angular/forms';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { DfAuthService } from '../services/df-auth.service';
-import {
-  AuthService,
-  DfSystemConfigDataService,
-  LdapService,
-} from '../../core/services/df-system-config-data.service';
+import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
 import {
   AlertType,
   DfAlertComponent,
@@ -31,6 +27,7 @@ import { NgIf, NgFor, NgTemplateOutlet } from '@angular/common';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatCardModule } from '@angular/material/card';
 import { TranslocoPipe } from '@ngneat/transloco';
+import { AuthService, LdapService } from 'src/app/shared/types/service';
 
 @Component({
   selector: 'df-user-login',

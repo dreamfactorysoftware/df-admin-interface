@@ -1,0 +1,7 @@
+{
+  "label": "Roles",
+  "role": "Role",
+  "app": "App",
+  "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
+  "noRoles": "No roles assigned."
+}

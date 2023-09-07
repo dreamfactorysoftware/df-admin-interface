@@ -4,7 +4,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { NgIf, AsyncPipe } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.component';
-
 @Component({
   selector: 'df-root',
   templateUrl: './app.component.html',

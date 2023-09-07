@@ -1,5 +1,5 @@
-import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
 import { RoleType } from './role';
+import { ServiceType } from './service';
 import { UserProfile } from './user';
 
 interface CacheLimitType {
@@ -24,7 +24,7 @@ export interface LimitType {
   rate: number;
   roleByRoleId: RoleType | null;
   roleId: number | null;
-  serviceByServiceId: SystemServiceData | null;
+  serviceByServiceId: ServiceType | null;
   serviceId: number | null;
   type: string;
   userByUserId: UserProfile | null;

@@ -10,7 +10,6 @@ export const loggedInGuard = () => {
   const authService = inject(DfAuthService);
   const userDataService = inject(DfUserDataService);
   const router = inject(Router);
-
   return userDataService.isLoggedIn$.pipe(
     switchMap(isLoggedIn => {
       if (!isLoggedIn) {

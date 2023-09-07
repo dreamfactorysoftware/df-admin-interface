@@ -1,28 +1,28 @@
 <div class="system-info-container">
   <p>
-    {{ 'system-info.subheading' | transloco }}
+    {{ 'systemInfo.subheading' | transloco }}
   </p>
-  <h2>DreamFactory {{ 'system-info.instance.instance' | transloco }}</h2>
+  <h2>DreamFactory {{ 'systemInfo.instance.instance' | transloco }}</h2>
   <div
     class="system-info-instance"
     [class.x-small]="breakpointService.isXSmallScreen | async">
     <div class="system-info-platform">
       <ul>
         <li>
-          {{ 'system-info.instance.licenseLevel' | transloco }}:
+          {{ 'systemInfo.instance.licenseLevel' | transloco }}:
           {{ platform.license }}
         </li>
         <li>
-          {{ 'system-info.instance.licenseKey' | transloco }}:
+          {{ 'systemInfo.instance.licenseKey' | transloco }}:
           {{ platform.licenseKey }}
         </li>
         <li>
-          {{ 'system-info.instance.subscriptionStatus' | transloco }}:
+          {{ 'systemInfo.instance.subscriptionStatus' | transloco }}:
           <!-- TODO missing data {{subscriptionData.msg}} -->
         </li>
 
         <li>
-          {{ 'system-info.instance.subscriptionExpirationDate' | transloco }}:
+          {{ 'systemInfo.instance.subscriptionExpirationDate' | transloco }}:
           <!-- TODO missing data {{subscriptionData.renewal_date}} -->
         </li>
         <li>
@@ -31,42 +31,42 @@
           {{ platform.version }}
         </li>
         <li>
-          {{ 'system-info.instance.systemDatabase' | transloco }}:
+          {{ 'systemInfo.instance.systemDatabase' | transloco }}:
           {{ platform.dbDriver }}
         </li>
         <li>
-          {{ 'system-info.instance.installPath' | transloco }}:
+          {{ 'systemInfo.instance.installPath' | transloco }}:
           {{ platform.installPath }}
         </li>
         <li>
-          {{ 'system-info.instance.logPath' | transloco }}:
+          {{ 'systemInfo.instance.logPath' | transloco }}:
           {{ platform.logPath }}
         </li>
         <li>
-          {{ 'system-info.instance.logMode' | transloco }}:
+          {{ 'systemInfo.instance.logMode' | transloco }}:
           {{ platform.logMode }}
         </li>
         <li>
-          {{ 'system-info.instance.logLevel' | transloco }}:
+          {{ 'systemInfo.instance.logLevel' | transloco }}:
           {{ platform.logLevel }}
         </li>
         <li>
-          {{ 'system-info.instance.cacheDriver' | transloco }}:
+          {{ 'systemInfo.instance.cacheDriver' | transloco }}:
           {{ platform.cacheDriver }}
         </li>
         <li>
-          {{ 'system-info.instance.demo' | transloco }}:
+          {{ 'systemInfo.instance.demo' | transloco }}:
           {{ platform.isTrial }}
         </li>
         <li>
           DreamFactory
-          {{ 'system-info.instance.instanceId' | transloco }}:
+          {{ 'systemInfo.instance.instanceId' | transloco }}:
           {{ platform.dfInstanceId }}
         </li>
       </ul>
     </div>
     <div class="system-info-packages">
-      <h3>{{ 'system-info.packages' | transloco }}</h3>
+      <h3>{{ 'systemInfo.packages' | transloco }}</h3>
       <div class="package-header">
         <span>{{ 'name' | transloco }}</span
         ><span>{{ 'version' | transloco }}</span>
@@ -81,36 +81,36 @@
       </div>
     </div>
   </div>
-  <h2>{{ 'system-info.server.heading' | transloco }}</h2>
+  <h2>{{ 'systemInfo.server.heading' | transloco }}</h2>
   <div class="system-info-server">
     <ul>
-      <li>{{ 'system-info.server.os' | transloco }}: {{ server.serverOs }}</li>
+      <li>{{ 'systemInfo.server.os' | transloco }}: {{ server.serverOs }}</li>
       <li>
-        {{ 'system-info.server.release' | transloco }}: {{ server.release }}
+        {{ 'systemInfo.server.release' | transloco }}: {{ server.release }}
       </li>
       <li>{{ 'version' | transloco }}: {{ server.version }}</li>
-      <li>{{ 'system-info.server.host' | transloco }}: {{ server.host }}</li>
+      <li>{{ 'systemInfo.server.host' | transloco }}: {{ server.host }}</li>
       <li>
-        {{ 'system-info.server.machine' | transloco }}: {{ server.machine }}
+        {{ 'systemInfo.server.machine' | transloco }}: {{ server.machine }}
       </li>
       <li>PHP {{ 'version' | transloco }}: {{ php.phpVersion }}</li>
       <li>
-        PHP {{ 'system-info.server.serverApi' | transloco }}:
+        PHP {{ 'systemInfo.server.serverApi' | transloco }}:
         {{ php.serverApi }}
       </li>
     </ul>
   </div>
-  <h2>{{ 'system-info.client.heading' | transloco }}</h2>
+  <h2>{{ 'systemInfo.client.heading' | transloco }}</h2>
   <div class="system-info-client">
     <ul>
       <li>
-        {{ 'system-info.client.userAgent' | transloco }}: {{ client.userAgent }}
+        {{ 'systemInfo.client.userAgent' | transloco }}: {{ client.userAgent }}
       </li>
       <li>
-        {{ 'system-info.client.ipAddress' | transloco }}: {{ client.ipAddress }}
+        {{ 'systemInfo.client.ipAddress' | transloco }}: {{ client.ipAddress }}
       </li>
       <li>
-        {{ 'system-info.client.Locale' | transloco }}: {{ client.locale }}
+        {{ 'systemInfo.client.Locale' | transloco }}: {{ client.locale }}
       </li>
     </ul>
   </div>

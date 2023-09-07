@@ -101,3 +101,8 @@ export const LOOKUP_KEYS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
 export const LOOKUP_KEYS_URL_TOKEN = new InjectionToken<string>(
   'LOOKUP_KEYS_URL_TOKEN'
 );
+
+export const BASE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'BASE_SERVICE_TOKEN'
+);
+export const BASE_URL_TOKEN = new InjectionToken<string>('BASE_URL_TOKEN');

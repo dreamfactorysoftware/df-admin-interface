@@ -15,6 +15,6 @@ export const schedulerResolver: ResolveFn<
     });
 
   return inject(SCHEDULER_SERVICE_TOKEN).getAll({
-    related: 'task_log_by_task_id',
+    related: 'task_log_by_task_id,service_by_service_id',
   });
 };

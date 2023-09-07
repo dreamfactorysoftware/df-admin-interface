@@ -5,12 +5,10 @@
   "delete": "Delete",
   "edit": "Edit",
   "select": "Select",
-  "view": "View",
   "submit": "Submit",
   "browse": "Browse",
   "launch": "Launch",
   "launchApp": "Launch {{appName}}",
-  "downloadApiDoc": "Download Api Documentation",
   "cancel": "Cancel",
   "basic": "Basic",
   "selectAnOption": "Select an option",
@@ -31,7 +29,6 @@
   "filter": "Filter",
   "resetRowCounter": "Reset counter for row {{id}}",
   "editRow": "Edit row {{id}}",
-  "viewRow": "View row {{id}}",
   "deleteRow": "Delete row {{id}}",
   "selectRow": "Select row {{id}}",
   "selectAll": "Select All",
@@ -78,328 +75,21 @@
   "yes": "Yes",
   "no": "No",
   "confirm": "Confirm",
+  "label": "Label",
   "confirmDelete": "Are you sure you want to delete this?",
-  "home": {
-    "resourceLinks": {
-      "gettingStartedGuide": "Getting Started Guide",
-      "writtenTutorials": "Written Tutorials",
-      "videoTutorials": "Video Tutorials",
-      "fullDocumentation": "Full Documentation",
-      "communityForum": "Community Forum",
-      "bugFeatureRequests": "Bugs and Feature Requests",
-      "twitter": "DreamFactory on Twitter",
-      "blog": "DreamFactory blog",
-      "contactSupport": "Contact Support"
-    },
-    "welcomePage": {
-      "watchVideoCta": "Watch our video!",
-      "welcomeHeading": "Welcome to DreamFactory!",
-      "welcomeSubHeading": "DreamFactory provides all of the backend services that you need to build great mobile, web, and IoT applications. Follow the links below to get started:",
-      "ossUsersHeading": "Attention OSS users",
-      "ossUsersText": "Did you know DreamFactory’s commercial solutions include connectors for Microsoft SQL Server, Oracle, SOAP-to-REST, API limiting, ELK stack integration, and much more? Contact Us at <a href=\"mailto:sales@dreamfactory.com\">sales@dreamfactory.com</a> to arrange a demo with our engineering team!",
-      "hearFromYouHeading": "We want to hear from you!",
-      "hearFromYouText": "Has DreamFactory made a difference in your organization? Are you doing something novel and interesting with our software? We’d love to add your story to the Dreamfactory.com user showcase! E-mail us at <a href=\"mailto:info@dreamfactory.com\">info@dreamfactory.com</a> with your project details and we’ll add your organization name, URL, and story to our site!",
-      "clientPlatformHeading": "Click on a client platform below to download a sample application and learn how to make API calls:",
-      "nativeExamplesHeading": "Native Examples",
-      "javaScriptExamplesHeading": "JavaScript Examples"
-    },
-    "quickstartPage": {
-      "quickstartHeading": "Quickstart",
-      "quickstartSubHeading": "An example application is a great way to learn how to make basic API calls to DreamFactory.",
-      "quickstartSteps": {
-        "stepOne": "Click on your favorite client platform below. This will take you to a GitHub repo with an example application.",
-        "stepTwo": "Follow the instructions in the README file to get the application running in your new DreamFactory instance.",
-        "stepThree": "If you have any problems, click on the \"Resources\" button at left for links to documentation, product tutorials, and technical support."
-      },
-      "clientPlatformHeading": "Click on a client platform below to download a sample application and learn how to make API calls:",
-      "nativeExamplesHeading": "Native Examples",
-      "javaScriptExamplesHeading": "JavaScript Examples"
-    },
-    "resourcesPage": {
-      "resourcesHeading": "Resources",
-      "resourcesSubHeading": "DreamFactory provides all of the backend services that you need to build great mobile, web, and IoT applications. Follow the links below to get started:"
-    },
-    "downloadPage": {
-      "downloadHeading": "DreamFactory Downloads",
-      "downloadText": "DreamFactory is an open source software package available under the Apache License. The source code is free to download, use, and share. You can install DreamFactory in a number of ways: using a cloud service, a local install, or on any Linux or Windows server. The links below provide access to downloads for your preferred platform.",
-      "cloudInstallersHeading": "Cloud Installers",
-      "localInstallersHeading": "Local Installers"
-    },
-    "brandNames": {
-      "oracleCloud": "Oracle Cloud",
-      "bitnami": "Bitnami",
-      "docker": "Docker",
-      "amazon": "Amazon",
-      "azure": "Azure",
-      "google": "Google",
-      "vmWare": "VMware",
-      "linux": "Linux",
-      "osx": "OS X",
-      "windows": "Windows",
-      "gitHubSource": "GitHub Source",
-      "objectiveC": "Objective-C",
-      "appleSwift": "Apple Swift",
-      "androidJava": "Android Java",
-      "microsoftNet": "Microsoft .NET",
-      "javaScript": "JavaScript",
-      "ionic": "Ionic",
-      "titanium": "Titanium",
-      "angularJs": "Angular JS",
-      "angular2": "Angular 2",
-      "react": "React"
-    }
-  },
-  "userManagement": {
-    "requiredForLogin": "Required for login",
-    "resetPassword": "Reset Password",
-    "passwordReset": "Password Reset",
-    "login": "Login",
-    "forgotPassword": "Forgot Password",
-    "requestPasswordReset": "Request Password Reset",
-    "invitatonConfirmation": "Invitation Confirmation",
-    "registrationConfirmation": "Registration Confirmation",
-    "confirmUser": "Confirm User",
-    "register": "Register",
-    "registerSuccess": {
-      "header": "Registration Success",
-      "title": "Thanks For Registering!",
-      "message": "A confirmation email has been sent to the email address that you registered with. Upon confirmation you will be able to login to the application. Thanks!"
-    },
-    "oAuth": "OAuth Login",
-    "saml": "SAML 2.0 Login",
-    "controls": {
-      "username": {
-        "label": "Choose Username",
-        "altLabel": "Enter Username",
-        "optional": "(Optional, defaults to email address)",
-        "errors": {
-          "required": "Username is required"
-        }
-      },
-      "email": {
-        "label": "Enter Email",
-        "errors": {
-          "required": "Email is required",
-          "invalid": "Invalid email format"
-        }
-      },
-      "firstName": {
-        "label": "Enter First Name",
-        "errors": {
-          "required": "First name is required"
-        }
-      },
-      "lastName": {
-        "label": "Enter Last Name",
-        "errors": {
-          "required": "Last name is required"
-        }
-      },
-      "displayName": {
-        "label": "Enter Display Name",
-        "errors": {
-          "required": "Display name is required"
-        }
-      },
-      "oldPassword": {
-        "label": "Enter Old Password",
-        "errors": {
-          "required": "Old password is required"
-        }
-      },
-      "password": {
-        "label": "Enter Password",
-        "altLabel": "Confirm new password",
-        "errors": {
-          "required": "Password is required",
-          "length": "Password must be at least 5 characters long"
-        }
-      },
-      "verifyPassword": {
-        "label": "Verify Password",
-        "altLabel": "Verify new password"
-      },
-      "confirmationCode": {
-        "label": "Enter confirmation code",
-        "errors": {
-          "required": "Confirmation code is required"
-        }
-      },
-      "confirmPassword": {
-        "label": "Confirm Password",
-        "altLabel": "Confirm new password",
-        "errors": {
-          "required": "Confirm password is required",
-          "match": "Passwords do not match"
-        }
-      },
-      "services": {
-        "label": "Services"
-      },
-      "setSecurityQuestion": {
-        "label": "Set Security Question"
-      },
-      "setPassword": {
-        "label": "Set Password"
-      },
-      "securityQuestion": {
-        "label": "Security Question"
-      },
-      "securityAnswer": {
-        "label": "Enter security answer",
-        "errors": {
-          "required": "Security answer is required"
-        }
-      },
-      "phone": {
-        "label": "Enter telephone number"
-      },
-      "currentPassword": {
-        "label": "Enter current password",
-        "errors": {
-          "required": "Required if Changing Email"
-        }
-      },
-      "sendInvite": {
-        "label": "Send Email Invite"
-      }
-    },
-    "alerts": {
-      "resetEmailSent": "A password reset email has been sent to the user's email address."
-    },
-    "profile": {
-      "tabs": {
-        "details": "Details",
-        "securityQuestion": "Security Question",
-        "password": "Password"
-      },
-      "alerts": {
-        "detailsUpdated": "Profile updated successfully",
-        "securtyQuestionUpdated": "Security question updated successfully",
-        "passwordUpdated": "Password updated successfully"
-      }
-    }
-  },
-  "apps": {
-    "manageApplications": "Manage Applications",
-    "manage": "Manage",
-    "import": "Import",
-    "search": "Search",
-    "deleteApp": "Delete app",
-    "deleteSelectedApps": "Delete selected apps",
-    "launchApp": "Launch app",
-    "createSuccess": "App created successfully",
-    "updateSuccess": "App successfully updated",
-    "sampleApps": {
-      "label": "Sample Apps",
-      "options": {
-        "android": "Android",
-        "iosObjectiveC": "iOS Objective-C",
-        "iosSwift": "iOS Swift",
-        "javascript": "JavaScript",
-        "angularJs": "AngularJS",
-        "angular2": "Angular 2",
-        "ionic": "Ionic",
-        "Titanium": "Titanium",
-        "ReactJS": "ReactJS",
-        "dotnet": ".NET"
-      }
-    },
-    "createApp": {
-      "applicationName": {
-        "label": "Application Name",
-        "tooltip": {
-          "label": "Display Name",
-          "text": "The display name or label for your app, seen by users of the app in the LaunchPad UI."
-        },
-        "error": "Application name required"
-      },
-      "defaultRoleFilter": "Default Role Filter",
-      "description": {
-        "label": "Description",
-        "tooltip": {
-          "text": "The app description, seen by users of the app in the LaunchPad UI."
-        }
-      },
-      "defaultRole": {
-        "label": "Assign a Default Role",
-        "tooltip": {
-          "text": "Unauthenticated or guest users of the app will have this role."
-        },
-        "options": {
-          "noRole": "-- No available filtered roles --"
-        }
-      },
-      "active": "Active",
-      "apiKey": {
-        "label": "The API key for this app is",
-        "copy": "Copy API Key"
-      },
-      "appLocation": {
-        "label": "App Location",
-        "tooltip": {
-          "text": "Select File Storage if you want to store your app code on your DreamFactory instance or some other remote file storage. Select Native for native apps or running the app from code on your local machine (CORS required). Select URL to specify a URL for your app."
-        },
-        "options": {
-          "noStorage": "No Storage Required - remote device, client, or desktop.",
-          "fileStorage": {
-            "label": "On a provisioned file storage service.",
-            "storageService": {
-              "label": "Storage Service",
-              "tooltip": "Where to store the files for your app.",
-              "options": {
-                "file": "Local File Storage",
-                "log": "Local Log Storage"
-              }
-            },
-            "storageFolder": {
-              "label": "Storage Folder",
-              "tooltip": "The folder on the selected storage service.",
-              "placeholder": "Enter Storage Container"
-            },
-            "launchPath": {
-              "label": "Launch Path",
-              "tooltip": "The is the file to load when your app is run. Default is index.html.",
-              "placeholder": "Enter default path and file to launch."
-            }
-          },
-          "webServer": {
-            "label": "On this web server.",
-            "pathToApp": {
-              "label": "Path to Application",
-              "tooltip": "The is the file to load when your app is run. Default is index.html."
-            }
-          },
-          "remoteUrl": {
-            "label": "On a remote URL.",
-            "url": {
-              "label": "URL to Application",
-              "tooltip": "Applications can consist of only a URL. This could be an app on some other server or a web site URL."
-            }
-          },
-          "urlPath": {
-            "label": "The URL for this app is:",
-            "copy": "Copy URL"
-          }
-        }
-      }
-    },
-    "importApp": {
-      "title": "Import Application",
-      "subtitle": "Select App Package File",
-      "description": "Select one of the sample apps below, enter the URL for a package file, or browse for a local package file. Click 'Import' to add the app to your DreamFactory instance.",
-      "url": {
-        "label": "Package URL",
-        "placeholder": "Enter URL to package file"
-      },
-      "optionsPrefix": "Address Book for ",
-      "storageService": "Storage Service (optional)",
-      "storageFolder": "Storage Folder (optional)",
-      "files": "Files",
-      "logs": "Logs",
-      "error": "File or File URL Required"
-    }
-  },
+  "origins": "Origins",
+  "headers": "Headers",
+  "exposedHeaders": "Exposed Headers",
+  "maxAge": "Max Age",
+  "methods": "Methods",
+  "supportsCredentials": "Supports Credentials",
+  "enabled": "Enabled",
+  "component": "Component",
+  "method": "Method",
+  "frequency": "Frequency (defined in minutes)",
+  "payload": "Payload (JSON)",
+  "view": "View",
+  "viewRow": "View row {{id}}",
   "nav": {
     "home": {
       "nav": "Home",
@@ -414,19 +104,21 @@
       },
       "download": { "nav": "Download", "header": "{{nav.home.download.nav}}" }
     },
-    "admin-settings": {
-      "schema": {
-        "header": "Databases",
-        "nav": "Schema"
-      }
-    },
     "api-connections": {
       "nav": "API Connections",
       "api-types": {
         "nav": "API Types",
         "database": {
           "nav": "Database",
-          "header": "{{nav.api-connections.api-types.database.nav}}"
+          "header": "{{nav.api-connections.api-types.database.nav}}",
+          "create": {
+            "nav": "Create Database API",
+            "header": "{{nav.api-connections.api-types.database.create.nav}}"
+          },
+          "edit": {
+            "nav": "{{edit}}",
+            "header": "{{nav.api-connections.api-types.database.edit.nav}}"
+          }
         },
         "custom": {
           "nav": "Custom",
@@ -466,27 +158,7 @@
       },
       "api-docs": {
         "nav": "API Docs",
-        "header": "{{nav.api-connections.api-docs.nav}}",
-        "view": {
-          "system": {
-            "header": "{{nav.api-connections.api-docs.nav}}"
-          },
-          ":name": {
-            "nav": "{{nav.api-connections.api-docs.nav}}"
-          },
-          "name": {
-            "header": "API Docs"
-          }
-        },
-        "table": {
-          "header": {
-            "name": "Service Name",
-            "label": "Label",
-            "description": "Description",
-            "group": "Group",
-            "type": "Type"
-          }
-        }
+        "header": "{{nav.api-connections.api-docs.nav}}"
       }
     },
     "api-security": {
@@ -519,42 +191,16 @@
         "cors": {
           "header": "Cors Configuration",
           "nav": "CORS",
-          "pageTitle": "CORS Overview",
-          "pageSubtitle": "Enter allowed hosts and HTTP verbs. You can enter * for all hosts. Use the * option for development to enable application code running locally on your computer to communicate directly with your DreamFactory instance.",
-          "table": {
-            "headers": {
-              "active": "Active",
-              "id": "ID",
-              "path": "Path",
-              "description": "Description",
-              "maxAge": "Max Age"
-            }
-          },
           "create": {
             "header": "Create Cors Configuration"
           },
           "edit": {
             "header": "Update Cors Configuration"
-          },
-          "formControls": {
-            "path": "Path",
-            "description": "Description",
-            "origins": "Origins",
-            "headers": "Headers",
-            "exposedHeaders": "Exposed Headers",
-            "maxAge": "Max Age",
-            "methods": "Methods",
-            "supportsCredentials": "Supports Credentials",
-            "enabled": "Enabled"
           }
         },
         "cache": {
           "nav": "Cache",
           "header": "{{nav.system-settings.config.cache.nav}}"
-        },
-        "global-lookup-keys": {
-          "nav": "Global Lookup Keys",
-          "header": "{{nav.system-settings.config.global-lookup-keys.nav}}"
         },
         "email-templates": {
           "nav": "Email Templates",
@@ -567,11 +213,21 @@
             "nav": "Edit Email Template",
             "header": "{{nav.system-settings.config.email-templates.edit.nav}}"
           }
+        },
+        "global-lookup-keys": {
+          "nav": "Global Lookup Keys",
+          "header": "{{nav.system-settings.config.global-lookup-keys.nav}}"
         }
       },
       "scheduler": {
         "nav": "Scheduler",
-        "header": "{{nav.system-settings.scheduler.nav}}"
+        "header": "{{nav.system-settings.scheduler.nav}}",
+        "create": {
+          "header": "Create Scheduler"
+        },
+        "edit": {
+          "header": "Update Scheduler"
+        }
       },
       "logs": { "nav": "Logs", "header": "{{nav.system-settings.logs.nav}}" },
       "reporting": {
@@ -607,310 +263,21 @@
         },
         "edit": { "header": "{{edit}}" }
       },
-      "files": { "nav": "{{files}}", "header": "{{files}}" },
-      "scheduler": {
-        "nav": "Scheduler",
-        "header": "{{nav.system-settings.scheduler.nav}}",
-        "create": {
-          "header": "Create a new Scheduled Task"
-        },
-        "edit": {
-          "header": "Update Scheduled Task"
-        },
-        "form": {
-          "label": {
-            "name": "Name",
-            "description": "Description",
-            "active": "Active",
-            "service": "Service",
-            "component": "Component",
-            "method": "Method",
-            "frequency": "Frequency (defined in minutes)",
-            "payload": "Payload (JSON)"
-          }
-        },
-        "table": {
-          "header": {
-            "active": "Active",
-            "id": "ID",
-            "name": "Name",
-            "description": "Description",
-            "service": "Service",
-            "component": "Component",
-            "method": "Method",
-            "frequency": "Frequency",
-            "log": "Log"
-          }
-        }
-      },
-      "profile": { "header": "Profile" },
-      "logout": { "header": "Logout" },
-      "data": { "nav": "{{data}}", "header": "{{data}}" },
-      "package-manager": { "nav": "{{packages}}", "header": "{{packages}}" },
-      "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" }
-    },
-    "admins": {
-      "accessByTabs": "Access by Tabs",
-      "alerts": {
-        "new": "For new Admins you can send an email invite so they can set their own password, or set a password for them now.",
-        "restrictedAdmin": "Restricted admin",
-        "autoRole": "An auto-generated role will be created for this admin.",
-        "roleId": "Role id: {{roleId}}",
-        "createdSuccess": "Admin created successfully",
-        "updateSuccess": "Admin updated successfully",
-        "deleteSuccess": "Admin deleted successfully",
-        "importSuccess": "Admin imported successfully",
-        "exportSuccess": "Admin exported successfully"
-      }
-    },
-    "alerts": {
-      "duplicateEmail": "Email address already exists",
-      "close": "Close alert"
-    },
-    "limits": {
-      "name": "Limit Name",
-      "description": "Description",
-      "limitType": "Limit Type",
-      "limitRate": "Limit Rate",
-      "limitPeriod": "Limit Period",
-      "role": "Role",
-      "service": "Service",
-      "endpoint": "Endpoint",
-      "user": "User",
-      "verb": "Verb",
-      "active": "Active",
-      "invalidForm": "Invalid Form Input",
-      "createSuccessMessage": "Limit successfully created",
-      "updateSuccessMessage": "Limit successfully updated",
-      "deleteSuccessMessage": "Limit successfully deleted",
-      "header": "Limits",
-      "create": {
-        "header": "Create Limit"
-      },
-      "edit": {
-        "header": "Edit Limit"
-      }
-    },
-    "lookupKeys": {
-      "label": "Lookup Keys",
-      "desc": "Lookup keys for service configuration and credentials must be made private.",
-      "noKeys": "No lookup keys."
+      "files": { "nav": "{{files}}", "header": "{{files}}" }
     },
     "profile": { "header": "Profile" },
     "logout": { "header": "Logout" },
-    "roles": { "header": "Roles" },
-    "services": { "header": "Services" },
-    "apps": {
-      "header": "Apps",
-      "create": { "header": "Create Application" },
-      "edit": { "header": "Edit Application" },
-      "import": { "header": "Import Application" }
-    },
-    "users": {
-      "nav": "Users",
-      "header": "Manage Users",
-      "create": { "header": "Create a new user" },
-      "edit": { "header": "Edit" },
-      "alerts": {
-        "new": "For new Users you can send an email invite so they can set their own password, or set a password for them now.",
-        "createdSuccess": "User created successfully",
-        "updateSuccess": "User updated successfully",
-        "deleteSuccess": "User deleted successfully",
-        "importSuccess": "User imported successfully",
-        "exportSuccess": "User exported successfully"
-      }
-    },
-    "api-docs": { "header": "API Docs" },
-    "schema": { "header": "Schema" },
-    "files": { "header": "Files" },
-    "scripts": { "header": "Scripts" },
-    "scheduler": {
-      "header": "Scheduler",
-      "create": {
-        "header": "Create a new Scheduled Task"
-      },
-      "edit": {
-        "header": "Manage Scheduled Task"
-      }
-    },
-    "reports": { "header": "Reports" },
     "data": { "nav": "{{data}}", "header": "{{data}}" },
     "package-manager": { "nav": "{{packages}}", "header": "{{packages}}" },
     "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" }
-  },
-  "admins": {
-    "accessByTabs": "Access by Tabs",
-    "alerts": {
-      "new": "For new Admins you can send an email invite so they can set their own password, or set a password for them now.",
-      "restrictedAdmin": "Restricted admin",
-      "autoRole": "An auto-generated role will be created for this admin.",
-      "roleId": "Role id: {{roleId}}",
-      "createdSuccess": "Admin created successfully",
-      "updateSuccess": "Admin updated successfully",
-      "deleteSuccess": "Admin deleted successfully",
-      "importSuccess": "Admin imported successfully",
-      "exportSuccess": "Admin exported successfully"
-    }
-  },
-  "users": {
-    "alerts": {
-      "new": "For new Users you can send an email invite so they can set their own password, or set a password for them now.",
-      "createdSuccess": "User created successfully",
-      "updateSuccess": "User updated successfully",
-      "deleteSuccess": "User deleted successfully",
-      "importSuccess": "User imported successfully",
-      "exportSuccess": "User exported successfully"
-    }
   },
   "alerts": {
     "duplicateEmail": "Email address already exists",
     "close": "Close alert"
   },
-  "limits": {
-    "name": "Limit Name",
-    "description": "Description",
-    "limitType": "Limit Type",
-    "limitRate": "Limit Rate",
-    "limitPeriod": "Limit Period",
-    "role": "Role",
-    "service": "Service",
-    "endpoint": "Endpoint",
-    "user": "User",
-    "verb": "Verb",
-    "active": "Active",
-    "invalidForm": "Invalid Form Input",
-    "createSuccessMessage": "Limit successfully created",
-    "updateSuccessMessage": "Limit successfully updated",
-    "deleteSuccessMessage": "Limit successfully deleted"
-  },
-  "scheduler": {
-    "logPageTitle": "Scheduler Task Log",
-    "logPageSubtitle": "This interface displays the scheduler task error log.",
-    "taskOverview": "Scheduler Task Overview",
-    "taskOverviewSubtitle": "Scheduler task provide a way to schedule requests to the platform.",
-    "alerts": {
-      "createdSuccess": "Scheduled task created successfully",
-      "updateSuccess": "Scheduled task updated successfully",
-      "deleteSuccess": "Scheduled task deleted successfully"
-    },
-    "cancel": "Cancel",
-    "basic": "Basic",
-    "selectAnOption": "Select an option",
-    "name": "Name",
-    "value": "Value",
-    "private": "Private",
-    "inviteSent": "An email invite has been sent.",
-    "launch": "Launch",
-    "launchApp": "Launch {{appName}}",
-    "lookupKeys": {
-      "label": "Lookup Keys",
-      "desc": "Lookup keys for service configuration and credentials must be made private.",
-      "noKeys": "No lookup keys."
-    },
-    "roles": {
-      "label": "Roles",
-      "role": "Role",
-      "app": "App",
-      "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
-      "noRoles": "No roles assigned."
-    },
-    "system-info": {
-      "subheading": "Displays current system information.",
-      "instance": {
-        "instance": "Instance",
-        "licenseLevel": "License Level",
-        "licenseKey": "License Key",
-        "subscriptionStatus": "Subscription Status",
-        "subscriptionExpirationDate": "Subscription Expiration Date",
-        "systemDatabase": "System Database",
-        "installPath": "Install Path",
-        "logPath": "Log Path",
-        "logMode": "Log Mode",
-        "logLevel": "Log Level",
-        "cacheDriver": "Cache Driver",
-        "demo": "Demo",
-        "instanceId": "Instance ID"
-      },
-      "packages": "Installed Packages",
-      "server": {
-        "heading": "Server",
-        "os": "Operating System",
-        "release": "Release",
-        "host": "Host",
-        "machine": "Machine",
-        "serverApi": "Server API"
-      },
-      "client": {
-        "heading": "Client",
-        "userAgent": "User Agent",
-        "ipAddress": "IP Address",
-        "Locale": "Locale"
-      }
-    }
-  },
-  "cache": {
-    "cache": "Cache",
-    "overview": "Cache Overview",
-    "flushService": "Flush {{serviceName}} Cache",
-    "description": "Flush system-wide cache or per-service caches. Use the cache clearing buttons below to refresh any changes made to your system configuration values.",
-    "flushSystemCache": "Flush System-Wide Cache",
-    "perServiceCaches": "Per-Service Caches"
-  },
-  "emailTemplates": {
-    "description": "Create and edit email templates for User Registration, User Invite, Password Reset, and your custom email services.",
-    "templateName": {
-      "label": "Template Name",
-      "placeholder": "Enter template name",
-      "error": "Template name required"
-    },
-    "templateDescription": {
-      "label": "Template Description",
-      "placeholder": "Enter template description"
-    },
-    "recipient": {
-      "label": "Recipient",
-      "tooltip": "Enter recipient address. Enter multiple addresses separated by comma."
-    },
-    "cc": {
-      "label": "CC",
-      "tooltip": "Enter cc address. Enter multiple addresses separated by comma"
-    },
-    "bcc": {
-      "label": "BCC",
-      "tooltip": "Enter bcc address. Enter multiple addresses separated by comma."
-    },
-    "subject": { "label": "Subject", "placeholder": "Enter email subject" },
-    "attachment": {
-      "label": "Attachment",
-      "tooltip": "You can enter URL for attachment. Enter multiple URLs separated by comma. You can use lookup keys here too. Example: {key1},{key2}.",
-      "placeholder": "Enter email attachment"
-    },
-    "body": "Body",
-    "senderName": {
-      "label": "Sender Name",
-      "placeholder": "Enter sender name"
-    },
-    "senderEmail": {
-      "label": "Sender Email",
-      "placeholder": "Enter sender email"
-    },
-    "replyToName": {
-      "label": "Reply To Name",
-      "placeholder": "Enter reply to name"
-    },
-    "replyToEmail": {
-      "label": "Reply To Email",
-      "placeholder": "Enter reply to email"
-    },
-    "alerts": {
-      "createSuccess": "Email template successfully created",
-      "updateSuccess": "Email template successfully updated"
-    }
-  },
   "lookupKeys": {
     "label": "Lookup Keys",
     "desc": "Lookup keys for service configuration and credentials must be made private.",
-    "noKeys": "No lookup keys.",
-    "fullDesc": "An administrator can create any number of 'key value' pairs attached to DreamFactory. The key values are automatically substituted on the server. For example, you can use Lookup Keys in Email Templates, as parameters in external REST Services, and in the username and password fields to connect to a SQL or NoSQL database. Mark any Lookup Key as private to securely encrypt the key value on the server and hide it in the user interface. Note that Lookup Keys for REST service configuration and credentials must be private."
+    "noKeys": "No lookup keys."
   }
 }

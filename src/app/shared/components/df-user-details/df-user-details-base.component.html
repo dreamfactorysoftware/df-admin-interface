@@ -119,9 +119,7 @@
               *ngFor="let tab of tabs.controls; let i = index"
               [formGroupName]="i">
               <mat-checkbox formControlName="checked">
-                {{
-                  'nav.' + tab.value.title + '.header' | transloco
-                }}</mat-checkbox
+                {{ 'admins.tabs.' + tab.value.title | transloco }}</mat-checkbox
               >
             </ng-container>
           </div>

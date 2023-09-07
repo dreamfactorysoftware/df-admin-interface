@@ -7,7 +7,6 @@ import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { SchedulerTaskData } from '../types/df-scheduler.types';
-import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
 import { MatPaginatorModule } from '@angular/material/paginator';
 import { MatMenuModule } from '@angular/material/menu';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
@@ -19,6 +18,7 @@ import { MatTableModule } from '@angular/material/table';
 import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { Service } from 'src/app/shared/types/service';
 
 @Component({
   selector: 'df-manage-scheduler-table',
@@ -46,7 +46,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
   ],
 })
 export class DfManageSchedulerTableComponent extends DfManageTableComponent<SchedulerTaskData> {
-  userServices: SystemServiceData[];
+  userServices: Service[];
 
   constructor(
     @Inject(SCHEDULER_SERVICE_TOKEN)
@@ -66,12 +66,6 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
       translateService,
       dialog
     );
-
-    this._activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.userServices = data['services'].resource;
-      });
   }
 
   override allowFilter = false;
@@ -80,52 +74,47 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
     {
       columnDef: 'active',
       cell: (row: SchedulerTaskData) => row.isActive,
-      header: 'nav.system-settings.scheduler.table.header.active',
+      header: 'scheduler.table.header.active',
     },
     {
       columnDef: 'id',
       cell: (row: SchedulerTaskData) => row.id,
-      header: 'nav.system-settings.scheduler.table.header.id',
+      header: 'scheduler.table.header.id',
     },
     {
       columnDef: 'name',
       cell: (row: SchedulerTaskData) => row.name,
-      header: 'nav.system-settings.scheduler.table.header.name',
+      header: 'scheduler.table.header.name',
     },
     {
       columnDef: 'description',
       cell: (row: SchedulerTaskData) => row.description,
-      header: 'nav.system-settings.scheduler.table.header.description',
+      header: 'scheduler.table.header.description',
     },
     {
       columnDef: 'service',
-      cell: (row: SchedulerTaskData) => {
-        const service = this.userServices.find(val => {
-          return val.id === row.serviceId;
-        });
-        return service?.name ?? '';
-      },
-      header: 'nav.system-settings.scheduler.table.header.service',
+      cell: (row: SchedulerTaskData) => row.serviceByServiceId.name,
+      header: 'scheduler.table.header.service',
     },
     {
       columnDef: 'component',
       cell: (row: SchedulerTaskData) => row.component,
-      header: 'nav.system-settings.scheduler.table.header.component',
+      header: 'scheduler.table.header.component',
     },
     {
       columnDef: 'method',
       cell: (row: SchedulerTaskData) => row.verb,
-      header: 'nav.system-settings.scheduler.table.header.method',
+      header: 'scheduler.table.header.method',
     },
     {
       columnDef: 'frequency',
       cell: (row: SchedulerTaskData) => row.frequency,
-      header: 'nav.system-settings.scheduler.table.header.frequency',
+      header: 'scheduler.table.header.frequency',
     },
     {
       columnDef: 'log',
       cell: (row: SchedulerTaskData) => !!row.taskLogByTaskId,
-      header: 'nav.system-settings.scheduler.table.header.log',
+      header: 'scheduler.table.header.log',
     },
     {
       columnDef: 'actions',
@@ -144,6 +133,7 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
         verb: val.verb,
         frequency: val.frequency,
         taskLogByTaskId: val.taskLogByTaskId,
+        serviceByServiceId: val.serviceByServiceId,
       };
     });
   }

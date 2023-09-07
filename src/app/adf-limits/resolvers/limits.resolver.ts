@@ -16,8 +16,5 @@ export const limitsResolver =
         related: 'limit_cache_by_limit_id',
       });
     }
-    return limitsService.get<LimitType>(id, {
-      related:
-        'service_by_service_id,role_by_role_id,user_by_user_id,limit_cache_by_limit_id',
-    });
+    return limitsService.get<LimitType>(id);
   };

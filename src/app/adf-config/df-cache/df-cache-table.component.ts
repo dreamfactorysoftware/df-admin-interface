@@ -64,6 +64,8 @@ export class DfCacheTableComponent extends DfManageTableComponent<CacheRow> {
     );
   }
 
+  override allowCreate = false;
+
   override columns = [
     {
       columnDef: 'label',

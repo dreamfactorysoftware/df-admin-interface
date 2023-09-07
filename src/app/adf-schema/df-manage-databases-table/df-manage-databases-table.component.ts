@@ -16,10 +16,7 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { takeUntil } from 'rxjs';
-import {
-  ServiceType,
-  SystemServiceData,
-} from '../../adf-services/services.types';
+import { Service, ServiceType } from 'src/app/shared/types/service';
 
 @Component({
   selector: 'df-manage-databases-table',
@@ -72,7 +69,7 @@ export class DfManageDatabasesTableComponent extends DfManageTableComponent<Data
       });
   }
 
-  services: Partial<SystemServiceData>[];
+  services: Partial<Service>[];
   serviceTypes: Partial<ServiceType>[];
 
   override readOnly = true;

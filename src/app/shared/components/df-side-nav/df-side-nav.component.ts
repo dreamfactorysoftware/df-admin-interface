@@ -68,7 +68,9 @@ export class DfSideNavComponent {
   }
 
   pageHeader() {
-    const segments = this.router.url.replace('/', '').split('/');
+    const url = this.router.url.replace('/', '');
+    if (!url) return;
+    const segments = url.split('/');
     if (/^[+-]?\d+$/.test(segments[segments.length - 1])) {
       segments.pop();
     }

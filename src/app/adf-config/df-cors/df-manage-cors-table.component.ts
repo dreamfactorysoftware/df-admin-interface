@@ -69,27 +69,27 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
     {
       columnDef: 'active',
       cell: (row: CorsConfigData) => row.enabled,
-      header: 'nav.system-settings.config.cors.table.headers.active',
+      header: 'active',
     },
     {
       columnDef: 'id',
       cell: (row: CorsConfigData) => row.id,
-      header: 'nav.system-settings.config.cors.table.headers.id',
+      header: 'id',
     },
     {
       columnDef: 'path',
       cell: (row: CorsConfigData) => row.path,
-      header: 'nav.system-settings.config.cors.table.headers.path',
+      header: 'path',
     },
     {
       columnDef: 'description',
       cell: (row: CorsConfigData) => row.description,
-      header: 'nav.system-settings.config.cors.table.headers.description',
+      header: 'description',
     },
     {
       columnDef: 'maxAge',
       cell: (row: CorsConfigData) => row.maxAge,
-      header: 'nav.system-settings.config.cors.table.headers.maxAge',
+      header: 'maxAge',
     },
     {
       columnDef: 'actions',

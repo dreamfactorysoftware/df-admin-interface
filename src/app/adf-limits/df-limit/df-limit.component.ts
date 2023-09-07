@@ -8,7 +8,6 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { RoleType } from 'src/app/shared/types/role';
-import { SystemServiceData } from 'src/app/adf-services/services/service-data.service';
 import { ROUTES } from 'src/app/core/constants/routes';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 
@@ -90,7 +89,8 @@ export class DfLimitComponent implements OnInit, OnDestroy {
 
   roleDropdownOptions: RoleType[] = [];
   userDropdownOptions: UserProfile[] = [];
-  serviceDropdownOptions: SystemServiceData[] = [];
+  // TODO SystemServiceData[]
+  serviceDropdownOptions: any[] = [];
 
   alertMsg = '';
   showAlert = false;

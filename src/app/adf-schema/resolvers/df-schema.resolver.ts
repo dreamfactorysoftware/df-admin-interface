@@ -1,15 +1,13 @@
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-import {
-  ServiceType,
-  SystemServiceData,
-} from '../../adf-services/services.types';
 import { inject } from '@angular/core';
 import {
   SERVICES_SERVICE_TOKEN,
   SERVICE_TYPES_SERVICE_TOKEN,
 } from '../../core/constants/tokens';
 import { DfDatabaseSchemaService } from '../services/df-database-schema.service';
+import { ServiceType } from 'src/app/shared/types/service';
+import { Service } from 'bonjour';
 
 export const schemaServiceTypeResolver: ResolveFn<
   GenericListResponse<Array<ServiceType>>
@@ -18,7 +16,7 @@ export const schemaServiceTypeResolver: ResolveFn<
 };
 
 export const schemaServiceResolver: ResolveFn<
-  GenericListResponse<Array<SystemServiceData>>
+  GenericListResponse<Array<Service>>
 > = () => {
   return inject(SERVICES_SERVICE_TOKEN).getAll();
 };
