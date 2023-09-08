@@ -20,6 +20,7 @@ import { JsonValidator } from 'src/app/shared/validators/json.validator';
 import { Subject, takeUntil } from 'rxjs';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { API_DOCS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfFunctionUseComponent } from './df-function-use/df-function-use.component';
 
 @Component({
   selector: 'df-field-details',
@@ -27,6 +28,7 @@ import { API_DOCS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
   styleUrls: ['./df-field-details.component.scss'],
   standalone: true,
   imports: [
+    DfFunctionUseComponent,
     ReactiveFormsModule,
     MatSlideToggleModule,
     NgIf,
@@ -101,8 +103,8 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       referenceTable: [{ value: '', disabled: true }],
       referenceField: [{ value: '', disabled: true }],
       validation: ['', JsonValidator],
-      dbFunctionUse: [],
-      picklist: [],
+      dbFunctionUse: this.formBuilder.array([]),
+      picklist: [''], // TODO: maybe add validation for comma separated values here
     });
 
     this.service
@@ -115,9 +117,20 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // TODO: uncomment this block once this component is connected to the table component
     // this.fieldDetailsForm
-    //   .get('referenceTable')
-    //   ?.valueChanges.pipe(takeUntil(this.destroyed$)).subscribe;
+    //   .get('foreignKey')
+    //   ?.valueChanges.pipe(takeUntil(this.destroyed$))
+    //   .subscribe(data => {
+    //     if (data && this.referenceTableDropdownMenuOptions.length === 0) {
+    //       this.service
+    //         .get('serviceName')
+    //         .pipe(takeUntil(this.destroyed$))
+    //         .subscribe((data: any) => {
+    //           this.referenceTableDropdownMenuOptions = data['resource'];
+    //         });
+    //     }
+    //   });
 
     this.fieldDetailsForm
       .get('foreignKey')
@@ -219,6 +232,11 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       });
   }
 
+  ngOnDestroy(): void {
+    this.destroyed$.next();
+    this.destroyed$.complete();
+  }
+
   private addFormField(fieldName: string, required = false): void {
     this.fieldDetailsForm.addControl(fieldName, this.formBuilder.control(''));
   }
@@ -239,8 +257,11 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
     if (value) this.fieldDetailsForm.controls[fieldName].setValue(value);
   }
 
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
+  onSubmit() {
+    console.log('submit form clicked', this.fieldDetailsForm.value);
+  }
+
+  onCancel() {
+    console.log('cancel button clicked');
   }
 }

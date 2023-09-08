@@ -1,0 +1,74 @@
+<div class="keys-accordion">
+  <mat-accordion *ngIf="showAccordion; else dbFunctionUse">
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title> DB Function Use</mat-panel-title>
+        <mat-panel-description
+          >Assign Database Function To Uses Of This Field
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+      <ng-container [ngTemplateOutlet]="dbFunctionUse"></ng-container>
+    </mat-expansion-panel>
+  </mat-accordion>
+
+  <ng-template #dbFunctionUse>
+    <ng-container [formGroup]="rootForm">
+      <ng-container formArrayName="dbFunctionUse">
+        <mat-table [dataSource]="dataSource">
+          <ng-container matColumnDef="uses">
+            <mat-header-cell *matHeaderCellDef>
+              {{ 'uses' | transloco }}
+            </mat-header-cell>
+            <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>{{ 'uses' | transloco }}</mat-label>
+                <mat-select formControlName="uses" multiple>
+                  <mat-option
+                    *ngFor="let option of functionUsesDropdownOptions"
+                    [value]="option.value"
+                    >{{ option.name }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </mat-cell>
+          </ng-container>
+
+          <ng-container matColumnDef="function">
+            <mat-header-cell *matHeaderCellDef>
+              {{ 'function' | transloco }}
+            </mat-header-cell>
+            <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>{{ 'function' | transloco }}</mat-label>
+                <input matInput formControlName="function" />
+              </mat-form-field>
+            </mat-cell>
+          </ng-container>
+
+          <ng-container matColumnDef="actions" stickyEnd>
+            <mat-header-cell *matHeaderCellDef>
+              <button
+                mat-mini-fab
+                color="primary"
+                [attr.aria-label]="'newEntry' | transloco"
+                type="button"
+                (click)="add()">
+                <fa-icon [icon]="faPlus" size="xl"></fa-icon>
+              </button>
+            </mat-header-cell>
+            <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
+              <button mat-icon-button (click)="remove(i)" type="button">
+                <fa-icon [icon]="faTrashCan" size="xs"></fa-icon>
+              </button>
+            </mat-cell>
+          </ng-container>
+          <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+          <mat-row *matRowDef="let row; columns: displayedColumns"></mat-row>
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell" colspan="4">No DB Function Uses</td>
+          </tr>
+        </mat-table>
+      </ng-container>
+    </ng-container>
+  </ng-template>
+</div>
