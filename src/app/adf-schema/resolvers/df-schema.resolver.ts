@@ -28,3 +28,11 @@ export const schemaResolver: ResolveFn<any> = (
   const name = route.paramMap.get('name') as string;
   return inject(DfDatabaseSchemaService).getDatabaseSchemas(name);
 };
+
+export const tableDetailsResolver: ResolveFn<any> = (
+  route: ActivatedRouteSnapshot
+) => {
+  const name = route.paramMap.get('name') as string;
+  const tableName = route.paramMap.get('tableName') as string;
+  return inject(DfDatabaseSchemaService).getTableDetails(name, tableName);
+};

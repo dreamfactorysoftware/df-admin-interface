@@ -1,0 +1,15 @@
+.table-details-form-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+  .flex-50 {
+    width: calc(50% - 0.5rem);
+  }
+
+  &.x-small {
+    .flex-50 {
+      width: 100%;
+    }
+  }
+}

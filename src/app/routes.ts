@@ -52,6 +52,7 @@ import {
   schemaResolver,
   schemaServiceResolver,
   schemaServiceTypeResolver,
+  tableDetailsResolver,
 } from './adf-schema/resolvers/df-schema.resolver';
 import { DfDatabaseSchemaService } from './adf-schema/services/df-database-schema.service';
 import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
@@ -572,6 +573,25 @@ export const routes: Routes = [
             resolve: {
               data: schemaResolver,
             },
+            children: [
+              {
+                path: ROUTES.CREATE,
+                loadComponent: () =>
+                  import(
+                    './adf-schema/df-table-details/df-table-details.component'
+                  ).then(m => m.DfTableDetailsComponent),
+                data: { type: 'create' },
+              },
+              {
+                path: `${ROUTES.EDIT}/:id`,
+                loadComponent: () =>
+                  import(
+                    './adf-schema/df-table-details/df-table-details.component'
+                  ).then(m => m.DfTableDetailsComponent),
+                // resolve: { data: tableDetailsResolver, type: 'edit' },
+                data: { type: 'edit' },
+              },
+            ],
           },
         ],
         providers: [

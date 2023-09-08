@@ -14,9 +14,9 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { DatabaseRowData } from '../df-schema.types';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
+import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
 import { takeUntil } from 'rxjs';
-import { Service, ServiceType } from 'src/app/shared/types/service';
+import { Service, ServiceType } from '../../shared/types/service';
 
 @Component({
   selector: 'df-manage-databases-table',

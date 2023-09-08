@@ -1,0 +1,82 @@
+<form
+  [formGroup]="tableDetailsForm"
+  (ngSubmit)="save()"
+  class="table-details-form-container"
+  [class.x-small]="breakpointService.isXSmallScreen | async">
+  <mat-form-field class="flex-50">
+    <mat-label>
+      <!-- {{
+        'emailTemplates.templateName.label' | transloco
+      }} -->
+      Table Name
+    </mat-label>
+    <input
+      matInput
+      formControlName="name"
+      required
+      placeholder="{{
+        'emailTemplates.templateName.placeholder' | transloco
+      }}" />
+    <mat-error *ngIf="tableDetailsForm.controls['name'].hasError('required')">
+      {{ 'emailTemplates.templateName.error' | transloco }}
+    </mat-error>
+  </mat-form-field>
+
+  <mat-form-field class="flex-50">
+    <mat-label> Alias </mat-label>
+    <input
+      matInput
+      formControlName="alias"
+      placeholder="{{
+        'emailTemplates.templateName.placeholder' | transloco
+      }}" />
+  </mat-form-field>
+  <mat-form-field class="flex-50">
+    <mat-label> Label </mat-label>
+    <input
+      matInput
+      formControlName="label"
+      placeholder="{{
+        'emailTemplates.templateName.placeholder' | transloco
+      }}" />
+  </mat-form-field>
+  <mat-form-field class="flex-50">
+    <mat-label> Plural Label </mat-label>
+    <input
+      matInput
+      formControlName="plural"
+      placeholder="{{
+        'emailTemplates.templateName.placeholder' | transloco
+      }}" />
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label> Description </mat-label>
+    <input
+      matInput
+      formControlName="description"
+      placeholder="{{
+        'emailTemplates.templateName.placeholder' | transloco
+      }}" />
+  </mat-form-field>
+
+  <div style="width: 100%">
+    <h2>Fields</h2>
+    <df-fields-table></df-fields-table>
+  </div>
+
+  <div style="width: 100%; margin-top: 30px">
+    <h2>Relationships</h2>
+    <df-relationships-table></df-relationships-table>
+  </div>
+
+  <div style="width: 100%; margin-top: 30px">
+    <button mat-flat-button type="button" (click)="goBack()">
+      {{ 'cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit">
+      <!-- <span *ngIf="editApp">{{ 'update' | transloco }}</span>
+        <span *ngIf="!editApp">{{ 'save' | transloco }}</span> -->
+      {{ 'save' | transloco }}
+    </button>
+  </div>
+</form>
