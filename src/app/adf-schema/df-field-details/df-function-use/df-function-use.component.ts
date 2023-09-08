@@ -48,7 +48,7 @@ export class DfFunctionUseComponent implements OnInit, OnDestroy {
   rootForm: FormGroup;
   keys: FormArray;
   dataSource: MatTableDataSource<any>;
-  displayedColumns = ['uses', 'function', 'actions'];
+  displayedColumns = ['use', 'function', 'actions'];
   faTrashCan = faTrashCan;
   faPlus = faPlus;
   @Input() showAccordion = true;
@@ -98,7 +98,7 @@ export class DfFunctionUseComponent implements OnInit, OnDestroy {
   add() {
     this.keys.push(
       new FormGroup({
-        uses: new FormControl([''], Validators.required),
+        use: new FormControl([''], Validators.required),
         function: new FormControl(''),
       })
     );

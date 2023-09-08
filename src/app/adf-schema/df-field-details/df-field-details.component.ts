@@ -19,8 +19,9 @@ import { DfLookupKeysComponent } from 'src/app/shared/components/df-lookup-keys/
 import { JsonValidator } from 'src/app/shared/validators/json.validator';
 import { Subject, takeUntil } from 'rxjs';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { API_DOCS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfFunctionUseComponent } from './df-function-use/df-function-use.component';
+import { DatabaseSchemaFieldType } from './df-field-details.types';
 
 @Component({
   selector: 'df-field-details',
@@ -73,9 +74,10 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   ];
 
   referenceTableDropdownMenuOptions: { name: string }[] = [];
+  referenceFieldDropdownMenuOptions: DatabaseSchemaFieldType[] = [];
 
   constructor(
-    @Inject(API_DOCS_SERVICE_TOKEN)
+    @Inject(BASE_SERVICE_TOKEN)
     private service: DfBaseCrudService,
     private formBuilder: FormBuilder,
     private activatedRoute: ActivatedRoute
@@ -106,40 +108,39 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       dbFunctionUse: this.formBuilder.array([]),
       picklist: [''], // TODO: maybe add validation for comma separated values here
     });
-
-    this.service
-      .get('')
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe((data: any) => {
-        console.log('data: ', data);
-        this.referenceTableDropdownMenuOptions = data['resource'];
-      });
   }
 
   ngOnInit(): void {
-    // TODO: uncomment this block once this component is connected to the table component
-    // this.fieldDetailsForm
-    //   .get('foreignKey')
-    //   ?.valueChanges.pipe(takeUntil(this.destroyed$))
-    //   .subscribe(data => {
-    //     if (data && this.referenceTableDropdownMenuOptions.length === 0) {
-    //       this.service
-    //         .get('serviceName')
-    //         .pipe(takeUntil(this.destroyed$))
-    //         .subscribe((data: any) => {
-    //           this.referenceTableDropdownMenuOptions = data['resource'];
-    //         });
-    //     }
-    //   });
+    this.fieldDetailsForm
+      .get('referenceTable')
+      ?.valueChanges.pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        if (data) {
+          this.service
+            .get(`mysql-test/_schema/${data}`) // TODO: modify to insert database name here before /_schema
+            .pipe(takeUntil(this.destroyed$))
+            .subscribe((data: any) => {
+              this.referenceFieldDropdownMenuOptions = data['field'];
+              this.enableFormField('referenceField');
+            });
+        }
+      });
 
     this.fieldDetailsForm
       .get('foreignKey')
       ?.valueChanges.pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         if (data) {
-          this.enableFormField('referenceTable');
+          this.service
+            .get('mysql-test/_schema') // TODO: modify to insert database name here before /_schema
+            .pipe(takeUntil(this.destroyed$))
+            .subscribe((data: any) => {
+              this.enableFormField('referenceTable');
+              this.referenceTableDropdownMenuOptions = data['resource'];
+            });
         } else {
           this.disableFormField('referenceTable');
+          this.disableFormField('referenceField');
         }
       });
 
@@ -258,7 +259,19 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   }
 
   onSubmit() {
-    console.log('submit form clicked', this.fieldDetailsForm.value);
+    if (this.fieldDetailsForm.valid) {
+      this.service
+        .create(
+          { resource: [this.fieldDetailsForm.value] },
+          {
+            snackbarSuccess: 'Database Field successfully created', // TODO: update with translation
+            snackbarError: 'server',
+          },
+          'mysql-test/_schema/test-table/_field' // TODO: modify this url to take database name and table name
+        )
+        .pipe(takeUntil(this.destroyed$))
+        .subscribe();
+    }
   }
 
   onCancel() {

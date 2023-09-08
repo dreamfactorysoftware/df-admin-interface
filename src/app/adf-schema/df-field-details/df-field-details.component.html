@@ -78,14 +78,22 @@
     <mat-form-field>
       <mat-label>Reference Table</mat-label>
       <mat-select formControlName="referenceTable">
-        <mat-option *ngFor="let table of referenceTableDropdownMenuOptions">
+        <mat-option
+          *ngFor="let table of referenceTableDropdownMenuOptions"
+          [value]="table.name">
           {{ table.name }}
         </mat-option>
       </mat-select>
     </mat-form-field>
     <mat-form-field>
       <mat-label>Reference Field</mat-label>
-      <input matInput formControlName="referenceField" />
+      <mat-select formControlName="referenceField">
+        <mat-option
+          *ngFor="let field of referenceFieldDropdownMenuOptions"
+          [value]="field.name"
+          >{{ field.label }}</mat-option
+        >
+      </mat-select>
     </mat-form-field>
     <mat-form-field>
       <mat-label>Validation</mat-label>
