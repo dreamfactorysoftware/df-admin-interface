@@ -50,6 +50,8 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   fieldDetailsForm: FormGroup;
   destroyed$ = new Subject<void>();
 
+  databaseFieldToEdit: DatabaseSchemaFieldType | null;
+
   typeDropdownMenuOptions = [
     'I will manually enter a type',
     'id',
@@ -111,6 +113,61 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    const name = this.activatedRoute.snapshot.paramMap.get('name');
+
+    if (name) {
+      this.service
+        .get(`/mysql-test/_schema/test-table/_field/name`) // TODO: modify to insert database name here before /_schema
+        .pipe(takeUntil(this.destroyed$))
+        .subscribe((data: any) => {
+          this.databaseFieldToEdit = data;
+
+          this.fieldDetailsForm.setValue({
+            name: data.name,
+            alias: data.alias,
+            label: data.label,
+            isVirtual: data.isVirtual,
+            isAggregate: [
+              { value: data.isAggregate, disabled: !!data.isAggregate },
+            ],
+            type: data.type,
+            databaseType: [
+              { value: data.databaseType, disabled: !!data.databaseType },
+            ],
+            length: data.length,
+            precision: [{ value: data.precision, disabled: !!data.precision }],
+            scale: [{ value: data.scale, disabled: !!data.scale }],
+            fixedLength: [
+              { value: data.fixedLength, disabled: !!data.fixedLength },
+            ],
+            supportsMultibyte: [
+              {
+                value: data.supportsMultibyte,
+                disabled: !!data.supportsMultibyte,
+              },
+            ],
+            allowNull: data.allowNull,
+            autoIncrement: data.autoIncrement,
+            defaultValue: data.defaultValue,
+            indexed: data.indexed,
+            unique: data.unique,
+            primaryKey: [
+              { value: data.primaryKey, disabled: !!data.primaryKey },
+            ],
+            foreignKey: data.foreignKey,
+            referenceTable: [
+              { value: data.referenceTable, disabled: !!data.referenceTable },
+            ],
+            referenceField: [
+              { value: data.referenceField, disabled: !!data.referenceField },
+            ],
+            validation: data.validation,
+            dbFunctionUse: this.formBuilder.array(data.dbFunctionUse), // TODO: modify this to accept arrays
+            picklist: data.picklist, // TODO: maybe add validation for comma separated values here
+          });
+        });
+    }
+
     this.fieldDetailsForm
       .get('referenceTable')
       ?.valueChanges.pipe(takeUntil(this.destroyed$))
@@ -275,6 +332,6 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   }
 
   onCancel() {
-    console.log('cancel button clicked');
+    // TODO: add route navigation once table details components is connected
   }
 }
