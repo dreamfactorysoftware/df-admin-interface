@@ -15,13 +15,4 @@ export class DfDatabaseSchemaService {
       },
     });
   }
-
-  getTableDetails(dbName: string, tableName: string) {
-    console.log('getTableDetails', dbName, tableName);
-    // return this.http.get(`${BASE_URL}/${dbName}/_schema/${tableName}`, {
-    //   params: {
-    //     refresh: true,
-    //   },
-    // });
-  }
 }

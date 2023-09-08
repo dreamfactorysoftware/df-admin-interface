@@ -49,10 +49,10 @@ import {
   DfEmailTemplatesResolver,
 } from './adf-config/resolvers/df-email-templates.resolver';
 import {
+  DfTableDetailsResolver,
   schemaResolver,
   schemaServiceResolver,
   schemaServiceTypeResolver,
-  tableDetailsResolver,
 } from './adf-schema/resolvers/df-schema.resolver';
 import { DfDatabaseSchemaService } from './adf-schema/services/df-database-schema.service';
 import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
@@ -566,14 +566,17 @@ export const routes: Routes = [
           },
           {
             path: `${ROUTES.VIEW}/:name`,
-            loadComponent: () =>
-              import(
-                './adf-schema/df-manage-tables-table/df-manage-tables-table.component'
-              ).then(m => m.DfManageTablesTableComponent),
-            resolve: {
-              data: schemaResolver,
-            },
             children: [
+              {
+                path: '',
+                loadComponent: () =>
+                  import(
+                    './adf-schema/df-manage-tables-table/df-manage-tables-table.component'
+                  ).then(m => m.DfManageTablesTableComponent),
+                resolve: {
+                  data: schemaResolver,
+                },
+              },
               {
                 path: ROUTES.CREATE,
                 loadComponent: () =>
@@ -581,6 +584,7 @@ export const routes: Routes = [
                     './adf-schema/df-table-details/df-table-details.component'
                   ).then(m => m.DfTableDetailsComponent),
                 data: { type: 'create' },
+                providers: [...BASE_SERVICE_PROVIDERS],
               },
               {
                 path: `${ROUTES.EDIT}/:id`,
@@ -588,8 +592,8 @@ export const routes: Routes = [
                   import(
                     './adf-schema/df-table-details/df-table-details.component'
                   ).then(m => m.DfTableDetailsComponent),
-                // resolve: { data: tableDetailsResolver, type: 'edit' },
-                data: { type: 'edit' },
+                resolve: { data: DfTableDetailsResolver, type: 'edit' },
+                providers: [...BASE_SERVICE_PROVIDERS],
               },
             ],
           },

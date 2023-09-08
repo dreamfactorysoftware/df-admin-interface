@@ -81,7 +81,13 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
   ];
 
   mapDataToTable(data: any[]): DatabaseTableRowData[] {
-    return data;
+    return data.map((item: any) => {
+      return {
+        label: item.label,
+        name: item.name,
+        id: item.name,
+      };
+    });
   }
   refreshTable(
     limit?: number | undefined,
