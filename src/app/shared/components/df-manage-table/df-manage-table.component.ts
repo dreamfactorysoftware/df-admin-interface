@@ -80,10 +80,10 @@ export abstract class DfManageTableComponent<T>
       this.activatedRoute.data
         .pipe(takeUntil(this.destroyed$))
         .subscribe(({ data }) => {
-          if (data.resource) {
+          if (data && data.resource) {
             this.dataSource.data = this.mapDataToTable(data.resource);
           }
-          if (data.meta) {
+          if (data && data.meta) {
             this.tableLength = data.meta.count;
           }
         });

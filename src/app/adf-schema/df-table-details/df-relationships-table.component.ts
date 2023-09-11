@@ -68,7 +68,8 @@ export class DfRelationshipsTableComponent extends DfManageTableComponent<Relati
     this._activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
-        this.tableName = data['data'].name;
+        this.tableName =
+          data['data'] && data['data'].name ? data['data'].name : '';
       });
 
     this.dbName = this._activatedRoute.snapshot.params['name'];
@@ -78,22 +79,22 @@ export class DfRelationshipsTableComponent extends DfManageTableComponent<Relati
   override columns = [
     {
       columnDef: 'name',
-      header: 'Name',
+      header: 'schema.name',
       cell: (row: RelationshipsRow) => row.name,
     },
     {
       columnDef: 'alias',
-      header: 'Alias',
+      header: 'schema.alias',
       cell: (row: RelationshipsRow) => row.alias,
     },
     {
       columnDef: 'type',
-      header: 'Type',
+      header: 'schema.type',
       cell: (row: RelationshipsRow) => row.type,
     },
     {
       columnDef: 'virtual',
-      header: 'Virtual',
+      header: 'schema.virtual',
       cell: (row: RelationshipsRow) => row.isVirtual,
     },
     {

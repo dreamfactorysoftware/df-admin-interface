@@ -78,6 +78,7 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
             description: data['data'].description,
           });
 
+          this.tableDetailsForm.get('name')?.disable();
           this.tableFields = data['data'].field;
           this.tableRelated = data['data'].related;
         }
@@ -112,7 +113,7 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
         .create(
           payload,
           {
-            snackbarSuccess: 'Table Successfully Created',
+            snackbarSuccess: 'schema.alerts.createSuccess',
             fields: '*',
           },
           `${this.dbName}/_schema`
@@ -123,7 +124,9 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
         });
     } else if (this.type === 'edit') {
       this.crudService
-        .patch(`${this.dbName}/_schema/${data.name}`, data)
+        .patch(`${this.dbName}/_schema/${data.name}`, data, {
+          snackbarSuccess: 'schema.alerts.updateSuccess',
+        })
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.goBack();

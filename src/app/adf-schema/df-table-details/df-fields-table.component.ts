@@ -68,47 +68,47 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
     this._activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
-        this.tableName = data['data'].name;
+        this.tableName =
+          data['data'] && data['data'].name ? data['data'].name : '';
       });
 
     this.dbName = this._activatedRoute.snapshot.params['name'];
   }
 
-  //   TODO add header translations
   override columns = [
     {
       columnDef: 'name',
-      header: 'Name',
+      header: 'schema.name',
       cell: (row: FieldsRow) => row.name,
     },
     {
       columnDef: 'alias',
-      header: 'Alias',
+      header: 'schema.alias',
       cell: (row: FieldsRow) => row.alias,
     },
     {
       columnDef: 'type',
-      header: 'Type',
+      header: 'schema.type',
       cell: (row: FieldsRow) => row.type,
     },
     {
       columnDef: 'virtual',
-      header: 'Virtual',
+      header: 'schema.virtual',
       cell: (row: FieldsRow) => row.isVirtual,
     },
     {
       columnDef: 'aggregate',
-      header: 'Aggregate',
+      header: 'schema.aggregate',
       cell: (row: FieldsRow) => row.isAggregate,
     },
     {
       columnDef: 'required',
-      header: 'Required',
+      header: 'schema.required',
       cell: (row: FieldsRow) => row.required,
     },
     {
       columnDef: 'constraints',
-      header: 'Constraints',
+      header: 'schema.constraints',
       cell: (row: FieldsRow) => row.constraints,
     },
     {
@@ -132,9 +132,9 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
 
   getFieldConstraints(field: TableField) {
     if (field.isPrimaryKey) {
-      return 'Primary Key';
+      return 'schema.primaryKey';
     } else if (field.isForeignKey) {
-      return 'Foreign Key';
+      return 'schema.foreignKey';
     }
 
     return '';
@@ -149,7 +149,6 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
       .delete(`${this.dbName}/_schema/${this.tableName}/_field/${row.name}`)
       .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
-        console.log('DELETE');
         this.refreshTable();
       });
     // TODO: implement error handling

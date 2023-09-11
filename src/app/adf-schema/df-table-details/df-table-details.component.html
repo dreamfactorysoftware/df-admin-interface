@@ -5,70 +5,62 @@
   [class.x-small]="breakpointService.isXSmallScreen | async">
   <mat-form-field class="flex-50">
     <mat-label>
-      <!-- {{
-        'emailTemplates.templateName.label' | transloco
-      }} -->
-      Table Name {{ type === 'edit' }}
+      {{ 'schema.tableName' | transloco }}
     </mat-label>
     <input
       matInput
       formControlName="name"
       required
-      placeholder="{{ 'emailTemplates.templateName.placeholder' | transloco }}"
-      [disabled]="type !== 'create'" />
+      placeholder="{{ 'schema.enter.tableName' | transloco }}" />
     <mat-error *ngIf="tableDetailsForm.controls['name'].hasError('required')">
-      {{ 'emailTemplates.templateName.error' | transloco }}
+      {{ 'schema.alert.tableNameError' | transloco }}
     </mat-error>
   </mat-form-field>
 
   <mat-form-field class="flex-50">
-    <mat-label> Alias </mat-label>
+    <mat-label>
+      {{ 'schema.alias' | transloco }}
+    </mat-label>
     <input
       matInput
       formControlName="alias"
-      placeholder="{{
-        'emailTemplates.templateName.placeholder' | transloco
-      }}" />
+      placeholder="{{ 'schema.enter.alias' | transloco }}" />
   </mat-form-field>
   <mat-form-field class="flex-50">
-    <mat-label> Label </mat-label>
+    <mat-label>
+      {{ 'schema.label' | transloco }}
+    </mat-label>
     <input
       matInput
       formControlName="label"
-      placeholder="{{
-        'emailTemplates.templateName.placeholder' | transloco
-      }}" />
+      placeholder="{{ 'schema.enter.label' | transloco }}" />
   </mat-form-field>
   <mat-form-field class="flex-50">
-    <mat-label> Plural Label </mat-label>
+    <mat-label> {{ 'schema.plural' | transloco }} </mat-label>
     <input
       matInput
       formControlName="plural"
-      placeholder="{{
-        'emailTemplates.templateName.placeholder' | transloco
-      }}" />
+      placeholder="{{ 'schema.enter.plural' | transloco }}" />
   </mat-form-field>
   <mat-form-field>
-    <mat-label> Description </mat-label>
+    <mat-label> {{ 'schema.description' | transloco }} </mat-label>
     <input
       matInput
       formControlName="description"
-      placeholder="{{
-        'emailTemplates.templateName.placeholder' | transloco
-      }}" />
+      placeholder="{{ 'schema.enter.description' | transloco }}" />
   </mat-form-field>
 
-  <div style="width: 100%">
-    <h2>Fields</h2>
+  <div class="flex-100">
+    <h2>{{ 'schema.fields' | transloco }}</h2>
     <df-fields-table [tableData]="tableFields"></df-fields-table>
   </div>
 
-  <div style="width: 100%; margin-top: 30px">
-    <h2>Relationships</h2>
+  <div class="flex-100 margin-2-0">
+    <h2>{{ 'schema.relationships' | transloco }}</h2>
     <df-relationships-table [tableData]="tableRelated"></df-relationships-table>
   </div>
 
-  <div style="width: 100%; margin-top: 30px">
+  <div class="flex-100">
     <button mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>

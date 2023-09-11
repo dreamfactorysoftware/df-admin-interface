@@ -603,6 +603,7 @@ export const routes: Routes = [
           ...SERVICES_SERVICE_PROVIDERS,
           ...SERVICE_TYPES_SERVICE_PROVIDERS,
           DfDatabaseSchemaService,
+          provideTranslocoScope('schema'),
         ],
       },
       {

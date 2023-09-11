@@ -252,7 +252,11 @@
       },
       "schema": {
         "nav": "Schema",
-        "header": "{{nav.admin-settings.schema.nav}}"
+        "header": "{{nav.admin-settings.schema.nav}}",
+        "create": {
+          "nav": "Create a table",
+          "header": "{{nav.admin-settings.schema.create.nav}}"
+        }
       },
       "users": {
         "nav": "Users",
