@@ -8,15 +8,14 @@
       <!-- {{
         'emailTemplates.templateName.label' | transloco
       }} -->
-      Table Name
+      Table Name {{ type === 'edit' }}
     </mat-label>
     <input
       matInput
       formControlName="name"
       required
-      placeholder="{{
-        'emailTemplates.templateName.placeholder' | transloco
-      }}" />
+      placeholder="{{ 'emailTemplates.templateName.placeholder' | transloco }}"
+      [disabled]="type !== 'create'" />
     <mat-error *ngIf="tableDetailsForm.controls['name'].hasError('required')">
       {{ 'emailTemplates.templateName.error' | transloco }}
     </mat-error>
@@ -61,12 +60,12 @@
 
   <div style="width: 100%">
     <h2>Fields</h2>
-    <df-fields-table></df-fields-table>
+    <df-fields-table [tableData]="tableFields"></df-fields-table>
   </div>
 
   <div style="width: 100%; margin-top: 30px">
     <h2>Relationships</h2>
-    <df-relationships-table></df-relationships-table>
+    <df-relationships-table [tableData]="tableRelated"></df-relationships-table>
   </div>
 
   <div style="width: 100%; margin-top: 30px">
@@ -74,9 +73,8 @@
       {{ 'cancel' | transloco }}
     </button>
     <button mat-flat-button color="primary" type="submit">
-      <!-- <span *ngIf="editApp">{{ 'update' | transloco }}</span>
-        <span *ngIf="!editApp">{{ 'save' | transloco }}</span> -->
-      {{ 'save' | transloco }}
+      <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
+      <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
     </button>
   </div>
 </form>
