@@ -53,7 +53,6 @@ export class DfFunctionUseComponent implements OnInit, OnDestroy {
   faPlus = faPlus;
   @Input() showAccordion = true;
 
-  // TODO: add translation to the name attribute of these objects
   functionUsesDropdownOptions = [
     {
       name: 'SELECT (get)',

@@ -1,35 +1,42 @@
-<!-- TODO: add translation to this file -->
 <div>
   <form [formGroup]="fieldDetailsForm">
     <mat-form-field>
-      <mat-label>Name</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.name' | transloco
+      }}</mat-label>
       <input matInput formControlName="name" />
       <mat-error
         *ngIf="
           this.fieldDetailsForm.controls['name'].errors &&
           this.fieldDetailsForm.controls['name'].errors['required']
         ">
-        Name is a required field
+        {{ 'schema.fieldDetailsForm.errors.name' | transloco }}
       </mat-error>
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Alias</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.alias' | transloco
+      }}</mat-label>
       <input matInput formControlName="alias" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Label</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.label' | transloco
+      }}</mat-label>
       <input matInput formControlName="label" />
     </mat-form-field>
     <div class="slide-toggle-container">
-      <mat-slide-toggle formControlName="isVirtual"
-        >Is Virtual?</mat-slide-toggle
-      >
-      <mat-slide-toggle formControlName="isAggregate"
-        >Is Aggregate?</mat-slide-toggle
-      >
+      <mat-slide-toggle formControlName="isVirtual">{{
+        'schema.fieldDetailsForm.controls.isVirtual' | transloco
+      }}</mat-slide-toggle>
+      <mat-slide-toggle formControlName="isAggregate">{{
+        'schema.fieldDetailsForm.controls.isAggregate' | transloco
+      }}</mat-slide-toggle>
     </div>
     <mat-form-field>
-      <mat-label>Type</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.type' | transloco
+      }}</mat-label>
       <mat-select formControlName="type">
         <mat-option
           *ngFor="let option of typeDropdownMenuOptions"
@@ -39,51 +46,67 @@
       </mat-select>
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Database Type</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.databaseType' | transloco
+      }}</mat-label>
       <input matInput formControlName="dbType" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Length</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.length' | transloco
+      }}</mat-label>
       <input type="number" matInput formControlName="length" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Precision</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.precision' | transloco
+      }}</mat-label>
       <input type="number" matInput formControlName="precision" />
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Scale</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.scale' | transloco
+      }}</mat-label>
       <input type="number" matInput formControlName="scale" />
     </mat-form-field>
     <div class="slide-toggle-container">
-      <mat-slide-toggle formControlName="fixedLength"
-        >Fixed Length</mat-slide-toggle
-      >
-      <mat-slide-toggle formControlName="supportsMultibyte"
-        >Supports Multibyte</mat-slide-toggle
-      >
-      <mat-slide-toggle formControlName="allowNull"
-        >Allow Null</mat-slide-toggle
-      >
-      <mat-slide-toggle formControlName="autoIncrement"
-        >Auto Increment</mat-slide-toggle
-      >
+      <mat-slide-toggle formControlName="fixedLength">{{
+        'schema.fieldDetailsForm.controls.fixedLength' | transloco
+      }}</mat-slide-toggle>
+      <mat-slide-toggle formControlName="supportsMultibyte">{{
+        'schema.fieldDetailsForm.controls.supportsMultibyte' | transloco
+      }}</mat-slide-toggle>
+      <mat-slide-toggle formControlName="allowNull">{{
+        'schema.fieldDetailsForm.controls.allowNull' | transloco
+      }}</mat-slide-toggle>
+      <mat-slide-toggle formControlName="autoIncrement">{{
+        'schema.fieldDetailsForm.controls.autoIncrement' | transloco
+      }}</mat-slide-toggle>
     </div>
     <mat-form-field>
-      <mat-label>Default Value</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.defaultValue' | transloco
+      }}</mat-label>
       <input matInput formControlName="default" />
     </mat-form-field>
     <div class="slide-toggle-container">
-      <mat-slide-toggle formControlName="isIndex">Indexed</mat-slide-toggle>
-      <mat-slide-toggle formControlName="isUnique">Unique</mat-slide-toggle>
-      <mat-slide-toggle formControlName="isPrimaryKey"
-        >Primary Key</mat-slide-toggle
-      >
-      <mat-slide-toggle formControlName="isForeignKey"
-        >Foreign Key</mat-slide-toggle
-      >
+      <mat-slide-toggle formControlName="isIndex">{{
+        'schema.fieldDetailsForm.controls.isIndex' | transloco
+      }}</mat-slide-toggle>
+      <mat-slide-toggle formControlName="isUnique">{{
+        'schema.fieldDetailsForm.controls.isUnique' | transloco
+      }}</mat-slide-toggle>
+      <mat-slide-toggle formControlName="isPrimaryKey">{{
+        'schema.fieldDetailsForm.controls.isPrimaryKey' | transloco
+      }}</mat-slide-toggle>
+      <mat-slide-toggle formControlName="isForeignKey">{{
+        'schema.fieldDetailsForm.controls.isForeignKey' | transloco
+      }}</mat-slide-toggle>
     </div>
     <mat-form-field>
-      <mat-label>Reference Table</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.refTable' | transloco
+      }}</mat-label>
       <mat-select formControlName="refTable">
         <mat-option
           *ngFor="let table of referenceTableDropdownMenuOptions"
@@ -93,7 +116,9 @@
       </mat-select>
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Reference Field</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.refField' | transloco
+      }}</mat-label>
       <mat-select formControlName="refField">
         <mat-option
           *ngFor="let field of referenceFieldDropdownMenuOptions"
@@ -103,7 +128,9 @@
       </mat-select>
     </mat-form-field>
     <mat-form-field>
-      <mat-label>Validation</mat-label>
+      <mat-label>{{
+        'schema.fieldDetailsForm.controls.validation' | transloco
+      }}</mat-label>
       <textarea
         matInput
         rows="4"
@@ -114,19 +141,21 @@
           this.fieldDetailsForm.controls['validation'].errors &&
           this.fieldDetailsForm.controls['validation'].errors['jsonInvalid']
         ">
-        Enter valid JSON here
+        {{ 'schema.fieldDetailsForm.errors.json' | transloco }}
       </mat-error>
     </mat-form-field>
     <df-function-use formArrayName="dbFunction"></df-function-use>
     <ng-container *ngIf="this.fieldDetailsForm.controls['picklist']"
       ><mat-form-field>
-        <mat-label>Picklist</mat-label>
+        <mat-label>{{
+          'schema.fieldDetailsForm.controls.picklist' | transloco
+        }}</mat-label>
         <input matInput formControlName="picklist" /> </mat-form-field
     ></ng-container>
   </form>
   <div>
     <button mat-raised-button color="primary" (click)="onSubmit()">
-      {{ databaseFieldToEdit ? 'Update' : 'Add' }} Field
+      {{ (databaseFieldToEdit ? 'save' : 'create') | transloco }} Field
     </button>
     <button mat-raised-button (click)="onCancel()">Cancel</button>
   </div>

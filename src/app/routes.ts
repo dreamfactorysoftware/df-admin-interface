@@ -574,14 +574,18 @@ export const routes: Routes = [
             },
           },
           {
-            path: 'addFields', // TODO: this is a temporary route for dev, update when ready
+            path: 'fields', // TODO: this is a temporary route for dev, change name from addFields to fields
             loadComponent: () =>
               import(
                 './adf-schema/df-field-details/df-field-details.component'
               ).then(m => m.DfFieldDetailsComponent),
-            // resolve: {
-            //   data: schemaResolver,
-            // },
+          },
+          {
+            path: 'fields/:name', // TODO: this is a temporary route for dev, change name from addFields to fields
+            loadComponent: () =>
+              import(
+                './adf-schema/df-field-details/df-field-details.component'
+              ).then(m => m.DfFieldDetailsComponent),
           },
         ],
         providers: [
@@ -589,6 +593,7 @@ export const routes: Routes = [
           ...SERVICE_TYPES_SERVICE_PROVIDERS,
           ...BASE_SERVICE_PROVIDERS,
           DfDatabaseSchemaService,
+          provideTranslocoScope('schema'),
         ],
       },
       {

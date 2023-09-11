@@ -252,7 +252,14 @@
       },
       "schema": {
         "nav": "Schema",
-        "header": "{{nav.admin-settings.schema.nav}}"
+        "header": "{{nav.admin-settings.schema.nav}}",
+        "fields": {
+          "nav": "Update Schema Field",
+          "header": "Create Schema Field",
+          "name": {
+            "header": "{{nav.admin-settings.schema.fields.nav}}"
+          }
+        }
       },
       "users": {
         "nav": "Users",

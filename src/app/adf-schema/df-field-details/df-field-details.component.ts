@@ -118,9 +118,9 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    const name = this.activatedRoute.snapshot.paramMap.get('name');
+    const fieldName = this.activatedRoute.snapshot.paramMap.get('name');
 
-    if (name) {
+    if (fieldName) {
       this.service
         .get(`/mysql-test/_schema/test-table/_field/active`) // TODO: modify to insert database name here before /_schema
         .pipe(takeUntil(this.destroyed$))
@@ -150,7 +150,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
             refTable: data.refTable,
             refField: data.refField,
             validation: data.validation ?? '',
-            picklist: data.picklist, // TODO: maybe add validation for comma separated values here
+            picklist: data.picklist,
           });
 
           if (data.dbFunction.length > 0) {
@@ -325,7 +325,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
             'mysql-test/_schema/test-table/_field', // TODO: modify this url to take database name and table name)
             { resource: [this.fieldDetailsForm.value] },
             {
-              snackbarSuccess: 'Database field successfully updated', // TODO: update with translation
+              snackbarSuccess: 'schema.fieldDetailsForm.updateSuccess',
               snackbarError: 'server',
             }
           )
@@ -336,7 +336,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
           .create(
             { resource: [this.fieldDetailsForm.value] },
             {
-              snackbarSuccess: 'Database field successfully created', // TODO: update with translation
+              snackbarSuccess: 'schema.fieldDetailsForm.createSuccess',
               snackbarError: 'server',
             },
             'mysql-test/_schema/test-table/_field' // TODO: modify this url to take database name and table name
