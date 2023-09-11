@@ -24,6 +24,7 @@ import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfFunctionUseComponent } from './df-function-use/df-function-use.component';
 import { DatabaseSchemaFieldType } from './df-field-details.types';
+import { CsvValidator } from '../validators/csv.validator';
 
 @Component({
   selector: 'df-field-details',
@@ -113,7 +114,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       refField: [{ value: '', disabled: true }],
       validation: ['', JsonValidator],
       dbFunction: this.formBuilder.array([]),
-      picklist: [''], // TODO: maybe add validation for comma separated values here
+      picklist: ['', CsvValidator],
     });
   }
 
@@ -319,31 +320,38 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
     // TODO: add navigation to table details component on create/update operation success
 
     if (this.fieldDetailsForm.valid) {
-      if (this.databaseFieldToEdit) {
-        this.service
-          .update(
-            'mysql-test/_schema/test-table/_field', // TODO: modify this url to take database name and table name)
-            { resource: [this.fieldDetailsForm.value] },
-            {
-              snackbarSuccess: 'schema.fieldDetailsForm.updateSuccess',
-              snackbarError: 'server',
-            }
-          )
-          .pipe(takeUntil(this.destroyed$))
-          .subscribe();
-      } else {
-        this.service
-          .create(
-            { resource: [this.fieldDetailsForm.value] },
-            {
-              snackbarSuccess: 'schema.fieldDetailsForm.createSuccess',
-              snackbarError: 'server',
-            },
-            'mysql-test/_schema/test-table/_field' // TODO: modify this url to take database name and table name
-          )
-          .pipe(takeUntil(this.destroyed$))
-          .subscribe();
-      }
+      console.log('valid: ', this.fieldDetailsForm.value);
+
+      //   if (this.databaseFieldToEdit) {
+      //     this.service
+      //       .update(
+      //         'mysql-test/_schema/test-table/_field', // TODO: modify this url to take database name and table name)
+      //         { resource: [this.fieldDetailsForm.value] },
+      //         {
+      //           snackbarSuccess: 'schema.fieldDetailsForm.updateSuccess',
+      //           snackbarError: 'server',
+      //         }
+      //       )
+      //       .pipe(takeUntil(this.destroyed$))
+      //       .subscribe();
+      //   } else {
+      //     this.service
+      //       .create(
+      //         { resource: [this.fieldDetailsForm.value] },
+      //         {
+      //           snackbarSuccess: 'schema.fieldDetailsForm.createSuccess',
+      //           snackbarError: 'server',
+      //         },
+      //         'mysql-test/_schema/test-table/_field' // TODO: modify this url to take database name and table name
+      //       )
+      //       .pipe(takeUntil(this.destroyed$))
+      //       .subscribe();
+      //   }
+    } else {
+      console.log(
+        'errors: ',
+        this.fieldDetailsForm.controls['picklist'].errors
+      );
     }
   }
 
