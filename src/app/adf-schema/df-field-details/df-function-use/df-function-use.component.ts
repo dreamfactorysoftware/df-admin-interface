@@ -57,19 +57,19 @@ export class DfFunctionUseComponent implements OnInit, OnDestroy {
   functionUsesDropdownOptions = [
     {
       name: 'SELECT (get)',
-      value: 'select',
+      value: 'SELECT',
     },
     {
       name: 'FILTER (get)',
-      value: 'filter',
+      value: 'FILTER',
     },
     {
       name: 'INSERT (post)',
-      value: 'insert',
+      value: 'INSERT',
     },
     {
       name: 'UPDATE (patch)',
-      value: 'update',
+      value: 'UPDATE',
     },
   ];
 
@@ -82,7 +82,7 @@ export class DfFunctionUseComponent implements OnInit, OnDestroy {
       .subscribe(() => {
         this.keys.markAllAsTouched();
       });
-    this.keys = this.rootForm.get('dbFunctionUse') as FormArray;
+    this.keys = this.rootForm.get('dbFunction') as FormArray;
     this.updateDataSource();
   }
 

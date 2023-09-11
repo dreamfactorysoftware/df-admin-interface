@@ -13,7 +13,7 @@
 
   <ng-template #dbFunctionUse>
     <ng-container [formGroup]="rootForm">
-      <ng-container formArrayName="dbFunctionUse">
+      <ng-container formArrayName="dbFunction">
         <mat-table [dataSource]="dataSource">
           <ng-container matColumnDef="use">
             <mat-header-cell *matHeaderCellDef>
@@ -22,7 +22,7 @@
             <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
               <mat-form-field subscriptSizing="dynamic">
                 <mat-label>{{ 'use' | transloco }}</mat-label>
-                <mat-select formControlName="uses" multiple>
+                <mat-select formControlName="use" multiple>
                   <mat-option
                     *ngFor="let option of functionUsesDropdownOptions"
                     [value]="option.value"

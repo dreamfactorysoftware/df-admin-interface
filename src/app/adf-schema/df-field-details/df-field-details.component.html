@@ -4,6 +4,13 @@
     <mat-form-field>
       <mat-label>Name</mat-label>
       <input matInput formControlName="name" />
+      <mat-error
+        *ngIf="
+          this.fieldDetailsForm.controls['name'].errors &&
+          this.fieldDetailsForm.controls['name'].errors['required']
+        ">
+        Name is a required field
+      </mat-error>
     </mat-form-field>
     <mat-form-field>
       <mat-label>Alias</mat-label>
@@ -37,15 +44,15 @@
     </mat-form-field>
     <mat-form-field>
       <mat-label>Length</mat-label>
-      <input matInput formControlName="length" />
+      <input type="number" matInput formControlName="length" />
     </mat-form-field>
     <mat-form-field>
       <mat-label>Precision</mat-label>
-      <input matInput formControlName="precision" />
+      <input type="number" matInput formControlName="precision" />
     </mat-form-field>
     <mat-form-field>
       <mat-label>Scale</mat-label>
-      <input matInput formControlName="scale" />
+      <input type="number" matInput formControlName="scale" />
     </mat-form-field>
     <div class="slide-toggle-container">
       <mat-slide-toggle formControlName="fixedLength"
@@ -102,8 +109,15 @@
         rows="4"
         cols="6"
         formControlName="validation"></textarea>
+      <mat-error
+        *ngIf="
+          this.fieldDetailsForm.controls['validation'].errors &&
+          this.fieldDetailsForm.controls['validation'].errors['jsonInvalid']
+        ">
+        Enter valid JSON here
+      </mat-error>
     </mat-form-field>
-    <df-function-use formArrayName="dbFunctionUse"></df-function-use>
+    <df-function-use formArrayName="dbFunction"></df-function-use>
     <ng-container *ngIf="this.fieldDetailsForm.controls['picklist']"
       ><mat-form-field>
         <mat-label>Picklist</mat-label>

@@ -1,7 +1,9 @@
 import { NgIf, NgFor, AsyncPipe } from '@angular/common';
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import {
+  FormArray,
   FormBuilder,
+  FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators,
@@ -51,6 +53,9 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   destroyed$ = new Subject<void>();
 
   databaseFieldToEdit: DatabaseSchemaFieldType | null;
+
+  @ViewChild(DfFunctionUseComponent)
+  dbFunctions!: DfFunctionUseComponent;
 
   typeDropdownMenuOptions = [
     'I will manually enter a type',
@@ -107,7 +112,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       refTable: [{ value: '', disabled: true }],
       refField: [{ value: '', disabled: true }],
       validation: ['', JsonValidator],
-      dbFunctionUse: this.formBuilder.array([]),
+      dbFunction: this.formBuilder.array([]),
       picklist: [''], // TODO: maybe add validation for comma separated values here
     });
   }
@@ -122,9 +127,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
         .subscribe((data: any) => {
           this.databaseFieldToEdit = data;
 
-          console.log('field to edit: ', this.databaseFieldToEdit);
-
-          this.fieldDetailsForm.setValue({
+          this.fieldDetailsForm.patchValue({
             name: data.name,
             alias: data.alias,
             label: data.label,
@@ -147,9 +150,21 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
             refTable: data.refTable,
             refField: data.refField,
             validation: data.validation ?? '',
-            dbFunctionUse: this.formBuilder.array([]), //this.formBuilder.array(data.dbFunctionUse), // TODO: modify this to accept arrays
             picklist: data.picklist, // TODO: maybe add validation for comma separated values here
           });
+
+          if (data.dbFunction.length > 0) {
+            data.dbFunction.forEach((item: any) => {
+              (this.fieldDetailsForm.controls['dbFunction'] as FormArray).push(
+                new FormGroup({
+                  use: new FormControl(item.use, Validators.required),
+                  function: new FormControl(item.function),
+                })
+              );
+            });
+
+            this.dbFunctions.updateDataSource();
+          }
         });
     }
 
@@ -280,7 +295,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
     this.destroyed$.complete();
   }
 
-  private addFormField(fieldName: string, required = false): void {
+  private addFormField(fieldName: string): void {
     this.fieldDetailsForm.addControl(fieldName, this.formBuilder.control(''));
   }
 
@@ -301,18 +316,34 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   }
 
   onSubmit() {
+    // TODO: add navigation to table details component on create/update operation success
+
     if (this.fieldDetailsForm.valid) {
-      this.service
-        .create(
-          { resource: [this.fieldDetailsForm.value] },
-          {
-            snackbarSuccess: 'Database Field successfully created', // TODO: update with translation
-            snackbarError: 'server',
-          },
-          'mysql-test/_schema/test-table/_field' // TODO: modify this url to take database name and table name
-        )
-        .pipe(takeUntil(this.destroyed$))
-        .subscribe();
+      if (this.databaseFieldToEdit) {
+        this.service
+          .update(
+            'mysql-test/_schema/test-table/_field', // TODO: modify this url to take database name and table name)
+            { resource: [this.fieldDetailsForm.value] },
+            {
+              snackbarSuccess: 'Database field successfully updated', // TODO: update with translation
+              snackbarError: 'server',
+            }
+          )
+          .pipe(takeUntil(this.destroyed$))
+          .subscribe();
+      } else {
+        this.service
+          .create(
+            { resource: [this.fieldDetailsForm.value] },
+            {
+              snackbarSuccess: 'Database field successfully created', // TODO: update with translation
+              snackbarError: 'server',
+            },
+            'mysql-test/_schema/test-table/_field' // TODO: modify this url to take database name and table name
+          )
+          .pipe(takeUntil(this.destroyed$))
+          .subscribe();
+      }
     }
   }
 
