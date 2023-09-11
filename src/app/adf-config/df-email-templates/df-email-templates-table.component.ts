@@ -4,10 +4,7 @@ import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import {
-  CACHE_SERVICE_TOKEN,
-  EMAIL_TEMPLATES_SERVICE_TOKEN,
-} from 'src/app/core/constants/tokens';
+import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';

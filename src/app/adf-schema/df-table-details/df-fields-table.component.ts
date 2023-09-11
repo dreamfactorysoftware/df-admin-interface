@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { DfManageTableComponent } from '../../shared/components/df-manage-table/df-manage-table.component';
-import { FieldsRow } from './df-table-details.types';
+import { FieldsRow, TableField } from './df-table-details.types';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
@@ -14,6 +14,9 @@ import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { takeUntil } from 'rxjs';
 
 @Component({
   selector: 'df-fields-table',
@@ -40,7 +43,12 @@ import { MatMenuModule } from '@angular/material/menu';
   ],
 })
 export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
+  dbName: string;
+  tableName: string;
+
   constructor(
+    @Inject(BASE_SERVICE_TOKEN)
+    private crudService: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -56,9 +64,15 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
       translateService,
       dialog
     );
-  }
 
-  override allowFilter = false;
+    this._activatedRoute.data
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        this.tableName = data['data'].name;
+      });
+
+    this.dbName = this._activatedRoute.snapshot.params['name'];
+  }
 
   //   TODO add header translations
   override columns = [
@@ -97,11 +111,13 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
       header: 'Constraints',
       cell: (row: FieldsRow) => row.constraints,
     },
+    {
+      columnDef: 'actions',
+    },
   ];
 
   mapDataToTable(data: any): FieldsRow[] {
-    return data.map((app: any) => {
-      // TODO fix above type
+    return data.map((app: TableField) => {
       return {
         name: app.name,
         alias: app.alias,
@@ -109,9 +125,19 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
         isVirtual: app.isVirtual,
         isAggregate: app.isAggregate,
         required: app.required,
-        constraints: app.constraints,
+        constraints: this.getFieldConstraints(app),
       };
     });
+  }
+
+  getFieldConstraints(field: TableField) {
+    if (field.isPrimaryKey) {
+      return 'Primary Key';
+    } else if (field.isForeignKey) {
+      return 'Foreign Key';
+    }
+
+    return '';
   }
 
   filterQuery(value: string): string {
@@ -119,22 +145,23 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
   }
 
   override deleteRow(row: FieldsRow): void {
-    // TODO imeplement delete row
-    return;
+    this.crudService
+      .delete(`${this.dbName}/_schema/${this.tableName}/_field/${row.name}`)
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(() => {
+        console.log('DELETE');
+        this.refreshTable();
+      });
+    // TODO: implement error handling
+    //  this.triggerAlert
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    // this.cacheService
-    //   .getAll<GenericListResponse<CacheType>>({
-    //     limit,
-    //     offset,
-    //     filter,
-    //     fields: '*',
-    //   })
-    //   .pipe(takeUntil(this.destroyed$))
-    //   .subscribe(data => {
-    //     this.dataSource.data = this.mapDataToTable(data.resource);
-    //     this.tableLength = data.resource.length;
-    //   });
+    this.crudService
+      .get(`${this.dbName}/_schema/${this.tableName}/_field`)
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe((data: any) => {
+        this.dataSource.data = this.mapDataToTable(data.resource);
+      });
   }
 }

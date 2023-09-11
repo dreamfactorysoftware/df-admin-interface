@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { DfManageTableComponent } from '../../shared/components/df-manage-table/df-manage-table.component';
-import { RelationshipsRow } from './df-table-details.types';
+import { RelationshipsRow, TableRelated } from './df-table-details.types';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
@@ -14,6 +14,9 @@ import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
+import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { takeUntil } from 'rxjs';
 
 @Component({
   selector: 'df-relationships-table',
@@ -40,7 +43,12 @@ import { MatMenuModule } from '@angular/material/menu';
   ],
 })
 export class DfRelationshipsTableComponent extends DfManageTableComponent<RelationshipsRow> {
+  dbName: string;
+  tableName: string;
+
   constructor(
+    @Inject(BASE_SERVICE_TOKEN)
+    private crudService: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -56,9 +64,15 @@ export class DfRelationshipsTableComponent extends DfManageTableComponent<Relati
       translateService,
       dialog
     );
-  }
 
-  override allowFilter = false;
+    this._activatedRoute.data
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        this.tableName = data['data'].name;
+      });
+
+    this.dbName = this._activatedRoute.snapshot.params['name'];
+  }
 
   //   TODO add header translations
   override columns = [
@@ -82,11 +96,13 @@ export class DfRelationshipsTableComponent extends DfManageTableComponent<Relati
       header: 'Virtual',
       cell: (row: RelationshipsRow) => row.isVirtual,
     },
+    {
+      columnDef: 'actions',
+    },
   ];
 
   mapDataToTable(data: any): RelationshipsRow[] {
-    return data.map((app: any) => {
-      // TODO fix above type
+    return data.map((app: TableRelated) => {
       return {
         name: app.name,
         alias: app.alias,
@@ -101,22 +117,21 @@ export class DfRelationshipsTableComponent extends DfManageTableComponent<Relati
   }
 
   override deleteRow(row: RelationshipsRow): void {
-    // TODO imeplement delete row
-    return;
+    this.crudService
+      .delete(`${this.dbName}/_schema/${this.tableName}/_related/${row.name}`)
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(() => {
+        this.refreshTable();
+      });
+    // TODO: implement error handling
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    // this.cacheService
-    //   .getAll<GenericListResponse<CacheType>>({
-    //     limit,
-    //     offset,
-    //     filter,
-    //     fields: '*',
-    //   })
-    //   .pipe(takeUntil(this.destroyed$))
-    //   .subscribe(data => {
-    //     this.dataSource.data = this.mapDataToTable(data.resource);
-    //     this.tableLength = data.resource.length;
-    //   });
+    this.crudService
+      .get(`${this.dbName}/_schema/${this.tableName}/_related`)
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe((data: any) => {
+        this.dataSource.data = this.mapDataToTable(data.resource);
+      });
   }
 }
