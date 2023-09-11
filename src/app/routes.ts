@@ -592,7 +592,8 @@ export const routes: Routes = [
                   import(
                     './adf-schema/df-table-details/df-table-details.component'
                   ).then(m => m.DfTableDetailsComponent),
-                resolve: { data: DfTableDetailsResolver, type: 'edit' },
+                resolve: { data: DfTableDetailsResolver },
+                data: { type: 'edit' },
                 providers: [...BASE_SERVICE_PROVIDERS],
               },
             ],
