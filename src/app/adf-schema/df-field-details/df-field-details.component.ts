@@ -58,6 +58,10 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   @ViewChild(DfFunctionUseComponent)
   dbFunctions!: DfFunctionUseComponent;
 
+  fieldName: string | null;
+  dbName: string;
+  tableName: string;
+
   typeDropdownMenuOptions = [
     'I will manually enter a type',
     'id',
@@ -119,11 +123,18 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    const fieldName = this.activatedRoute.snapshot.paramMap.get('name');
+    this.fieldName = this.activatedRoute.snapshot.paramMap.get('fieldName');
+    this.dbName = this.activatedRoute.snapshot.paramMap.get('dbName') as string;
+    this.tableName = this.activatedRoute.snapshot.paramMap.get(
+      'tableName'
+    ) as string;
 
-    if (fieldName) {
+    if (this.fieldName) {
       this.service
-        .get(`/mysql-test/_schema/test-table/_field/active`) // TODO: modify to insert database name here before /_schema
+        // TODO: modify to insert database name here before /_schema
+        .get(
+          `${this.dbName}/_schema/${this.tableName}/_field/${this.fieldName}`
+        )
         .pipe(takeUntil(this.destroyed$))
         .subscribe((data: any) => {
           this.databaseFieldToEdit = data;
@@ -175,7 +186,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       .subscribe(data => {
         if (data) {
           this.service
-            .get(`mysql-test/_schema/${data}`) // TODO: modify to insert database name here before /_schema
+            .get(`${this.dbName}/_schema/${data}`) // TODO: modify to insert database name here before /_schema
             .pipe(takeUntil(this.destroyed$))
             .subscribe((data: any) => {
               this.referenceFieldDropdownMenuOptions = data['field'];
@@ -190,7 +201,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       .subscribe(data => {
         if (data) {
           this.service
-            .get('mysql-test/_schema') // TODO: modify to insert database name here before /_schema
+            .get(`${this.dbName}/_schema`) // TODO: modify to insert database name here before /_schema
             .pipe(takeUntil(this.destroyed$))
             .subscribe((data: any) => {
               this.enableFormField('refTable');
@@ -320,38 +331,31 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
     // TODO: add navigation to table details component on create/update operation success
 
     if (this.fieldDetailsForm.valid) {
-      console.log('valid: ', this.fieldDetailsForm.value);
-
-      //   if (this.databaseFieldToEdit) {
-      //     this.service
-      //       .update(
-      //         'mysql-test/_schema/test-table/_field', // TODO: modify this url to take database name and table name)
-      //         { resource: [this.fieldDetailsForm.value] },
-      //         {
-      //           snackbarSuccess: 'schema.fieldDetailsForm.updateSuccess',
-      //           snackbarError: 'server',
-      //         }
-      //       )
-      //       .pipe(takeUntil(this.destroyed$))
-      //       .subscribe();
-      //   } else {
-      //     this.service
-      //       .create(
-      //         { resource: [this.fieldDetailsForm.value] },
-      //         {
-      //           snackbarSuccess: 'schema.fieldDetailsForm.createSuccess',
-      //           snackbarError: 'server',
-      //         },
-      //         'mysql-test/_schema/test-table/_field' // TODO: modify this url to take database name and table name
-      //       )
-      //       .pipe(takeUntil(this.destroyed$))
-      //       .subscribe();
-      //   }
-    } else {
-      console.log(
-        'errors: ',
-        this.fieldDetailsForm.controls['picklist'].errors
-      );
+      if (this.databaseFieldToEdit) {
+        this.service
+          .update(
+            `${this.dbName}/_schema/${this.tableName}/_field`, // TODO: modify this url to take database name and table name)
+            { resource: [this.fieldDetailsForm.value] },
+            {
+              snackbarSuccess: 'schema.fieldDetailsForm.updateSuccess',
+              snackbarError: 'server',
+            }
+          )
+          .pipe(takeUntil(this.destroyed$))
+          .subscribe();
+      } else {
+        this.service
+          .create(
+            { resource: [this.fieldDetailsForm.value] },
+            {
+              snackbarSuccess: 'schema.fieldDetailsForm.createSuccess',
+              snackbarError: 'server',
+            },
+            `${this.dbName}/_schema/${this.tableName}/_field` // TODO: modify this url to take database name and table name
+          )
+          .pipe(takeUntil(this.destroyed$))
+          .subscribe();
+      }
     }
   }
 

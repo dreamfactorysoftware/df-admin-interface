@@ -53,7 +53,6 @@ import {
   schemaServiceResolver,
   schemaServiceTypeResolver,
 } from './adf-schema/resolvers/df-schema.resolver';
-import { DfDatabaseSchemaService } from './adf-schema/services/df-database-schema.service';
 import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
 import { ServiceRoutes } from './adf-services/routes';
 import { servicesResolver } from './adf-services/resolvers/services.resolver';
@@ -564,35 +563,49 @@ export const routes: Routes = [
             },
           },
           {
-            path: `${ROUTES.VIEW}/:name`,
-            loadComponent: () =>
-              import(
-                './adf-schema/df-manage-tables-table/df-manage-tables-table.component'
-              ).then(m => m.DfManageTablesTableComponent),
-            resolve: {
-              data: schemaResolver,
-            },
-          },
-          {
-            path: 'fields', // TODO: this is a temporary route for dev, change name from addFields to fields
-            loadComponent: () =>
-              import(
-                './adf-schema/df-field-details/df-field-details.component'
-              ).then(m => m.DfFieldDetailsComponent),
-          },
-          {
-            path: 'fields/:name', // TODO: this is a temporary route for dev, change name from addFields to fields
-            loadComponent: () =>
-              import(
-                './adf-schema/df-field-details/df-field-details.component'
-              ).then(m => m.DfFieldDetailsComponent),
+            path: `${ROUTES.VIEW}/:name`, // name here is the dbName
+            children: [
+              {
+                path: '',
+                loadComponent: () =>
+                  import(
+                    './adf-schema/df-manage-tables-table/df-manage-tables-table.component'
+                  ).then(m => m.DfManageTablesTableComponent),
+                resolve: {
+                  data: schemaResolver,
+                },
+              },
+              {
+                path: ROUTES.CREATE, // create table (table details)
+                component: DfPlaceHolderComponent,
+              },
+              {
+                path: `${ROUTES.EDIT}/:id`, // edit table (table details), id here is the table name
+                component: DfPlaceHolderComponent,
+                children: [
+                  {
+                    path: `${ROUTES.CREATE}`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
+                  {
+                    path: `${ROUTES.EDIT}/:fieldName`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
+                ],
+              },
+            ],
           },
         ],
         providers: [
           ...SERVICES_SERVICE_PROVIDERS,
           ...SERVICE_TYPES_SERVICE_PROVIDERS,
           ...BASE_SERVICE_PROVIDERS,
-          DfDatabaseSchemaService,
           provideTranslocoScope('schema'),
         ],
       },
