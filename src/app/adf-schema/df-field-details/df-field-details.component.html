@@ -33,7 +33,7 @@
     </mat-form-field>
     <mat-form-field>
       <mat-label>Database Type</mat-label>
-      <input matInput formControlName="databaseType" />
+      <input matInput formControlName="dbType" />
     </mat-form-field>
     <mat-form-field>
       <mat-label>Length</mat-label>
@@ -63,21 +63,21 @@
     </div>
     <mat-form-field>
       <mat-label>Default Value</mat-label>
-      <input matInput formControlName="defaultValue" />
+      <input matInput formControlName="default" />
     </mat-form-field>
     <div class="slide-toggle-container">
-      <mat-slide-toggle formControlName="indexed">Indexed</mat-slide-toggle>
-      <mat-slide-toggle formControlName="unique">Unique</mat-slide-toggle>
-      <mat-slide-toggle formControlName="primaryKey"
+      <mat-slide-toggle formControlName="isIndex">Indexed</mat-slide-toggle>
+      <mat-slide-toggle formControlName="isUnique">Unique</mat-slide-toggle>
+      <mat-slide-toggle formControlName="isPrimaryKey"
         >Primary Key</mat-slide-toggle
       >
-      <mat-slide-toggle formControlName="foreignKey"
+      <mat-slide-toggle formControlName="isForeignKey"
         >Foreign Key</mat-slide-toggle
       >
     </div>
     <mat-form-field>
       <mat-label>Reference Table</mat-label>
-      <mat-select formControlName="referenceTable">
+      <mat-select formControlName="refTable">
         <mat-option
           *ngFor="let table of referenceTableDropdownMenuOptions"
           [value]="table.name">
@@ -87,7 +87,7 @@
     </mat-form-field>
     <mat-form-field>
       <mat-label>Reference Field</mat-label>
-      <mat-select formControlName="referenceField">
+      <mat-select formControlName="refField">
         <mat-option
           *ngFor="let field of referenceFieldDropdownMenuOptions"
           [value]="field.name"
@@ -112,7 +112,7 @@
   </form>
   <div>
     <button mat-raised-button color="primary" (click)="onSubmit()">
-      Add Field
+      {{ databaseFieldToEdit ? 'Update' : 'Add' }} Field
     </button>
     <button mat-raised-button (click)="onCancel()">Cancel</button>
   </div>

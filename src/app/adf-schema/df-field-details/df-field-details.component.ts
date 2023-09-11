@@ -91,7 +91,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       isVirtual: [false],
       isAggregate: [{ value: false, disabled: true }],
       type: ['', Validators.required],
-      databaseType: [{ value: '', disabled: true }],
+      dbType: [{ value: '', disabled: true }],
       length: [],
       precision: [{ value: '', disabled: true }],
       scale: [{ value: 0, disabled: true }],
@@ -99,13 +99,13 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       supportsMultibyte: [{ value: false, disabled: true }],
       allowNull: [false],
       autoIncrement: [false],
-      defaultValue: [],
-      indexed: [false],
-      unique: [false],
-      primaryKey: [{ value: false, disabled: true }],
-      foreignKey: [false],
-      referenceTable: [{ value: '', disabled: true }],
-      referenceField: [{ value: '', disabled: true }],
+      default: [],
+      isIndex: [false],
+      isUnique: [false],
+      isPrimaryKey: [{ value: false, disabled: true }],
+      isForeignKey: [false],
+      refTable: [{ value: '', disabled: true }],
+      refField: [{ value: '', disabled: true }],
       validation: ['', JsonValidator],
       dbFunctionUse: this.formBuilder.array([]),
       picklist: [''], // TODO: maybe add validation for comma separated values here
@@ -117,59 +117,44 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
 
     if (name) {
       this.service
-        .get(`/mysql-test/_schema/test-table/_field/name`) // TODO: modify to insert database name here before /_schema
+        .get(`/mysql-test/_schema/test-table/_field/active`) // TODO: modify to insert database name here before /_schema
         .pipe(takeUntil(this.destroyed$))
         .subscribe((data: any) => {
           this.databaseFieldToEdit = data;
+
+          console.log('field to edit: ', this.databaseFieldToEdit);
 
           this.fieldDetailsForm.setValue({
             name: data.name,
             alias: data.alias,
             label: data.label,
             isVirtual: data.isVirtual,
-            isAggregate: [
-              { value: data.isAggregate, disabled: !!data.isAggregate },
-            ],
+            isAggregate: data.isAggregate,
             type: data.type,
-            databaseType: [
-              { value: data.databaseType, disabled: !!data.databaseType },
-            ],
+            dbType: data.dbType,
             length: data.length,
-            precision: [{ value: data.precision, disabled: !!data.precision }],
-            scale: [{ value: data.scale, disabled: !!data.scale }],
-            fixedLength: [
-              { value: data.fixedLength, disabled: !!data.fixedLength },
-            ],
-            supportsMultibyte: [
-              {
-                value: data.supportsMultibyte,
-                disabled: !!data.supportsMultibyte,
-              },
-            ],
+            precision: data.precision,
+            scale: data.scale,
+            fixedLength: data.fixedLength,
+            supportsMultibyte: data.supportsMultibyte,
             allowNull: data.allowNull,
             autoIncrement: data.autoIncrement,
-            defaultValue: data.defaultValue,
-            indexed: data.indexed,
-            unique: data.unique,
-            primaryKey: [
-              { value: data.primaryKey, disabled: !!data.primaryKey },
-            ],
-            foreignKey: data.foreignKey,
-            referenceTable: [
-              { value: data.referenceTable, disabled: !!data.referenceTable },
-            ],
-            referenceField: [
-              { value: data.referenceField, disabled: !!data.referenceField },
-            ],
-            validation: data.validation,
-            dbFunctionUse: this.formBuilder.array(data.dbFunctionUse), // TODO: modify this to accept arrays
+            default: data.default,
+            isIndex: data.isIndex,
+            isUnique: data.isUnique,
+            isPrimaryKey: data.isPrimaryKey,
+            isForeignKey: data.isForeignKey,
+            refTable: data.refTable,
+            refField: data.refField,
+            validation: data.validation ?? '',
+            dbFunctionUse: this.formBuilder.array([]), //this.formBuilder.array(data.dbFunctionUse), // TODO: modify this to accept arrays
             picklist: data.picklist, // TODO: maybe add validation for comma separated values here
           });
         });
     }
 
     this.fieldDetailsForm
-      .get('referenceTable')
+      .get('refTable')
       ?.valueChanges.pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         if (data) {
@@ -178,13 +163,13 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
             .pipe(takeUntil(this.destroyed$))
             .subscribe((data: any) => {
               this.referenceFieldDropdownMenuOptions = data['field'];
-              this.enableFormField('referenceField');
+              this.enableFormField('refField');
             });
         }
       });
 
     this.fieldDetailsForm
-      .get('foreignKey')
+      .get('isForeignKey')
       ?.valueChanges.pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         if (data) {
@@ -192,12 +177,12 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
             .get('mysql-test/_schema') // TODO: modify to insert database name here before /_schema
             .pipe(takeUntil(this.destroyed$))
             .subscribe((data: any) => {
-              this.enableFormField('referenceTable');
+              this.enableFormField('refTable');
               this.referenceTableDropdownMenuOptions = data['resource'];
             });
         } else {
-          this.disableFormField('referenceTable');
-          this.disableFormField('referenceField');
+          this.disableFormField('refTable');
+          this.disableFormField('refField');
         }
       });
 
@@ -206,14 +191,14 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       ?.valueChanges.pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         if (data) {
-          this.disableFormField('databaseType');
+          this.disableFormField('dbType');
           this.enableFormField('isAggregate');
         } else {
           if (
             this.fieldDetailsForm.get('type')?.value ===
             this.typeDropdownMenuOptions[0]
           )
-            this.enableFormField('databaseType');
+            this.enableFormField('dbType');
           this.disableFormField('isAggregate');
         }
       });
@@ -225,11 +210,11 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
         switch (data) {
           case this.typeDropdownMenuOptions[0]:
             if (this.fieldDetailsForm.get('isVirtual')?.value === false) {
-              this.enableFormField('databaseType');
+              this.enableFormField('dbType');
               this.disableFormField('length');
               this.disableFormField('precision');
               this.disableFormField('scale');
-            } else this.disableFormField('databaseType');
+            } else this.disableFormField('dbType');
             this.removeFormField('picklist');
             this.disableFormField('fixedLength');
             this.disableFormField('supportsMultibyte');
@@ -237,7 +222,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
 
           case 'string':
             this.addFormField('picklist');
-            this.disableFormField('databaseType');
+            this.disableFormField('dbType');
             this.enableFormField('length');
             this.disableFormField('precision');
             this.disableFormField('scale');
@@ -247,7 +232,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
 
           case 'integer':
             this.addFormField('picklist');
-            this.disableFormField('databaseType');
+            this.disableFormField('dbType');
             this.enableFormField('length');
             this.disableFormField('precision');
             this.disableFormField('scale');
@@ -257,7 +242,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
 
           case 'text':
           case 'binary':
-            this.disableFormField('databaseType');
+            this.disableFormField('dbType');
             this.enableFormField('length');
             this.disableFormField('precision');
             this.disableFormField('scale');
@@ -269,7 +254,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
           case 'float':
           case 'double':
           case 'decimal':
-            this.disableFormField('databaseType');
+            this.disableFormField('dbType');
             this.disableFormField('length');
             this.enableFormField('precision');
             this.enableFormField('scale', 0);
@@ -279,7 +264,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
             break;
 
           default:
-            this.disableFormField('databaseType');
+            this.disableFormField('dbType');
             this.disableFormField('length');
             this.disableFormField('precision');
             this.disableFormField('scale');
