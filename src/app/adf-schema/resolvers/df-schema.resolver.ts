@@ -34,7 +34,6 @@ export const schemaResolver: ResolveFn<any> = (
 export const DfTableDetailsResolver: ResolveFn<TableDetailsType> = (
   route: ActivatedRouteSnapshot
 ) => {
-  console.log('DfTableDetailsResolver', route.params);
   const name = route.paramMap.get('name') ?? '';
   const id = route.paramMap.get('id') ?? '';
   const crudService = inject(BASE_SERVICE_TOKEN);
