@@ -39,9 +39,14 @@ export class DfBaseCrudService {
     data: {
       resource: Array<S>;
     },
-    options?: Partial<RequestOptions>
+    options?: Partial<RequestOptions>,
+    endpoint?: string
   ) {
-    return this.http.post<T>(this.url, data, this.getOptions({ ...options }));
+    return this.http.post<T>(
+      `${this.url}${endpoint ? `/${endpoint}` : ''}`,
+      data,
+      this.getOptions({ ...options })
+    );
   }
 
   update<T, S>(
@@ -69,10 +74,10 @@ export class DfBaseCrudService {
     );
   }
 
-  patch(id: string | number, options?: Partial<RequestOptions>) {
-    return this.http.patch(
+  patch<T, S>(id: string | number, data: S, options?: Partial<RequestOptions>) {
+    return this.http.patch<T>(
       `${this.url}/${id}`,
-      null,
+      data,
       this.getOptions({ snackbarError: 'server', ...options })
     );
   }

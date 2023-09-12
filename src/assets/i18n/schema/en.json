@@ -1,0 +1,33 @@
+{
+  "name": "Name",
+  "alias": "Alias",
+  "type": "Type",
+  "virtual": "Virtual",
+  "aggregate": "Aggregate",
+  "required": "Required",
+  "constraints": "Constraints",
+  "tableName": "Table Name",
+  "label": "Label",
+  "plural": "Plural Label",
+  "description": "Description",
+  "enter": {
+    "tableName": "Enter {tableName}",
+    "alias": "Enter {alias} label",
+    "label": "Enter table label",
+    "plural": "Enter table plural label",
+    "description": "Enter table description"
+  },
+  "fields": "Fields",
+  "relationships": "Relationships",
+  "addField": "Add Field",
+  "addRelationship": "Add Virtual Relationship",
+  "alert": {
+    "tableNameError": "Table name is required",
+    "saveSuccess": "Table created",
+    "updateSuccess": "Table updated",
+    "deleteSuccess": "Table deleted"
+  },
+  "primaryKey": "Primary Key",
+  "foreignKey": "Foreign Key",
+  "table": "Table"
+}

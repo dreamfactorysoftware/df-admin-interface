@@ -14,7 +14,7 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { DatabaseTableRowData } from '../df-schema.types';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
+import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
 import { takeUntil } from 'rxjs';
 import { DfDatabaseSchemaService } from '../services/df-database-schema.service';
 
@@ -63,9 +63,10 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
     );
   }
 
-  override allowDelete = false;
-  override allowCreate = false;
+  // override allowDelete = false;
+  // override allowCreate = false;
   override allowFilter = false;
+  // override readOnly = true;
 
   // TODO: update the header names with translation below
   override columns = [
@@ -80,7 +81,13 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
   ];
 
   mapDataToTable(data: any[]): DatabaseTableRowData[] {
-    return data;
+    return data.map((item: any) => {
+      return {
+        label: item.label,
+        name: item.name,
+        id: item.name,
+      };
+    });
   }
   refreshTable(
     limit?: number | undefined,

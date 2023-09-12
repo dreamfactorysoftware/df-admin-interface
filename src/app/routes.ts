@@ -49,6 +49,7 @@ import {
   DfEmailTemplatesResolver,
 } from './adf-config/resolvers/df-email-templates.resolver';
 import {
+  DfTableDetailsResolver,
   schemaResolver,
   schemaServiceResolver,
   schemaServiceTypeResolver,
@@ -565,19 +566,44 @@ export const routes: Routes = [
           },
           {
             path: `${ROUTES.VIEW}/:name`,
-            loadComponent: () =>
-              import(
-                './adf-schema/df-manage-tables-table/df-manage-tables-table.component'
-              ).then(m => m.DfManageTablesTableComponent),
-            resolve: {
-              data: schemaResolver,
-            },
+            children: [
+              {
+                path: '',
+                loadComponent: () =>
+                  import(
+                    './adf-schema/df-manage-tables-table/df-manage-tables-table.component'
+                  ).then(m => m.DfManageTablesTableComponent),
+                resolve: {
+                  data: schemaResolver,
+                },
+              },
+              {
+                path: ROUTES.CREATE,
+                loadComponent: () =>
+                  import(
+                    './adf-schema/df-table-details/df-table-details.component'
+                  ).then(m => m.DfTableDetailsComponent),
+                data: { type: 'create' },
+                providers: [...BASE_SERVICE_PROVIDERS],
+              },
+              {
+                path: `${ROUTES.EDIT}/:id`,
+                loadComponent: () =>
+                  import(
+                    './adf-schema/df-table-details/df-table-details.component'
+                  ).then(m => m.DfTableDetailsComponent),
+                resolve: { data: DfTableDetailsResolver },
+                data: { type: 'edit' },
+                providers: [...BASE_SERVICE_PROVIDERS],
+              },
+            ],
           },
         ],
         providers: [
           ...SERVICES_SERVICE_PROVIDERS,
           ...SERVICE_TYPES_SERVICE_PROVIDERS,
           DfDatabaseSchemaService,
+          provideTranslocoScope('schema'),
         ],
       },
       {
