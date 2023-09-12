@@ -28,5 +28,6 @@
     "deleteSuccess": "Table deleted"
   },
   "primaryKey": "Primary Key",
-  "foreignKey": "Foreign Key"
+  "foreignKey": "Foreign Key",
+  "table": "Table"
 }

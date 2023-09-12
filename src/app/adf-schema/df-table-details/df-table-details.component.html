@@ -1,72 +1,90 @@
-<form
-  [formGroup]="tableDetailsForm"
-  (ngSubmit)="save()"
-  class="table-details-form-container"
-  [class.x-small]="breakpointService.isXSmallScreen | async">
-  <mat-form-field class="flex-50">
-    <mat-label>
-      {{ 'schema.tableName' | transloco }}
-    </mat-label>
-    <input
-      matInput
-      formControlName="name"
-      required
-      placeholder="{{ 'schema.enter.tableName' | transloco }}" />
-    <mat-error *ngIf="tableDetailsForm.controls['name'].hasError('required')">
-      {{ 'schema.alert.tableNameError' | transloco }}
-    </mat-error>
-  </mat-form-field>
+<mat-tab-group
+  animationDuration="0ms"
+  *ngIf="type === 'edit'; else tableDetails">
+  <mat-tab label="{{ 'schema.table' | transloco }}">
+    <ng-container [ngTemplateOutlet]="tableDetails"></ng-container>
+  </mat-tab>
+  <mat-tab label="JSON">
+    <!-- TODO: update form data on change -->
+    <mat-form-field class="example-full-width">
+      <mat-label>Address</mat-label>
+      <textarea matInput class="json-area">{{ jsonData }}</textarea>
+    </mat-form-field>
+  </mat-tab>
+</mat-tab-group>
 
-  <mat-form-field class="flex-50">
-    <mat-label>
-      {{ 'schema.alias' | transloco }}
-    </mat-label>
-    <input
-      matInput
-      formControlName="alias"
-      placeholder="{{ 'schema.enter.alias' | transloco }}" />
-  </mat-form-field>
-  <mat-form-field class="flex-50">
-    <mat-label>
-      {{ 'schema.label' | transloco }}
-    </mat-label>
-    <input
-      matInput
-      formControlName="label"
-      placeholder="{{ 'schema.enter.label' | transloco }}" />
-  </mat-form-field>
-  <mat-form-field class="flex-50">
-    <mat-label> {{ 'schema.plural' | transloco }} </mat-label>
-    <input
-      matInput
-      formControlName="plural"
-      placeholder="{{ 'schema.enter.plural' | transloco }}" />
-  </mat-form-field>
-  <mat-form-field>
-    <mat-label> {{ 'schema.description' | transloco }} </mat-label>
-    <input
-      matInput
-      formControlName="description"
-      placeholder="{{ 'schema.enter.description' | transloco }}" />
-  </mat-form-field>
+<ng-template #tableDetails>
+  <form
+    [formGroup]="tableDetailsForm"
+    (ngSubmit)="save()"
+    class="table-details-form-container"
+    [class.x-small]="breakpointService.isXSmallScreen | async">
+    <mat-form-field class="flex-50">
+      <mat-label>
+        {{ 'schema.tableName' | transloco }}
+      </mat-label>
+      <input
+        matInput
+        formControlName="name"
+        required
+        placeholder="{{ 'schema.enter.tableName' | transloco }}" />
+      <mat-error *ngIf="tableDetailsForm.controls['name'].hasError('required')">
+        {{ 'schema.alert.tableNameError' | transloco }}
+      </mat-error>
+    </mat-form-field>
 
-  <div class="flex-100">
-    <h2>{{ 'schema.fields' | transloco }}</h2>
-    <df-fields-table [tableData]="tableFields"></df-fields-table>
-  </div>
+    <mat-form-field class="flex-50">
+      <mat-label>
+        {{ 'schema.alias' | transloco }}
+      </mat-label>
+      <input
+        matInput
+        formControlName="alias"
+        placeholder="{{ 'schema.enter.alias' | transloco }}" />
+    </mat-form-field>
+    <mat-form-field class="flex-50">
+      <mat-label>
+        {{ 'schema.label' | transloco }}
+      </mat-label>
+      <input
+        matInput
+        formControlName="label"
+        placeholder="{{ 'schema.enter.label' | transloco }}" />
+    </mat-form-field>
+    <mat-form-field class="flex-50">
+      <mat-label> {{ 'schema.plural' | transloco }} </mat-label>
+      <input
+        matInput
+        formControlName="plural"
+        placeholder="{{ 'schema.enter.plural' | transloco }}" />
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label> {{ 'schema.description' | transloco }} </mat-label>
+      <input
+        matInput
+        formControlName="description"
+        placeholder="{{ 'schema.enter.description' | transloco }}" />
+    </mat-form-field>
 
-  <div class="flex-100 margin-2-0">
-    <h2>{{ 'schema.relationships' | transloco }}</h2>
-    <df-relationships-table [tableData]="tableRelated"></df-relationships-table>
-  </div>
+    <div class="flex-100">
+      <h2>{{ 'schema.fields' | transloco }}</h2>
+      <df-fields-table [tableData]="tableFields"></df-fields-table>
+    </div>
 
-  <div class="flex-100">
-    <button mat-flat-button type="button" (click)="goBack()">
-      {{ 'cancel' | transloco }}
-    </button>
-    <button mat-flat-button color="primary" type="submit">
-      <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
-      <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
-    </button>
-  </div>
-</form>
+    <div class="flex-100 margin-2-0">
+      <h2>{{ 'schema.relationships' | transloco }}</h2>
+      <df-relationships-table
+        [tableData]="tableRelated"></df-relationships-table>
+    </div>
+
+    <div class="flex-100">
+      <button mat-flat-button type="button" (click)="goBack()">
+        {{ 'cancel' | transloco }}
+      </button>
+      <button mat-flat-button color="primary" type="submit">
+        <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
+        <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
+      </button>
+    </div>
+  </form>
+</ng-template>

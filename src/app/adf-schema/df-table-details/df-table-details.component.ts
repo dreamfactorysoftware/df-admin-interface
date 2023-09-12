@@ -11,12 +11,13 @@ import { Subject, takeUntil } from 'rxjs';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { AsyncPipe, NgIf } from '@angular/common';
+import { AsyncPipe, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfFieldsTableComponent } from './df-fields-table.component';
 import { DfRelationshipsTableComponent } from './df-relationships-table.component';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { MatTabsModule } from '@angular/material/tabs';
 
 @Component({
   selector: 'df-table-details',
@@ -33,10 +34,12 @@ import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
     DfFieldsTableComponent,
     DfRelationshipsTableComponent,
     AsyncPipe,
+    MatTabsModule,
+    NgTemplateOutlet,
   ],
 })
 export class DfTableDetailsComponent implements OnInit, OnDestroy {
-  // TODO: JSON View
+  // TODO: JSON View with Ace Editor
 
   tableDetailsForm: FormGroup;
   destroyed$ = new Subject<void>();
@@ -44,6 +47,7 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
   dbName: string;
   tableFields: [];
   tableRelated: [];
+  jsonData: string;
 
   constructor(
     @Inject(BASE_SERVICE_TOKEN)
@@ -68,6 +72,7 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
       .subscribe(data => {
         this.dbName = this.activatedRoute.snapshot.params['name'];
         this.type = data['type'];
+        this.jsonData = JSON.stringify(data['data']);
 
         if (this.type === 'edit') {
           this.tableDetailsForm.patchValue({
@@ -104,10 +109,10 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
 
   save() {
     const data = this.tableDetailsForm.value;
-
     const payload = {
       resource: [data],
     };
+
     if (this.type === 'create') {
       this.crudService
         .create(
@@ -123,8 +128,9 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
           this.goBack();
         });
     } else if (this.type === 'edit') {
+      const tableName = this.tableDetailsForm.get('name')?.value;
       this.crudService
-        .patch(`${this.dbName}/_schema/${data.name}`, data, {
+        .patch(`${this.dbName}/_schema/${tableName}`, data, {
           snackbarSuccess: 'schema.alerts.updateSuccess',
         })
         .pipe(takeUntil(this.destroyed$))
