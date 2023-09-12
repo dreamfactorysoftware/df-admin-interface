@@ -61,6 +61,7 @@ import { HomeRoutes } from './adf-home/routes';
 import { provideTranslocoScope } from '@ngneat/transloco';
 import { AuthRoutes } from './adf-user-management/routes';
 import { serviceTypesResolver } from './adf-services/resolvers/service-types.resolver';
+import { DfScriptsComponent } from './adf-scripts/df-scripts/df-scripts.component';
 
 export const routes: Routes = [
   {
@@ -217,7 +218,7 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.SCRIPTS,
-        component: DfPlaceHolderComponent,
+        component: DfScriptsComponent,
       },
       {
         path: ROUTES.API_DOCS,
