@@ -150,8 +150,16 @@
         <mat-label>{{
           'schema.fieldDetailsForm.controls.picklist' | transloco
         }}</mat-label>
-        <input matInput formControlName="picklist" /> </mat-form-field
-    ></ng-container>
+        <input matInput formControlName="picklist" />
+      </mat-form-field>
+      <mat-error
+        *ngIf="
+          this.fieldDetailsForm.controls['picklist'].errors &&
+          this.fieldDetailsForm.controls['picklist'].errors['csvInvalid']
+        ">
+        {{ 'schema.fieldDetailsForm.errors.csv' | transloco }}
+      </mat-error>
+    </ng-container>
   </form>
   <div>
     <button mat-raised-button color="primary" (click)="onSubmit()">

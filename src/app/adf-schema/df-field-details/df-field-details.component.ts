@@ -14,7 +14,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSelectModule } from '@angular/material/select';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfLookupKeysComponent } from 'src/app/shared/components/df-lookup-keys/df-lookup-keys.component';
@@ -25,6 +25,7 @@ import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfFunctionUseComponent } from './df-function-use/df-function-use.component';
 import { DatabaseSchemaFieldType } from './df-field-details.types';
 import { CsvValidator } from '../validators/csv.validator';
+import { ROUTES } from 'src/app/core/constants/routes';
 
 @Component({
   selector: 'df-field-details',
@@ -92,7 +93,8 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
     @Inject(BASE_SERVICE_TOKEN)
     private service: DfBaseCrudService,
     private formBuilder: FormBuilder,
-    private activatedRoute: ActivatedRoute
+    private activatedRoute: ActivatedRoute,
+    private router: Router
   ) {
     this.fieldDetailsForm = this.formBuilder.group({
       name: ['', Validators.required],
@@ -131,7 +133,6 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
 
     if (this.fieldName) {
       this.service
-        // TODO: modify to insert database name here before /_schema
         .get(
           `${this.dbName}/_schema/${this.tableName}/_field/${this.fieldName}`
         )
@@ -186,7 +187,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       .subscribe(data => {
         if (data) {
           this.service
-            .get(`${this.dbName}/_schema/${data}`) // TODO: modify to insert database name here before /_schema
+            .get(`${this.dbName}/_schema/${data}`)
             .pipe(takeUntil(this.destroyed$))
             .subscribe((data: any) => {
               this.referenceFieldDropdownMenuOptions = data['field'];
@@ -201,7 +202,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
       .subscribe(data => {
         if (data) {
           this.service
-            .get(`${this.dbName}/_schema`) // TODO: modify to insert database name here before /_schema
+            .get(`${this.dbName}/_schema`)
             .pipe(takeUntil(this.destroyed$))
             .subscribe((data: any) => {
               this.enableFormField('refTable');
@@ -328,13 +329,11 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   }
 
   onSubmit() {
-    // TODO: add navigation to table details component on create/update operation success
-
     if (this.fieldDetailsForm.valid) {
       if (this.databaseFieldToEdit) {
         this.service
           .update(
-            `${this.dbName}/_schema/${this.tableName}/_field`, // TODO: modify this url to take database name and table name)
+            `${this.dbName}/_schema/${this.tableName}/_field`,
             { resource: [this.fieldDetailsForm.value] },
             {
               snackbarSuccess: 'schema.fieldDetailsForm.updateSuccess',
@@ -342,7 +341,11 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
             }
           )
           .pipe(takeUntil(this.destroyed$))
-          .subscribe();
+          .subscribe(() => {
+            this.router.navigate([
+              `${ROUTES.ADMIN_SETTINGS}/${ROUTES.SCHEMA}/${ROUTES.VIEW}/:name/${ROUTES.CREATE}`,
+            ]);
+          });
       } else {
         this.service
           .create(
@@ -351,15 +354,21 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
               snackbarSuccess: 'schema.fieldDetailsForm.createSuccess',
               snackbarError: 'server',
             },
-            `${this.dbName}/_schema/${this.tableName}/_field` // TODO: modify this url to take database name and table name
+            `${this.dbName}/_schema/${this.tableName}/_field`
           )
           .pipe(takeUntil(this.destroyed$))
-          .subscribe();
+          .subscribe(() => {
+            this.router.navigate([
+              `${ROUTES.ADMIN_SETTINGS}/${ROUTES.SCHEMA}/${ROUTES.VIEW}/:name/${ROUTES.CREATE}`,
+            ]);
+          });
       }
     }
   }
 
   onCancel() {
-    // TODO: add route navigation once table details components is connected
+    this.router.navigate([
+      `${ROUTES.ADMIN_SETTINGS}/${ROUTES.SCHEMA}/${ROUTES.VIEW}/:name/${ROUTES.CREATE}`,
+    ]);
   }
 }

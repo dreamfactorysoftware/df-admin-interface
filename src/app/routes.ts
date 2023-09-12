@@ -581,8 +581,11 @@ export const routes: Routes = [
               },
               {
                 path: `${ROUTES.EDIT}/:id`, // edit table (table details), id here is the table name
-                component: DfPlaceHolderComponent,
                 children: [
+                  {
+                    path: '',
+                    component: DfPlaceHolderComponent,
+                  },
                   {
                     path: `${ROUTES.CREATE}`,
                     loadComponent: () =>

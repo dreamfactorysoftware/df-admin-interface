@@ -29,7 +29,8 @@
     },
     "errors": {
       "name": "Name is a required field",
-      "json": "Enter valid JSON here"
+      "json": "Enter valid JSON here",
+      "csv": "Enter valid CSV here"
     }
   }
 }
