@@ -587,20 +587,20 @@ export const routes: Routes = [
                       ).then(m => m.DfTableDetailsComponent),
                     data: { type: 'create' },
                   },
-                  // {
-                  //   path: `${ROUTES.CREATE}/field`, //TODO: check the create route childrens
-                  //   loadComponent: () =>
-                  //     import(
-                  //       './adf-schema/df-field-details/df-field-details.component'
-                  //     ).then(m => m.DfFieldDetailsComponent),
-                  // },
-                  // {
-                  //   path: `${ROUTES.EDIT}/:fieldName`,
-                  //   loadComponent: () =>
-                  //     import(
-                  //       './adf-schema/df-field-details/df-field-details.component'
-                  //     ).then(m => m.DfFieldDetailsComponent),
-                  // },
+                  {
+                    path: `${ROUTES.CREATE}/field`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
+                  {
+                    path: `${ROUTES.EDIT}/:fieldName`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
                 ],
               },
               {
