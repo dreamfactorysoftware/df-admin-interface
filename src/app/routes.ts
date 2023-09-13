@@ -33,6 +33,7 @@ import {
   SERVICE_TYPE_SERVICE_PROVIDERS,
   BASE_SERVICE_PROVIDERS,
   SERVICE_SERVICE_PROVIDERS,
+  SCRIPTS_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -219,6 +220,12 @@ export const routes: Routes = [
       {
         path: ROUTES.SCRIPTS,
         component: DfScriptsComponent,
+        resolve: { data: servicesResolver() },
+        providers: [
+          ...SCRIPTS_SERVICE_PROVIDERS,
+          ...SERVICES_SERVICE_PROVIDERS,
+          ...SERVICE_TYPE_SERVICE_PROVIDERS,
+        ],
       },
       {
         path: ROUTES.API_DOCS,
