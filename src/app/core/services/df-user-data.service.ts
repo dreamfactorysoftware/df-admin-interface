@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
+import { Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
+import { ROUTES } from '../constants/routes';
 @Injectable({
   providedIn: 'root',
 })
@@ -9,9 +11,12 @@ export class DfUserDataService {
   private userDataSubject = new BehaviorSubject<UserData | null>(null);
   userData$ = this.userDataSubject.asObservable();
 
+  constructor(private router: Router) {}
+
   private TOKEN_KEY = 'session_token';
   clearToken() {
     document.cookie = `${this.TOKEN_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`;
+    this.isLoggedIn = false;
   }
 
   get userData(): UserData | null {
@@ -28,6 +33,10 @@ export class DfUserDataService {
 
   set isLoggedIn(isLoggedIn: boolean) {
     this.isLoggedInSubject.next(isLoggedIn);
+    if (!isLoggedIn) {
+      this.userData = null;
+      this.router.navigate([`/${ROUTES.AUTH}/${ROUTES.LOGIN}`]);
+    }
   }
 
   get token(): string | null {

@@ -48,4 +48,5 @@ export enum ROUTES {
   CACHE = 'cache',
   EMAIL_TEMPLATES = 'email-templates',
   GLOBAL_LOOKUP_KEYS = 'global-lookup-keys',
+  TABLES = 'tables',
 }

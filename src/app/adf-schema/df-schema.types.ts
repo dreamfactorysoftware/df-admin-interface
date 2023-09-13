@@ -9,4 +9,5 @@ export type DatabaseRowData = {
 export type DatabaseTableRowData = {
   name: string;
   label: string;
+  id: string;
 };

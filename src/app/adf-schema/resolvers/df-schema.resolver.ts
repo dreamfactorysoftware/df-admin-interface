@@ -8,6 +8,7 @@ import {
 } from '../../core/constants/tokens';
 import { ServiceType } from 'src/app/shared/types/service';
 import { Service } from 'bonjour';
+import { TableDetailsType } from '../df-table-details/df-table-details.types';
 
 export const schemaServiceTypeResolver: ResolveFn<
   GenericListResponse<Array<ServiceType>>
@@ -28,4 +29,16 @@ export const schemaResolver: ResolveFn<
   return inject(BASE_SERVICE_TOKEN).get(`${dbName}/_schema`, {
     fields: ['name', 'label'].join(','),
   });
+};
+
+export const DfTableDetailsResolver: ResolveFn<TableDetailsType> = (
+  route: ActivatedRouteSnapshot
+) => {
+  const name = route.paramMap.get('name') ?? '';
+  const id = route.paramMap.get('id') ?? '';
+  const crudService = inject(BASE_SERVICE_TOKEN);
+  return crudService.get<TableDetailsType>(
+    `${name}/_schema/${id}?refresh=true`,
+    {}
+  );
 };

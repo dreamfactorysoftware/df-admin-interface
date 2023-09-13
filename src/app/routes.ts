@@ -49,6 +49,7 @@ import {
   DfEmailTemplatesResolver,
 } from './adf-config/resolvers/df-email-templates.resolver';
 import {
+  DfTableDetailsResolver,
   schemaResolver,
   schemaServiceResolver,
   schemaServiceTypeResolver,
@@ -563,7 +564,7 @@ export const routes: Routes = [
             },
           },
           {
-            path: `${ROUTES.VIEW}/:name`, // name here is the dbName
+            path: `${ROUTES.VIEW}/:name`,
             children: [
               {
                 path: '',
@@ -576,18 +577,46 @@ export const routes: Routes = [
                 },
               },
               {
-                path: ROUTES.CREATE, // create table (table details)
-                component: DfPlaceHolderComponent,
-              },
-              {
-                path: `${ROUTES.EDIT}/:id`, // edit table (table details), id here is the table name
+                path: ROUTES.CREATE,
                 children: [
                   {
                     path: '',
-                    component: DfPlaceHolderComponent,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-table-details/df-table-details.component'
+                      ).then(m => m.DfTableDetailsComponent),
+                    data: { type: 'create' },
+                  },
+                  // {
+                  //   path: `${ROUTES.CREATE}/field`, //TODO: check the create route childrens
+                  //   loadComponent: () =>
+                  //     import(
+                  //       './adf-schema/df-field-details/df-field-details.component'
+                  //     ).then(m => m.DfFieldDetailsComponent),
+                  // },
+                  // {
+                  //   path: `${ROUTES.EDIT}/:fieldName`,
+                  //   loadComponent: () =>
+                  //     import(
+                  //       './adf-schema/df-field-details/df-field-details.component'
+                  //     ).then(m => m.DfFieldDetailsComponent),
+                  // },
+                ],
+              },
+              {
+                path: `${ROUTES.EDIT}/:id`,
+                children: [
+                  {
+                    path: '',
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-table-details/df-table-details.component'
+                      ).then(m => m.DfTableDetailsComponent),
+                    resolve: { data: DfTableDetailsResolver },
+                    data: { type: 'edit' },
                   },
                   {
-                    path: `${ROUTES.CREATE}`,
+                    path: `${ROUTES.CREATE}/field`,
                     loadComponent: () =>
                       import(
                         './adf-schema/df-field-details/df-field-details.component'

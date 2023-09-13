@@ -74,10 +74,10 @@ export class DfBaseCrudService {
     );
   }
 
-  patch(id: string | number, options?: Partial<RequestOptions>) {
-    return this.http.patch(
+  patch<T, S>(id: string | number, data: S, options?: Partial<RequestOptions>) {
+    return this.http.patch<T>(
       `${this.url}/${id}`,
-      null,
+      data,
       this.getOptions({ snackbarError: 'server', ...options })
     );
   }

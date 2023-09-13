@@ -259,6 +259,10 @@
           "name": {
             "header": "{{nav.admin-settings.schema.fields.nav}}"
           }
+        },
+        "create": {
+          "nav": "Create a table",
+          "header": "{{nav.admin-settings.schema.create.nav}}"
         }
       },
       "users": {
