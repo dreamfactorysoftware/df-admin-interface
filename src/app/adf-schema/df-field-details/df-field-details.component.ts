@@ -126,10 +126,8 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.fieldName = this.activatedRoute.snapshot.paramMap.get('fieldName');
-    this.dbName = this.activatedRoute.snapshot.paramMap.get('dbName') as string;
-    this.tableName = this.activatedRoute.snapshot.paramMap.get(
-      'tableName'
-    ) as string;
+    this.dbName = this.activatedRoute.snapshot.paramMap.get('name') as string;
+    this.tableName = this.activatedRoute.snapshot.paramMap.get('id') as string;
 
     if (this.fieldName) {
       this.service
@@ -342,9 +340,9 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
           )
           .pipe(takeUntil(this.destroyed$))
           .subscribe(() => {
-            this.router.navigate([
-              `${ROUTES.ADMIN_SETTINGS}/${ROUTES.SCHEMA}/${ROUTES.VIEW}/:name/${ROUTES.CREATE}`,
-            ]);
+            this.router.navigate(['../../'], {
+              relativeTo: this.activatedRoute,
+            });
           });
       } else {
         this.service
@@ -358,17 +356,17 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
           )
           .pipe(takeUntil(this.destroyed$))
           .subscribe(() => {
-            this.router.navigate([
-              `${ROUTES.ADMIN_SETTINGS}/${ROUTES.SCHEMA}/${ROUTES.VIEW}/:name/${ROUTES.CREATE}`,
-            ]);
+            this.router.navigate(['../../'], {
+              relativeTo: this.activatedRoute,
+            });
           });
       }
     }
   }
 
   onCancel() {
-    this.router.navigate([
-      `${ROUTES.ADMIN_SETTINGS}/${ROUTES.SCHEMA}/${ROUTES.VIEW}/:name/${ROUTES.CREATE}`,
-    ]);
+    this.router.navigate(['../../'], {
+      relativeTo: this.activatedRoute,
+    });
   }
 }
