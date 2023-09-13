@@ -1,5 +1,37 @@
 <mat-tab-group>
-  <mat-tab label="Scripts"> Content 1 </mat-tab>
+  <mat-tab label="Scripts">
+    <div cdkMenuBar>
+      <button
+        *ngFor="let service of userServices"
+        class="script-menu-bar-item"
+        cdkMenuItem
+        [cdkMenuTriggerFor]="file">
+        {{ service.name }}
+      </button>
+    </div>
+
+    <ng-template #file>
+      <!-- <div class="script-menu" cdkMenu>
+        <button class="script-menu-item" cdkMenuItem>Share</button>
+        <hr />
+        <button
+          class="script-menu-item"
+          cdkMenuItem
+          [cdkMenuTriggerFor]="new_doc">
+          New <span>&#10148;</span>
+        </button>
+        <button class="script-menu-item" cdkMenuItem>Open</button>
+        <button class="script-menu-item" cdkMenuItem>Make a Copy</button>
+        <hr />
+        <button
+          class="script-menu-item"
+          cdkMenuItem
+          [cdkMenuTriggerFor]="download">
+          Download <span>&#10148;</span>
+        </button>
+      </div> -->
+    </ng-template>
+  </mat-tab>
   <mat-tab label="Script Samples">
     <df-script-samples></df-script-samples>
   </mat-tab>

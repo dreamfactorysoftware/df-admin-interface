@@ -84,6 +84,14 @@ export const CONFIG_CORS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
 export const CONFIG_CORS_URL_TOKEN = new InjectionToken<string>(
   'CONFIG_CORS_URL_TOKEN'
 );
+
+export const SCRIPTS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SCRIPTS_SERVICE_TOKEN'
+);
+export const SCRIPTS_URL_TOKEN = new InjectionToken<string>(
+  'SCRIPTS_URL_TOKEN'
+);
+
 export const CACHE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'CACHE_SERVICE_TOKEN'
 );

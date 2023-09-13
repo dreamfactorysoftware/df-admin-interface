@@ -21,6 +21,7 @@ export enum URLS {
   SYSTEM_USER = `${BASE_URL}/system/user`,
   SERVICE_REPORT = `${BASE_URL}/system/service_report`,
   SYSTEM_CORS = `${BASE_URL}/system/cors`,
+  SYSTEM_EVENT = `${BASE_URL}/system/event`,
   SCHEDULER = `${BASE_URL}/system/scheduler`,
   SYSTEM_CACHE = `${BASE_URL}/system/cache`,
   EMAIL_TEMPLATES = `${BASE_URL}/system/email_template`,

@@ -35,6 +35,8 @@ import {
   BASE_SERVICE_TOKEN,
   SERVICES_URL_TOKEN,
   SERVICES_SERVICE_TOKEN,
+  SCRIPTS_URL_TOKEN,
+  SCRIPTS_SERVICE_TOKEN,
 } from './tokens';
 import { BASE_URL, URLS } from './urls';
 
@@ -191,6 +193,18 @@ export const SERVICE_TYPES_SERVICE_PROVIDERS = [
     provide: SERVICE_TYPES_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [SERVICE_TYPES_URL_TOKEN, HttpClient],
+  },
+];
+
+export const SCRIPTS_SERVICE_PROVIDERS = [
+  {
+    provide: SCRIPTS_URL_TOKEN,
+    useValue: URLS.SYSTEM_EVENT,
+  },
+  {
+    provide: SCRIPTS_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [SCRIPTS_URL_TOKEN, HttpClient],
   },
 ];
 
