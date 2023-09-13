@@ -1,4 +1,38 @@
 {
+  "fieldDetailsForm": {
+    "updateSuccess": "Database field successfully updated",
+    "createSuccess": "Database field successfully created",
+    "controls": {
+      "name": "Name",
+      "alias": "Alias",
+      "label": "Label",
+      "isVirtual": "Is Virtual?",
+      "isAggregate": "Is Aggregate?",
+      "type": "Type",
+      "databaseType": "Database Type",
+      "length": "Length",
+      "precision": "Precision",
+      "scale": "Scale",
+      "fixedLength": "Fixed Length",
+      "supportsMultibyte": "Supports Multibyte",
+      "allowNull": "Allow Null",
+      "autoIncrement": "Auto Increment",
+      "defaultValue": "Default Value",
+      "isIndex": "Indexed",
+      "isUnique": "Unique",
+      "isPrimaryKey": "Primary Key",
+      "isForeignKey": "Foreign Key",
+      "refTable": "Reference Table",
+      "refField": "Reference Field",
+      "validation": "validation",
+      "picklist": "picklist"
+    },
+    "errors": {
+      "name": "Name is a required field",
+      "json": "Enter valid JSON here",
+      "csv": "Enter valid CSV here"
+    }
+  },
   "name": "Name",
   "alias": "Alias",
   "type": "Type",

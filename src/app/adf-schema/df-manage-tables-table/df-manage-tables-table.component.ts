@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { DfManageTableComponent } from '../../shared/components/df-manage-table/df-manage-table.component';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,7 +16,8 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
 import { takeUntil } from 'rxjs';
-import { DfDatabaseSchemaService } from '../services/df-database-schema.service';
+import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 
 @Component({
   selector: 'df-manage-tables-table',
@@ -45,7 +46,8 @@ import { DfDatabaseSchemaService } from '../services/df-database-schema.service'
 })
 export class DfManageTablesTableComponent extends DfManageTableComponent<DatabaseTableRowData> {
   constructor(
-    private service: DfDatabaseSchemaService,
+    @Inject(BASE_SERVICE_TOKEN)
+    private service: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -89,16 +91,20 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
       };
     });
   }
-  refreshTable(
-    limit?: number | undefined,
-    offset?: number | undefined,
-    filter?: string | undefined
-  ): void {
-    this._activatedRoute.data
+  refreshTable(limit?: number, offset?: number, filter?: string): void {
+    const dbName = this._activatedRoute.snapshot.paramMap.get('name');
+
+    this.service
+      .get(`${dbName}/_schema`, {
+        fields: ['name', 'label'].join(','),
+        limit,
+        offset,
+        filter,
+      })
       .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ data }) => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
+      .subscribe((data: any) => {
+        this.dataSource.data = this.mapDataToTable(data.data.resource);
+        this.tableLength = data.data.meta.count;
       });
   }
 

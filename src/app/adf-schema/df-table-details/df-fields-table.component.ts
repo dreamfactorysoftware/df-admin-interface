@@ -17,6 +17,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { takeUntil } from 'rxjs';
+import { ROUTES } from 'src/app/core/constants/routes';
 
 @Component({
   selector: 'df-fields-table',
@@ -142,6 +143,18 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
 
   filterQuery(value: string): string {
     return '';
+  }
+
+  override createRow(): void {
+    this.router.navigate([ROUTES.CREATE, 'field'], {
+      relativeTo: this._activatedRoute,
+    });
+  }
+
+  override editRow(row: FieldsRow): void {
+    this.router.navigate([ROUTES.EDIT, row.name], {
+      relativeTo: this._activatedRoute,
+    });
   }
 
   override deleteRow(row: FieldsRow): void {

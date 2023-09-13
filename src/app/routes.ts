@@ -54,7 +54,6 @@ import {
   schemaServiceResolver,
   schemaServiceTypeResolver,
 } from './adf-schema/resolvers/df-schema.resolver';
-import { DfDatabaseSchemaService } from './adf-schema/services/df-database-schema.service';
 import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
 import { ServiceRoutes } from './adf-services/routes';
 import { servicesResolver } from './adf-services/resolvers/services.resolver';
@@ -579,22 +578,58 @@ export const routes: Routes = [
               },
               {
                 path: ROUTES.CREATE,
-                loadComponent: () =>
-                  import(
-                    './adf-schema/df-table-details/df-table-details.component'
-                  ).then(m => m.DfTableDetailsComponent),
-                data: { type: 'create' },
-                providers: [...BASE_SERVICE_PROVIDERS],
+                children: [
+                  {
+                    path: '',
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-table-details/df-table-details.component'
+                      ).then(m => m.DfTableDetailsComponent),
+                    data: { type: 'create' },
+                  },
+                  {
+                    path: `${ROUTES.CREATE}/field`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
+                  {
+                    path: `${ROUTES.EDIT}/:fieldName`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
+                ],
               },
               {
                 path: `${ROUTES.EDIT}/:id`,
-                loadComponent: () =>
-                  import(
-                    './adf-schema/df-table-details/df-table-details.component'
-                  ).then(m => m.DfTableDetailsComponent),
-                resolve: { data: DfTableDetailsResolver },
-                data: { type: 'edit' },
-                providers: [...BASE_SERVICE_PROVIDERS],
+                children: [
+                  {
+                    path: '',
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-table-details/df-table-details.component'
+                      ).then(m => m.DfTableDetailsComponent),
+                    resolve: { data: DfTableDetailsResolver },
+                    data: { type: 'edit' },
+                  },
+                  {
+                    path: `${ROUTES.CREATE}/field`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
+                  {
+                    path: `${ROUTES.EDIT}/:fieldName`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
+                ],
               },
             ],
           },
@@ -602,7 +637,7 @@ export const routes: Routes = [
         providers: [
           ...SERVICES_SERVICE_PROVIDERS,
           ...SERVICE_TYPES_SERVICE_PROVIDERS,
-          DfDatabaseSchemaService,
+          ...BASE_SERVICE_PROVIDERS,
           provideTranslocoScope('schema'),
         ],
       },
