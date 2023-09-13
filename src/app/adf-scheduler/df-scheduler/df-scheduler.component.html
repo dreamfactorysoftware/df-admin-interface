@@ -80,7 +80,7 @@
       <!-- TODO Translate -->
       <p>Status Code: {{ scheduleToEdit?.taskLogByTaskId?.statusCode }}</p>
       <p>Error:</p>
-      <textarea rows="40" cols="60" matInput [value]="log" readonly></textarea>
+      <df-ace-editor [readonly]="true" [value]="log" />
       <button mat-raised-button color="primary" (click)="onCancel()">
         {{ 'goBack' | transloco }}
       </button>

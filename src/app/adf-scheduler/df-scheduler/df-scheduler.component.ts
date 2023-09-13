@@ -1,10 +1,5 @@
 import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
-import {
-  FormBuilder,
-  FormControl,
-  FormGroup,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { ROUTES } from 'src/app/core/constants/routes';
@@ -29,6 +24,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { Service } from 'src/app/shared/types/service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 
 @Component({
   selector: 'df-scheduler',
@@ -47,6 +43,7 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
     NgTemplateOutlet,
     TranslocoPipe,
     ReactiveFormsModule,
+    DfAceEditorComponent,
   ],
 })
 export class DfSchedulerComponent implements OnInit, OnDestroy {
