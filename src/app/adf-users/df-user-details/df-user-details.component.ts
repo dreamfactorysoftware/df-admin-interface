@@ -71,7 +71,7 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
 
   sendInvite() {
     this.userService
-      .patch(this.currentProfile.id, {
+      .patch(this.currentProfile.id, null, {
         snackbarSuccess: 'inviteSent',
       })
       .subscribe();

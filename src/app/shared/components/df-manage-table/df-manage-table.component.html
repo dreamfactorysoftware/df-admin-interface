@@ -69,7 +69,8 @@
         <button
           mat-icon-button
           [matMenuTriggerFor]="actionsMenu"
-          aria-label="Actions">
+          aria-label="Actions"
+          type="button">
           <fa-icon [icon]="faEllipsisV" size="xs"></fa-icon>
         </button>
         <mat-menu #actionsMenu="matMenu">
@@ -105,6 +106,11 @@
   </ng-container>
   <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
   <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+  <tr class="mat-row no-data-row" *matNoDataRow>
+    <td class="mat-cell" [attr.colspan]="columns.length">
+      {{ 'noEnteries' | transloco }}
+    </td>
+  </tr>
 </table>
 <div class="bottom-action-bar">
   <mat-paginator

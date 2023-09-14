@@ -4,6 +4,7 @@ import {
   AfterViewInit,
   Component,
   ContentChild,
+  Input,
   OnDestroy,
   OnInit,
   TemplateRef,
@@ -37,6 +38,7 @@ import { DfConfirmDialogComponent } from '../df-confirm-dialog/df-confirm-dialog
 export abstract class DfManageTableComponent<T>
   implements OnInit, AfterViewInit, OnDestroy
 {
+  @Input() tableData?: Array<T>;
   @ContentChild('itemActions') itemActions: TemplateRef<any>;
   destroyed$ = new Subject<void>();
   dataSource = new MatTableDataSource<T>();
@@ -74,16 +76,21 @@ export abstract class DfManageTableComponent<T>
   ) {}
 
   ngOnInit(): void {
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ data }) => {
-        if (data.resource) {
-          this.dataSource.data = this.mapDataToTable(data.resource);
-        }
-        if (data.meta) {
-          this.tableLength = data.meta.count;
-        }
-      });
+    if (!this.tableData) {
+      this.activatedRoute.data
+        .pipe(takeUntil(this.destroyed$))
+        .subscribe(({ data }) => {
+          if (data && data.resource) {
+            this.dataSource.data = this.mapDataToTable(data.resource);
+          }
+          if (data && data.meta) {
+            this.tableLength = data.meta.count;
+          }
+        });
+    } else {
+      this.allowFilter = false;
+      this.dataSource.data = this.mapDataToTable(this.tableData);
+    }
   }
 
   ngAfterViewInit(): void {

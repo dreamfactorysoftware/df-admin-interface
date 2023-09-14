@@ -1,0 +1,120 @@
+{
+  "fieldDetailsForm": {
+    "updateSuccess": "Database field successfully updated",
+    "createSuccess": "Database field successfully created",
+    "controls": {
+      "name": "Name",
+      "alias": "Alias",
+      "label": "Label",
+      "isVirtual": "Is Virtual?",
+      "isAggregate": "Is Aggregate?",
+      "type": "Type",
+      "databaseType": "Database Type",
+      "length": "Length",
+      "precision": "Precision",
+      "scale": "Scale",
+      "fixedLength": "Fixed Length",
+      "supportsMultibyte": "Supports Multibyte",
+      "allowNull": "Allow Null",
+      "autoIncrement": "Auto Increment",
+      "defaultValue": "Default Value",
+      "isIndex": "Indexed",
+      "isUnique": "Unique",
+      "isPrimaryKey": "Primary Key",
+      "isForeignKey": "Foreign Key",
+      "refTable": "Reference Table",
+      "refField": "Reference Field",
+      "validation": "validation",
+      "picklist": "picklist"
+    },
+    "errors": {
+      "name": "Name is a required field",
+      "json": "Enter valid JSON here",
+      "csv": "Enter valid CSV here"
+    }
+  },
+  "name": "Name",
+  "alias": "Alias",
+  "type": "Type",
+  "virtual": "Virtual",
+  "aggregate": "Aggregate",
+  "required": "Required",
+  "constraints": "Constraints",
+  "tableName": "Table Name",
+  "label": "Label",
+  "plural": "Plural Label",
+  "description": "Description",
+  "enter": {
+    "tableName": "Enter {tableName}",
+    "alias": "Enter {alias} label",
+    "label": "Enter table label",
+    "plural": "Enter table plural label",
+    "description": "Enter table description"
+  },
+  "fields": "Fields",
+  "addField": "Add Field",
+  "addRelationship": "Add Virtual Relationship",
+  "alert": {
+    "tableNameError": "Table name is required",
+    "saveSuccess": "Table created",
+    "updateSuccess": "Table updated",
+    "deleteSuccess": "Table deleted"
+  },
+  "primaryKey": "Primary Key",
+  "foreignKey": "Foreign Key",
+  "table": "Table",
+  "relationships": {
+    "heading": "Relationships",
+    "name": {
+      "tooltip": "The auto-generated relation name used by the API."
+    },
+    "alias": {
+      "tooltip": "If set, the alias is used in relation access instead of the name."
+    },
+    "label": {
+      "tooltip": "A displayable name used by clients."
+    },
+    "description": {
+      "tooltip": "A displayable description used by clients."
+    },
+    "fetch": "Always Fetch",
+    "type": "Type",
+    "virtualRelationship": "Virtual Relationship",
+    "field": {
+      "label": "Field",
+      "default": "Select Field"
+    },
+    "referenceService": {
+      "label": "Reference Service",
+      "default": "Select Reference Service"
+    },
+    "referenceTable": {
+      "label": "Reference Table",
+      "default": "Select Reference Table"
+    },
+    "referenceField": {
+      "label": "Reference Field",
+      "default": "Select Reference Field"
+    },
+    "junctionService": {
+      "label": "Junction Service",
+      "default": "Select Junction Service"
+    },
+    "junctionTable": {
+      "label": "Junction Table",
+      "default": "Select Junction Table"
+    },
+    "junctionField": {
+      "label": "Junction Field",
+      "default": "Select Junction Field"
+    },
+    "junctionReferenceField": {
+      "label": "Junction Reference Field",
+      "default": "Select Junction Reference Field"
+    },
+    "alert": {
+      "createSuccecss": "Relationship created",
+      "updateSuccess": "Relationship updated"
+    }
+  }
+}

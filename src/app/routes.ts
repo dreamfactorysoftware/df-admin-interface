@@ -51,11 +51,13 @@ import {
   DfEmailTemplatesResolver,
 } from './adf-config/resolvers/df-email-templates.resolver';
 import {
+  DfTableDetailsResolver,
+  DfTableFieldResolver,
+  DfTableRelationshipsEditResolver,
   schemaResolver,
   schemaServiceResolver,
   schemaServiceTypeResolver,
 } from './adf-schema/resolvers/df-schema.resolver';
-import { DfDatabaseSchemaService } from './adf-schema/services/df-database-schema.service';
 import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
 import { ServiceRoutes } from './adf-services/routes';
 import { servicesResolver } from './adf-services/resolvers/services.resolver';
@@ -289,7 +291,7 @@ export const routes: Routes = [
               ),
             resolve: {
               data: limitsResolver(),
-              users: usersResolver,
+              users: usersResolver(0),
               roles: rolesResolver(0),
               services: servicesResolver(0),
             },
@@ -302,7 +304,7 @@ export const routes: Routes = [
               ),
             resolve: {
               data: limitsResolver(),
-              users: usersResolver,
+              users: usersResolver(0),
               roles: rolesResolver(0),
               services: servicesResolver(0),
             },
@@ -577,19 +579,108 @@ export const routes: Routes = [
           },
           {
             path: `${ROUTES.VIEW}/:name`,
-            loadComponent: () =>
-              import(
-                './adf-schema/df-manage-tables-table/df-manage-tables-table.component'
-              ).then(m => m.DfManageTablesTableComponent),
-            resolve: {
-              data: schemaResolver,
-            },
+            children: [
+              {
+                path: '',
+                loadComponent: () =>
+                  import(
+                    './adf-schema/df-manage-tables-table/df-manage-tables-table.component'
+                  ).then(m => m.DfManageTablesTableComponent),
+                resolve: {
+                  data: schemaResolver,
+                },
+              },
+              {
+                path: ROUTES.CREATE,
+                children: [
+                  {
+                    path: '',
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-table-details/df-table-details.component'
+                      ).then(m => m.DfTableDetailsComponent),
+                    data: { type: 'create' },
+                  },
+                  {
+                    path: `${ROUTES.CREATE}/field`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
+                  {
+                    path: `${ROUTES.EDIT}/:fieldName`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
+                ],
+              },
+              {
+                path: `${ROUTES.EDIT}/:id`,
+                children: [
+                  {
+                    path: '',
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-table-details/df-table-details.component'
+                      ).then(m => m.DfTableDetailsComponent),
+                    resolve: { data: DfTableDetailsResolver },
+                    data: { type: 'edit' },
+                  },
+                  {
+                    path: `${ROUTES.CREATE}/field`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
+                  {
+                    path: `${ROUTES.EDIT}/:fieldName`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-field-details/df-field-details.component'
+                      ).then(m => m.DfFieldDetailsComponent),
+                  },
+                  {
+                    path: ROUTES.RELATIONSHIPS,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-relationship-details/df-relationship-details.component'
+                      ).then(m => m.DfRelationshipDetailsComponent),
+                    resolve: {
+                      fields: DfTableFieldResolver,
+                      serviceTypes: schemaServiceTypeResolver,
+                      services: schemaServiceResolver,
+                    },
+                    data: { type: 'create' },
+                  },
+                  {
+                    path: `${ROUTES.RELATIONSHIPS}/:relName`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-relationship-details/df-relationship-details.component'
+                      ).then(m => m.DfRelationshipDetailsComponent),
+                    resolve: {
+                      data: DfTableRelationshipsEditResolver,
+                      fields: DfTableFieldResolver,
+                      serviceTypes: schemaServiceTypeResolver,
+                      services: schemaServiceResolver,
+                    },
+                    data: { type: 'edit' },
+                  },
+                ],
+                providers: [...BASE_SERVICE_PROVIDERS],
+              },
+            ],
           },
         ],
         providers: [
           ...SERVICES_SERVICE_PROVIDERS,
           ...SERVICE_TYPES_SERVICE_PROVIDERS,
-          DfDatabaseSchemaService,
+          ...BASE_SERVICE_PROVIDERS,
+          provideTranslocoScope('schema'),
         ],
       },
       {
@@ -601,7 +692,7 @@ export const routes: Routes = [
               import(
                 './adf-users/df-manage-users/df-manage-users.component'
               ).then(m => m.DfManageUsersComponent),
-            resolve: { data: usersResolver },
+            resolve: { data: usersResolver() },
           },
           {
             path: `${ROUTES.EDIT}/:id`,

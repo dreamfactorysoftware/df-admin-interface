@@ -90,6 +90,7 @@
   "payload": "Payload (JSON)",
   "view": "View",
   "viewRow": "View row {{id}}",
+  "noEnteries":"No enteries found, you can create one by clicking on the button above.",
   "nav": {
     "home": {
       "nav": "Home",
@@ -252,7 +253,18 @@
       },
       "schema": {
         "nav": "Schema",
-        "header": "{{nav.admin-settings.schema.nav}}"
+        "header": "{{nav.admin-settings.schema.nav}}",
+        "fields": {
+          "nav": "Update Schema Field",
+          "header": "Create Schema Field",
+          "name": {
+            "header": "{{nav.admin-settings.schema.fields.nav}}"
+          }
+        },
+        "create": {
+          "nav": "Create a table",
+          "header": "{{nav.admin-settings.schema.create.nav}}"
+        }
       },
       "users": {
         "nav": "Users",

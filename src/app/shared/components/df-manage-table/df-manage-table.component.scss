@@ -32,3 +32,10 @@ $red-palette: mat.define-palette(mat.$red-palette);
   flex-direction: row;
   justify-content: center;
 }
+
+.no-data-row {
+  td {
+    text-align: center;
+    padding: 32px;
+  }
+}
