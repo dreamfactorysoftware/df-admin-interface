@@ -50,6 +50,8 @@ import {
 } from './adf-config/resolvers/df-email-templates.resolver';
 import {
   DfTableDetailsResolver,
+  DfTableFieldResolver,
+  DfTableRelationshipsEditResolver,
   schemaResolver,
   schemaServiceResolver,
   schemaServiceTypeResolver,
@@ -629,7 +631,35 @@ export const routes: Routes = [
                         './adf-schema/df-field-details/df-field-details.component'
                       ).then(m => m.DfFieldDetailsComponent),
                   },
+                  {
+                    path: ROUTES.RELATIONSHIPS,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-relationship-details/df-relationship-details.component'
+                      ).then(m => m.DfRelationshipDetailsComponent),
+                    resolve: {
+                      fields: DfTableFieldResolver,
+                      serviceTypes: schemaServiceTypeResolver,
+                      services: schemaServiceResolver,
+                    },
+                    data: { type: 'create' },
+                  },
+                  {
+                    path: `${ROUTES.RELATIONSHIPS}/:relName`,
+                    loadComponent: () =>
+                      import(
+                        './adf-schema/df-relationship-details/df-relationship-details.component'
+                      ).then(m => m.DfRelationshipDetailsComponent),
+                    resolve: {
+                      data: DfTableRelationshipsEditResolver,
+                      fields: DfTableFieldResolver,
+                      serviceTypes: schemaServiceTypeResolver,
+                      services: schemaServiceResolver,
+                    },
+                    data: { type: 'edit' },
+                  },
                 ],
+                providers: [...BASE_SERVICE_PROVIDERS],
               },
             ],
           },

@@ -52,7 +52,6 @@
     "description": "Enter table description"
   },
   "fields": "Fields",
-  "relationships": "Relationships",
   "addField": "Add Field",
   "addRelationship": "Add Virtual Relationship",
   "alert": {
@@ -63,5 +62,59 @@
   },
   "primaryKey": "Primary Key",
   "foreignKey": "Foreign Key",
-  "table": "Table"
+  "table": "Table",
+  "relationships": {
+    "heading": "Relationships",
+    "name": {
+      "tooltip": "The auto-generated relation name used by the API."
+    },
+    "alias": {
+      "tooltip": "If set, the alias is used in relation access instead of the name."
+    },
+    "label": {
+      "tooltip": "A displayable name used by clients."
+    },
+    "description": {
+      "tooltip": "A displayable description used by clients."
+    },
+    "fetch": "Always Fetch",
+    "type": "Type",
+    "virtualRelationship": "Virtual Relationship",
+    "field": {
+      "label": "Field",
+      "default": "Select Field"
+    },
+    "referenceService": {
+      "label": "Reference Service",
+      "default": "Select Reference Service"
+    },
+    "referenceTable": {
+      "label": "Reference Table",
+      "default": "Select Reference Table"
+    },
+    "referenceField": {
+      "label": "Reference Field",
+      "default": "Select Reference Field"
+    },
+    "junctionService": {
+      "label": "Junction Service",
+      "default": "Select Junction Service"
+    },
+    "junctionTable": {
+      "label": "Junction Table",
+      "default": "Select Junction Table"
+    },
+    "junctionField": {
+      "label": "Junction Field",
+      "default": "Select Junction Field"
+    },
+    "junctionReferenceField": {
+      "label": "Junction Reference Field",
+      "default": "Select Junction Reference Field"
+    },
+    "alert": {
+      "createSuccecss": "Relationship created",
+      "updateSuccess": "Relationship updated"
+    }
+  }
 }

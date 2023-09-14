@@ -49,4 +49,6 @@ export enum ROUTES {
   EMAIL_TEMPLATES = 'email-templates',
   GLOBAL_LOOKUP_KEYS = 'global-lookup-keys',
   TABLES = 'tables',
+  RELATIONSHIPS = 'relationships',
+  FIELDS = 'fields',
 }
