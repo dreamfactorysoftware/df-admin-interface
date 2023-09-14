@@ -9,7 +9,10 @@ import {
   CdkMenuBar,
 } from '@angular/cdk/menu';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { SCRIPTS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import {
+  EVENT_SCRIPT_SERVICE_TOKEN,
+  SCRIPTS_SERVICE_TOKEN,
+} from 'src/app/core/constants/tokens';
 import { ActivatedRoute } from '@angular/router';
 import { Service } from 'src/app/shared/types/service';
 import { Subject, takeUntil } from 'rxjs';
@@ -22,6 +25,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { camelCase, snakeCase } from 'lodash';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 
 @Component({
   selector: 'df-scripts',
@@ -35,6 +39,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
     MatSelectModule,
     MatSlideToggleModule,
     DfScriptSamplesComponent,
+    DfAceEditorComponent,
     CdkMenuGroup,
     CdkMenu,
     CdkMenuTrigger,
@@ -68,6 +73,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
 
   constructor(
     @Inject(SCRIPTS_SERVICE_TOKEN) private scriptService: DfBaseCrudService,
+    @Inject(EVENT_SCRIPT_SERVICE_TOKEN) private service: DfBaseCrudService,
     private activatedRoute: ActivatedRoute,
     private formBuilder: FormBuilder
   ) {
@@ -125,13 +131,48 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
 
   onSave() {
     console.log('is form valid: ', this.scriptFormGroup.valid);
-    console.log('form value: ', this.scriptFormGroup.value);
     console.log('script name: ', this.scriptFormGroup.controls['name'].value);
+    const createPayload = {
+      name: this.scriptFormGroup.controls['name'].value,
+      type: this.scriptFormGroup.controls['type'].value,
+      isActive: this.scriptFormGroup.controls['isActive'].value,
+      allowEventModification:
+        this.scriptFormGroup.controls['allowEventModification'].value,
+      content: this.scriptFormGroup.controls['content'].value,
+      scmReference: null,
+      scmRepository: null,
+      storagePath: null,
+      storageServiceId: null,
+    };
+    console.log('form value: ', createPayload);
+
+    if (this.scriptFormGroup.valid) {
+      this.service
+        .create(
+          {
+            resource: [createPayload],
+          },
+          {
+            snackbarError: 'server',
+            snackbarSuccess: 'Script successfully created', // TODO: add translation key here
+          }
+        )
+        .pipe(takeUntil(this.destroyed$))
+        .subscribe(data => {
+          console.log('success response: ', data);
+        });
+    }
   }
 
   onBack() {
     this.isDropdownFormVisible = true;
     this.confirmedEndpoint = null;
+    this.scriptFormGroup.patchValue({
+      type: this.scriptTypes[0],
+      content: '',
+      isActive: false,
+      allowEventModification: false,
+    });
   }
 
   onDesktopUploadScriptFile = async (event: Event) => {

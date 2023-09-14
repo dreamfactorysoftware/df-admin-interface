@@ -35,6 +35,7 @@ import {
   SERVICE_SERVICE_PROVIDERS,
   SCRIPTS_SERVICE_PROVIDERS,
   SCRIPT_TYPE_SERVICE_PROVIDERS,
+  EVENT_SCRIPT_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -230,6 +231,7 @@ export const routes: Routes = [
           ...SCRIPT_TYPE_SERVICE_PROVIDERS,
           ...SERVICES_SERVICE_PROVIDERS,
           ...SERVICE_TYPE_SERVICE_PROVIDERS,
+          ...EVENT_SCRIPT_SERVICE_PROVIDERS,
           provideTranslocoScope('scripts'),
         ],
       },
