@@ -20,4 +20,9 @@ export interface ScriptObject {
   scmRepository: any | null; // TODO: update these any types to an appropriate type
   scmReference: any | null;
   storagePath: any | null;
+  config?: any;
+  createdById?: number;
+  createdDate?: string;
+  lastModifiedById?: number;
+  lastModifiedDate?: string;
 }

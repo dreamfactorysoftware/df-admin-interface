@@ -15,11 +15,15 @@ import {
 } from 'src/app/core/constants/tokens';
 import { ActivatedRoute } from '@angular/router';
 import { Service } from 'src/app/shared/types/service';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { MatButtonModule } from '@angular/material/button';
-import { ScriptDetailsType, ScriptType } from '../types/df-scripts.types';
+import {
+  ScriptDetailsType,
+  ScriptObject,
+  ScriptType,
+} from '../types/df-scripts.types';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -63,10 +67,12 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
   selectedServiceAttributeKey: string;
   serviceKeys: string[] = [];
   serviceEndpoints: string[] = [];
-  serviceEndpointsToConfirm: string[] = []; // endpoints that may/may not contain inserted parameters
+  explodedEndpoints: string[] = [];
   selectedEndpoint: string | null;
   confirmedEndpoint: string | null;
   isDropdownFormVisible = true;
+  editScriptMode = false;
+  scriptToEdit: ScriptObject | null;
 
   dropDownOptionsFormGroup: FormGroup;
   scriptFormGroup: FormGroup;
@@ -130,9 +136,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
   }
 
   onSave() {
-    console.log('is form valid: ', this.scriptFormGroup.valid);
-    console.log('script name: ', this.scriptFormGroup.controls['name'].value);
-    const createPayload = {
+    const payload = {
       name: this.scriptFormGroup.controls['name'].value,
       type: this.scriptFormGroup.controls['type'].value,
       isActive: this.scriptFormGroup.controls['isActive'].value,
@@ -143,30 +147,55 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
       scmRepository: null,
       storagePath: null,
       storageServiceId: null,
-    };
-    console.log('form value: ', createPayload);
+    } as ScriptObject;
 
     if (this.scriptFormGroup.valid) {
-      this.service
-        .create(
-          {
-            resource: [createPayload],
-          },
-          {
-            snackbarError: 'server',
-            snackbarSuccess: 'Script successfully created', // TODO: add translation key here
-          }
-        )
-        .pipe(takeUntil(this.destroyed$))
-        .subscribe(data => {
-          console.log('success response: ', data);
-        });
+      if (this.editScriptMode) {
+        // update script here
+        this.service
+          .update(
+            payload.name,
+            {
+              ...payload,
+              config: this.scriptToEdit?.config,
+              createdById: this.scriptToEdit?.createdById,
+              createdDate: this.scriptToEdit?.createdDate,
+              lastModifiedById: this.scriptToEdit?.lastModifiedById,
+              lastModifiedDate: this.scriptToEdit?.lastModifiedDate,
+            },
+            {
+              snackbarError: 'server',
+              snackbarSuccess: 'Script successfully updated', // TODO: add translation key here
+            }
+          )
+          .pipe(takeUntil(this.destroyed$))
+          .subscribe(data => {
+            console.log('update success response: ', data);
+          });
+      } else {
+        this.service
+          .create(
+            {
+              resource: [payload],
+            },
+            {
+              snackbarError: 'server',
+              snackbarSuccess: 'Script successfully created', // TODO: add translation key here
+            }
+          )
+          .pipe(takeUntil(this.destroyed$))
+          .subscribe(data => {
+            console.log('create success response: ', data);
+          });
+      }
     }
   }
 
   onBack() {
+    this.editScriptMode = false;
     this.isDropdownFormVisible = true;
     this.confirmedEndpoint = null;
+
     this.scriptFormGroup.patchValue({
       type: this.scriptTypes[0],
       content: '',
@@ -182,7 +211,6 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
     this.scriptFormGroup.patchValue({
       content: text,
     });
-    console.log('file content: ', text);
   };
 
   onGithubUploadScriptFile(event: Event) {
@@ -190,32 +218,47 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
   }
 
   onConfirmServiceEndpointClick(confirmedEndpoint: string) {
-    // console.log('confirm endpoint selected: ', confirmedEndpoint);
     this.confirmedEndpoint = confirmedEndpoint;
     this.scriptFormGroup.patchValue({ name: this.confirmedEndpoint });
+
+    this.service
+      .get(this.confirmedEndpoint)
+      .pipe(
+        takeUntil(this.destroyed$),
+        catchError(err => {
+          console.error(err);
+          this.editScriptMode = false;
+          return throwError(() => new Error(err));
+        })
+      )
+      .subscribe((data: any) => {
+        this.editScriptMode = true;
+        this.scriptToEdit = data;
+
+        this.scriptFormGroup.patchValue({
+          type: data.type,
+          isActive: data.isActive,
+          content: data.content,
+        });
+      });
 
     this.isDropdownFormVisible = false;
   }
 
   onServiceEndpointClick(endpoint: string) {
-    // console.log('endpoint selected: ', endpoint);
     this.selectedEndpoint = endpoint;
 
-    this.serviceEndpointsToConfirm = [endpoint];
+    this.explodedEndpoints = [endpoint];
 
     if (
       this.selectedServiceAttributes[this.selectedServiceAttributeKey]
         .parameter !== null
     ) {
-      // loop through parameters and insert endpoint then insert parameter-interpolated endpoint strings into the selectedEndpoint str then insert into 'serviceEndpointsToConfirm' array
-      //const parameterName;
-
       const parameterObject =
         this.selectedServiceAttributes[this.selectedServiceAttributeKey]
           .parameter;
 
       const paramObjectKeys = Object.keys(parameterObject);
-      // console.log('key for parameters object: ', paramObjectKeys);
 
       const parameters: string[] = [];
 
@@ -223,39 +266,29 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         parameters.push(...parameterObject[paramObjectKey]);
       });
 
-      // console.log('parameters: ', parameters);
-
       if (endpoint.indexOf('{') >= 0 && endpoint.indexOf('}') >= 0) {
         paramObjectKeys.forEach(paramObjectKey => {
           parameters.forEach(param => {
-            this.serviceEndpointsToConfirm.push(
+            this.explodedEndpoints.push(
               endpoint.replace('{' + snakeCase(paramObjectKey) + '}', param)
             );
           });
         });
       }
-
-      // console.log(
-      //   'endpoint list for last dropdown: ',
-      //   this.serviceEndpointsToConfirm
-      // );
     }
 
     this.dropDownOptionsFormGroup.controls['confirmedServiceEndpoint'].enable();
   }
 
   onServiceKeyClick(key: string) {
-    // console.log('key: ', key);
     this.selectedServiceAttributeKey = key;
 
     this.dropDownOptionsFormGroup.controls['serviceEndpoint'].enable();
 
     this.serviceEndpoints = this.selectedServiceAttributes[key].endpoints;
-    // console.log('selectedServiceEndpoints:', this.serviceEndpoints);
   }
 
   onSelectServiceClick(service: Service) {
-    // console.log('service: ', service.name);
     this.selectedService = service;
 
     this.scriptService
@@ -277,13 +310,9 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         this.dropDownOptionsFormGroup.controls['serviceKeys'].enable();
 
         this.selectedServiceDetails = data;
-        // console.log('entire obj: ', this.selectedServiceDetails);
         const camel = camelCase(this.selectedService.name);
-        // console.log('selectedService name (key): ', camel);
         this.selectedServiceAttributes = this.selectedServiceDetails[camel];
-        // console.log('obj children: ', this.selectedServiceAttributes);
         this.serviceKeys = Object.keys(this.selectedServiceAttributes);
-        // console.log('obj children keys: ', this.serviceKeys);
       });
   }
 }

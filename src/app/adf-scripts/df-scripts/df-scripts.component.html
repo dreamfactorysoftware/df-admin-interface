@@ -3,7 +3,7 @@
   <mat-tab label="Scripts">
     <div class="script-button-container">
       <button mat-raised-button color="primary" (click)="onSave()">Save</button>
-      <button mat-raised-button>Delete</button>
+      <button mat-raised-button [disabled]="!editScriptMode">Delete</button>
       <button
         *ngIf="!isDropdownFormVisible"
         mat-raised-button
@@ -52,7 +52,7 @@
         <mat-form-field>
           <mat-select formControlName="confirmedServiceEndpoint">
             <mat-option
-              *ngFor="let confirmedEndpoint of serviceEndpointsToConfirm"
+              *ngFor="let confirmedEndpoint of explodedEndpoints"
               (click)="onConfirmServiceEndpointClick(confirmedEndpoint)"
               [value]="confirmedEndpoint">
               {{ confirmedEndpoint }}
@@ -95,7 +95,7 @@
           <input
             type="file"
             [accept]="getAcceptedFileTypes()"
-            #fileInput
+            #githubFileInput
             (change)="onGithubUploadScriptFile($event)" />
         </div>
         <!-- <div>
