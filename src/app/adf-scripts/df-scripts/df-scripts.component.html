@@ -1,35 +1,43 @@
 <mat-tab-group>
   <mat-tab label="Scripts">
-    <div cdkMenuBar>
+    <div class="script-button-container">
+      <button mat-raised-button color="primary">Save</button>
+      <button mat-raised-button>Cancel</button>
+    </div>
+    <div class="script-services-menu" cdkMenuBar>
       <button
         *ngFor="let service of userServices"
         class="script-menu-bar-item"
         cdkMenuItem
-        [cdkMenuTriggerFor]="file">
+        (click)="onSelectServiceClick(service)"
+        [cdkMenuTriggerFor]="scriptKeys">
         {{ service.name }}
       </button>
     </div>
 
-    <ng-template #file>
-      <!-- <div class="script-menu" cdkMenu>
-        <button class="script-menu-item" cdkMenuItem>Share</button>
-        <hr />
+    <ng-template #scriptKeys>
+      <div class="script-menu" cdkMenu>
         <button
+          *ngFor="let key of selectedServiceKeys"
           class="script-menu-item"
-          cdkMenuItem
-          [cdkMenuTriggerFor]="new_doc">
-          New <span>&#10148;</span>
+          (click)="onServiceKeyClick(key)"
+          [cdkMenuTriggerFor]="scriptEndpoints"
+          cdkMenuItem>
+          {{ key }}
         </button>
-        <button class="script-menu-item" cdkMenuItem>Open</button>
-        <button class="script-menu-item" cdkMenuItem>Make a Copy</button>
-        <hr />
+      </div>
+    </ng-template>
+
+    <ng-template #scriptEndpoints>
+      <div class="script-menu" cdkMenu>
         <button
+          *ngFor="let endpoint of selectedServiceEndpoints"
           class="script-menu-item"
-          cdkMenuItem
-          [cdkMenuTriggerFor]="download">
-          Download <span>&#10148;</span>
+          (click)="onServiceEndpointClick(endpoint)"
+          cdkMenuItem>
+          {{ endpoint }}
         </button>
-      </div> -->
+      </div>
     </ng-template>
   </mat-tab>
   <mat-tab label="Script Samples">

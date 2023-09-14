@@ -70,8 +70,8 @@ export interface Service {
   type: string;
   mutable: boolean;
   deletable: boolean;
-  createdData: string;
-  lastModifiedData: string;
+  createdDate: string;
+  lastModifiedDate: string;
   createdById: number | null;
   lastModifiedById: number | null;
   config: any;

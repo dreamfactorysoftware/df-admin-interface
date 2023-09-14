@@ -53,6 +53,14 @@ export const SERVICE_TYPES_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
   'SERVICE_TYPES_URL_TOKEN'
 );
 
+export const SCRIPT_TYPE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SCRIPT_TYPE_SERVICE_TOKEN'
+);
+
+export const SCRIPT_TYPE_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SCRIPT_TYPE_URL_TOKEN'
+);
+
 export const SCHEDULER_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'SCHEDULER_SERVICE_TOKEN'
 );

@@ -1,0 +1,21 @@
+.script-services-menu {
+  // display: inline-grid;
+  .script-menu-bar-item {
+    cursor: pointer;
+    border: none;
+
+    user-select: none;
+    min-width: 34px;
+    line-height: 26px;
+    padding: 0 16px;
+  }
+}
+
+.script-menu {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 180px;
+  max-width: 280px;
+  background-color: rgb(255, 255, 255);
+  padding: 6px 0;
+}

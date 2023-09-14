@@ -34,6 +34,7 @@ import {
   BASE_SERVICE_PROVIDERS,
   SERVICE_SERVICE_PROVIDERS,
   SCRIPTS_SERVICE_PROVIDERS,
+  SCRIPT_TYPE_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -63,6 +64,7 @@ import { provideTranslocoScope } from '@ngneat/transloco';
 import { AuthRoutes } from './adf-user-management/routes';
 import { serviceTypesResolver } from './adf-services/resolvers/service-types.resolver';
 import { DfScriptsComponent } from './adf-scripts/df-scripts/df-scripts.component';
+import { scriptTypeResolver } from './adf-scripts/resolvers/scripts.resolver';
 
 export const routes: Routes = [
   {
@@ -220,9 +222,10 @@ export const routes: Routes = [
       {
         path: ROUTES.SCRIPTS,
         component: DfScriptsComponent,
-        resolve: { data: servicesResolver() },
+        resolve: { data: servicesResolver(), scriptType: scriptTypeResolver },
         providers: [
           ...SCRIPTS_SERVICE_PROVIDERS,
+          ...SCRIPT_TYPE_SERVICE_PROVIDERS,
           ...SERVICES_SERVICE_PROVIDERS,
           ...SERVICE_TYPE_SERVICE_PROVIDERS,
         ],
