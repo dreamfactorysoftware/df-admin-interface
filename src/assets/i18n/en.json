@@ -90,6 +90,7 @@
   "payload": "Payload (JSON)",
   "view": "View",
   "viewRow": "View row {{id}}",
+  "noEnteries":"No enteries found, you can create one by clicking on the button above.",
   "nav": {
     "home": {
       "nav": "Home",

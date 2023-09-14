@@ -279,7 +279,7 @@ export const routes: Routes = [
               ),
             resolve: {
               data: limitsResolver(),
-              users: usersResolver,
+              users: usersResolver(0),
               roles: rolesResolver(0),
               services: servicesResolver(0),
             },
@@ -292,7 +292,7 @@ export const routes: Routes = [
               ),
             resolve: {
               data: limitsResolver(),
-              users: usersResolver,
+              users: usersResolver(0),
               roles: rolesResolver(0),
               services: servicesResolver(0),
             },
@@ -680,7 +680,7 @@ export const routes: Routes = [
               import(
                 './adf-users/df-manage-users/df-manage-users.component'
               ).then(m => m.DfManageUsersComponent),
-            resolve: { data: usersResolver },
+            resolve: { data: usersResolver() },
           },
           {
             path: `${ROUTES.EDIT}/:id`,
