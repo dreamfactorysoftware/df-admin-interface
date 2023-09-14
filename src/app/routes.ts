@@ -228,6 +228,7 @@ export const routes: Routes = [
           ...SCRIPT_TYPE_SERVICE_PROVIDERS,
           ...SERVICES_SERVICE_PROVIDERS,
           ...SERVICE_TYPE_SERVICE_PROVIDERS,
+          provideTranslocoScope('scripts'),
         ],
       },
       {
