@@ -2,56 +2,67 @@
 <mat-tab-group>
   <mat-tab label="Scripts">
     <div class="script-button-container">
-      <button mat-raised-button color="primary">Save</button>
-      <button mat-raised-button>Cancel</button>
+      <button mat-raised-button color="primary" (click)="onSave()">Save</button>
+      <button mat-raised-button>Delete</button>
+      <button
+        *ngIf="!isDropdownFormVisible"
+        mat-raised-button
+        (click)="onBack()">
+        Back
+      </button>
     </div>
-    <form [formGroup]="dropDownOptionsFormGroup">
-      <mat-form-field>
-        <mat-select formControlName="selectedService">
-          <mat-option
-            (click)="onSelectServiceClick(service)"
-            *ngFor="let service of userServices"
-            [value]="service">
-            {{ service.name }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
+    <ng-container>
+      <form
+        class="dropdown-form-group-container"
+        *ngIf="isDropdownFormVisible"
+        [formGroup]="dropDownOptionsFormGroup">
+        <mat-form-field>
+          <mat-select formControlName="selectedService">
+            <mat-option
+              (click)="onSelectServiceClick(service)"
+              *ngFor="let service of userServices"
+              [value]="service">
+              {{ service.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
 
-      <mat-form-field>
-        <mat-select formControlName="serviceKeys">
-          <mat-option
-            *ngFor="let key of serviceKeys"
-            (click)="onServiceKeyClick(key)"
-            [value]="key">
-            {{ key }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
+        <mat-form-field>
+          <mat-select formControlName="serviceKeys">
+            <mat-option
+              *ngFor="let key of serviceKeys"
+              (click)="onServiceKeyClick(key)"
+              [value]="key">
+              {{ key }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
 
-      <mat-form-field>
-        <mat-select formControlName="serviceEndpoint">
-          <mat-option
-            *ngFor="let endpoint of serviceEndpoints"
-            (click)="onServiceEndpointClick(endpoint)"
-            [value]="endpoint">
-            {{ endpoint }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
+        <mat-form-field>
+          <mat-select formControlName="serviceEndpoint">
+            <mat-option
+              *ngFor="let endpoint of serviceEndpoints"
+              (click)="onServiceEndpointClick(endpoint)"
+              [value]="endpoint">
+              {{ endpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
 
-      <mat-form-field>
-        <mat-select formControlName="confirmedServiceEndpoint">
-          <mat-option
-            *ngFor="let confirmedEndpoint of serviceEndpointsToConfirm"
-            (click)="onConfirmServiceEndpointClick(confirmedEndpoint)"
-            [value]="confirmedEndpoint">
-            {{ confirmedEndpoint }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-    </form>
-    <div *ngIf="confirmedEndpoint">
-      <form [formGroup]="scriptFormGroup">
+        <mat-form-field>
+          <mat-select formControlName="confirmedServiceEndpoint">
+            <mat-option
+              *ngFor="let confirmedEndpoint of serviceEndpointsToConfirm"
+              (click)="onConfirmServiceEndpointClick(confirmedEndpoint)"
+              [value]="confirmedEndpoint">
+              {{ confirmedEndpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </form>
+    </ng-container>
+    <ng-container *ngIf="confirmedEndpoint">
+      <form class="script-form-group-container" [formGroup]="scriptFormGroup">
         <mat-form-field>
           <mat-label>Script Name</mat-label>
           <input matInput formControlName="name" />
@@ -59,45 +70,43 @@
         <mat-form-field>
           <mat-label>Script Type/Language</mat-label>
           <mat-select formControlName="type">
-            <mat-option *ngFor="let type of scriptTypes">
+            <mat-option *ngFor="let type of scriptTypes" [value]="type.name">
               {{ type.label }}
             </mat-option>
           </mat-select>
         </mat-form-field>
-        <mat-form-field>
+        <div>
           <mat-slide-toggle formControlName="isActive">Active</mat-slide-toggle>
-        </mat-form-field>
-        <mat-form-field>
+        </div>
+        <div>
           <mat-slide-toggle formControlName="allowEventModification"
             >Allow script to modify request payload</mat-slide-toggle
           >
-        </mat-form-field>
-        <mat-form-field>
+        </div>
+        <div class="file-import-container">
           <h4>Import a script file</h4>
           <mat-label>From Desktop:</mat-label>
           <input
             type="file"
             [accept]="getAcceptedFileTypes()"
             #fileInput
-            (change)="onDesktopUploadScriptFile($event)"
-            style="display: none" />
+            (change)="onDesktopUploadScriptFile($event)" />
           <mat-label>From GitHub:</mat-label>
           <input
             type="file"
             [accept]="getAcceptedFileTypes()"
             #fileInput
-            (change)="onGithubUploadScriptFile($event)"
-            style="display: none" />
-        </mat-form-field>
-        <mat-form-field>
+            (change)="onGithubUploadScriptFile($event)" />
+        </div>
+        <!-- <div>
           <h4>Link to a service</h4>
           <mat-label>Service: </mat-label>
           <mat-select>
             <mat-option> </mat-option>
           </mat-select>
-        </mat-form-field>
+        </div> -->
       </form>
-    </div>
+    </ng-container>
   </mat-tab>
   <mat-tab label="Script Samples">
     <df-script-samples></df-script-samples>

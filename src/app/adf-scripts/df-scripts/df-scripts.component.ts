@@ -48,6 +48,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
   ],
 })
 export class DfScriptsComponent implements OnInit, OnDestroy {
+  // TODO: remove all console.logs
   destroyed$ = new Subject<void>();
   userServices: Service[];
   scriptTypes: ScriptType[];
@@ -60,6 +61,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
   serviceEndpointsToConfirm: string[] = []; // endpoints that may/may not contain inserted parameters
   selectedEndpoint: string | null;
   confirmedEndpoint: string | null;
+  isDropdownFormVisible = true;
 
   dropDownOptionsFormGroup: FormGroup;
   scriptFormGroup: FormGroup;
@@ -117,25 +119,45 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         return '.py';
 
       default:
-        return 'application/json';
+        return '.js, application/json, .py, .php'; //TODO: update to correct values
     }
   }
 
-  onDesktopUploadScriptFile(event: Event) {
-    console.log('desktop upload event: ', event);
+  onSave() {
+    console.log('is form valid: ', this.scriptFormGroup.valid);
+    console.log('form value: ', this.scriptFormGroup.value);
+    console.log('script name: ', this.scriptFormGroup.controls['name'].value);
   }
+
+  onBack() {
+    this.isDropdownFormVisible = true;
+    this.confirmedEndpoint = null;
+  }
+
+  onDesktopUploadScriptFile = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const text = await file?.text();
+    this.scriptFormGroup.patchValue({
+      content: text,
+    });
+    console.log('file content: ', text);
+  };
 
   onGithubUploadScriptFile(event: Event) {
     console.log('github upload event: ', event);
   }
 
   onConfirmServiceEndpointClick(confirmedEndpoint: string) {
-    console.log('confirm endpoint selected: ', confirmedEndpoint);
+    // console.log('confirm endpoint selected: ', confirmedEndpoint);
     this.confirmedEndpoint = confirmedEndpoint;
+    this.scriptFormGroup.patchValue({ name: this.confirmedEndpoint });
+
+    this.isDropdownFormVisible = false;
   }
 
   onServiceEndpointClick(endpoint: string) {
-    console.log('endpoint selected: ', endpoint);
+    // console.log('endpoint selected: ', endpoint);
     this.selectedEndpoint = endpoint;
 
     this.serviceEndpointsToConfirm = [endpoint];
@@ -152,7 +174,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
           .parameter;
 
       const paramObjectKeys = Object.keys(parameterObject);
-      console.log('key for parameters object: ', paramObjectKeys);
+      // console.log('key for parameters object: ', paramObjectKeys);
 
       const parameters: string[] = [];
 
@@ -160,7 +182,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         parameters.push(...parameterObject[paramObjectKey]);
       });
 
-      console.log('parameters: ', parameters);
+      // console.log('parameters: ', parameters);
 
       if (endpoint.indexOf('{') >= 0 && endpoint.indexOf('}') >= 0) {
         paramObjectKeys.forEach(paramObjectKey => {
@@ -172,27 +194,27 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         });
       }
 
-      console.log(
-        'endpoint list for last dropdown: ',
-        this.serviceEndpointsToConfirm
-      );
+      // console.log(
+      //   'endpoint list for last dropdown: ',
+      //   this.serviceEndpointsToConfirm
+      // );
     }
 
     this.dropDownOptionsFormGroup.controls['confirmedServiceEndpoint'].enable();
   }
 
   onServiceKeyClick(key: string) {
-    console.log('key: ', key);
+    // console.log('key: ', key);
     this.selectedServiceAttributeKey = key;
 
     this.dropDownOptionsFormGroup.controls['serviceEndpoint'].enable();
 
     this.serviceEndpoints = this.selectedServiceAttributes[key].endpoints;
-    console.log('selectedServiceEndpoints:', this.serviceEndpoints);
+    // console.log('selectedServiceEndpoints:', this.serviceEndpoints);
   }
 
   onSelectServiceClick(service: Service) {
-    console.log('service: ', service.name);
+    // console.log('service: ', service.name);
     this.selectedService = service;
 
     this.scriptService
@@ -214,13 +236,13 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         this.dropDownOptionsFormGroup.controls['serviceKeys'].enable();
 
         this.selectedServiceDetails = data;
-        console.log('entire obj: ', this.selectedServiceDetails);
+        // console.log('entire obj: ', this.selectedServiceDetails);
         const camel = camelCase(this.selectedService.name);
-        console.log('selectedService name (key): ', camel);
+        // console.log('selectedService name (key): ', camel);
         this.selectedServiceAttributes = this.selectedServiceDetails[camel];
-        console.log('obj children: ', this.selectedServiceAttributes);
+        // console.log('obj children: ', this.selectedServiceAttributes);
         this.serviceKeys = Object.keys(this.selectedServiceAttributes);
-        console.log('obj children keys: ', this.serviceKeys);
+        // console.log('obj children keys: ', this.serviceKeys);
       });
   }
 }
