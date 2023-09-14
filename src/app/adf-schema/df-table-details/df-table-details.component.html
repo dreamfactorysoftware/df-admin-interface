@@ -72,18 +72,18 @@
     </div>
 
     <div class="flex-100 margin-2-0">
-      <h2>{{ 'schema.relationships' | transloco }}</h2>
+      <h2>{{ 'schema.relationships.heading' | transloco }}</h2>
       <df-relationships-table
         [tableData]="tableRelated"></df-relationships-table>
     </div>
 
     <div class="flex-100">
-      <button mat-flat-button type="button" (click)="goBack()">
-        {{ 'cancel' | transloco }}
-      </button>
       <button mat-flat-button color="primary" type="submit">
         <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
         <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
+      </button>
+      <button mat-flat-button type="button" (click)="goBack()">
+        {{ 'cancel' | transloco }}
       </button>
     </div>
   </form>

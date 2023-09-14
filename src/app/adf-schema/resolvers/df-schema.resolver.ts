@@ -8,7 +8,10 @@ import {
 } from '../../core/constants/tokens';
 import { ServiceType } from 'src/app/shared/types/service';
 import { Service } from 'bonjour';
-import { TableDetailsType } from '../df-table-details/df-table-details.types';
+import {
+  TableDetailsType,
+  TableField,
+} from '../df-table-details/df-table-details.types';
 
 export const schemaServiceTypeResolver: ResolveFn<
   GenericListResponse<Array<ServiceType>>
@@ -41,4 +44,23 @@ export const DfTableDetailsResolver: ResolveFn<TableDetailsType> = (
     `${name}/_schema/${id}?refresh=true`,
     {}
   );
+};
+
+export const DfTableFieldResolver: ResolveFn<
+  GenericListResponse<Array<TableField>>
+> = (route: ActivatedRouteSnapshot) => {
+  const name = route.paramMap.get('name') ?? '';
+  const id = route.paramMap.get('id') ?? '';
+  const crudService = inject(BASE_SERVICE_TOKEN);
+  return crudService.get(`${name}/_schema/${id}/_field`, {});
+};
+
+export const DfTableRelationshipsEditResolver: ResolveFn<
+  GenericListResponse<Array<TableField>>
+> = (route: ActivatedRouteSnapshot) => {
+  const name = route.paramMap.get('name') ?? '';
+  const id = route.paramMap.get('id') ?? '';
+  const relName = route.paramMap.get('relName') ?? '';
+  const crudService = inject(BASE_SERVICE_TOKEN);
+  return crudService.get(`${name}/_schema/${id}/_related/${relName}`, {});
 };

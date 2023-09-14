@@ -17,6 +17,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { takeUntil } from 'rxjs';
+import { ROUTES } from 'src/app/core/constants/routes';
 
 @Component({
   selector: 'df-relationships-table',
@@ -115,6 +116,18 @@ export class DfRelationshipsTableComponent extends DfManageTableComponent<Relati
 
   filterQuery(value: string): string {
     return '';
+  }
+
+  override createRow(): void {
+    this.router.navigate([ROUTES.RELATIONSHIPS], {
+      relativeTo: this._activatedRoute,
+    });
+  }
+
+  override editRow(row: RelationshipsRow): void {
+    this.router.navigate([`${ROUTES.RELATIONSHIPS}/${row.name}`], {
+      relativeTo: this._activatedRoute,
+    });
   }
 
   override deleteRow(row: RelationshipsRow): void {
