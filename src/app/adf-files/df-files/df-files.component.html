@@ -1,0 +1,27 @@
+<df-files-table [tableData]="filesTableData">
+  <ng-container topActions>
+    <button
+      mat-mini-fab
+      color="primary"
+      [attr.aria-label]="'uploadFile' | transloco"
+      (click)="uploadFile()">
+      <fa-icon [icon]="faUpload" size="xl"></fa-icon>
+    </button>
+  </ng-container>
+  <ng-template let-row #itemActions>
+    <button
+      *ngIf="row.type === 'folder'"
+      mat-menu-item
+      (click)="openFolder(row)"
+      [attr.aria-label]="openFolderLabel(row) | async">
+      {{ 'open' | transloco }}
+    </button>
+    <button
+      *ngIf="row.type === 'folder'"
+      mat-menu-item
+      (click)="downloadFolder(row)"
+      [attr.aria-label]="downloadFolderLabel(row) | async">
+      {{ 'files.download' | transloco }}
+    </button>
+  </ng-template>
+</df-files-table>

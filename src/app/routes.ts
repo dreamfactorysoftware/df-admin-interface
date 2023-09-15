@@ -33,6 +33,7 @@ import {
   SERVICE_TYPE_SERVICE_PROVIDERS,
   BASE_SERVICE_PROVIDERS,
   SERVICE_SERVICE_PROVIDERS,
+  FILE_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -63,6 +64,11 @@ import { HomeRoutes } from './adf-home/routes';
 import { provideTranslocoScope } from '@ngneat/transloco';
 import { AuthRoutes } from './adf-user-management/routes';
 import { serviceTypesResolver } from './adf-services/resolvers/service-types.resolver';
+import {
+  DfFileResolver,
+  DfFilesResolver,
+  DfFolderResolver,
+} from './adf-files/resolver/df-files.resolver';
 
 export const routes: Routes = [
   {
@@ -719,7 +725,93 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.FILES,
-        component: DfPlaceHolderComponent,
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./adf-files/df-files/df-files.component').then(
+                m => m.DfFilesComponent
+              ),
+            resolve: { data: DfFilesResolver },
+          },
+          {
+            path: '**',
+            loadComponent: () =>
+              import('./adf-files/df-files/df-files.component').then(
+                m => m.DfFilesComponent
+              ),
+            resolve: { data: DfFilesResolver },
+          },
+          {
+            path: ':folderName',
+            pathMatch: 'full',
+            loadComponent: () =>
+              import('./adf-files/df-files/df-files.component').then(
+                m => m.DfFilesComponent
+              ),
+            resolve: { data: DfFolderResolver },
+            children: [
+              {
+                path: `${ROUTES.EDIT}/:fileName`,
+                loadComponent: () =>
+                  import(
+                    './adf-files/df-file-details/df-file-details.component'
+                  ).then(m => m.DfFileDetailsComponent),
+                resolve: { data: DfFileResolver },
+              },
+            ],
+          },
+          {
+            path: `${ROUTES.EDIT}/:fileName`,
+            loadComponent: () =>
+              import(
+                './adf-files/df-file-details/df-file-details.component'
+              ).then(m => m.DfFileDetailsComponent),
+            resolve: { data: DfFileResolver },
+          },
+          // children: [
+          //   {
+          //     path: '',
+          //     pathMatch: 'full',
+          //     loadComponent: () =>
+          //       import('./adf-files/df-files/df-files.component').then(
+          //         m => m.DfFilesComponent
+          //       ),
+          //     resolve: { data: DfFolderResolver },
+          //   },
+          //   {
+          //     path: ':folderName',
+          //     loadComponent: () =>
+          //       import('./adf-files/df-files/df-files.component').then(
+          //         m => m.DfFilesComponent
+          //       ),
+          //     children: [
+          //       {
+          //         path: '',
+          //         pathMatch: 'full',
+          //         loadComponent: () =>
+          //           import('./adf-files/df-files/df-files.component').then(
+          //             m => m.DfFilesComponent
+          //           ),
+          //       },
+          //     ],
+          //   },
+          //   {
+          //     path: `${ROUTES.EDIT}/:fileName`,
+          //     loadComponent: () =>
+          //       import(
+          //         './adf-files/df-file-details/df-file-details.component'
+          //       ).then(m => m.DfFileDetailsComponent),
+          //     resolve: { data: DfFileResolver },
+          //   },
+          // ],
+          // },
+        ],
+        providers: [
+          ...FILE_SERVICE_PROVIDERS,
+          ...BASE_SERVICE_PROVIDERS,
+          provideTranslocoScope('files'),
+        ],
       },
     ],
     canActivate: [loggedInGuard],

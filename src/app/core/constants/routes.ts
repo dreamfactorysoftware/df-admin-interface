@@ -51,4 +51,5 @@ export enum ROUTES {
   TABLES = 'tables',
   RELATIONSHIPS = 'relationships',
   FIELDS = 'fields',
+  ERROR = 'error',
 }

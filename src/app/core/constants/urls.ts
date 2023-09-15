@@ -25,4 +25,5 @@ export enum URLS {
   SYSTEM_CACHE = `${BASE_URL}/system/cache`,
   EMAIL_TEMPLATES = `${BASE_URL}/system/email_template`,
   LOOKUP_KEYS = `${BASE_URL}/system/lookup`,
+  FILES = `${BASE_URL}/files`,
 }

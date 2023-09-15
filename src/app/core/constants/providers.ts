@@ -35,6 +35,8 @@ import {
   BASE_SERVICE_TOKEN,
   SERVICES_URL_TOKEN,
   SERVICES_SERVICE_TOKEN,
+  FILE_URL_TOKEN,
+  FILE_SERVICE_TOKEN,
 } from './tokens';
 import { BASE_URL, URLS } from './urls';
 
@@ -250,5 +252,17 @@ export const BASE_SERVICE_PROVIDERS = [
     provide: BASE_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [BASE_URL_TOKEN, HttpClient],
+  },
+];
+
+export const FILE_SERVICE_PROVIDERS = [
+  {
+    provide: FILE_URL_TOKEN,
+    useValue: URLS.FILES,
+  },
+  {
+    provide: FILE_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [FILE_URL_TOKEN, HttpClient],
   },
 ];
