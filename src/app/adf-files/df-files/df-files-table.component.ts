@@ -47,9 +47,6 @@ import { FileTableRow, FileResponse } from '../df-files.types';
   ],
 })
 export class DfFilesTableComponent extends DfManageTableComponent<any> {
-  dbName: string;
-  tableName: string;
-
   constructor(
     @Inject(FILE_SERVICE_TOKEN)
     private crudService: DfBaseCrudService,
@@ -68,13 +65,6 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
       translateService,
       dialog
     );
-
-    this._activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        // RESOLVER DATA
-        console.log('file table', data);
-      });
   }
   override allowFilter = false;
   override columns = [
@@ -82,6 +72,12 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
       columnDef: 'name',
       header: 'name',
       cell: (row: FileTableRow) => row.name,
+    },
+    {
+      columnDef: 'type',
+      header: 'type',
+      cell: (row: FileTableRow) =>
+        row.type === 'folder' ? 'Folder' : row.contentType,
     },
     {
       columnDef: 'actions',
@@ -94,6 +90,7 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
         name: app.name,
         path: app.path,
         type: app.type,
+        contentType: app.contentType,
       };
     });
   }
@@ -103,28 +100,15 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
   }
 
   override editRow(row: FileTableRow): void {
-    this.router.navigate([ROUTES.EDIT, row.name], {
-      relativeTo: this._activatedRoute,
-    });
+    this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.FILES, row.path]);
   }
 
   override deleteRow(row: FileTableRow): void {
-    this.crudService
-      .delete(`${this.dbName}/_schema/${this.tableName}/_field/${row.name}`)
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(() => {
-        this.refreshTable();
-      });
     // TODO: implement error handling
     //  this.triggerAlert
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    this.crudService
-      .get(`${this.dbName}/_schema/${this.tableName}/_field`)
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe((data: any) => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-      });
+    //TODO ??
   }
 }

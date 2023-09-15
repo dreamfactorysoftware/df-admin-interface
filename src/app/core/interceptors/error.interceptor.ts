@@ -29,7 +29,7 @@ export const errorInterceptor: HttpInterceptorFn = (
           errorService.error = error.error.error.message;
           router.navigate([ROUTES.ERROR]);
         }
-        return throwError(() => new Error(error.error.message));
+        return throwError(() => error);
       })
     );
   }

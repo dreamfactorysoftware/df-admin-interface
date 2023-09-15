@@ -1,10 +1,9 @@
 import { Component } from '@angular/core';
 
 @Component({
-  selector: 'df-df-file-details',
+  selector: 'df-file-details',
   templateUrl: './df-file-details.component.html',
-  styleUrls: ['./df-file-details.component.scss']
+  styleUrls: ['./df-file-details.component.scss'],
+  standalone: true,
 })
-export class DfFileDetailsComponent {
-
-}
+export class DfFileDetailsComponent {}

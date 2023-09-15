@@ -69,7 +69,6 @@ export class DfFilesComponent {
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         // RESOLVER DATA
-        console.log('df-files', data['data']);
         this.filesTableData = data['data'].services;
       });
   }
@@ -86,9 +85,11 @@ export class DfFilesComponent {
 
   openFolder(row: FileTableRow) {
     console.log('open', row);
-    this.router.navigate([(row as any).path], {
-      relativeTo: this.activatedRoute,
-    });
+    this.router.navigate([
+      ROUTES.ADMIN_SETTINGS,
+      ROUTES.FILES,
+      (row as any).path,
+    ]);
   }
 
   openFolderLabel(row: FileTableRow) {

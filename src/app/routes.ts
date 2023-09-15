@@ -65,9 +65,8 @@ import { provideTranslocoScope } from '@ngneat/transloco';
 import { AuthRoutes } from './adf-user-management/routes';
 import { serviceTypesResolver } from './adf-services/resolvers/service-types.resolver';
 import {
-  DfFileResolver,
-  DfFilesResolver,
-  DfFolderResolver,
+  entityResolver,
+  entitiesResolver,
 } from './adf-files/resolver/df-files.resolver';
 
 export const routes: Routes = [
@@ -732,80 +731,26 @@ export const routes: Routes = [
               import('./adf-files/df-files/df-files.component').then(
                 m => m.DfFilesComponent
               ),
-            resolve: { data: DfFilesResolver },
+            resolve: { data: entitiesResolver },
           },
           {
-            path: '**',
+            path: ':entity',
             loadComponent: () =>
-              import('./adf-files/df-files/df-files.component').then(
-                m => m.DfFilesComponent
-              ),
-            resolve: { data: DfFilesResolver },
-          },
-          {
-            path: ':folderName',
-            pathMatch: 'full',
-            loadComponent: () =>
-              import('./adf-files/df-files/df-files.component').then(
-                m => m.DfFilesComponent
-              ),
-            resolve: { data: DfFolderResolver },
+              import(
+                './adf-files/df-file-viewer/df-file-viewer.component'
+              ).then(m => m.DfFileViewerComponent),
+            resolve: { data: entityResolver },
             children: [
               {
                 path: `${ROUTES.EDIT}/:fileName`,
                 loadComponent: () =>
                   import(
-                    './adf-files/df-file-details/df-file-details.component'
-                  ).then(m => m.DfFileDetailsComponent),
-                resolve: { data: DfFileResolver },
+                    './adf-files/df-file-viewer/df-file-viewer.component'
+                  ).then(m => m.DfFileViewerComponent),
+                resolve: { data: entityResolver },
               },
             ],
           },
-          {
-            path: `${ROUTES.EDIT}/:fileName`,
-            loadComponent: () =>
-              import(
-                './adf-files/df-file-details/df-file-details.component'
-              ).then(m => m.DfFileDetailsComponent),
-            resolve: { data: DfFileResolver },
-          },
-          // children: [
-          //   {
-          //     path: '',
-          //     pathMatch: 'full',
-          //     loadComponent: () =>
-          //       import('./adf-files/df-files/df-files.component').then(
-          //         m => m.DfFilesComponent
-          //       ),
-          //     resolve: { data: DfFolderResolver },
-          //   },
-          //   {
-          //     path: ':folderName',
-          //     loadComponent: () =>
-          //       import('./adf-files/df-files/df-files.component').then(
-          //         m => m.DfFilesComponent
-          //       ),
-          //     children: [
-          //       {
-          //         path: '',
-          //         pathMatch: 'full',
-          //         loadComponent: () =>
-          //           import('./adf-files/df-files/df-files.component').then(
-          //             m => m.DfFilesComponent
-          //           ),
-          //       },
-          //     ],
-          //   },
-          //   {
-          //     path: `${ROUTES.EDIT}/:fileName`,
-          //     loadComponent: () =>
-          //       import(
-          //         './adf-files/df-file-details/df-file-details.component'
-          //       ).then(m => m.DfFileDetailsComponent),
-          //     resolve: { data: DfFileResolver },
-          //   },
-          // ],
-          // },
         ],
         providers: [
           ...FILE_SERVICE_PROVIDERS,

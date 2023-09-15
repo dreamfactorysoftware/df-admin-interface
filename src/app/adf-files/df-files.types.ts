@@ -26,13 +26,15 @@ export interface FileTableRow {
   path: string;
   name: string;
   type: 'folder' | 'file';
+  contentType: string;
+  lastModified?: string;
 }
 
 export interface FileResponse {
   path: string;
-  content_type?: string;
-  last_modified?: string;
-  content_length?: number;
+  contentType?: string;
+  lastModified?: string;
+  contentLength?: number;
   name: string;
   type: string;
 }
