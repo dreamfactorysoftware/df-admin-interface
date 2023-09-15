@@ -67,6 +67,7 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
     );
   }
   override allowFilter = false;
+  override allowCreate = false;
   override columns = [
     {
       columnDef: 'name',

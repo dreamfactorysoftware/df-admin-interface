@@ -733,6 +733,14 @@ export const routes: Routes = [
               ),
             resolve: { data: entitiesResolver },
           },
+          // {
+          //   path: '**',
+          //   loadComponent: () =>
+          //     import('./adf-files/df-files/df-files.component').then(
+          //       m => m.DfFilesComponent
+          //     ),
+          //   resolve: { data: DfFilesResolver },
+          // },
           {
             path: ':entity',
             loadComponent: () =>

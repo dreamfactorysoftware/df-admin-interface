@@ -8,7 +8,7 @@ describe('DfFileDetailsComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfFileDetailsComponent]
+      declarations: [DfFileDetailsComponent],
     });
     fixture = TestBed.createComponent(DfFileDetailsComponent);
     component = fixture.componentInstance;

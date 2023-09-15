@@ -1,6 +1,6 @@
 import { Component, Inject } from '@angular/core';
 import { DfFilesTableComponent } from './df-files-table.component';
-import { faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faFolderPlus, faUpload } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { AsyncPipe, NgIf } from '@angular/common';
@@ -12,6 +12,8 @@ import { MatMenuModule } from '@angular/material/menu';
 import { FILE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { ROUTES } from 'src/app/core/constants/routes';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { DfFilesDialogComponent } from './df-files-dialog.component';
 
 @Component({
   selector: 'df-files',
@@ -26,6 +28,8 @@ import { ROUTES } from 'src/app/core/constants/routes';
     MatButtonModule,
     AsyncPipe,
     MatMenuModule,
+    MatDialogModule,
+    DfFilesDialogComponent,
   ],
 })
 export class DfFilesComponent {
@@ -55,6 +59,7 @@ export class DfFilesComponent {
   // POST http://localhost/api/v2/files/{FOLDER_NAME}/{FILE_NAME}?force=true
 
   faUpload = faUpload;
+  faFolderPlus = faFolderPlus;
   filesTableData: FileResponse[];
   destroyed$ = new Subject<void>();
 
@@ -63,7 +68,8 @@ export class DfFilesComponent {
     private crudService: DfBaseCrudService,
     private activatedRoute: ActivatedRoute,
     private translateService: TranslocoService,
-    private router: Router
+    private router: Router,
+    public dialog: MatDialog
   ) {
     this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
@@ -73,12 +79,20 @@ export class DfFilesComponent {
       });
   }
 
+  // ! DELETE
+  testEditFile(): void {
+    this.router.navigate(['details'], {
+      relativeTo: this.activatedRoute,
+    });
+  }
+
   uploadFile(): void {
     console.log('upload file');
   }
 
   createFolder(): void {
     console.log('create folder');
+    this.dialog.open(DfFilesDialogComponent);
   }
 
   // TODO: hide "edit" action option for folders

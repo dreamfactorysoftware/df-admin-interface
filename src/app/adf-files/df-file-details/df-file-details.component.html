@@ -1,1 +1,12 @@
-<p>df-file-details works!</p>
+<div class="file-details-container">
+  <df-ace-editor [(value)]="fileData" />
+  <!-- (valueChange)="onValueChange($event)"  -->
+  <div>
+    <button mat-flat-button color="primary" type="button" (click)="save()">
+      {{ 'save' | transloco }}
+    </button>
+    <button mat-flat-button type="button" (click)="goBack()">
+      {{ 'cancel' | transloco }}
+    </button>
+  </div>
+</div>

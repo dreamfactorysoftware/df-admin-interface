@@ -3,9 +3,20 @@
     <button
       mat-mini-fab
       color="primary"
+      [attr.aria-label]="'createFolder' | transloco"
+      (click)="createFolder()">
+      <fa-icon [icon]="faFolderPlus" size="xl"></fa-icon>
+    </button>
+    <button
+      mat-mini-fab
+      color="primary"
       [attr.aria-label]="'uploadFile' | transloco"
       (click)="uploadFile()">
       <fa-icon [icon]="faUpload" size="xl"></fa-icon>
+    </button>
+    <!-- TODO DELETE -->
+    <button mat-mini-fab color="secondary" (click)="testEditFile()">
+      Edit File
     </button>
   </ng-container>
   <ng-template let-row #itemActions>

@@ -11,6 +11,7 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  EventEmitter,
   Input,
   OnChanges,
   OnDestroy,
@@ -33,7 +34,7 @@ export class DfAceEditorComponent
   @Input() mode: AceEditorMode = 'text';
   @Input() readonly = false;
   @Input() value: string;
-  @Output() valueChange: string;
+  @Output() valueChange = new EventEmitter<string>();
 
   @ViewChild('editor') elementRef: ElementRef<HTMLElement>;
 
@@ -59,7 +60,7 @@ export class DfAceEditorComponent
     });
     this.editor.renderer.attachToShadowRoot();
     this.editor.addEventListener('change', () => {
-      this.valueChange = this.editor.getValue();
+      this.valueChange.emit(this.editor.getValue());
     });
   }
 
