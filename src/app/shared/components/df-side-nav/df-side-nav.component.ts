@@ -16,6 +16,7 @@ import { transformRoutes } from '../../utilities/route';
 import { Nav } from '../../types/nav';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
+import { DfErrorService } from 'src/app/core/services/df-error.service';
 
 @Component({
   selector: 'df-side-nav',
@@ -44,14 +45,15 @@ export class DfSideNavComponent {
   userData$ = this.userDataService.userData$;
   faAngleDown = faAngleDown;
   faBars = faBars;
-
+  hasError$ = this.errorService.hasError$;
   nav = transformRoutes(routes);
 
   constructor(
     private breakpointService: DfBreakpointService,
     private userDataService: DfUserDataService,
     private authService: DfAuthService,
-    private router: Router
+    private router: Router,
+    private errorService: DfErrorService
   ) {}
 
   logout() {

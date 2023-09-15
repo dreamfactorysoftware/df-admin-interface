@@ -1,6 +1,6 @@
 @use '@angular/material' as mat;
-
-$deep-purple-palette: mat.define-palette(mat.$deep-purple-palette);
+@use 'src/theme' as theme;
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
 .logo {
   height: 30px;
@@ -13,11 +13,15 @@ $deep-purple-palette: mat.define-palette(mat.$deep-purple-palette);
   flex-direction: column;
 }
 
+.mat-toolbar {
+  min-height: 64px;
+}
+
 .sidenav-container {
-  height: 100%;
+  flex: 1 1 auto;
   .sidenav {
-    background-color: mat.get-color-from-palette($deep-purple-palette, 500);
-    min-width: 30%;
+    background-color: mat.get-color-from-palette($df-purple-palette, 900);
+    min-width: 40%;
     border: none;
     transition: min-width 0.3s ease-out;
     .small & {
@@ -31,7 +35,7 @@ $deep-purple-palette: mat.define-palette(mat.$deep-purple-palette);
       min-width: 40%;
     }
     .parent-route {
-      font-size: 16px;
+      font-size: 1.6rem;
       font-weight: 400;
       height: 48px;
       padding: 0 16px;
@@ -44,19 +48,20 @@ $deep-purple-palette: mat.define-palette(mat.$deep-purple-palette);
     mat-nav-list {
       a {
         &.active {
-          background-color: mat.get-color-from-palette(
-            $deep-purple-palette,
-            200
-          );
+          background-color: mat.get-color-from-palette($df-purple-palette, 200);
         }
       }
     }
   }
   .sidenav-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
     .banner {
+      flex-shrink: 0;
       height: 150px;
       width: 100%;
-      background-color: mat.get-color-from-palette($deep-purple-palette, 500);
+      background-color: mat.get-color-from-palette($df-purple-palette, 900);
       .page-header {
         color: white;
         padding: 32px;
@@ -64,16 +69,18 @@ $deep-purple-palette: mat.define-palette(mat.$deep-purple-palette);
     }
     .main {
       height: 100%;
-      .logged-in & {
-        height: fit-content;
-        margin: -60px 32px 0 32px;
-        padding: 32px 32px 0 32px;
-        background-color: white;
-      }
-      .logged-in.small & {
-        margin: 0;
-        margin-top: -60px;
-        padding: 8px 8px 0 8px;
+      flex-grow: 1;
+      &.no-error {
+        .logged-in & {
+          margin: -60px 32px 0 32px;
+          padding: 32px 32px 0 32px;
+          background-color: white;
+        }
+        .logged-in.small & {
+          margin: 0;
+          margin-top: -60px;
+          padding: 16px 16px 0 16px;
+        }
       }
     }
   }

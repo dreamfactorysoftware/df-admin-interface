@@ -16,7 +16,10 @@ export class DfLoadingSpinnerService {
     if (value) {
       this.activeCounter++;
     } else {
-      this.activeCounter = Math.max(this.activeCounter - 1, 0);
+      setTimeout(
+        () => (this.activeCounter = Math.max(this.activeCounter - 1, 0)),
+        100
+      );
     }
     this.active$.next(value);
   }

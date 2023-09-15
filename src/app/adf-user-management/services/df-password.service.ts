@@ -17,7 +17,9 @@ import {
 } from '../../core/constants/http-headers';
 import { DfUserDataService } from 'src/app/core/services/df-user-data.service';
 
-@Injectable()
+@Injectable({
+  providedIn: 'root',
+})
 export class DfPasswordService {
   constructor(
     private http: HttpClient,

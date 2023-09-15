@@ -6,10 +6,17 @@ export function transformRoutes(routes: Routes, root = '') {
     .filter(
       route =>
         route.path &&
-        !['CREATE', 'IMPORT', 'EDIT', 'AUTH', 'PROFILE', 'VIEW'].includes(
-          route.path.split('/')[0].toUpperCase()
-        ) &&
-        route.path !== ''
+        ![
+          'CREATE',
+          'IMPORT',
+          'EDIT',
+          'AUTH',
+          'PROFILE',
+          'VIEW',
+          'ERROR',
+        ].includes(route.path.split('/')[0].toUpperCase()) &&
+        route.path !== '' &&
+        !route.path.includes(':')
     )
     .map(route => {
       const transformed: Nav = { route: `${root}/${route.path}` };

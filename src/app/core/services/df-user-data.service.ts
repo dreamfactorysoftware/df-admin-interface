@@ -1,7 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { ROUTES } from '../constants/routes';
 @Injectable({
   providedIn: 'root',
 })
@@ -10,8 +8,6 @@ export class DfUserDataService {
   isLoggedIn$ = this.isLoggedInSubject.asObservable();
   private userDataSubject = new BehaviorSubject<UserData | null>(null);
   userData$ = this.userDataSubject.asObservable();
-
-  constructor(private router: Router) {}
 
   private TOKEN_KEY = 'session_token';
   clearToken() {
@@ -35,7 +31,6 @@ export class DfUserDataService {
     this.isLoggedInSubject.next(isLoggedIn);
     if (!isLoggedIn) {
       this.userData = null;
-      this.router.navigate([`/${ROUTES.AUTH}/${ROUTES.LOGIN}`]);
     }
   }
 

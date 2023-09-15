@@ -1,7 +1,7 @@
 <df-side-nav>
-  <router-outlet></router-outlet>
+  <router-outlet />
 </df-side-nav>
-<div *ngIf="activeSpinner$ | async" class="loading-spinner">
+<div *ngIf="activeSpinner$ | async" class="spinner-container">
   <div class="backdrop"></div>
-  <mat-spinner></mat-spinner>
+  <img class="spinner" src="assets/img/df-cog.svg" alt="spinner" width="200" />
 </div>

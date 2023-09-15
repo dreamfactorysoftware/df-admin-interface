@@ -2,6 +2,26 @@
   class="app-container"
   [class.small]="isSmallScreen | async"
   [class.logged-in]="isLoggedIn$ | async">
+  <ng-container *ngIf="isLoggedIn$ | async">
+    <mat-toolbar>
+      <button mat-icon-button (click)="sideNav.toggle()">
+        <fa-icon [icon]="faBars"></fa-icon>
+      </button>
+      <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
+      <span class="spacer"></span>
+      <button mat-button [matMenuTriggerFor]="profileMenu">
+        {{ (userData$ | async)?.name }}
+      </button>
+      <mat-menu #profileMenu="matMenu">
+        <button mat-menu-item [routerLink]="['/profile']">
+          {{ 'nav.profile.header' | transloco }}
+        </button>
+        <button mat-menu-item (click)="logout()">
+          {{ 'nav.logout.header' | transloco }}
+        </button>
+      </mat-menu>
+    </mat-toolbar>
+  </ng-container>
   <mat-sidenav-container class="sidenav-container" autosize>
     <mat-sidenav
       #sideNav
@@ -10,7 +30,6 @@
       class="sidenav"
       [mode]="(isSmallScreen | async) ? 'over' : 'side'">
       <mat-nav-list *ngIf="isLoggedIn$ | async">
-        <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
         <ng-container
           *ngTemplateOutlet="
             navList;
@@ -20,31 +39,11 @@
     </mat-sidenav>
     <mat-sidenav-content class="sidenav-content">
       <ng-container *ngIf="isLoggedIn$ | async">
-        <mat-toolbar>
-          <button
-            mat-icon-button
-            (click)="sideNav.toggle()"
-            *ngIf="isSmallScreen | async">
-            <fa-icon [icon]="faBars"></fa-icon>
-          </button>
-          <span class="spacer"></span>
-          <button mat-button [matMenuTriggerFor]="profileMenu">
-            {{ (userData$ | async)?.name }}
-          </button>
-          <mat-menu #profileMenu="matMenu">
-            <button mat-menu-item [routerLink]="['/profile']">
-              {{ 'nav.profile.header' | transloco }}
-            </button>
-            <button mat-menu-item (click)="logout()">
-              {{ 'nav.logout.header' | transloco }}
-            </button>
-          </mat-menu>
-        </mat-toolbar>
-        <div class="banner">
+        <div class="banner" *ngIf="(hasError$ | async) === false">
           <h1 class="page-header">{{ pageHeader() | transloco }}</h1>
         </div>
       </ng-container>
-      <div class="main">
+      <div class="main" [class.no-error]="(hasError$ | async) === false">
         <ng-content></ng-content>
       </div>
     </mat-sidenav-content>
