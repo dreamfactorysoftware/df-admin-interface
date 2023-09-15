@@ -32,15 +32,9 @@ export class DfFileDetailsComponent implements OnInit, OnDestroy {
     private router: Router,
     private activatedRoute: ActivatedRoute
   ) {
-    this.crudService
-      .get('testfolder/test-file.js?method=GET', {
-        limit: 0,
-      })
+    this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
-      .subscribe(res => {
-        console.log('FILE DETAILS', res);
-        // this.fileData = 'this is some test data';
-      });
+      .subscribe(({ data }) => (this.fileData = data.data));
   }
 
   ngOnInit(): void {

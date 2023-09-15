@@ -14,23 +14,23 @@ export const entityResolver: ResolveFn<any> = (
 ) => {
   const entity = route.paramMap.get('entity') ?? '';
   const crudService = inject(FILE_SERVICE_TOKEN);
-  return crudService
-    .get(`${entity}`, {
-      limit: 0,
-    })
-    .pipe(
+  const file = route.queryParams['file'];
+  if (file === 'true') {
+    return crudService.getText(`${entity}`).pipe(
       map((response: any) => {
-        const type = response.resource ? 'folder' : 'file';
-        if (type === 'folder') {
-          return {
-            type,
-            ...response,
-          };
-        }
         return {
-          type,
+          type: 'file',
           data: response,
         };
       })
     );
+  }
+  return crudService.get(`${entity}`).pipe(
+    map((response: any) => {
+      return {
+        type: 'folder',
+        ...response,
+      };
+    })
+  );
 };

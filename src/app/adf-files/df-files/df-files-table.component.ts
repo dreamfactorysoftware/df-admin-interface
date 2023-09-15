@@ -101,7 +101,11 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
   }
 
   override editRow(row: FileTableRow): void {
-    this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.FILES, row.path]);
+    this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.FILES, row.path], {
+      queryParams: {
+        file: 'true',
+      },
+    });
   }
 
   override deleteRow(row: FileTableRow): void {

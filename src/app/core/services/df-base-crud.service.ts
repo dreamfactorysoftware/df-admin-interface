@@ -35,6 +35,13 @@ export class DfBaseCrudService {
     );
   }
 
+  getText(id: string | number, options?: Partial<RequestOptions>) {
+    return this.http.get(`${this.url}/${id}`, {
+      responseType: 'text',
+      ...this.getOptions({ contentType: 'text/plain', ...options }),
+    });
+  }
+
   create<T, S>(
     data: {
       resource: Array<S>;

@@ -12,7 +12,6 @@ import { DfFileDetailsComponent } from '../df-file-details/df-file-details.compo
   imports: [AsyncPipe, DfFileDetailsComponent, DfFilesComponent, NgIf],
 })
 export class DfFileViewerComponent {
-  data = this.activatedRoute.data.pipe(map(({ data }) => data));
-  type = this.data.pipe(map(({ type }) => type));
+  type = this.activatedRoute.data.pipe(map(({ data }) => data.type));
   constructor(private activatedRoute: ActivatedRoute) {}
 }
