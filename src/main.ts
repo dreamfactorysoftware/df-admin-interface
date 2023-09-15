@@ -12,6 +12,7 @@ import { snackbarInterceptor } from './app/core/interceptors/snackbar.intercepto
 import { caseInterceptor } from './app/core/interceptors/case.interceptor';
 import { TranslocoHttpLoader } from './transloco-loader';
 import { provideTransloco } from '@ngneat/transloco';
+import { errorInterceptor } from './app/core/interceptors/error.interceptor';
 
 function initEnvironment(systemConfigService: DfSystemConfigDataService) {
   return () => systemConfigService.fetchEnvironmentData();
@@ -29,10 +30,11 @@ bootstrapApplication(AppComponent, {
     provideAnimations(),
     provideHttpClient(
       withInterceptors([
-        sessionTokenInterceptor,
-        loadingInterceptor,
-        snackbarInterceptor,
         caseInterceptor,
+        loadingInterceptor,
+        errorInterceptor,
+        sessionTokenInterceptor,
+        snackbarInterceptor,
       ])
     ),
     provideRouter(routes, withHashLocation()),

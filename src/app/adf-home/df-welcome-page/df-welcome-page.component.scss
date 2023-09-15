@@ -1,7 +1,8 @@
 @use '@angular/material' as mat;
+@use 'src/theme' as theme;
 @import '../adf-home.module.scss';
 
-$orange-palette: mat.define-palette(mat.$orange-palette);
+$df-coral-palette: mat.define-palette(theme.$df-coral-palette);
 
 .two-column-flex-container {
   display: flex;
@@ -62,7 +63,7 @@ $orange-palette: mat.define-palette(mat.$orange-palette);
 }
 
 #video-link-description {
-  font-size: 18px;
+  font-size: 1.8rem;
   font-weight: bold;
 }
 
@@ -73,5 +74,5 @@ mat-card.notice-card {
 
 .pre-heading-icon {
   margin-right: 10px;
-  color: mat.get-color-from-palette($orange-palette, 300);
+  color: mat.get-color-from-palette($df-coral-palette, 300);
 }

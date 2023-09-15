@@ -1,0 +1,86 @@
+@use '@angular/material' as mat;
+
+@include mat.core();
+
+@font-face {
+  font-family: 'Inter';
+  src: url('assets/fonts/Inter/Inter-VariableFont_slnt\,wght.ttf');
+}
+
+$df-typography-config: mat.define-typography-config(
+  $font-family: 'Inter',
+);
+// $headline-1: mat.define-typography-level(64px, 72px, 600),
+// $headline-5: mat.define-typography-level(48px, 54px, 600),
+// $headline-6: mat.define-typography-level(32px, 42px, 600),
+//   $subtitle-1: mat.define-typography-level(24px, 32px, 600),
+//   $body-1: mat.define-typography-level(22px, 28px, 600),
+//   $body-2: mat.define-typography-level(16px, 24px, 300),
+//   $subtitle-2: mat.define-typography-level(20px, 28px, 300),
+
+$df-purple-palette: (
+  50: #f1f0f6,
+  100: #e2e1ed,
+  200: #c6c4db,
+  300: #aaa8ca,
+  400: #908cba,
+  500: #7571a9,
+  600: #5c5699,
+  700: #423c89,
+  800: #29227a,
+  900: #0f0761,
+  contrast: (
+    50: #000000,
+    100: #000000,
+    200: #000000,
+    300: #000000,
+    400: #ffffff,
+    500: #ffffff,
+    600: #ffffff,
+    700: #ffffff,
+    800: #ffffff,
+    900: #ffffff,
+  ),
+);
+
+$df-coral-palette: (
+  50: #ffede5,
+  100: #ffdbcb,
+  200: #ffb595,
+  300: #ff8c5a,
+  400: #dd7345,
+  500: #b65f39,
+  600: #914b2d,
+  700: #6d3922,
+  800: #4b2717,
+  900: #2b160d,
+  contrast: (
+    50: #000000,
+    100: #000000,
+    200: #000000,
+    300: #000000,
+    400: #ffffff,
+    500: #ffffff,
+    600: #ffffff,
+    700: #ffffff,
+    800: #ffffff,
+    900: #ffffff,
+  ),
+);
+
+$my-primary: mat.define-palette($df-purple-palette, 900);
+$my-accent: mat.define-palette($df-coral-palette, 500);
+$my-warn: mat.define-palette(mat.$red-palette);
+
+$my-theme: mat.define-light-theme(
+  (
+    color: (
+      primary: $my-primary,
+      accent: $my-accent,
+      warn: $my-warn,
+    ),
+    typography: $df-typography-config,
+  )
+);
+@include mat.all-component-themes($my-theme);
+@include mat.typography-hierarchy($df-typography-config);
