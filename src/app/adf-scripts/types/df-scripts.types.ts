@@ -26,3 +26,19 @@ export interface ScriptObject {
   lastModifiedById?: number;
   lastModifiedDate?: string;
 }
+
+// TODO: may need to update this from snake case to camel case
+export interface GithubFileObject {
+  content: string;
+  download_url: string;
+  encoding: string;
+  git_url: string;
+  html_url: string;
+  name: string;
+  path: string;
+  sha: string;
+  size: number;
+  type: string;
+  url: string;
+  _links: { self: string; git: string; html: string };
+}

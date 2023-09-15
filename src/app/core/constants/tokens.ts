@@ -3,6 +3,13 @@ import { DfBaseCrudService } from '../services/df-base-crud.service';
 
 export const URL_TOKEN = new InjectionToken<string>('URL_TOKEN');
 
+export const GITHUB_REPO_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'GITHUB_REPO_SERVICE_TOKEN'
+);
+export const GITHUB_REPO_URL_TOKEN = new InjectionToken<string>(
+  'GITHUB_REPO_URL_TOKEN'
+);
+
 export const ADMIN_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'ADMIN_SERVICE_TOKEN'
 );

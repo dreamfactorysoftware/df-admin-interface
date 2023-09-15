@@ -3,7 +3,12 @@
   <mat-tab label="Scripts">
     <div class="script-button-container">
       <button mat-raised-button color="primary" (click)="onSave()">Save</button>
-      <button mat-raised-button [disabled]="!editScriptMode">Delete</button>
+      <button
+        mat-raised-button
+        (click)="onDelete()"
+        [disabled]="!editScriptMode">
+        Delete
+      </button>
       <button
         *ngIf="!isDropdownFormVisible"
         mat-raised-button
@@ -92,11 +97,9 @@
             #fileInput
             (change)="onDesktopUploadScriptFile($event)" />
           <mat-label>From GitHub:</mat-label>
-          <input
-            type="file"
-            [accept]="getAcceptedFileTypes()"
-            #githubFileInput
-            (change)="onGithubUploadScriptFile($event)" />
+          <button mat-raised-button color="primary" (click)="openDialog()">
+            Select File
+          </button>
         </div>
         <!-- <div>
           <h4>Link to a service</h4>

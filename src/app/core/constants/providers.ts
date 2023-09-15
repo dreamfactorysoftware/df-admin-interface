@@ -41,6 +41,8 @@ import {
   SCRIPT_TYPE_SERVICE_TOKEN,
   EVENT_SCRIPT_URL_TOKEN,
   EVENT_SCRIPT_SERVICE_TOKEN,
+  GITHUB_REPO_URL_TOKEN,
+  GITHUB_REPO_SERVICE_TOKEN,
 } from './tokens';
 import { BASE_URL, URLS } from './urls';
 
@@ -53,6 +55,18 @@ export const ADMIN_SERVICE_PROVIDERS = [
     provide: ADMIN_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [ADMIN_URL_TOKEN, HttpClient],
+  },
+];
+
+export const GITHUB_REPO_SERVICE_PROVIDERS = [
+  {
+    provide: GITHUB_REPO_URL_TOKEN,
+    useValue: URLS.GITHUB_REPO,
+  },
+  {
+    provide: GITHUB_REPO_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [GITHUB_REPO_URL_TOKEN, HttpClient],
   },
 ];
 

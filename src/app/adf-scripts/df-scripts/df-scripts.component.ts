@@ -20,6 +20,7 @@ import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { MatButtonModule } from '@angular/material/button';
 import {
+  GithubFileObject,
   ScriptDetailsType,
   ScriptObject,
   ScriptType,
@@ -30,6 +31,8 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { camelCase, snakeCase } from 'lodash';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { DfScriptsGithubDialogComponent } from '../df-scripts-github-dialog/df-scripts-github-dialog.component';
 
 @Component({
   selector: 'df-scripts',
@@ -38,6 +41,7 @@ import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df
   standalone: true,
   imports: [
     MatButtonModule,
+    MatDialogModule,
     MatInputModule,
     MatTabsModule,
     MatSelectModule,
@@ -73,6 +77,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
   isDropdownFormVisible = true;
   editScriptMode = false;
   scriptToEdit: ScriptObject | null;
+  githubFileObject: GithubFileObject;
 
   dropDownOptionsFormGroup: FormGroup;
   scriptFormGroup: FormGroup;
@@ -81,7 +86,8 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
     @Inject(SCRIPTS_SERVICE_TOKEN) private scriptService: DfBaseCrudService,
     @Inject(EVENT_SCRIPT_SERVICE_TOKEN) private service: DfBaseCrudService,
     private activatedRoute: ActivatedRoute,
-    private formBuilder: FormBuilder
+    private formBuilder: FormBuilder,
+    public dialog: MatDialog
   ) {
     this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
@@ -133,6 +139,23 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
       default:
         return '.js, application/json, .py, .php'; //TODO: update to correct values
     }
+  }
+
+  openDialog() {
+    const dialogRef = this.dialog.open(DfScriptsGithubDialogComponent);
+
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(res => {
+        console.log('res: ', res);
+        if (res) {
+          this.githubFileObject = res.data;
+          this.scriptFormGroup.patchValue({
+            content: window.atob(this.githubFileObject['content']),
+          });
+        }
+      });
   }
 
   onSave() {
@@ -202,6 +225,17 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
       isActive: false,
       allowEventModification: false,
     });
+  }
+
+  onDelete() {
+    if (this.scriptToEdit) {
+      this.service
+        .delete(this.scriptToEdit.name)
+        .pipe(takeUntil(this.destroyed$))
+        .subscribe(() => {
+          this.onBack();
+        });
+    }
   }
 
   onDesktopUploadScriptFile = async (event: Event) => {
