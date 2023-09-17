@@ -105,7 +105,14 @@
           <div class="file-import-container">
             <h4>Import a script file</h4>
             <mat-label>From Desktop:</mat-label>
+            <button
+              mat-raised-button
+              color="primary"
+              (click)="fileInput.click()">
+              Select File
+            </button>
             <input
+              hidden
               type="file"
               [accept]="getAcceptedFileTypes()"
               #fileInput
@@ -131,30 +138,39 @@
             </mat-form-field>
             <mat-form-field
               *ngIf="
-                selectedFileService &&
-                (selectedFileService.type === 'github' ||
-                  selectedFileService.type === 'gitlab' ||
-                  selectedFileService.type === 'bitbucket')
+                (selectedFileService &&
+                  (selectedFileService.type === 'github' ||
+                    selectedFileService.type === 'gitlab' ||
+                    selectedFileService.type === 'bitbucket')) ||
+                scriptFormGroup.controls['scmRepository'].value
               ">
               <mat-label>Repository: </mat-label>
               <input matInput formControlName="scmRepository" />
             </mat-form-field>
             <mat-form-field
               *ngIf="
-                selectedFileService &&
-                (selectedFileService.type === 'github' ||
-                  selectedFileService.type === 'gitlab' ||
-                  selectedFileService.type === 'bitbucket')
+                (selectedFileService &&
+                  (selectedFileService.type === 'github' ||
+                    selectedFileService.type === 'gitlab' ||
+                    selectedFileService.type === 'bitbucket')) ||
+                scriptFormGroup.controls['scmReference'].value
               ">
               <mat-label>Branch/Tag: </mat-label>
               <input matInput formControlName="scmReference" />
             </mat-form-field>
             <mat-form-field
-              *ngIf="selectedFileService && fileServiceDropdownOptions.length">
+              *ngIf="
+                (selectedFileService && fileServiceDropdownOptions.length) ||
+                scriptFormGroup.controls['storagePath'].value
+              ">
               <mat-label>Path: </mat-label>
               <input matInput formControlName="storagePath" />
             </mat-form-field>
-            <div>
+            <div
+              *ngIf="
+                selectedFileService ||
+                scriptFormGroup.controls['storageServiceId'].value
+              ">
               <button mat-button color="primary" (click)="pullLatestScript()">
                 View Latest
               </button>

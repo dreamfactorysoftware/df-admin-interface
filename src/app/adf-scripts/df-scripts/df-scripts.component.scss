@@ -1,6 +1,28 @@
+.dropdown-form-group-container {
+  width: 40%;
+}
+
 .script-form-group-container {
+  padding: 20px;
+
   .file-import-container {
     margin-top: 1rem;
     display: grid;
+
+    button {
+      width: 40%;
+    }
+  }
+
+  .script-form-container {
+    width: 50%;
+    float: left;
+    padding: 20px;
+  }
+
+  .script-editor-container {
+    width: 40%;
+    float: right;
+    padding: 20px;
   }
 }

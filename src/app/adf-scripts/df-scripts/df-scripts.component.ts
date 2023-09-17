@@ -144,7 +144,6 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         this.selectedFileService = this.fileServiceDropdownOptions.find(val => {
           return val.id === id;
         });
-        console.log('file service: ', this.selectedFileService);
       });
   }
 
@@ -194,19 +193,16 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
 
   onSave() {
     const payload = {
-      // TODO: remove the commented code below
-
-      // name: this.scriptFormGroup.controls['name'].value,
-      // type: this.scriptFormGroup.controls['type'].value,
-      // isActive: this.scriptFormGroup.controls['isActive'].value,
-      // allowEventModification:
-      //   this.scriptFormGroup.controls['allowEventModification'].value,
-      // content: this.scriptFormGroup.controls['content'].value,
-      ...this.scriptFormGroup.value,
-      // scmReference: null,
-      // scmRepository: null,
-      // storagePath: null,
-      // storageServiceId: null,
+      name: this.scriptFormGroup.controls['name'].value,
+      type: this.scriptFormGroup.controls['type'].value,
+      isActive: this.scriptFormGroup.controls['isActive'].value,
+      allowEventModification:
+        this.scriptFormGroup.controls['allowEventModification'].value,
+      content: this.scriptFormGroup.controls['content'].value,
+      scmReference: this.scriptFormGroup.controls['scmReference'].value,
+      scmRepository: this.scriptFormGroup.controls['scmRepository'].value,
+      storagePath: this.scriptFormGroup.controls['storagePath'].value,
+      storageServiceId: this.scriptFormGroup.controls['storageServiceId'].value,
     } as ScriptObject;
 
     if (this.scriptFormGroup.valid) {
@@ -242,7 +238,11 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
             }
           )
           .pipe(takeUntil(this.destroyed$))
-          .subscribe();
+          .subscribe(() => {
+            if (this.confirmedEndpoint) {
+              this.fetchScript(this.confirmedEndpoint);
+            }
+          });
       }
     }
   }
@@ -263,7 +263,10 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
   onDelete() {
     if (this.scriptToEdit) {
       this.eventScriptService
-        .delete(this.scriptToEdit.name)
+        .delete(this.scriptToEdit.name, {
+          snackbarError: 'server',
+          snackbarSuccess: 'Script successfully deleted', // TODO: add translation key here
+        })
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.onBack();
@@ -332,12 +335,9 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
     });
   };
 
-  onConfirmServiceEndpointClick(confirmedEndpoint: string) {
-    this.confirmedEndpoint = confirmedEndpoint;
-    this.scriptFormGroup.patchValue({ name: this.confirmedEndpoint });
-
+  private fetchScript(endpoint: string) {
     this.eventScriptService
-      .get(this.confirmedEndpoint)
+      .get(endpoint)
       .pipe(
         takeUntil(this.destroyed$),
         catchError(err => {
@@ -355,6 +355,14 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
           content: data.content,
         });
       });
+  }
+
+  onConfirmServiceEndpointClick(confirmedEndpoint: string) {
+    this.confirmedEndpoint = confirmedEndpoint;
+    this.scriptFormGroup.patchValue({ name: this.confirmedEndpoint });
+
+    // fetching if script exists, if it does the form is populated
+    this.fetchScript(this.confirmedEndpoint);
 
     this.isDropdownFormVisible = false;
   }
@@ -405,6 +413,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
   onSelectServiceClick(service: Service) {
     this.selectedService = service;
 
+    // fetch all endpoints for selected service
     this.scriptService
       .getAll({
         additionalParams: [
