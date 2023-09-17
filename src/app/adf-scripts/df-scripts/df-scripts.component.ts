@@ -34,6 +34,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfScriptsGithubDialogComponent } from '../df-scripts-github-dialog/df-scripts-github-dialog.component';
+import { KeyValuePair } from 'src/app/shared/types/generic-http.type';
 
 @Component({
   selector: 'df-scripts',
@@ -270,11 +271,52 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
     }
   }
 
-  pullLatestScript() {}
+  pullLatestScript() {
+    const serviceName = this.scriptFormGroup.controls['name'];
+    const serviceRepo = this.scriptFormGroup.controls['scmRepository'];
+    const serviceRef = this.scriptFormGroup.controls['scmReference'];
+    const servicePath = this.scriptFormGroup.controls['storagePath'];
+    let endpoint = '/' + serviceName;
+
+    let params: KeyValuePair[] = [];
+
+    if (
+      this.selectedFileService &&
+      (this.selectedFileService.type === 'github' ||
+        this.selectedFileService.type === 'gitlab' ||
+        this.selectedFileService.type === 'bitbucket')
+    ) {
+      params = [
+        {
+          key: 'path',
+          value: servicePath,
+        },
+        { key: 'branch', value: serviceRef },
+        { key: 'content', value: 1 },
+      ];
+      endpoint = endpoint + '/_repo/' + serviceRepo;
+    } else {
+      endpoint = endpoint + '/' + servicePath;
+    }
+
+    this.baseService
+      .get(endpoint, {
+        additionalParams: [...params],
+        snackbarError: 'server',
+        snackbarSuccess: 'Successfully pulled the latest script from source.',
+      })
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        console.log('latest script data: ', data);
+      });
+  }
 
   deleteScriptFromCache() {
     this.baseService
-      .delete(`system/cache/_event/${this.confirmedEndpoint}`)
+      .delete(`system/cache/_event/${this.confirmedEndpoint}`, {
+        snackbarError: 'server',
+        snackbarSuccess: 'Successfully cleared script from cache.',
+      })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(response => {
         console.log('onDeleteScriptFromCache response: ', response);
