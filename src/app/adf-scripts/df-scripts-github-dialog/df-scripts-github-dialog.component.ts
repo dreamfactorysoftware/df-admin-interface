@@ -69,19 +69,19 @@ export class DfScriptsGithubDialogComponent implements OnInit, OnDestroy {
             const urlParams = url.substring(url.indexOf('.com/') + 5);
             const urlArray = urlParams.split('/');
 
-            console.log('url array: ', urlArray);
-
             this.repoOwner = urlArray[0];
             this.repoName = urlArray[1];
             this.fileName = urlArray[4];
             const githubApiEndpoint = `${this.repoOwner}/${this.repoName}`;
 
             this.githubService
-              .get(githubApiEndpoint)
+              .get(githubApiEndpoint, {
+                snackbarError: 'server',
+                snackbarSuccess: 'Script file successfully fetched', // TODO: add translation
+              })
               .pipe(
                 takeUntil(this.destroyed$),
                 catchError(err => {
-                  console.error(err);
                   // repo can't be found therefore it is private hence enabling the username and password fields
                   this.isGitRepoPrivate = true;
                   this.formGroup.addControl(

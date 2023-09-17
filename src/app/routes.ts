@@ -228,6 +228,7 @@ export const routes: Routes = [
         component: DfScriptsComponent,
         resolve: { data: servicesResolver(), scriptType: scriptTypeResolver },
         providers: [
+          ...BASE_SERVICE_PROVIDERS,
           ...SCRIPTS_SERVICE_PROVIDERS,
           ...SCRIPT_TYPE_SERVICE_PROVIDERS,
           ...SERVICES_SERVICE_PROVIDERS,

@@ -10,6 +10,7 @@ import {
 } from '@angular/cdk/menu';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import {
+  BASE_SERVICE_TOKEN,
   EVENT_SCRIPT_SERVICE_TOKEN,
   SCRIPTS_SERVICE_TOKEN,
 } from 'src/app/core/constants/tokens';
@@ -61,7 +62,6 @@ import { DfScriptsGithubDialogComponent } from '../df-scripts-github-dialog/df-s
   ],
 })
 export class DfScriptsComponent implements OnInit, OnDestroy {
-  // TODO: remove all console.logs
   destroyed$ = new Subject<void>();
   userServices: Service[];
   scriptTypes: ScriptType[];
@@ -78,13 +78,18 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
   editScriptMode = false;
   scriptToEdit: ScriptObject | null;
   githubFileObject: GithubFileObject;
+  fileServiceDropdownOptions: Partial<Service>[] = [];
+  selectedFileService: Partial<Service> | undefined;
 
   dropDownOptionsFormGroup: FormGroup;
   scriptFormGroup: FormGroup;
 
   constructor(
     @Inject(SCRIPTS_SERVICE_TOKEN) private scriptService: DfBaseCrudService,
-    @Inject(EVENT_SCRIPT_SERVICE_TOKEN) private service: DfBaseCrudService,
+    @Inject(EVENT_SCRIPT_SERVICE_TOKEN)
+    private eventScriptService: DfBaseCrudService,
+    @Inject(BASE_SERVICE_TOKEN)
+    private baseService: DfBaseCrudService,
     private activatedRoute: ActivatedRoute,
     private formBuilder: FormBuilder,
     public dialog: MatDialog
@@ -109,17 +114,46 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
       content: [''],
       isActive: [false],
       allowEventModification: [false],
+      storageServiceId: [null],
+      scmRepository: [null], // TODO: update these any types to an appropriate type
+      scmReference: [null],
+      storagePath: [null],
     });
   }
 
   ngOnInit(): void {
-    // TODO: add the value changes subscriptions to dropdowns here
-    console.log();
+    const baseParams = ['source+control', 'file'];
+    this.baseService
+      .get('', {
+        additionalParams: [
+          {
+            key: 'group',
+            value: baseParams.join(','),
+          },
+        ],
+      })
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe((data: any) => {
+        this.fileServiceDropdownOptions = data.services;
+      });
+
+    this.scriptFormGroup.controls['storageServiceId'].valueChanges
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe((id: number) => {
+        this.selectedFileService = this.fileServiceDropdownOptions.find(val => {
+          return val.id === id;
+        });
+        console.log('file service: ', this.selectedFileService);
+      });
   }
 
   ngOnDestroy(): void {
     this.destroyed$.next();
     this.destroyed$.complete();
+  }
+
+  onLinkToServiceSelectionChange(event: any) {
+    console.log('event selection: ', event);
   }
 
   getAcceptedFileTypes(): string {
@@ -148,7 +182,6 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
       .afterClosed()
       .pipe(takeUntil(this.destroyed$))
       .subscribe(res => {
-        console.log('res: ', res);
         if (res) {
           this.githubFileObject = res.data;
           this.scriptFormGroup.patchValue({
@@ -160,22 +193,25 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
 
   onSave() {
     const payload = {
-      name: this.scriptFormGroup.controls['name'].value,
-      type: this.scriptFormGroup.controls['type'].value,
-      isActive: this.scriptFormGroup.controls['isActive'].value,
-      allowEventModification:
-        this.scriptFormGroup.controls['allowEventModification'].value,
-      content: this.scriptFormGroup.controls['content'].value,
-      scmReference: null,
-      scmRepository: null,
-      storagePath: null,
-      storageServiceId: null,
+      // TODO: remove the commented code below
+
+      // name: this.scriptFormGroup.controls['name'].value,
+      // type: this.scriptFormGroup.controls['type'].value,
+      // isActive: this.scriptFormGroup.controls['isActive'].value,
+      // allowEventModification:
+      //   this.scriptFormGroup.controls['allowEventModification'].value,
+      // content: this.scriptFormGroup.controls['content'].value,
+      ...this.scriptFormGroup.value,
+      // scmReference: null,
+      // scmRepository: null,
+      // storagePath: null,
+      // storageServiceId: null,
     } as ScriptObject;
 
     if (this.scriptFormGroup.valid) {
       if (this.editScriptMode) {
         // update script here
-        this.service
+        this.eventScriptService
           .update(
             payload.name,
             {
@@ -192,11 +228,9 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
             }
           )
           .pipe(takeUntil(this.destroyed$))
-          .subscribe(data => {
-            console.log('update success response: ', data);
-          });
+          .subscribe();
       } else {
-        this.service
+        this.eventScriptService
           .create(
             {
               resource: [payload],
@@ -207,9 +241,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
             }
           )
           .pipe(takeUntil(this.destroyed$))
-          .subscribe(data => {
-            console.log('create success response: ', data);
-          });
+          .subscribe();
       }
     }
   }
@@ -229,13 +261,24 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
 
   onDelete() {
     if (this.scriptToEdit) {
-      this.service
+      this.eventScriptService
         .delete(this.scriptToEdit.name)
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.onBack();
         });
     }
+  }
+
+  pullLatestScript() {}
+
+  deleteScriptFromCache() {
+    this.baseService
+      .delete(`system/cache/_event/${this.confirmedEndpoint}`)
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(response => {
+        console.log('onDeleteScriptFromCache response: ', response);
+      });
   }
 
   onDesktopUploadScriptFile = async (event: Event) => {
@@ -247,20 +290,15 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
     });
   };
 
-  onGithubUploadScriptFile(event: Event) {
-    console.log('github upload event: ', event);
-  }
-
   onConfirmServiceEndpointClick(confirmedEndpoint: string) {
     this.confirmedEndpoint = confirmedEndpoint;
     this.scriptFormGroup.patchValue({ name: this.confirmedEndpoint });
 
-    this.service
+    this.eventScriptService
       .get(this.confirmedEndpoint)
       .pipe(
         takeUntil(this.destroyed$),
         catchError(err => {
-          console.error(err);
           this.editScriptMode = false;
           return throwError(() => new Error(err));
         })
