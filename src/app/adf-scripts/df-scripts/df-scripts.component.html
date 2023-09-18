@@ -1,6 +1,6 @@
 <mat-tab-group>
   <mat-tab label="Scripts">
-    <div class="script-button-container">
+    <div *ngIf="!isDropdownFormVisible" class="script-button-container">
       <button mat-raised-button color="primary" (click)="onSave()">
         {{ 'save' | transloco }}
       </button>
@@ -10,10 +10,7 @@
         [disabled]="!editScriptMode">
         {{ 'delete' | transloco }}
       </button>
-      <button
-        *ngIf="!isDropdownFormVisible"
-        mat-raised-button
-        (click)="onBack()">
+      <button mat-raised-button (click)="onBack()">
         {{ 'goBack' | transloco }}
       </button>
     </div>
