@@ -79,7 +79,7 @@
               </mat-option>
             </mat-select>
           </mat-form-field>
-          <div>
+          <div class="form-toggle-container">
             <mat-slide-toggle formControlName="isActive">{{
               'scripts.active' | transloco
             }}</mat-slide-toggle>
@@ -89,16 +89,20 @@
               confirmedEndpoint.indexOf('pre_process') >= 0 ||
               confirmedEndpoint.indexOf('post_process') >= 0
             ">
-            <mat-slide-toggle
-              *ngIf="confirmedEndpoint.indexOf('pre_process') >= 0"
-              formControlName="allowEventModification"
-              >Allow script to modify request payload</mat-slide-toggle
-            >
-            <mat-slide-toggle
-              *ngIf="confirmedEndpoint.indexOf('post_process') >= 0"
-              formControlName="allowEventModification"
-              >Allow script to modify response payload</mat-slide-toggle
-            >
+            <div class="form-toggle-container">
+              <mat-slide-toggle
+                *ngIf="confirmedEndpoint.indexOf('pre_process') >= 0"
+                formControlName="allowEventModification"
+                >Allow script to modify request payload</mat-slide-toggle
+              >
+            </div>
+            <div class="form-toggle-container">
+              <mat-slide-toggle
+                *ngIf="confirmedEndpoint.indexOf('post_process') >= 0"
+                formControlName="allowEventModification"
+                >Allow script to modify response payload</mat-slide-toggle
+              >
+            </div>
           </div>
           <div class="file-import-container">
             <h4>{{ 'scripts.importScriptFile' | transloco }}</h4>
@@ -112,7 +116,6 @@
             <input
               hidden
               type="file"
-              [accept]="getAcceptedFileTypes()"
               #fileInput
               (change)="onDesktopUploadScriptFile($event)" />
             <mat-label>{{ 'scripts.fromGitHub' | transloco }}:</mat-label>
@@ -128,7 +131,6 @@
                 <mat-option [value]="undefined">-- None --</mat-option>
                 <mat-option
                   *ngFor="let service of fileServiceDropdownOptions"
-                  (onSelectionChange)="onLinkToServiceSelectionChange($event)"
                   [value]="service.id"
                   >{{ service.label }}</mat-option
                 >

@@ -1,4 +1,11 @@
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Inject,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
 import { MatTabsModule } from '@angular/material/tabs';
 import { DfScriptSamplesComponent } from '../df-script-samples/df-script-samples.component';
 import {
@@ -82,6 +89,8 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
   fileServiceDropdownOptions: Partial<Service>[] = [];
   selectedFileService: Partial<Service> | undefined;
 
+  @ViewChild('fileInput') fileInput: ElementRef;
+
   dropDownOptionsFormGroup: FormGroup;
   scriptFormGroup: FormGroup;
 
@@ -145,6 +154,13 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
           return val.id === id;
         });
       });
+
+    this.scriptFormGroup.controls['type'].valueChanges
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(val => {
+        const fileType = this.getAcceptedFileTypes(val);
+        this.fileInput.nativeElement.accept = fileType;
+      });
   }
 
   ngOnDestroy(): void {
@@ -152,10 +168,8 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
     this.destroyed$.complete();
   }
 
-  getAcceptedFileTypes(): string {
-    const selectedScriptType = this.scriptFormGroup.controls['type']
-      .value as ScriptType;
-    switch (selectedScriptType.name) {
+  getAcceptedFileTypes(fileType: string): string {
+    switch (fileType) {
       case 'nodejs':
         return '.js, application/json';
 

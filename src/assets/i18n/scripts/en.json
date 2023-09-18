@@ -16,5 +16,7 @@
   "deleteSuccessMsg": "Script successfully deleted",
   "createSuccessMsg": "Script successfully created",
   "updateSuccessMsg": "Script successfully updated",
-  "getScriptSuccessMsg": "Script file successfully fetched"
+  "getScriptSuccessMsg": "Script file successfully fetched",
+  "fetchCacheSuccessMsg": "Successfully pulled the latest script from source.",
+  "deleteCacheSuccessMsg": "Successfully cleared script from cache."
 }
