@@ -2,7 +2,6 @@ export type FilterQueryType =
   | 'user'
   | 'apiDocs'
   | 'apps'
-  | 'cache'
   | 'emailTemplates'
   | 'serviceReports'
   | 'roles'
@@ -17,8 +16,6 @@ export const getFilterQuery = (type?: FilterQueryType) => (value: string) => {
       return `((name like "%${value}%") or (label like "%${value}%") or (description like "%${value}%"))`;
     case 'apps':
       return `(name like "%${value}%") or (description like "%${value}%")`;
-    case 'cache':
-      return `(label like "%${value}%")`;
     case 'emailTemplates':
       return `(name like "%${value}%") or (description like "%${value}%")`;
     case 'serviceReports':

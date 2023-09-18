@@ -10,8 +10,6 @@ import { CacheRow, CacheType } from './df-cache.types';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { CACHE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { TranslocoService } from '@ngneat/transloco';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-import { takeUntil } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { faRefresh } from '@fortawesome/free-solid-svg-icons';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
@@ -40,6 +38,7 @@ export class DfCacheTableComponent extends DfManageTableComponent<CacheRow> {
   }
 
   override allowCreate = false;
+  override allowFilter = false;
 
   override columns = [
     {
@@ -77,26 +76,12 @@ export class DfCacheTableComponent extends DfManageTableComponent<CacheRow> {
   }
 
   clearCache = (row: CacheRow) => {
-    // TODO move text to en.json
     this.cacheService
-      .delete(row.name, { snackbarSuccess: `${name} cache flushed` })
+      .delete(row.name, { snackbarSuccess: 'cache.serviceCacheFlushed' })
       .subscribe();
   };
 
-  // TODO get query from Jas
-  filterQuery = getFilterQuery('cache');
+  filterQuery = getFilterQuery();
 
-  refreshTable(limit?: number, offset?: number, filter?: string): void {
-    this.cacheService
-      .getAll<GenericListResponse<CacheType>>({
-        limit,
-        offset,
-        filter,
-        fields: '*',
-      })
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-      });
-  }
+  refreshTable = () => null;
 }

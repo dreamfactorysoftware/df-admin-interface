@@ -64,7 +64,6 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
       this.actions.additional = extraActions;
     }
   }
-  // TODO add icon for "launch app"
   override columns = [
     {
       columnDef: 'active',
