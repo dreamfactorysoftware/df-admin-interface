@@ -14,6 +14,7 @@ import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { takeUntil } from 'rxjs';
 import { Service, ServiceType } from 'src/app/shared/types/service';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-api-docs-table',
@@ -124,7 +125,5 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
       });
   }
 
-  override filterQuery(value: string): string {
-    return `((name like "%${value}%") or (label like "%${value}%") or (description like "%${value}%"))`;
-  }
+  filterQuery = getFilterQuery('apiDocs');
 }

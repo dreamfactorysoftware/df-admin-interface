@@ -12,6 +12,7 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { takeUntil } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { EmailTemplate, EmailTemplateRow } from './df-email-templates.types';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-email-templates-table',
@@ -64,9 +65,7 @@ export class DfEmailTemplatesTableComponent extends DfManageTableComponent<any> 
     });
   }
 
-  filterQuery(value: string): string {
-    return `(name like "%${value}%") or (description like "%${value}%")`;
-  }
+  filterQuery = getFilterQuery('emailTemplates');
 
   override deleteRow(row: EmailTemplateRow): void {
     this.emailTemplateService

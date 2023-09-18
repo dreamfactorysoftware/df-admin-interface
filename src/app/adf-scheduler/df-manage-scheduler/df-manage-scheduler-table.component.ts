@@ -12,6 +12,7 @@ import { SchedulerTaskData } from '../types/df-scheduler.types';
 import { MatDialog } from '@angular/material/dialog';
 import { Service } from 'src/app/shared/types/service';
 import { TranslocoService } from '@ngneat/transloco';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-manage-scheduler-table',
@@ -108,10 +109,7 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
     });
   }
 
-  // There is no filter for this component
-  filterQuery(_value: string): string {
-    return '';
-  }
+  filterQuery = getFilterQuery();
 
   override deleteRow(row: SchedulerTaskData): void {
     this.service

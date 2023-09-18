@@ -9,7 +9,7 @@ import { UserProfile, UserRow } from 'src/app/shared/types/user';
 import { takeUntil } from 'rxjs';
 import { saveAsFile } from 'src/app/shared/utilities/file';
 import { USER_COLUMNS } from 'src/app/core/constants/table-columns';
-import { userFilterQuery } from 'src/app/shared/utilities/filter-queries';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { USER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
@@ -54,7 +54,7 @@ export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow>
     });
   }
 
-  filterQuery = userFilterQuery;
+  filterQuery = getFilterQuery('user');
 
   override deleteRow(row: UserRow): void {
     this.userService

@@ -13,6 +13,7 @@ import { ServiceReportData } from 'src/app/shared/types/reports';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-manage-service-report-table',
@@ -90,7 +91,5 @@ export class DfManageServiceReportTableComponent extends DfManageTableComponent<
       });
   }
 
-  override filterQuery(value: string): string {
-    return `(id like ${value}) or (service_id like ${value}) or (service_name like "%${value}%") or (user_email like "%${value}%") or (action like "%${value}%") or (request_verb like "%${value}%")`;
-  }
+  filterQuery = getFilterQuery('serviceReports');
 }

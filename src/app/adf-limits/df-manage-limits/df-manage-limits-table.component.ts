@@ -15,6 +15,7 @@ import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 export type LimitTableRowData = {
   id: number;
@@ -114,9 +115,7 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
     });
   }
 
-  filterQuery(value: string): string {
-    return `(name like "%${value}%")`;
-  }
+  filterQuery = getFilterQuery('limits');
 
   refreshRows(id?: number): void {
     const ids = id

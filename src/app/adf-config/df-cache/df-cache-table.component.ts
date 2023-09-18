@@ -14,6 +14,7 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { takeUntil } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { faRefresh } from '@fortawesome/free-solid-svg-icons';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-cache-table',
@@ -83,9 +84,7 @@ export class DfCacheTableComponent extends DfManageTableComponent<CacheRow> {
   };
 
   // TODO get query from Jas
-  filterQuery(value: string): string {
-    return `(label like "%${value}%")`;
-  }
+  filterQuery = getFilterQuery('cache');
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.cacheService

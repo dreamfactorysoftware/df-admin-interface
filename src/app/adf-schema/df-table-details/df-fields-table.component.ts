@@ -12,6 +12,7 @@ import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { takeUntil } from 'rxjs';
 import { ROUTES } from 'src/app/core/constants/routes';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-fields-table',
@@ -113,9 +114,7 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
     return '';
   }
 
-  filterQuery(value: string): string {
-    return '';
-  }
+  filterQuery = getFilterQuery();
 
   override createRow(): void {
     this.router.navigate([ROUTES.CREATE, 'field'], {

@@ -12,6 +12,7 @@ import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-manage-roles-table',
@@ -36,9 +37,7 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
 
-  filterQuery(value: string): string {
-    return `(id like "%${value}%") or (name like "%${value}%") or (description like "%${value}%")`;
-  }
+  filterQuery = getFilterQuery('roles');
 
   override columns = [
     {

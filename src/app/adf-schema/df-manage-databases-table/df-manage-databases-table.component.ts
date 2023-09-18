@@ -11,6 +11,7 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
 import { takeUntil } from 'rxjs';
 import { Service, ServiceType } from '../../shared/types/service';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-manage-databases-table',
@@ -112,7 +113,5 @@ export class DfManageDatabasesTableComponent extends DfManageTableComponent<Data
       });
   }
 
-  filterQuery(value: string): string {
-    return '';
-  }
+  filterQuery = getFilterQuery('services');
 }

@@ -12,6 +12,7 @@ import {
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { Service, ServiceRow, ServiceType } from 'src/app/shared/types/service';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-manage-services-table',
@@ -93,9 +94,7 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
     });
   }
 
-  filterQuery(value: string): string {
-    return `((name like "%${value}%") or (label like "%${value}%") or (description like "%${value}%") or (type like "%${value}%"))`;
-  }
+  filterQuery = getFilterQuery('services');
 
   override deleteRow(row: ServiceRow): void {
     this.serviceService

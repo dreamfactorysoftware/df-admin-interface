@@ -11,6 +11,7 @@ import {
 import { CorsConfigData } from '../types';
 import { takeUntil } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-manage-cors-table',
@@ -92,8 +93,5 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
       });
   }
 
-  // this component has no filter
-  override filterQuery(value: string): string {
-    return '';
-  }
+  filterQuery = getFilterQuery();
 }

@@ -11,6 +11,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { takeUntil } from 'rxjs';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-manage-tables-table',
@@ -78,7 +79,5 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
       });
   }
 
-  filterQuery(value: string): string {
-    return '';
-  }
+  filterQuery = getFilterQuery();
 }

@@ -13,6 +13,7 @@ import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-manage-apps-table',
@@ -109,9 +110,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
     });
   }
 
-  filterQuery(value: string): string {
-    return `(name like "%${value}%") or (description like "%${value}%")`;
-  }
+  filterQuery = getFilterQuery('apps');
 
   override deleteRow(row: AppRow): void {
     this.appsService
