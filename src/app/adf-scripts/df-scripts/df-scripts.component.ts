@@ -68,7 +68,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
   scriptTypes: ScriptType[];
   selectedService: Service;
   selectedServiceDetails: ScriptDetailsType;
-  selectedServiceAttributes: any; // TODO: update type
+  selectedServiceAttributes: any;
   selectedServiceAttributeKey: string;
   serviceKeys: string[] = [];
   serviceEndpoints: string[] = [];
@@ -116,7 +116,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
       isActive: [false],
       allowEventModification: [false],
       storageServiceId: [null],
-      scmRepository: [null], // TODO: update these any types to an appropriate type
+      scmRepository: [null],
       scmReference: [null],
       storagePath: [null],
     });
@@ -171,7 +171,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         return '.py';
 
       default:
-        return '.js, application/json, .py, .php'; //TODO: update to correct values
+        return '.js, application/json';
     }
   }
 
@@ -221,7 +221,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
             },
             {
               snackbarError: 'server',
-              snackbarSuccess: 'Script successfully updated', // TODO: add translation key here
+              snackbarSuccess: 'updateSuccessMsg',
             }
           )
           .pipe(takeUntil(this.destroyed$))
@@ -234,7 +234,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
             },
             {
               snackbarError: 'server',
-              snackbarSuccess: 'Script successfully created', // TODO: add translation key here
+              snackbarSuccess: 'createSuccessMsg',
             }
           )
           .pipe(takeUntil(this.destroyed$))
@@ -265,7 +265,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
       this.eventScriptService
         .delete(this.scriptToEdit.name, {
           snackbarError: 'server',
-          snackbarSuccess: 'Script successfully deleted', // TODO: add translation key here
+          snackbarSuccess: 'deleteSuccessMsg',
         })
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {

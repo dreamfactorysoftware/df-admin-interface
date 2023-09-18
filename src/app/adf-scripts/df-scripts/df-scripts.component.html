@@ -1,19 +1,20 @@
-<!-- TODO: add translation to this file -->
 <mat-tab-group>
   <mat-tab label="Scripts">
     <div class="script-button-container">
-      <button mat-raised-button color="primary" (click)="onSave()">Save</button>
+      <button mat-raised-button color="primary" (click)="onSave()">
+        {{ 'save' | transloco }}
+      </button>
       <button
         mat-raised-button
         (click)="onDelete()"
         [disabled]="!editScriptMode">
-        Delete
+        {{ 'delete' | transloco }}
       </button>
       <button
         *ngIf="!isDropdownFormVisible"
         mat-raised-button
         (click)="onBack()">
-        Back
+        {{ 'goBack' | transloco }}
       </button>
     </div>
     <ng-container>
@@ -70,11 +71,11 @@
       <form class="script-form-group-container" [formGroup]="scriptFormGroup">
         <div class="script-form-container">
           <mat-form-field>
-            <mat-label>Script Name</mat-label>
+            <mat-label> {{ 'scriptName' | transloco }}</mat-label>
             <input matInput formControlName="name" />
           </mat-form-field>
           <mat-form-field>
-            <mat-label>Script Type/Language</mat-label>
+            <mat-label>{{ 'scriptType' | transloco }}</mat-label>
             <mat-select formControlName="type">
               <mat-option *ngFor="let type of scriptTypes" [value]="type.name">
                 {{ type.label }}
@@ -82,9 +83,9 @@
             </mat-select>
           </mat-form-field>
           <div>
-            <mat-slide-toggle formControlName="isActive"
-              >Active</mat-slide-toggle
-            >
+            <mat-slide-toggle formControlName="isActive">{{
+              'active' | transloco
+            }}</mat-slide-toggle>
           </div>
           <div
             *ngIf="
@@ -103,8 +104,8 @@
             >
           </div>
           <div class="file-import-container">
-            <h4>Import a script file</h4>
-            <mat-label>From Desktop:</mat-label>
+            <h4>{{ 'importScriptFile' | transloco }}</h4>
+            <mat-label>{{ 'fromDesktop' | transloco }}:</mat-label>
             <button
               mat-raised-button
               color="primary"
@@ -117,15 +118,15 @@
               [accept]="getAcceptedFileTypes()"
               #fileInput
               (change)="onDesktopUploadScriptFile($event)" />
-            <mat-label>From GitHub:</mat-label>
+            <mat-label>{{ 'fromGitHub' | transloco }}:</mat-label>
             <button mat-raised-button color="primary" (click)="openDialog()">
-              Select File
+              {{ 'selectFile' | transloco }}
             </button>
           </div>
           <div>
-            <h4>Link to a service</h4>
+            <h4>{{ 'linkToService' | transloco }}</h4>
             <mat-form-field>
-              <mat-label>Service: </mat-label>
+              <mat-label>{{ 'service' | transloco }}: </mat-label>
               <mat-select formControlName="storageServiceId">
                 <mat-option [value]="undefined">-- None --</mat-option>
                 <mat-option
@@ -144,7 +145,7 @@
                     selectedFileService.type === 'bitbucket')) ||
                 scriptFormGroup.controls['scmRepository'].value
               ">
-              <mat-label>Repository: </mat-label>
+              <mat-label>{{ 'repository' | transloco }}: </mat-label>
               <input matInput formControlName="scmRepository" />
             </mat-form-field>
             <mat-form-field
@@ -155,7 +156,7 @@
                     selectedFileService.type === 'bitbucket')) ||
                 scriptFormGroup.controls['scmReference'].value
               ">
-              <mat-label>Branch/Tag: </mat-label>
+              <mat-label>{{ 'branch' | transloco }}: </mat-label>
               <input matInput formControlName="scmReference" />
             </mat-form-field>
             <mat-form-field
@@ -163,7 +164,7 @@
                 (selectedFileService && fileServiceDropdownOptions.length) ||
                 scriptFormGroup.controls['storagePath'].value
               ">
-              <mat-label>Path: </mat-label>
+              <mat-label>{{ 'path' | transloco }}: </mat-label>
               <input matInput formControlName="storagePath" />
             </mat-form-field>
             <div
@@ -172,10 +173,10 @@
                 scriptFormGroup.controls['storageServiceId'].value
               ">
               <button mat-button color="primary" (click)="pullLatestScript()">
-                View Latest
+                {{ 'viewLatest' | transloco }}
               </button>
               <button mat-button (click)="deleteScriptFromCache()">
-                Delete Cache
+                {{ 'deleteCache' | transloco }}
               </button>
             </div>
           </div>
