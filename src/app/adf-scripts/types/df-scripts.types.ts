@@ -17,9 +17,9 @@ export interface ScriptObject {
   isActive: boolean;
   allowEventModification: boolean;
   storageServiceId: number | null;
-  scmRepository: any | null; // TODO: update these any types to an appropriate type
-  scmReference: any | null;
-  storagePath: any | null;
+  scmRepository: string | null;
+  scmReference: string | null;
+  storagePath: string | null;
   config?: any;
   createdById?: number;
   createdDate?: string;
@@ -28,6 +28,7 @@ export interface ScriptObject {
 }
 
 // TODO: may need to update this from snake case to camel case
+// additonal note: this object appears in snake case
 export interface GithubFileObject {
   content: string;
   download_url: string;

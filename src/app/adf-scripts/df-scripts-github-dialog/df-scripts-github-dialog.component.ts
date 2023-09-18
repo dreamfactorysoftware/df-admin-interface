@@ -77,7 +77,7 @@ export class DfScriptsGithubDialogComponent implements OnInit, OnDestroy {
             this.githubService
               .get(githubApiEndpoint, {
                 snackbarError: 'server',
-                snackbarSuccess: 'Script file successfully fetched', // TODO: add translation
+                snackbarSuccess: 'getScriptSuccessMsg',
               })
               .pipe(
                 takeUntil(this.destroyed$),

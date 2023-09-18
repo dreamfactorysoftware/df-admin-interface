@@ -8,7 +8,7 @@ describe('DfScriptsGithubDialogComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DfScriptsGithubDialogComponent]
+      declarations: [DfScriptsGithubDialogComponent],
     });
     fixture = TestBed.createComponent(DfScriptsGithubDialogComponent);
     component = fixture.componentInstance;
