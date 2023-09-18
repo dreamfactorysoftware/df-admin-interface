@@ -65,7 +65,7 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
       return {
         id: role.id,
         name: role.name,
-        description: role.description,
+        description: role.description ? role.description : '',
         active: role.isActive,
       };
     });

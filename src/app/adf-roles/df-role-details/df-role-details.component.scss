@@ -1,0 +1,14 @@
+.roles-container {
+  .role-overview {
+    display: flex;
+    gap: 20px;
+  }
+
+  .red {
+    color: red;
+  }
+
+  mat-divider {
+    margin: 1rem 0 2rem;
+  }
+}
