@@ -29,12 +29,12 @@ import {
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { camelCase, snakeCase } from 'lodash';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfScriptsGithubDialogComponent } from '../df-scripts-github-dialog/df-scripts-github-dialog.component';
 import { KeyValuePair } from 'src/app/shared/types/generic-http.type';
+import { mapCamelToSnake } from 'src/app/shared/utilities/case';
 
 @Component({
   selector: 'df-scripts',
@@ -152,10 +152,6 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
     this.destroyed$.complete();
   }
 
-  onLinkToServiceSelectionChange(event: any) {
-    console.log('event selection: ', event);
-  }
-
   getAcceptedFileTypes(): string {
     const selectedScriptType = this.scriptFormGroup.controls['type']
       .value as ScriptType;
@@ -221,7 +217,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
             },
             {
               snackbarError: 'server',
-              snackbarSuccess: 'updateSuccessMsg',
+              snackbarSuccess: 'scripts.updateSuccessMsg',
             }
           )
           .pipe(takeUntil(this.destroyed$))
@@ -234,7 +230,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
             },
             {
               snackbarError: 'server',
-              snackbarSuccess: 'createSuccessMsg',
+              snackbarSuccess: 'scripts.createSuccessMsg',
             }
           )
           .pipe(takeUntil(this.destroyed$))
@@ -265,7 +261,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
       this.eventScriptService
         .delete(this.scriptToEdit.name, {
           snackbarError: 'server',
-          snackbarSuccess: 'deleteSuccessMsg',
+          snackbarSuccess: 'scripts.deleteSuccessMsg',
         })
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
@@ -306,11 +302,13 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
       .get(endpoint, {
         additionalParams: [...params],
         snackbarError: 'server',
-        snackbarSuccess: 'Successfully pulled the latest script from source.',
+        snackbarSuccess: 'scripts.fetchCacheSuccessMsg',
       })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
-        console.log('latest script data: ', data);
+        this.scriptFormGroup.patchValue({
+          content: data,
+        });
       });
   }
 
@@ -318,12 +316,10 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
     this.baseService
       .delete(`system/cache/_event/${this.confirmedEndpoint}`, {
         snackbarError: 'server',
-        snackbarSuccess: 'Successfully cleared script from cache.',
+        snackbarSuccess: 'scripts.deleteCacheSuccessMsg',
       })
       .pipe(takeUntil(this.destroyed$))
-      .subscribe(response => {
-        console.log('onDeleteScriptFromCache response: ', response);
-      });
+      .subscribe();
   }
 
   onDesktopUploadScriptFile = async (event: Event) => {
@@ -353,6 +349,11 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
           type: data.type,
           isActive: data.isActive,
           content: data.content,
+          allowEventModification: data.allowEventModification,
+          storageServiceId: data.storageServiceId,
+          scmRepository: data.scmRepository,
+          scmReference: data.scmReference,
+          storagePath: data.storagePath,
         });
       });
   }
@@ -392,7 +393,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         paramObjectKeys.forEach(paramObjectKey => {
           parameters.forEach(param => {
             this.explodedEndpoints.push(
-              endpoint.replace('{' + snakeCase(paramObjectKey) + '}', param)
+              endpoint.replace('{' + paramObjectKey + '}', param)
             );
           });
         });
@@ -432,9 +433,9 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         // enable 2nd dropdown
         this.dropDownOptionsFormGroup.controls['serviceKeys'].enable();
 
-        this.selectedServiceDetails = data;
-        const camel = camelCase(this.selectedService.name);
-        this.selectedServiceAttributes = this.selectedServiceDetails[camel];
+        this.selectedServiceDetails = mapCamelToSnake(data); // adapting the keys here to be in their normal state (snakecase) as interceptor changes all requests to camelcase
+        this.selectedServiceAttributes =
+          this.selectedServiceDetails[this.selectedService.name];
         this.serviceKeys = Object.keys(this.selectedServiceAttributes);
       });
   }
