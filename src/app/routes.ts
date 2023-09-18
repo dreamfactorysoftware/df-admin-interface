@@ -33,6 +33,10 @@ import {
   SERVICE_TYPE_SERVICE_PROVIDERS,
   BASE_SERVICE_PROVIDERS,
   SERVICE_SERVICE_PROVIDERS,
+  SCRIPTS_SERVICE_PROVIDERS,
+  SCRIPT_TYPE_SERVICE_PROVIDERS,
+  EVENT_SCRIPT_SERVICE_PROVIDERS,
+  GITHUB_REPO_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -63,6 +67,8 @@ import { HomeRoutes } from './adf-home/routes';
 import { provideTranslocoScope } from '@ngneat/transloco';
 import { AuthRoutes } from './adf-user-management/routes';
 import { serviceTypesResolver } from './adf-services/resolvers/service-types.resolver';
+import { DfScriptsComponent } from './adf-scripts/df-scripts/df-scripts.component';
+import { scriptTypeResolver } from './adf-scripts/resolvers/scripts.resolver';
 
 export const routes: Routes = [
   {
@@ -219,7 +225,18 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.SCRIPTS,
-        component: DfPlaceHolderComponent,
+        component: DfScriptsComponent,
+        resolve: { data: servicesResolver(), scriptType: scriptTypeResolver },
+        providers: [
+          ...BASE_SERVICE_PROVIDERS,
+          ...SCRIPTS_SERVICE_PROVIDERS,
+          ...SCRIPT_TYPE_SERVICE_PROVIDERS,
+          ...SERVICES_SERVICE_PROVIDERS,
+          ...SERVICE_TYPE_SERVICE_PROVIDERS,
+          ...EVENT_SCRIPT_SERVICE_PROVIDERS,
+          ...GITHUB_REPO_SERVICE_PROVIDERS,
+          provideTranslocoScope('scripts'),
+        ],
       },
       {
         path: ROUTES.API_DOCS,
