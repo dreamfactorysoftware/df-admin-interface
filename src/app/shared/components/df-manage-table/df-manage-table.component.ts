@@ -1,23 +1,20 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { SelectionModel } from '@angular/cdk/collections';
 import {
   AfterViewInit,
   Component,
-  ContentChild,
   Input,
   OnDestroy,
   OnInit,
-  TemplateRef,
   ViewChild,
 } from '@angular/core';
-import { PageEvent } from '@angular/material/paginator';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
-import { MatTableDataSource } from '@angular/material/table';
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 import { ROUTES } from 'src/app/core/constants/routes';
 import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { IconProp } from '@fortawesome/fontawesome-svg-core';
+import { IconDefinition, IconProp } from '@fortawesome/fontawesome-svg-core';
 import {
   faTrashCan,
   faPenToSquare,
@@ -27,10 +24,51 @@ import {
   faCheckCircle,
   faXmarkCircle,
 } from '@fortawesome/free-solid-svg-icons';
-import { TranslocoService } from '@ngneat/transloco';
-import { MatDialog } from '@angular/material/dialog';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfConfirmDialogComponent } from '../df-confirm-dialog/df-confirm-dialog.component';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { AsyncPipe, NgFor, NgIf } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 
+export const DfManageTableModules = [
+  NgIf,
+  MatButtonModule,
+  FontAwesomeModule,
+  MatTableModule,
+  NgFor,
+  MatMenuModule,
+  ReactiveFormsModule,
+  TranslocoPipe,
+  AsyncPipe,
+  MatDialogModule,
+  MatPaginatorModule,
+  MatFormFieldModule,
+  MatInputModule,
+];
+
+export interface DefaultAction<T> {
+  label: string;
+  function: (row: T) => void;
+  ariaLabel: {
+    key: string;
+    param?: string;
+  };
+}
+
+export interface AdditonalAction<T> extends DefaultAction<T> {
+  disabled?: boolean | ((row: T) => boolean);
+  icon?: IconDefinition;
+}
+
+export interface Actions<T> {
+  default: DefaultAction<T> | null;
+  additional: Array<AdditonalAction<T>> | null;
+}
 @Component({
   selector: 'df-manage-table',
   template: '',
@@ -39,14 +77,11 @@ export abstract class DfManageTableComponent<T>
   implements OnInit, AfterViewInit, OnDestroy
 {
   @Input() tableData?: Array<T>;
-  @ContentChild('itemActions') itemActions: TemplateRef<any>;
   destroyed$ = new Subject<void>();
   dataSource = new MatTableDataSource<T>();
-  selection = new SelectionModel<T>(true, []);
   tableLength = 0;
   pageSizes = [10, 50, 100];
   currentPageSize = this.defaultPageSize;
-  isSmallScreen = this.breakpointService.isSmallScreen;
   faTrashCan = faTrashCan;
   faPenToSquare = faPenToSquare;
   faPlus = faPlus;
@@ -54,8 +89,7 @@ export abstract class DfManageTableComponent<T>
   faTriangleExclamation = faTriangleExclamation;
   allowCreate = true;
   allowFilter = true;
-  readOnly = false;
-  allowDelete = true;
+  currentFilter = new FormControl('');
 
   abstract columns: Array<{
     columnDef: string;
@@ -66,11 +100,32 @@ export abstract class DfManageTableComponent<T>
   _activatedRoute = this.activatedRoute;
   _translateService = this.translateService;
 
+  actions: Actions<T> = {
+    default: {
+      label: 'view',
+      function: row => this.viewRow(row),
+      ariaLabel: {
+        key: 'viewRow',
+        param: 'id',
+      },
+    },
+    additional: [
+      {
+        label: 'delete',
+        function: row => this.confirmDelete(row),
+        ariaLabel: {
+          key: 'deleteRow',
+          param: 'id',
+        },
+        icon: faTrashCan,
+      },
+    ],
+  };
+
   constructor(
     protected router: Router,
     private activatedRoute: ActivatedRoute,
     private liveAnnouncer: LiveAnnouncer,
-    private breakpointService: DfBreakpointService,
     private translateService: TranslocoService,
     private dialog: MatDialog
   ) {}
@@ -91,6 +146,17 @@ export abstract class DfManageTableComponent<T>
       this.allowFilter = false;
       this.dataSource.data = this.mapDataToTable(this.tableData);
     }
+    this.currentFilter.valueChanges
+      .pipe(
+        takeUntil(this.destroyed$),
+        debounceTime(1000),
+        distinctUntilChanged()
+      )
+      .subscribe(filter => {
+        filter
+          ? this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter))
+          : this.refreshTable();
+      });
   }
 
   ngAfterViewInit(): void {
@@ -107,6 +173,21 @@ export abstract class DfManageTableComponent<T>
 
   get defaultPageSize() {
     return this.pageSizes[0];
+  }
+
+  isActionDisabled(action: AdditonalAction<T>, row: T): boolean {
+    if (!action.disabled) {
+      return false;
+    }
+    return typeof action.disabled === 'function'
+      ? action.disabled(row)
+      : action.disabled;
+  }
+
+  handleKeyDown(event: KeyboardEvent, row: T, action: DefaultAction<T>) {
+    if (event.key === 'Enter') {
+      action.function(row);
+    }
   }
 
   abstract mapDataToTable(data: Array<any>): Array<T>;
@@ -146,57 +227,9 @@ export abstract class DfManageTableComponent<T>
     this.router.navigate([ROUTES.CREATE], { relativeTo: this._activatedRoute });
   }
 
-  editRow(row: T): void {
-    this.router.navigate([ROUTES.EDIT, (row as any).id], {
-      relativeTo: this._activatedRoute,
-    });
-  }
-
   viewRow(row: T): void {
-    this.router.navigate([ROUTES.VIEW, (row as any).name], {
+    this.router.navigate([(row as any).id], {
       relativeTo: this._activatedRoute,
-    });
-  }
-
-  isAllSelected() {
-    const numSelected = this.selection.selected.length;
-    const numRows = this.dataSource.data.length;
-    return numSelected === numRows;
-  }
-
-  viewLabel(row: T) {
-    return this.translateService.selectTranslate('viewRow', {
-      id: (row as any).id,
-    });
-  }
-
-  toggleAllRows() {
-    this.isAllSelected()
-      ? this.selection.clear()
-      : this.selection.select(...this.dataSource.data);
-  }
-
-  checkboxLabel(row?: T) {
-    if (!row) {
-      return this.translateService.selectTranslate(
-        `${this.isAllSelected() ? 'deselectAll' : 'selectAll'}`
-      );
-    }
-    return this.translateService.selectTranslate(
-      `${this.selection.isSelected(row) ? 'deselect' : 'select'}`,
-      { id: (row as any).id }
-    );
-  }
-
-  deleteLabel(row: T) {
-    return this.translateService.selectTranslate('deleteRow', {
-      id: (row as any).id,
-    });
-  }
-
-  editLabel(row: T) {
-    return this.translateService.selectTranslate('editRow', {
-      id: (row as any).id,
     });
   }
 
@@ -212,13 +245,6 @@ export abstract class DfManageTableComponent<T>
         this.translateService.translate('sortCleared')
       );
     }
-  }
-
-  triggerSearch(event: Event) {
-    const filter = (event.target as HTMLInputElement).value;
-    filter
-      ? this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter))
-      : this.refreshTable();
   }
 
   sortDescription(header: string) {

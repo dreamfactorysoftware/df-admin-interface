@@ -28,7 +28,7 @@ export const ServiceRoutes: Routes = [
     },
   },
   {
-    path: `${ROUTES.EDIT}/:id`,
+    path: ':id',
     loadComponent: () =>
       import('./df-service-details/df-service-details.component').then(
         m => m.DfServiceDetailsComponent

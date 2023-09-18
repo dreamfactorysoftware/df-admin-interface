@@ -37,6 +37,14 @@ import {
   SERVICES_SERVICE_TOKEN,
   FILE_URL_TOKEN,
   FILE_SERVICE_TOKEN,
+  SCRIPTS_URL_TOKEN,
+  SCRIPTS_SERVICE_TOKEN,
+  SCRIPT_TYPE_URL_TOKEN,
+  SCRIPT_TYPE_SERVICE_TOKEN,
+  EVENT_SCRIPT_URL_TOKEN,
+  EVENT_SCRIPT_SERVICE_TOKEN,
+  GITHUB_REPO_URL_TOKEN,
+  GITHUB_REPO_SERVICE_TOKEN,
 } from './tokens';
 import { BASE_URL, URLS } from './urls';
 
@@ -49,6 +57,18 @@ export const ADMIN_SERVICE_PROVIDERS = [
     provide: ADMIN_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [ADMIN_URL_TOKEN, HttpClient],
+  },
+];
+
+export const GITHUB_REPO_SERVICE_PROVIDERS = [
+  {
+    provide: GITHUB_REPO_URL_TOKEN,
+    useValue: URLS.GITHUB_REPO,
+  },
+  {
+    provide: GITHUB_REPO_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [GITHUB_REPO_URL_TOKEN, HttpClient],
   },
 ];
 
@@ -193,6 +213,42 @@ export const SERVICE_TYPES_SERVICE_PROVIDERS = [
     provide: SERVICE_TYPES_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [SERVICE_TYPES_URL_TOKEN, HttpClient],
+  },
+];
+
+export const SCRIPTS_SERVICE_PROVIDERS = [
+  {
+    provide: SCRIPTS_URL_TOKEN,
+    useValue: URLS.SYSTEM_EVENT,
+  },
+  {
+    provide: SCRIPTS_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [SCRIPTS_URL_TOKEN, HttpClient],
+  },
+];
+
+export const EVENT_SCRIPT_SERVICE_PROVIDERS = [
+  {
+    provide: EVENT_SCRIPT_URL_TOKEN,
+    useValue: URLS.EVENT_SCRIPT,
+  },
+  {
+    provide: EVENT_SCRIPT_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [EVENT_SCRIPT_URL_TOKEN, HttpClient],
+  },
+];
+
+export const SCRIPT_TYPE_SERVICE_PROVIDERS = [
+  {
+    provide: SCRIPT_TYPE_URL_TOKEN,
+    useValue: URLS.SCRIPT_TYPE,
+  },
+  {
+    provide: SCRIPT_TYPE_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [SCRIPT_TYPE_URL_TOKEN, HttpClient],
   },
 ];
 

@@ -1,0 +1,193 @@
+<mat-tab-group>
+  <mat-tab label="Scripts">
+    <div *ngIf="!isDropdownFormVisible" class="script-button-container">
+      <button mat-raised-button color="primary" (click)="onSave()">
+        {{ 'save' | transloco }}
+      </button>
+      <button
+        mat-raised-button
+        (click)="onDelete()"
+        [disabled]="!editScriptMode">
+        {{ 'delete' | transloco }}
+      </button>
+      <button mat-raised-button (click)="onBack()">
+        {{ 'goBack' | transloco }}
+      </button>
+    </div>
+    <ng-container>
+      <form
+        class="dropdown-form-group-container"
+        *ngIf="isDropdownFormVisible"
+        [formGroup]="dropDownOptionsFormGroup">
+        <mat-form-field>
+          <mat-select formControlName="selectedService">
+            <mat-option
+              (click)="onSelectServiceClick(service)"
+              *ngFor="let service of userServices"
+              [value]="service">
+              {{ service.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-select formControlName="serviceKeys">
+            <mat-option
+              *ngFor="let key of serviceKeys"
+              (click)="onServiceKeyClick(key)"
+              [value]="key">
+              {{ key }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-select formControlName="serviceEndpoint">
+            <mat-option
+              *ngFor="let endpoint of serviceEndpoints"
+              (click)="onServiceEndpointClick(endpoint)"
+              [value]="endpoint">
+              {{ endpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-select formControlName="confirmedServiceEndpoint">
+            <mat-option
+              *ngFor="let confirmedEndpoint of explodedEndpoints"
+              (click)="onConfirmServiceEndpointClick(confirmedEndpoint)"
+              [value]="confirmedEndpoint">
+              {{ confirmedEndpoint }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </form>
+    </ng-container>
+    <ng-container *ngIf="confirmedEndpoint">
+      <form class="script-form-group-container" [formGroup]="scriptFormGroup">
+        <div class="script-form-container">
+          <mat-form-field>
+            <mat-label> {{ 'scripts.scriptName' | transloco }}</mat-label>
+            <input matInput formControlName="name" />
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>{{ 'scripts.scriptType' | transloco }}</mat-label>
+            <mat-select formControlName="type">
+              <mat-option *ngFor="let type of scriptTypes" [value]="type.name">
+                {{ type.label }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+          <div class="form-toggle-container">
+            <mat-slide-toggle formControlName="isActive">{{
+              'scripts.active' | transloco
+            }}</mat-slide-toggle>
+          </div>
+          <div
+            *ngIf="
+              confirmedEndpoint.indexOf('pre_process') >= 0 ||
+              confirmedEndpoint.indexOf('post_process') >= 0
+            ">
+            <div class="form-toggle-container">
+              <mat-slide-toggle
+                *ngIf="confirmedEndpoint.indexOf('pre_process') >= 0"
+                formControlName="allowEventModification"
+                >Allow script to modify request payload</mat-slide-toggle
+              >
+            </div>
+            <div class="form-toggle-container">
+              <mat-slide-toggle
+                *ngIf="confirmedEndpoint.indexOf('post_process') >= 0"
+                formControlName="allowEventModification"
+                >Allow script to modify response payload</mat-slide-toggle
+              >
+            </div>
+          </div>
+          <div class="file-import-container">
+            <h4>{{ 'scripts.importScriptFile' | transloco }}</h4>
+            <mat-label>{{ 'scripts.fromDesktop' | transloco }}:</mat-label>
+            <button
+              mat-raised-button
+              color="primary"
+              (click)="fileInput.click()">
+              Select File
+            </button>
+            <input
+              hidden
+              type="file"
+              #fileInput
+              (change)="onDesktopUploadScriptFile($event)" />
+            <mat-label>{{ 'scripts.fromGitHub' | transloco }}:</mat-label>
+            <button mat-raised-button color="primary" (click)="openDialog()">
+              {{ 'scripts.selectFile' | transloco }}
+            </button>
+          </div>
+          <div>
+            <h4>{{ 'scripts.linkToService' | transloco }}</h4>
+            <mat-form-field>
+              <mat-label>{{ 'scripts.service' | transloco }}: </mat-label>
+              <mat-select formControlName="storageServiceId">
+                <mat-option [value]="undefined">-- None --</mat-option>
+                <mat-option
+                  *ngFor="let service of fileServiceDropdownOptions"
+                  [value]="service.id"
+                  >{{ service.label }}</mat-option
+                >
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field
+              *ngIf="
+                (selectedFileService &&
+                  (selectedFileService.type === 'github' ||
+                    selectedFileService.type === 'gitlab' ||
+                    selectedFileService.type === 'bitbucket')) ||
+                scriptFormGroup.controls['scmRepository'].value
+              ">
+              <mat-label>{{ 'scripts.repository' | transloco }}: </mat-label>
+              <input matInput formControlName="scmRepository" />
+            </mat-form-field>
+            <mat-form-field
+              *ngIf="
+                (selectedFileService &&
+                  (selectedFileService.type === 'github' ||
+                    selectedFileService.type === 'gitlab' ||
+                    selectedFileService.type === 'bitbucket')) ||
+                scriptFormGroup.controls['scmReference'].value
+              ">
+              <mat-label>{{ 'scripts.branch' | transloco }}: </mat-label>
+              <input matInput formControlName="scmReference" />
+            </mat-form-field>
+            <mat-form-field
+              *ngIf="
+                (selectedFileService && fileServiceDropdownOptions.length) ||
+                scriptFormGroup.controls['storagePath'].value
+              ">
+              <mat-label>{{ 'scripts.path' | transloco }}: </mat-label>
+              <input matInput formControlName="storagePath" />
+            </mat-form-field>
+            <div
+              *ngIf="
+                selectedFileService ||
+                scriptFormGroup.controls['storageServiceId'].value
+              ">
+              <button mat-button color="primary" (click)="pullLatestScript()">
+                {{ 'scripts.viewLatest' | transloco }}
+              </button>
+              <button mat-button (click)="deleteScriptFromCache()">
+                {{ 'scripts.deleteCache' | transloco }}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="script-editor-container">
+          <df-ace-editor
+            [value]="this.scriptFormGroup.value.content"></df-ace-editor>
+        </div>
+      </form>
+    </ng-container>
+  </mat-tab>
+  <mat-tab label="Script Samples">
+    <df-script-samples></df-script-samples>
+  </mat-tab>
+</mat-tab-group>

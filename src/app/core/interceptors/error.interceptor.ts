@@ -25,7 +25,7 @@ export const errorInterceptor: HttpInterceptorFn = (
           userDataService.clearToken();
           router.navigate([ROUTES.AUTH, ROUTES.LOGIN]);
         }
-        if (error.status === 403) {
+        if (error.status === 403 || error.status === 404) {
           errorService.error = error.error.error.message;
           router.navigate([ROUTES.ERROR]);
         }

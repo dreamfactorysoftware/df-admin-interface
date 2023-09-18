@@ -74,3 +74,14 @@ mat-form-field {
     box-shadow: none !important;
   }
 }
+
+.no-data-row {
+  td {
+    text-align: center;
+    padding: 32px;
+  }
+}
+
+.tool-tip-trigger {
+  padding: 0 8px;
+}

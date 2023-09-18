@@ -78,7 +78,7 @@ export abstract class DfUserDetailsBaseComponent<T>
   }
 
   get cancelRoute() {
-    let route = '/';
+    let route = `/${ROUTES.ADMIN_SETTINGS}/`;
     if (this.userType === 'admins') {
       route += ROUTES.ADMINS;
     }

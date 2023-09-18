@@ -12,15 +12,5 @@
         {{ 'cache.flushSystemCache' | transloco }}
       </button></ng-container
     >
-    <ng-template let-row #itemActions>
-      <button
-        mat-icon-button
-        (click)="flushServiceCache(row.name)"
-        [attr.aria-label]="
-          'cache.flushService' | transloco: { serviceName: row.label }
-        ">
-        <fa-icon [icon]="faRotate"></fa-icon>
-      </button>
-    </ng-template>
   </df-cache-table>
 </div>

@@ -1,23 +1,17 @@
 import { Component, Inject } from '@angular/core';
-import { DfManageTableComponent } from '../../shared/components/df-manage-table/df-manage-table.component';
-import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { MatTableModule } from '@angular/material/table';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import {
+  DfManageTableComponent,
+  DfManageTableModules,
+} from '../../shared/components/df-manage-table/df-manage-table.component';
+import { MatDialog } from '@angular/material/dialog';
+import { TranslocoService } from '@ngneat/transloco';
 import { DatabaseTableRowData } from '../df-schema.types';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
-import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
 import { takeUntil } from 'rxjs';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-manage-tables-table',
@@ -27,22 +21,7 @@ import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
   standalone: true,
-  imports: [
-    AsyncPipe,
-    NgFor,
-    NgIf,
-    NgTemplateOutlet,
-    FontAwesomeModule,
-    MatPaginatorModule,
-    MatButtonModule,
-    MatDialogModule,
-    MatMenuModule,
-    MatInputModule,
-    MatFormFieldModule,
-    MatCheckboxModule,
-    MatTableModule,
-    TranslocoPipe,
-  ],
+  imports: DfManageTableModules,
 })
 export class DfManageTablesTableComponent extends DfManageTableComponent<DatabaseTableRowData> {
   constructor(
@@ -51,18 +30,10 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
-    breakpointService: DfBreakpointService,
     translateService: TranslocoService,
     dialog: MatDialog
   ) {
-    super(
-      router,
-      activatedRoute,
-      liveAnnouncer,
-      breakpointService,
-      translateService,
-      dialog
-    );
+    super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
 
   // override allowDelete = false;
@@ -108,7 +79,5 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
       });
   }
 
-  filterQuery(value: string): string {
-    return '';
-  }
+  filterQuery = getFilterQuery();
 }

@@ -13,6 +13,7 @@ import { caseInterceptor } from './app/core/interceptors/case.interceptor';
 import { TranslocoHttpLoader } from './transloco-loader';
 import { provideTransloco } from '@ngneat/transloco';
 import { errorInterceptor } from './app/core/interceptors/error.interceptor';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 
 function initEnvironment(systemConfigService: DfSystemConfigDataService) {
   return () => systemConfigService.fetchEnvironmentData();
@@ -20,7 +21,7 @@ function initEnvironment(systemConfigService: DfSystemConfigDataService) {
 
 bootstrapApplication(AppComponent, {
   providers: [
-    importProvidersFrom(BrowserModule),
+    importProvidersFrom(BrowserModule, MatSnackBarModule),
     {
       provide: APP_INITIALIZER,
       useFactory: initEnvironment,

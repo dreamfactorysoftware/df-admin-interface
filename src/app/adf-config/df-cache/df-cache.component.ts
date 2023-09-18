@@ -37,11 +37,4 @@ export class DfCacheComponent {
       .delete('system', { snackbarSuccess: 'System-wide cache flushed.' })
       .subscribe();
   }
-
-  flushServiceCache = (name: string) => {
-    // TODO move text to en.json
-    this.cacheService
-      .delete(name, { snackbarSuccess: `${name} cache flushed` })
-      .subscribe();
-  };
 }

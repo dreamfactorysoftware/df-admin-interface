@@ -6,5 +6,6 @@ export interface CacheType {
 }
 
 export interface CacheRow {
+  name: string;
   label: string;
 }

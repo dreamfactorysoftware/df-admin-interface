@@ -1,23 +1,18 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { Component, Inject } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { MatTableModule } from '@angular/material/table';
+import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { TranslocoService } from '@ngneat/transloco';
 import { takeUntil } from 'rxjs';
 import { SERVICES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
+import {
+  DfManageTableComponent,
+  DfManageTableModules,
+} from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { Service, ServiceRow, ServiceType } from 'src/app/shared/types/service';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
   selector: 'df-manage-services-table',
@@ -27,21 +22,7 @@ import { Service, ServiceRow, ServiceType } from 'src/app/shared/types/service';
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
   standalone: true,
-  imports: [
-    NgIf,
-    MatButtonModule,
-    FontAwesomeModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatTableModule,
-    NgFor,
-    MatMenuModule,
-    NgTemplateOutlet,
-    MatPaginatorModule,
-    TranslocoPipe,
-    AsyncPipe,
-    MatDialogModule,
-  ],
+  imports: DfManageTableModules,
 })
 export class DfManageServicesTableComponent extends DfManageTableComponent<ServiceRow> {
   serviceTypes: Array<ServiceType> = [];
@@ -50,26 +31,27 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
-    breakpointService: DfBreakpointService,
     translateService: TranslocoService,
     @Inject(SERVICES_SERVICE_TOKEN)
     private serviceService: DfBaseCrudService,
     dialog: MatDialog
   ) {
-    super(
-      router,
-      activatedRoute,
-      liveAnnouncer,
-      breakpointService,
-      translateService,
-      dialog
-    );
+    super(router, activatedRoute, liveAnnouncer, translateService, dialog);
     this._activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
       .subscribe(({ system, data }) => {
         this.serviceTypes = data.serviceTypes;
         this.system = system;
         this.allowCreate = !system;
+        if (system) {
+          this.actions = {
+            default: this.actions.default,
+            additional:
+              this.actions.additional?.filter(
+                action => action.label !== 'delete'
+              ) ?? null,
+          };
+        }
       });
   }
   override columns = [
@@ -112,9 +94,7 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
     });
   }
 
-  filterQuery(value: string): string {
-    return `((name like "%${value}%") or (label like "%${value}%") or (description like "%${value}%") or (type like "%${value}%"))`;
-  }
+  filterQuery = getFilterQuery('services');
 
   override deleteRow(row: ServiceRow): void {
     this.serviceService

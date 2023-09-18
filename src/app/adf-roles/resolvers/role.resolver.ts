@@ -10,7 +10,6 @@ export const roleResolver: ResolveFn<RoleType | undefined> = (
   const roleService = inject(ROLE_SERVICE_TOKEN);
   const id = route.paramMap.get('id');
   if (!id) {
-    // TODO: add 404 page
     return;
   }
   return roleService.get<RoleType>(id, {

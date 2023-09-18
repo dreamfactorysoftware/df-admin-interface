@@ -1,12 +1,9 @@
 @use '@angular/material' as mat;
+@use 'src/theme' as theme;
 
-$deep-purple-palette: mat.define-palette(mat.$deep-purple-palette);
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 $green-palette: mat.define-palette(mat.$green-palette);
 $red-palette: mat.define-palette(mat.$red-palette);
-
-.selected {
-  background-color: mat.get-color-from-palette($deep-purple-palette, 100);
-}
 
 .active {
   color: mat.get-color-from-palette($green-palette, 500);
@@ -17,6 +14,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
 }
 
 .top-action-bar {
+  width: 100%;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -28,14 +26,36 @@ $red-palette: mat.define-palette(mat.$red-palette);
 }
 
 .bottom-action-bar {
+  margin-top: 16px;
   display: flex;
   flex-direction: row;
   justify-content: center;
 }
 
-.no-data-row {
-  td {
-    text-align: center;
-    padding: 32px;
+.table-container {
+  width: 100%;
+  overflow-y: auto;
+}
+
+.clickable {
+  &.mat-mdc-row {
+    outline: 0;
+    .mat-mdc-cell {
+      cursor: pointer;
+    }
+  }
+  &.mat-mdc-row:focus,
+  &.mat-mdc-row:focus-within {
+    .mat-mdc-cell:first-child {
+      border-left: 2px solid mat.get-color-from-palette($df-purple-palette, 500);
+    }
+  }
+
+  &.mat-mdc-row:focus,
+  &.mat-mdc-row:focus-within,
+  &.mat-mdc-row:hover {
+    .mat-mdc-cell {
+      background-color: mat.get-color-from-palette($df-purple-palette, 100);
+    }
   }
 }

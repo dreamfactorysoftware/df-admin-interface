@@ -3,6 +3,13 @@ import { DfBaseCrudService } from '../services/df-base-crud.service';
 
 export const URL_TOKEN = new InjectionToken<string>('URL_TOKEN');
 
+export const GITHUB_REPO_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'GITHUB_REPO_SERVICE_TOKEN'
+);
+export const GITHUB_REPO_URL_TOKEN = new InjectionToken<string>(
+  'GITHUB_REPO_URL_TOKEN'
+);
+
 export const ADMIN_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'ADMIN_SERVICE_TOKEN'
 );
@@ -53,6 +60,14 @@ export const SERVICE_TYPES_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
   'SERVICE_TYPES_URL_TOKEN'
 );
 
+export const SCRIPT_TYPE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SCRIPT_TYPE_SERVICE_TOKEN'
+);
+
+export const SCRIPT_TYPE_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SCRIPT_TYPE_URL_TOKEN'
+);
+
 export const SCHEDULER_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'SCHEDULER_SERVICE_TOKEN'
 );
@@ -84,6 +99,21 @@ export const CONFIG_CORS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
 export const CONFIG_CORS_URL_TOKEN = new InjectionToken<string>(
   'CONFIG_CORS_URL_TOKEN'
 );
+
+export const SCRIPTS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'SCRIPTS_SERVICE_TOKEN'
+);
+export const SCRIPTS_URL_TOKEN = new InjectionToken<string>(
+  'SCRIPTS_URL_TOKEN'
+);
+
+export const EVENT_SCRIPT_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'EVENT_SCRIPT_SERVICE_TOKEN'
+);
+export const EVENT_SCRIPT_URL_TOKEN = new InjectionToken<string>(
+  'EVENT_SCRIPT_URL_TOKEN'
+);
+
 export const CACHE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'CACHE_SERVICE_TOKEN'
 );

@@ -1,27 +1,21 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Component, Inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
+import {
+  DfManageTableComponent,
+  DfManageTableModules,
+} from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { takeUntil } from 'rxjs';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-
 import { LimitType } from 'src/app/shared/types/limit';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatTableModule } from '@angular/material/table';
-import { MatInputModule } from '@angular/material/input';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { MatButtonModule } from '@angular/material/button';
-import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 import {
   LIMIT_CACHE_SERVICE_TOKEN,
   LIMIT_SERVICE_TOKEN,
 } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { TranslocoService } from '@ngneat/transloco';
+import { MatDialog } from '@angular/material/dialog';
+import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 export type LimitTableRowData = {
   id: number;
@@ -43,21 +37,7 @@ export type LimitTableRowData = {
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
   standalone: true,
-  imports: [
-    NgIf,
-    MatButtonModule,
-    FontAwesomeModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatTableModule,
-    NgFor,
-    MatMenuModule,
-    NgTemplateOutlet,
-    MatPaginatorModule,
-    TranslocoPipe,
-    AsyncPipe,
-    MatDialogModule,
-  ],
+  imports: DfManageTableModules,
 })
 export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTableRowData> {
   constructor(
@@ -68,29 +48,16 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
-    breakpointService: DfBreakpointService,
     translateService: TranslocoService,
     dialog: MatDialog
   ) {
-    super(
-      router,
-      activatedRoute,
-      liveAnnouncer,
-      breakpointService,
-      translateService,
-      dialog
-    );
+    super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
   override columns = [
     {
       columnDef: 'active',
       cell: (row: LimitTableRowData) => row.active,
       header: 'active',
-    },
-    {
-      columnDef: 'id',
-      cell: (row: LimitTableRowData) => row.id,
-      header: 'id',
     },
     {
       columnDef: 'name',
@@ -148,9 +115,7 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
     });
   }
 
-  filterQuery(value: string): string {
-    return `(name like "%${value}%")`;
-  }
+  filterQuery = getFilterQuery('limits');
 
   refreshRows(id?: number): void {
     const ids = id

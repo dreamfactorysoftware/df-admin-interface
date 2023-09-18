@@ -2,7 +2,6 @@ import { Component, Inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_SNACK_BAR_DATA,
-  MatSnackBarModule,
   MatSnackBarRef,
 } from '@angular/material/snack-bar';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
@@ -23,12 +22,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
   templateUrl: './df-snackbar.component.html',
   styleUrls: ['../df-alert/df-alert.component.scss'],
   standalone: true,
-  imports: [
-    MatButtonModule,
-    MatSnackBarModule,
-    FontAwesomeModule,
-    TranslocoPipe,
-  ],
+  imports: [MatButtonModule, FontAwesomeModule, TranslocoPipe],
 })
 export class DfSnackbarComponent {
   faXmark = faXmark;

@@ -1,4 +1,4 @@
-import { ActivatedRouteSnapshot, ResolveFn, Router } from '@angular/router';
+import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { inject } from '@angular/core';
 import { UserProfile } from '../../shared/types/user';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
@@ -8,12 +8,8 @@ export const userResolver: ResolveFn<UserProfile | undefined> = (
   route: ActivatedRouteSnapshot
 ) => {
   const userService = inject(USER_SERVICE_TOKEN);
-  const router = inject(Router);
-
   const id = route.paramMap.get('id');
   if (!id) {
-    // TODO: add 404 page
-    router.navigate(['/']);
     return;
   }
   return userService.get<UserProfile>(id, {

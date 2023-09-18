@@ -77,7 +77,6 @@ export const serviceResolver: ResolveFn<Service | undefined> = (
   const servicesService = inject(SERVICES_SERVICE_TOKEN);
   const id = route.paramMap.get('id');
   if (!id) {
-    // TODO: add 404 page
     return;
   }
   return servicesService.get<Service>(id, {
