@@ -13,10 +13,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 import { ServiceResponseObj } from '../df-roles.types';
 import { TranslocoPipe } from '@ngneat/transloco';
-import {
-  BASE_SERVICE_TOKEN,
-  ROLE_SERVICE_TOKEN,
-} from 'src/app/core/constants/tokens';
+import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
@@ -76,8 +73,6 @@ export class DfRolesAccessComponent implements OnInit, OnDestroy {
   ];
 
   constructor(
-    @Inject(ROLE_SERVICE_TOKEN)
-    private roleService: DfBaseCrudService,
     private rootFormGroup: FormGroupDirective,
     private activatedRoute: ActivatedRoute,
     @Inject(BASE_SERVICE_TOKEN)
@@ -112,7 +107,10 @@ export class DfRolesAccessComponent implements OnInit, OnDestroy {
           ) || [];
 
         // if service ID exists, GET service components
-        if (data.data.roleServiceAccessByRoleId.length > 0) {
+        if (
+          data.type === 'edit' &&
+          data.data.roleServiceAccessByRoleId.length > 0
+        ) {
           data.data.roleServiceAccessByRoleId.forEach((item: any) => {
             const serviceId = item.serviceId;
             const serviceName =
