@@ -68,11 +68,11 @@
       <form class="script-form-group-container" [formGroup]="scriptFormGroup">
         <div class="script-form-container">
           <mat-form-field>
-            <mat-label> {{ 'scriptName' | transloco }}</mat-label>
+            <mat-label> {{ 'scripts.scriptName' | transloco }}</mat-label>
             <input matInput formControlName="name" />
           </mat-form-field>
           <mat-form-field>
-            <mat-label>{{ 'scriptType' | transloco }}</mat-label>
+            <mat-label>{{ 'scripts.scriptType' | transloco }}</mat-label>
             <mat-select formControlName="type">
               <mat-option *ngFor="let type of scriptTypes" [value]="type.name">
                 {{ type.label }}
@@ -81,7 +81,7 @@
           </mat-form-field>
           <div>
             <mat-slide-toggle formControlName="isActive">{{
-              'active' | transloco
+              'scripts.active' | transloco
             }}</mat-slide-toggle>
           </div>
           <div
@@ -101,8 +101,8 @@
             >
           </div>
           <div class="file-import-container">
-            <h4>{{ 'importScriptFile' | transloco }}</h4>
-            <mat-label>{{ 'fromDesktop' | transloco }}:</mat-label>
+            <h4>{{ 'scripts.importScriptFile' | transloco }}</h4>
+            <mat-label>{{ 'scripts.fromDesktop' | transloco }}:</mat-label>
             <button
               mat-raised-button
               color="primary"
@@ -115,15 +115,15 @@
               [accept]="getAcceptedFileTypes()"
               #fileInput
               (change)="onDesktopUploadScriptFile($event)" />
-            <mat-label>{{ 'fromGitHub' | transloco }}:</mat-label>
+            <mat-label>{{ 'scripts.fromGitHub' | transloco }}:</mat-label>
             <button mat-raised-button color="primary" (click)="openDialog()">
-              {{ 'selectFile' | transloco }}
+              {{ 'scripts.selectFile' | transloco }}
             </button>
           </div>
           <div>
-            <h4>{{ 'linkToService' | transloco }}</h4>
+            <h4>{{ 'scripts.linkToService' | transloco }}</h4>
             <mat-form-field>
-              <mat-label>{{ 'service' | transloco }}: </mat-label>
+              <mat-label>{{ 'scripts.service' | transloco }}: </mat-label>
               <mat-select formControlName="storageServiceId">
                 <mat-option [value]="undefined">-- None --</mat-option>
                 <mat-option
@@ -142,7 +142,7 @@
                     selectedFileService.type === 'bitbucket')) ||
                 scriptFormGroup.controls['scmRepository'].value
               ">
-              <mat-label>{{ 'repository' | transloco }}: </mat-label>
+              <mat-label>{{ 'scripts.repository' | transloco }}: </mat-label>
               <input matInput formControlName="scmRepository" />
             </mat-form-field>
             <mat-form-field
@@ -153,7 +153,7 @@
                     selectedFileService.type === 'bitbucket')) ||
                 scriptFormGroup.controls['scmReference'].value
               ">
-              <mat-label>{{ 'branch' | transloco }}: </mat-label>
+              <mat-label>{{ 'scripts.branch' | transloco }}: </mat-label>
               <input matInput formControlName="scmReference" />
             </mat-form-field>
             <mat-form-field
@@ -161,7 +161,7 @@
                 (selectedFileService && fileServiceDropdownOptions.length) ||
                 scriptFormGroup.controls['storagePath'].value
               ">
-              <mat-label>{{ 'path' | transloco }}: </mat-label>
+              <mat-label>{{ 'scripts.path' | transloco }}: </mat-label>
               <input matInput formControlName="storagePath" />
             </mat-form-field>
             <div
@@ -170,10 +170,10 @@
                 scriptFormGroup.controls['storageServiceId'].value
               ">
               <button mat-button color="primary" (click)="pullLatestScript()">
-                {{ 'viewLatest' | transloco }}
+                {{ 'scripts.viewLatest' | transloco }}
               </button>
               <button mat-button (click)="deleteScriptFromCache()">
-                {{ 'deleteCache' | transloco }}
+                {{ 'scripts.deleteCache' | transloco }}
               </button>
             </div>
           </div>

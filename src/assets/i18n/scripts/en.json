@@ -15,5 +15,6 @@
   "deleteCache": "Delete Cache",
   "deleteSuccessMsg": "Script successfully deleted",
   "createSuccessMsg": "Script successfully created",
-  "updateSuccessMsg": "Script successfully updated"
+  "updateSuccessMsg": "Script successfully updated",
+  "getScriptSuccessMsg": "Script file successfully fetched"
 }
