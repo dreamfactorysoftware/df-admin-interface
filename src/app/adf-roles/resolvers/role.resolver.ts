@@ -13,7 +13,7 @@ export const roleResolver: ResolveFn<RoleType | undefined> = (
     return;
   }
   return roleService.get<RoleType>(id, {
-    related: 'lookup_by_role_id',
+    related: 'role_service_access_by_role_id,lookup_by_role_id',
     additionalParams: [
       {
         key: 'accessible_tabs',

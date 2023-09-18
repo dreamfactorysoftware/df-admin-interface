@@ -165,19 +165,28 @@ export const routes: Routes = [
             path: 'create',
             loadComponent: () =>
               import(
-                './adf-roles/df-create-role/df-create-role.component'
-              ).then(m => m.DfCreateRoleComponent),
+                './adf-roles/df-role-details/df-role-details.component'
+              ).then(m => m.DfRoleDetailsComponent),
+            resolve: { services: servicesResolver(0) },
+            data: { type: 'create' },
           },
           {
             path: ':id',
             loadComponent: () =>
               import(
-                './adf-roles/df-create-role/df-create-role.component'
-              ).then(m => m.DfCreateRoleComponent),
-            resolve: { data: roleResolver },
+                './adf-roles/df-role-details/df-role-details.component'
+              ).then(m => m.DfRoleDetailsComponent),
+            resolve: { data: roleResolver, services: servicesResolver(0) },
+            data: { type: 'edit' },
           },
         ],
-        providers: [...ROLE_SERVICE_PROVIDERS, provideTranslocoScope('roles')],
+        providers: [
+          ...ROLE_SERVICE_PROVIDERS,
+          ...SERVICE_TYPE_SERVICE_PROVIDERS,
+          ...SERVICES_SERVICE_PROVIDERS,
+          ...BASE_SERVICE_PROVIDERS,
+          provideTranslocoScope('roles'),
+        ],
       },
       {
         path: ROUTES.API_KEYS,
