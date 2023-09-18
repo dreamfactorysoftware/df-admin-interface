@@ -31,7 +31,7 @@ export class DfBaseCrudService {
   get<T>(id: string | number, options?: Partial<RequestOptions>) {
     return this.http.get<T>(
       `${this.url}/${id}`,
-      this.getOptions({ ...options })
+      this.getOptions({ snackbarError: 'server', ...options })
     );
   }
 

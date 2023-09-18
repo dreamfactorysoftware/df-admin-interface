@@ -5,11 +5,9 @@ import {
   HttpRequest,
   HttpResponse,
 } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { DfSnackbarComponent } from 'src/app/shared/components/df-snackbar/df-snackbar.component';
-import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { inject } from '@angular/core';
 import { tap } from 'rxjs';
+import { DfSnackbarService } from '../services/df-snackbar.service';
 
 export const snackbarInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
@@ -19,6 +17,7 @@ export const snackbarInterceptor: HttpInterceptorFn = (
     req.headers.has('snackbar-success') ||
     req.headers.has('snackbar-error')
   ) {
+    const snackbarService = inject(DfSnackbarService);
     const success = req.headers.get('snackbar-success');
     let error = req.headers.get('snackbar-error');
     req = req.clone({
@@ -28,7 +27,7 @@ export const snackbarInterceptor: HttpInterceptorFn = (
       tap({
         next: evt => {
           if (evt instanceof HttpResponse && success) {
-            openSnackBar(success, 'success');
+            snackbarService.openSnackBar(success, 'success');
           }
         },
         error: err => {
@@ -37,7 +36,7 @@ export const snackbarInterceptor: HttpInterceptorFn = (
             if (error === 'server' && serverError) {
               error = serverError.message;
             }
-            openSnackBar(error ?? 'defaultError', 'error');
+            snackbarService.openSnackBar(error ?? 'defaultError', 'error');
           }
         },
       })
@@ -45,16 +44,3 @@ export const snackbarInterceptor: HttpInterceptorFn = (
   }
   return next(req);
 };
-
-function openSnackBar(message: string, alertType: AlertType) {
-  const snackBar = inject(MatSnackBar);
-  snackBar.openFromComponent(DfSnackbarComponent, {
-    duration: 5000,
-    horizontalPosition: 'left',
-    verticalPosition: 'bottom',
-    data: {
-      message,
-      alertType,
-    },
-  });
-}

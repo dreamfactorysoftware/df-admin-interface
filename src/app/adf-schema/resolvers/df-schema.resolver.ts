@@ -1,29 +1,12 @@
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { inject } from '@angular/core';
-import {
-  BASE_SERVICE_TOKEN,
-  SERVICES_SERVICE_TOKEN,
-  SERVICE_TYPES_SERVICE_TOKEN,
-} from '../../core/constants/tokens';
-import { ServiceType } from 'src/app/shared/types/service';
-import { Service } from 'bonjour';
+import { BASE_SERVICE_TOKEN } from '../../core/constants/tokens';
+
 import {
   TableDetailsType,
   TableField,
 } from '../df-table-details/df-table-details.types';
-
-export const schemaServiceTypeResolver: ResolveFn<
-  GenericListResponse<Array<ServiceType>>
-> = () => {
-  return inject(SERVICE_TYPES_SERVICE_TOKEN).getAll();
-};
-
-export const schemaServiceResolver: ResolveFn<
-  GenericListResponse<Array<Service>>
-> = () => {
-  return inject(SERVICES_SERVICE_TOKEN).getAll();
-};
 
 export const schemaResolver: ResolveFn<
   GenericListResponse<Array<{ name: string; label: string }>>

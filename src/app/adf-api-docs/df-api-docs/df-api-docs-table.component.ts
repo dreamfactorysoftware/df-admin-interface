@@ -1,21 +1,16 @@
 import { Component, Inject } from '@angular/core';
-import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
+import {
+  Actions,
+  DfManageTableComponent,
+  DfManageTableModules,
+} from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { ApiDocsRowData } from '../types';
 import { SERVICES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatDialog } from '@angular/material/dialog';
 import { Router, ActivatedRoute } from '@angular/router';
-import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { TranslocoService } from '@ngneat/transloco';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { MatTableModule } from '@angular/material/table';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { takeUntil } from 'rxjs';
 import { Service, ServiceType } from 'src/app/shared/types/service';
@@ -28,26 +23,11 @@ import { Service, ServiceType } from 'src/app/shared/types/service';
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
   standalone: true,
-  imports: [
-    NgIf,
-    MatButtonModule,
-    FontAwesomeModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatTableModule,
-    NgFor,
-    MatMenuModule,
-    NgTemplateOutlet,
-    MatPaginatorModule,
-    TranslocoPipe,
-    AsyncPipe,
-    MatDialogModule,
-  ],
+  imports: DfManageTableModules,
 })
 export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowData> {
   serviceTypes: ServiceType[];
   override allowCreate = false;
-  override readOnly = true;
 
   constructor(
     @Inject(SERVICES_SERVICE_TOKEN)
@@ -55,18 +35,10 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
-    breakpointService: DfBreakpointService,
     translateService: TranslocoService,
     dialog: MatDialog
   ) {
-    super(
-      router,
-      activatedRoute,
-      liveAnnouncer,
-      breakpointService,
-      translateService,
-      dialog
-    );
+    super(router, activatedRoute, liveAnnouncer, translateService, dialog);
 
     this._activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
@@ -105,6 +77,17 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
       columnDef: 'actions',
     },
   ];
+
+  override actions: Actions<ApiDocsRowData> = {
+    default: this.actions.default,
+    additional: null,
+  };
+
+  override viewRow(row: ApiDocsRowData): void {
+    this.router.navigate([row.name], {
+      relativeTo: this._activatedRoute,
+    });
+  }
 
   override mapDataToTable(data: Service[]): ApiDocsRowData[] {
     return data.map(val => {

@@ -15,6 +15,7 @@ import {
 import { GenericSuccessResponse } from 'src/app/shared/types/generic-http.type';
 import { LoginCredentials, RegisterDetails } from '../types';
 
+//TODO default role for app enable user to enter without authentication
 @Injectable({
   providedIn: 'root',
 })

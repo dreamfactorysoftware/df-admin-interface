@@ -1,211 +1,210 @@
-<div class="apps-container">
-  <form [formGroup]="appForm" (ngSubmit)="onSubmit()" class="form-container">
-    <div class="app-info">
-      <mat-form-field>
-        <!-- TODO add into tooltip -->
-        <mat-label>
-          {{ 'apps.createApp.applicationName.label' | transloco }}
-        </mat-label>
-        <input
-          matInput
-          placeholder="{{ 'apps.createApp.applicationName.label' | transloco }}"
-          formControlName="name"
-          required />
-        <mat-error *ngIf="appForm.controls['name'].hasError('required')">
-          {{ 'apps.createApp.applicationName.error' | transloco }}
-        </mat-error>
-      </mat-form-field>
-      <mat-form-field>
-        <!-- TODO add into tooltip -->
-        <mat-label>{{
-          'apps.createApp.description.label' | transloco
-        }}</mat-label>
-        <input
-          matInput
-          placeholder="{{ 'apps.createApp.description.label' | transloco }}"
-          formControlName="description" />
-      </mat-form-field>
-      <mat-form-field>
-        <!-- TODO add into tooltip -->
-        <mat-label>{{
-          'apps.createApp.defaultRole.label' | transloco
-        }}</mat-label>
-        <input
-          #rolesInput
-          type="text"
-          placeholder="Pick one"
-          matInput
-          formControlName="defaultRole"
-          [matAutocomplete]="auto"
-          (input)="filter()"
-          (focus)="filter()" />
-        <mat-autocomplete
-          requireSelection
-          #auto="matAutocomplete"
-          [displayWith]="displayFn">
-          <mat-option *ngFor="let role of filteredRoles" [value]="role">
-            {{ role.name }}
-          </mat-option>
-        </mat-autocomplete>
-      </mat-form-field>
-      <mat-slide-toggle formControlName="active">{{
-        'apps.createApp.active' | transloco
-      }}</mat-slide-toggle>
-    </div>
-    <!-- API Card -->
-    <mat-card *ngIf="apiKey">
+<form [formGroup]="appForm" (ngSubmit)="onSubmit()" class="form-container">
+  <div class="app-info">
+    <mat-form-field>
+      <!-- TODO add into tooltip -->
+      <mat-label>
+        {{ 'apps.createApp.applicationName.label' | transloco }}
+      </mat-label>
+      <input
+        matInput
+        placeholder="{{ 'apps.createApp.applicationName.label' | transloco }}"
+        formControlName="name"
+        required />
+      <mat-error *ngIf="appForm.controls['name'].hasError('required')">
+        {{ 'apps.createApp.applicationName.error' | transloco }}
+      </mat-error>
+    </mat-form-field>
+    <mat-form-field>
+      <!-- TODO add into tooltip -->
+      <mat-label>{{
+        'apps.createApp.description.label' | transloco
+      }}</mat-label>
+      <input
+        matInput
+        placeholder="{{ 'apps.createApp.description.label' | transloco }}"
+        formControlName="description" />
+    </mat-form-field>
+    <mat-form-field>
+      <!-- TODO add into tooltip -->
+      <mat-label>{{
+        'apps.createApp.defaultRole.label' | transloco
+      }}</mat-label>
+      <input
+        #rolesInput
+        type="text"
+        placeholder="Pick one"
+        matInput
+        formControlName="defaultRole"
+        [matAutocomplete]="auto"
+        (input)="filter()"
+        (focus)="filter()" />
+      <!-- TODO unable to remove default role -->
+      <mat-autocomplete
+        requireSelection
+        #auto="matAutocomplete"
+        [displayWith]="displayFn">
+        <mat-option *ngFor="let role of filteredRoles" [value]="role">
+          {{ role.name }}
+        </mat-option>
+      </mat-autocomplete>
+    </mat-form-field>
+    <mat-slide-toggle formControlName="active">{{
+      'apps.createApp.active' | transloco
+    }}</mat-slide-toggle>
+  </div>
+  <!-- API Card -->
+  <mat-card *ngIf="apiKey">
+    <mat-card-header>
+      <mat-card-subtitle>{{
+        'apps.createApp.apiKey.label' | transloco
+      }}</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      {{ apiKey }}
+    </mat-card-content>
+    <mat-card-actions>
+      <button mat-button type="button" (click)="copyApiKey()">
+        <fa-icon [icon]="faCopy" class="copy-icon"></fa-icon>
+
+        {{ 'apps.createApp.apiKey.copy' | transloco }}
+      </button>
+    </mat-card-actions>
+  </mat-card>
+  <!-- app location -->
+  <div class="flex-col">
+    <!-- TODO add into tooltip -->
+    <p>{{ 'apps.createApp.appLocation.label' | transloco }}</p>
+    <mat-radio-group
+      class="flex-col"
+      aria-label="Select an option"
+      formControlName="appLocation">
+      <mat-radio-button value="0">{{
+        'apps.createApp.appLocation.options.noStorage' | transloco
+      }}</mat-radio-button>
+      <mat-radio-button value="1">{{
+        'apps.createApp.appLocation.options.fileStorage.label' | transloco
+      }}</mat-radio-button>
+      <mat-radio-button value="3">{{
+        'apps.createApp.appLocation.options.webServer.label' | transloco
+      }}</mat-radio-button>
+      <mat-radio-button value="2">{{
+        'apps.createApp.appLocation.options.remoteUrl.label' | transloco
+      }}</mat-radio-button>
+    </mat-radio-group>
+  </div>
+  <!-- conditional inputs -->
+  <div
+    *ngIf="
+      appForm.controls['appLocation'].value === '1' ||
+      appForm.controls['appLocation'].value === '2' ||
+      appForm.controls['appLocation'].value === '3'
+    ">
+    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
+      <mat-label>{{
+        'apps.createApp.appLocation.options.fileStorage.storageService.label'
+          | transloco
+      }}</mat-label>
+      <mat-select formControlName="storageServiceId" name="defaultRole">
+        <mat-option [value]="3">
+          {{
+            'apps.createApp.appLocation.options.fileStorage.storageService.options.file'
+              | transloco
+          }}
+        </mat-option>
+        <mat-option [value]="4">
+          {{
+            'apps.createApp.appLocation.options.fileStorage.storageService.options.log'
+              | transloco
+          }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
+      <mat-label>{{
+        'apps.createApp.appLocation.options.fileStorage.storageFolder.label'
+          | transloco
+      }}</mat-label>
+      <input
+        matInput
+        placeholder="{{
+          'apps.createApp.appLocation.options.fileStorage.storageFolder.placeholder'
+            | transloco
+        }}"
+        formControlName="storageContainer" />
+    </mat-form-field>
+    <!-- shared path input -->
+    <mat-form-field
+      *ngIf="
+        appForm.controls['appLocation'].value === '1' ||
+        appForm.controls['appLocation'].value === '3'
+      ">
+      <!-- TODO add into tooltip -->
+      <mat-label *ngIf="appForm.controls['appLocation'].value === '1'">
+        {{
+          'apps.createApp.appLocation.options.fileStorage.launchPath.label'
+            | transloco
+        }}
+      </mat-label>
+      <!-- TODO add into tooltip -->
+      <mat-label *ngIf="appForm.controls['appLocation'].value === '3'">
+        {{
+          'apps.createApp.appLocation.options.webServer.pathToApp.label'
+            | transloco
+        }}
+      </mat-label>
+      <input
+        matInput
+        placeholder="{{
+          'apps.createApp.appLocation.options.fileStorage.launchPath.placeholder'
+            | transloco
+        }}"
+        formControlName="path" />
+    </mat-form-field>
+    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '2'">
+      <!-- TODO add into tooltip -->
+      <mat-label>
+        {{ 'apps.createApp.appLocation.options.remoteUrl.label' | transloco }}
+      </mat-label>
+      <input
+        matInput
+        placeholder="{{
+          'apps.createApp.appLocation.options.fileStorage.launchPath.placeholder'
+            | transloco
+        }}"
+        formControlName="url" />
+    </mat-form-field>
+
+    <mat-card
+      *ngIf="
+        appForm.controls['appLocation'].value === '1' ||
+        appForm.controls['appLocation'].value === '3'
+      ">
       <mat-card-header>
+        <!-- TODO add into tooltip -->
         <mat-card-subtitle>{{
-          'apps.createApp.apiKey.label' | transloco
+          'apps.createApp.appLocation.options.urlPath.label' | transloco
         }}</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        {{ apiKey }}
+        {{ getAppLocationUrl() }}
       </mat-card-content>
       <mat-card-actions>
-        <button mat-button type="button" (click)="copyApiKey()">
+        <button mat-button type="button" (click)="copyAppUrl()">
           <fa-icon [icon]="faCopy" class="copy-icon"></fa-icon>
 
-          {{ 'apps.createApp.apiKey.copy' | transloco }}
+          {{ 'apps.createApp.appLocation.options.urlPath.copy' | transloco }}
         </button>
       </mat-card-actions>
     </mat-card>
-    <!-- app location -->
-    <div class="flex-col">
-      <!-- TODO add into tooltip -->
-      <p>{{ 'apps.createApp.appLocation.label' | transloco }}</p>
-      <mat-radio-group
-        class="flex-col"
-        aria-label="Select an option"
-        formControlName="appLocation">
-        <mat-radio-button value="0">{{
-          'apps.createApp.appLocation.options.noStorage' | transloco
-        }}</mat-radio-button>
-        <mat-radio-button value="1">{{
-          'apps.createApp.appLocation.options.fileStorage.label' | transloco
-        }}</mat-radio-button>
-        <mat-radio-button value="3">{{
-          'apps.createApp.appLocation.options.webServer.label' | transloco
-        }}</mat-radio-button>
-        <mat-radio-button value="2">{{
-          'apps.createApp.appLocation.options.remoteUrl.label' | transloco
-        }}</mat-radio-button>
-      </mat-radio-group>
-    </div>
-    <!-- conditional inputs -->
-    <div
-      *ngIf="
-        appForm.controls['appLocation'].value === '1' ||
-        appForm.controls['appLocation'].value === '2' ||
-        appForm.controls['appLocation'].value === '3'
-      ">
-      <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
-        <mat-label>{{
-          'apps.createApp.appLocation.options.fileStorage.storageService.label'
-            | transloco
-        }}</mat-label>
-        <mat-select formControlName="storageServiceId" name="defaultRole">
-          <mat-option [value]="3">
-            {{
-              'apps.createApp.appLocation.options.fileStorage.storageService.options.file'
-                | transloco
-            }}
-          </mat-option>
-          <mat-option [value]="4">
-            {{
-              'apps.createApp.appLocation.options.fileStorage.storageService.options.log'
-                | transloco
-            }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-      <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
-        <mat-label>{{
-          'apps.createApp.appLocation.options.fileStorage.storageFolder.label'
-            | transloco
-        }}</mat-label>
-        <input
-          matInput
-          placeholder="{{
-            'apps.createApp.appLocation.options.fileStorage.storageFolder.placeholder'
-              | transloco
-          }}"
-          formControlName="storageContainer" />
-      </mat-form-field>
-      <!-- shared path input -->
-      <mat-form-field
-        *ngIf="
-          appForm.controls['appLocation'].value === '1' ||
-          appForm.controls['appLocation'].value === '3'
-        ">
-        <!-- TODO add into tooltip -->
-        <mat-label *ngIf="appForm.controls['appLocation'].value === '1'">
-          {{
-            'apps.createApp.appLocation.options.fileStorage.launchPath.label'
-              | transloco
-          }}
-        </mat-label>
-        <!-- TODO add into tooltip -->
-        <mat-label *ngIf="appForm.controls['appLocation'].value === '3'">
-          {{
-            'apps.createApp.appLocation.options.webServer.pathToApp.label'
-              | transloco
-          }}
-        </mat-label>
-        <input
-          matInput
-          placeholder="{{
-            'apps.createApp.appLocation.options.fileStorage.launchPath.placeholder'
-              | transloco
-          }}"
-          formControlName="path" />
-      </mat-form-field>
-      <mat-form-field *ngIf="appForm.controls['appLocation'].value === '2'">
-        <!-- TODO add into tooltip -->
-        <mat-label>
-          {{ 'apps.createApp.appLocation.options.remoteUrl.label' | transloco }}
-        </mat-label>
-        <input
-          matInput
-          placeholder="{{
-            'apps.createApp.appLocation.options.fileStorage.launchPath.placeholder'
-              | transloco
-          }}"
-          formControlName="url" />
-      </mat-form-field>
-
-      <mat-card
-        *ngIf="
-          appForm.controls['appLocation'].value === '1' ||
-          appForm.controls['appLocation'].value === '3'
-        ">
-        <mat-card-header>
-          <!-- TODO add into tooltip -->
-          <mat-card-subtitle>{{
-            'apps.createApp.appLocation.options.urlPath.label' | transloco
-          }}</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          {{ getAppLocationUrl() }}
-        </mat-card-content>
-        <mat-card-actions>
-          <button mat-button type="button" (click)="copyAppUrl()">
-            <fa-icon [icon]="faCopy" class="copy-icon"></fa-icon>
-
-            {{ 'apps.createApp.appLocation.options.urlPath.copy' | transloco }}
-          </button>
-        </mat-card-actions>
-      </mat-card>
-    </div>
-    <!-- submit -->
-    <div>
-      <button mat-flat-button type="button" (click)="goBack()">
-        {{ 'cancel' | transloco }}
-      </button>
-      <button mat-raised-button color="primary" type="submit">
-        <span *ngIf="this.editApp">{{ 'save' | transloco }}</span>
-        <span *ngIf="!this.editApp">{{ 'create' | transloco }}</span>
-      </button>
-    </div>
-  </form>
-</div>
+  </div>
+  <!-- submit -->
+  <div>
+    <button mat-flat-button type="button" (click)="goBack()">
+      {{ 'cancel' | transloco }}
+    </button>
+    <button mat-raised-button color="primary" type="submit">
+      <span *ngIf="this.editApp">{{ 'save' | transloco }}</span>
+      <span *ngIf="!this.editApp">{{ 'create' | transloco }}</span>
+    </button>
+  </div>
+</form>

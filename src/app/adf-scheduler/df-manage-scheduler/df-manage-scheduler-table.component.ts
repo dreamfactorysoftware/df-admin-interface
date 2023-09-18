@@ -1,24 +1,17 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Component, Inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
+import {
+  DfManageTableComponent,
+  DfManageTableModules,
+} from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { takeUntil } from 'rxjs';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { SchedulerTaskData } from '../types/df-scheduler.types';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { MatMenuModule } from '@angular/material/menu';
-import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
-import { MatInputModule } from '@angular/material/input';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatCheckboxModule } from '@angular/material/checkbox';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { MatTableModule } from '@angular/material/table';
-import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
-import { MatButtonModule } from '@angular/material/button';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatDialog } from '@angular/material/dialog';
 import { Service } from 'src/app/shared/types/service';
+import { TranslocoService } from '@ngneat/transloco';
 
 @Component({
   selector: 'df-manage-scheduler-table',
@@ -28,22 +21,7 @@ import { Service } from 'src/app/shared/types/service';
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
   standalone: true,
-  imports: [
-    AsyncPipe,
-    NgFor,
-    NgIf,
-    NgTemplateOutlet,
-    FontAwesomeModule,
-    MatPaginatorModule,
-    MatButtonModule,
-    MatDialogModule,
-    MatMenuModule,
-    MatInputModule,
-    MatFormFieldModule,
-    MatCheckboxModule,
-    MatTableModule,
-    TranslocoPipe,
-  ],
+  imports: DfManageTableModules,
 })
 export class DfManageSchedulerTableComponent extends DfManageTableComponent<SchedulerTaskData> {
   userServices: Service[];
@@ -54,18 +32,10 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
-    breakpointService: DfBreakpointService,
     translateService: TranslocoService,
     dialog: MatDialog
   ) {
-    super(
-      router,
-      activatedRoute,
-      liveAnnouncer,
-      breakpointService,
-      translateService,
-      dialog
-    );
+    super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
 
   override allowFilter = false;

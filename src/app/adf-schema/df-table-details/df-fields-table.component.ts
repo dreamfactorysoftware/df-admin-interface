@@ -1,19 +1,13 @@
 import { Component, Inject } from '@angular/core';
-import { DfManageTableComponent } from '../../shared/components/df-manage-table/df-manage-table.component';
+import {
+  DfManageTableComponent,
+  DfManageTableModules,
+} from '../../shared/components/df-manage-table/df-manage-table.component';
 import { FieldsRow, TableField } from './df-table-details.types';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
-import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatButtonModule } from '@angular/material/button';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { MatTableModule } from '@angular/material/table';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatMenuModule } from '@angular/material/menu';
+import { TranslocoService } from '@ngneat/transloco';
+import { MatDialog } from '@angular/material/dialog';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { takeUntil } from 'rxjs';
@@ -27,21 +21,7 @@ import { ROUTES } from 'src/app/core/constants/routes';
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
   standalone: true,
-  imports: [
-    MatButtonModule,
-    FontAwesomeModule,
-    MatTableModule,
-    MatPaginatorModule,
-    TranslocoPipe,
-    AsyncPipe,
-    NgIf,
-    NgFor,
-    NgTemplateOutlet,
-    MatMenuModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatDialogModule,
-  ],
+  imports: DfManageTableModules,
 })
 export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
   dbName: string;
@@ -53,18 +33,10 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
-    breakpointService: DfBreakpointService,
     translateService: TranslocoService,
     dialog: MatDialog
   ) {
-    super(
-      router,
-      activatedRoute,
-      liveAnnouncer,
-      breakpointService,
-      translateService,
-      dialog
-    );
+    super(router, activatedRoute, liveAnnouncer, translateService, dialog);
 
     this._activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
@@ -147,12 +119,6 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
 
   override createRow(): void {
     this.router.navigate([ROUTES.CREATE, 'field'], {
-      relativeTo: this._activatedRoute,
-    });
-  }
-
-  override editRow(row: FieldsRow): void {
-    this.router.navigate([ROUTES.EDIT, row.name], {
       relativeTo: this._activatedRoute,
     });
   }

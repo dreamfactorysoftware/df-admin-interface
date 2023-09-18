@@ -27,8 +27,6 @@ import {
   USER_SERVICE_PROVIDERS,
   API_DOCS_SERVICE_PROVIDERS,
   EMAIL_TEMPLATES_SERVICE_PROVIDERS,
-  SERVICES_SERVICE_PROVIDERS,
-  SERVICE_TYPES_SERVICE_PROVIDERS,
   LOOKUP_KEYS_SERVICE_PROVIDERS,
   SERVICE_TYPE_SERVICE_PROVIDERS,
   BASE_SERVICE_PROVIDERS,
@@ -37,6 +35,7 @@ import {
   SCRIPT_TYPE_SERVICE_PROVIDERS,
   EVENT_SCRIPT_SERVICE_PROVIDERS,
   GITHUB_REPO_SERVICE_PROVIDERS,
+  SERVICES_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
@@ -57,8 +56,6 @@ import {
   DfTableFieldResolver,
   DfTableRelationshipsEditResolver,
   schemaResolver,
-  schemaServiceResolver,
-  schemaServiceTypeResolver,
 } from './adf-schema/resolvers/df-schema.resolver';
 import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
 import { ServiceRoutes } from './adf-services/routes';
@@ -75,6 +72,13 @@ export const routes: Routes = [
     path: '',
     pathMatch: 'full',
     redirectTo: ROUTES.HOME,
+  },
+  {
+    path: ROUTES.ERROR,
+    loadComponent: () =>
+      import('./shared/components/df-error/df-error.component').then(
+        m => m.DfErrorComponent
+      ),
   },
   {
     path: ROUTES.AUTH,
@@ -165,7 +169,7 @@ export const routes: Routes = [
               ).then(m => m.DfCreateRoleComponent),
           },
           {
-            path: `${ROUTES.EDIT}/:id`,
+            path: ':id',
             loadComponent: () =>
               import(
                 './adf-roles/df-create-role/df-create-role.component'
@@ -181,22 +185,11 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import('./adf-apps/df-manage-apps/df-manage-apps.component').then(
-                m => m.DfManageAppsComponent
-              ),
+              import(
+                './adf-apps/df-manage-apps/df-manage-apps-table.component'
+              ).then(m => m.DfManageAppsTableComponent),
             resolve: {
               data: appsResolver(0),
-            },
-          },
-          {
-            path: `${ROUTES.EDIT}/:id`,
-            loadComponent: () =>
-              import('./adf-apps/df-app-details/df-app-details.component').then(
-                m => m.DfAppDetailsComponent
-              ),
-            resolve: {
-              roles: rolesResolver(0),
-              appData: editAppResolver,
             },
           },
           {
@@ -210,11 +203,15 @@ export const routes: Routes = [
             },
           },
           {
-            path: ROUTES.IMPORT,
+            path: ':id',
             loadComponent: () =>
-              import('./adf-apps/df-import-app/df-import-app.component').then(
-                m => m.DfImportAppComponent
+              import('./adf-apps/df-app-details/df-app-details.component').then(
+                m => m.DfAppDetailsComponent
               ),
+            resolve: {
+              roles: rolesResolver(0),
+              appData: editAppResolver,
+            },
           },
         ],
         providers: [
@@ -257,7 +254,7 @@ export const routes: Routes = [
             ],
           },
           {
-            path: `${ROUTES.VIEW}/:name`,
+            path: ':name',
             loadComponent: () =>
               import('./adf-api-docs/df-api-docs/df-api-docs.component').then(
                 m => m.DfApiDocsComponent
@@ -302,7 +299,7 @@ export const routes: Routes = [
             },
           },
           {
-            path: `${ROUTES.EDIT}/:id`,
+            path: ':id',
             loadComponent: () =>
               import('./adf-limits/df-limit/df-limit.component').then(
                 m => m.DfLimitComponent
@@ -379,7 +376,7 @@ export const routes: Routes = [
                   ).then(m => m.DfCorsConfigDetailsComponent),
               },
               {
-                path: `${ROUTES.EDIT}/:id`,
+                path: ':id',
                 loadComponent: () =>
                   import(
                     './adf-config/df-cors/df-cors-config-details.component'
@@ -422,21 +419,21 @@ export const routes: Routes = [
                 },
               },
               {
-                path: `${ROUTES.EDIT}/:id`,
-                loadComponent: () =>
-                  import(
-                    './adf-config/df-email-template-details/df-email-template-details.component'
-                  ).then(m => m.DfEmailTemplateDetailsComponent),
-                resolve: { data: DfEmailTemplateDetailsResolver },
-                data: { type: 'edit' },
-              },
-              {
                 path: ROUTES.CREATE,
                 loadComponent: () =>
                   import(
                     './adf-config/df-email-template-details/df-email-template-details.component'
                   ).then(m => m.DfEmailTemplateDetailsComponent),
                 data: { type: 'create' },
+              },
+              {
+                path: ':id',
+                loadComponent: () =>
+                  import(
+                    './adf-config/df-email-template-details/df-email-template-details.component'
+                  ).then(m => m.DfEmailTemplateDetailsComponent),
+                resolve: { data: DfEmailTemplateDetailsResolver },
+                data: { type: 'edit' },
               },
             ],
             providers: [
@@ -481,7 +478,7 @@ export const routes: Routes = [
             },
           },
           {
-            path: `${ROUTES.EDIT}/:id`,
+            path: ':id',
             loadComponent: () =>
               import(
                 './adf-scheduler/df-scheduler/df-scheduler.component'
@@ -544,21 +541,21 @@ export const routes: Routes = [
             resolve: { data: adminsResolver() },
           },
           {
-            path: `${ROUTES.EDIT}/:id`,
-            loadComponent: () =>
-              import(
-                './adf-admins/df-admin-details/df-admin-details.component'
-              ).then(m => m.DfAdminDetailsComponent),
-            resolve: { data: adminsResolver() },
-            data: { type: 'edit' },
-          },
-          {
             path: ROUTES.CREATE,
             loadComponent: () =>
               import(
                 './adf-admins/df-admin-details/df-admin-details.component'
               ).then(m => m.DfAdminDetailsComponent),
             data: { type: 'create' },
+          },
+          {
+            path: ':id',
+            loadComponent: () =>
+              import(
+                './adf-admins/df-admin-details/df-admin-details.component'
+              ).then(m => m.DfAdminDetailsComponent),
+            resolve: { data: adminsResolver() },
+            data: { type: 'edit' },
           },
         ],
         providers: [
@@ -578,12 +575,11 @@ export const routes: Routes = [
                 './adf-schema/df-manage-databases-table/df-manage-databases-table.component'
               ).then(m => m.DfManageDatabasesTableComponent),
             resolve: {
-              data: schemaServiceResolver,
-              serviceTypes: schemaServiceTypeResolver,
+              data: servicesResolver(),
             },
           },
           {
-            path: `${ROUTES.VIEW}/:name`,
+            path: ':name',
             children: [
               {
                 path: '',
@@ -614,7 +610,7 @@ export const routes: Routes = [
                       ).then(m => m.DfFieldDetailsComponent),
                   },
                   {
-                    path: `${ROUTES.EDIT}/:fieldName`,
+                    path: ':fieldName',
                     loadComponent: () =>
                       import(
                         './adf-schema/df-field-details/df-field-details.component'
@@ -623,7 +619,7 @@ export const routes: Routes = [
                 ],
               },
               {
-                path: `${ROUTES.EDIT}/:id`,
+                path: ':id',
                 children: [
                   {
                     path: '',
@@ -642,7 +638,7 @@ export const routes: Routes = [
                       ).then(m => m.DfFieldDetailsComponent),
                   },
                   {
-                    path: `${ROUTES.EDIT}/:fieldName`,
+                    path: ':fieldName',
                     loadComponent: () =>
                       import(
                         './adf-schema/df-field-details/df-field-details.component'
@@ -656,8 +652,7 @@ export const routes: Routes = [
                       ).then(m => m.DfRelationshipDetailsComponent),
                     resolve: {
                       fields: DfTableFieldResolver,
-                      serviceTypes: schemaServiceTypeResolver,
-                      services: schemaServiceResolver,
+                      services: servicesResolver(0),
                     },
                     data: { type: 'create' },
                   },
@@ -670,8 +665,7 @@ export const routes: Routes = [
                     resolve: {
                       data: DfTableRelationshipsEditResolver,
                       fields: DfTableFieldResolver,
-                      serviceTypes: schemaServiceTypeResolver,
-                      services: schemaServiceResolver,
+                      services: servicesResolver(0),
                     },
                     data: { type: 'edit' },
                   },
@@ -682,11 +676,14 @@ export const routes: Routes = [
           },
         ],
         providers: [
-          ...SERVICES_SERVICE_PROVIDERS,
-          ...SERVICE_TYPES_SERVICE_PROVIDERS,
+          ...SERVICE_SERVICE_PROVIDERS,
+          ...SERVICE_TYPE_SERVICE_PROVIDERS,
           ...BASE_SERVICE_PROVIDERS,
           provideTranslocoScope('schema'),
         ],
+        data: {
+          groups: ['Database'],
+        },
       },
       {
         path: ROUTES.USERS,
@@ -700,19 +697,6 @@ export const routes: Routes = [
             resolve: { data: usersResolver() },
           },
           {
-            path: `${ROUTES.EDIT}/:id`,
-            loadComponent: () =>
-              import(
-                './adf-users/df-user-details/df-user-details.component'
-              ).then(m => m.DfUserDetailsComponent),
-            resolve: {
-              data: userResolver,
-              apps: appsResolver(0),
-              roles: rolesResolver(0),
-            },
-            data: { type: 'edit' },
-          },
-          {
             path: ROUTES.CREATE,
             loadComponent: () =>
               import(
@@ -723,6 +707,19 @@ export const routes: Routes = [
               apps: appsResolver(0),
               roles: rolesResolver(0),
             },
+          },
+          {
+            path: ':id',
+            loadComponent: () =>
+              import(
+                './adf-users/df-user-details/df-user-details.component'
+              ).then(m => m.DfUserDetailsComponent),
+            resolve: {
+              data: userResolver,
+              apps: appsResolver(0),
+              roles: rolesResolver(0),
+            },
+            data: { type: 'edit' },
           },
         ],
         providers: [

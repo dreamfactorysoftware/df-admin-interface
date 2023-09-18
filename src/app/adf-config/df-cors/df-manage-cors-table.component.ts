@@ -1,22 +1,16 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 import { Component, Inject } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { MatTableModule } from '@angular/material/table';
 import { Router, ActivatedRoute } from '@angular/router';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { TranslocoService } from '@ngneat/transloco';
 import { CONFIG_CORS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
+import {
+  DfManageTableComponent,
+  DfManageTableModules,
+} from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { CorsConfigData } from '../types';
 import { takeUntil } from 'rxjs';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatDialog } from '@angular/material/dialog';
 
 @Component({
   selector: 'df-manage-cors-table',
@@ -26,41 +20,19 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
   standalone: true,
-  imports: [
-    NgIf,
-    MatButtonModule,
-    FontAwesomeModule,
-    MatDialogModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatTableModule,
-    NgFor,
-    MatMenuModule,
-    NgTemplateOutlet,
-    MatPaginatorModule,
-    TranslocoPipe,
-    AsyncPipe,
-  ],
+  imports: DfManageTableModules,
 })
 export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfigData> {
   constructor(
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
-    breakpointService: DfBreakpointService,
     translateService: TranslocoService,
     dialog: MatDialog,
     @Inject(CONFIG_CORS_SERVICE_TOKEN)
     private corsService: DfBaseCrudService
   ) {
-    super(
-      router,
-      activatedRoute,
-      liveAnnouncer,
-      breakpointService,
-      translateService,
-      dialog
-    );
+    super(router, activatedRoute, liveAnnouncer, translateService, dialog);
 
     this.allowFilter = false;
   }
@@ -70,11 +42,6 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
       columnDef: 'active',
       cell: (row: CorsConfigData) => row.enabled,
       header: 'active',
-    },
-    {
-      columnDef: 'id',
-      cell: (row: CorsConfigData) => row.id,
-      header: 'id',
     },
     {
       columnDef: 'path',

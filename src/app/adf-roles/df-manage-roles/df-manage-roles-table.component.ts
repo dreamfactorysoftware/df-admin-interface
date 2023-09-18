@@ -1,24 +1,17 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DfManageTableComponent } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
+import {
+  DfManageTableComponent,
+  DfManageTableModules,
+} from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { takeUntil } from 'rxjs';
 import { Component, Inject } from '@angular/core';
 import { RoleRow, RoleType } from 'src/app/shared/types/role';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatTableModule } from '@angular/material/table';
-import { MatInputModule } from '@angular/material/input';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { MatButtonModule } from '@angular/material/button';
-import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 import { ROLE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { TranslocoService } from '@ngneat/transloco';
+import { MatDialog } from '@angular/material/dialog';
 
 @Component({
   selector: 'df-manage-roles-table',
@@ -28,21 +21,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
   standalone: true,
-  imports: [
-    NgIf,
-    MatButtonModule,
-    FontAwesomeModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatTableModule,
-    NgFor,
-    MatMenuModule,
-    NgTemplateOutlet,
-    MatPaginatorModule,
-    TranslocoPipe,
-    AsyncPipe,
-    MatDialogModule,
-  ],
+  imports: DfManageTableModules,
 })
 export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow> {
   constructor(
@@ -51,18 +30,10 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
-    breakpointService: DfBreakpointService,
     translateService: TranslocoService,
     dialog: MatDialog
   ) {
-    super(
-      router,
-      activatedRoute,
-      liveAnnouncer,
-      breakpointService,
-      translateService,
-      dialog
-    );
+    super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
 
   filterQuery(value: string): string {
@@ -74,11 +45,6 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
       columnDef: 'active',
       cell: (row: RoleRow) => `${row.active}`,
       header: 'active',
-    },
-    {
-      columnDef: 'id',
-      cell: (row: RoleRow) => `${row.id}`,
-      header: 'id',
     },
     {
       columnDef: 'name',
