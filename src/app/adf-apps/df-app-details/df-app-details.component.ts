@@ -31,6 +31,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { faCircleInfo, faCopy } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { ROUTES } from 'src/app/core/constants/routes';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 @Component({
   selector: 'df-app-details',
@@ -52,6 +53,7 @@ import { ROUTES } from 'src/app/core/constants/routes';
     MatRadioModule,
     MatSelectModule,
     TranslocoPipe,
+    MatTooltipModule,
   ],
 })
 export class DfAppDetailsComponent implements OnInit {

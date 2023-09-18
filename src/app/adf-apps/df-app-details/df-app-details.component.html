@@ -1,7 +1,6 @@
 <form [formGroup]="appForm" (ngSubmit)="onSubmit()" class="form-container">
   <div class="app-info">
     <mat-form-field>
-      <!-- TODO add into tooltip -->
       <mat-label>
         {{ 'apps.createApp.applicationName.label' | transloco }}
       </mat-label>
@@ -10,12 +9,16 @@
         placeholder="{{ 'apps.createApp.applicationName.label' | transloco }}"
         formControlName="name"
         required />
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="'apps.createApp.applicationName.tooltip' | transloco" />
       <mat-error *ngIf="appForm.controls['name'].hasError('required')">
         {{ 'apps.createApp.applicationName.error' | transloco }}
       </mat-error>
     </mat-form-field>
     <mat-form-field>
-      <!-- TODO add into tooltip -->
       <mat-label>{{
         'apps.createApp.description.label' | transloco
       }}</mat-label>
@@ -23,9 +26,13 @@
         matInput
         placeholder="{{ 'apps.createApp.description.label' | transloco }}"
         formControlName="description" />
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="'apps.createApp.description.tooltip' | transloco" />
     </mat-form-field>
     <mat-form-field>
-      <!-- TODO add into tooltip -->
       <mat-label>{{
         'apps.createApp.defaultRole.label' | transloco
       }}</mat-label>
@@ -38,6 +45,11 @@
         [matAutocomplete]="auto"
         (input)="filter()"
         (focus)="filter()" />
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="'apps.createApp.defaultRole.tooltip' | transloco" />
       <!-- TODO unable to remove default role -->
       <mat-autocomplete
         requireSelection
@@ -72,8 +84,14 @@
   </mat-card>
   <!-- app location -->
   <div class="flex-col">
-    <!-- TODO add into tooltip -->
-    <p>{{ 'apps.createApp.appLocation.label' | transloco }}</p>
+    <p>
+      {{ 'apps.createApp.appLocation.label' | transloco
+      }}<fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="'apps.createApp.appLocation.tooltip' | transloco" />
+    </p>
     <mat-radio-group
       class="flex-col"
       aria-label="Select an option"
@@ -118,6 +136,14 @@
           }}
         </mat-option>
       </mat-select>
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="
+          'apps.createApp.appLocation.options.fileStorage.storageService.tooltip'
+            | transloco
+        " />
     </mat-form-field>
     <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
       <mat-label>{{
@@ -131,6 +157,14 @@
             | transloco
         }}"
         formControlName="storageContainer" />
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="
+          'apps.createApp.appLocation.options.fileStorage.storageFolder.tooltip'
+            | transloco
+        " />
     </mat-form-field>
     <!-- shared path input -->
     <mat-form-field
@@ -138,14 +172,12 @@
         appForm.controls['appLocation'].value === '1' ||
         appForm.controls['appLocation'].value === '3'
       ">
-      <!-- TODO add into tooltip -->
       <mat-label *ngIf="appForm.controls['appLocation'].value === '1'">
         {{
           'apps.createApp.appLocation.options.fileStorage.launchPath.label'
             | transloco
         }}
       </mat-label>
-      <!-- TODO add into tooltip -->
       <mat-label *ngIf="appForm.controls['appLocation'].value === '3'">
         {{
           'apps.createApp.appLocation.options.webServer.pathToApp.label'
@@ -159,9 +191,19 @@
             | transloco
         }}"
         formControlName="path" />
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="
+          'apps.createApp.appLocation.options.' +
+            (appForm.controls['appLocation'].value === '1'
+              ? 'fileStorage.launchPath'
+              : 'webServer.pathToApp') +
+            '.tooltip' | transloco
+        " />
     </mat-form-field>
     <mat-form-field *ngIf="appForm.controls['appLocation'].value === '2'">
-      <!-- TODO add into tooltip -->
       <mat-label>
         {{ 'apps.createApp.appLocation.options.remoteUrl.label' | transloco }}
       </mat-label>
@@ -172,6 +214,13 @@
             | transloco
         }}"
         formControlName="url" />
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="
+          'apps.createApp.appLocation.options.remoteUrl.url.tooltip' | transloco
+        " />
     </mat-form-field>
 
     <mat-card
@@ -180,7 +229,6 @@
         appForm.controls['appLocation'].value === '3'
       ">
       <mat-card-header>
-        <!-- TODO add into tooltip -->
         <mat-card-subtitle>{{
           'apps.createApp.appLocation.options.urlPath.label' | transloco
         }}</mat-card-subtitle>

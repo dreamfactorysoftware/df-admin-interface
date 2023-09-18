@@ -26,24 +26,17 @@
   "createApp": {
     "applicationName": {
       "label": "Application Name",
-      "tooltip": {
-        "label": "Display Name",
-        "text": "The display name or label for your app, seen by users of the app in the LaunchPad UI."
-      },
+      "tooltip": "The display name or label for your app, seen by users of the app in the LaunchPad UI.",
       "error": "Application name required"
     },
     "defaultRoleFilter": "Default Role Filter",
     "description": {
       "label": "Description",
-      "tooltip": {
-        "text": "The app description, seen by users of the app in the LaunchPad UI."
-      }
+      "tooltip": "The app description, seen by users of the app in the LaunchPad UI."
     },
     "defaultRole": {
       "label": "Assign a Default Role",
-      "tooltip": {
-        "text": "Unauthenticated or guest users of the app will have this role."
-      },
+      "tooltip": "Unauthenticated or guest users of the app will have this role.",
       "options": {
         "noRole": "-- No available filtered roles --"
       }
@@ -55,9 +48,7 @@
     },
     "appLocation": {
       "label": "App Location",
-      "tooltip": {
-        "text": "Select File Storage if you want to store your app code on your DreamFactory instance or some other remote file storage. Select Native for native apps or running the app from code on your local machine (CORS required). Select URL to specify a URL for your app."
-      },
+      "tooltip": "Select File Storage if you want to store your app code on your DreamFactory instance or some other remote file storage. Select Native for native apps or running the app from code on your local machine (CORS required). Select URL to specify a URL for your app.",
       "options": {
         "noStorage": "No Storage Required - remote device, client, or desktop.",
         "fileStorage": {

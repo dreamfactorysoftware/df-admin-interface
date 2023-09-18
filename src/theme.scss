@@ -69,7 +69,7 @@ $df-coral-palette: (
 );
 
 $my-primary: mat.define-palette($df-purple-palette, 900);
-$my-accent: mat.define-palette($df-coral-palette, 500);
+$my-accent: mat.define-palette($df-coral-palette, 400);
 $my-warn: mat.define-palette(mat.$red-palette);
 
 $my-theme: mat.define-light-theme(

@@ -177,7 +177,6 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         )
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() =>
-          // TODO: this call is made successfully but throws an injection context error
           this.router.navigate([
             `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
           ])
@@ -194,7 +193,6 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         })
         .pipe(takeUntil(this.destroyed$))
         .subscribe(() =>
-          // TODO: this call is made successfully but throws an injection context error
           this.router.navigate([
             `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
           ])
@@ -262,8 +260,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
     | CreateSchedulePayload
     | null {
     if (this.selectedService) {
-      // eslint-disable-next-line prefer-const
-      let payload = {
+      const payload = {
         component: this.formGroup.value.component,
         description: this.formGroup.value.description,
         frequency: this.formGroup.value.frequency,

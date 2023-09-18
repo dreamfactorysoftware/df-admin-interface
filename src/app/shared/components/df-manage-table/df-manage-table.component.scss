@@ -32,13 +32,6 @@ $red-palette: mat.define-palette(mat.$red-palette);
   justify-content: center;
 }
 
-.no-data-row {
-  td {
-    text-align: center;
-    padding: 32px;
-  }
-}
-
 .table-container {
   width: 100%;
   overflow-y: auto;
