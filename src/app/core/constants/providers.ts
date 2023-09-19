@@ -327,12 +327,12 @@ export const FILE_SERVICE_PROVIDERS = [
 
 export const LOGS_SERVICE_PROVIDERS = [
   {
-    provide: LOGS_URL_TOKEN,
+    provide: FILE_URL_TOKEN,
     useValue: URLS.LOGS,
   },
   {
     provide: LOGS_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
-    deps: [LOGS_URL_TOKEN, HttpClient],
+    deps: [FILE_URL_TOKEN, HttpClient],
   },
 ];

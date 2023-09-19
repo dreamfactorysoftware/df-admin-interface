@@ -22,7 +22,7 @@ export const caseInterceptor: HttpInterceptorFn = (
       map(event => {
         if (
           event instanceof HttpResponse &&
-          event.headers.get('Content-type') === 'application/json'
+          event.headers.get('Content-Type') === 'application/json'
         ) {
           return event.clone({ body: mapSnakeToCamel(event.body) });
         }

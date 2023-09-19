@@ -85,7 +85,7 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
 
   downloadAdminList(type: string) {
     this.adminService
-      .downloadFile(type, { snackbarSuccess: 'admins.alerts.exportSuccess' })
+      .exportList(type, { snackbarSuccess: 'admins.alerts.exportSuccess' })
       .subscribe(data => {
         saveAsFile(data, `admin.${type}`, type);
       });

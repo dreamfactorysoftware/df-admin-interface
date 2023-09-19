@@ -9,7 +9,7 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { FILE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { FileTableRow, FileResponse, FileType } from '../df-files.types';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { ROUTES } from 'src/app/core/constants/routes';
@@ -30,8 +30,10 @@ import { saveAsFile } from 'src/app/shared/utilities/file';
   imports: [DfManageTableModules, NgIf],
 })
 export class DfFilesTableComponent extends DfManageTableComponent<any> {
+  path: 'files' | 'logs';
+
   constructor(
-    @Inject(FILE_SERVICE_TOKEN)
+    @Inject(BASE_SERVICE_TOKEN)
     private crudService: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
@@ -40,6 +42,12 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
     dialog: MatDialog
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
+
+    this._activatedRoute.data
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        this.path = data['type'];
+      });
   }
   faDownload = faDownload;
   override allowFilter = false;
@@ -65,7 +73,7 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
     default: {
       label: 'view',
       function: (row: any) => {
-        this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.FILES, row.path]);
+        this.router.navigate([ROUTES.ADMIN_SETTINGS, this.path, row.path]);
       },
       ariaLabel: {
         key: 'view',
@@ -95,9 +103,15 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
 
   // TODO: file download not working
   downloadFile(row: FileTableRow) {
-    this.crudService.downloadFile(row.path, {}).subscribe(data => {
-      saveAsFile(data, row.name, row.contentType);
-    });
+    console.log('download', `${this.path}/${row.path}`, row);
+    // return;
+
+    this.crudService
+      .downloadFile(`${this.path}/${row.path}`)
+      .subscribe(data => {
+        console.log('data', data);
+        saveAsFile(data, row.name, row.contentType);
+      });
   }
 
   mapDataToTable(data: any): FileTableRow[] {
@@ -121,7 +135,7 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
           additionalHeaders: [{ key: 'X-Http-Method', value: 'DELETE' }],
           snackbarSuccess: 'files.alerts.deleteFolderSuccess',
         },
-        `${row.path}?force=true`
+        `${this.path}/${row.path}?force=true`
       )
       .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
@@ -146,7 +160,7 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
       this._activatedRoute.snapshot.url.toString()
     );
     this.crudService
-      .get<GenericListResponse<FileType>>(route, { limit })
+      .get<GenericListResponse<FileType>>(`${this.path}/${route}`, { limit })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);

@@ -34,7 +34,9 @@ export function getMimeType(type: string) {
       return 'application/json';
     case 'xml':
       return 'application/xml';
-    default:
+    case 'csv':
       return 'text/csv';
+    default:
+      return type;
   }
 }

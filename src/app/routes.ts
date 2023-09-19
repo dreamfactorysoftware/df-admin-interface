@@ -72,10 +72,6 @@ import {
 } from './adf-files/resolver/df-files.resolver';
 import { DfScriptsComponent } from './adf-scripts/df-scripts/df-scripts.component';
 import { scriptTypeResolver } from './adf-scripts/resolvers/scripts.resolver';
-import {
-  logsEntitiesResolver,
-  logsEntityResolver,
-} from './adf-files/resolver/df-logs.resolver';
 
 export const routes: Routes = [
   {
@@ -743,9 +739,11 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.FILES,
+        data: { type: 'files' },
         children: [
           {
             path: '',
+            pathMatch: 'full',
             loadComponent: () =>
               import('./adf-files/df-files/df-files.component').then(
                 m => m.DfFilesComponent
@@ -755,63 +753,37 @@ export const routes: Routes = [
           {
             path: ':entity',
             loadComponent: () =>
-              import(
-                './adf-files/df-file-viewer/df-file-viewer.component'
-              ).then(m => m.DfFileViewerComponent),
+              import('./adf-files/df-files/df-files.component').then(
+                m => m.DfFilesComponent
+              ),
             resolve: { data: entityResolver },
-            children: [
-              {
-                path: `${ROUTES.EDIT}/:fileName`,
-                loadComponent: () =>
-                  import(
-                    './adf-files/df-file-viewer/df-file-viewer.component'
-                  ).then(m => m.DfFileViewerComponent),
-                resolve: { data: entityResolver },
-              },
-            ],
           },
         ],
-        providers: [
-          ...FILE_SERVICE_PROVIDERS,
-          ...BASE_SERVICE_PROVIDERS,
-          provideTranslocoScope('files'),
-        ],
+        providers: [...BASE_SERVICE_PROVIDERS, provideTranslocoScope('files')],
       },
       {
         path: ROUTES.LOGS,
+        data: { type: 'logs' },
         children: [
           {
             path: '',
+            pathMatch: 'full',
             loadComponent: () =>
-              import('./adf-files/df-logs/df-logs.component').then(
-                m => m.DfLogsComponent
+              import('./adf-files/df-files/df-files.component').then(
+                m => m.DfFilesComponent
               ),
-            resolve: { data: logsEntitiesResolver },
+            resolve: { data: entitiesResolver },
           },
           {
             path: ':entity',
             loadComponent: () =>
-              import('./adf-files/df-log-viewer/df-log-viewer.component').then(
-                m => m.DfLogViewerComponent
+              import('./adf-files/df-files/df-files.component').then(
+                m => m.DfFilesComponent
               ),
-            resolve: { data: logsEntityResolver },
-            children: [
-              {
-                path: `${ROUTES.EDIT}/:fileName`,
-                loadComponent: () =>
-                  import(
-                    './adf-files/df-log-viewer/df-log-viewer.component'
-                  ).then(m => m.DfLogViewerComponent),
-                resolve: { data: logsEntityResolver },
-              },
-            ],
+            resolve: { data: entityResolver },
           },
         ],
-        providers: [
-          ...LOGS_SERVICE_PROVIDERS,
-          ...BASE_SERVICE_PROVIDERS,
-          provideTranslocoScope('files'),
-        ],
+        providers: [...BASE_SERVICE_PROVIDERS, provideTranslocoScope('files')],
       },
     ],
     canActivate: [loggedInGuard],

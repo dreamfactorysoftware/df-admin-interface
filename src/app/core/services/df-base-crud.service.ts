@@ -105,12 +105,22 @@ export class DfBaseCrudService {
     );
   }
 
-  downloadFile(type: string, options?: Partial<RequestOptions>) {
+  exportList(type: string, options?: Partial<RequestOptions>) {
     return this.http.get(
       this.url,
       this.getOptions({
         snackbarError: 'server',
         additionalParams: [{ key: 'file', value: `list.${type}` }],
+        ...options,
+      })
+    );
+  }
+
+  downloadFile(path: string, options?: Partial<RequestOptions>) {
+    return this.http.get(
+      this.url + '/' + path,
+      this.getOptions({
+        snackbarError: 'server',
         ...options,
       })
     );
