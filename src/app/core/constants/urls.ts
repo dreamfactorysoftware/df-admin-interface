@@ -30,4 +30,5 @@ export enum URLS {
   EMAIL_TEMPLATES = `${BASE_URL}/system/email_template`,
   LOOKUP_KEYS = `${BASE_URL}/system/lookup`,
   FILES = `${BASE_URL}/files`,
+  LOGS = `${BASE_URL}/logs`,
 }

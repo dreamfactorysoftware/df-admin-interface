@@ -45,6 +45,8 @@ import {
   EVENT_SCRIPT_SERVICE_TOKEN,
   GITHUB_REPO_URL_TOKEN,
   GITHUB_REPO_SERVICE_TOKEN,
+  LOGS_URL_TOKEN,
+  LOGS_SERVICE_TOKEN,
 } from './tokens';
 import { BASE_URL, URLS } from './urls';
 
@@ -320,5 +322,17 @@ export const FILE_SERVICE_PROVIDERS = [
     provide: FILE_SERVICE_TOKEN,
     useFactory: dfBaseCrudServiceFactory,
     deps: [FILE_URL_TOKEN, HttpClient],
+  },
+];
+
+export const LOGS_SERVICE_PROVIDERS = [
+  {
+    provide: LOGS_URL_TOKEN,
+    useValue: URLS.LOGS,
+  },
+  {
+    provide: LOGS_SERVICE_TOKEN,
+    useFactory: dfBaseCrudServiceFactory,
+    deps: [LOGS_URL_TOKEN, HttpClient],
   },
 ];

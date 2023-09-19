@@ -1,0 +1,23 @@
+<df-logs-table>
+  <ng-container topActions>
+    <button
+      mat-mini-fab
+      color="primary"
+      [attr.aria-label]="'createFolder' | transloco"
+      (click)="createFolder()">
+      <fa-icon [icon]="faFolderPlus" size="xl"></fa-icon>
+    </button>
+    <button
+      mat-mini-fab
+      color="primary"
+      [attr.aria-label]="'uploadFile' | transloco"
+      (click)="fileInput.click()">
+      <fa-icon [icon]="faUpload" size="xl"></fa-icon>
+    </button>
+    <input
+      type="file"
+      #fileInput
+      (change)="uploadFile($event)"
+      style="display: none" />
+  </ng-container>
+</df-logs-table>

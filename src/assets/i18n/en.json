@@ -60,6 +60,7 @@
   "action": "Action",
   "request": "Request",
   "files": "Files",
+  "logs": "Logs",
   "data": "Data",
   "packages": "Packages",
   "launchpad": "LaunchPad",
@@ -276,7 +277,8 @@
         },
         "edit": { "header": "{{edit}}" }
       },
-      "files": { "nav": "{{files}}", "header": "{{files}}" }
+      "files": { "nav": "{{files}}", "header": "{{files}}" },
+      "logs": { "nav": "{{logs}}", "header": "{{logs}}" }
     },
     "profile": { "header": "Profile" },
     "logout": { "header": "Logout" },
