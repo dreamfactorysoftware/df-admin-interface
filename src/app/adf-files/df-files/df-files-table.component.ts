@@ -9,13 +9,15 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import {
-  BASE_SERVICE_TOKEN,
-  FILE_SERVICE_TOKEN,
-} from 'src/app/core/constants/tokens';
-import { FileTableRow, FileResponse } from '../df-files.types';
+import { FILE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { FileTableRow, FileResponse, FileType } from '../df-files.types';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { ROUTES } from 'src/app/core/constants/routes';
+import { takeUntil } from 'rxjs';
+import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { faDownload } from '@fortawesome/free-solid-svg-icons';
+import { NgIf } from '@angular/common';
+import { saveAsFile } from 'src/app/shared/utilities/file';
 
 @Component({
   selector: 'df-files-table',
@@ -25,7 +27,7 @@ import { ROUTES } from 'src/app/core/constants/routes';
     '../../shared/components/df-manage-table/df-manage-table.component.scss',
   ],
   standalone: true,
-  imports: [DfManageTableModules],
+  imports: [DfManageTableModules, NgIf],
 })
 export class DfFilesTableComponent extends DfManageTableComponent<any> {
   constructor(
@@ -39,6 +41,7 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
+  faDownload = faDownload;
   override allowFilter = false;
   override allowCreate = false;
   override columns = [
@@ -68,8 +71,34 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
         key: 'view',
       },
     },
-    additional: this.actions.additional,
+    additional: [
+      {
+        label: 'delete',
+        function: row => this.confirmDelete(row),
+        ariaLabel: {
+          key: 'deleteRow',
+          param: 'id',
+        },
+        icon: this.faTrashCan,
+      },
+      {
+        label: 'files.downloadFile',
+        icon: faDownload,
+        function: (row: FileTableRow) => this.downloadFile(row),
+        ariaLabel: {
+          key: 'files.downloadFile',
+          param: 'label',
+        },
+      },
+    ],
   };
+
+  // TODO: file download not working
+  downloadFile(row: FileTableRow) {
+    this.crudService.downloadFile(row.path, {}).subscribe(data => {
+      saveAsFile(data, row.name, row.contentType);
+    });
+  }
 
   mapDataToTable(data: any): FileTableRow[] {
     return data.map((app: FileResponse) => {
@@ -85,9 +114,42 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
   filterQuery = getFilterQuery();
 
   override deleteRow(row: FileTableRow): void {
+    this.crudService
+      .create(
+        { resource: [] },
+        {
+          additionalHeaders: [{ key: 'X-Http-Method', value: 'DELETE' }],
+          snackbarSuccess: 'files.alerts.deleteFolderSuccess',
+        },
+        `${row.path}?force=true`
+      )
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(() => {
+        this.refreshTable(0);
+      });
+
     // TODO: implement error handling
     //  this.triggerAlert
   }
 
-  refreshTable = () => null;
+  // TODO: get working
+  uploadFile(files: FileList) {
+    this.crudService
+      .uploadFile(files[0], { snackbarSuccess: 'files.alerts.uploadSuccess' })
+      .subscribe(() => {
+        this.refreshTable(0);
+      });
+  }
+
+  refreshTable(limit?: number): void {
+    const route = decodeURIComponent(
+      this._activatedRoute.snapshot.url.toString()
+    );
+    this.crudService
+      .get<GenericListResponse<FileType>>(route, { limit })
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        this.dataSource.data = this.mapDataToTable(data.resource);
+      });
+  }
 }

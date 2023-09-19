@@ -38,3 +38,10 @@ export interface FileResponse {
   name: string;
   type: string;
 }
+
+export interface FileType {
+  path: string;
+  last_modified?: string;
+  name: string;
+  type: string;
+}

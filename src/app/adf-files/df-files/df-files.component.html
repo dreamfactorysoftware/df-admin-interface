@@ -11,28 +11,13 @@
       mat-mini-fab
       color="primary"
       [attr.aria-label]="'uploadFile' | transloco"
-      (click)="uploadFile()">
+      (click)="fileInput.click()">
       <fa-icon [icon]="faUpload" size="xl"></fa-icon>
     </button>
-    <!-- TODO DELETE -->
-    <button mat-mini-fab color="secondary" (click)="testEditFile()">
-      Edit File
-    </button>
+    <input
+      type="file"
+      #fileInput
+      (change)="uploadFile($event)"
+      style="display: none" />
   </ng-container>
-  <ng-template let-row #itemActions>
-    <button
-      *ngIf="row.type === 'folder'"
-      mat-menu-item
-      (click)="openFolder(row)"
-      [attr.aria-label]="openFolderLabel(row) | async">
-      {{ 'open' | transloco }}
-    </button>
-    <button
-      *ngIf="row.type === 'folder'"
-      mat-menu-item
-      (click)="downloadFolder(row)"
-      [attr.aria-label]="downloadFolderLabel(row) | async">
-      {{ 'files.download' | transloco }}
-    </button>
-  </ng-template>
 </df-files-table>

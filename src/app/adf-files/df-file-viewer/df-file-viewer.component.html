@@ -1,6 +1,3 @@
-<ng-container *ngIf="(type | async) === 'file'; else folder">
-  <df-file-details></df-file-details>
-</ng-container>
 <ng-template #folder>
   <df-files></df-files>
 </ng-template>

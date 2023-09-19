@@ -3,13 +3,12 @@ import { Component } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { map } from 'rxjs';
 import { DfFilesComponent } from '../df-files/df-files.component';
-import { DfFileDetailsComponent } from '../df-file-details/df-file-details.component';
 
 @Component({
   selector: 'df-file-viewer',
   templateUrl: './df-file-viewer.component.html',
   standalone: true,
-  imports: [AsyncPipe, DfFileDetailsComponent, DfFilesComponent, NgIf],
+  imports: [AsyncPipe, DfFilesComponent, NgIf],
 })
 export class DfFileViewerComponent {
   type = this.activatedRoute.data.pipe(map(({ data }) => data.type));

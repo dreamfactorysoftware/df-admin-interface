@@ -25,7 +25,7 @@ export const entityResolver: ResolveFn<any> = (
       })
     );
   }
-  return crudService.get(`${entity}`).pipe(
+  return crudService.get(entity).pipe(
     map((response: any) => {
       return {
         type: 'folder',
