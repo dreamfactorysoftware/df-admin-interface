@@ -19,8 +19,8 @@ import { FILE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 
 @Component({
-  selector: 'df-files-dialog-component',
-  templateUrl: 'df-files-dialog.component.html',
+  selector: 'df-folder-dialog-component',
+  templateUrl: 'df-folder-dialog.component.html',
   standalone: true,
   imports: [
     MatDialogModule,
@@ -31,7 +31,7 @@ import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
     ReactiveFormsModule,
   ],
 })
-export class DfFileDialogComponent implements OnDestroy {
+export class DfFolderDialogComponent implements OnDestroy {
   dialogForm: FormGroup;
   destroyed$ = new Subject<void>();
 
@@ -40,7 +40,7 @@ export class DfFileDialogComponent implements OnDestroy {
     private crudService: DfBaseCrudService,
     @Inject(MAT_DIALOG_DATA) public data: { route: string },
     private fb: FormBuilder,
-    public dialogRef: MatDialogRef<DfFileDialogComponent>
+    public dialogRef: MatDialogRef<DfFolderDialogComponent>
   ) {
     this.dialogForm = this.fb.group({
       name: ['', Validators.required],
