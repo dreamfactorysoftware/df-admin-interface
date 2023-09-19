@@ -10,7 +10,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { DfFileDialogComponent } from '../df-file-dialog/df-files-dialog.component';
+import { DfFolderDialogComponent } from '../df-folder-dialog/df-folder-dialog.component';
 
 @Component({
   selector: 'df-files',
@@ -26,7 +26,7 @@ import { DfFileDialogComponent } from '../df-file-dialog/df-files-dialog.compone
     AsyncPipe,
     MatMenuModule,
     MatDialogModule,
-    DfFileDialogComponent,
+    DfFolderDialogComponent,
   ],
 })
 export class DfFilesComponent {
@@ -61,7 +61,7 @@ export class DfFilesComponent {
   }
 
   createFolder(): void {
-    const dialogRef = this.dialog.open(DfFileDialogComponent, {
+    const dialogRef = this.dialog.open(DfFolderDialogComponent, {
       data: {
         route: decodeURIComponent(this.activatedRoute.snapshot.url.toString()),
       },
