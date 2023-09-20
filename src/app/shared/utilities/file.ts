@@ -1,6 +1,7 @@
 import { Observable, Subject } from 'rxjs';
 
-export function readAsText(file: File): Observable<string> {
+export function readAsText(file: File | Blob): Observable<string> {
+  console.log('readAsText');
   const subject = new Subject<string>();
   const reader = new FileReader();
 
@@ -18,14 +19,22 @@ export function readAsText(file: File): Observable<string> {
   return subject.asObservable();
 }
 
-export function saveAsFile(data: any, filename: string, type: string): void {
+export function saveRawAsFile(data: any, filename: string, type: string): void {
   const blob = new Blob([data], { type: getMimeType(type) });
+  saveAsFile(blob, filename);
+}
+
+export function saveAsFile(blob: any, filename: string): void {
   const url = window.URL.createObjectURL(blob);
+  saveFromUrl(url, filename);
+  window.URL.revokeObjectURL(url);
+}
+
+export function saveFromUrl(url: string, filename: string): void {
   const anchor = document.createElement('a');
   anchor.download = filename;
   anchor.href = url;
   anchor.click();
-  window.URL.revokeObjectURL(url);
 }
 
 export function getMimeType(type: string) {

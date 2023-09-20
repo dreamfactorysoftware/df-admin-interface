@@ -7,7 +7,7 @@ import {
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { UserProfile, UserRow } from 'src/app/shared/types/user';
 import { takeUntil } from 'rxjs';
-import { saveAsFile } from 'src/app/shared/utilities/file';
+import { saveRawAsFile } from 'src/app/shared/utilities/file';
 import { USER_COLUMNS } from 'src/app/core/constants/table-columns';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
@@ -77,7 +77,7 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
 
   uploadAdminList(files: FileList) {
     this.adminService
-      .uploadFile(files[0], { snackbarSuccess: 'admins.alerts.importSuccess' })
+      .importList(files[0], { snackbarSuccess: 'admins.alerts.importSuccess' })
       .subscribe(() => {
         this.refreshTable();
       });
@@ -87,7 +87,7 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
     this.adminService
       .exportList(type, { snackbarSuccess: 'admins.alerts.exportSuccess' })
       .subscribe(data => {
-        saveAsFile(data, `admin.${type}`, type);
+        saveRawAsFile(data, `admin.${type}`, type);
       });
   }
 }

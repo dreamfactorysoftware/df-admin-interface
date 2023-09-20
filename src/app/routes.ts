@@ -69,6 +69,7 @@ import { serviceTypesResolver } from './adf-services/resolvers/service-types.res
 import {
   entityResolver,
   entitiesResolver,
+  fileResolver,
 } from './adf-files/resolver/df-files.resolver';
 import { DfScriptsComponent } from './adf-scripts/df-scripts/df-scripts.component';
 import { scriptTypeResolver } from './adf-scripts/resolvers/scripts.resolver';
@@ -773,6 +774,14 @@ export const routes: Routes = [
                 m => m.DfFilesComponent
               ),
             resolve: { data: entitiesResolver },
+          },
+          {
+            path: `${ROUTES.VIEW}/:entity`,
+            loadComponent: () =>
+              import('./adf-files/df-log-viewer/df-log-viewer.component').then(
+                m => m.DfLogViewerComponent
+              ),
+            resolve: { data: fileResolver },
           },
           {
             path: ':entity',

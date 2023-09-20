@@ -1,7 +1,7 @@
 {
   "createFolder": "Create Folder",
   "folderName": "Folder Name",
-  "uploadFile": "Upload File",
+  "importList": "Upload File",
   "size": "Size",
   "deleteFile": "Delete File",
   "downloadFile": "Download File",

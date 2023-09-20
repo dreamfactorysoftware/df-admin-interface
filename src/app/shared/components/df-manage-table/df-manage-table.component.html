@@ -133,18 +133,14 @@
       </ng-container>
     </ng-container>
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <ng-container *ngIf="actions.default; else nonClickable"
-      ><tr
-        tabindex="0"
-        mat-row
-        *matRowDef="let row; columns: displayedColumns"
-        class="clickable"
-        (click)="actions.default.function(row)"
-        (keydown)="handleKeyDown($event, row, actions.default)"></tr
-    ></ng-container>
-    <ng-template #nonClickable>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-    </ng-template>
+    <tr
+      [attr.tabindex]="isClickable(row) ? 0 : -1"
+      mat-row
+      *matRowDef="let row; columns: displayedColumns"
+      [class.clickable]="isClickable(row)"
+      (click)="callDefaultAction(row)"
+      (keydown)="handleKeyDown($event, row)"></tr>
+
     <tr class="mat-row no-data-row" *matNoDataRow>
       <td class="mat-cell" [attr.colspan]="columns.length">
         {{ 'noEnteries' | transloco }}

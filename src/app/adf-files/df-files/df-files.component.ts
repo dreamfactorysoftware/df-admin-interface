@@ -32,28 +32,22 @@ import { DfFolderDialogComponent } from '../df-folder-dialog/df-folder-dialog.co
 export class DfFilesComponent {
   faUpload = faUpload;
   faFolderPlus = faFolderPlus;
-  filesTableData: FileResponse[];
   destroyed$ = new Subject<void>();
   currentRoute = '';
   @ViewChild(DfFilesTableComponent) filesTable: DfFilesTableComponent;
-
+  type: 'files' | 'logs';
   constructor(
     private activatedRoute: ActivatedRoute,
     public dialog: MatDialog
   ) {
     this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.filesTableData = data['data'].resource;
+      .subscribe(({ type }) => {
+        this.type = type;
       });
   }
 
-  // TODO get working
   uploadFile(event: Event): void {
-    // ! no file type limitations on input
-    // ! user can select multiple files
-    // POST http://localhost/api/v2/files/{FOLDER_NAME}/?api_key={API_KEY}
-
     const input = event.target as HTMLInputElement;
     if (input.files) {
       this.filesTable.uploadFile(input.files);

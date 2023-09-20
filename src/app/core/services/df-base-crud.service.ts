@@ -35,13 +35,6 @@ export class DfBaseCrudService {
     );
   }
 
-  getText(id: string | number, options?: Partial<RequestOptions>) {
-    return this.http.get(`${this.url}/${id}`, {
-      responseType: 'text',
-      ...this.getOptions({ contentType: 'text/plain', ...options }),
-    });
-  }
-
   create<T, S>(
     data: {
       resource: Array<S>;
@@ -89,7 +82,7 @@ export class DfBaseCrudService {
     );
   }
 
-  uploadFile(file: File, options?: Partial<RequestOptions>) {
+  importList(file: File, options?: Partial<RequestOptions>) {
     return readAsText(file).pipe(
       switchMap(data =>
         this.http.post(
@@ -116,14 +109,32 @@ export class DfBaseCrudService {
     );
   }
 
-  downloadFile(path: string, options?: Partial<RequestOptions>) {
-    return this.http.get(
-      this.url + '/' + path,
+  uploadFile(
+    location: string,
+    files: FileList,
+    options?: Partial<RequestOptions>
+  ) {
+    const formData = new FormData();
+    Object.keys(files).forEach((f, i) => formData.append('files', files[i]));
+    return this.http.post(
+      `${this.url}/${location}`,
+      formData,
       this.getOptions({
         snackbarError: 'server',
         ...options,
       })
     );
+  }
+
+  downloadFile(path: string, options?: Partial<RequestOptions>) {
+    return this.http.get(`${this.url}/${path}`, {
+      responseType: 'blob',
+      observe: 'response',
+      ...this.getOptions({
+        snackbarError: 'server',
+        ...options,
+      }),
+    });
   }
 
   getOptions(options: Partial<RequestOptions>) {

@@ -1,5 +1,5 @@
-<df-files-table [tableData]="filesTableData">
-  <ng-container topActions>
+<df-files-table>
+  <ng-container topActions *ngIf="type === 'files'">
     <button
       mat-mini-fab
       color="primary"
@@ -10,13 +10,14 @@
     <button
       mat-mini-fab
       color="primary"
-      [attr.aria-label]="'uploadFile' | transloco"
+      [attr.aria-label]="'importList' | transloco"
       (click)="fileInput.click()">
       <fa-icon [icon]="faUpload" size="xl"></fa-icon>
     </button>
     <input
       type="file"
       #fileInput
+      multiple
       (change)="uploadFile($event)"
       style="display: none" />
   </ng-container>
