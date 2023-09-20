@@ -148,8 +148,16 @@ export class DfFilesTableComponent extends DfManageTableComponent<any> {
 
   // TODO: get working
   uploadFile(files: FileList) {
+    // example: ?api_key=b5cb82af7b5d4130f36149f90aa2746782e59a872ac70454ac188743cb55b0ba&session_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI5Mzk0MmU5NmY1YWNkODNlMmUwNDdhZDhmZTAzMTE0ZCIsImlzcyI6Imh0dHA6Ly9sb2NhbGhvc3QvYXBpL3YyL3N5c3RlbS9hZG1pbi9zZXNzaW9uIiwiaWF0IjoxNjk1MDg1MjU1LCJleHAiOjE2OTUxNzE2NTUsIm5iZiI6MTY5NTA4NTI1NSwianRpIjoiSExKTDU4ekxtUG1rNTNYZiIsInVzZXJfaWQiOjEsImZvcmV2ZXIiOmZhbHNlfQ.3Ost6JbtVeELZMi7JKvUlfCIJ_fwfS1V7GImMXi2DCA
+    const route = decodeURIComponent(
+      this._activatedRoute.snapshot.url.toString()
+    );
     this.crudService
-      .uploadFile(files[0], { snackbarSuccess: 'files.alerts.uploadSuccess' })
+      .uploadFile(
+        files[0],
+        { snackbarSuccess: 'files.alerts.uploadSuccess' }
+        // `${this.path}/${route}`
+      )
       .subscribe(() => {
         this.refreshTable(0);
       });
