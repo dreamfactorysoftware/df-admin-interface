@@ -136,3 +136,13 @@ export const BASE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'BASE_SERVICE_TOKEN'
 );
 export const BASE_URL_TOKEN = new InjectionToken<string>('BASE_URL_TOKEN');
+
+export const FILE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'FILE_SERVICE_TOKEN'
+);
+export const FILE_URL_TOKEN = new InjectionToken<string>('FILE_URL_TOKEN');
+
+export const LOGS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'LOGS_SERVICE_TOKEN'
+);
+export const LOGS_URL_TOKEN = new InjectionToken<string>('LOGS_URL_TOKEN');

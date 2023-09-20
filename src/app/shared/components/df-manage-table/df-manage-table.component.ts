@@ -13,7 +13,6 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 import { ROUTES } from 'src/app/core/constants/routes';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
 import { IconDefinition, IconProp } from '@fortawesome/fontawesome-svg-core';
 import {
   faTrashCan,
@@ -58,10 +57,10 @@ export interface DefaultAction<T> {
     key: string;
     param?: string;
   };
+  disabled?: (row: T) => boolean;
 }
 
 export interface AdditonalAction<T> extends DefaultAction<T> {
-  disabled?: boolean | ((row: T) => boolean);
   icon?: IconDefinition;
 }
 
@@ -184,9 +183,19 @@ export abstract class DfManageTableComponent<T>
       : action.disabled;
   }
 
-  handleKeyDown(event: KeyboardEvent, row: T, action: DefaultAction<T>) {
+  handleKeyDown(event: KeyboardEvent, row: T) {
     if (event.key === 'Enter') {
-      action.function(row);
+      this.callDefaultAction(row);
+    }
+  }
+
+  callDefaultAction(row: T) {
+    if (
+      this.actions.default &&
+      (!this.actions.default.disabled ||
+        (this.actions.default.disabled && !this.actions.default.disabled(row)))
+    ) {
+      this.actions.default.function(row);
     }
   }
 
@@ -251,6 +260,14 @@ export abstract class DfManageTableComponent<T>
     return this.translateService.selectTranslate('sortDescription', {
       header,
     });
+  }
+
+  isClickable(row: T) {
+    return (
+      this.actions.default &&
+      this.actions.default.disabled &&
+      !this.actions.default.disabled(row)
+    );
   }
 
   ngOnDestroy(): void {

@@ -60,6 +60,7 @@
   "action": "Action",
   "request": "Request",
   "files": "Files",
+  "logs": "Logs",
   "data": "Data",
   "packages": "Packages",
   "launchpad": "LaunchPad",
@@ -91,6 +92,7 @@
   "view": "View",
   "viewRow": "View row {{id}}",
   "noEnteries": "No enteries found, you can create one by clicking on the button above.",
+  "open": "Open",
   "nav": {
     "home": {
       "nav": "Home",
@@ -275,7 +277,8 @@
         },
         "edit": { "header": "{{edit}}" }
       },
-      "files": { "nav": "{{files}}", "header": "{{files}}" }
+      "files": { "nav": "{{files}}", "header": "{{files}}" },
+      "logs": { "nav": "{{logs}}", "header": "{{logs}}" }
     },
     "profile": { "header": "Profile" },
     "logout": { "header": "Logout" },

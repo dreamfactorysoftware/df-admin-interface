@@ -139,7 +139,6 @@ export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
           this.goBack();
         });
     } else {
-      console.log('create', payload);
       this.crudService
         .create(
           { resource: [payload] },
