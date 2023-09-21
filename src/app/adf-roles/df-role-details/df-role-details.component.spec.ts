@@ -26,12 +26,6 @@ const fakeActivatedRoute = (isEdit = false) => {
             fn({
               data: isEdit ? mockRole : undefined,
               type: isEdit ? 'edit' : 'create',
-              apps: {
-                resource: [],
-              },
-              roles: {
-                resource: [],
-              },
             }),
         };
       },
