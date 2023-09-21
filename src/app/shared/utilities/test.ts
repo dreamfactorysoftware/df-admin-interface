@@ -7,10 +7,12 @@ import { TranslocoHttpLoader } from 'src/transloco-loader';
 export function createTestBedConfig(
   componentName: any,
   serviceProviders: any[],
-  mockActivatedRoute: any
+  mockActivatedRoute: any,
+  declarations?: any[]
 ): any {
   return {
     imports: [componentName, HttpClientTestingModule, NoopAnimationsModule],
+    declarations: [...declarations],
     providers: [
       provideTransloco({
         config: {
