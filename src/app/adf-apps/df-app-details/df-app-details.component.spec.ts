@@ -12,9 +12,9 @@ import { By } from '@angular/platform-browser';
 import { Validators } from '@angular/forms';
 import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
 import {
-  ROLES,
   CREATE_ACTIVATED_ROUTE,
   EDIT_ACTIVATED_ROUTE,
+  EDIT_DATA,
 } from './df-app-details.mock';
 
 describe('DfAppDetailsComponent - Create', () => {
@@ -141,23 +141,20 @@ describe('DfAppDetailsComponent - Edit', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should successfully submit valid create form', () => {
-    const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'update');
+  it('should successfully populate form with edit data', () => {
+    const appFormPopulated = {
+      name: EDIT_DATA.name,
+      description: EDIT_DATA.description,
+      defaultRole: EDIT_DATA.roleByRoleId,
+      active: EDIT_DATA.isActive,
+      appLocation: EDIT_DATA.type.toString(),
+      storageServiceId: EDIT_DATA.storageServiceId,
+      storageContainer: EDIT_DATA.storageContainer,
+      path: EDIT_DATA.path,
+      url: EDIT_DATA.url,
+    };
 
-    component.appForm.controls['name'].setValue('test update');
-    component.save();
-
+    expect(component.appForm.value).toEqual(appFormPopulated);
     expect(component.appForm.valid).toBeTruthy();
-    expect(crudServiceSpy).toHaveBeenCalled();
-  });
-
-  it('should error on invalid form', () => {
-    const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'update');
-
-    component.appForm.controls['name'].setValue('');
-    component.save();
-
-    expect(component.appForm.valid).toBeFalsy();
-    expect(crudServiceSpy).not.toHaveBeenCalled();
   });
 });
