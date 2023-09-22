@@ -154,7 +154,7 @@ describe('DfCorsConfigDetailsComponent - Edit view', () => {
     fixture.detectChanges();
   });
 
-  it.only('should populate form with data', () => {
+  it('should populate form with data', () => {
     expect(component.corsForm.value).toEqual(FORM_DATA);
     expect(component.corsForm.valid).toBeTruthy();
   });
