@@ -48,9 +48,11 @@
           *ngIf="!currentProfile.confirmed">
           Send Invite <fa-icon [icon]="faEnvelope"></fa-icon>
         </button>
-        <mat-checkbox formControlName="setPassword"
-          >{{ 'userManagement.controls.setPassword.label' | transloco }}
-        </mat-checkbox>
+        <ng-container *ngIf="userForm.contains('setPassword')">
+          <mat-checkbox formControlName="setPassword"
+            >{{ 'userManagement.controls.setPassword.label' | transloco }}
+          </mat-checkbox>
+        </ng-container>
       </ng-template>
       <ng-container
         *ngIf="
@@ -61,7 +63,11 @@
           <mat-label>{{
             'userManagement.controls.password.label' | transloco
           }}</mat-label>
-          <input matInput type="password" formControlName="password" />
+          <input
+            matInput
+            class="user-details-set-password"
+            type="password"
+            formControlName="password" />
           <mat-error *ngIf="userForm.get('password')?.errors?.['required']">
             {{ 'userManagement.controls.password.errors.required' | transloco }}
           </mat-error>
@@ -74,7 +80,11 @@
             'userManagement.controls.confirmPassword.label' | transloco
           }}</mat-label>
 
-          <input matInput type="password" formControlName="confirmPassword" />
+          <input
+            matInput
+            class="user-details-confirm-password"
+            type="password"
+            formControlName="confirmPassword" />
           <mat-error
             *ngIf="userForm.get('confirmPassword')?.hasError('doesNotMatch')">
             {{
