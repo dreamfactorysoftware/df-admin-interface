@@ -115,6 +115,22 @@ export class DfAppDetailsComponent implements OnInit {
       this.apiKey = this.editApp.apiKey;
     }
 
+    this.appForm.controls['appLocation'].valueChanges.subscribe(value => {
+      const pathControl = this.appForm.get('path');
+      const urlControl = this.appForm.get('url');
+
+      if (value === '2') {
+        pathControl?.clearValidators();
+        urlControl?.setValidators([Validators.required]);
+      } else if (value === '3') {
+        pathControl?.setValidators([Validators.required]);
+        urlControl?.clearValidators();
+      }
+
+      pathControl?.updateValueAndValidity();
+      urlControl?.updateValueAndValidity();
+    });
+
     this.appForm.controls['storageServiceId'].updateValueAndValidity();
   }
 
@@ -170,7 +186,10 @@ export class DfAppDetailsComponent implements OnInit {
     this.router.navigate([`${ROUTES.API_CONNECTIONS}/${ROUTES.API_KEYS}`]);
   }
 
-  onSubmit() {
+  save() {
+    if (this.appForm.invalid) {
+      return;
+    }
     const payload: AppPayload = {
       name: this.appForm.value.name,
       description: this.appForm.value.description,
