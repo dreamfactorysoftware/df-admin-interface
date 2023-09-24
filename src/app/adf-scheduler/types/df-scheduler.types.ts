@@ -10,7 +10,7 @@ export type UpdateSchedulePayload = CreateSchedulePayload & {
     taskId: number;
     statusCode: number;
     lastModifiedDate: string;
-    createdData: string;
+    createdDate: string;
     content: string;
   } | null;
 };
@@ -56,7 +56,7 @@ export interface SchedulerTaskData {
     taskId: number;
     statusCode: number;
     lastModifiedDate: string;
-    createdData: string;
+    createdDate: string;
     content: string;
   } | null;
   serviceByServiceId: Service;
