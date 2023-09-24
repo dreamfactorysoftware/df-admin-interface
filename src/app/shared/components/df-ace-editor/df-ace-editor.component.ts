@@ -75,6 +75,6 @@ export class DfAceEditorComponent
   }
 
   ngOnDestroy(): void {
-    this.editor.destroy();
+    if (this.editor) this.editor.destroy();
   }
 }

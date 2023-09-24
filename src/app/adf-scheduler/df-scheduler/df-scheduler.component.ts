@@ -108,33 +108,31 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         this.userServicesDropdownOptions = data.data.resource;
       });
 
-    const id = this.activatedRoute.snapshot.paramMap.get('id');
+    this.activatedRoute.data
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe((data: any) => {
+        this.scheduleToEdit = data.schedulerObject;
 
-    if (id) {
-      this.activatedRoute.data
-        .pipe(takeUntil(this.destroyed$))
-        .subscribe((data: any) => {
-          this.scheduleToEdit = data.schedulerObject;
+        if (this.scheduleToEdit) {
+          this.log = this.scheduleToEdit.taskLogByTaskId?.content ?? '';
 
-          this.log = this.scheduleToEdit?.taskLogByTaskId?.content ?? '';
-
-          this.getServiceAccessList(this.scheduleToEdit?.serviceId as number);
+          this.getServiceAccessList(this.scheduleToEdit.serviceId as number);
 
           this.formGroup.setValue({
-            name: this.scheduleToEdit?.name,
-            description: this.scheduleToEdit?.description,
-            active: this.scheduleToEdit?.isActive,
-            serviceId: this.scheduleToEdit?.serviceId,
-            component: this.scheduleToEdit?.component,
-            method: this.scheduleToEdit?.verb,
-            frequency: this.scheduleToEdit?.frequency,
+            name: this.scheduleToEdit.name,
+            description: this.scheduleToEdit.description,
+            active: this.scheduleToEdit.isActive,
+            serviceId: this.scheduleToEdit.serviceId,
+            component: this.scheduleToEdit.component,
+            method: this.scheduleToEdit.verb,
+            frequency: this.scheduleToEdit.frequency,
           });
 
-          if (this.scheduleToEdit?.verb !== 'GET') {
-            this.addPayloadField(this.scheduleToEdit?.payload as string);
+          if (this.scheduleToEdit.verb !== 'GET') {
+            this.addPayloadField(this.scheduleToEdit.payload as string);
           }
-        });
-    }
+        }
+      });
 
     this.formGroup
       .get('method')
@@ -282,19 +280,17 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
       };
 
       if (this.scheduleToEdit) {
-        // edit mode
         return {
-          lastModifiedDate: this.scheduleToEdit?.lastModifiedDate as string,
-          lastModifiedById: this.scheduleToEdit?.lastModifiedById as number,
+          lastModifiedDate: this.scheduleToEdit.lastModifiedDate as string,
+          lastModifiedById: this.scheduleToEdit.lastModifiedById as number,
           hasLog: !!this.scheduleToEdit.taskLogByTaskId,
-          createdDate: this.scheduleToEdit?.createdDate as string,
-          createdById: this.scheduleToEdit?.createdById as number,
+          createdDate: this.scheduleToEdit.createdDate as string,
+          createdById: this.scheduleToEdit.createdById as number,
           id: this.scheduleToEdit.id,
           ...payload,
         } as UpdateSchedulePayload;
       }
 
-      // create mode
       return { ...payload, id: null } as CreateSchedulePayload;
     }
 
