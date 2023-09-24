@@ -27,12 +27,16 @@
           [attr.aria-label]="'selectAnOption' | transloco"
           formControlName="pass-invite"
           class="pass-invite">
-          <mat-radio-button value="invite">{{
+          <mat-radio-button class="userform-invite-radio-btn" value="invite">{{
             'userManagement.controls.sendInvite.label' | transloco
           }}</mat-radio-button>
-          <mat-radio-button value="password">{{
-            'userManagement.controls.setPassword.label' | transloco
-          }}</mat-radio-button>
+          <mat-radio-button
+            class="userform-password-radio-btn"
+            value="password"
+            >{{
+              'userManagement.controls.setPassword.label' | transloco
+            }}</mat-radio-button
+          >
         </mat-radio-group>
       </ng-container>
       <ng-template #editMode
