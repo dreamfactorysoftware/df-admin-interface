@@ -390,6 +390,7 @@ export const routes: Routes = [
                   import(
                     './adf-config/df-cors/df-cors-config-details.component'
                   ).then(m => m.DfCorsConfigDetailsComponent),
+                data: { type: 'create' },
               },
               {
                 path: ':id',
@@ -400,6 +401,7 @@ export const routes: Routes = [
                 resolve: {
                   data: corsConfigResolver,
                 },
+                data: { type: 'edit' },
               },
             ],
             providers: [

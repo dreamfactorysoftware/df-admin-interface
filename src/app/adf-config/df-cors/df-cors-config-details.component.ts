@@ -53,6 +53,7 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   corsConfigToEdit: CorsConfigData | undefined;
   @ViewChild('select') select: MatSelect;
   allMethodsSelected = false;
+  type = 'create';
 
   verbDropdownOptions = [
     {
@@ -99,20 +100,19 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    const id = this.activatedRoute.snapshot.paramMap.get('id');
-
-    if (id) {
-      this.activatedRoute.data
-        .pipe(
-          takeUntil(this.destroyed$),
-          catchError(error => {
-            this.router.navigate([
-              `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
-            ]);
-            return throwError(() => new Error(error));
-          })
-        )
-        .subscribe(data => {
+    this.activatedRoute.data
+      .pipe(
+        takeUntil(this.destroyed$),
+        catchError(error => {
+          this.router.navigate([
+            `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
+          ]);
+          return throwError(() => new Error(error));
+        })
+      )
+      .subscribe(data => {
+        this.type = data['type'];
+        if (this.type === 'edit') {
           this.corsConfigToEdit = data['data'] as CorsConfigData;
           this.corsForm.setValue({
             path: this.corsConfigToEdit.path,
@@ -128,8 +128,8 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
 
           if (this.corsConfigToEdit.method.length === 5)
             this.allMethodsSelected = true;
-        });
-    }
+        }
+      });
   }
 
   ngOnDestroy(): void {
