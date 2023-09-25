@@ -25,6 +25,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { Service } from 'src/app/shared/types/service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
+import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
 
 @Component({
   selector: 'df-scheduler',
@@ -44,6 +45,7 @@ import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df
     TranslocoPipe,
     ReactiveFormsModule,
     DfAceEditorComponent,
+    DfVerbPickerComponent,
   ],
 })
 export class DfSchedulerComponent implements OnInit, OnDestroy {
@@ -58,29 +60,6 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
 
   scheduleToEdit: SchedulerTaskData | undefined;
   log = '';
-
-  verbDropdownOptions = [
-    {
-      value: 'GET',
-      name: 'verbs.get',
-    },
-    {
-      value: 'POST',
-      name: 'verbs.post',
-    },
-    {
-      value: 'PUT',
-      name: 'verbs.put',
-    },
-    {
-      value: 'PATCH',
-      name: 'verbs.patch',
-    },
-    {
-      value: 'DELETE',
-      name: 'verbs.delete',
-    },
-  ];
 
   constructor(
     @Inject(SCHEDULER_SERVICE_TOKEN)
@@ -99,7 +78,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
       active: [true, Validators.required],
       serviceId: ['', Validators.required],
       component: ['', Validators.required],
-      method: [this.verbDropdownOptions[0].value, Validators.required],
+      method: ['GET', Validators.required],
       frequency: [],
     });
     this.activatedRoute.data

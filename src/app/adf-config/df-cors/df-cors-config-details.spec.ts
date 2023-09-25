@@ -6,7 +6,6 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
 import { DfCorsConfigDetailsComponent } from './df-cors-config-details.component';
-import { CORS_CONFIG_SERVICE_PROVIDERS } from 'src/app/core/constants/providers';
 
 const FORM_DATA = {
   path: 'test',
@@ -69,7 +68,6 @@ describe('DfCorsConfigDetailsComponent - Create view', () => {
             },
           },
         },
-        ...CORS_CONFIG_SERVICE_PROVIDERS,
       ],
     });
     fixture = TestBed.createComponent(DfCorsConfigDetailsComponent);
@@ -140,7 +138,6 @@ describe('DfCorsConfigDetailsComponent - Edit view', () => {
             },
           },
         },
-        ...CORS_CONFIG_SERVICE_PROVIDERS,
       ],
     });
     fixture = TestBed.createComponent(DfCorsConfigDetailsComponent);

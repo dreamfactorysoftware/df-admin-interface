@@ -18,6 +18,7 @@ import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { MatTabsModule } from '@angular/material/tabs';
+import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 
 @Component({
   selector: 'df-table-details',
@@ -36,6 +37,7 @@ import { MatTabsModule } from '@angular/material/tabs';
     AsyncPipe,
     MatTabsModule,
     NgTemplateOutlet,
+    DfAceEditorComponent,
   ],
 })
 export class DfTableDetailsComponent implements OnInit, OnDestroy {
@@ -72,7 +74,7 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
       .subscribe(data => {
         this.dbName = this.activatedRoute.snapshot.params['name'];
         this.type = data['type'];
-        this.jsonData = JSON.stringify(data['data']);
+        this.jsonData = JSON.stringify(data['data'], null, 2);
 
         if (this.type === 'edit') {
           this.tableDetailsForm.patchValue({

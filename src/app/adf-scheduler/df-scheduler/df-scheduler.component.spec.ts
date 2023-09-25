@@ -5,10 +5,6 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute } from '@angular/router';
 import { provideTransloco, TranslocoService } from '@ngneat/transloco';
-import {
-  BASE_SERVICE_PROVIDERS,
-  SCHEDULER_SERVICE_PROVIDER,
-} from '../../core/constants/providers';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
 import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
@@ -143,8 +139,6 @@ describe('DfSchedulerComponent - create scheduler task flow', () => {
           },
           loader: TranslocoHttpLoader,
         }),
-        ...SCHEDULER_SERVICE_PROVIDER,
-        ...BASE_SERVICE_PROVIDERS,
         DfSystemConfigDataService,
         DfBreakpointService,
         TranslocoService,
@@ -239,8 +233,6 @@ describe('DfSchedulerComponent - edit scheduler task flow', () => {
           },
           loader: TranslocoHttpLoader,
         }),
-        ...SCHEDULER_SERVICE_PROVIDER,
-        ...BASE_SERVICE_PROVIDERS,
         DfSystemConfigDataService,
         DfBreakpointService,
         TranslocoService,

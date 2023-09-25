@@ -10,8 +10,10 @@
   "user": "User",
   "verb": "Verb",
   "active": "Active",
+  "refresh": "Refresh",
   "invalidForm": "Invalid Form Input",
   "createSuccessMessage": "Limit successfully created",
   "updateSuccessMessage": "Limit successfully updated",
-  "deleteSuccessMessage": "Limit successfully deleted"
+  "deleteSuccessMessage": "Limit successfully deleted",
+  "verbTooltip": "By default, all verbs will be limited unless a specific verb is selected for the limit type."
 }

@@ -19,6 +19,7 @@ export const errorInterceptor: HttpInterceptorFn = (
     const router = inject(Router);
     const userDataService = inject(DfUserDataService);
     const errorService = inject(DfErrorService);
+    errorService.error = null;
     return next(req).pipe(
       catchError((error: HttpErrorResponse) => {
         if (error.status === 401) {

@@ -32,6 +32,7 @@ import {
   TranslocoPipe,
   TranslocoService,
 } from '@ngneat/transloco';
+import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
 
 @Component({
   selector: 'df-limit',
@@ -51,6 +52,7 @@ import {
     MatButtonModule,
     TranslocoDirective,
     TranslocoPipe,
+    DfVerbPickerComponent,
   ],
 })
 export class DfLimitComponent implements OnInit, OnDestroy {
@@ -77,8 +79,6 @@ export class DfLimitComponent implements OnInit, OnDestroy {
     { value: '7-day', name: 'Week' },
     { value: '30-day', name: '30 Days' },
   ];
-
-  verbs = ['ANY', 'GET', 'PUT', 'POST', 'PATCH', 'DELETE'];
 
   formGroup: FormGroup;
 
@@ -114,7 +114,7 @@ export class DfLimitComponent implements OnInit, OnDestroy {
       endpoint: [],
       limitRate: [null, Validators.required],
       limitPeriod: [this.limitPeriods[0].value, Validators.required],
-      verb: [this.verbs[0], Validators.required],
+      verb: [],
       active: [true],
     });
   }
@@ -149,7 +149,7 @@ export class DfLimitComponent implements OnInit, OnDestroy {
             active: this.limitTypeToEdit.isActive,
             description: this.limitTypeToEdit.description,
             endpoint: this.limitTypeToEdit.endpoint,
-            verb: this.limitTypeToEdit.verb ?? this.verbs[0],
+            verb: this.limitTypeToEdit.verb,
           });
 
           if (!this.formGroup.value.serviceId)
@@ -252,13 +252,6 @@ export class DfLimitComponent implements OnInit, OnDestroy {
   }
 
   private assembleLimitPayload(): CreateLimitPayload | UpdateLimitPayload {
-    let verb: string | null = this.formGroup.value.verb ?? null;
-
-    if (verb && verb.toLowerCase() === 'any') {
-      // Verb is null when the user selects any http verb
-      verb = null;
-    }
-
     const data = {
       description: this.formGroup.value.description ?? null,
       endpoint: this.formGroup.value.endpoint ?? null,
@@ -269,7 +262,7 @@ export class DfLimitComponent implements OnInit, OnDestroy {
       serviceId: this.formGroup.value.serviceId ?? null,
       userId: this.formGroup.value.userId ?? null,
       type: this.formGroup.value.limitType as string,
-      verb: verb,
+      verb: this.formGroup.value.verb,
     };
 
     if (this.isEditMode) {

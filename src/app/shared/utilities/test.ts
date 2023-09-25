@@ -8,7 +8,7 @@ export function createTestBedConfig(
   componentName: any,
   serviceProviders: any[],
   mockActivatedRoute: any,
-  declarations?: any[]
+  declarations: any[] = []
 ): any {
   return {
     imports: [componentName, HttpClientTestingModule, NoopAnimationsModule],

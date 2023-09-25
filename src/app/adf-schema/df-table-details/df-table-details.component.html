@@ -1,15 +1,14 @@
 <mat-tab-group
+  dynamicHeight
+  mat-stretch-tabs="false"
+  mat-align-tabs="start"
   animationDuration="0ms"
   *ngIf="type === 'edit'; else tableDetails">
   <mat-tab label="{{ 'schema.table' | transloco }}">
     <ng-container [ngTemplateOutlet]="tableDetails"></ng-container>
   </mat-tab>
   <mat-tab label="JSON">
-    <!-- TODO: update form data on change -->
-    <mat-form-field class="example-full-width">
-      <mat-label>Address</mat-label>
-      <textarea matInput class="json-area">{{ jsonData }}</textarea>
-    </mat-form-field>
+    <df-ace-editor mode="json" [value]="jsonData"></df-ace-editor>
   </mat-tab>
 </mat-tab-group>
 

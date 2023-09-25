@@ -5,10 +5,6 @@ import { switchMap } from 'rxjs';
 import { Inject, Injectable } from '@angular/core';
 import { URL_TOKEN } from '../constants/tokens';
 
-export function dfBaseCrudServiceFactory(url: string, http: HttpClient) {
-  return new DfBaseCrudService(url, http);
-}
-
 @Injectable()
 export class DfBaseCrudService {
   constructor(
@@ -59,6 +55,17 @@ export class DfBaseCrudService {
       data,
       this.getOptions({ ...options })
     );
+  }
+
+  legacyDelete(endpoint: string, options?: Partial<RequestOptions>) {
+    const { headers, params } = this.getOptions({
+      snackbarError: 'server',
+      ...options,
+    });
+    return this.http.post(`${this.url}/${endpoint}`, null, {
+      headers: { ...headers, 'X-Http-Method': 'DELETE' },
+      params,
+    });
   }
 
   delete(

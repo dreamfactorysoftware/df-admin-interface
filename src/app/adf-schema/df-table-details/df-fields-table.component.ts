@@ -1,5 +1,6 @@
 import { Component, Inject } from '@angular/core';
 import {
+  Actions,
   DfManageTableComponent,
   DfManageTableModules,
 } from '../../shared/components/df-manage-table/df-manage-table.component';
@@ -48,6 +49,21 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
 
     this.dbName = this._activatedRoute.snapshot.params['name'];
   }
+
+  override actions: Actions<FieldsRow> = {
+    default: {
+      label: 'view',
+      function: (row: FieldsRow) => {
+        this.router.navigate([row.name], {
+          relativeTo: this._activatedRoute,
+        });
+      },
+      ariaLabel: {
+        key: 'view',
+      },
+    },
+    additional: this.actions.additional,
+  };
 
   override columns = [
     {

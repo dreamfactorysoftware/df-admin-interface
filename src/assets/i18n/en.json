@@ -93,6 +93,8 @@
   "viewRow": "View row {{id}}",
   "noEnteries": "No enteries found, you can create one by clicking on the button above.",
   "open": "Open",
+  "noFileSelected": "No file selected",
+  "toggleNav": "Toggle navigation",
   "nav": {
     "home": {
       "nav": "Home",
