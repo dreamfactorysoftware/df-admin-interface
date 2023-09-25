@@ -14,29 +14,6 @@ import {
   rolesResolver,
 } from './adf-roles/resolvers/role.resolver';
 import { limitsResolver } from './adf-limits/resolvers/limits.resolver';
-import {
-  ADMIN_SERVICE_PROVIDERS,
-  APP_SERVICE_PROVIDERS,
-  CORS_CONFIG_SERVICE_PROVIDERS,
-  LIMIT_CACHE_SERVICE_PROVIDERS,
-  CACHE_SERVICE_PROVIDERS,
-  LIMIT_SERVICE_PROVIDERS,
-  REPORT_SERVICE_PROVIDERS,
-  ROLE_SERVICE_PROVIDERS,
-  SCHEDULER_SERVICE_PROVIDER,
-  USER_SERVICE_PROVIDERS,
-  API_DOCS_SERVICE_PROVIDERS,
-  EMAIL_TEMPLATES_SERVICE_PROVIDERS,
-  LOOKUP_KEYS_SERVICE_PROVIDERS,
-  SERVICE_TYPE_SERVICE_PROVIDERS,
-  BASE_SERVICE_PROVIDERS,
-  SERVICE_SERVICE_PROVIDERS,
-  SCRIPTS_SERVICE_PROVIDERS,
-  SCRIPT_TYPE_SERVICE_PROVIDERS,
-  EVENT_SCRIPT_SERVICE_PROVIDERS,
-  GITHUB_REPO_SERVICE_PROVIDERS,
-  SERVICES_SERVICE_PROVIDERS,
-} from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
 import { DfPasswordService } from './adf-user-management/services/df-password.service';
@@ -148,11 +125,7 @@ export const routes: Routes = [
             },
           },
         ],
-        providers: [
-          ...SERVICE_SERVICE_PROVIDERS,
-          ...SERVICE_TYPE_SERVICE_PROVIDERS,
-          provideTranslocoScope('services'),
-        ],
+        providers: [provideTranslocoScope('services')],
       },
       {
         path: ROUTES.ROLE_BASED_ACCESS,
@@ -184,13 +157,7 @@ export const routes: Routes = [
             data: { type: 'edit' },
           },
         ],
-        providers: [
-          ...ROLE_SERVICE_PROVIDERS,
-          ...SERVICE_TYPE_SERVICE_PROVIDERS,
-          ...SERVICES_SERVICE_PROVIDERS,
-          ...BASE_SERVICE_PROVIDERS,
-          provideTranslocoScope('roles'),
-        ],
+        providers: [provideTranslocoScope('roles')],
       },
       {
         path: ROUTES.API_KEYS,
@@ -227,26 +194,13 @@ export const routes: Routes = [
             },
           },
         ],
-        providers: [
-          ...APP_SERVICE_PROVIDERS,
-          ...ROLE_SERVICE_PROVIDERS,
-          provideTranslocoScope('apps'),
-        ],
+        providers: [provideTranslocoScope('apps')],
       },
       {
         path: ROUTES.SCRIPTS,
         component: DfScriptsComponent,
         resolve: { data: servicesResolver(), scriptType: scriptTypeResolver },
-        providers: [
-          ...BASE_SERVICE_PROVIDERS,
-          ...SCRIPTS_SERVICE_PROVIDERS,
-          ...SCRIPT_TYPE_SERVICE_PROVIDERS,
-          ...SERVICES_SERVICE_PROVIDERS,
-          ...SERVICE_TYPE_SERVICE_PROVIDERS,
-          ...EVENT_SCRIPT_SERVICE_PROVIDERS,
-          ...GITHUB_REPO_SERVICE_PROVIDERS,
-          provideTranslocoScope('scripts'),
-        ],
+        providers: [provideTranslocoScope('scripts')],
       },
       {
         path: ROUTES.API_DOCS,
@@ -261,10 +215,6 @@ export const routes: Routes = [
               data: servicesResolver(10, '(type not like "%swagger%")'),
               serviceTypes: serviceTypesResolver,
             },
-            providers: [
-              ...SERVICE_TYPE_SERVICE_PROVIDERS,
-              ...SERVICE_SERVICE_PROVIDERS,
-            ],
           },
           {
             path: ':name',
@@ -275,7 +225,6 @@ export const routes: Routes = [
             resolve: {
               data: apiDocResolver,
             },
-            providers: [...API_DOCS_SERVICE_PROVIDERS],
           },
         ],
         providers: [provideTranslocoScope('apiDocs')],
@@ -325,15 +274,7 @@ export const routes: Routes = [
             },
           },
         ],
-        providers: [
-          ...LIMIT_SERVICE_PROVIDERS,
-          ...USER_SERVICE_PROVIDERS,
-          ...ROLE_SERVICE_PROVIDERS,
-          ...LIMIT_CACHE_SERVICE_PROVIDERS,
-          provideTranslocoScope('limits'),
-          ...SERVICE_SERVICE_PROVIDERS,
-          ...SERVICE_TYPE_SERVICE_PROVIDERS,
-        ],
+        providers: [provideTranslocoScope('limits')],
       },
       {
         path: ROUTES.AUTHENTICATION,
@@ -341,11 +282,7 @@ export const routes: Routes = [
         data: {
           groups: ['LDAP', 'SSO', 'OAuth'],
         },
-        providers: [
-          ...SERVICE_SERVICE_PROVIDERS,
-          ...SERVICE_TYPE_SERVICE_PROVIDERS,
-          provideTranslocoScope('services'),
-        ],
+        providers: [provideTranslocoScope('services')],
       },
     ],
     canActivate: [loggedInGuard],
@@ -401,10 +338,7 @@ export const routes: Routes = [
                 data: { type: 'edit' },
               },
             ],
-            providers: [
-              ...CORS_CONFIG_SERVICE_PROVIDERS,
-              provideTranslocoScope('cors'),
-            ],
+            providers: [provideTranslocoScope('cors')],
           },
           {
             path: ROUTES.CACHE,
@@ -415,10 +349,7 @@ export const routes: Routes = [
             resolve: {
               data: DfCacheResolver,
             },
-            providers: [
-              ...CACHE_SERVICE_PROVIDERS,
-              provideTranslocoScope('cache'),
-            ],
+            providers: [provideTranslocoScope('cache')],
           },
           {
             path: ROUTES.EMAIL_TEMPLATES,
@@ -451,10 +382,7 @@ export const routes: Routes = [
                 data: { type: 'edit' },
               },
             ],
-            providers: [
-              ...EMAIL_TEMPLATES_SERVICE_PROVIDERS,
-              provideTranslocoScope('emailTemplates'),
-            ],
+            providers: [provideTranslocoScope('emailTemplates')],
           },
           {
             path: ROUTES.GLOBAL_LOOKUP_KEYS,
@@ -465,7 +393,6 @@ export const routes: Routes = [
             resolve: {
               data: DfGlobalLookupKeysResolver,
             },
-            providers: [...LOOKUP_KEYS_SERVICE_PROVIDERS],
           },
         ],
       },
@@ -504,13 +431,7 @@ export const routes: Routes = [
             },
           },
         ],
-        providers: [
-          ...SCHEDULER_SERVICE_PROVIDER,
-          ...SERVICE_TYPE_SERVICE_PROVIDERS,
-          ...SERVICE_SERVICE_PROVIDERS,
-          ...BASE_SERVICE_PROVIDERS,
-          provideTranslocoScope('scheduler'),
-        ],
+        providers: [provideTranslocoScope('scheduler')],
       },
       {
         path: ROUTES.LOGS,
@@ -518,11 +439,7 @@ export const routes: Routes = [
         data: {
           groups: ['Log'],
         },
-        providers: [
-          ...SERVICE_SERVICE_PROVIDERS,
-          ...SERVICE_TYPE_SERVICE_PROVIDERS,
-          provideTranslocoScope('services'),
-        ],
+        providers: [provideTranslocoScope('services')],
       },
       {
         path: ROUTES.REPORTING,
@@ -531,7 +448,6 @@ export const routes: Routes = [
             './adf-reports/df-manage-service-report/df-manage-service-report-table.component'
           ).then(m => m.DfManageServiceReportTableComponent),
         resolve: { data: serviceReportsResolver },
-        providers: [...REPORT_SERVICE_PROVIDERS],
       },
       {
         path: ROUTES.DF_PLATFORM_APIS,
@@ -539,11 +455,7 @@ export const routes: Routes = [
         data: {
           system: true,
         },
-        providers: [
-          ...SERVICE_SERVICE_PROVIDERS,
-          ...SERVICE_TYPE_SERVICE_PROVIDERS,
-          provideTranslocoScope('services'),
-        ],
+        providers: [provideTranslocoScope('services')],
       },
     ],
     canActivate: [loggedInGuard],
@@ -582,8 +494,6 @@ export const routes: Routes = [
           },
         ],
         providers: [
-          ...ADMIN_SERVICE_PROVIDERS,
-          ...ROLE_SERVICE_PROVIDERS,
           provideTranslocoScope('admins'),
           provideTranslocoScope('userManagement'),
         ],
@@ -631,6 +541,7 @@ export const routes: Routes = [
                       import(
                         './adf-schema/df-field-details/df-field-details.component'
                       ).then(m => m.DfFieldDetailsComponent),
+                    data: { type: 'create' },
                   },
                   {
                     path: ':fieldName',
@@ -638,6 +549,7 @@ export const routes: Routes = [
                       import(
                         './adf-schema/df-field-details/df-field-details.component'
                       ).then(m => m.DfFieldDetailsComponent),
+                    data: { type: 'edit' },
                   },
                 ],
               },
@@ -693,17 +605,11 @@ export const routes: Routes = [
                     data: { type: 'edit' },
                   },
                 ],
-                providers: [...BASE_SERVICE_PROVIDERS],
               },
             ],
           },
         ],
-        providers: [
-          ...SERVICE_SERVICE_PROVIDERS,
-          ...SERVICE_TYPE_SERVICE_PROVIDERS,
-          ...BASE_SERVICE_PROVIDERS,
-          provideTranslocoScope('schema'),
-        ],
+        providers: [provideTranslocoScope('schema')],
         data: {
           groups: ['Database'],
           system: false,
@@ -747,9 +653,6 @@ export const routes: Routes = [
           },
         ],
         providers: [
-          ...USER_SERVICE_PROVIDERS,
-          ...APP_SERVICE_PROVIDERS,
-          ...ROLE_SERVICE_PROVIDERS,
           provideTranslocoScope('users'),
           provideTranslocoScope('roles'),
           provideTranslocoScope('userManagement'),
@@ -777,7 +680,7 @@ export const routes: Routes = [
             resolve: { data: entityResolver },
           },
         ],
-        providers: [...BASE_SERVICE_PROVIDERS, provideTranslocoScope('files')],
+        providers: [provideTranslocoScope('files')],
       },
       {
         path: ROUTES.LOGS,
@@ -809,7 +712,7 @@ export const routes: Routes = [
             resolve: { data: entityResolver },
           },
         ],
-        providers: [...BASE_SERVICE_PROVIDERS, provideTranslocoScope('files')],
+        providers: [provideTranslocoScope('files')],
       },
     ],
     canActivate: [loggedInGuard],

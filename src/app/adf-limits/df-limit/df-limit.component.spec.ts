@@ -5,10 +5,6 @@ import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-import {
-  LIMIT_CACHE_SERVICE_PROVIDERS,
-  LIMIT_SERVICE_PROVIDERS,
-} from 'src/app/core/constants/providers';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
 
@@ -96,8 +92,6 @@ describe('DfLimitComponent - Create View', () => {
             },
           },
         },
-        ...LIMIT_CACHE_SERVICE_PROVIDERS,
-        ...LIMIT_SERVICE_PROVIDERS,
       ],
     });
     fixture = TestBed.createComponent(DfLimitComponent);
@@ -185,8 +179,6 @@ describe('DfLimitComponent - Edit View', () => {
             },
           },
         },
-        ...LIMIT_CACHE_SERVICE_PROVIDERS,
-        ...LIMIT_SERVICE_PROVIDERS,
       ],
     });
     fixture = TestBed.createComponent(DfLimitComponent);

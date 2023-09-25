@@ -1,14 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfAppDetailsComponent } from './df-app-details.component';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
-// import { TranslocoHttpLoader } from 'src/transloco-loader';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-// import { APP_SERVICE_PROVIDERS } from 'src/app/core/constants/providers';
-import { APP_SERVICE_PROVIDERS } from '../../core/constants/providers';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { By } from '@angular/platform-browser';
 import { Validators } from '@angular/forms';
 import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
 import {
@@ -37,7 +33,6 @@ describe('DfAppDetailsComponent - Create', () => {
           },
           loader: TranslocoHttpLoader,
         }),
-        ...APP_SERVICE_PROVIDERS,
         TranslocoService,
         {
           provide: ActivatedRoute,
@@ -118,7 +113,6 @@ describe('DfAppDetailsComponent - Edit', () => {
           },
           loader: TranslocoHttpLoader,
         }),
-        ...APP_SERVICE_PROVIDERS,
         TranslocoService,
         {
           provide: ActivatedRoute,

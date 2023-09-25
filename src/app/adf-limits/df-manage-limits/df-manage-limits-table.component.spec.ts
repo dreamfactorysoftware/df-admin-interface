@@ -1,14 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { DfManageLimitsTableComponent } from './df-manage-limits-table.component';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-import {
-  LIMIT_CACHE_SERVICE_PROVIDERS,
-  LIMIT_SERVICE_PROVIDERS,
-} from 'src/app/core/constants/providers';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
 
@@ -44,8 +39,6 @@ describe('DfManageLimitsTableComponent', () => {
             },
           },
         },
-        ...LIMIT_CACHE_SERVICE_PROVIDERS,
-        ...LIMIT_SERVICE_PROVIDERS,
       ],
     });
     fixture = TestBed.createComponent(DfManageLimitsTableComponent);
@@ -58,7 +51,7 @@ describe('DfManageLimitsTableComponent', () => {
 
   it('should refresh rows', () => {
     const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'delete');
-    component.refreshRows(2);
+    component.refreshRow(2);
     expect(crudServiceSpy).toHaveBeenCalled();
   });
 

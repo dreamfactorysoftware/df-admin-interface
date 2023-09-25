@@ -4,12 +4,6 @@ import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { DfRoleDetailsComponent } from './df-role-details.component';
 import { ActivatedRoute } from '@angular/router';
 import { provideTransloco, TranslocoService } from '@ngneat/transloco';
-import {
-  ROLE_SERVICE_PROVIDERS,
-  SERVICE_TYPE_SERVICE_PROVIDERS,
-  SERVICES_SERVICE_PROVIDERS,
-  BASE_SERVICE_PROVIDERS,
-} from '../../core/constants/providers';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
 import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
@@ -76,10 +70,6 @@ describe('DfRoleDetailsComponent - create', () => {
           },
           loader: TranslocoHttpLoader,
         }),
-        ...ROLE_SERVICE_PROVIDERS,
-        ...SERVICE_TYPE_SERVICE_PROVIDERS,
-        ...SERVICES_SERVICE_PROVIDERS,
-        ...BASE_SERVICE_PROVIDERS,
         DfSystemConfigDataService,
         DfBreakpointService,
         TranslocoService,
@@ -158,10 +148,6 @@ describe('DfRoleDetailsComponent - edit', () => {
           },
           loader: TranslocoHttpLoader,
         }),
-        ...ROLE_SERVICE_PROVIDERS,
-        ...SERVICE_TYPE_SERVICE_PROVIDERS,
-        ...SERVICES_SERVICE_PROVIDERS,
-        ...BASE_SERVICE_PROVIDERS,
         DfSystemConfigDataService,
         DfBreakpointService,
         TranslocoService,
