@@ -1,13 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { DfFieldDetailsComponent } from './df-field-details.component';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { BASE_SERVICE_PROVIDERS } from 'src/app/core/constants/providers';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
 
 const FIELD_DATA = {
   alias: null,
@@ -111,7 +108,6 @@ describe('DfFieldDetailsComponent', () => {
             },
           },
         },
-        ...BASE_SERVICE_PROVIDERS,
       ],
     });
     fixture = TestBed.createComponent(DfFieldDetailsComponent);

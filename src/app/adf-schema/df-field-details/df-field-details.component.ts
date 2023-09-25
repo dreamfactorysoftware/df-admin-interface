@@ -25,7 +25,6 @@ import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfFunctionUseComponent } from './df-function-use/df-function-use.component';
 import { DatabaseSchemaFieldType } from './df-field-details.types';
 import { CsvValidator } from '../validators/csv.validator';
-import { ROUTES } from 'src/app/core/constants/routes';
 
 @Component({
   selector: 'df-field-details',
