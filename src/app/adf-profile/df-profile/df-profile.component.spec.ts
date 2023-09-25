@@ -26,18 +26,20 @@ describe('DfProfileComponent', () => {
   let fixture: ComponentFixture<DfProfileComponent>;
 
   beforeEach(() => {
-    createTestBedConfig(
-      DfProfileComponent,
-      [
-        DfSystemConfigDataService,
-        DfBreakpointService,
-        DfProfileService,
-        DfPasswordService,
-        TranslocoService,
-      ],
-      {
-        data: { ...mockProfile },
-      }
+    TestBed.configureTestingModule(
+      createTestBedConfig(
+        DfProfileComponent,
+        [
+          DfSystemConfigDataService,
+          DfBreakpointService,
+          DfProfileService,
+          DfPasswordService,
+          TranslocoService,
+        ],
+        {
+          data: { ...mockProfile },
+        }
+      )
     );
 
     fixture = TestBed.createComponent(DfProfileComponent);
