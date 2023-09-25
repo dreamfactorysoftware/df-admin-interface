@@ -5,10 +5,6 @@ import { switchMap } from 'rxjs';
 import { Inject, Injectable } from '@angular/core';
 import { URL_TOKEN } from '../constants/tokens';
 
-export function dfBaseCrudServiceFactory(url: string, http: HttpClient) {
-  return new DfBaseCrudService(url, http);
-}
-
 @Injectable()
 export class DfBaseCrudService {
   constructor(

@@ -1,11 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { DfCacheTableComponent } from './df-cache-table.component';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { CACHE_SERVICE_PROVIDERS } from 'src/app/core/constants/providers';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
 
@@ -55,7 +53,6 @@ describe('DfCacheTableComponent', () => {
             },
           },
         },
-        ...CACHE_SERVICE_PROVIDERS,
       ],
     });
     fixture = TestBed.createComponent(DfCacheTableComponent);

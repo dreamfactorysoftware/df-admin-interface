@@ -2,10 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HarnessLoader } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { MatRadioButtonHarness } from '@angular/material/radio/testing';
-
 import { DfUserDetailsComponent } from './df-user-details.component';
 import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
-import { USER_SERVICE_PROVIDERS } from '../../core/constants/providers';
 import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
 import { ActivatedRoute } from '@angular/router';
@@ -89,7 +87,6 @@ describe('DfUserDetailsComponent - create', () => {
           },
           loader: TranslocoHttpLoader,
         }),
-        ...USER_SERVICE_PROVIDERS,
         DfSystemConfigDataService,
         DfBreakpointService,
         TranslocoService,
@@ -217,7 +214,6 @@ describe('DfUserDetailsComponent - edit', () => {
           },
           loader: TranslocoHttpLoader,
         }),
-        ...USER_SERVICE_PROVIDERS,
         DfSystemConfigDataService,
         DfBreakpointService,
         TranslocoService,

@@ -15,7 +15,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { Subject, takeUntil } from 'rxjs';
-import { FILE_SERVICE_PROVIDERS } from 'src/app/core/constants/providers';
 import { FILE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
 import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 
@@ -31,7 +30,6 @@ import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
     TranslocoPipe,
     ReactiveFormsModule,
   ],
-  providers: [...FILE_SERVICE_PROVIDERS],
 })
 export class DfFolderDialogComponent implements OnDestroy {
   dialogForm: FormGroup;

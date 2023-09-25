@@ -3,7 +3,6 @@ import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { ADMIN_SERVICE_PROVIDERS } from 'src/app/core/constants/providers';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
 import { DfManageAdminsTableComponent } from './df-manage-admins-table.component';
@@ -40,7 +39,6 @@ describe('DfManageAdminsTableComponent', () => {
             },
           },
         },
-        ...ADMIN_SERVICE_PROVIDERS,
       ],
     });
     fixture = TestBed.createComponent(DfManageAdminsTableComponent);

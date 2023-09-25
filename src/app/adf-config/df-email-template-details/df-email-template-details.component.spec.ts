@@ -1,8 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { DfEmailTemplateDetailsComponent } from './df-email-template-details.component';
 import { createTestBedConfig } from '../../shared/utilities/test';
-import { EMAIL_TEMPLATES_SERVICE_PROVIDERS } from '../../core/constants/providers';
 import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
 
 describe('DfEmailTemplateDetailsComponent - create email template flow', () => {
@@ -11,14 +9,10 @@ describe('DfEmailTemplateDetailsComponent - create email template flow', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule(
-      createTestBedConfig(
-        DfEmailTemplateDetailsComponent,
-        [EMAIL_TEMPLATES_SERVICE_PROVIDERS],
-        {
-          data: undefined,
-          type: 'create',
-        }
-      )
+      createTestBedConfig(DfEmailTemplateDetailsComponent, [], {
+        data: undefined,
+        type: 'create',
+      })
     );
     fixture = TestBed.createComponent(DfEmailTemplateDetailsComponent);
     component = fixture.componentInstance;
@@ -62,18 +56,14 @@ describe('DfEmailTemplateDetailsComponent - edit email template flow', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule(
-      createTestBedConfig(
-        DfEmailTemplateDetailsComponent,
-        [EMAIL_TEMPLATES_SERVICE_PROVIDERS],
-        {
-          data: {
-            id: 1,
-            name: 'test',
-            description: 'test',
-          },
-          type: 'edit',
-        }
-      )
+      createTestBedConfig(DfEmailTemplateDetailsComponent, [], {
+        data: {
+          id: 1,
+          name: 'test',
+          description: 'test',
+        },
+        type: 'edit',
+      })
     );
     fixture = TestBed.createComponent(DfEmailTemplateDetailsComponent);
     component = fixture.componentInstance;

@@ -1,148 +1,127 @@
-import { InjectionToken } from '@angular/core';
+import { InjectionToken, inject } from '@angular/core';
 import { DfBaseCrudService } from '../services/df-base-crud.service';
+import { BASE_URL, URLS } from './urls';
+import { HttpClient } from '@angular/common/http';
+
+export const dfBaseCrudServiceProvider = (
+  url: string
+): {
+  providedIn: 'root' | 'platform' | 'any' | null;
+  factory: () => DfBaseCrudService;
+} => ({
+  providedIn: 'root',
+  factory: () => new DfBaseCrudService(url, inject(HttpClient)),
+});
 
 export const URL_TOKEN = new InjectionToken<string>('URL_TOKEN');
 
 export const GITHUB_REPO_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'GITHUB_REPO_SERVICE_TOKEN'
-);
-export const GITHUB_REPO_URL_TOKEN = new InjectionToken<string>(
-  'GITHUB_REPO_URL_TOKEN'
+  'GITHUB_REPO_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.GITHUB_REPO)
 );
 
 export const ADMIN_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'ADMIN_SERVICE_TOKEN'
+  'ADMIN_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.SYSTEM_ADMIN)
 );
-export const ADMIN_URL_TOKEN = new InjectionToken<string>('ADMIN_URL_TOKEN');
 
 export const USER_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'USER_SERVICE_TOKEN'
+  'USER_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.SYSTEM_USER)
 );
-export const USER_URL_TOKEN = new InjectionToken<string>('USER_URL_TOKEN');
 
 export const APP_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'APP_SERVICE_TOKEN'
+  'APP_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.APP)
 );
-export const APP_URL_TOKEN = new InjectionToken<string>('APP_URL_TOKEN');
 
 export const API_DOCS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'API_DOCS_SERVICE_TOKEN'
-);
-export const API_DOCS_URL_TOKEN = new InjectionToken<string>(
-  'API_DOCS_URL_TOKEN'
+  'API_DOCS_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.API_DOCS)
 );
 
 export const SERVICE_TYPE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'SERVICE_TYPE_SERVICE_TOKEN'
+  'SERVICE_TYPE_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.SERVICE_TYPE)
 );
 
-export const SERVICE_TYPE_URL_TOKEN = new InjectionToken<string>(
-  'SERVICE_TYPE_URL_TOKEN'
-);
-
-export const REPORT_URL_TOKEN = new InjectionToken<string>('REPORT_URL_TOKEN');
 export const REPORT_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'REPORT_SERVICE_TOKEN'
+  'REPORT_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.SERVICE_REPORT)
 );
 
 export const SERVICES_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'SERVICES_SERVICE_TOKEN'
-);
-
-export const SERVICES_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'SERVICES_URL_TOKEN'
-);
-
-export const SERVICE_TYPES_SERVICE_TOKEN =
-  new InjectionToken<DfBaseCrudService>('SERVICE_TYPES_SERVICE_TOKEN');
-
-export const SERVICE_TYPES_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'SERVICE_TYPES_URL_TOKEN'
+  'SERVICES_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.SYSTEM_SERVICE)
 );
 
 export const SCRIPT_TYPE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'SCRIPT_TYPE_SERVICE_TOKEN'
-);
-
-export const SCRIPT_TYPE_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'SCRIPT_TYPE_URL_TOKEN'
+  'SCRIPT_TYPE_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.SCRIPT_TYPE)
 );
 
 export const SCHEDULER_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'SCHEDULER_SERVICE_TOKEN'
-);
-
-export const SCHEDULER_URL_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'SCHEDULER_URL_TOKEN'
+  'SCHEDULER_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.SCHEDULER)
 );
 
 export const LIMIT_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'LIMIT_SERVICE_TOKEN'
+  'LIMIT_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.LIMITS)
 );
-export const LIMIT_URL_TOKEN = new InjectionToken<string>('LIMIT_URL_TOKEN');
 
 export const LIMIT_CACHE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'LIMIT_CACHE_SERVICE_TOKEN'
-);
-export const LIMIT_CACHE_URL_TOKEN = new InjectionToken<string>(
-  'LIMIT_CACHE_URL_TOKEN'
+  'LIMIT_CACHE_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.LIMIT_CACHE)
 );
 
 export const ROLE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'ROLE_SERVICE_TOKEN'
+  'ROLE_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.ROLES)
 );
-export const ROLE_URL_TOKEN = new InjectionToken<string>('ROLE_URL_TOKEN');
 
 export const CONFIG_CORS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'CONFIG_CORS_SERVICE_TOKEN'
-);
-export const CONFIG_CORS_URL_TOKEN = new InjectionToken<string>(
-  'CONFIG_CORS_URL_TOKEN'
+  'CONFIG_CORS_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.SYSTEM_CORS)
 );
 
 export const SCRIPTS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'SCRIPTS_SERVICE_TOKEN'
-);
-export const SCRIPTS_URL_TOKEN = new InjectionToken<string>(
-  'SCRIPTS_URL_TOKEN'
+  'SCRIPTS_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.SYSTEM_EVENT)
 );
 
 export const EVENT_SCRIPT_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'EVENT_SCRIPT_SERVICE_TOKEN'
-);
-export const EVENT_SCRIPT_URL_TOKEN = new InjectionToken<string>(
-  'EVENT_SCRIPT_URL_TOKEN'
+  'EVENT_SCRIPT_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.EVENT_SCRIPT)
 );
 
 export const CACHE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'CACHE_SERVICE_TOKEN'
+  'CACHE_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.SYSTEM_CACHE)
 );
-export const CACHE_URL_TOKEN = new InjectionToken<string>('CACHE_URL_TOKEN');
 
 export const EMAIL_TEMPLATES_SERVICE_TOKEN =
-  new InjectionToken<DfBaseCrudService>('EMAIL_TEMPLATES_SERVICE_TOKEN');
-export const EMAIL_TEMPLATES_URL_TOKEN = new InjectionToken<string>(
-  'EMAIL_TEMPLATES_URL_TOKEN'
-);
+  new InjectionToken<DfBaseCrudService>(
+    'EMAIL_TEMPLATES_SERVICE_TOKEN',
+    dfBaseCrudServiceProvider(URLS.EMAIL_TEMPLATES)
+  );
 
 export const LOOKUP_KEYS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'LOOKUP_KEYS_SERVICE_TOKEN'
-);
-export const LOOKUP_KEYS_URL_TOKEN = new InjectionToken<string>(
-  'LOOKUP_KEYS_URL_TOKEN'
+  'LOOKUP_KEYS_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.LOOKUP_KEYS)
 );
 
 export const BASE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'BASE_SERVICE_TOKEN'
+  'BASE_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(BASE_URL)
 );
-export const BASE_URL_TOKEN = new InjectionToken<string>('BASE_URL_TOKEN');
 
 export const FILE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'FILE_SERVICE_TOKEN'
+  'FILE_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.FILES)
 );
-export const FILE_URL_TOKEN = new InjectionToken<string>('FILE_URL_TOKEN');
 
 export const LOGS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'LOGS_SERVICE_TOKEN'
+  'LOGS_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.LOGS)
 );
-export const LOGS_URL_TOKEN = new InjectionToken<string>('LOGS_URL_TOKEN');

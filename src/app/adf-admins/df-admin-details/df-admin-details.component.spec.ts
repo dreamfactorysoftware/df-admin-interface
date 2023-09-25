@@ -5,7 +5,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute } from '@angular/router';
 import { provideTransloco, TranslocoService } from '@ngneat/transloco';
-import { ADMIN_SERVICE_PROVIDERS } from '../../core/constants/providers';
 import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
 import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
@@ -89,7 +88,6 @@ describe('DfAdminDetailsComponent - create', () => {
           },
           loader: TranslocoHttpLoader,
         }),
-        ...ADMIN_SERVICE_PROVIDERS,
         DfSystemConfigDataService,
         DfBreakpointService,
         TranslocoService,
@@ -218,7 +216,6 @@ describe('DfAdminDetailsComponent - edit', () => {
           },
           loader: TranslocoHttpLoader,
         }),
-        ...ADMIN_SERVICE_PROVIDERS,
         DfSystemConfigDataService,
         DfBreakpointService,
         TranslocoService,
