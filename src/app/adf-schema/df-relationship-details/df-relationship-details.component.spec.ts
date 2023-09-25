@@ -1,11 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { DfRelationshipDetailsComponent } from './df-relationship-details.component';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { BASE_SERVICE_PROVIDERS } from 'src/app/core/constants/providers';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
 
@@ -87,7 +85,6 @@ describe('DfRelationshipDetailsComponent - Create View', () => {
             },
           },
         },
-        ...BASE_SERVICE_PROVIDERS,
       ],
     });
     fixture = TestBed.createComponent(DfRelationshipDetailsComponent);
@@ -199,7 +196,6 @@ describe('DfRelationshipDetailsComponent - Edit View', () => {
             },
           },
         },
-        ...BASE_SERVICE_PROVIDERS,
       ],
     });
     fixture = TestBed.createComponent(DfRelationshipDetailsComponent);
