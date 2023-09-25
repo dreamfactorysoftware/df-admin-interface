@@ -46,9 +46,11 @@ export const servicesResolver =
             .getAll<GenericListResponse<Service>>({
               limit,
               sort: 'name',
-              filter: `(created_by_id is not null) and (type in ("${serviceTypes
-                .map(src => src.name)
-                .join('","')}"))${filter ? ` and ${filter}` : ''}`,
+              filter: `${
+                system ? '(created_by_id is not null) and ' : ''
+              }(type in ("${serviceTypes.map(src => src.name).join('","')}"))${
+                filter ? ` and ${filter}` : ''
+              }`,
             })
             .pipe(
               map(services => ({

@@ -1,4 +1,8 @@
 /* You can add global styles to this file, and also import other style files */
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
 html,
 body {
@@ -84,4 +88,37 @@ mat-form-field {
 
 .tool-tip-trigger {
   padding: 0 8px;
+}
+
+.details-form {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px;
+  width: 100%;
+  & .full-width {
+    width: 100%;
+  }
+  & .half-width {
+    width: calc(50% - 8px);
+  }
+  & .dynamic-width {
+    width: calc(50% - 8px);
+    .small & {
+      width: 100%;
+    }
+  }
+}
+
+fa-icon.mat-mdc-tooltip-trigger {
+  color: mat.get-color-from-palette($df-purple-palette, 400);
+}
+
+.mat-mdc-tab-group {
+  height: 100%;
+}
+
+.mat-mdc-tab-body-content {
+  padding: 8px;
+  height: 100%;
 }

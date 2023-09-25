@@ -10,6 +10,7 @@
   "user": "User",
   "verb": "Verb",
   "active": "Active",
+  "refresh": "Refresh",
   "invalidForm": "Invalid Form Input",
   "createSuccessMessage": "Limit successfully created",
   "updateSuccessMessage": "Limit successfully updated",

@@ -61,6 +61,17 @@ export class DfBaseCrudService {
     );
   }
 
+  legacyDelete(endpoint: string, options?: Partial<RequestOptions>) {
+    const { headers, params } = this.getOptions({
+      snackbarError: 'server',
+      ...options,
+    });
+    return this.http.post(`${this.url}/${endpoint}`, null, {
+      headers: { ...headers, 'X-Http-Method': 'DELETE' },
+      params,
+    });
+  }
+
   delete(
     id: string | number | Array<string | number>,
     options?: Partial<RequestOptions>

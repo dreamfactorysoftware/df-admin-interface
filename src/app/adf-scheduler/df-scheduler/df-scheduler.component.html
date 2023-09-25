@@ -1,4 +1,4 @@
-<mat-tab-group>
+<mat-tab-group dynamicHeight mat-stretch-tabs="false" mat-align-tabs="start">
   <mat-tab label="Basic">
     <h4>{{ 'scheduler.taskOverviewSubtitle' | transloco }}</h4>
     <form [formGroup]="formGroup" (ngSubmit)="onSubmit()">

@@ -14,7 +14,7 @@
     class="search-input"
     subscriptSizing="dynamic">
     <mat-label>{{ 'search' | transloco }}</mat-label>
-    <input matInput formControlName="currentFilter" />
+    <input matInput [formControl]="currentFilter" />
   </mat-form-field>
 </div>
 <div class="table-container">

@@ -16,7 +16,7 @@ export class DfErrorService {
 
   set error(error: string | null) {
     this.errorSubject.next(error);
-    this.hasError = true;
+    this.hasError = !!error;
   }
 
   get hasError(): boolean {

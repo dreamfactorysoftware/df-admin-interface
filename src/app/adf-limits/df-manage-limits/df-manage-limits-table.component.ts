@@ -2,6 +2,7 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Component, Inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
+  Actions,
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
@@ -53,6 +54,23 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
+
+  override actions: Actions<LimitTableRowData> = {
+    default: this.actions.default,
+    additional: [
+      {
+        label: 'limits.refresh',
+        function: (row: LimitTableRowData) => {
+          this.refreshRow(row);
+        },
+        ariaLabel: {
+          key: 'limits.refresh',
+        },
+      },
+      ...(this.actions.additional ? this.actions.additional : []),
+    ],
+  };
+
   override columns = [
     {
       columnDef: 'active',
@@ -117,15 +135,9 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
 
   filterQuery = getFilterQuery('limits');
 
-  refreshRows(id?: number): void {
-    const ids = id
-      ? [id.toString()]
-      : this.dataSource.data.map(row => {
-          return row.id.toString();
-        });
-
+  refreshRow(row: LimitTableRowData): void {
     this.limitCacheService
-      .delete(ids)
+      .delete(row.id)
       .pipe(takeUntil(this.destroyed$))
       .subscribe(() => this.refreshTable());
   }

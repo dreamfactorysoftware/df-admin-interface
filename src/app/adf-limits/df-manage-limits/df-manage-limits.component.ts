@@ -1,10 +1,7 @@
 import { Component, ViewChild } from '@angular/core';
-import {
-  DfManageLimitsTableComponent,
-  LimitTableRowData,
-} from './df-manage-limits-table.component';
+import { DfManageLimitsTableComponent } from './df-manage-limits-table.component';
 import { faArrowsRotate } from '@fortawesome/free-solid-svg-icons';
-import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
+import { TranslocoPipe } from '@ngneat/transloco';
 import { AsyncPipe, NgIf } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
@@ -30,15 +27,7 @@ export class DfManageLimitsComponent {
   @ViewChild(DfManageLimitsTableComponent)
   manageLimitsTableComponent!: DfManageLimitsTableComponent;
 
-  constructor(private translateService: TranslocoService) {}
-
-  resetRowCounterLabel(row: LimitTableRowData) {
-    return this.translateService.selectTranslate('resetRowCounter', {
-      id: (row as any).id,
-    });
-  }
-
-  refreshRows(id?: number) {
-    this.manageLimitsTableComponent.refreshRows(id);
+  refreshTable() {
+    this.manageLimitsTableComponent.refreshTable();
   }
 }
