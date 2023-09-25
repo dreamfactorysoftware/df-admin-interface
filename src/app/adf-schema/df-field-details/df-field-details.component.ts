@@ -88,6 +88,7 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
 
   referenceTableDropdownMenuOptions: { name: string }[] = [];
   referenceFieldDropdownMenuOptions: DatabaseSchemaFieldType[] = [];
+  type = '';
 
   constructor(
     @Inject(BASE_SERVICE_TOKEN)
@@ -125,9 +126,19 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.fieldName = this.activatedRoute.snapshot.paramMap.get('fieldName');
-    this.dbName = this.activatedRoute.snapshot.paramMap.get('name') as string;
-    this.tableName = this.activatedRoute.snapshot.paramMap.get('id') as string;
+    this.activatedRoute.data
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe(data => {
+        this.type === data['type'];
+      });
+
+    if (this.type === 'edit') {
+      this.fieldName = this.activatedRoute.snapshot.paramMap.get('fieldName');
+      this.dbName = this.activatedRoute.snapshot.paramMap.get('name') as string;
+      this.tableName = this.activatedRoute.snapshot.paramMap.get(
+        'id'
+      ) as string;
+    }
 
     if (this.fieldName) {
       this.service
