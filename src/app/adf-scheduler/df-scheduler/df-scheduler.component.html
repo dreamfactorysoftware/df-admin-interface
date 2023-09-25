@@ -40,16 +40,11 @@
           >
         </mat-select>
       </mat-form-field>
-      <mat-form-field>
-        <mat-label>{{ 'scheduler.form.label.method' | transloco }}</mat-label>
-        <mat-select formControlName="method">
-          <mat-option
-            *ngFor="let verb of verbDropdownOptions"
-            [value]="verb.value"
-            >{{ verb.name | transloco }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
+      <df-verb-picker
+        formControlName="method"
+        [schema]="{
+          label: 'scheduler.form.label.method' | transloco
+        }"></df-verb-picker>
       <mat-form-field>
         <mat-label>{{
           'scheduler.form.label.frequency' | transloco

@@ -25,6 +25,7 @@ import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { CorsConfigData } from '../types';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
 
 @Component({
   selector: 'df-cors-config-details',
@@ -45,6 +46,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
     MatButtonModule,
     TranslocoDirective,
     TranslocoPipe,
+    DfVerbPickerComponent,
   ],
 })
 export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
@@ -54,29 +56,6 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   @ViewChild('select') select: MatSelect;
   allMethodsSelected = false;
   type = 'create';
-
-  verbDropdownOptions = [
-    {
-      value: 'GET',
-      name: 'verbs.get',
-    },
-    {
-      value: 'POST',
-      name: 'verbs.post',
-    },
-    {
-      value: 'PUT',
-      name: 'verbs.put',
-    },
-    {
-      value: 'PATCH',
-      name: 'verbs.patch',
-    },
-    {
-      value: 'DELETE',
-      name: 'verbs.delete',
-    },
-  ];
 
   constructor(
     @Inject(CONFIG_CORS_SERVICE_TOKEN)

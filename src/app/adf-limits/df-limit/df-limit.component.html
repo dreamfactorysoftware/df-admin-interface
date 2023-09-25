@@ -77,15 +77,12 @@
         </mat-option>
       </mat-select>
     </mat-form-field>
-    <mat-form-field>
-      <!-- TODO: add tooltip here -->
-      <mat-label>{{ 'limits.verb' | transloco }}</mat-label>
-      <mat-select formControlName="verb">
-        <mat-option *ngFor="let verb of verbs" [value]="verb">
-          {{ verb }}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
+    <df-verb-picker
+      formControlName="verb"
+      [schema]="{
+        label: 'limits.verb' | transloco,
+        description: 'limits.verbTooltip' | transloco
+      }"></df-verb-picker>
     <ng-container>
       <mat-slide-toggle formControlName="active">{{
         'limits.active' | transloco

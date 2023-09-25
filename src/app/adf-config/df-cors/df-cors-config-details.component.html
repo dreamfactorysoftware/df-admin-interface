@@ -27,26 +27,12 @@
       <mat-label>{{ 'cors.formControls.maxAge' | transloco }}</mat-label>
       <input matInput type="number" formControlName="maxAge" />
     </mat-form-field>
-    <mat-form-field>
-      <mat-label>{{ 'cors.formControls.methods' | transloco }}</mat-label>
-      <mat-select #select formControlName="methods" multiple>
-        <div class="select-all">
-          <mat-checkbox
-            [(ngModel)]="allMethodsSelected"
-            [ngModelOptions]="{ standalone: true }"
-            (change)="toggleAllSelection()"
-            >{{
-              (!allMethodsSelected ? 'selectAll' : 'deselectAll') | transloco
-            }}</mat-checkbox
-          >
-        </div>
-        <mat-option
-          *ngFor="let verb of verbDropdownOptions"
-          [value]="verb.value"
-          >{{ verb.name | transloco }}</mat-option
-        >
-      </mat-select>
-    </mat-form-field>
+    <df-verb-picker
+      formControlName="methods"
+      [schema]="{
+        label: 'cors.formControls.methods' | transloco
+      }"
+      type="verb_multiple"></df-verb-picker>
     <div class="slide-toggle-container">
       <ng-container>
         <mat-slide-toggle formControlName="credentials">
