@@ -2,19 +2,19 @@ import { Component, Inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, takeUntil, throwError } from 'rxjs';
-import { DfSystemConfigDataService } from 'src/app/core/services/df-system-config-data.service';
+import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import {
   UserProfile,
   CreateAdmin,
   UserProfileType,
 } from 'src/app/shared/types/user';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { ROUTES } from 'src/app/core/constants/routes';
+import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
+import { ROUTES } from 'src/app/shared/constants/routes';
 
 import { parseError } from 'src/app/shared/utilities/parse-errors';
 import { DfUserDetailsBaseComponent } from 'src/app/shared/components/df-user-details/df-user-details-base.component';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { ADMIN_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { ADMIN_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfLookupKeysComponent } from '../../shared/components/df-lookup-keys/df-lookup-keys.component';
 import { DfUserAppRolesComponent } from '../../shared/components/df-user-app-roles/df-user-app-roles.component';
 import { MatInputModule } from '@angular/material/input';

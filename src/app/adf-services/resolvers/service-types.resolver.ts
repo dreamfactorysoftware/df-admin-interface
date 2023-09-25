@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { forkJoin, map } from 'rxjs';
-import { SERVICE_TYPE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { SERVICE_TYPE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { ServiceType } from 'src/app/shared/types/service';
 

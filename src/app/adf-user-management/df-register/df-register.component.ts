@@ -6,10 +6,10 @@ import {
   ReactiveFormsModule,
 } from '@angular/forms';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
-import { DfSystemConfigDataService } from 'src/app/core/services/df-system-config-data.service';
+import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { DfAuthService } from '../services/df-auth.service';
-import { ROUTES } from 'src/app/core/constants/routes';
+import { ROUTES } from 'src/app/shared/constants/routes';
 
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';

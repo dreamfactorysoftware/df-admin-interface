@@ -4,8 +4,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoService } from '@ngneat/transloco';
 import { takeUntil } from 'rxjs';
-import { SERVICES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import {
   DfManageTableComponent,
   DfManageTableModules,

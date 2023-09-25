@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
-import { ROUTES } from './core/constants/routes';
-import { loggedInGuard } from './core/guards/logged-in.guard';
-import { notLoggedInGuard } from './core/guards/not-logged-in.guard';
+import { ROUTES } from './shared/constants/routes';
+import { loggedInGuard } from './shared/guards/logged-in.guard';
+import { notLoggedInGuard } from './shared/guards/not-logged-in.guard';
 import { appsResolver } from './adf-apps/resolvers/manage-apps.resolver';
 import {
   userResolver,

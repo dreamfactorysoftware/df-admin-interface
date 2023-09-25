@@ -8,7 +8,7 @@ import {
 import { Location, NgIf } from '@angular/common';
 import { UserParams, LoginCredentials } from '../types';
 import { DfPasswordService } from '../services/df-password.service';
-import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
+import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import { matchValidator } from '../../shared/validators/match.validator';
 import { Subject, catchError, switchMap, takeUntil, throwError } from 'rxjs';
 import {

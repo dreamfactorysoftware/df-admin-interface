@@ -6,7 +6,7 @@ import { map, of, switchMap } from 'rxjs';
 import {
   ADMIN_SERVICE_TOKEN,
   ROLE_SERVICE_TOKEN,
-} from 'src/app/core/constants/tokens';
+} from 'src/app/shared/constants/tokens';
 import { RoleType } from 'src/app/shared/types/role';
 
 export const adminsResolver =

@@ -5,12 +5,12 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute } from '@angular/router';
 import { provideTransloco, TranslocoService } from '@ngneat/transloco';
-import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
-import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
+import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
+import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { DfAdminDetailsComponent } from './df-admin-details.component';
 import { UserProfile } from '../../shared/types/user';
-import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
+import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 import { MatRadioButtonHarness } from '@angular/material/radio/testing';
 import { MatInputHarness } from '@angular/material/input/testing';
 

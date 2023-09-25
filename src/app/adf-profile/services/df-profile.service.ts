@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { URLS } from 'src/app/core/constants/urls';
-import { DfUserDataService } from 'src/app/core/services/df-user-data.service';
-import { SHOW_LOADING_HEADER } from 'src/app/core/constants/http-headers';
+import { URLS } from 'src/app/shared/constants/urls';
+import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
+import { SHOW_LOADING_HEADER } from 'src/app/shared/constants/http-headers';
 import { UserProfile } from '../../shared/types/user';
 
 @Injectable()

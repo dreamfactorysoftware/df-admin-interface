@@ -2,7 +2,7 @@ import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { inject } from '@angular/core';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { RoleType } from 'src/app/shared/types/role';
-import { ROLE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { ROLE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 
 export const roleResolver: ResolveFn<RoleType | undefined> = (
   route: ActivatedRouteSnapshot

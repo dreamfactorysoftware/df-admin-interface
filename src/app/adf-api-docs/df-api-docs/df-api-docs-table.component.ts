@@ -5,12 +5,12 @@ import {
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { ApiDocsRowData } from '../types';
-import { SERVICES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MatDialog } from '@angular/material/dialog';
 import { Router, ActivatedRoute } from '@angular/router';
 import { TranslocoService } from '@ngneat/transloco';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { takeUntil } from 'rxjs';
 import { Service, ServiceType } from 'src/app/shared/types/service';

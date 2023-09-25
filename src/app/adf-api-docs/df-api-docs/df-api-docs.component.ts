@@ -11,7 +11,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { TranslocoModule } from '@ngneat/transloco';
-import { ROUTES } from 'src/app/core/constants/routes';
+import { ROUTES } from 'src/app/shared/constants/routes';
 import { saveRawAsFile } from 'src/app/shared/utilities/file';
 
 @Component({

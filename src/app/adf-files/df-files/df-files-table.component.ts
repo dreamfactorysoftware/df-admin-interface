@@ -8,17 +8,17 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { FileTableRow, FileResponse, FileType } from '../df-files.types';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
-import { ROUTES } from 'src/app/core/constants/routes';
+import { ROUTES } from 'src/app/shared/constants/routes';
 import { takeUntil } from 'rxjs';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { faDownload } from '@fortawesome/free-solid-svg-icons';
 import { NgIf } from '@angular/common';
 import { saveAsFile } from 'src/app/shared/utilities/file';
-import { URLS } from 'src/app/core/constants/urls';
+import { URLS } from 'src/app/shared/constants/urls';
 
 @Component({
   selector: 'df-files-table',

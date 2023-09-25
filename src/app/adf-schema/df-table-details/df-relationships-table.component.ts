@@ -9,10 +9,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
-import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { takeUntil } from 'rxjs';
-import { ROUTES } from 'src/app/core/constants/routes';
+import { ROUTES } from 'src/app/shared/constants/routes';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({

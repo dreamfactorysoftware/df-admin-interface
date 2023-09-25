@@ -9,13 +9,13 @@ import {
 } from '../types';
 import { GenericSuccessResponse } from '../../shared/types/generic-http.type';
 import { catchError, tap } from 'rxjs';
-import { URLS } from '../../core/constants/urls';
+import { URLS } from '../../shared/constants/urls';
 import {
   HTTP_OPTION_LOGIN_FALSE,
   HTTP_OPTION_RESET_TRUE,
   SHOW_LOADING_HEADER,
-} from '../../core/constants/http-headers';
-import { DfUserDataService } from 'src/app/core/services/df-user-data.service';
+} from '../../shared/constants/http-headers';
+import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 
 @Injectable({
   providedIn: 'root',

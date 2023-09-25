@@ -8,15 +8,15 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { Router, RouterModule } from '@angular/router';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { DfAuthService } from 'src/app/adf-user-management/services/df-auth.service';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { DfUserDataService } from 'src/app/core/services/df-user-data.service';
+import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
+import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 import { faAngleDown, faBars } from '@fortawesome/free-solid-svg-icons';
 import { routes } from 'src/app/routes';
 import { transformRoutes } from '../../utilities/route';
 import { Nav } from '../../types/nav';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
-import { DfErrorService } from 'src/app/core/services/df-error.service';
+import { DfErrorService } from 'src/app/shared/services/df-error.service';
 
 @Component({
   selector: 'df-side-nav',

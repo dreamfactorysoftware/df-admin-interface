@@ -15,8 +15,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { Subject, takeUntil } from 'rxjs';
-import { FILE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { FILE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 
 @Component({
   selector: 'df-folder-dialog-component',

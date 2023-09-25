@@ -7,8 +7,8 @@ import {
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { CacheRow, CacheType } from './df-cache.types';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { CACHE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { CACHE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { faRefresh } from '@fortawesome/free-solid-svg-icons';

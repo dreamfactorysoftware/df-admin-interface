@@ -1,6 +1,6 @@
 import { Component, ViewChild } from '@angular/core';
 import { DfManageAdminsTableComponent } from './df-manage-admins-table.component';
-import { EXPORT_TYPES } from 'src/app/core/constants/supported-extensions';
+import { EXPORT_TYPES } from 'src/app/shared/constants/supported-extensions';
 
 import { NgFor, UpperCasePipe } from '@angular/common';
 import { MatMenuModule } from '@angular/material/menu';

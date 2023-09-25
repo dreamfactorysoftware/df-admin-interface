@@ -1,7 +1,7 @@
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { inject } from '@angular/core';
 import { AppType } from '../types/df-apps.types';
-import { APP_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { APP_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 
 export const editAppResolver: ResolveFn<AppType> = (
   route: ActivatedRouteSnapshot

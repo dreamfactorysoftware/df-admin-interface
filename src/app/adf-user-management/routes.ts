@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { ROUTES } from '../core/constants/routes';
+import { ROUTES } from '../shared/constants/routes';
 import { urlQueryLoginGuard } from './guards/url-query-login.guard';
 import { oauthLoginGuard } from './guards/oauth-login.guard';
 import { openRegisterGuard } from './guards/open-register.guard';

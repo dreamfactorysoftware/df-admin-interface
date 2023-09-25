@@ -1,6 +1,6 @@
 import { AsyncPipe } from '@angular/common';
 import { Component } from '@angular/core';
-import { DfErrorService } from 'src/app/core/services/df-error.service';
+import { DfErrorService } from 'src/app/shared/services/df-error.service';
 
 @Component({
   selector: 'df-error',

@@ -2,16 +2,16 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
-import { URLS } from '../../core/constants/urls';
+import { URLS } from '../../shared/constants/urls';
 import {
   HTTP_OPTION_LOGIN_FALSE,
   SHOW_LOADING_HEADER,
-} from '../../core/constants/http-headers';
-import { ROUTES } from '../../core/constants/routes';
+} from '../../shared/constants/http-headers';
+import { ROUTES } from '../../shared/constants/routes';
 import {
   DfUserDataService,
   UserData,
-} from '../../core/services/df-user-data.service';
+} from '../../shared/services/df-user-data.service';
 import { GenericSuccessResponse } from 'src/app/shared/types/generic-http.type';
 import { LoginCredentials, RegisterDetails } from '../types';
 

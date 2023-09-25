@@ -2,13 +2,13 @@ import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
-import { ROUTES } from 'src/app/core/constants/routes';
+import { ROUTES } from 'src/app/shared/constants/routes';
 import { JsonValidator } from 'src/app/shared/validators/json.validator';
 import {
   BASE_SERVICE_TOKEN,
   SCHEDULER_SERVICE_TOKEN,
-} from 'src/app/core/constants/tokens';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+} from 'src/app/shared/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import {
   CreateSchedulePayload,
   SchedulerTaskData,

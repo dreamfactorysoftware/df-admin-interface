@@ -2,7 +2,7 @@ import { AsyncPipe, NgFor } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
-import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
+import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { Client, Php, Platform, Server } from '../types';
 

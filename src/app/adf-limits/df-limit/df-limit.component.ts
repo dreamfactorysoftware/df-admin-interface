@@ -8,7 +8,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { RoleType } from 'src/app/shared/types/role';
-import { ROUTES } from 'src/app/core/constants/routes';
+import { ROUTES } from 'src/app/shared/constants/routes';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 
 import {
@@ -25,8 +25,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { DfAlertComponent } from '../../shared/components/df-alert/df-alert.component';
-import { LIMIT_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { LIMIT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import {
   TranslocoDirective,
   TranslocoPipe,

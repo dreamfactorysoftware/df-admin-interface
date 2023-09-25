@@ -17,8 +17,8 @@ import {
 import { Subject, takeUntil } from 'rxjs';
 import { AsyncPipe, NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { ROLE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { ROLE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { DfLookupKeysComponent } from 'src/app/shared/components/df-lookup-keys/df-lookup-keys.component';
 import { MatInputModule } from '@angular/material/input';
@@ -26,7 +26,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatButtonModule } from '@angular/material/button';
 import { DfRolesAccessComponent } from '../df-roles-access/df-roles-access.component';
 import { MatDividerModule } from '@angular/material/divider';
-import { ROUTES } from 'src/app/core/constants/routes';
+import { ROUTES } from 'src/app/shared/constants/routes';
 
 @Component({
   selector: 'df-role-details',

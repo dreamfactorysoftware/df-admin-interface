@@ -6,8 +6,8 @@ import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
-import { DfSystemConfigDataService } from 'src/app/core/services/df-system-config-data.service';
+import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
+import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { DfPasswordService } from '../services/df-password.service';
 
 describe('DfForgotPasswordComponent - Username Reset', () => {

@@ -11,8 +11,8 @@ import { LimitType } from 'src/app/shared/types/limit';
 import {
   LIMIT_CACHE_SERVICE_TOKEN,
   LIMIT_SERVICE_TOKEN,
-} from 'src/app/core/constants/tokens';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+} from 'src/app/shared/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';

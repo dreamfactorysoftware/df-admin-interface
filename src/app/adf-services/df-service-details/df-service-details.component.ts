@@ -18,7 +18,13 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { Subject } from 'rxjs';
+import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
+import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
 import { ServiceType } from 'src/app/shared/types/service';
+import { mapCamelToSnake } from 'src/app/shared/utilities/case';
+import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 @Component({
   selector: 'df-service-details',
@@ -39,6 +45,10 @@ import { ServiceType } from 'src/app/shared/types/service';
     NgIf,
     MatCheckboxModule,
     NgTemplateOutlet,
+    DfDynamicFieldComponent,
+    DfArrayFieldComponent,
+    FontAwesomeModule,
+    MatTooltipModule,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit, OnDestroy {
@@ -46,6 +56,7 @@ export class DfServiceDetailsComponent implements OnInit, OnDestroy {
   edit = false;
   serviceTypes: Array<ServiceType>;
   serviceForm: FormGroup;
+  faCircleInfo = faCircleInfo;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -62,9 +73,6 @@ export class DfServiceDetailsComponent implements OnInit, OnDestroy {
     if (id) {
       this.edit = true;
     }
-    this.activatedRoute.data.subscribe(({ serviceTypes }) => {
-      this.serviceTypes = serviceTypes;
-    });
   }
 
   ngOnInit(): void {
@@ -83,6 +91,16 @@ export class DfServiceDetailsComponent implements OnInit, OnDestroy {
           );
         });
         this.serviceForm.addControl('config', config);
+      }
+    });
+
+    this.activatedRoute.data.subscribe(({ data, serviceTypes }) => {
+      this.serviceTypes = serviceTypes;
+      if (this.edit) {
+        this.serviceForm.patchValue({
+          ...data,
+          config: mapCamelToSnake(data.config),
+        });
       }
     });
   }

@@ -1,5 +1,5 @@
 import { Component, Input } from '@angular/core';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
+import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
 
 import { AsyncPipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';

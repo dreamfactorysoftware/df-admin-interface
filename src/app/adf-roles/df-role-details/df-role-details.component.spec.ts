@@ -4,12 +4,12 @@ import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { DfRoleDetailsComponent } from './df-role-details.component';
 import { ActivatedRoute } from '@angular/router';
 import { provideTransloco, TranslocoService } from '@ngneat/transloco';
-import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
-import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
+import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
+import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
+import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 
 const fakeActivatedRoute = (isEdit = false) => {
   return {

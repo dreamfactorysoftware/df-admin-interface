@@ -9,9 +9,9 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
-import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
+import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import { matchValidator } from '../../shared/validators/match.validator';
-import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
+import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
 import {
   AlertType,
   DfAlertComponent,

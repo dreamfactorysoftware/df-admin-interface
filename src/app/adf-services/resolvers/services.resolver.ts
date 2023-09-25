@@ -4,7 +4,7 @@ import { forkJoin, map, switchMap } from 'rxjs';
 import {
   SERVICES_SERVICE_TOKEN,
   SERVICE_TYPE_SERVICE_TOKEN,
-} from 'src/app/core/constants/tokens';
+} from 'src/app/shared/constants/tokens';
 import {
   GenericListResponse,
   Meta,

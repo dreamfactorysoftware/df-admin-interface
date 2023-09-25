@@ -1,98 +1,89 @@
 <!-- TODO Add translations -->
-<mat-tab-group dynamicHeight mat-stretch-tabs="false" mat-align-tabs="start">
-  <mat-tab [label]="'services.details' | transloco">
-    <form [formGroup]="serviceForm">
-      <mat-form-field>
-        <mat-label>Service Type</mat-label>
-        <mat-select formControlName="type">
-          <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
-            {{ type.label }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-      <mat-form-field>
-        <mat-label>Namespace</mat-label>
-        <input matInput formControlName="name" />
-      </mat-form-field>
-      <mat-form-field>
-        <mat-label>Label</mat-label>
-        <input matInput formControlName="label" />
-      </mat-form-field>
-      <mat-form-field>
-        <mat-label>Description</mat-label>
-        <input matInput formControlName="description" />
-      </mat-form-field>
-      <mat-slide-toggle formControlName="active">Active</mat-slide-toggle>
-      <ng-container *ngIf="configSchema">
-        <ng-container formGroupName="config">
-          <mat-accordion>
-            <mat-expansion-panel>
-              <mat-expansion-panel-header>Config</mat-expansion-panel-header>
-              <ng-container
-                *ngTemplateOutlet="
-                  configFields;
-                  context: { $implicit: configSchema }
-                ">
-              </ng-container>
-            </mat-expansion-panel>
-          </mat-accordion>
-        </ng-container>
-      </ng-container>
-    </form>
-  </mat-tab>
-  <mat-tab [label]="'services.definition' | transloco"></mat-tab>
-</mat-tab-group>
-<ng-template #configFields let-schema>
-  <ng-container *ngFor="let item of schema">
-    <mat-form-field
-      *ngIf="
-        [
-          'integer',
-          'password',
-          'string',
-          'text',
-          'picklist',
-          'multi_picklist'
-        ].includes(item.type)
-      ">
-      <mat-label>{{ item.label }}</mat-label>
-      <input
-        *ngIf="['integer', 'string', 'password'].includes(item.type)"
-        matInput
-        [formControlName]="item.name"
-        [type]="
-          item.type === 'integer'
-            ? 'number'
-            : item.type === 'password'
-            ? 'password'
-            : 'text'
-        " />
-      <textarea
-        *ngIf="item.type === 'text'"
-        matInput
-        [formControlName]="item.name"></textarea>
-      <mat-select
-        *ngIf="['picklist', 'multi_picklist'].includes(item.type)"
-        [formControlName]="item.name"
-        [multiple]="item.type === 'multi_picklist'">
-        <mat-option *ngFor="let option of item.values" [value]="option.name">
-          {{ option.label }}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
-    <mat-checkbox
-      *ngIf="item.type === 'boolean'"
-      [formControlName]="item.name"
-      >{{ item.label }}</mat-checkbox
-    >
-    <ng-container *ngIf="item.type === 'array'">
-      <ng-container [formArrayName]="item.name">
-        <ng-container
-          *ngTemplateOutlet="
-            configFields;
-            context: { $implicit: item.items }
-          "></ng-container>
-      </ng-container>
+<form [formGroup]="serviceForm" class="details-form">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>{{
+      'services.controls.serviceType.label' | transloco
+    }}</mat-label>
+    <mat-select formControlName="type">
+      <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
+        {{ type.label }}
+      </mat-option>
+    </mat-select>
+    <fa-icon
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
+  </mat-form-field>
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>{{ 'services.controls.namespace.label' | transloco }}</mat-label>
+    <input matInput formControlName="name" />
+    <fa-icon
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="'services.controls.namespace.tooltip' | transloco" />
+  </mat-form-field>
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>{{ 'services.controls.label.label' | transloco }}</mat-label>
+    <input matInput formControlName="label" />
+    <fa-icon
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="'services.controls.label.tooltip' | transloco" />
+  </mat-form-field>
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>{{
+      'services.controls.description.label' | transloco
+    }}</mat-label>
+    <input matInput formControlName="description" />
+    <fa-icon
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="'services.controls.description.tooltip' | transloco" />
+  </mat-form-field>
+  <mat-slide-toggle formControlName="active">{{
+    'active' | transloco
+  }}</mat-slide-toggle>
+  <ng-container *ngIf="configSchema">
+    <ng-container formGroupName="config">
+      <mat-accordion class="full-width">
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>{{
+            'services.config' | transloco
+          }}</mat-expansion-panel-header>
+          <div class="details-form">
+            <ng-container *ngFor="let item of configSchema">
+              <df-dynamic-field
+                *ngIf="
+                  [
+                    'integer',
+                    'password',
+                    'string',
+                    'text',
+                    'picklist',
+                    'multi_picklist',
+                    'boolean',
+                    'file_certificate'
+                  ].includes(item.type)
+                "
+                [schema]="item"
+                [formControlName]="item.name"
+                [class.dynamic-width]="item.type !== 'file_certificate'"
+                [class.full-width]="
+                  item.type === 'file_certificate'
+                "></df-dynamic-field>
+              <df-array-field
+                *ngIf="item.type === 'array' || item.type === 'object'"
+                [schema]="item"
+                [formControlName]="item.name"
+                class="full-width"></df-array-field>
+            </ng-container>
+          </div>
+        </mat-expansion-panel>
+      </mat-accordion>
     </ng-container>
   </ng-container>
-</ng-template>
+</form>

@@ -15,12 +15,12 @@ import {
   CdkMenuItem,
   CdkMenuBar,
 } from '@angular/cdk/menu';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import {
   BASE_SERVICE_TOKEN,
   EVENT_SCRIPT_SERVICE_TOKEN,
   SCRIPTS_SERVICE_TOKEN,
-} from 'src/app/core/constants/tokens';
+} from 'src/app/shared/constants/tokens';
 import { ActivatedRoute } from '@angular/router';
 import { Service } from 'src/app/shared/types/service';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';

@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { Router, ActivatedRouteSnapshot } from '@angular/router';
 import { DfAuthService } from '../services/df-auth.service';
 import { catchError, map, of } from 'rxjs';
-import { ROUTES } from '../../core/constants/routes';
+import { ROUTES } from '../../shared/constants/routes';
 
 export const urlQueryLoginGuard = (next: ActivatedRouteSnapshot) => {
   const router = inject(Router);

@@ -19,9 +19,9 @@ import {
   TranslocoPipe,
   TranslocoService,
 } from '@ngneat/transloco';
-import { ROUTES } from 'src/app/core/constants/routes';
-import { CONFIG_CORS_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { ROUTES } from 'src/app/shared/constants/routes';
+import { CONFIG_CORS_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { CorsConfigData } from '../types';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { MatCheckboxModule } from '@angular/material/checkbox';

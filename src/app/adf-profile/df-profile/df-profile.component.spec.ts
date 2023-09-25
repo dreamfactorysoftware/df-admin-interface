@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@ngneat/transloco';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { DfSystemConfigDataService } from 'src/app/core/services/df-system-config-data.service';
+import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
+import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { DfProfileComponent } from './df-profile.component';
 import { DfProfileService } from '../services/df-profile.service';
 import { UserProfile } from 'src/app/shared/types/user';

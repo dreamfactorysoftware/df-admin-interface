@@ -7,8 +7,8 @@ import {
 import { takeUntil } from 'rxjs';
 import { Component, Inject } from '@angular/core';
 import { RoleRow, RoleType } from 'src/app/shared/types/role';
-import { ROLE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { ROLE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';

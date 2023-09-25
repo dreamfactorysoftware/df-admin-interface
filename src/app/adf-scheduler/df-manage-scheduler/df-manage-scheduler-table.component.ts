@@ -6,8 +6,8 @@ import {
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { takeUntil } from 'rxjs';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { SCHEDULER_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { SchedulerTaskData } from '../types/df-scheduler.types';
 import { MatDialog } from '@angular/material/dialog';
 import { Service } from 'src/app/shared/types/service';

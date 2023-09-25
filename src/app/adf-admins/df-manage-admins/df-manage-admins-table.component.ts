@@ -8,10 +8,10 @@ import {
 import { UserProfile, UserRow } from 'src/app/shared/types/user';
 import { takeUntil } from 'rxjs';
 import { saveRawAsFile } from 'src/app/shared/utilities/file';
-import { USER_COLUMNS } from 'src/app/core/constants/table-columns';
+import { USER_COLUMNS } from 'src/app/shared/constants/table-columns';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { ADMIN_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { ADMIN_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';

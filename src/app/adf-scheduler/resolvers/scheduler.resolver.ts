@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-import { SCHEDULER_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { SCHEDULER_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { SchedulerTaskData } from '../types/df-scheduler.types';
 
 export const schedulerResolver: ResolveFn<

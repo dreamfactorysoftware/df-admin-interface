@@ -3,16 +3,16 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 import { routes } from './app/routes';
 import { BrowserModule, bootstrapApplication } from '@angular/platform-browser';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { DfSystemConfigDataService } from './app/core/services/df-system-config-data.service';
+import { DfSystemConfigDataService } from './app/shared/services/df-system-config-data.service';
 import { APP_INITIALIZER, importProvidersFrom, isDevMode } from '@angular/core';
 import { provideRouter, withHashLocation } from '@angular/router';
-import { sessionTokenInterceptor } from './app/core/interceptors/session-token.interceptor';
-import { loadingInterceptor } from './app/core/interceptors/loading.interceptor';
-import { snackbarInterceptor } from './app/core/interceptors/snackbar.interceptor';
-import { caseInterceptor } from './app/core/interceptors/case.interceptor';
+import { sessionTokenInterceptor } from './app/shared/interceptors/session-token.interceptor';
+import { loadingInterceptor } from './app/shared/interceptors/loading.interceptor';
+import { snackbarInterceptor } from './app/shared/interceptors/snackbar.interceptor';
+import { caseInterceptor } from './app/shared/interceptors/case.interceptor';
 import { TranslocoHttpLoader } from './transloco-loader';
 import { provideTransloco } from '@ngneat/transloco';
-import { errorInterceptor } from './app/core/interceptors/error.interceptor';
+import { errorInterceptor } from './app/shared/interceptors/error.interceptor';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 
 function initEnvironment(systemConfigService: DfSystemConfigDataService) {

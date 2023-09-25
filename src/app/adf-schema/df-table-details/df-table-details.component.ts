@@ -14,9 +14,9 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { AsyncPipe, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfFieldsTableComponent } from './df-fields-table.component';
 import { DfRelationshipsTableComponent } from './df-relationships-table.component';
-import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { MatTabsModule } from '@angular/material/tabs';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 

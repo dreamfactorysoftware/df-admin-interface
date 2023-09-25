@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { URLS } from '../../core/constants/urls';
-import { SHOW_LOADING_HEADER } from 'src/app/core/constants/http-headers';
+import { URLS } from '../../shared/constants/urls';
+import { SHOW_LOADING_HEADER } from 'src/app/shared/constants/http-headers';
 
 @Injectable()
 export class DfAppsService {

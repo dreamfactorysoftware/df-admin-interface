@@ -5,8 +5,8 @@ import { faRotate } from '@fortawesome/free-solid-svg-icons';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTableModule } from '@angular/material/table';
 import { NgFor } from '@angular/common';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { CACHE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { CACHE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfCacheTableComponent } from './df-cache-table.component';
 
 @Component({

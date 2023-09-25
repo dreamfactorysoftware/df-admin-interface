@@ -5,8 +5,8 @@ import {
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { TranslocoService } from '@ngneat/transloco';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { takeUntil } from 'rxjs';

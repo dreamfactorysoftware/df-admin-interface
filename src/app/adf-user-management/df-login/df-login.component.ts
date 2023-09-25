@@ -7,13 +7,13 @@ import {
 } from '@angular/forms';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { DfAuthService } from '../services/df-auth.service';
-import { DfSystemConfigDataService } from '../../core/services/df-system-config-data.service';
+import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import {
   AlertType,
   DfAlertComponent,
 } from '../../shared/components/df-alert/df-alert.component';
 import { Router, RouterLink } from '@angular/router';
-import { ROUTES } from '../../core/constants/routes';
+import { ROUTES } from '../../shared/constants/routes';
 import { getIcon, iconExist } from '../../shared/utilities/icons';
 import { LoginCredentials } from '../types';
 

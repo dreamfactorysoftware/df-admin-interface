@@ -13,15 +13,15 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatButtonModule } from '@angular/material/button';
 import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { DfBreakpointService } from '../../core/services/df-breakpoint.service';
+import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
 import {
   EmailTemplate,
   EmailTemplatePayload,
 } from '../df-email-templates/df-email-templates.types';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { Subject, takeUntil } from 'rxjs';
-import { ROUTES } from 'src/app/core/constants/routes';
-import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { ROUTES } from 'src/app/shared/constants/routes';
+import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 
 @Component({
   selector: 'df-email-template-details',

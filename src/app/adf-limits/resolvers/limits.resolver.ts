@@ -2,7 +2,7 @@ import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { inject } from '@angular/core';
 import { LimitType } from 'src/app/shared/types/limit';
-import { LIMIT_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { LIMIT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 
 export const limitsResolver =
   (limit?: number): ResolveFn<GenericListResponse<LimitType> | LimitType> =>

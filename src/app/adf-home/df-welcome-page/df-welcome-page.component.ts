@@ -5,7 +5,7 @@ import {
   nativeExampleLinks,
   welcomePageResources,
 } from '../constants';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
+import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
 
 import { DfIconCardLinkComponent } from '../df-icon-card-link/df-icon-card-link.component';
 import { MatDividerModule } from '@angular/material/divider';

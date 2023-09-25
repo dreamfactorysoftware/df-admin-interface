@@ -6,7 +6,7 @@ import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { Validators } from '@angular/forms';
-import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
+import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 import {
   CREATE_ACTIVATED_ROUTE,
   EDIT_ACTIVATED_ROUTE,

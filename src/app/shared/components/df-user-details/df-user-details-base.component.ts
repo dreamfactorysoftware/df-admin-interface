@@ -8,13 +8,13 @@ import {
 } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { AlertType } from '../df-alert/df-alert.component';
-import { DfSystemConfigDataService } from 'src/app/core/services/df-system-config-data.service';
+import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { ActivatedRoute } from '@angular/router';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
+import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
 import { matchValidator } from '../../validators/match.validator';
 import { MatCheckboxChange } from '@angular/material/checkbox';
 import { UserProfileType } from '../../types/user';
-import { ROUTES } from 'src/app/core/constants/routes';
+import { ROUTES } from 'src/app/shared/constants/routes';
 import { uniqueNameValidator } from '../../validators/unique-name.validator';
 import { AppType } from 'src/app/adf-apps/types/df-apps.types';
 import { RoleType } from '../../types/role';

@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { ROUTES } from '../core/constants/routes';
+import { ROUTES } from '../shared/constants/routes';
 import {
   serviceResolver,
   servicesResolver,

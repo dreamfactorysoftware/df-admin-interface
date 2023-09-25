@@ -1,5 +1,5 @@
 import { Component, ViewChild } from '@angular/core';
-import { EXPORT_TYPES } from 'src/app/core/constants/supported-extensions';
+import { EXPORT_TYPES } from 'src/app/shared/constants/supported-extensions';
 import { DfManageUsersTableComponent } from './df-manage-users-table.component';
 
 import { NgFor, UpperCasePipe } from '@angular/common';

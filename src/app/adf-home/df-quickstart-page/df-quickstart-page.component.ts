@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { javaScriptExampleLinks, nativeExampleLinks } from '../constants';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
+import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
 
 import { DfIconCardLinkComponent } from '../df-icon-card-link/df-icon-card-link.component';
 import { NgFor, AsyncPipe } from '@angular/common';

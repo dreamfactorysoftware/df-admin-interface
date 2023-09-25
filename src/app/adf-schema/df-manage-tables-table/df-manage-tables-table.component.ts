@@ -9,8 +9,8 @@ import { DatabaseTableRowData } from '../df-schema.types';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
 import { takeUntil } from 'rxjs';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
-import { BASE_SERVICE_TOKEN } from 'src/app/core/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
