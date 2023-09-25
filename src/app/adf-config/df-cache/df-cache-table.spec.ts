@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { DfCacheComponent } from './df-cache.component';
+import { DfCacheTableComponent } from './df-cache-table.component';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
@@ -22,14 +22,14 @@ const ACTIVATED_ROUTE_DATA = {
   },
 };
 
-describe('DfCacheComponent', () => {
-  let component: DfCacheComponent;
-  let fixture: ComponentFixture<DfCacheComponent>;
+describe('DfCacheTableComponent', () => {
+  let component: DfCacheTableComponent;
+  let fixture: ComponentFixture<DfCacheTableComponent>;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [
-        DfCacheComponent,
+        DfCacheTableComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
       ],
@@ -58,13 +58,8 @@ describe('DfCacheComponent', () => {
         ...CACHE_SERVICE_PROVIDERS,
       ],
     });
-    fixture = TestBed.createComponent(DfCacheComponent);
+    fixture = TestBed.createComponent(DfCacheTableComponent);
     component = fixture.componentInstance;
-    fixture.detectChanges();
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
     fixture.detectChanges();
   });
 
@@ -72,10 +67,9 @@ describe('DfCacheComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('calls the service to clear cache', () => {
+  it('should flush system cache', () => {
     const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'delete');
-    component.flushSystemCache();
-    fixture.detectChanges();
+    component.clearCache({ name: 'system', label: 'System Management' });
     expect(crudServiceSpy).toHaveBeenCalled();
   });
 });

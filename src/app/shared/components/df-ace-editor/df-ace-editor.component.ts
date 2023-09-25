@@ -57,6 +57,7 @@ export class DfAceEditorComponent
       highlightActiveLine: true,
       tabSize: 2,
       readOnly: this.readonly,
+      maxLines: 50,
     });
     this.editor.renderer.attachToShadowRoot();
     this.editor.addEventListener('change', () => {
@@ -75,6 +76,6 @@ export class DfAceEditorComponent
   }
 
   ngOnDestroy(): void {
-    this.editor.destroy();
+    if (this.editor) this.editor.destroy();
   }
 }

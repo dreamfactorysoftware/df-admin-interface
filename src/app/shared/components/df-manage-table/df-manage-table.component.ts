@@ -265,8 +265,8 @@ export abstract class DfManageTableComponent<T>
   isClickable(row: T) {
     return (
       this.actions.default &&
-      this.actions.default.disabled &&
-      !this.actions.default.disabled(row)
+      ((this.actions.default.disabled && !this.actions.default.disabled(row)) ||
+        !this.actions.default.disabled)
     );
   }
 

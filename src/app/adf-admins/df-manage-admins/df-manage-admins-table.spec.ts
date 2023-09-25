@@ -1,35 +1,21 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
-import { DfCacheComponent } from './df-cache.component';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { CACHE_SERVICE_PROVIDERS } from 'src/app/core/constants/providers';
+import { ADMIN_SERVICE_PROVIDERS } from 'src/app/core/constants/providers';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { DfBaseCrudService } from '../../core/services/df-base-crud.service';
+import { DfManageAdminsTableComponent } from './df-manage-admins-table.component';
 
-const ACTIVATED_ROUTE_DATA = {
-  data: {
-    resource: [
-      {
-        name: 'system',
-        label: 'System Management',
-        description: 'Service for managing system resources.',
-        type: 'system',
-      },
-    ],
-  },
-};
-
-describe('DfCacheComponent', () => {
-  let component: DfCacheComponent;
-  let fixture: ComponentFixture<DfCacheComponent>;
+describe('DfManageAdminsTableComponent', () => {
+  let component: DfManageAdminsTableComponent;
+  let fixture: ComponentFixture<DfManageAdminsTableComponent>;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [
-        DfCacheComponent,
+        DfManageAdminsTableComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
       ],
@@ -48,34 +34,44 @@ describe('DfCacheComponent', () => {
             data: {
               pipe: () => {
                 return {
-                  subscribe: (fn: (value: any) => void) =>
-                    fn(ACTIVATED_ROUTE_DATA),
+                  subscribe: (fn: (value: any) => void) => fn({}),
                 };
               },
             },
           },
         },
-        ...CACHE_SERVICE_PROVIDERS,
+        ...ADMIN_SERVICE_PROVIDERS,
       ],
     });
-    fixture = TestBed.createComponent(DfCacheComponent);
+    fixture = TestBed.createComponent(DfManageAdminsTableComponent);
     component = fixture.componentInstance;
-    fixture.detectChanges();
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
-    fixture.detectChanges();
+    // fixture.detectChanges();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  it('calls the service to clear cache', () => {
-    const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'delete');
-    component.flushSystemCache();
-    fixture.detectChanges();
+  it('should call exportList', () => {
+    const crudServiceSpy = jest.spyOn(
+      DfBaseCrudService.prototype,
+      'exportList'
+    );
+    component.downloadAdminList('JSON');
+    expect(crudServiceSpy).toHaveBeenCalled();
+  });
+
+  it('should call adminService.importList with the correct parameters', () => {
+    const crudServiceSpy = jest.spyOn(
+      DfBaseCrudService.prototype,
+      'importList'
+    );
+
+    const file = new File(['content'], 'filename.txt', { type: 'text/plain' });
+    const files = { 0: file, length: 1 } as unknown as FileList;
+
+    component.uploadAdminList(files);
+
     expect(crudServiceSpy).toHaveBeenCalled();
   });
 });

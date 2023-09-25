@@ -31,19 +31,16 @@ import {
   SERVICE_TYPE_SERVICE_PROVIDERS,
   BASE_SERVICE_PROVIDERS,
   SERVICE_SERVICE_PROVIDERS,
-  FILE_SERVICE_PROVIDERS,
   SCRIPTS_SERVICE_PROVIDERS,
   SCRIPT_TYPE_SERVICE_PROVIDERS,
   EVENT_SCRIPT_SERVICE_PROVIDERS,
   GITHUB_REPO_SERVICE_PROVIDERS,
   SERVICES_SERVICE_PROVIDERS,
-  LOGS_SERVICE_PROVIDERS,
 } from './core/constants/providers';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
 import { DfPasswordService } from './adf-user-management/services/df-password.service';
 import { profileResolver } from './adf-profile/resolvers/profile.resolver';
-import { DfPlaceHolderComponent } from './shared/components/df-placeholder/df-placeholder.component';
 import { corsConfigResolver } from './adf-config/resolvers/df-cors-config.resolver';
 import { schedulerResolver } from './adf-scheduler/resolvers/scheduler.resolver';
 import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
@@ -390,6 +387,7 @@ export const routes: Routes = [
                   import(
                     './adf-config/df-cors/df-cors-config-details.component'
                   ).then(m => m.DfCorsConfigDetailsComponent),
+                data: { type: 'create' },
               },
               {
                 path: ':id',
@@ -400,6 +398,7 @@ export const routes: Routes = [
                 resolve: {
                   data: corsConfigResolver,
                 },
+                data: { type: 'edit' },
               },
             ],
             providers: [
@@ -515,7 +514,15 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.LOGS,
-        component: DfPlaceHolderComponent,
+        children: ServiceRoutes,
+        data: {
+          groups: ['Log'],
+        },
+        providers: [
+          ...SERVICE_SERVICE_PROVIDERS,
+          ...SERVICE_TYPE_SERVICE_PROVIDERS,
+          provideTranslocoScope('services'),
+        ],
       },
       {
         path: ROUTES.REPORTING,
@@ -699,6 +706,7 @@ export const routes: Routes = [
         ],
         data: {
           groups: ['Database'],
+          system: false,
         },
       },
       {
@@ -819,10 +827,5 @@ export const routes: Routes = [
       DfPasswordService,
       provideTranslocoScope('userManagement'),
     ],
-  },
-  {
-    path: ROUTES.LAUNCHPAD,
-    component: DfPlaceHolderComponent,
-    canActivate: [loggedInGuard],
   },
 ];

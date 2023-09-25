@@ -4,7 +4,10 @@
   [class.logged-in]="isLoggedIn$ | async">
   <ng-container *ngIf="isLoggedIn$ | async">
     <mat-toolbar>
-      <button mat-icon-button (click)="sideNav.toggle()">
+      <button
+        mat-icon-button
+        (click)="sideNav.toggle()"
+        [attr.aria-label]="'toggleNav' | transloco">
         <fa-icon [icon]="faBars"></fa-icon>
       </button>
       <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />

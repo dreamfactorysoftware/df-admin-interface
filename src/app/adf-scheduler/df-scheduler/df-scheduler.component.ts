@@ -25,6 +25,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { Service } from 'src/app/shared/types/service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
+import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
 
 @Component({
   selector: 'df-scheduler',
@@ -44,6 +45,7 @@ import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df
     TranslocoPipe,
     ReactiveFormsModule,
     DfAceEditorComponent,
+    DfVerbPickerComponent,
   ],
 })
 export class DfSchedulerComponent implements OnInit, OnDestroy {
@@ -58,29 +60,6 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
 
   scheduleToEdit: SchedulerTaskData | undefined;
   log = '';
-
-  verbDropdownOptions = [
-    {
-      value: 'GET',
-      name: 'verbs.get',
-    },
-    {
-      value: 'POST',
-      name: 'verbs.post',
-    },
-    {
-      value: 'PUT',
-      name: 'verbs.put',
-    },
-    {
-      value: 'PATCH',
-      name: 'verbs.patch',
-    },
-    {
-      value: 'DELETE',
-      name: 'verbs.delete',
-    },
-  ];
 
   constructor(
     @Inject(SCHEDULER_SERVICE_TOKEN)
@@ -99,7 +78,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
       active: [true, Validators.required],
       serviceId: ['', Validators.required],
       component: ['', Validators.required],
-      method: [this.verbDropdownOptions[0].value, Validators.required],
+      method: ['GET', Validators.required],
       frequency: [],
     });
     this.activatedRoute.data
@@ -108,33 +87,31 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
         this.userServicesDropdownOptions = data.data.resource;
       });
 
-    const id = this.activatedRoute.snapshot.paramMap.get('id');
+    this.activatedRoute.data
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe((data: any) => {
+        this.scheduleToEdit = data.schedulerObject;
 
-    if (id) {
-      this.activatedRoute.data
-        .pipe(takeUntil(this.destroyed$))
-        .subscribe((data: any) => {
-          this.scheduleToEdit = data.schedulerObject;
+        if (this.scheduleToEdit) {
+          this.log = this.scheduleToEdit.taskLogByTaskId?.content ?? '';
 
-          this.log = this.scheduleToEdit?.taskLogByTaskId?.content ?? '';
-
-          this.getServiceAccessList(this.scheduleToEdit?.serviceId as number);
+          this.getServiceAccessList(this.scheduleToEdit.serviceId as number);
 
           this.formGroup.setValue({
-            name: this.scheduleToEdit?.name,
-            description: this.scheduleToEdit?.description,
-            active: this.scheduleToEdit?.isActive,
-            serviceId: this.scheduleToEdit?.serviceId,
-            component: this.scheduleToEdit?.component,
-            method: this.scheduleToEdit?.verb,
-            frequency: this.scheduleToEdit?.frequency,
+            name: this.scheduleToEdit.name,
+            description: this.scheduleToEdit.description,
+            active: this.scheduleToEdit.isActive,
+            serviceId: this.scheduleToEdit.serviceId,
+            component: this.scheduleToEdit.component,
+            method: this.scheduleToEdit.verb,
+            frequency: this.scheduleToEdit.frequency,
           });
 
-          if (this.scheduleToEdit?.verb !== 'GET') {
-            this.addPayloadField(this.scheduleToEdit?.payload as string);
+          if (this.scheduleToEdit.verb !== 'GET') {
+            this.addPayloadField(this.scheduleToEdit.payload as string);
           }
-        });
-    }
+        }
+      });
 
     this.formGroup
       .get('method')
@@ -282,19 +259,17 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
       };
 
       if (this.scheduleToEdit) {
-        // edit mode
         return {
-          lastModifiedDate: this.scheduleToEdit?.lastModifiedDate as string,
-          lastModifiedById: this.scheduleToEdit?.lastModifiedById as number,
+          lastModifiedDate: this.scheduleToEdit.lastModifiedDate as string,
+          lastModifiedById: this.scheduleToEdit.lastModifiedById as number,
           hasLog: !!this.scheduleToEdit.taskLogByTaskId,
-          createdDate: this.scheduleToEdit?.createdDate as string,
-          createdById: this.scheduleToEdit?.createdById as number,
+          createdDate: this.scheduleToEdit.createdDate as string,
+          createdById: this.scheduleToEdit.createdById as number,
           id: this.scheduleToEdit.id,
           ...payload,
         } as UpdateSchedulePayload;
       }
 
-      // create mode
       return { ...payload, id: null } as CreateSchedulePayload;
     }
 

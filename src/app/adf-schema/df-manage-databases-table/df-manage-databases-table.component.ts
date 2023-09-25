@@ -10,7 +10,7 @@ import { DatabaseRowData } from '../df-schema.types';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
 import { takeUntil } from 'rxjs';
-import { Service, ServiceType } from '../../shared/types/service';
+import { Service } from '../../shared/types/service';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 
 @Component({
@@ -59,27 +59,26 @@ export class DfManageDatabasesTableComponent extends DfManageTableComponent<Data
     additional: null,
   };
 
-  // TODO: update the header names with translation below
   override columns = [
     {
       columnDef: 'name',
       cell: (row: DatabaseRowData) => row.name,
-      header: 'Name',
+      header: 'name',
     },
     {
       columnDef: 'description',
       cell: (row: DatabaseRowData) => row.description,
-      header: 'Description',
+      header: 'description',
     },
     {
       columnDef: 'label',
       cell: (row: DatabaseRowData) => row.label,
-      header: 'Label',
+      header: 'label',
     },
     {
       columnDef: 'type',
       cell: (row: DatabaseRowData) => row.type,
-      header: 'Type',
+      header: 'type',
     },
     {
       columnDef: 'actions',

@@ -18,6 +18,7 @@ import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { TableField } from '../df-table-details/df-table-details.types';
+import { Service } from 'src/app/shared/types/service';
 
 interface BasicOption {
   label: string;
@@ -132,10 +133,7 @@ export class DfRelationshipDetailsComponent implements OnInit, OnDestroy {
           };
         });
 
-        this.serviceOptions = this.filterDbs(
-          data['services'].resource,
-          data['serviceTypes'].resource
-        ).map(item => {
+        this.serviceOptions = data['services'].resource.map((item: Service) => {
           return { label: item.label, value: item.id, name: item.name };
         });
 
@@ -222,18 +220,6 @@ export class DfRelationshipDetailsComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroyed$.next();
     this.destroyed$.complete();
-  }
-
-  filterDbs(services: any[], serviceTypes: any[]): any[] {
-    const databaseServices = serviceTypes.filter(val => {
-      return val.group?.toLowerCase() === 'database';
-    });
-
-    return services.filter(val => {
-      return databaseServices.some(databaseService => {
-        return databaseService.name === val.type;
-      });
-    });
   }
 
   getServiceName(serviceId: number) {

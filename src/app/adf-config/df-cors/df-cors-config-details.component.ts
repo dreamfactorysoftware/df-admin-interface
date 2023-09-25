@@ -25,6 +25,7 @@ import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
 import { CorsConfigData } from '../types';
 import { Subject, catchError, takeUntil, throwError } from 'rxjs';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
 
 @Component({
   selector: 'df-cors-config-details',
@@ -45,6 +46,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
     MatButtonModule,
     TranslocoDirective,
     TranslocoPipe,
+    DfVerbPickerComponent,
   ],
 })
 export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
@@ -53,29 +55,7 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   corsConfigToEdit: CorsConfigData | undefined;
   @ViewChild('select') select: MatSelect;
   allMethodsSelected = false;
-
-  verbDropdownOptions = [
-    {
-      value: 'GET',
-      name: 'verbs.get',
-    },
-    {
-      value: 'POST',
-      name: 'verbs.post',
-    },
-    {
-      value: 'PUT',
-      name: 'verbs.put',
-    },
-    {
-      value: 'PATCH',
-      name: 'verbs.patch',
-    },
-    {
-      value: 'DELETE',
-      name: 'verbs.delete',
-    },
-  ];
+  type = 'create';
 
   constructor(
     @Inject(CONFIG_CORS_SERVICE_TOKEN)
@@ -99,20 +79,19 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    const id = this.activatedRoute.snapshot.paramMap.get('id');
-
-    if (id) {
-      this.activatedRoute.data
-        .pipe(
-          takeUntil(this.destroyed$),
-          catchError(error => {
-            this.router.navigate([
-              `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
-            ]);
-            return throwError(() => new Error(error));
-          })
-        )
-        .subscribe(data => {
+    this.activatedRoute.data
+      .pipe(
+        takeUntil(this.destroyed$),
+        catchError(error => {
+          this.router.navigate([
+            `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
+          ]);
+          return throwError(() => new Error(error));
+        })
+      )
+      .subscribe(data => {
+        this.type = data['type'];
+        if (this.type === 'edit') {
           this.corsConfigToEdit = data['data'] as CorsConfigData;
           this.corsForm.setValue({
             path: this.corsConfigToEdit.path,
@@ -128,8 +107,8 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
 
           if (this.corsConfigToEdit.method.length === 5)
             this.allMethodsSelected = true;
-        });
-    }
+        }
+      });
   }
 
   ngOnDestroy(): void {

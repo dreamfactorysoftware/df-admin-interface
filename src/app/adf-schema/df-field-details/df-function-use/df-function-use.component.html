@@ -3,6 +3,7 @@
     <mat-expansion-panel>
       <mat-expansion-panel-header>
         <mat-panel-title> DB Function Use</mat-panel-title>
+        <!-- TODO translations -->
         <mat-panel-description
           >Assign Database Function To Uses Of This Field
         </mat-panel-description>
@@ -56,8 +57,12 @@
                 <fa-icon [icon]="faPlus" size="xl"></fa-icon>
               </button>
             </mat-header-cell>
-            <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
-              <button mat-icon-button (click)="remove(i)" type="button">
+            <mat-cell *matCellDef="let row; let i = index">
+              <button
+                mat-icon-button
+                (click)="remove(i)"
+                type="button"
+                [attr.aria-label]="'deleteRow' | transloco: { id: i }">
                 <fa-icon [icon]="faTrashCan" size="xs"></fa-icon>
               </button>
             </mat-cell>

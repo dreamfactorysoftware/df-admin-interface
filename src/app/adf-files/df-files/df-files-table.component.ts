@@ -138,27 +138,16 @@ export class DfFilesTableComponent extends DfManageTableComponent<FileTableRow> 
 
   override deleteRow(row: FileTableRow): void {
     this.crudService
-      .create(
-        { resource: [] },
-        {
-          additionalHeaders: [{ key: 'X-Http-Method', value: 'DELETE' }],
-          snackbarSuccess: 'files.alerts.deleteFolderSuccess',
-        },
-        `${this.type}/${row.path}?force=true`
-      )
+      .legacyDelete(`${this.type}/${row.path}`, {
+        additionalParams: [{ key: 'force', value: 'true' }],
+      })
       .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
         this.refreshTable(0);
       });
-
-    // TODO: implement error handling
-    //  this.triggerAlert
   }
 
   uploadFile(files: FileList) {
-    const route = decodeURIComponent(
-      this._activatedRoute.snapshot.url.toString()
-    );
     this.crudService
       .uploadFile(`files/${this.path}`, files, {
         snackbarSuccess: 'files.alerts.uploadSuccess',

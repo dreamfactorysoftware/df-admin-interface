@@ -27,14 +27,19 @@
           [attr.aria-label]="'selectAnOption' | transloco"
           formControlName="pass-invite"
           class="pass-invite">
-          <mat-radio-button value="invite">{{
+          <mat-radio-button class="userform-invite-radio-btn" value="invite">{{
             'userManagement.controls.sendInvite.label' | transloco
           }}</mat-radio-button>
-          <mat-radio-button value="password">{{
-            'userManagement.controls.setPassword.label' | transloco
-          }}</mat-radio-button>
+          <mat-radio-button
+            class="userform-password-radio-btn"
+            value="password"
+            >{{
+              'userManagement.controls.setPassword.label' | transloco
+            }}</mat-radio-button
+          >
         </mat-radio-group>
       </ng-container>
+      <!-- // TODO missing translation -->
       <ng-template #editMode
         ><span>Confirmed: {{ currentProfile.confirmed ? 'Yes' : 'No' }}</span>
         <button
@@ -44,9 +49,11 @@
           *ngIf="!currentProfile.confirmed">
           Send Invite <fa-icon [icon]="faEnvelope"></fa-icon>
         </button>
-        <mat-checkbox formControlName="setPassword"
-          >{{ 'userManagement.controls.setPassword.label' | transloco }}
-        </mat-checkbox>
+        <ng-container *ngIf="userForm.contains('setPassword')">
+          <mat-checkbox formControlName="setPassword"
+            >{{ 'userManagement.controls.setPassword.label' | transloco }}
+          </mat-checkbox>
+        </ng-container>
       </ng-template>
       <ng-container
         *ngIf="
@@ -57,7 +64,11 @@
           <mat-label>{{
             'userManagement.controls.password.label' | transloco
           }}</mat-label>
-          <input matInput type="password" formControlName="password" />
+          <input
+            matInput
+            class="user-details-set-password"
+            type="password"
+            formControlName="password" />
           <mat-error *ngIf="userForm.get('password')?.errors?.['required']">
             {{ 'userManagement.controls.password.errors.required' | transloco }}
           </mat-error>
@@ -70,7 +81,11 @@
             'userManagement.controls.confirmPassword.label' | transloco
           }}</mat-label>
 
-          <input matInput type="password" formControlName="confirmPassword" />
+          <input
+            matInput
+            class="user-details-confirm-password"
+            type="password"
+            formControlName="confirmPassword" />
           <mat-error
             *ngIf="userForm.get('confirmPassword')?.hasError('doesNotMatch')">
             {{

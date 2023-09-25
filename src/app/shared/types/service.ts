@@ -19,7 +19,8 @@ export interface ConfigSchema {
     | 'array'
     | 'picklist'
     | 'multi_picklist'
-    | 'file_certificate';
+    | 'file_certificate'
+    | 'verb_mask';
   description?: string;
   alias: string;
   native?: any[];
@@ -47,7 +48,7 @@ export interface ConfigSchema {
     key: LabelType;
     value: LabelType;
   };
-  items: Array<ConfigSchema>;
+  items: Array<ConfigSchema> | 'string';
   values?: any[];
   dbType?: string;
   autoIncrement?: boolean;

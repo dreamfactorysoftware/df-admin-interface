@@ -68,12 +68,12 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
       }
     }
     .main {
-      height: 100%;
+      // height: 100%;
       flex-grow: 1;
       &.no-error {
         .logged-in & {
-          margin: -60px 32px 0 32px;
-          padding: 32px 32px 0 32px;
+          margin: -60px 16px 0 16px;
+          padding: 16px 24px;
           background-color: white;
         }
         .logged-in.small & {
