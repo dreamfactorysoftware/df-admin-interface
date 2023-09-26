@@ -51,6 +51,7 @@ export class DfFilesComponent {
     const input = event.target as HTMLInputElement;
     if (input.files) {
       this.filesTable.uploadFile(input.files);
+      this.filesTable.refreshTable();
     }
   }
 
