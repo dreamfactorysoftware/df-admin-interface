@@ -1,48 +1,44 @@
-<div class="roles-container">
-  <form [formGroup]="roleForm" (ngSubmit)="onSubmit()" class="form-container">
-    <h2>{{ 'roles.rolesOverview.heading' | transloco }}</h2>
-    <p>
-      {{ 'roles.rolesOverview.description' | transloco }}
-    </p>
+<p>
+  {{ 'roles.rolesOverview.description' | transloco }}
+</p>
+<!-- TODO add error banner -->
+<form [formGroup]="roleForm" (ngSubmit)="onSubmit()" class="details-form">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>{{ 'name' | transloco }}</mat-label>
+    <input matInput formControlName="name" required />
+    <mat-error *ngIf="roleForm.controls['name'].hasError('required')">
+      {{ 'roles.rolesOverview.error.name' | transloco }}
+    </mat-error>
+  </mat-form-field>
+  <mat-slide-toggle formControlName="active" class="dynamic-width">{{
+    'active' | transloco
+  }}</mat-slide-toggle>
+  <mat-form-field subscriptSizing="dynamic">
+    <mat-label>{{ 'description' | transloco }}</mat-label>
+    <textarea rows="1" matInput formControlName="description"></textarea>
+  </mat-form-field>
 
-    <div class="role-overview">
-      <mat-form-field>
-        <mat-label>{{ 'name' | transloco }}</mat-label>
-        <input matInput formControlName="name" required />
-        <mat-error *ngIf="roleForm.controls['name'].hasError('required')">
-          {{ 'roles.rolesOverview.error.name' | transloco }}
-        </mat-error>
-      </mat-form-field>
-      <mat-form-field>
-        <mat-label>{{ 'description' | transloco }}</mat-label>
-        <input matInput formControlName="description" />
-      </mat-form-field>
-      <mat-slide-toggle formControlName="active">{{
-        'active' | transloco
-      }}</mat-slide-toggle>
-    </div>
+  <df-roles-access
+    formArrayName="serviceAccess"
+    class="full-width"></df-roles-access>
 
-    <df-roles-access formArrayName="serviceAccess"></df-roles-access>
+  <p>
+    {{ 'roles.lookupKeys.description' | transloco }}
+  </p>
 
-    <br />
-    <h2>{{ 'roles.lookupKeys.heading' | transloco }}</h2>
-    <p>
-      {{ 'roles.lookupKeys.description' | transloco }}
-    </p>
+  <df-lookup-keys
+    formArrayName="lookupKeys"
+    class="full-width"></df-lookup-keys>
 
-    <df-lookup-keys formArrayName="lookupKeys"></df-lookup-keys>
-
-    <mat-divider></mat-divider>
-    <button mat-raised-button color="primary" type="submit">
-      <span *ngIf="type === 'create'">
-        {{ 'save' | transloco }}
-      </span>
-      <span *ngIf="type === 'edit'">
-        {{ 'update' | transloco }}
-      </span>
-    </button>
-    <button mat-flat-button type="button" (click)="goBack()">
-      {{ 'cancel' | transloco }}
-    </button>
-  </form>
-</div>
+  <button mat-raised-button color="primary" type="submit">
+    <span *ngIf="type === 'create'">
+      {{ 'save' | transloco }}
+    </span>
+    <span *ngIf="type === 'edit'">
+      {{ 'update' | transloco }}
+    </span>
+  </button>
+  <button mat-flat-button type="button" (click)="goBack()">
+    {{ 'cancel' | transloco }}
+  </button>
+</form>

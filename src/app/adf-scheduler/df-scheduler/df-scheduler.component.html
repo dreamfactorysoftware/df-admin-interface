@@ -1,24 +1,27 @@
+<!-- TODO add error banner -->
+<!-- TODO change to scheduler-details -->
 <mat-tab-group dynamicHeight mat-stretch-tabs="false" mat-align-tabs="start">
   <mat-tab label="Basic">
     <h4>{{ 'scheduler.taskOverviewSubtitle' | transloco }}</h4>
-    <form [formGroup]="formGroup" (ngSubmit)="onSubmit()">
-      <mat-form-field>
+    <form [formGroup]="formGroup" (ngSubmit)="onSubmit()" class="details-form">
+      <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
         <mat-label>{{ 'scheduler.form.label.name' | transloco }}</mat-label>
         <input matInput placeholder="Name" formControlName="name" />
       </mat-form-field>
-      <mat-form-field>
+      <mat-slide-toggle formControlName="active" class="dynamic-width">{{
+        'scheduler.form.label.active' | transloco
+      }}</mat-slide-toggle>
+      <mat-form-field subscriptSizing="dynamic" class="full-width">
         <mat-label>{{
           'scheduler.form.label.description' | transloco
         }}</mat-label>
-        <input
+        <textarea
+          rows="1"
           matInput
           placeholder="Description"
-          formControlName="description" />
+          formControlName="description"></textarea>
       </mat-form-field>
-      <mat-slide-toggle formControlName="active">{{
-        'scheduler.form.label.active' | transloco
-      }}</mat-slide-toggle>
-      <mat-form-field>
+      <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
         <mat-label>{{ 'scheduler.form.label.service' | transloco }}</mat-label>
         <mat-select formControlName="serviceId">
           <mat-option
@@ -28,7 +31,10 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
-      <mat-form-field *ngIf="componentDropdownOptions.length">
+      <mat-form-field
+        subscriptSizing="dynamic"
+        *ngIf="componentDropdownOptions.length"
+        class="dynamic-width">
         <mat-label>{{
           'scheduler.form.label.component' | transloco
         }}</mat-label>
@@ -40,25 +46,27 @@
           >
         </mat-select>
       </mat-form-field>
-      <df-verb-picker
-        formControlName="method"
-        [schema]="{
-          label: 'scheduler.form.label.method' | transloco
-        }"></df-verb-picker>
-      <mat-form-field>
+
+      <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
         <mat-label>{{
           'scheduler.form.label.frequency' | transloco
         }}</mat-label>
         <input matInput type="number" formControlName="frequency" />
       </mat-form-field>
       <ng-container *ngIf="this.formGroup.controls['payload']">
-        <mat-form-field>
+        <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
           <mat-label>{{
             'scheduler.form.label.payload' | transloco
           }}</mat-label>
-          <textarea matInput formControlName="payload"></textarea>
+          <textarea rows="1" matInput formControlName="payload"></textarea>
         </mat-form-field>
       </ng-container>
+      <df-verb-picker
+        class="dynamic-width"
+        formControlName="method"
+        [schema]="{
+          label: 'scheduler.form.label.method' | transloco
+        }"></df-verb-picker>
       <div>
         <button mat-raised-button (click)="onCancel()">
           {{ 'cancel' | transloco }}

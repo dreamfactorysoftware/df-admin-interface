@@ -36,7 +36,6 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 @Component({
   selector: 'df-app-details',
   templateUrl: './df-app-details.component.html',
-  styleUrls: ['./df-app-details.component.scss'],
   standalone: true,
   imports: [
     ReactiveFormsModule,

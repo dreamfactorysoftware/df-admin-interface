@@ -1,3 +1,4 @@
+<!-- TODO add error banner -->
 <div
   class="email-template-details-container"
   [class.x-small]="breakpointService.isXSmallScreen | async">
@@ -49,7 +50,7 @@
       <input matInput formControlName="bcc" />
     </mat-form-field>
 
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{ 'emailTemplates.subject.label' | transloco }}</mat-label>
       <input
         matInput
@@ -57,7 +58,7 @@
         placeholder="{{ 'emailTemplates.subject.placeholder' | transloco }}" />
     </mat-form-field>
 
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{ 'emailTemplates.attachment.label' | transloco }}</mat-label>
       <input
         matInput
@@ -67,9 +68,10 @@
         }}" />
     </mat-form-field>
 
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{ 'emailTemplates.body' | transloco }}</mat-label>
       <textarea
+        rows="1"
         matInput
         formControlName="body"
         class="email-template-body"></textarea>

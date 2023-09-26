@@ -33,11 +33,11 @@
       [icon]="faCircleInfo"
       [matTooltip]="'services.controls.label.tooltip' | transloco" />
   </mat-form-field>
-  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+  <mat-form-field subscriptSizing="dynamic" class="full-width">
     <mat-label>{{
       'services.controls.description.label' | transloco
     }}</mat-label>
-    <input matInput formControlName="description" />
+    <textarea rows="1" matInput formControlName="description"></textarea>
     <fa-icon
       class="tool-tip-trigger"
       matSuffix

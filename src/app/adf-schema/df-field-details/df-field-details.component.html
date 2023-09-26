@@ -1,6 +1,6 @@
 <div>
   <form [formGroup]="fieldDetailsForm">
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.name' | transloco
       }}</mat-label>
@@ -13,13 +13,13 @@
         {{ 'schema.fieldDetailsForm.errors.name' | transloco }}
       </mat-error>
     </mat-form-field>
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.alias' | transloco
       }}</mat-label>
       <input matInput formControlName="alias" />
     </mat-form-field>
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.label' | transloco
       }}</mat-label>
@@ -33,7 +33,7 @@
         'schema.fieldDetailsForm.controls.isAggregate' | transloco
       }}</mat-slide-toggle>
     </div>
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.type' | transloco
       }}</mat-label>
@@ -45,25 +45,25 @@
         </mat-option>
       </mat-select>
     </mat-form-field>
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.databaseType' | transloco
       }}</mat-label>
       <input matInput formControlName="dbType" />
     </mat-form-field>
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.length' | transloco
       }}</mat-label>
       <input type="number" matInput formControlName="length" />
     </mat-form-field>
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.precision' | transloco
       }}</mat-label>
       <input type="number" matInput formControlName="precision" />
     </mat-form-field>
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.scale' | transloco
       }}</mat-label>
@@ -83,7 +83,7 @@
         'schema.fieldDetailsForm.controls.autoIncrement' | transloco
       }}</mat-slide-toggle>
     </div>
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.defaultValue' | transloco
       }}</mat-label>
@@ -103,7 +103,7 @@
         'schema.fieldDetailsForm.controls.isForeignKey' | transloco
       }}</mat-slide-toggle>
     </div>
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.refTable' | transloco
       }}</mat-label>
@@ -115,7 +115,7 @@
         </mat-option>
       </mat-select>
     </mat-form-field>
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.refField' | transloco
       }}</mat-label>
@@ -127,7 +127,7 @@
         >
       </mat-select>
     </mat-form-field>
-    <mat-form-field>
+    <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.validation' | transloco
       }}</mat-label>
@@ -146,7 +146,7 @@
     </mat-form-field>
     <df-function-use formArrayName="dbFunction"></df-function-use>
     <ng-container *ngIf="this.fieldDetailsForm.controls['picklist']"
-      ><mat-form-field>
+      ><mat-form-field subscriptSizing="dynamic">
         <mat-label>{{
           'schema.fieldDetailsForm.controls.picklist' | transloco
         }}</mat-label>

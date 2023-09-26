@@ -1,71 +1,70 @@
-<form [formGroup]="appForm" (ngSubmit)="save()" class="form-container">
-  <div class="app-info">
-    <mat-form-field>
-      <mat-label>
-        {{ 'apps.createApp.applicationName.label' | transloco }}
-      </mat-label>
-      <input
-        matInput
-        placeholder="{{ 'apps.createApp.applicationName.label' | transloco }}"
-        formControlName="name"
-        required />
-      <fa-icon
-        class="tool-tip-trigger"
-        matSuffix
-        [icon]="faCircleInfo"
-        [matTooltip]="'apps.createApp.applicationName.tooltip' | transloco" />
-      <mat-error *ngIf="appForm.controls['name'].hasError('required')">
-        {{ 'apps.createApp.applicationName.error' | transloco }}
-      </mat-error>
-    </mat-form-field>
-    <mat-form-field>
-      <mat-label>{{
-        'apps.createApp.description.label' | transloco
-      }}</mat-label>
-      <input
-        matInput
-        placeholder="{{ 'apps.createApp.description.label' | transloco }}"
-        formControlName="description" />
-      <fa-icon
-        class="tool-tip-trigger"
-        matSuffix
-        [icon]="faCircleInfo"
-        [matTooltip]="'apps.createApp.description.tooltip' | transloco" />
-    </mat-form-field>
-    <mat-form-field>
-      <mat-label>{{
-        'apps.createApp.defaultRole.label' | transloco
-      }}</mat-label>
-      <input
-        #rolesInput
-        type="text"
-        placeholder="Pick one"
-        matInput
-        formControlName="defaultRole"
-        [matAutocomplete]="auto"
-        (input)="filter()"
-        (focus)="filter()" />
-      <fa-icon
-        class="tool-tip-trigger"
-        matSuffix
-        [icon]="faCircleInfo"
-        [matTooltip]="'apps.createApp.defaultRole.tooltip' | transloco" />
-      <!-- TODO unable to remove default role -->
-      <mat-autocomplete
-        requireSelection
-        #auto="matAutocomplete"
-        [displayWith]="displayFn">
-        <mat-option *ngFor="let role of filteredRoles" [value]="role">
-          {{ role.name }}
-        </mat-option>
-      </mat-autocomplete>
-    </mat-form-field>
-    <mat-slide-toggle formControlName="active">{{
-      'apps.createApp.active' | transloco
-    }}</mat-slide-toggle>
-  </div>
+<!-- TODO add error banner -->
+<form [formGroup]="appForm" (ngSubmit)="save()" class="details-form">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'apps.createApp.applicationName.label' | transloco }}
+    </mat-label>
+    <input
+      matInput
+      placeholder="{{ 'apps.createApp.applicationName.label' | transloco }}"
+      formControlName="name"
+      required />
+    <fa-icon
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="'apps.createApp.applicationName.tooltip' | transloco" />
+    <mat-error *ngIf="appForm.controls['name'].hasError('required')">
+      {{ 'apps.createApp.applicationName.error' | transloco }}
+    </mat-error>
+  </mat-form-field>
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>{{ 'apps.createApp.defaultRole.label' | transloco }}</mat-label>
+    <input
+      #rolesInput
+      type="text"
+      placeholder="Pick one"
+      matInput
+      formControlName="defaultRole"
+      [matAutocomplete]="auto"
+      (input)="filter()"
+      (focus)="filter()" />
+    <fa-icon
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="'apps.createApp.defaultRole.tooltip' | transloco" />
+    <!-- TODO unable to remove default role -->
+    <mat-autocomplete
+      requireSelection
+      #auto="matAutocomplete"
+      [displayWith]="displayFn">
+      <mat-option *ngFor="let role of filteredRoles" [value]="role">
+        {{ role.name }}
+      </mat-option>
+    </mat-autocomplete>
+  </mat-form-field>
+  <mat-form-field subscriptSizing="dynamic" class="full-width">
+    <mat-label>{{ 'apps.createApp.description.label' | transloco }}</mat-label>
+    <textarea
+      rows="1"
+      matInput
+      placeholder="{{ 'apps.createApp.description.label' | transloco }}"
+      formControlName="description"></textarea>
+    <fa-icon
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="'apps.createApp.description.tooltip' | transloco" />
+  </mat-form-field>
+  <mat-slide-toggle formControlName="active" class="full-width">{{
+    'apps.createApp.active' | transloco
+  }}</mat-slide-toggle>
   <!-- API Card -->
-  <mat-card *ngIf="apiKey">
+  <mat-card
+    *ngIf="apiKey"
+    class="full-width"
+    [style]="{ 'word-break': 'break-all' }">
     <mat-card-header>
       <mat-card-subtitle>{{
         'apps.createApp.apiKey.label' | transloco
@@ -83,7 +82,7 @@
     </mat-card-actions>
   </mat-card>
   <!-- app location -->
-  <div class="flex-col">
+  <div class="flex-col full-width">
     <p>
       {{ 'apps.createApp.appLocation.label' | transloco
       }}<fa-icon

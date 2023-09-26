@@ -19,7 +19,7 @@
         class="dropdown-form-group-container"
         *ngIf="isDropdownFormVisible"
         [formGroup]="dropDownOptionsFormGroup">
-        <mat-form-field>
+        <mat-form-field subscriptSizing="dynamic">
           <mat-select formControlName="selectedService">
             <mat-option
               (click)="onSelectServiceClick(service)"
@@ -30,7 +30,7 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field>
+        <mat-form-field subscriptSizing="dynamic">
           <mat-select formControlName="serviceKeys">
             <mat-option
               *ngFor="let key of serviceKeys"
@@ -41,7 +41,7 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field>
+        <mat-form-field subscriptSizing="dynamic">
           <mat-select formControlName="serviceEndpoint">
             <mat-option
               *ngFor="let endpoint of serviceEndpoints"
@@ -52,7 +52,7 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field>
+        <mat-form-field subscriptSizing="dynamic">
           <mat-select formControlName="confirmedServiceEndpoint">
             <mat-option
               *ngFor="let confirmedEndpoint of explodedEndpoints"
@@ -67,11 +67,11 @@
     <ng-container *ngIf="confirmedEndpoint">
       <form class="script-form-group-container" [formGroup]="scriptFormGroup">
         <div class="script-form-container">
-          <mat-form-field>
+          <mat-form-field subscriptSizing="dynamic">
             <mat-label> {{ 'scripts.scriptName' | transloco }}</mat-label>
             <input matInput formControlName="name" />
           </mat-form-field>
-          <mat-form-field>
+          <mat-form-field subscriptSizing="dynamic">
             <mat-label>{{ 'scripts.scriptType' | transloco }}</mat-label>
             <mat-select formControlName="type">
               <mat-option *ngFor="let type of scriptTypes" [value]="type.name">
@@ -125,7 +125,7 @@
           </div>
           <div>
             <h4>{{ 'scripts.linkToService' | transloco }}</h4>
-            <mat-form-field>
+            <mat-form-field subscriptSizing="dynamic">
               <mat-label>{{ 'scripts.service' | transloco }}: </mat-label>
               <mat-select formControlName="storageServiceId">
                 <mat-option [value]="undefined">-- None --</mat-option>

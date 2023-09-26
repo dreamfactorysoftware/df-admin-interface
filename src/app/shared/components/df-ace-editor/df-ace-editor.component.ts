@@ -20,7 +20,13 @@ import {
   ViewChild,
 } from '@angular/core';
 
-type AceEditorMode = 'json' | 'yaml' | 'text' | 'javascript' | 'php' | 'python';
+export type AceEditorMode =
+  | 'json'
+  | 'yaml'
+  | 'text'
+  | 'javascript'
+  | 'php'
+  | 'python';
 
 @Component({
   selector: 'df-ace-editor',

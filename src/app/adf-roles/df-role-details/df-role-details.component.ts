@@ -25,13 +25,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatButtonModule } from '@angular/material/button';
 import { DfRolesAccessComponent } from '../df-roles-access/df-roles-access.component';
-import { MatDividerModule } from '@angular/material/divider';
 import { ROUTES } from 'src/app/shared/constants/routes';
 
 @Component({
   selector: 'df-role-details',
   templateUrl: './df-role-details.component.html',
-  styleUrls: ['./df-role-details.component.scss'],
   standalone: true,
   imports: [
     TranslocoPipe,
@@ -45,7 +43,6 @@ import { ROUTES } from 'src/app/shared/constants/routes';
     MatButtonModule,
     DfRolesAccessComponent,
     NgIf,
-    MatDividerModule,
   ],
 })
 export class DfRoleDetailsComponent implements OnInit, OnDestroy {
