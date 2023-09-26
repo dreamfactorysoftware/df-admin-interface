@@ -53,6 +53,9 @@ export class DfFolderDialogComponent implements OnDestroy {
   }
 
   save(): void {
+    if (!this.dialogForm.valid) {
+      return;
+    }
     this.crudService
       .create(
         { resource: [] },
