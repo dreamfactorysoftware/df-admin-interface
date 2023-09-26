@@ -128,12 +128,13 @@ export class DfFieldDetailsComponent implements OnInit, OnDestroy {
     this.activatedRoute.data
       .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
-        this.type === data['type'];
+        this.type = data['type'];
       });
+
+    this.dbName = this.activatedRoute.snapshot.paramMap.get('name') as string;
 
     if (this.type === 'edit') {
       this.fieldName = this.activatedRoute.snapshot.paramMap.get('fieldName');
-      this.dbName = this.activatedRoute.snapshot.paramMap.get('name') as string;
       this.tableName = this.activatedRoute.snapshot.paramMap.get(
         'id'
       ) as string;
