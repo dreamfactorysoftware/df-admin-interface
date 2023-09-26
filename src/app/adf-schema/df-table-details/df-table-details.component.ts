@@ -41,8 +41,6 @@ import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df
   ],
 })
 export class DfTableDetailsComponent implements OnInit, OnDestroy {
-  // TODO: JSON View with Ace Editor
-
   tableDetailsForm: FormGroup;
   destroyed$ = new Subject<void>();
   type: string;
@@ -110,6 +108,8 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
   }
 
   save() {
+    if (this.tableDetailsForm.invalid) return;
+
     const data = this.tableDetailsForm.value;
     const payload = {
       resource: [data],
