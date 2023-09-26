@@ -573,6 +573,7 @@ export const routes: Routes = [
                       import(
                         './adf-schema/df-field-details/df-field-details.component'
                       ).then(m => m.DfFieldDetailsComponent),
+                    data: { type: 'create' },
                   },
                   {
                     path: ':fieldName',
@@ -580,6 +581,7 @@ export const routes: Routes = [
                       import(
                         './adf-schema/df-field-details/df-field-details.component'
                       ).then(m => m.DfFieldDetailsComponent),
+                    data: { type: 'edit' },
                   },
                   {
                     path: ROUTES.RELATIONSHIPS,
