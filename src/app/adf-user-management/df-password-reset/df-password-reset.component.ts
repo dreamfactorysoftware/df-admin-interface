@@ -74,24 +74,30 @@ export class DfPasswordResetComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    const UrlParams = this.location.path().split('?')[1];
-    if (UrlParams) {
-      const params = UrlParams.split('&');
-      params.forEach((param: string) => {
-        const [key, value] = param.split('=');
-        this.user[key as keyof UserParams] = value;
-      });
+    if (this.route.queryParams) {
+      this.route.queryParams
+        .pipe(takeUntil(this.destroyed$))
+        .subscribe(params => {
+          this.user = {
+            code: params['code'],
+            email: params['email'],
+            username: params['username'],
+            admin: params['admin'],
+          };
+
+          this.passwordResetForm.patchValue({
+            email: this.user.email,
+            username: this.user.username,
+            code: this.user.code,
+          });
+        });
     }
+
     this.systemConfigDataService.environment$
       .pipe(takeUntil(this.destroyed$))
       .subscribe(env => {
         this.loginAttribute = env.authentication.loginAttribute;
       });
-    this.passwordResetForm.patchValue({
-      email: this.user.email,
-      username: this.user.username,
-      code: this.user.code,
-    });
     this.route.data.pipe(takeUntil(this.destroyed$)).subscribe(data => {
       if ('type' in data) {
         this.type = data['type'];
