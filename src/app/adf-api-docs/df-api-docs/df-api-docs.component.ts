@@ -52,6 +52,10 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
   }
 
   downloadApiDoc() {
-    saveRawAsFile(JSON.stringify(this.apiDocJson), 'api-spec.json', 'json');
+    saveRawAsFile(
+      JSON.stringify(this.apiDocJson, undefined, 2),
+      'api-spec.json',
+      'json'
+    );
   }
 }

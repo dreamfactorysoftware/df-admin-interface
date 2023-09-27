@@ -32,6 +32,7 @@ export function createTestBedConfig(
                 subscribe: (fn: (value: any) => void) => fn(mockActivatedRoute),
               };
             },
+            subscribe: (fn: (value: any) => void) => fn(mockActivatedRoute),
           },
           snapshot: {
             params: params ?? undefined,
