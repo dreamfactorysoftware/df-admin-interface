@@ -50,7 +50,6 @@ describe('DfProfileComponent', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
-    component.ngOnDestroy();
     fixture.detectChanges();
   });
 

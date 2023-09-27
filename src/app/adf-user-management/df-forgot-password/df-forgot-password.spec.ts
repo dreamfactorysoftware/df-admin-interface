@@ -66,7 +66,6 @@ describe('DfForgotPasswordComponent - Username Reset', () => {
     jest.clearAllMocks();
     component.forgetPasswordForm.reset();
     component.securityQuestionForm.reset();
-    component.ngOnDestroy();
   });
 
   it('should create', () => {
