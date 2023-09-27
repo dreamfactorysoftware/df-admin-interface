@@ -139,6 +139,10 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
     this.limitCacheService.delete(row.id).subscribe(() => this.refreshTable());
   }
 
+  override deleteRow(row: LimitTableRowData): void {
+    this.limitService.delete(row.id).subscribe(() => this.refreshTable());
+  }
+
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.limitService
       .getAll<GenericListResponse<LimitType>>({

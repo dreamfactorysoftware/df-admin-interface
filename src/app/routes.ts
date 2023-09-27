@@ -250,28 +250,30 @@ export const routes: Routes = [
           {
             path: ROUTES.CREATE,
             loadComponent: () =>
-              import('./adf-limits/df-limit/df-limit.component').then(
-                m => m.DfLimitComponent
-              ),
+              import(
+                './adf-limits/df-limit-details/df-limit-details.component'
+              ).then(m => m.DfLimitComponent),
             resolve: {
               data: limitsResolver(),
               users: usersResolver(0),
               roles: rolesResolver(0),
               services: servicesResolver(0),
             },
+            data: { type: 'create' },
           },
           {
             path: ':id',
             loadComponent: () =>
-              import('./adf-limits/df-limit/df-limit.component').then(
-                m => m.DfLimitComponent
-              ),
+              import(
+                './adf-limits/df-limit-details/df-limit-details.component'
+              ).then(m => m.DfLimitComponent),
             resolve: {
               data: limitsResolver(),
               users: usersResolver(0),
               roles: rolesResolver(0),
               services: servicesResolver(0),
             },
+            data: { type: 'edit' },
           },
         ],
         providers: [provideTranslocoScope('limits')],

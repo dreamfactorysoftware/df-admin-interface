@@ -37,8 +37,8 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-limit',
-  templateUrl: './df-limit.component.html',
-  styleUrls: ['./df-limit.component.scss'],
+  templateUrl: './df-limit-details.component.html',
+  styleUrls: ['./df-limit-details.component.scss'],
   standalone: true,
   imports: [
     DfAlertComponent,
@@ -89,12 +89,13 @@ export class DfLimitComponent implements OnInit {
 
   roleDropdownOptions: RoleType[] = [];
   userDropdownOptions: UserProfile[] = [];
-  // TODO SystemServiceData[]
   serviceDropdownOptions: any[] = [];
 
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
+
+  type = 'create';
 
   constructor(
     @Inject(LIMIT_SERVICE_TOKEN)
@@ -120,24 +121,20 @@ export class DfLimitComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    const id = this.activatedRoute.snapshot.paramMap.get('id');
-
-    if (id) {
-      this.isEditMode = true;
-
-      this.activatedRoute.data
-        .pipe(
-          catchError(error => {
-            this.router.navigate([
-              `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
-            ]);
-            return throwError(() => new Error(error));
-          })
-        )
-        .subscribe(resp => {
+    this.activatedRoute.data
+      .pipe(
+        catchError(error => {
+          this.router.navigate([
+            `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
+          ]);
+          return throwError(() => new Error(error));
+        })
+      )
+      .subscribe(resp => {
+        this.type = resp['type'];
+        if (resp['type'] === 'edit') {
           this.limitTypeToEdit = resp['data'] as LimitType;
-
-          this.formGroup.setValue({
+          this.formGroup.patchValue({
             limitName: this.limitTypeToEdit.name,
             limitType: this.limitTypeToEdit.type,
             serviceId: this.limitTypeToEdit.serviceId,
@@ -159,8 +156,10 @@ export class DfLimitComponent implements OnInit {
           if (!this.formGroup.value.userId) this.removeFormField('userId');
 
           if (!this.formGroup.value.endpoint) this.removeFormField('endpoint');
-        });
-    } else {
+        }
+      });
+
+    if (this.type === 'create') {
       this.removeFormField();
       this.renderCorrectHiddenFields(this.limitTypes[0].value);
     }
@@ -188,7 +187,7 @@ export class DfLimitComponent implements OnInit {
   onSubmit() {
     if (this.formGroup.valid) {
       this.showAlert = false;
-      if (!this.isEditMode) {
+      if (this.type === 'create') {
         const payload = this.assembleLimitPayload() as CreateLimitPayload;
 
         this.limitService
@@ -205,7 +204,7 @@ export class DfLimitComponent implements OnInit {
               `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
             ]);
           });
-      } else {
+      } else if (this.type === 'edit') {
         // edit mode
         const payload = this.assembleLimitPayload() as UpdateLimitPayload;
 
@@ -248,7 +247,7 @@ export class DfLimitComponent implements OnInit {
       verb: this.formGroup.value.verb,
     };
 
-    if (this.isEditMode) {
+    if (this.type === 'edit') {
       return {
         id: this.limitTypeToEdit?.id,
         createdDate: this.limitTypeToEdit?.createdDate,
