@@ -1,7 +1,6 @@
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
 import { ROUTES } from 'src/app/shared/constants/routes';
 import { JsonValidator } from 'src/app/shared/validators/json.validator';
 import {

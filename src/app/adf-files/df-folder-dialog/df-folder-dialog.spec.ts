@@ -6,10 +6,8 @@ import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import {
   MAT_DIALOG_DATA,
-  MatDialog,
   MatDialogModule,
   MatDialogRef,
 } from '@angular/material/dialog';

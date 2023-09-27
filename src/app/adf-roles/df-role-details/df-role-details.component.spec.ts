@@ -52,7 +52,6 @@ const mockRole = {
 describe('DfRoleDetailsComponent - create', () => {
   let component: DfRoleDetailsComponent;
   let fixture: ComponentFixture<DfRoleDetailsComponent>;
-  let loader: HarnessLoader;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -130,7 +129,6 @@ describe('DfRoleDetailsComponent - create', () => {
 describe('DfRoleDetailsComponent - edit', () => {
   let component: DfRoleDetailsComponent;
   let fixture: ComponentFixture<DfRoleDetailsComponent>;
-  let loader: HarnessLoader;
 
   beforeEach(() => {
     TestBed.configureTestingModule({

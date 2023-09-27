@@ -146,7 +146,7 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
     //  this.triggerAlert
   }
 
-  refreshTable(limit?: number, offset?: number, filter?: string): void {
+  refreshTable(): void {
     this.crudService
       .get(`${this.dbName}/_schema/${this.tableName}/_field`)
       .subscribe((data: any) => {

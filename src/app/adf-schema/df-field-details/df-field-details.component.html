@@ -6,10 +6,7 @@
       }}</mat-label>
       <input matInput formControlName="name" />
       <mat-error
-        *ngIf="
-          this.fieldDetailsForm.controls['name'].errors &&
-          this.fieldDetailsForm.controls['name'].errors['required']
-        ">
+        *ngIf="this.fieldDetailsForm.controls['name'].hasError('required')">
         {{ 'schema.fieldDetailsForm.errors.name' | transloco }}
       </mat-error>
     </mat-form-field>
@@ -138,8 +135,7 @@
         formControlName="validation"></textarea>
       <mat-error
         *ngIf="
-          this.fieldDetailsForm.controls['validation'].errors &&
-          this.fieldDetailsForm.controls['validation'].errors['jsonInvalid']
+          this.fieldDetailsForm.controls['validation'].hasError('jsonInvalid')
         ">
         {{ 'schema.fieldDetailsForm.errors.json' | transloco }}
       </mat-error>
@@ -154,8 +150,7 @@
       </mat-form-field>
       <mat-error
         *ngIf="
-          this.fieldDetailsForm.controls['picklist'].errors &&
-          this.fieldDetailsForm.controls['picklist'].errors['csvInvalid']
+          this.fieldDetailsForm.controls['picklist'].hasError('csvInvalid')
         ">
         {{ 'schema.fieldDetailsForm.errors.csv' | transloco }}
       </mat-error>

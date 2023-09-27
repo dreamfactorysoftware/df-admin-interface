@@ -2,7 +2,6 @@ import {
   Component,
   ElementRef,
   Inject,
-  OnDestroy,
   OnInit,
   ViewChild,
 } from '@angular/core';
@@ -23,7 +22,7 @@ import {
 } from 'src/app/shared/constants/tokens';
 import { ActivatedRoute } from '@angular/router';
 import { Service } from 'src/app/shared/types/service';
-import { Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { catchError, throwError } from 'rxjs';
 import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { MatButtonModule } from '@angular/material/button';
