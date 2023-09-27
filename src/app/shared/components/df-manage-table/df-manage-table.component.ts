@@ -126,7 +126,7 @@ export abstract class DfManageTableComponent<T>
     private activatedRoute: ActivatedRoute,
     private liveAnnouncer: LiveAnnouncer,
     private translateService: TranslocoService,
-    private dialog: MatDialog
+    public dialog: MatDialog
   ) {}
 
   ngOnInit(): void {

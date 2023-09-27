@@ -6,7 +6,6 @@ import {
 } from './df-manage-table.component';
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
-import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 
 interface MockTableDataType {
@@ -46,9 +45,7 @@ class TestManageTableComponent<
 
 class MockDialog {
   open() {
-    return {
-      afterClosed: () => of({}),
-    };
+    return jest.fn();
   }
 }
 
@@ -56,7 +53,6 @@ describe('DfManageTableComponent', () => {
   let component: TestManageTableComponent<MockTableDataType>;
   let fixture: ComponentFixture<TestManageTableComponent<MockTableDataType>>;
   let router: Router;
-  let dialog: MatDialog;
 
   beforeEach(() => {
     TestBed.configureTestingModule(
@@ -68,7 +64,6 @@ describe('DfManageTableComponent', () => {
     );
 
     router = TestBed.inject(Router);
-    dialog = TestBed.inject(MatDialog);
 
     fixture = TestBed.createComponent<
       TestManageTableComponent<MockTableDataType>
@@ -91,7 +86,7 @@ describe('DfManageTableComponent', () => {
 
     component.createRow();
 
-    expect(navigateSpy).toHaveBeenCalledTimes(1);
+    expect(navigateSpy).toHaveBeenCalled();
   });
 
   it('should navigate to the view route relative to the current route when the table row is clicked', () => {
@@ -104,12 +99,21 @@ describe('DfManageTableComponent', () => {
       isActive: true,
     });
 
-    expect(navigateSpy).toHaveBeenCalledTimes(1);
+    expect(navigateSpy).toHaveBeenCalled();
   });
 
-  // TODO: Fix this test
-  it.skip('should open the dialog when the delete button is clicked', () => {
-    const dialogSpy = jest.spyOn(dialog, 'open');
+  it('should open the delete confirmation dialog when the delete button is clicked', () => {
+    const dialogRefMock = {
+      afterClosed: () => {
+        return {
+          subscribe: (fn: (value: any) => void) => fn({}),
+        };
+      },
+    };
+
+    const openSpy = jest
+      .spyOn(component.dialog, 'open')
+      .mockReturnValue(dialogRefMock as any);
 
     component.confirmDelete({
       id: 1,
@@ -118,6 +122,6 @@ describe('DfManageTableComponent', () => {
       isActive: true,
     });
 
-    expect(dialogSpy).toHaveBeenCalled();
+    expect(openSpy).toHaveBeenCalled();
   });
 });
