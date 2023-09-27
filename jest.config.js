@@ -5,7 +5,7 @@ module.exports = {
     '^src/(.*)$': '<rootDir>/src/$1',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!@angular|swagger-ui|react-syntax-highlighter|swagger-client|@ngneat)',
+    'node_modules/(?!@angular|swagger-ui|react-syntax-highlighter|swagger-client|@ngneat|@fortawesome)',
   ],
   coverageReporters: ['html'],
   collectCoverageFrom: ['src/**/*.ts', '!src/index.ts', '!src/**/*.d.ts'],
