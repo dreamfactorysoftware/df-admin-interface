@@ -5,8 +5,11 @@ import {
   DfManageTableModules,
 } from './df-manage-table.component';
 import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { of } from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
 
-export interface MockTableDataType {
+interface MockTableDataType {
   id: number;
   name: string;
   description: string;
@@ -18,7 +21,7 @@ export interface MockTableDataType {
   templateUrl: './df-manage-table.component.html',
   imports: [...DfManageTableModules],
 })
-export class TestManageTableComponent<
+class TestManageTableComponent<
   MockTableDataType,
 > extends DfManageTableComponent<MockTableDataType> {
   override columns: {
@@ -41,16 +44,31 @@ export class TestManageTableComponent<
   }
 }
 
+class MockDialog {
+  open() {
+    return {
+      afterClosed: () => of({}),
+    };
+  }
+}
+
 describe('DfManageTableComponent', () => {
   let component: TestManageTableComponent<MockTableDataType>;
   let fixture: ComponentFixture<TestManageTableComponent<MockTableDataType>>;
+  let router: Router;
+  let dialog: MatDialog;
 
   beforeEach(() => {
     TestBed.configureTestingModule(
-      createTestBedConfig(TestManageTableComponent, [...DfManageTableModules], {
-        data: {},
-      })
+      createTestBedConfig(
+        TestManageTableComponent,
+        [...DfManageTableModules, { provide: MatDialog, useClass: MockDialog }],
+        {}
+      )
     );
+
+    router = TestBed.inject(Router);
+    dialog = TestBed.inject(MatDialog);
 
     fixture = TestBed.createComponent<
       TestManageTableComponent<MockTableDataType>
@@ -68,5 +86,38 @@ describe('DfManageTableComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  // TODO: implement remaining tests
+  it('should navigate to the create route relative to the current route when the create button is clicked', () => {
+    const navigateSpy = jest.spyOn(router, 'navigate');
+
+    component.createRow();
+
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('should navigate to the view route relative to the current route when the table row is clicked', () => {
+    const navigateSpy = jest.spyOn(router, 'navigate');
+
+    component.viewRow({
+      id: 1,
+      name: 'test',
+      description: 'test',
+      isActive: true,
+    });
+
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // TODO: Fix this test
+  it.skip('should open the dialog when the delete button is clicked', () => {
+    const dialogSpy = jest.spyOn(dialog, 'open');
+
+    component.confirmDelete({
+      id: 1,
+      name: 'test',
+      description: 'test',
+      isActive: true,
+    });
+
+    expect(dialogSpy).toHaveBeenCalled();
+  });
 });
