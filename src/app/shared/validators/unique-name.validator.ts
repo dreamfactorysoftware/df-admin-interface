@@ -32,7 +32,7 @@ export const uniqueNameValidator: ValidatorFn = (
 
     if (nameMap.has(name)) {
       const firstIndex = nameMap.get(name);
-      setErrors(firstIndex!);
+      setErrors(firstIndex ?? 0);
       setErrors(index);
     } else {
       nameMap.set(name, index);

@@ -116,7 +116,9 @@ export class DfFilesTableComponent extends DfManageTableComponent<FileTableRow> 
     this.crudService
       .downloadFile(`${this.type}/${row.path}`, { additionalParams })
       .subscribe(({ body }) => {
-        saveAsFile(body, `${row.name}${isFolder ? '.zip' : ''}`);
+        if (body) {
+          saveAsFile(body, `${row.name}${isFolder ? '.zip' : ''}`);
+        }
       });
   }
 

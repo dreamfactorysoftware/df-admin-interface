@@ -24,7 +24,7 @@ export function saveRawAsFile(data: any, filename: string, type: string): void {
   saveAsFile(blob, filename);
 }
 
-export function saveAsFile(blob: any, filename: string): void {
+export function saveAsFile(blob: Blob, filename: string): void {
   const url = window.URL.createObjectURL(blob);
   saveFromUrl(url, filename);
   window.URL.revokeObjectURL(url);

@@ -10,9 +10,10 @@ import {
   faSalesforce,
   faTwitch,
   faOpenid,
+  IconDefinition,
 } from '@fortawesome/free-brands-svg-icons';
 
-const supportedIcons = {
+const supportedIcons: { [keys: string]: IconDefinition } = {
   google: faGoogle,
   github: faGithub,
   microsoft: faMicrosoft,
@@ -31,5 +32,5 @@ export function iconExist(icon: string) {
 }
 
 export function getIcon(icon: string) {
-  return (supportedIcons as any)[icon];
+  return supportedIcons[icon];
 }

@@ -97,11 +97,7 @@ export class DfManageDatabasesTableComponent extends DfManageTableComponent<Data
 
   // TODO change refresh table
 
-  refreshTable(
-    limit?: number | undefined,
-    offset?: number | undefined,
-    filter?: string | undefined
-  ): void {
+  refreshTable(): void {
     this._activatedRoute.data.subscribe(({ data }) => {
       this.dataSource.data = this.mapDataToTable(data.resource);
       this.tableLength = data.meta.count;
