@@ -132,10 +132,8 @@ export class DfLimitComponent implements OnInit {
       )
       .subscribe(resp => {
         this.type = resp['type'];
-
         if (resp['type'] === 'edit') {
           this.limitTypeToEdit = resp['data'] as LimitType;
-
           this.formGroup.patchValue({
             limitName: this.limitTypeToEdit.name,
             limitType: this.limitTypeToEdit.type,
