@@ -14,7 +14,9 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-apps-table',
   templateUrl:
@@ -112,18 +114,14 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
   filterQuery = getFilterQuery('apps');
 
   override deleteRow(row: AppRow): void {
-    this.appsService
-      .delete(row.id)
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(() => {
-        this.refreshTable();
-      });
+    this.appsService.delete(row.id).subscribe(() => {
+      this.refreshTable();
+    });
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.appsService
       .getAll<GenericListResponse<AppType>>({ limit, offset, filter })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;

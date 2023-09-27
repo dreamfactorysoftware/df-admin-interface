@@ -5,13 +5,12 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { AsyncPipe, NgIf } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
-import { FileResponse } from '../df-files.types';
 import { ActivatedRoute } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfFolderDialogComponent } from '../df-folder-dialog/df-folder-dialog.component';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-files',
   templateUrl: './df-files.component.html',
@@ -32,7 +31,6 @@ import { DfFolderDialogComponent } from '../df-folder-dialog/df-folder-dialog.co
 export class DfFilesComponent {
   faUpload = faUpload;
   faFolderPlus = faFolderPlus;
-  destroyed$ = new Subject<void>();
   currentRoute = '';
   @ViewChild(DfFilesTableComponent) filesTable: DfFilesTableComponent;
   type: 'files' | 'logs';
@@ -40,11 +38,9 @@ export class DfFilesComponent {
     private activatedRoute: ActivatedRoute,
     public dialog: MatDialog
   ) {
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ type }) => {
-        this.type = type;
-      });
+    this.activatedRoute.data.subscribe(({ type }) => {
+      this.type = type;
+    });
   }
 
   uploadFile(event: Event): void {

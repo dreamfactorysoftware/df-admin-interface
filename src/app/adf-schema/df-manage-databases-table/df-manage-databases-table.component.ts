@@ -9,10 +9,10 @@ import { TranslocoService } from '@ngneat/transloco';
 import { DatabaseRowData } from '../df-schema.types';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
-import { takeUntil } from 'rxjs';
 import { Service } from '../../shared/types/service';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-databases-table',
   templateUrl:
@@ -33,11 +33,9 @@ export class DfManageDatabasesTableComponent extends DfManageTableComponent<Data
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
 
-    this._activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ data }) => {
-        this.services = data.resource;
-      });
+    this._activatedRoute.data.subscribe(({ data }) => {
+      this.services = data.resource;
+    });
   }
 
   services: Partial<Service>[];
@@ -104,12 +102,10 @@ export class DfManageDatabasesTableComponent extends DfManageTableComponent<Data
     offset?: number | undefined,
     filter?: string | undefined
   ): void {
-    this._activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ data }) => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
-      });
+    this._activatedRoute.data.subscribe(({ data }) => {
+      this.dataSource.data = this.mapDataToTable(data.resource);
+      this.tableLength = data.meta.count;
+    });
   }
 
   filterQuery = getFilterQuery('services');

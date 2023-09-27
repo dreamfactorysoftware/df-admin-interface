@@ -1,4 +1,4 @@
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import {
   FormArray,
   FormControl,
@@ -10,7 +10,6 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { Subject, takeUntil } from 'rxjs';
 import { MatInputModule } from '@angular/material/input';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 
@@ -21,7 +20,9 @@ import { RoleType } from '../../types/role';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { NgIf } from '@angular/common';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-user-app-roles',
   templateUrl: './df-user-app-roles.component.html',
@@ -40,10 +41,9 @@ import { NgIf } from '@angular/common';
     NgIf,
   ],
 })
-export class DfUserAppRolesComponent implements OnInit, OnDestroy {
+export class DfUserAppRolesComponent implements OnInit {
   @Input() apps: Array<AppType> = [];
   @Input() roles: Array<RoleType> = [];
-  destroyed$ = new Subject<void>();
   rootForm: FormGroup;
   appRoles: FormArray;
   dataSource: MatTableDataSource<any>;
@@ -55,11 +55,9 @@ export class DfUserAppRolesComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.rootForm = this.rootFormGroup.control;
-    this.rootFormGroup.ngSubmit
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(() => {
-        this.rootForm.markAllAsTouched();
-      });
+    this.rootFormGroup.ngSubmit.subscribe(() => {
+      this.rootForm.markAllAsTouched();
+    });
     this.appRoles = this.rootForm.get('appRoles') as FormArray;
     this.updateDataSource();
   }
@@ -96,10 +94,5 @@ export class DfUserAppRolesComponent implements OnInit, OnDestroy {
   remove(index: number) {
     this.appRoles.removeAt(index);
     this.updateDataSource();
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

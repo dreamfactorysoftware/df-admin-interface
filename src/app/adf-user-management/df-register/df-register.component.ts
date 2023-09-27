@@ -1,11 +1,11 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
   Validators,
   ReactiveFormsModule,
 } from '@angular/forms';
-import { Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { catchError, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { DfAuthService } from '../services/df-auth.service';
@@ -19,7 +19,8 @@ import { DfAlertComponent } from '../../shared/components/df-alert/df-alert.comp
 import { MatCardModule } from '@angular/material/card';
 import { NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-register',
   templateUrl: './df-register.component.html',
@@ -37,8 +38,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
     TranslocoPipe,
   ],
 })
-export class DfRegisterComponent implements OnInit, OnDestroy {
-  private destroyed$ = new Subject<void>();
+export class DfRegisterComponent implements OnInit {
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
@@ -63,20 +63,18 @@ export class DfRegisterComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.systemConfigDataService.environment$
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(env => {
-        this.loginAttribute = env.authentication.loginAttribute;
-        if (this.loginAttribute === 'username') {
-          this.registerForm
-            .get('profileDetailsGroup.username')
-            ?.setValidators([Validators.required]);
-        } else {
-          this.registerForm
-            .get('profileDetailsGroup.email')
-            ?.addValidators([Validators.required]);
-        }
-      });
+    this.systemConfigDataService.environment$.subscribe(env => {
+      this.loginAttribute = env.authentication.loginAttribute;
+      if (this.loginAttribute === 'username') {
+        this.registerForm
+          .get('profileDetailsGroup.username')
+          ?.setValidators([Validators.required]);
+      } else {
+        this.registerForm
+          .get('profileDetailsGroup.email')
+          ?.addValidators([Validators.required]);
+      }
+    });
   }
 
   register() {
@@ -86,7 +84,6 @@ export class DfRegisterComponent implements OnInit, OnDestroy {
     this.authService
       .register(this.registerForm.controls['profileDetailsGroup'].value)
       .pipe(
-        takeUntil(this.destroyed$),
         catchError(err => {
           this.alertMsg = err.error.error.message;
           this.showAlert = true;
@@ -97,10 +94,5 @@ export class DfRegisterComponent implements OnInit, OnDestroy {
         this.showAlert = false;
         this.complete = true;
       });
-  }
-
-  ngOnDestroy() {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

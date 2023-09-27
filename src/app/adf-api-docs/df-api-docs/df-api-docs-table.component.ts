@@ -12,10 +12,11 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { TranslocoService } from '@ngneat/transloco';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-import { takeUntil } from 'rxjs';
 import { Service, ServiceType } from 'src/app/shared/types/service';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-api-docs-table',
   templateUrl:
@@ -41,11 +42,9 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
 
-    this._activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ serviceTypes }) => {
-        this.serviceTypes = serviceTypes;
-      });
+    this._activatedRoute.data.subscribe(({ serviceTypes }) => {
+      this.serviceTypes = serviceTypes;
+    });
   }
 
   override columns = [
@@ -118,7 +117,6 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
         offset,
         filter: `(type not like "%swagger%")${filter ? ` and ${filter}` : ''}`,
       })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;

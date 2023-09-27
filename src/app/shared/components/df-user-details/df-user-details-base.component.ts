@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import {
   FormArray,
   FormBuilder,
@@ -6,7 +6,6 @@ import {
   FormGroup,
   Validators,
 } from '@angular/forms';
-import { Subject, takeUntil } from 'rxjs';
 import { AlertType } from '../df-alert/df-alert.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { ActivatedRoute } from '@angular/router';
@@ -19,15 +18,14 @@ import { uniqueNameValidator } from '../../validators/unique-name.validator';
 import { AppType } from 'src/app/adf-apps/types/df-apps.types';
 import { RoleType } from '../../types/role';
 import { faEnvelope } from '@fortawesome/free-solid-svg-icons';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-user-details',
   template: '',
 })
-export abstract class DfUserDetailsBaseComponent<T>
-  implements OnInit, OnDestroy
-{
-  destroyed$ = new Subject<void>();
+export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
   abstract userType: UserProfileType;
   userForm: FormGroup;
   currentProfile: T;
@@ -92,113 +90,105 @@ export abstract class DfUserDetailsBaseComponent<T>
   abstract save(): void;
 
   ngOnInit(): void {
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ type, data, apps, roles }) => {
-        this.type = type;
-        if (this.userType === 'users') {
-          this.apps = apps.resource;
-          this.roles = roles.resource;
-        }
-        if (type === 'edit') {
-          this.currentProfile = data;
-          this.userForm.patchValue({
-            profileDetailsGroup: {
-              username: data.username,
-              email: data.email,
-              firstName: data.firstName,
-              lastName: data.lastName,
-              name: data.name,
-              phone: data.phone,
-            },
-            isActive: data.isActive,
-          });
-          this.userForm.addControl('setPassword', new FormControl(false));
-          this.userForm.controls['setPassword'].valueChanges
-            .pipe(takeUntil(this.destroyed$))
-            .subscribe(value => {
-              if (value) {
-                this.addPasswordControls();
-              } else {
-                this.removePasswordControls();
+    this.activatedRoute.data.subscribe(({ type, data, apps, roles }) => {
+      this.type = type;
+      if (this.userType === 'users') {
+        this.apps = apps.resource;
+        this.roles = roles.resource;
+      }
+      if (type === 'edit') {
+        this.currentProfile = data;
+        this.userForm.patchValue({
+          profileDetailsGroup: {
+            username: data.username,
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            name: data.name,
+            phone: data.phone,
+          },
+          isActive: data.isActive,
+        });
+        this.userForm.addControl('setPassword', new FormControl(false));
+        this.userForm.controls['setPassword'].valueChanges.subscribe(value => {
+          if (value) {
+            this.addPasswordControls();
+          } else {
+            this.removePasswordControls();
+          }
+        });
+        if (this.userType === 'admins') {
+          if (data.isRootAdmin) {
+            this.userForm.removeControl('tabs');
+          }
+          if (data.userToAppToRoleByUserId.length > 0) {
+            this.changeAllTabs(false);
+            data.role.accessibleTabs.forEach((tab: string) => {
+              const control = this.tabs.controls.find(
+                c => c.value.name === tab
+              );
+              if (control) {
+                control.patchValue({ checked: true });
               }
             });
-          if (this.userType === 'admins') {
-            if (data.isRootAdmin) {
-              this.userForm.removeControl('tabs');
-            }
-            if (data.userToAppToRoleByUserId.length > 0) {
-              this.changeAllTabs(false);
-              data.role.accessibleTabs.forEach((tab: string) => {
-                const control = this.tabs.controls.find(
-                  c => c.value.name === tab
-                );
-                if (control) {
-                  control.patchValue({ checked: true });
-                }
-              });
-            }
           }
-          if (this.userType === 'users') {
-            if (data.userToAppToRoleByUserId.length > 0) {
-              data.userToAppToRoleByUserId.forEach((item: any) => {
-                (this.userForm.controls['appRoles'] as FormArray).push(
-                  new FormGroup({
-                    app: new FormControl(
-                      this.apps.find(app => app.id === item.appId)?.name,
-                      [Validators.required]
-                    ),
-                    role: new FormControl(
-                      this.roles.find(role => role.id === item.roleId)?.name,
-                      [Validators.required]
-                    ),
-                  })
-                );
-              });
-            }
-          }
-          if (data.lookupByUserId.length > 0) {
-            data.lookupByUserId.forEach((item: any) => {
-              (this.userForm.controls['lookupKeys'] as FormArray).push(
+        }
+        if (this.userType === 'users') {
+          if (data.userToAppToRoleByUserId.length > 0) {
+            data.userToAppToRoleByUserId.forEach((item: any) => {
+              (this.userForm.controls['appRoles'] as FormArray).push(
                 new FormGroup({
-                  name: new FormControl(item.name, [Validators.required]),
-                  value: new FormControl(item.value),
-                  private: new FormControl(item.private),
-                  id: new FormControl(item.id),
+                  app: new FormControl(
+                    this.apps.find(app => app.id === item.appId)?.name,
+                    [Validators.required]
+                  ),
+                  role: new FormControl(
+                    this.roles.find(role => role.id === item.roleId)?.name,
+                    [Validators.required]
+                  ),
                 })
               );
             });
           }
-        } else {
-          this.userForm.addControl(
-            'pass-invite',
-            new FormControl('', [Validators.required])
-          );
-          this.userForm.controls['pass-invite'].valueChanges
-            .pipe(takeUntil(this.destroyed$))
-            .subscribe(value => {
-              if (value === 'password') {
-                this.addPasswordControls();
-              } else {
-                this.removePasswordControls();
-              }
-            });
         }
-      });
-    this.systemConfigDataService.environment$
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(env => {
-        this.loginAttribute = env.authentication.loginAttribute;
-        if (this.loginAttribute === 'username') {
-          this.userForm
-            .get('profileDetailsGroup.username')
-            ?.addValidators([Validators.required]);
-        } else {
-          this.userForm
-            .get('profileDetailsGroup.email')
-            ?.addValidators([Validators.required]);
+        if (data.lookupByUserId.length > 0) {
+          data.lookupByUserId.forEach((item: any) => {
+            (this.userForm.controls['lookupKeys'] as FormArray).push(
+              new FormGroup({
+                name: new FormControl(item.name, [Validators.required]),
+                value: new FormControl(item.value),
+                private: new FormControl(item.private),
+                id: new FormControl(item.id),
+              })
+            );
+          });
         }
-      });
+      } else {
+        this.userForm.addControl(
+          'pass-invite',
+          new FormControl('', [Validators.required])
+        );
+        this.userForm.controls['pass-invite'].valueChanges.subscribe(value => {
+          if (value === 'password') {
+            this.addPasswordControls();
+          } else {
+            this.removePasswordControls();
+          }
+        });
+      }
+    });
+    this.systemConfigDataService.environment$.subscribe(env => {
+      this.loginAttribute = env.authentication.loginAttribute;
+      if (this.loginAttribute === 'username') {
+        this.userForm
+          .get('profileDetailsGroup.username')
+          ?.addValidators([Validators.required]);
+      } else {
+        this.userForm
+          .get('profileDetailsGroup.email')
+          ?.addValidators([Validators.required]);
+      }
+    });
   }
 
   addPasswordControls() {
@@ -250,10 +240,5 @@ export abstract class DfUserDetailsBaseComponent<T>
     this.alertType = type;
     this.alertMsg = msg;
     this.showAlert = true;
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

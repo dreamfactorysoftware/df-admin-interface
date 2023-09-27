@@ -1,5 +1,5 @@
 import { NgFor, NgIf } from '@angular/common';
-import { Component, Inject, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, Inject, OnInit, ViewChild } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
@@ -23,14 +23,15 @@ import { ROUTES } from 'src/app/shared/constants/routes';
 import { CONFIG_CORS_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { CorsConfigData } from '../types';
-import { Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { catchError, throwError } from 'rxjs';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-cors-config-details',
   templateUrl: './df-cors-config-details.component.html',
-  styleUrls: ['./df-cors-config-details.component.scss'],
   standalone: true,
   imports: [
     ReactiveFormsModule,
@@ -49,8 +50,7 @@ import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/
     DfVerbPickerComponent,
   ],
 })
-export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
-  destroyed$ = new Subject<void>();
+export class DfCorsConfigDetailsComponent implements OnInit {
   corsForm: FormGroup;
   corsConfigToEdit: CorsConfigData | undefined;
   @ViewChild('select') select: MatSelect;
@@ -81,7 +81,6 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.activatedRoute.data
       .pipe(
-        takeUntil(this.destroyed$),
         catchError(error => {
           this.router.navigate([
             `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
@@ -109,11 +108,6 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
             this.allMethodsSelected = true;
         }
       });
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 
   toggleAllSelection() {
@@ -173,7 +167,6 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
               fields: '*',
             }
           )
-          .pipe(takeUntil(this.destroyed$))
           .subscribe(() => {
             this.router.navigate([
               `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
@@ -184,7 +177,6 @@ export class DfCorsConfigDetailsComponent implements OnInit, OnDestroy {
         const payload = this.assemblePayload();
         this.corsConfigService
           .update(this.corsConfigToEdit.id, payload)
-          .pipe(takeUntil(this.destroyed$))
           .subscribe(() => {
             this.router.navigate([
               `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,

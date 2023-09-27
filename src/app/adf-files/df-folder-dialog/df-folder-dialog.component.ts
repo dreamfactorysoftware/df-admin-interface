@@ -1,4 +1,4 @@
-import { Component, Inject, OnDestroy } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
@@ -14,10 +14,10 @@ import {
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { Subject, takeUntil } from 'rxjs';
+import { UntilDestroy } from '@ngneat/until-destroy';
 import { FILE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-folder-dialog-component',
   templateUrl: 'df-folder-dialog.component.html',
@@ -31,9 +31,8 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
     ReactiveFormsModule,
   ],
 })
-export class DfFolderDialogComponent implements OnDestroy {
+export class DfFolderDialogComponent {
   dialogForm: FormGroup;
-  destroyed$ = new Subject<void>();
 
   constructor(
     @Inject(FILE_SERVICE_TOKEN)
@@ -45,11 +44,6 @@ export class DfFolderDialogComponent implements OnDestroy {
     this.dialogForm = this.fb.group({
       name: ['', Validators.required],
     });
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 
   save(): void {
@@ -70,7 +64,6 @@ export class DfFolderDialogComponent implements OnDestroy {
         },
         this.data.route
       )
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
         this.dialogRef.close({ refreshData: true });
       });

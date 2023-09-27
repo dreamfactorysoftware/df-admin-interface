@@ -1,12 +1,5 @@
 import { NgFor, NgIf } from '@angular/common';
-import {
-  Component,
-  DoCheck,
-  Input,
-  OnDestroy,
-  Optional,
-  Self,
-} from '@angular/core';
+import { Component, DoCheck, Input, Self } from '@angular/core';
 import {
   ControlValueAccessor,
   FormControl,
@@ -17,14 +10,14 @@ import {
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { Subject, takeUntil } from 'rxjs';
 import { ConfigSchema } from '../../types/service';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
 type Verb = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-verb-picker',
   templateUrl: './df-verb-picker.component.html',
@@ -40,14 +33,11 @@ type Verb = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     FontAwesomeModule,
   ],
 })
-export class DfVerbPickerComponent
-  implements ControlValueAccessor, OnDestroy, DoCheck
-{
+export class DfVerbPickerComponent implements ControlValueAccessor, DoCheck {
   @Input() type: 'number' | 'verb' | 'verb_multiple' = 'verb';
   @Input() schema: Partial<ConfigSchema>;
   @Input() showLabel = true;
   faCircleInfo = faCircleInfo;
-  destroyed$ = new Subject<void>();
   control = new FormControl();
 
   verbs = [
@@ -120,23 +110,17 @@ export class DfVerbPickerComponent
 
   registerOnChange(fn: any): void {
     this.onChange = fn;
-    this.control.valueChanges
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(selected => {
-        const total =
-          this.type === 'number'
-            ? (selected || []).reduce(
-                (acc: number, val: number) => acc | val,
-                0
-              )
-            : this.type === 'verb_multiple'
-            ? ((selected || []).map(
-                (v: any) =>
-                  this.verbs.find(vr => vr.value === v)?.altValue ?? ''
-              ) as Array<Verb>)
-            : this.verbs.find(vr => vr.value === selected)?.altValue ?? '';
-        this.onChange(total);
-      });
+    this.control.valueChanges.subscribe(selected => {
+      const total =
+        this.type === 'number'
+          ? (selected || []).reduce((acc: number, val: number) => acc | val, 0)
+          : this.type === 'verb_multiple'
+          ? ((selected || []).map(
+              (v: any) => this.verbs.find(vr => vr.value === v)?.altValue ?? ''
+            ) as Array<Verb>)
+          : this.verbs.find(vr => vr.value === selected)?.altValue ?? '';
+      this.onChange(total);
+    });
   }
 
   registerOnTouched(fn: any): void {
@@ -145,10 +129,5 @@ export class DfVerbPickerComponent
 
   setDisabledState(disabled: boolean): void {
     disabled ? this.control.disable() : this.control.enable();
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

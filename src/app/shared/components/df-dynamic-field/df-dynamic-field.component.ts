@@ -1,11 +1,4 @@
-import {
-  Component,
-  DoCheck,
-  Input,
-  OnDestroy,
-  Optional,
-  Self,
-} from '@angular/core';
+import { Component, DoCheck, Input, Optional, Self } from '@angular/core';
 import {
   FormControl,
   NgControl,
@@ -24,8 +17,8 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
-import { Subject, takeUntil } from 'rxjs';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-dynamic-field',
   templateUrl: './df-dynamic-field.component.html',
@@ -45,8 +38,7 @@ import { Subject, takeUntil } from 'rxjs';
     MatTooltipModule,
   ],
 })
-export class DfDynamicFieldComponent implements OnDestroy, DoCheck {
-  destroyed$ = new Subject<void>();
+export class DfDynamicFieldComponent implements DoCheck {
   @Input() schema: ConfigSchema;
   @Input() showLabel = true;
   faCircleInfo = faCircleInfo;
@@ -81,9 +73,7 @@ export class DfDynamicFieldComponent implements OnDestroy, DoCheck {
 
   registerOnChange(fn: any): void {
     this.onChange = fn;
-    this.control.valueChanges
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(value => this.onChange(value));
+    this.control.valueChanges.subscribe(value => this.onChange(value));
   }
 
   registerOnTouched(fn: any): void {
@@ -92,10 +82,5 @@ export class DfDynamicFieldComponent implements OnDestroy, DoCheck {
 
   setDisabledState(isDisabled: boolean): void {
     isDisabled ? this.control.disable() : this.control.enable();
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

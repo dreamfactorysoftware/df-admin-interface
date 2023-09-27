@@ -1,4 +1,4 @@
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
@@ -7,7 +7,6 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslocoPipe } from '@ngneat/transloco';
@@ -19,7 +18,8 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { MatTabsModule } from '@angular/material/tabs';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-table-details',
   templateUrl: './df-table-details.component.html',
@@ -40,9 +40,8 @@ import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df
     DfAceEditorComponent,
   ],
 })
-export class DfTableDetailsComponent implements OnInit, OnDestroy {
+export class DfTableDetailsComponent implements OnInit {
   tableDetailsForm: FormGroup;
-  destroyed$ = new Subject<void>();
   type: string;
   dbName: string;
   tableFields: [];
@@ -67,32 +66,25 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.dbName = this.activatedRoute.snapshot.params['name'];
-        this.type = data['type'];
-        this.jsonData = JSON.stringify(data['data'], null, 2);
+    this.activatedRoute.data.subscribe(data => {
+      this.dbName = this.activatedRoute.snapshot.params['name'];
+      this.type = data['type'];
+      this.jsonData = JSON.stringify(data['data'], null, 2);
 
-        if (this.type === 'edit') {
-          this.tableDetailsForm.patchValue({
-            name: data['data'].name,
-            alias: data['data'].alias,
-            label: data['data'].label,
-            plural: data['data'].plural,
-            description: data['data'].description,
-          });
+      if (this.type === 'edit') {
+        this.tableDetailsForm.patchValue({
+          name: data['data'].name,
+          alias: data['data'].alias,
+          label: data['data'].label,
+          plural: data['data'].plural,
+          description: data['data'].description,
+        });
 
-          this.tableDetailsForm.get('name')?.disable();
-          this.tableFields = data['data'].field;
-          this.tableRelated = data['data'].related;
-        }
-      });
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
+        this.tableDetailsForm.get('name')?.disable();
+        this.tableFields = data['data'].field;
+        this.tableRelated = data['data'].related;
+      }
+    });
   }
 
   goBack() {
@@ -125,7 +117,6 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
           },
           `${this.dbName}/_schema`
         )
-        .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.goBack();
         });
@@ -135,7 +126,6 @@ export class DfTableDetailsComponent implements OnInit, OnDestroy {
         .patch(`${this.dbName}/_schema/${tableName}`, data, {
           snackbarSuccess: 'schema.alerts.updateSuccess',
         })
-        .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.goBack();
         });

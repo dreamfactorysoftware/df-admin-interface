@@ -1,4 +1,4 @@
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
@@ -9,14 +9,15 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { catchError, throwError } from 'rxjs';
 import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { isValidHttpUrl } from '../helpers/url-validation';
 import { GITHUB_REPO_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { KeyValuePair } from 'src/app/shared/types/generic-http.type';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-scripts-github-dialog',
   templateUrl: './df-scripts-github-dialog.component.html',
@@ -34,10 +35,9 @@ import { KeyValuePair } from 'src/app/shared/types/generic-http.type';
     TranslocoPipe,
   ],
 })
-export class DfScriptsGithubDialogComponent implements OnInit, OnDestroy {
+export class DfScriptsGithubDialogComponent implements OnInit {
   isGitRepoPrivate = false;
   formGroup: FormGroup;
-  destroyed$ = new Subject<void>();
   repoOwner: string;
   repoName: string;
   fileName: string;
@@ -53,56 +53,53 @@ export class DfScriptsGithubDialogComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.formGroup.controls['url'].valueChanges
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe((url: string) => {
-        if (isValidHttpUrl(url)) {
-          console.log('value: ', url);
+    this.formGroup.controls['url'].valueChanges.subscribe((url: string) => {
+      if (isValidHttpUrl(url)) {
+        console.log('value: ', url);
 
-          if (
-            (url.indexOf('.js') > 0 ||
-              url.indexOf('.py') > 0 ||
-              url.indexOf('.php') > 0 ||
-              url.indexOf('.txt') > 0) &&
-            url.includes('github')
-          ) {
-            const urlParams = url.substring(url.indexOf('.com/') + 5);
-            const urlArray = urlParams.split('/');
+        if (
+          (url.indexOf('.js') > 0 ||
+            url.indexOf('.py') > 0 ||
+            url.indexOf('.php') > 0 ||
+            url.indexOf('.txt') > 0) &&
+          url.includes('github')
+        ) {
+          const urlParams = url.substring(url.indexOf('.com/') + 5);
+          const urlArray = urlParams.split('/');
 
-            this.repoOwner = urlArray[0];
-            this.repoName = urlArray[1];
-            this.fileName = urlArray[4];
-            const githubApiEndpoint = `${this.repoOwner}/${this.repoName}`;
+          this.repoOwner = urlArray[0];
+          this.repoName = urlArray[1];
+          this.fileName = urlArray[4];
+          const githubApiEndpoint = `${this.repoOwner}/${this.repoName}`;
 
-            this.githubService
-              .get(githubApiEndpoint, {
-                snackbarError: 'server',
-                snackbarSuccess: 'getScriptSuccessMsg',
+          this.githubService
+            .get(githubApiEndpoint, {
+              snackbarError: 'server',
+              snackbarSuccess: 'getScriptSuccessMsg',
+            })
+            .pipe(
+              catchError(err => {
+                // repo can't be found therefore it is private hence enabling the username and password fields
+                this.isGitRepoPrivate = true;
+                this.formGroup.addControl(
+                  'username',
+                  this.formBuilder.control('', Validators.required)
+                );
+                this.formGroup.addControl(
+                  'password',
+                  this.formBuilder.control('', Validators.required)
+                );
+                return throwError(() => new Error(err));
               })
-              .pipe(
-                takeUntil(this.destroyed$),
-                catchError(err => {
-                  // repo can't be found therefore it is private hence enabling the username and password fields
-                  this.isGitRepoPrivate = true;
-                  this.formGroup.addControl(
-                    'username',
-                    this.formBuilder.control('', Validators.required)
-                  );
-                  this.formGroup.addControl(
-                    'password',
-                    this.formBuilder.control('', Validators.required)
-                  );
-                  return throwError(() => new Error(err));
-                })
-              )
-              .subscribe(data => {
-                console.log('github api response: ', data);
-              });
-          } else {
-            // display error message stating that file needs to have certain extension
-          }
+            )
+            .subscribe(data => {
+              console.log('github api response: ', data);
+            });
+        } else {
+          // display error message stating that file needs to have certain extension
         }
-      });
+      }
+    });
   }
 
   onUpload() {
@@ -126,14 +123,9 @@ export class DfScriptsGithubDialogComponent implements OnInit, OnDestroy {
         additionalParams: [{ key: 'ref', value: 'main' }],
         additionalHeaders: [...headers],
       })
-      .pipe(takeUntil(this.destroyed$))
+
       .subscribe(data => {
         this.dialogRef.close({ data: data });
       });
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

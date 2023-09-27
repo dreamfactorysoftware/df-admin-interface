@@ -1,5 +1,5 @@
 import { NgIf } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import {
   FormGroup,
   FormGroupDirective,
@@ -10,8 +10,9 @@ import {
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { Subject, takeUntil } from 'rxjs';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-profile-details',
   templateUrl: './df-profile-details.component.html',
@@ -25,18 +26,15 @@ import { Subject, takeUntil } from 'rxjs';
     NgIf,
   ],
 })
-export class DfProfileDetailsComponent implements OnInit, OnDestroy {
-  destroyed$ = new Subject<void>();
+export class DfProfileDetailsComponent implements OnInit {
   rootForm: FormGroup;
   constructor(private rootFormGroup: FormGroupDirective) {}
 
   ngOnInit() {
     this.rootForm = this.rootFormGroup.control;
-    this.rootFormGroup.ngSubmit
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(() => {
-        this.rootForm.markAllAsTouched();
-      });
+    this.rootFormGroup.ngSubmit.subscribe(() => {
+      this.rootForm.markAllAsTouched();
+    });
   }
 
   controlExists(control: string): boolean {
@@ -45,10 +43,5 @@ export class DfProfileDetailsComponent implements OnInit, OnDestroy {
 
   isRequired(control: string): boolean {
     return !!this.rootForm.get(control)?.hasValidator(Validators.required);
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

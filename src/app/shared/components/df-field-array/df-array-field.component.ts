@@ -1,5 +1,5 @@
 import { NgFor, NgIf } from '@angular/common';
-import { Component, Input, OnDestroy, OnInit, forwardRef } from '@angular/core';
+import { Component, Input, OnInit, forwardRef } from '@angular/core';
 import {
   ControlValueAccessor,
   FormArray,
@@ -21,13 +21,14 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { DfDynamicFieldComponent } from '../df-dynamic-field/df-dynamic-field.component';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { Subject, map } from 'rxjs';
+import { map } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfVerbPickerComponent } from '../df-verb-picker/df-verb-picker.component';
 import { MatSelectModule } from '@angular/material/select';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-array-field',
   templateUrl: './df-array-field.component.html',
@@ -57,11 +58,8 @@ import { MatSelectModule } from '@angular/material/select';
     MatSelectModule,
   ],
 })
-export class DfArrayFieldComponent
-  implements OnInit, ControlValueAccessor, OnDestroy
-{
+export class DfArrayFieldComponent implements OnInit, ControlValueAccessor {
   @Input() schema: ConfigSchema;
-  destroyed$ = new Subject<void>();
   fieldArray: FormArray;
   faPlus = faPlus;
   faTrashCan = faTrashCan;
@@ -200,10 +198,5 @@ export class DfArrayFieldComponent
 
   remove(index: number) {
     this.fieldArray.removeAt(index);
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }
