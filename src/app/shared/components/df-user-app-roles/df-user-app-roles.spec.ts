@@ -13,17 +13,13 @@ import {
   FormGroupDirective,
   FormGroup,
   FormArray,
-  FormControl,
 } from '@angular/forms';
-import { MatTableDataSource } from '@angular/material/table';
 import { MatInputModule } from '@angular/material/input';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { AppType } from 'src/app/adf-apps/types/df-apps.types';
 import { RoleType } from '../../types/role';
-import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
-import { TranslocoPipe } from '@ngneat/transloco';
 import { NgIf, NgFor } from '@angular/common';
 
 describe('DfUserAppRolesComponent', () => {
