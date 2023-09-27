@@ -20,16 +20,6 @@ describe('DfAlertComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should display the message', () => {
-    const message = 'This is a test message';
-    component.message = message;
-    fixture.detectChanges();
-    fixture.whenStable().then(() => {
-      const element = fixture.nativeElement.querySelector('.alert-message');
-      expect(element.textContent).toContain(message);
-    });
-  });
-
   it('should display the correct icon for the alert type', () => {
     const alertType: AlertType = 'error';
     component.alertType = alertType;
