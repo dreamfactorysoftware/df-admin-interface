@@ -81,7 +81,6 @@ describe('DfPasswordResetComponent - Username Reset', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
-    component.ngOnDestroy();
   });
 
   it('should create', () => {

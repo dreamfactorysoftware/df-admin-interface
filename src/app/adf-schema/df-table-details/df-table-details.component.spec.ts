@@ -5,8 +5,8 @@ import {
   createTestBedConfig,
   mockTableDetailsData,
 } from 'src/app/shared/utilities/test';
-import { DfBreakpointService } from 'src/app/core/services/df-breakpoint.service';
-import { DfBaseCrudService } from 'src/app/core/services/df-base-crud.service';
+import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 
 describe('DfTableDetailsComponent - edit table details', () => {
   let component: DfTableDetailsComponent;
