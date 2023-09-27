@@ -6,7 +6,6 @@ import {
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import { takeUntil } from 'rxjs';
 import { LimitType } from 'src/app/shared/types/limit';
 import {
   LIMIT_CACHE_SERVICE_TOKEN,
@@ -17,6 +16,7 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
 export type LimitTableRowData = {
   id: number;
@@ -29,7 +29,7 @@ export type LimitTableRowData = {
   role: number | null;
   active: boolean;
 };
-
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-limits-table',
   templateUrl:
@@ -136,10 +136,7 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
   filterQuery = getFilterQuery('limits');
 
   refreshRow(row: LimitTableRowData): void {
-    this.limitCacheService
-      .delete(row.id)
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(() => this.refreshTable());
+    this.limitCacheService.delete(row.id).subscribe(() => this.refreshTable());
   }
 
   override deleteRow(row: LimitTableRowData): void {
@@ -158,7 +155,6 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
         related:
           'service_by_service_id,role_by_role_id,user_by_user_id,limit_cache_by_limit_id',
       })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;

@@ -1,4 +1,4 @@
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
@@ -6,7 +6,7 @@ import {
   ReactiveFormsModule,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { catchError, throwError } from 'rxjs';
 import { RoleType } from 'src/app/shared/types/role';
 import { ROUTES } from 'src/app/shared/constants/routes';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
@@ -33,7 +33,8 @@ import {
   TranslocoService,
 } from '@ngneat/transloco';
 import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-limit',
   templateUrl: './df-limit-details.component.html',
@@ -55,7 +56,7 @@ import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/
     DfVerbPickerComponent,
   ],
 })
-export class DfLimitComponent implements OnInit, OnDestroy {
+export class DfLimitComponent implements OnInit {
   limitTypes = [
     { value: 'instance', name: 'Instance' },
     { value: 'instance.user', name: 'User' },
@@ -82,7 +83,6 @@ export class DfLimitComponent implements OnInit, OnDestroy {
 
   formGroup: FormGroup;
 
-  destroyed$ = new Subject<void>();
   isEditMode = false;
 
   limitTypeToEdit: LimitType | null = null;
@@ -123,7 +123,6 @@ export class DfLimitComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.activatedRoute.data
       .pipe(
-        takeUntil(this.destroyed$),
         catchError(error => {
           this.router.navigate([
             `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
@@ -167,38 +166,24 @@ export class DfLimitComponent implements OnInit, OnDestroy {
       this.renderCorrectHiddenFields(this.limitTypes[0].value);
     }
 
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.serviceDropdownOptions = data['services'].resource;
-      });
+    this.activatedRoute.data.subscribe(data => {
+      this.serviceDropdownOptions = data['services'].resource;
+    });
 
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.userDropdownOptions = data['users'].resource;
-      });
+    this.activatedRoute.data.subscribe(data => {
+      this.userDropdownOptions = data['users'].resource;
+    });
 
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.roleDropdownOptions = data['roles'].resource;
-      });
+    this.activatedRoute.data.subscribe(data => {
+      this.roleDropdownOptions = data['roles'].resource;
+    });
 
-    this.formGroup
-      .get('limitType')
-      ?.valueChanges.pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        if (data) {
-          this.removeFormField();
-          this.renderCorrectHiddenFields(data);
-        }
-      });
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
+    this.formGroup.get('limitType')?.valueChanges.subscribe(data => {
+      if (data) {
+        this.removeFormField();
+        this.renderCorrectHiddenFields(data);
+      }
+    });
   }
 
   onSubmit() {
@@ -210,7 +195,6 @@ export class DfLimitComponent implements OnInit, OnDestroy {
         this.limitService
           .create({ resource: [payload] })
           .pipe(
-            takeUntil(this.destroyed$),
             catchError(err => {
               this.alertMsg = err.error.error.message;
               this.showAlert = true;
@@ -229,7 +213,6 @@ export class DfLimitComponent implements OnInit, OnDestroy {
         this.limitService
           .update(payload.id, payload)
           .pipe(
-            takeUntil(this.destroyed$),
             catchError(err => {
               this.alertMsg = err.error.error.message;
               this.showAlert = true;

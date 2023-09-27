@@ -42,7 +42,8 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfScriptsGithubDialogComponent } from '../df-scripts-github-dialog/df-scripts-github-dialog.component';
 import { KeyValuePair } from 'src/app/shared/types/generic-http.type';
 import { mapCamelToSnake } from 'src/app/shared/utilities/case';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-scripts',
   templateUrl: './df-scripts.component.html',
@@ -69,8 +70,7 @@ import { mapCamelToSnake } from 'src/app/shared/utilities/case';
     ReactiveFormsModule,
   ],
 })
-export class DfScriptsComponent implements OnInit, OnDestroy {
-  destroyed$ = new Subject<void>();
+export class DfScriptsComponent implements OnInit {
   userServices: Service[];
   scriptTypes: ScriptType[];
   selectedService: Service;
@@ -104,12 +104,10 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
     private formBuilder: FormBuilder,
     public dialog: MatDialog
   ) {
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe((data: any) => {
-        this.userServices = data.data.resource;
-        this.scriptTypes = data.scriptType.resource;
-      });
+    this.activatedRoute.data.subscribe((data: any) => {
+      this.userServices = data.data.resource;
+      this.scriptTypes = data.scriptType.resource;
+    });
 
     this.dropDownOptionsFormGroup = this.formBuilder.group({
       selectedService: [],
@@ -142,30 +140,23 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
           },
         ],
       })
-      .pipe(takeUntil(this.destroyed$))
+
       .subscribe((data: any) => {
         this.fileServiceDropdownOptions = data.services;
       });
 
-    this.scriptFormGroup.controls['storageServiceId'].valueChanges
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe((id: number) => {
+    this.scriptFormGroup.controls['storageServiceId'].valueChanges.subscribe(
+      (id: number) => {
         this.selectedFileService = this.fileServiceDropdownOptions.find(val => {
           return val.id === id;
         });
-      });
+      }
+    );
 
-    this.scriptFormGroup.controls['type'].valueChanges
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(val => {
-        const fileType = this.getAcceptedFileTypes(val);
-        this.fileInput.nativeElement.accept = fileType;
-      });
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
+    this.scriptFormGroup.controls['type'].valueChanges.subscribe(val => {
+      const fileType = this.getAcceptedFileTypes(val);
+      this.fileInput.nativeElement.accept = fileType;
+    });
   }
 
   getAcceptedFileTypes(fileType: string): string {
@@ -190,7 +181,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
 
     dialogRef
       .afterClosed()
-      .pipe(takeUntil(this.destroyed$))
+
       .subscribe(res => {
         if (res) {
           this.githubFileObject = res.data;
@@ -234,7 +225,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
               snackbarSuccess: 'scripts.updateSuccessMsg',
             }
           )
-          .pipe(takeUntil(this.destroyed$))
+
           .subscribe();
       } else {
         this.eventScriptService
@@ -247,7 +238,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
               snackbarSuccess: 'scripts.createSuccessMsg',
             }
           )
-          .pipe(takeUntil(this.destroyed$))
+
           .subscribe(() => {
             if (this.confirmedEndpoint) {
               this.fetchScript(this.confirmedEndpoint);
@@ -277,7 +268,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
           snackbarError: 'server',
           snackbarSuccess: 'scripts.deleteSuccessMsg',
         })
-        .pipe(takeUntil(this.destroyed$))
+
         .subscribe(() => {
           this.onBack();
         });
@@ -318,7 +309,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         snackbarError: 'server',
         snackbarSuccess: 'scripts.fetchCacheSuccessMsg',
       })
-      .pipe(takeUntil(this.destroyed$))
+
       .subscribe(data => {
         this.scriptFormGroup.patchValue({
           content: data,
@@ -332,7 +323,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
         snackbarError: 'server',
         snackbarSuccess: 'scripts.deleteCacheSuccessMsg',
       })
-      .pipe(takeUntil(this.destroyed$))
+
       .subscribe();
   }
 
@@ -349,7 +340,6 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
     this.eventScriptService
       .get(endpoint)
       .pipe(
-        takeUntil(this.destroyed$),
         catchError(err => {
           this.editScriptMode = false;
           return throwError(() => new Error(err));
@@ -442,7 +432,7 @@ export class DfScriptsComponent implements OnInit, OnDestroy {
           },
         ],
       })
-      .pipe(takeUntil(this.destroyed$))
+
       .subscribe((data: any) => {
         // enable 2nd dropdown
         this.dropDownOptionsFormGroup.controls['serviceKeys'].enable();

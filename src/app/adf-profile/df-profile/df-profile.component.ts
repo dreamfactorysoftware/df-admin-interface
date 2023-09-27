@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { DfProfileService } from '../services/df-profile.service';
 import {
   FormBuilder,
@@ -8,7 +8,7 @@ import {
   ReactiveFormsModule,
 } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { catchError, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import { matchValidator } from '../../shared/validators/match.validator';
 import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
@@ -26,7 +26,8 @@ import { NgIf, AsyncPipe } from '@angular/common';
 import { DfProfileDetailsComponent } from '../../shared/components/df-profile-details/df-profile-details.component';
 import { MatTabsModule } from '@angular/material/tabs';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-profile',
   templateUrl: './df-profile.component.html',
@@ -44,8 +45,7 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
     TranslocoPipe,
   ],
 })
-export class DfProfileComponent implements OnInit, OnDestroy {
-  private destroyed$ = new Subject<void>();
+export class DfProfileComponent implements OnInit {
   profileForm: FormGroup;
   securityQuestionForm: FormGroup;
   updatePasswordForm: FormGroup;
@@ -91,42 +91,37 @@ export class DfProfileComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ data }) => {
-        this.currentProfile = data;
-        this.profileForm.patchValue({
-          profileDetailsGroup: {
-            username: data.username,
-            email: data.email,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            name: data.name,
-            phone: data.phone,
-          },
-        });
-        this.securityQuestionForm.patchValue({
-          securityQuestion: data.securityQuestion,
-        });
+    this.activatedRoute.data.subscribe(({ data }) => {
+      this.currentProfile = data;
+      this.profileForm.patchValue({
+        profileDetailsGroup: {
+          username: data.username,
+          email: data.email,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          name: data.name,
+          phone: data.phone,
+        },
       });
-    this.systemConfigDataService.environment$
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(env => {
-        this.loginAttribute = env.authentication.loginAttribute;
-        if (this.loginAttribute === 'username') {
-          this.profileForm
-            .get('profileDetailsGroup.username')
-            ?.addValidators([Validators.required]);
-        } else {
-          this.profileForm
-            .get('profileDetailsGroup.email')
-            ?.addValidators([Validators.required]);
-        }
+      this.securityQuestionForm.patchValue({
+        securityQuestion: data.securityQuestion,
       });
+    });
+    this.systemConfigDataService.environment$.subscribe(env => {
+      this.loginAttribute = env.authentication.loginAttribute;
+      if (this.loginAttribute === 'username') {
+        this.profileForm
+          .get('profileDetailsGroup.username')
+          ?.addValidators([Validators.required]);
+      } else {
+        this.profileForm
+          .get('profileDetailsGroup.email')
+          ?.addValidators([Validators.required]);
+      }
+    });
     this.profileForm
       .get('profileDetailsGroup.email')
-      ?.valueChanges.pipe(takeUntil(this.destroyed$))
-      .subscribe(val => {
+      ?.valueChanges.subscribe(val => {
         if (this.currentProfile.email !== val) {
           this.needPassword = true;
           this.profileForm.addControl(
@@ -154,7 +149,6 @@ export class DfProfileComponent implements OnInit, OnDestroy {
     this.profileService
       .saveProfile(body)
       .pipe(
-        takeUntil(this.destroyed$),
         catchError(err => {
           this.triggerAlert('error', err.error.error.message);
           return throwError(() => new Error(err));
@@ -187,7 +181,6 @@ export class DfProfileComponent implements OnInit, OnDestroy {
     this.profileService
       .saveProfile(body)
       .pipe(
-        takeUntil(this.destroyed$),
         catchError(err => {
           this.triggerAlert('error', err.error.error.message);
           return throwError(() => new Error(err));
@@ -211,7 +204,6 @@ export class DfProfileComponent implements OnInit, OnDestroy {
     this.passwordService
       .updatePassword(this.updatePasswordForm.value)
       .pipe(
-        takeUntil(this.destroyed$),
         catchError(err => {
           this.triggerAlert('error', err.error.error.message);
           return throwError(() => new Error(err));
@@ -226,10 +218,5 @@ export class DfProfileComponent implements OnInit, OnDestroy {
         );
         this.updatePasswordForm.reset();
       });
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

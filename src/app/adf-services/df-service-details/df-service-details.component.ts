@@ -1,5 +1,5 @@
 import { NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormControl,
@@ -17,7 +17,6 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { Subject } from 'rxjs';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
 import { ServiceType } from 'src/app/shared/types/service';
@@ -25,7 +24,9 @@ import { mapCamelToSnake } from 'src/app/shared/utilities/case';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
-
+import { MatButtonModule } from '@angular/material/button';
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-service-details',
   templateUrl: './df-service-details.component.html',
@@ -49,10 +50,10 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     DfArrayFieldComponent,
     FontAwesomeModule,
     MatTooltipModule,
+    MatButtonModule,
   ],
 })
-export class DfServiceDetailsComponent implements OnInit, OnDestroy {
-  destroyed$ = new Subject<void>();
+export class DfServiceDetailsComponent implements OnInit {
   edit = false;
   serviceTypes: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -97,6 +98,7 @@ export class DfServiceDetailsComponent implements OnInit, OnDestroy {
     this.activatedRoute.data.subscribe(({ data, serviceTypes }) => {
       this.serviceTypes = serviceTypes;
       if (this.edit) {
+        this.serviceForm.controls['type'].disable();
         this.serviceForm.patchValue({
           ...data,
           config: mapCamelToSnake(data.config),
@@ -107,12 +109,7 @@ export class DfServiceDetailsComponent implements OnInit, OnDestroy {
 
   get configSchema() {
     return this.serviceTypes.find(
-      type => type.name === this.serviceForm.value.type
+      type => type.name === this.serviceForm.getRawValue().type
     )?.configSchema;
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

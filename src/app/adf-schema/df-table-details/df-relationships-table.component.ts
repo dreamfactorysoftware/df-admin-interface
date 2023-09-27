@@ -11,10 +11,10 @@ import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { takeUntil } from 'rxjs';
 import { ROUTES } from 'src/app/shared/constants/routes';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-relationships-table',
   templateUrl:
@@ -40,12 +40,10 @@ export class DfRelationshipsTableComponent extends DfManageTableComponent<Relati
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
 
-    this._activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.tableName =
-          data['data'] && data['data'].name ? data['data'].name : '';
-      });
+    this._activatedRoute.data.subscribe(data => {
+      this.tableName =
+        data['data'] && data['data'].name ? data['data'].name : '';
+    });
 
     this.dbName = this._activatedRoute.snapshot.params['name'];
   }
@@ -113,17 +111,15 @@ export class DfRelationshipsTableComponent extends DfManageTableComponent<Relati
   override deleteRow(row: RelationshipsRow): void {
     this.crudService
       .delete(`${this.dbName}/_schema/${this.tableName}/_related/${row.name}`)
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
         this.refreshTable();
       });
     // TODO: implement error handling
   }
 
-  refreshTable(limit?: number, offset?: number, filter?: string): void {
+  refreshTable(): void {
     this.crudService
       .get(`${this.dbName}/_schema/${this.tableName}/_related`)
-      .pipe(takeUntil(this.destroyed$))
       .subscribe((data: any) => {
         this.dataSource.data = this.mapDataToTable(data.resource);
       });

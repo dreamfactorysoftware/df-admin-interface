@@ -3,7 +3,6 @@ import { Component, Inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoService } from '@ngneat/transloco';
-import { takeUntil } from 'rxjs';
 import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import {
@@ -13,7 +12,8 @@ import {
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { Service, ServiceRow, ServiceType } from 'src/app/shared/types/service';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-services-table',
   templateUrl:
@@ -37,22 +37,20 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
     dialog: MatDialog
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
-    this._activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ system, data }) => {
-        this.serviceTypes = data.serviceTypes;
-        this.system = system;
-        this.allowCreate = !system;
-        if (system) {
-          this.actions = {
-            default: this.actions.default,
-            additional:
-              this.actions.additional?.filter(
-                action => action.label !== 'delete'
-              ) ?? null,
-          };
-        }
-      });
+    this._activatedRoute.data.subscribe(({ system, data }) => {
+      this.serviceTypes = data.serviceTypes;
+      this.system = system;
+      this.allowCreate = !system;
+      if (system) {
+        this.actions = {
+          default: this.actions.default,
+          additional:
+            this.actions.additional?.filter(
+              action => action.label !== 'delete'
+            ) ?? null,
+        };
+      }
+    });
   }
   override columns = [
     {
@@ -99,7 +97,6 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
   override deleteRow(row: ServiceRow): void {
     this.serviceService
       .delete(row.id, { snackbarSuccess: 'admins.alerts.deleteSuccess' })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
         this.refreshTable();
       });
@@ -125,7 +122,6 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
         offset,
         filter,
       })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;

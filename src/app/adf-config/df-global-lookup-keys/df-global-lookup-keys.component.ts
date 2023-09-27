@@ -1,4 +1,4 @@
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import {
   FormArray,
   FormBuilder,
@@ -7,7 +7,6 @@ import {
   Validators,
   ReactiveFormsModule,
 } from '@angular/forms';
-import { Subject, takeUntil } from 'rxjs';
 import { DfLookupKeysComponent } from 'src/app/shared/components/df-lookup-keys/df-lookup-keys.component';
 import { uniqueNameValidator } from 'src/app/shared/validators/unique-name.validator';
 import { TranslocoPipe } from '@ngneat/transloco';
@@ -16,7 +15,8 @@ import { ActivatedRoute } from '@angular/router';
 import { LookupKeyType } from './df-global-lookup-keys.types';
 import { LOOKUP_KEYS_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-global-lookup-keys',
   templateUrl: './df-global-lookup-keys.component.html',
@@ -29,9 +29,8 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
     MatButtonModule,
   ],
 })
-export class DfGlobalLookupKeysComponent implements OnInit, OnDestroy {
+export class DfGlobalLookupKeysComponent implements OnInit {
   lookupKeysForm: FormGroup;
-  destroyed$ = new Subject<void>();
 
   constructor(
     @Inject(LOOKUP_KEYS_SERVICE_TOKEN)
@@ -45,22 +44,20 @@ export class DfGlobalLookupKeysComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(({ data }) => {
-        if (data.resource.length > 0) {
-          data.resource.forEach((item: LookupKeyType) => {
-            (this.lookupKeysForm.controls['lookupKeys'] as FormArray).push(
-              new FormGroup({
-                name: new FormControl(item.name, [Validators.required]),
-                value: new FormControl(item.value),
-                private: new FormControl(item.private),
-                id: new FormControl(item.id),
-              })
-            );
-          });
-        }
-      });
+    this.activatedRoute.data.subscribe(({ data }) => {
+      if (data.resource.length > 0) {
+        data.resource.forEach((item: LookupKeyType) => {
+          (this.lookupKeysForm.controls['lookupKeys'] as FormArray).push(
+            new FormGroup({
+              name: new FormControl(item.name, [Validators.required]),
+              value: new FormControl(item.value),
+              private: new FormControl(item.private),
+              id: new FormControl(item.id),
+            })
+          );
+        });
+      }
+    });
   }
 
   save() {
@@ -96,10 +93,5 @@ export class DfGlobalLookupKeysComponent implements OnInit, OnDestroy {
         }
       });
     }
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

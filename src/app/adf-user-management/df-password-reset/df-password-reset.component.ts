@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
@@ -10,7 +10,7 @@ import { UserParams, LoginCredentials } from '../types';
 import { DfPasswordService } from '../services/df-password.service';
 import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import { matchValidator } from '../../shared/validators/match.validator';
-import { Subject, catchError, switchMap, takeUntil, throwError } from 'rxjs';
+import { catchError, switchMap, throwError } from 'rxjs';
 import {
   AlertType,
   DfAlertComponent,
@@ -24,7 +24,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatCardModule } from '@angular/material/card';
 import { TranslocoPipe } from '@ngneat/transloco';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-password-reset',
   templateUrl: './df-password-reset.component.html',
@@ -42,8 +43,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
     TranslocoPipe,
   ],
 })
-export class DfPasswordResetComponent implements OnInit, OnDestroy {
-  private destroyed$ = new Subject<void>();
+export class DfPasswordResetComponent implements OnInit {
   passwordResetForm: FormGroup;
   user: UserParams = { email: '', username: '', code: '', admin: '' };
   alertMsg = '';
@@ -75,39 +75,30 @@ export class DfPasswordResetComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     if (this.route.queryParams) {
-      this.route.queryParams
-        .pipe(takeUntil(this.destroyed$))
-        .subscribe(params => {
-          this.user = {
-            code: params['code'],
-            email: params['email'],
-            username: params['username'],
-            admin: params['admin'],
-          };
+      this.route.queryParams.subscribe(params => {
+        this.user = {
+          code: params['code'],
+          email: params['email'],
+          username: params['username'],
+          admin: params['admin'],
+        };
 
-          this.passwordResetForm.patchValue({
-            email: this.user.email,
-            username: this.user.username,
-            code: this.user.code,
-          });
+        this.passwordResetForm.patchValue({
+          email: this.user.email,
+          username: this.user.username,
+          code: this.user.code,
         });
+      });
     }
 
-    this.systemConfigDataService.environment$
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(env => {
-        this.loginAttribute = env.authentication.loginAttribute;
-      });
-    this.route.data.pipe(takeUntil(this.destroyed$)).subscribe(data => {
+    this.systemConfigDataService.environment$.subscribe(env => {
+      this.loginAttribute = env.authentication.loginAttribute;
+    });
+    this.route.data.subscribe(data => {
       if ('type' in data) {
         this.type = data['type'];
       }
     });
-  }
-
-  ngOnDestroy() {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 
   get isAdmin() {
@@ -122,7 +113,6 @@ export class DfPasswordResetComponent implements OnInit, OnDestroy {
     this.passwordResetService
       .resetPassword(resetCred, this.isAdmin)
       .pipe(
-        takeUntil(this.destroyed$),
         switchMap(() => {
           const credentials: LoginCredentials = {
             password: resetCred.newPassword,

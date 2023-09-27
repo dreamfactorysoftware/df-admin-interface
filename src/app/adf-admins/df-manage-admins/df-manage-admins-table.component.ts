@@ -6,7 +6,6 @@ import {
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { UserProfile, UserRow } from 'src/app/shared/types/user';
-import { takeUntil } from 'rxjs';
 import { saveRawAsFile } from 'src/app/shared/utilities/file';
 import { USER_COLUMNS } from 'src/app/shared/constants/table-columns';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
@@ -15,7 +14,9 @@ import { ADMIN_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-admins-table',
   templateUrl:
@@ -59,7 +60,6 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
   override deleteRow(row: UserRow): void {
     this.adminService
       .delete(row.id, { snackbarSuccess: 'admins.alerts.deleteSuccess' })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
         this.refreshTable();
       });
@@ -68,7 +68,6 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.adminService
       .getAll<GenericListResponse<UserProfile>>({ limit, offset, filter })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;

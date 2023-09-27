@@ -26,7 +26,8 @@ import { Service } from 'src/app/shared/types/service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-scheduler',
   templateUrl: './df-scheduler.component.html',
@@ -48,8 +49,7 @@ import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/
     DfVerbPickerComponent,
   ],
 })
-export class DfSchedulerComponent implements OnInit, OnDestroy {
-  destroyed$ = new Subject<void>();
+export class DfSchedulerComponent implements OnInit {
   formGroup: FormGroup; // basic form
   userServicesDropdownOptions: Service[];
   selectedService: Service | undefined;
@@ -81,57 +81,42 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
       method: ['GET', Validators.required],
       frequency: [],
     });
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe((data: any) => {
-        this.userServicesDropdownOptions = data.data.resource;
-      });
+    this.activatedRoute.data.subscribe((data: any) => {
+      this.userServicesDropdownOptions = data.data.resource;
+    });
 
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe((data: any) => {
-        this.scheduleToEdit = data.schedulerObject;
+    this.activatedRoute.data.subscribe((data: any) => {
+      this.scheduleToEdit = data.schedulerObject;
 
-        if (this.scheduleToEdit) {
-          this.log = this.scheduleToEdit.taskLogByTaskId?.content ?? '';
+      if (this.scheduleToEdit) {
+        this.log = this.scheduleToEdit.taskLogByTaskId?.content ?? '';
 
-          this.getServiceAccessList(this.scheduleToEdit.serviceId as number);
+        this.getServiceAccessList(this.scheduleToEdit.serviceId as number);
 
-          this.formGroup.setValue({
-            name: this.scheduleToEdit.name,
-            description: this.scheduleToEdit.description,
-            active: this.scheduleToEdit.isActive,
-            serviceId: this.scheduleToEdit.serviceId,
-            component: this.scheduleToEdit.component,
-            method: this.scheduleToEdit.verb,
-            frequency: this.scheduleToEdit.frequency,
-          });
+        this.formGroup.setValue({
+          name: this.scheduleToEdit.name,
+          description: this.scheduleToEdit.description,
+          active: this.scheduleToEdit.isActive,
+          serviceId: this.scheduleToEdit.serviceId,
+          component: this.scheduleToEdit.component,
+          method: this.scheduleToEdit.verb,
+          frequency: this.scheduleToEdit.frequency,
+        });
 
-          if (this.scheduleToEdit.verb !== 'GET') {
-            this.addPayloadField(this.scheduleToEdit.payload as string);
-          }
+        if (this.scheduleToEdit.verb !== 'GET') {
+          this.addPayloadField(this.scheduleToEdit.payload as string);
         }
-      });
+      }
+    });
 
-    this.formGroup
-      .get('method')
-      ?.valueChanges.pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        if (data === 'GET') this.removePayloadField();
-        else if (!this.formGroup.contains('payload')) this.addPayloadField();
-      });
+    this.formGroup.get('method')?.valueChanges.subscribe(data => {
+      if (data === 'GET') this.removePayloadField();
+      else if (!this.formGroup.contains('payload')) this.addPayloadField();
+    });
 
-    this.formGroup
-      .get('serviceId')
-      ?.valueChanges.pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.getServiceAccessList(data);
-      });
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
+    this.formGroup.get('serviceId')?.valueChanges.subscribe(data => {
+      this.getServiceAccessList(data);
+    });
   }
 
   onCancel() {
@@ -152,7 +137,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
             related: this.relatedParam,
           }
         )
-        .pipe(takeUntil(this.destroyed$))
+
         .subscribe(() =>
           this.router.navigate([
             `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
@@ -168,7 +153,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
           fields: '*',
           related: this.relatedParam,
         })
-        .pipe(takeUntil(this.destroyed$))
+
         .subscribe(() =>
           this.router.navigate([
             `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
@@ -204,7 +189,7 @@ export class DfSchedulerComponent implements OnInit, OnDestroy {
             },
           ],
         })
-        .pipe(takeUntil(this.destroyed$))
+
         .subscribe(data => {
           this.componentDropdownOptions = data.resource;
         });

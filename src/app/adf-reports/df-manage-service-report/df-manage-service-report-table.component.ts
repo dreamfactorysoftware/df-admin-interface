@@ -6,7 +6,6 @@ import {
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
-import { takeUntil } from 'rxjs';
 import { REPORT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { ServiceReportData } from 'src/app/shared/types/reports';
@@ -14,7 +13,8 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-service-report-table',
   templateUrl:
@@ -84,7 +84,6 @@ export class DfManageServiceReportTableComponent extends DfManageTableComponent<
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.service
       .getAll<GenericListResponse<ServiceReportData>>({ limit, offset, filter })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;

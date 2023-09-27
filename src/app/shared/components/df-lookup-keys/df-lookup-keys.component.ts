@@ -1,5 +1,5 @@
 import { NgIf, NgTemplateOutlet } from '@angular/common';
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import {
   FormArray,
   FormControl,
@@ -12,15 +12,14 @@ import {
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { Subject, takeUntil } from 'rxjs';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-
 import { MatExpansionModule } from '@angular/material/expansion';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-lookup-keys',
   templateUrl: './df-lookup-keys.component.html',
@@ -41,8 +40,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
     TranslocoPipe,
   ],
 })
-export class DfLookupKeysComponent implements OnInit, OnDestroy {
-  destroyed$ = new Subject<void>();
+export class DfLookupKeysComponent implements OnInit {
   rootForm: FormGroup;
   lookupKeys: FormArray;
   dataSource: MatTableDataSource<any>;
@@ -55,11 +53,9 @@ export class DfLookupKeysComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.rootForm = this.rootFormGroup.control;
-    this.rootFormGroup.ngSubmit
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(() => {
-        this.lookupKeys.markAllAsTouched();
-      });
+    this.rootFormGroup.ngSubmit.subscribe(() => {
+      this.lookupKeys.markAllAsTouched();
+    });
     this.lookupKeys = this.rootForm.get('lookupKeys') as FormArray;
     this.updateDataSource();
   }
@@ -82,10 +78,5 @@ export class DfLookupKeysComponent implements OnInit, OnDestroy {
   remove(index: number) {
     this.lookupKeys.removeAt(index);
     this.updateDataSource();
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

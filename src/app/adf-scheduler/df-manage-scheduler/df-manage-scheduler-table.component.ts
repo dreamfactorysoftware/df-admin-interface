@@ -5,7 +5,6 @@ import {
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import { takeUntil } from 'rxjs';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { SCHEDULER_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { SchedulerTaskData } from '../types/df-scheduler.types';
@@ -13,7 +12,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { Service } from 'src/app/shared/types/service';
 import { TranslocoService } from '@ngneat/transloco';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-scheduler-table',
   templateUrl:
@@ -112,16 +112,12 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
   filterQuery = getFilterQuery();
 
   override deleteRow(row: SchedulerTaskData): void {
-    this.service
-      .delete(row.id.toString())
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(() => this.refreshTable());
+    this.service.delete(row.id.toString()).subscribe(() => this.refreshTable());
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.service
       .getAll({ limit: limit, offset: offset, filter: filter })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe((data: any) => {
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;

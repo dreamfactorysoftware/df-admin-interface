@@ -1,4 +1,4 @@
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
@@ -19,10 +19,11 @@ import {
   EmailTemplatePayload,
 } from '../df-email-templates/df-email-templates.types';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { Subject, takeUntil } from 'rxjs';
 import { ROUTES } from 'src/app/shared/constants/routes';
 import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-email-template-details',
   templateUrl: './df-email-template-details.component.html',
@@ -41,10 +42,9 @@ import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
     AsyncPipe,
   ],
 })
-export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
+export class DfEmailTemplateDetailsComponent implements OnInit {
   emailTemplateForm: FormGroup;
   translateService: any;
-  destroyed$ = new Subject<void>();
   editApp: EmailTemplate;
 
   constructor(
@@ -73,11 +73,9 @@ export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe((data: any) => {
-        this.editApp = data?.data;
-      });
+    this.activatedRoute.data.subscribe((data: any) => {
+      this.editApp = data?.data;
+    });
 
     if (this.editApp) {
       this.emailTemplateForm.patchValue({
@@ -96,11 +94,6 @@ export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
         id: this.editApp.id,
       });
     }
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 
   goBack() {
@@ -134,7 +127,6 @@ export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
         .update(this.emailTemplateForm.value.id, payload, {
           snackbarSuccess: 'emailTemplates.alerts.updateSuccess',
         })
-        .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.goBack();
         });
@@ -146,7 +138,6 @@ export class DfEmailTemplateDetailsComponent implements OnInit, OnDestroy {
             snackbarSuccess: 'emailTemplates.alerts.createSuccess',
           }
         )
-        .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.goBack();
         });

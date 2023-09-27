@@ -1,7 +1,7 @@
 import { Component, Inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, takeUntil, throwError } from 'rxjs';
+import { catchError, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { UserProfile, UserProfileType } from 'src/app/shared/types/user';
 import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
@@ -24,7 +24,8 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { DfProfileDetailsComponent } from '../../shared/components/df-profile-details/df-profile-details.component';
 import { DfAlertComponent } from '../../shared/components/df-alert/df-alert.component';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-user-details',
   templateUrl:
@@ -146,7 +147,6 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
           }
         )
         .pipe(
-          takeUntil(this.destroyed$),
           catchError(err => {
             this.triggerAlert(
               'error',
@@ -169,7 +169,6 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
           snackbarSuccess: 'admins.alerts.updateSuccess',
         })
         .pipe(
-          takeUntil(this.destroyed$),
           catchError(err => {
             this.triggerAlert('error', err.error.error.message);
             return throwError(() => new Error(err));

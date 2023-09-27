@@ -12,7 +12,6 @@ import {
   ReactiveFormsModule,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
 import { AppPayload, AppType } from '../types/df-apps.types';
 import { APP_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
@@ -32,7 +31,9 @@ import { faCircleInfo, faCopy } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { ROUTES } from 'src/app/shared/constants/routes';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-app-details',
   templateUrl: './df-app-details.component.html',
@@ -57,7 +58,6 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 })
 export class DfAppDetailsComponent implements OnInit {
   @ViewChild('rolesInput') rolesInput: ElementRef<HTMLInputElement>;
-  private destroyed$ = new Subject<void>();
   appForm: FormGroup;
   roles: any[] = [];
   filteredRoles: any[] = [];
@@ -90,13 +90,11 @@ export class DfAppDetailsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe((data: any) => {
-        this.roles = data?.roles?.resource || [];
-        this.filteredRoles = data?.roles?.resource || [];
-        this.editApp = data?.appData || null;
-      });
+    this.activatedRoute.data.subscribe((data: any) => {
+      this.roles = data?.roles?.resource || [];
+      this.filteredRoles = data?.roles?.resource || [];
+      this.editApp = data?.appData || null;
+    });
 
     if (this.editApp) {
       this.appForm.patchValue({

@@ -13,13 +13,12 @@ import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { FileTableRow, FileResponse, FileType } from '../df-files.types';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { ROUTES } from 'src/app/shared/constants/routes';
-import { takeUntil } from 'rxjs';
 import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { faDownload } from '@fortawesome/free-solid-svg-icons';
 import { NgIf } from '@angular/common';
 import { saveAsFile } from 'src/app/shared/utilities/file';
-import { URLS } from 'src/app/shared/constants/urls';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-files-table',
   templateUrl:
@@ -45,14 +44,12 @@ export class DfFilesTableComponent extends DfManageTableComponent<FileTableRow> 
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
 
-    this._activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.type = data['type'];
-      });
-    this._activatedRoute.paramMap
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(params => (this.path = params.get('entity') || ''));
+    this._activatedRoute.data.subscribe(data => {
+      this.type = data['type'];
+    });
+    this._activatedRoute.paramMap.subscribe(
+      params => (this.path = params.get('entity') || '')
+    );
   }
   faDownload = faDownload;
   override allowFilter = false;
@@ -141,7 +138,6 @@ export class DfFilesTableComponent extends DfManageTableComponent<FileTableRow> 
       .legacyDelete(`${this.type}/${row.path}`, {
         additionalParams: [{ key: 'force', value: 'true' }],
       })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(() => {
         this.refreshTable(0);
       });
@@ -163,7 +159,6 @@ export class DfFilesTableComponent extends DfManageTableComponent<FileTableRow> 
     );
     this.crudService
       .get<GenericListResponse<FileType>>(`${this.type}/${route}`, { limit })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
       });

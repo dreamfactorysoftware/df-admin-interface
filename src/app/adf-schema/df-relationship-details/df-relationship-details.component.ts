@@ -1,4 +1,4 @@
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
@@ -6,7 +6,6 @@ import {
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { MatButtonModule } from '@angular/material/button';
@@ -19,13 +18,14 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { TableField } from '../df-table-details/df-table-details.types';
 import { Service } from 'src/app/shared/types/service';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
 interface BasicOption {
   label: string;
   value: string | number;
   name?: string;
 }
-
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-relationship-details',
   templateUrl: './df-relationship-details.component.html',
@@ -44,8 +44,7 @@ interface BasicOption {
     NgIf,
   ],
 })
-export class DfRelationshipDetailsComponent implements OnInit, OnDestroy {
-  destroyed$ = new Subject<void>();
+export class DfRelationshipDetailsComponent implements OnInit {
   relationshipForm: FormGroup;
   type: string;
   dbName: string;
@@ -119,61 +118,59 @@ export class DfRelationshipDetailsComponent implements OnInit, OnDestroy {
       ],
     });
 
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(data => {
-        this.type = data['type'];
-        this.dbName = this.activatedRoute.snapshot.params['name'];
-        this.tableName = this.activatedRoute.snapshot.params['id'];
+    this.activatedRoute.data.subscribe(data => {
+      this.type = data['type'];
+      this.dbName = this.activatedRoute.snapshot.params['name'];
+      this.tableName = this.activatedRoute.snapshot.params['id'];
 
-        this.fieldOptions = data['fields'].resource.map((field: TableField) => {
-          return {
-            label: field.label,
-            value: field.name,
-          };
-        });
-
-        this.serviceOptions = data['services'].resource.map((item: Service) => {
-          return { label: item.label, value: item.id, name: item.name };
-        });
-
-        if (this.type === 'edit') {
-          this.relationshipForm.patchValue({
-            name: data['data'].name,
-            alias: data['data'].alias,
-            label: data['data'].label,
-            description: data['data'].description,
-            alwaysFetch: data['data'].alwaysFetch,
-            type: data['data'].type,
-            isVirtual: data['data'].isVirtual,
-            field: data['data'].field,
-            refServiceId: data['data'].refServiceId,
-            refTable: data['data'].refTable,
-            refField: data['data'].refField,
-            junctionServiceId: data['data'].junctionServiceId,
-            junctionTable: data['data'].junctionTable,
-            junctionField: data['data'].junctionField,
-            junctionRefField: data['data'].junctionRefField,
-          });
-
-          if (data['data'].refServiceId) {
-            this.getTables('reference');
-            this.getFields('reference');
-          }
-
-          if (data['data'].junctionServiceId) {
-            this.getTables('junction');
-            this.getFields('junction');
-          }
-
-          if (data['data'].type === 'many_many') {
-            this.relationshipForm.get('junctionServiceId')?.enable();
-            this.relationshipForm.get('junctionTable')?.enable();
-            this.relationshipForm.get('junctionField')?.enable();
-            this.relationshipForm.get('junctionRefField')?.enable();
-          }
-        }
+      this.fieldOptions = data['fields'].resource.map((field: TableField) => {
+        return {
+          label: field.label,
+          value: field.name,
+        };
       });
+
+      this.serviceOptions = data['services'].resource.map((item: Service) => {
+        return { label: item.label, value: item.id, name: item.name };
+      });
+
+      if (this.type === 'edit') {
+        this.relationshipForm.patchValue({
+          name: data['data'].name,
+          alias: data['data'].alias,
+          label: data['data'].label,
+          description: data['data'].description,
+          alwaysFetch: data['data'].alwaysFetch,
+          type: data['data'].type,
+          isVirtual: data['data'].isVirtual,
+          field: data['data'].field,
+          refServiceId: data['data'].refServiceId,
+          refTable: data['data'].refTable,
+          refField: data['data'].refField,
+          junctionServiceId: data['data'].junctionServiceId,
+          junctionTable: data['data'].junctionTable,
+          junctionField: data['data'].junctionField,
+          junctionRefField: data['data'].junctionRefField,
+        });
+
+        if (data['data'].refServiceId) {
+          this.getTables('reference');
+          this.getFields('reference');
+        }
+
+        if (data['data'].junctionServiceId) {
+          this.getTables('junction');
+          this.getFields('junction');
+        }
+
+        if (data['data'].type === 'many_many') {
+          this.relationshipForm.get('junctionServiceId')?.enable();
+          this.relationshipForm.get('junctionTable')?.enable();
+          this.relationshipForm.get('junctionField')?.enable();
+          this.relationshipForm.get('junctionRefField')?.enable();
+        }
+      }
+    });
   }
 
   ngOnInit(): void {
@@ -215,11 +212,6 @@ export class DfRelationshipDetailsComponent implements OnInit, OnDestroy {
       this.relationshipForm.get('junctionRefField')?.enable();
       this.getFields('junction');
     });
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 
   getServiceName(serviceId: number) {
@@ -330,7 +322,6 @@ export class DfRelationshipDetailsComponent implements OnInit, OnDestroy {
           },
           `${this.dbName}/_schema/${this.tableName}/_related`
         )
-        .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.goBack();
         });
@@ -339,7 +330,6 @@ export class DfRelationshipDetailsComponent implements OnInit, OnDestroy {
         .patch(`${this.dbName}/_schema/${this.tableName}/_related`, payload, {
           snackbarSuccess: 'schema.relationships.alert.updateSuccess',
         })
-        .pipe(takeUntil(this.destroyed$))
         .subscribe(() => {
           this.goBack();
         });

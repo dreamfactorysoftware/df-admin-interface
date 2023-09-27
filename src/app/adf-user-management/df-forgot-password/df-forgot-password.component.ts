@@ -1,11 +1,11 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
   Validators,
   ReactiveFormsModule,
 } from '@angular/forms';
-import { Subject, catchError, switchMap, takeUntil, throwError } from 'rxjs';
+import { catchError, switchMap, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import {
   AlertType,
@@ -25,7 +25,8 @@ import { NgIf } from '@angular/common';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatCardModule } from '@angular/material/card';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-forgot-password',
   templateUrl: './df-forgot-password.component.html',
@@ -44,8 +45,7 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
     TranslocoPipe,
   ],
 })
-export class DfForgotPasswordComponent implements OnInit, OnDestroy {
-  private destroyed$ = new Subject<void>();
+export class DfForgotPasswordComponent implements OnInit {
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
@@ -80,21 +80,19 @@ export class DfForgotPasswordComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.systemConfigDataService.environment$
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(env => {
-        this.loginAttribute = env.authentication.loginAttribute;
-        if (this.loginAttribute === 'username') {
-          this.forgetPasswordForm.controls['username'].setValidators([
-            Validators.required,
-          ]);
-        } else {
-          this.forgetPasswordForm.controls['email'].setValidators([
-            Validators.required,
-            Validators.email,
-          ]);
-        }
-      });
+    this.systemConfigDataService.environment$.subscribe(env => {
+      this.loginAttribute = env.authentication.loginAttribute;
+      if (this.loginAttribute === 'username') {
+        this.forgetPasswordForm.controls['username'].setValidators([
+          Validators.required,
+        ]);
+      } else {
+        this.forgetPasswordForm.controls['email'].setValidators([
+          Validators.required,
+          Validators.email,
+        ]);
+      }
+    });
   }
 
   requestReset() {
@@ -108,7 +106,6 @@ export class DfForgotPasswordComponent implements OnInit, OnDestroy {
           : { email: this.forgetPasswordForm.controls['email'].value }
       )
       .pipe(
-        takeUntil(this.destroyed$),
         catchError(err => {
           this.alertMsg = err.error.error.message;
           this.showAlert = true;
@@ -145,7 +142,6 @@ export class DfForgotPasswordComponent implements OnInit, OnDestroy {
         true
       )
       .pipe(
-        takeUntil(this.destroyed$),
         catchError(err => {
           this.alertMsg = err.error.error.message;
           this.showAlert = true;
@@ -169,10 +165,5 @@ export class DfForgotPasswordComponent implements OnInit, OnDestroy {
         this.showAlert = false;
         this.router.navigate([`/`]);
       });
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

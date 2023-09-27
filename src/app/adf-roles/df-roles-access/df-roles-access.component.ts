@@ -1,4 +1,4 @@
-import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import {
   FormArray,
   FormControl,
@@ -9,7 +9,6 @@ import {
 } from '@angular/forms';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
-import { Subject, takeUntil } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 import { ServiceResponseObj } from '../df-roles.types';
 import { TranslocoPipe } from '@ngneat/transloco';
@@ -21,7 +20,8 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
 import { NgFor, NgIf } from '@angular/common';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-roles-access',
   templateUrl: './df-roles-access.component.html',
@@ -40,8 +40,7 @@ import { NgFor, NgIf } from '@angular/common';
     NgIf,
   ],
 })
-export class DfRolesAccessComponent implements OnInit, OnDestroy {
-  destroyed$ = new Subject<void>();
+export class DfRolesAccessComponent implements OnInit {
   rootForm: FormGroup;
   serviceAccess: FormArray;
   dataSource: MatTableDataSource<any>;
@@ -81,55 +80,51 @@ export class DfRolesAccessComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.rootForm = this.rootFormGroup.control;
-    this.rootFormGroup.ngSubmit
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(() => {
-        this.rootForm.markAllAsTouched();
-      });
+    this.rootFormGroup.ngSubmit.subscribe(() => {
+      this.rootForm.markAllAsTouched();
+    });
     this.serviceAccess = this.rootForm.get('serviceAccess') as FormArray;
 
     // get services options
-    this.activatedRoute.data
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe((data: any) => {
-        // sort service options by name
-        this.serviceOptions =
-          data?.services?.resource.sort(
-            (a: ServiceResponseObj, b: ServiceResponseObj) => {
-              if (a.name < b.name) {
-                return -1;
-              } else if (a.name > b.name) {
-                return 1;
-              } else {
-                return 0;
-              }
+    this.activatedRoute.data.subscribe((data: any) => {
+      // sort service options by name
+      this.serviceOptions =
+        data?.services?.resource.sort(
+          (a: ServiceResponseObj, b: ServiceResponseObj) => {
+            if (a.name < b.name) {
+              return -1;
+            } else if (a.name > b.name) {
+              return 1;
+            } else {
+              return 0;
             }
-          ) || [];
+          }
+        ) || [];
 
-        // if service ID exists, GET service components
-        if (
-          data.type === 'edit' &&
-          data.data.roleServiceAccessByRoleId.length > 0
-        ) {
-          data.data.roleServiceAccessByRoleId.forEach((item: any) => {
-            const serviceId = item.serviceId;
-            const serviceName =
-              this.serviceOptions.find(service => service.id === serviceId)
-                ?.name || '';
+      // if service ID exists, GET service components
+      if (
+        data.type === 'edit' &&
+        data.data.roleServiceAccessByRoleId.length > 0
+      ) {
+        data.data.roleServiceAccessByRoleId.forEach((item: any) => {
+          const serviceId = item.serviceId;
+          const serviceName =
+            this.serviceOptions.find(service => service.id === serviceId)
+              ?.name || '';
 
-            // GET Components for service
-            this.baseService
-              .get(serviceName, {
-                additionalParams: [{ key: 'as_access_list', value: true }],
-              })
-              .pipe(takeUntil(this.destroyed$))
-              .subscribe((response: any) => {
-                const components = response.resource;
-                this.componentOptions.push({ serviceId, components });
-              });
-          });
-        }
-      });
+          // GET Components for service
+          this.baseService
+            .get(serviceName, {
+              additionalParams: [{ key: 'as_access_list', value: true }],
+            })
+
+            .subscribe((response: any) => {
+              const components = response.resource;
+              this.componentOptions.push({ serviceId, components });
+            });
+        });
+      }
+    });
 
     this.updateDataSource();
   }
@@ -153,7 +148,7 @@ export class DfRolesAccessComponent implements OnInit, OnDestroy {
         .get(service, {
           additionalParams: [{ key: 'as_access_list', value: true }],
         })
-        .pipe(takeUntil(this.destroyed$))
+
         .subscribe((data: any) => {
           this.componentOptions.push({
             serviceId,
@@ -216,11 +211,6 @@ export class DfRolesAccessComponent implements OnInit, OnDestroy {
   remove(index: number) {
     this.serviceAccess.removeAt(index);
     this.updateDataSource();
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }
 

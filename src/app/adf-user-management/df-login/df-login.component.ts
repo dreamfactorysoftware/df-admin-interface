@@ -1,11 +1,11 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import {
   FormBuilder,
   FormGroup,
   Validators,
   ReactiveFormsModule,
 } from '@angular/forms';
-import { Subject, catchError, takeUntil, throwError } from 'rxjs';
+import { catchError, throwError } from 'rxjs';
 import { DfAuthService } from '../services/df-auth.service';
 import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import {
@@ -28,7 +28,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatCardModule } from '@angular/material/card';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { AuthService, LdapService } from 'src/app/shared/types/service';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-user-login',
   templateUrl: './df-login.component.html',
@@ -52,8 +53,7 @@ import { AuthService, LdapService } from 'src/app/shared/types/service';
     TranslocoPipe,
   ],
 })
-export class DfLoginComponent implements OnInit, OnDestroy {
-  private destroyed$ = new Subject<void>();
+export class DfLoginComponent implements OnInit {
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
@@ -84,15 +84,13 @@ export class DfLoginComponent implements OnInit, OnDestroy {
   getIcon = getIcon;
 
   ngOnInit() {
-    this.systemConfigDataService.environment$
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(env => {
-        this.envloginAttribute = env.authentication.loginAttribute;
-        this.setLoginAttribute(env.authentication.loginAttribute);
-        this.ldapServices = env.authentication.adldap;
-        this.oauthServices = env.authentication.oauth;
-        this.samlServices = env.authentication.saml;
-      });
+    this.systemConfigDataService.environment$.subscribe(env => {
+      this.envloginAttribute = env.authentication.loginAttribute;
+      this.setLoginAttribute(env.authentication.loginAttribute);
+      this.ldapServices = env.authentication.adldap;
+      this.oauthServices = env.authentication.oauth;
+      this.samlServices = env.authentication.saml;
+    });
 
     this.loginForm.controls['services'].valueChanges.subscribe(
       (value: string) => {
@@ -103,11 +101,6 @@ export class DfLoginComponent implements OnInit, OnDestroy {
         }
       }
     );
-  }
-
-  ngOnDestroy() {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 
   setLoginAttribute(attribute: string) {
@@ -144,7 +137,6 @@ export class DfLoginComponent implements OnInit, OnDestroy {
     this.authService
       .login(credentials)
       .pipe(
-        takeUntil(this.destroyed$),
         catchError(err => {
           this.alertMsg = err.error.error.message;
           this.showAlert = true;

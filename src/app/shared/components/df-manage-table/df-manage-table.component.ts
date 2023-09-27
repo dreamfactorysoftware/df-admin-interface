@@ -3,7 +3,6 @@ import {
   AfterViewInit,
   Component,
   Input,
-  OnDestroy,
   OnInit,
   ViewChild,
 } from '@angular/core';
@@ -11,7 +10,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { ROUTES } from 'src/app/shared/constants/routes';
 import { IconDefinition, IconProp } from '@fortawesome/fontawesome-svg-core';
 import {
@@ -33,6 +32,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
 export const DfManageTableModules = [
   NgIf,
@@ -68,15 +68,16 @@ export interface Actions<T> {
   default: DefaultAction<T> | null;
   additional: Array<AdditonalAction<T>> | null;
 }
+
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-table',
   template: '',
 })
 export abstract class DfManageTableComponent<T>
-  implements OnInit, AfterViewInit, OnDestroy
+  implements OnInit, AfterViewInit
 {
   @Input() tableData?: Array<T>;
-  destroyed$ = new Subject<void>();
   dataSource = new MatTableDataSource<T>();
   tableLength = 0;
   pageSizes = [10, 50, 100];
@@ -131,26 +132,20 @@ export abstract class DfManageTableComponent<T>
 
   ngOnInit(): void {
     if (!this.tableData) {
-      this.activatedRoute.data
-        .pipe(takeUntil(this.destroyed$))
-        .subscribe(({ data }) => {
-          if (data && data.resource) {
-            this.dataSource.data = this.mapDataToTable(data.resource);
-          }
-          if (data && data.meta) {
-            this.tableLength = data.meta.count;
-          }
-        });
+      this.activatedRoute.data.subscribe(({ data }) => {
+        if (data && data.resource) {
+          this.dataSource.data = this.mapDataToTable(data.resource);
+        }
+        if (data && data.meta) {
+          this.tableLength = data.meta.count;
+        }
+      });
     } else {
       this.allowFilter = false;
       this.dataSource.data = this.mapDataToTable(this.tableData);
     }
     this.currentFilter.valueChanges
-      .pipe(
-        takeUntil(this.destroyed$),
-        debounceTime(1000),
-        distinctUntilChanged()
-      )
+      .pipe(debounceTime(1000), distinctUntilChanged())
       .subscribe(filter => {
         filter
           ? this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter))
@@ -268,10 +263,5 @@ export abstract class DfManageTableComponent<T>
       ((this.actions.default.disabled && !this.actions.default.disabled(row)) ||
         !this.actions.default.disabled)
     );
-  }
-
-  ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
   }
 }

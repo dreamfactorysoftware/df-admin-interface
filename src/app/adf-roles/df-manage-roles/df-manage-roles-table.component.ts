@@ -4,7 +4,6 @@ import {
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import { takeUntil } from 'rxjs';
 import { Component, Inject } from '@angular/core';
 import { RoleRow, RoleType } from 'src/app/shared/types/role';
 import { ROLE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
@@ -13,7 +12,8 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-roles-table',
   templateUrl:
@@ -72,18 +72,14 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
   }
 
   override deleteRow(row: RoleRow): void {
-    this.roleService
-      .delete(row.id)
-      .pipe(takeUntil(this.destroyed$))
-      .subscribe(() => {
-        this.refreshTable();
-      });
+    this.roleService.delete(row.id).subscribe(() => {
+      this.refreshTable();
+    });
   }
 
   refreshTable(limit?: number, offset?: number): void {
     this.roleService
       .getAll<GenericListResponse<RoleType>>({ limit, offset })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;

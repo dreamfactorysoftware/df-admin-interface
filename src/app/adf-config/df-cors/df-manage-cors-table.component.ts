@@ -9,10 +9,11 @@ import {
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { CorsConfigData } from '../types';
-import { takeUntil } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-cors-table',
   templateUrl:
@@ -71,7 +72,6 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
   override deleteRow(row: CorsConfigData): void {
     this.corsService
       .delete(row.id, { fields: '*' })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe(() => this.refreshTable());
   }
 
@@ -86,7 +86,6 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
         offset,
         filter,
       })
-      .pipe(takeUntil(this.destroyed$))
       .subscribe((data: any) => {
         this.dataSource = data.data.resource;
         this.tableLength = data.meta.count;
