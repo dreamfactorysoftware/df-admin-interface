@@ -115,7 +115,8 @@
       appForm.controls['appLocation'].value === '1' ||
       appForm.controls['appLocation'].value === '2' ||
       appForm.controls['appLocation'].value === '3'
-    ">
+    "
+    class="half-width">
     <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
       <mat-label>{{
         'apps.createApp.appLocation.options.fileStorage.storageService.label'
@@ -245,7 +246,7 @@
     </mat-card>
   </div>
   <!-- submit -->
-  <div>
+  <div style="width: 100%">
     <button mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
