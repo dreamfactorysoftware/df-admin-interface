@@ -77,12 +77,12 @@
     </div>
 
     <div class="flex-100">
+      <button mat-flat-button type="button" (click)="goBack()">
+        {{ 'cancel' | transloco }}
+      </button>
       <button mat-flat-button color="primary" type="submit">
         <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
         <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
-      </button>
-      <button mat-flat-button type="button" (click)="goBack()">
-        {{ 'cancel' | transloco }}
       </button>
     </div>
   </form>
