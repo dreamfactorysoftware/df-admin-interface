@@ -119,11 +119,14 @@ export class DfSchedulerComponent implements OnInit {
   }
 
   onCancel() {
+    console.log('cancel clicked!');
     this.router.navigate([`${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`]);
   }
 
   onSubmit() {
-    if (this.formGroup.valid && typeof this.scheduleToEdit === 'undefined') {
+    if (this.formGroup.invalid || this.formGroup.pristine) return;
+
+    if (typeof this.scheduleToEdit === 'undefined') {
       const payload = this.assemblePayload() as CreateSchedulePayload;
 
       this.service
@@ -142,7 +145,7 @@ export class DfSchedulerComponent implements OnInit {
             `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
           ])
         );
-    } else if (this.formGroup.valid && this.scheduleToEdit) {
+    } else if (this.scheduleToEdit) {
       const payload = this.assemblePayload() as UpdateSchedulePayload;
 
       this.service

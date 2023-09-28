@@ -1,122 +1,22 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { DfSchedulerComponent } from './df-scheduler-details.component';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { ActivatedRoute } from '@angular/router';
-import { provideTransloco, TranslocoService } from '@ngneat/transloco';
+import { TranslocoService } from '@ngneat/transloco';
 import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
 import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
-import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
-import { Service } from 'src/app/shared/types/service';
-import { SchedulerTaskData } from '../types/df-scheduler.types';
+import { createTestBedConfig } from 'src/app/shared/utilities/test';
+import { mockSchedulerTaskData, mockServices } from './test-mocks/mocks';
 
-const fakeActivatedRoute = (isEdit = false) => {
-  return {
-    data: {
-      pipe: () => {
-        return {
-          subscribe: (fn: (value: any) => void) =>
-            fn({
-              data: { resource: mockServices },
-              schedulerObject: isEdit ? mockSchedulerTaskData : undefined,
-              type: isEdit ? 'edit' : 'create',
-            }),
-        };
-      },
-    },
-  };
+const editModeActivatedRoute = {
+  data: { resource: mockServices },
+  schedulerObject: mockSchedulerTaskData,
+  type: 'edit',
 };
 
-const mockServices: Service[] = [
-  {
-    id: 2,
-    name: 'api_docs',
-    label: 'Live API Docs',
-    description: 'API documenting and testing service.',
-    isActive: true,
-    type: 'swagger',
-    mutable: false,
-    deletable: false,
-    createdDate: '2023-08-04T21:10:07.000000Z',
-    lastModifiedDate: '2023-08-04T21:10:07.000000Z',
-    createdById: null,
-    lastModifiedById: null,
-    config: [],
-    serviceDocByServiceId: null,
-  },
-  {
-    id: 5,
-    name: 'db',
-    label: 'Local SQL Database',
-    description: 'Service for accessing local SQLite database.',
-    isActive: true,
-    type: 'sqlite',
-    mutable: true,
-    deletable: true,
-    createdDate: '2023-08-04T21:10:07.000000Z',
-    lastModifiedDate: '2023-08-21T13:46:25.000000Z',
-    createdById: null,
-    lastModifiedById: 1,
-    config: {
-      service_id: 5,
-      options: [],
-      attributes: null,
-      statements: null,
-      database: 'db.sqlite',
-      allow_upsert: false,
-      max_records: 1000,
-      cache_enabled: false,
-      cache_ttl: 0,
-    },
-    serviceDocByServiceId: null,
-  },
-  {
-    id: 6,
-    name: 'email',
-    label: 'Local Email Service',
-    description:
-      'Email service used for sending user invites and/or password reset confirmation.',
-    isActive: true,
-    type: 'local_email',
-    mutable: true,
-    deletable: true,
-    createdDate: '2023-08-04T21:10:07.000000Z',
-    lastModifiedDate: '2023-08-04T21:10:07.000000Z',
-    createdById: null,
-    lastModifiedById: null,
-    config: {
-      parameters: [],
-    },
-    serviceDocByServiceId: null,
-  },
-];
-
-const mockSchedulerTaskData: SchedulerTaskData = {
-  id: 15,
-  name: 'gaaa',
-  description: 'pac',
-  isActive: true,
-  serviceId: 5,
-  component: '*',
-  verbMask: 1,
-  frequency: 88,
-  payload: null,
-  createdDate: '2023-08-30T14:41:44.000000Z',
-  lastModifiedDate: '2023-08-30T14:59:06.000000Z',
-  createdById: 1,
-  lastModifiedById: 1,
-  verb: 'GET',
-  serviceByServiceId: mockServices[1],
-  taskLogByTaskId: {
-    taskId: 15,
-    statusCode: 404,
-    content:
-      "REST Exception #404 > Resource '*' not found for service 'name'. DreamFactory Core Utility ServiceResponse Object (    [statusCode:protected] => 404    [content:protected] => Array        ( [error] => Array                (                [code] => 404                    [context] => [message] => Resource '*' not found for service 'name'.   [status_code] => 404              )        )    [contentType:protected] =>    [dataFormat:protected] => 201   [headers:protected] => Array       (        ))REST Exception #404 > Resource '*' not found for service 'name'. Resource '*' not found for service 'name'. REST Exception #500 > Resource '*' not found for service 'name'. In Request.php line 71: Resource '*' not found for service 'name'.",
-    createdDate: '2023-08-30T15:28:04.000000Z',
-    lastModifiedDate: '2023-08-30T15:28:04.000000Z',
-  },
+const createModeActivatedRoute = {
+  data: { resource: mockServices },
+  schedulerObject: undefined,
+  type: 'create',
 };
 
 describe('DfSchedulerComponent - create scheduler task flow', () => {
@@ -124,30 +24,14 @@ describe('DfSchedulerComponent - create scheduler task flow', () => {
   let fixture: ComponentFixture<DfSchedulerComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [
+    TestBed.configureTestingModule(
+      createTestBedConfig(
         DfSchedulerComponent,
-        HttpClientTestingModule,
-        NoopAnimationsModule,
-      ],
-      declarations: [],
-      providers: [
-        provideTransloco({
-          config: {
-            availableLangs: ['en'],
-            defaultLang: 'en',
-          },
-          loader: TranslocoHttpLoader,
-        }),
-        DfSystemConfigDataService,
-        DfBreakpointService,
-        TranslocoService,
-        {
-          provide: ActivatedRoute,
-          useValue: fakeActivatedRoute(),
-        },
-      ],
-    });
+        [DfBreakpointService, TranslocoService, DfSystemConfigDataService],
+        { ...createModeActivatedRoute }
+      )
+    );
+
     fixture = TestBed.createComponent(DfSchedulerComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -173,6 +57,8 @@ describe('DfSchedulerComponent - create scheduler task flow', () => {
       method: 'GET',
       frequency: 600,
     });
+    component.formGroup.markAsDirty();
+
     component.onSubmit();
     expect(spy).toHaveBeenCalled();
   });
@@ -188,6 +74,9 @@ describe('DfSchedulerComponent - create scheduler task flow', () => {
       method: 'GET',
       frequency: 600,
     });
+
+    component.formGroup.markAsDirty();
+
     component.onSubmit();
     expect(spy).not.toHaveBeenCalled();
   });
@@ -218,30 +107,14 @@ describe('DfSchedulerComponent - edit scheduler task flow', () => {
   let fixture: ComponentFixture<DfSchedulerComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [
+    TestBed.configureTestingModule(
+      createTestBedConfig(
         DfSchedulerComponent,
-        HttpClientTestingModule,
-        NoopAnimationsModule,
-      ],
-      declarations: [],
-      providers: [
-        provideTransloco({
-          config: {
-            availableLangs: ['en'],
-            defaultLang: 'en',
-          },
-          loader: TranslocoHttpLoader,
-        }),
-        DfSystemConfigDataService,
-        DfBreakpointService,
-        TranslocoService,
-        {
-          provide: ActivatedRoute,
-          useValue: fakeActivatedRoute(true),
-        },
-      ],
-    });
+        [DfBreakpointService, TranslocoService, DfSystemConfigDataService],
+        { ...editModeActivatedRoute }
+      )
+    );
+
     fixture = TestBed.createComponent(DfSchedulerComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -259,6 +132,8 @@ describe('DfSchedulerComponent - edit scheduler task flow', () => {
       name: 'new-name',
     });
 
+    component.formGroup.markAsDirty();
+
     component.onSubmit();
 
     expect(spy).toHaveBeenCalled();
@@ -270,6 +145,8 @@ describe('DfSchedulerComponent - edit scheduler task flow', () => {
     component.formGroup.patchValue({
       name: '',
     });
+
+    component.formGroup.markAsDirty();
 
     component.onSubmit();
 
