@@ -119,7 +119,6 @@ export class DfSchedulerComponent implements OnInit {
   }
 
   onCancel() {
-    console.log('cancel clicked!');
     this.router.navigate([`${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`]);
   }
 
