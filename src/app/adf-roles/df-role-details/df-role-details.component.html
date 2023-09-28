@@ -30,15 +30,15 @@
     formArrayName="lookupKeys"
     class="full-width"></df-lookup-keys>
 
-  <button mat-raised-button color="primary" type="submit">
+  <button mat-flat-button type="button" (click)="goBack()">
+    {{ 'cancel' | transloco }}
+  </button>
+  <button mat-flat-button color="primary" type="submit">
     <span *ngIf="type === 'create'">
       {{ 'save' | transloco }}
     </span>
     <span *ngIf="type === 'edit'">
       {{ 'update' | transloco }}
     </span>
-  </button>
-  <button mat-flat-button type="button" (click)="goBack()">
-    {{ 'cancel' | transloco }}
   </button>
 </form>
