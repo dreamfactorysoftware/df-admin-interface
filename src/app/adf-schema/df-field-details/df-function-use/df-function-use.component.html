@@ -2,10 +2,14 @@
   <mat-accordion *ngIf="showAccordion; else dbFunctionUse">
     <mat-expansion-panel>
       <mat-expansion-panel-header>
-        <mat-panel-title> DB Function Use</mat-panel-title>
-        <!-- TODO translations -->
+        <mat-panel-title>{{
+          'schema.fieldDetailsForm.controls.dbFunctionTitle' | transloco
+        }}</mat-panel-title>
         <mat-panel-description
-          >Assign Database Function To Uses Of This Field
+          >{{
+            'schema.fieldDetailsForm.controls.dbFunctionUseDescription'
+              | transloco
+          }}
         </mat-panel-description>
       </mat-expansion-panel-header>
       <ng-container [ngTemplateOutlet]="dbFunctionUse"></ng-container>
@@ -70,7 +74,9 @@
           <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
           <mat-row *matRowDef="let row; columns: displayedColumns"></mat-row>
           <tr class="mat-row" *matNoDataRow>
-            <td class="mat-cell" colspan="4">No DB Function Uses</td>
+            <td class="mat-cell" colspan="4">
+              {{ 'schema.fieldDetailsForm.controls.noDbFunctions' | transloco }}
+            </td>
           </tr>
         </mat-table>
       </ng-container>
