@@ -1,5 +1,4 @@
 <!-- TODO add error banner -->
-<!-- TODO change to scheduler-details -->
 <mat-tab-group dynamicHeight mat-stretch-tabs="false" mat-align-tabs="start">
   <mat-tab label="Basic">
     <h4>{{ 'scheduler.taskOverviewSubtitle' | transloco }}</h4>
@@ -68,7 +67,7 @@
           label: 'scheduler.form.label.method' | transloco
         }"></df-verb-picker>
       <div>
-        <button mat-raised-button (click)="onCancel()">
+        <button mat-flat-button type="button" (click)="onCancel()">
           {{ 'cancel' | transloco }}
         </button>
         <button mat-raised-button color="primary" type="submit">
@@ -79,10 +78,12 @@
   </mat-tab>
   <mat-tab label="Log">
     <div class="scheduler-log-container">
-      <h4>{{ 'scheduler.logPageSubtitle' | transloco }}</h4>
-      <!-- TODO Translate -->
-      <p>Status Code: {{ scheduleToEdit?.taskLogByTaskId?.statusCode }}</p>
-      <p>Error:</p>
+      <h4>{{ 'scheduler.logs.subtitle' | transloco }}</h4>
+      <p>
+        {{ 'scheduler.logs.statusCode' | transloco }}:
+        {{ scheduleToEdit?.taskLogByTaskId?.statusCode }}
+      </p>
+      <p>{{ 'scheduler.logs.error' | transloco }}:</p>
       <df-ace-editor [readonly]="true" [value]="log" />
       <button mat-raised-button color="primary" (click)="onCancel()">
         {{ 'goBack' | transloco }}
