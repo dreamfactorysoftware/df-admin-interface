@@ -16,17 +16,13 @@
   <form
     [formGroup]="tableDetailsForm"
     (ngSubmit)="save()"
-    class="table-details-form-container"
+    class="table-details-form-container details-form"
     [class.x-small]="breakpointService.isXSmallScreen | async">
     <mat-form-field class="flex-50">
       <mat-label>
         {{ 'schema.tableName' | transloco }}
       </mat-label>
-      <input
-        matInput
-        formControlName="name"
-        required
-        placeholder="{{ 'schema.enter.tableName' | transloco }}" />
+      <input matInput formControlName="name" required />
       <mat-error *ngIf="tableDetailsForm.controls['name'].hasError('required')">
         {{ 'schema.alert.tableNameError' | transloco }}
       </mat-error>
@@ -36,33 +32,21 @@
       <mat-label>
         {{ 'schema.alias' | transloco }}
       </mat-label>
-      <input
-        matInput
-        formControlName="alias"
-        placeholder="{{ 'schema.enter.alias' | transloco }}" />
+      <input matInput formControlName="alias" />
     </mat-form-field>
     <mat-form-field class="flex-50">
       <mat-label>
         {{ 'schema.label' | transloco }}
       </mat-label>
-      <input
-        matInput
-        formControlName="label"
-        placeholder="{{ 'schema.enter.label' | transloco }}" />
+      <input matInput formControlName="label" />
     </mat-form-field>
     <mat-form-field class="flex-50">
       <mat-label> {{ 'schema.plural' | transloco }} </mat-label>
-      <input
-        matInput
-        formControlName="plural"
-        placeholder="{{ 'schema.enter.plural' | transloco }}" />
+      <input matInput formControlName="plural" />
     </mat-form-field>
     <mat-form-field subscriptSizing="dynamic">
       <mat-label> {{ 'schema.description' | transloco }} </mat-label>
-      <input
-        matInput
-        formControlName="description"
-        placeholder="{{ 'schema.enter.description' | transloco }}" />
+      <input matInput formControlName="description" />
     </mat-form-field>
 
     <div class="flex-100">
