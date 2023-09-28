@@ -415,7 +415,7 @@ export const routes: Routes = [
             path: ROUTES.CREATE,
             loadComponent: () =>
               import(
-                './adf-scheduler/df-scheduler/df-scheduler.component'
+                './adf-scheduler/df-scheduler-details/df-scheduler-details.component'
               ).then(m => m.DfSchedulerComponent),
             resolve: {
               data: servicesResolver(0),
@@ -425,7 +425,7 @@ export const routes: Routes = [
             path: ':id',
             loadComponent: () =>
               import(
-                './adf-scheduler/df-scheduler/df-scheduler.component'
+                './adf-scheduler/df-scheduler-details/df-scheduler-details.component'
               ).then(m => m.DfSchedulerComponent),
             resolve: {
               data: servicesResolver(0),
