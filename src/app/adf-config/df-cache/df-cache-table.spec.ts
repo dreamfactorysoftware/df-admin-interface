@@ -45,12 +45,6 @@ describe('DfCacheTableComponent', () => {
           useValue: {
             data: {
               subscribe: (fn: (value: any) => void) => fn(ACTIVATED_ROUTE_DATA),
-              //     pipe: () => {
-              //         return {
-              //         subscribe: (fn: (value: any) => void) =>
-              //           fn(ACTIVATED_ROUTE_DATA),
-              //     };
-              //   },
             },
           },
         },

@@ -9,12 +9,38 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { DfPasswordService } from '../services/df-password.service';
+import { of, throwError } from 'rxjs';
+import { DfAuthService } from '../services/df-auth.service';
+
+const authServiceMock = {
+  login: jest.fn(),
+};
+
+const passwordServiceMock = {
+  requestPasswordReset: jest.fn().mockReturnValue(of({})),
+};
+
+const systemConfigDataServiceUsernameMock = {
+  environment$: of({ authentication: { loginAttribute: 'username' } }),
+};
+
+const systemConfigDataServiceEmailMock = {
+  environment$: of({ authentication: { loginAttribute: 'email' } }),
+};
 
 describe('DfForgotPasswordComponent - Username Reset', () => {
   let component: DfForgotPasswordComponent;
   let fixture: ComponentFixture<DfForgotPasswordComponent>;
 
+  let authService: DfAuthService;
+  let passwordService: DfPasswordService;
+  let systemConfigDataService: DfSystemConfigDataService;
+
   beforeEach(() => {
+    passwordService = {
+      requestPasswordReset: jest.fn(),
+    } as unknown as DfPasswordService;
+
     TestBed.configureTestingModule({
       imports: [
         DfForgotPasswordComponent,
@@ -31,19 +57,6 @@ describe('DfForgotPasswordComponent - Username Reset', () => {
         }),
         TranslocoService,
         {
-          provide: DfSystemConfigDataService,
-          useValue: {
-            environment$: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) =>
-                    fn({ authentication: { loginAttribute: 'username' } }),
-                };
-              },
-            },
-          },
-        },
-        {
           provide: ActivatedRoute,
           useValue: {
             data: {
@@ -55,8 +68,21 @@ describe('DfForgotPasswordComponent - Username Reset', () => {
             },
           },
         },
+        { provide: DfAuthService, useValue: authServiceMock },
+        {
+          provide: DfPasswordService,
+          useValue: passwordServiceMock,
+        },
+        {
+          provide: DfSystemConfigDataService,
+          useValue: systemConfigDataServiceUsernameMock,
+        },
       ],
     });
+
+    authService = TestBed.inject(DfAuthService);
+    passwordService = TestBed.inject(DfPasswordService);
+    systemConfigDataService = TestBed.inject(DfSystemConfigDataService);
     fixture = TestBed.createComponent(DfForgotPasswordComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -88,15 +114,42 @@ describe('DfForgotPasswordComponent - Username Reset', () => {
     expect(crudServiceSpy).not.toHaveBeenCalled();
   });
 
-  it('should call password reset service if form is valid', () => {
-    const crudServiceSpy = jest.spyOn(
-      DfPasswordService.prototype,
+  it('should call requestPasswordReset and handle success', () => {
+    const passwordServiceSpy = jest.spyOn(
+      passwordService,
       'requestPasswordReset'
     );
-    component.forgetPasswordForm.controls['username'].setValue('test');
+
+    passwordServiceMock.requestPasswordReset.mockReturnValue(of({}));
+
+    component.forgetPasswordForm.patchValue({ username: 'test' });
     component.requestReset();
+
     expect(component.forgetPasswordForm.valid).toBeTruthy();
-    expect(crudServiceSpy).toHaveBeenCalled();
+    expect(passwordServiceSpy).toHaveBeenCalled();
+  });
+
+  it('should call requestPasswordReset and handle error', () => {
+    const passwordServiceSpy = jest.spyOn(
+      passwordService,
+      'requestPasswordReset'
+    );
+
+    passwordServiceMock.requestPasswordReset.mockReturnValue(
+      throwError({
+        error: {
+          error: {
+            message: 'error',
+          },
+        },
+      })
+    );
+
+    component.forgetPasswordForm.patchValue({ username: 'test' });
+    component.requestReset();
+
+    expect(component.forgetPasswordForm.valid).toBeTruthy();
+    expect(passwordServiceSpy).toHaveBeenCalled();
   });
 
   it('should require security question answer if security question is enabled', () => {
@@ -112,10 +165,11 @@ describe('DfForgotPasswordComponent - Username Reset', () => {
   });
 
   it('should call resetPassword service if securityQuestionForm is valid', () => {
-    const crudServiceSpy = jest.spyOn(
-      DfPasswordService.prototype,
+    const passwordServiceSpy = jest.spyOn(
+      passwordService,
       'requestPasswordReset'
     );
+
     component.hasSecurityQuestion = true;
 
     component.securityQuestionForm.patchValue({
@@ -127,13 +181,17 @@ describe('DfForgotPasswordComponent - Username Reset', () => {
     component.resetPassword();
 
     expect(component.securityQuestionForm.valid).toBeTruthy();
-    expect(crudServiceSpy).toHaveBeenCalled();
+    expect(passwordServiceSpy).toHaveBeenCalled();
   });
 });
 
 describe('DfForgotPasswordComponent - Email Reset', () => {
   let component: DfForgotPasswordComponent;
   let fixture: ComponentFixture<DfForgotPasswordComponent>;
+
+  let authService: DfAuthService;
+  let passwordService: DfPasswordService;
+  let systemConfigDataService: DfSystemConfigDataService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -151,33 +209,37 @@ describe('DfForgotPasswordComponent - Email Reset', () => {
           loader: TranslocoHttpLoader,
         }),
         TranslocoService,
-        {
-          provide: DfSystemConfigDataService,
-          useValue: {
-            environment$: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) =>
-                    fn({ authentication: { loginAttribute: 'email' } }),
-                };
-              },
-            },
-          },
-        },
+        // {
+        //   provide: DfSystemConfigDataService,
+        //   useValue: {
+        //     environment$: {
+        //       authentication: { loginAttribute: 'email' },
+        //       //   pipe: () => {
+        //       //     return {
+        //       //       subscribe: (fn: (value: any) => void) =>
+        //       //         fn({ authentication: { loginAttribute: 'email' } }),
+        //       //     };
+        //       //   },
+        //     },
+        //   },
+        // },
         {
           provide: ActivatedRoute,
           useValue: {
-            data: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) => fn({}),
-                };
-              },
-            },
+            data: {},
           },
+        },
+        { provide: DfAuthService, useValue: authServiceMock },
+        { provide: DfPasswordService, useValue: passwordServiceMock },
+        {
+          provide: DfSystemConfigDataService,
+          useValue: systemConfigDataServiceEmailMock,
         },
       ],
     });
+    authService = TestBed.inject(DfAuthService);
+    passwordService = TestBed.inject(DfPasswordService);
+    systemConfigDataService = TestBed.inject(DfSystemConfigDataService);
     fixture = TestBed.createComponent(DfForgotPasswordComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();

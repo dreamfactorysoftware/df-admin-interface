@@ -10,6 +10,12 @@ import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-con
 import { DfPasswordService } from '../services/df-password.service';
 import { of } from 'rxjs';
 
+let systemConfigDataServiceMock = {
+  environment$: of({
+    authentication: { loginAttribute: 'username' },
+  }),
+};
+
 describe('DfPasswordResetComponent - Username Reset', () => {
   let component: DfPasswordResetComponent;
   let fixture: ComponentFixture<DfPasswordResetComponent>;
@@ -32,30 +38,12 @@ describe('DfPasswordResetComponent - Username Reset', () => {
         TranslocoService,
         {
           provide: DfSystemConfigDataService,
-          useValue: {
-            environment$: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) =>
-                    fn({ authentication: { loginAttribute: 'username' } }),
-                };
-              },
-            },
-          },
+          useValue: systemConfigDataServiceMock,
         },
         {
           provide: ActivatedRoute,
           useValue: {
-            data: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) =>
-                    fn({
-                      type: 'reset',
-                    }),
-                };
-              },
-            },
+            data: of({ type: 'reset' }),
             snapshot: {
               queryParams: {
                 code: '123testcode',
@@ -119,6 +107,37 @@ describe('DfPasswordResetComponent - Username Reset', () => {
     component.resetPassword();
     expect(resetPasswordSpy).toHaveBeenCalled();
   });
-});
 
-// http://localhost:4200/#/auth/reset-password?code=9AF80BE9OO6OPW4EONMH2RURJFRNO0WO&email=user@email.com&username=user@email.com&admin=
+  it('should not call resetPassword() on submit with invalid form', () => {
+    const resetPasswordSpy = jest.spyOn(
+      DfPasswordService.prototype,
+      'resetPassword'
+    );
+
+    component.resetPassword();
+    expect(resetPasswordSpy).not.toHaveBeenCalled();
+  });
+
+  it('should call resetPassword() on submit with valid form', () => {
+    systemConfigDataServiceMock = {
+      environment$: of({
+        authentication: { loginAttribute: 'email' },
+      }),
+    };
+
+    const resetPasswordSpy = jest.spyOn(
+      DfPasswordService.prototype,
+      'resetPassword'
+    );
+    component.passwordResetForm.patchValue({
+      code: '123testcode',
+      email: 'user@email.com',
+      username: 'user@email.com',
+      newPassword: 'password',
+      confirmPassword: 'password',
+    });
+
+    component.resetPassword();
+    expect(resetPasswordSpy).toHaveBeenCalled();
+  });
+});

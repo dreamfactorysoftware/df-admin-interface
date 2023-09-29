@@ -6,6 +6,8 @@ import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
+import { of } from 'rxjs';
+import { Router } from '@angular/router';
 
 const ROUTE_DATA = {
   alias: 'many alias',
@@ -42,11 +44,31 @@ const ROUTE_SERVICES = {
   ],
 };
 
+let routerMock: any;
+let activatedRouteMock: any;
+
 describe('DfRelationshipDetailsComponent - Create View', () => {
   let component: DfRelationshipDetailsComponent;
   let fixture: ComponentFixture<DfRelationshipDetailsComponent>;
 
   beforeEach(() => {
+    routerMock = {
+      navigate: jest.fn(),
+    };
+    activatedRouteMock = {
+      data: of({
+        fields: ROUTE_FIELDS,
+        services: ROUTE_SERVICES,
+        type: 'create',
+      }),
+      snapshot: {
+        params: {
+          id: 'testDb',
+          name: 'testTable',
+        },
+      },
+    };
+
     TestBed.configureTestingModule({
       imports: [
         DfRelationshipDetailsComponent,
@@ -64,27 +86,9 @@ describe('DfRelationshipDetailsComponent - Create View', () => {
         TranslocoService,
         {
           provide: ActivatedRoute,
-          useValue: {
-            data: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) =>
-                    fn({
-                      fields: ROUTE_FIELDS,
-                      services: ROUTE_SERVICES,
-                      type: 'create',
-                    }),
-                };
-              },
-            },
-            snapshot: {
-              params: {
-                id: 'testDb',
-                name: 'testTable',
-              },
-            },
-          },
+          useValue: activatedRouteMock,
         },
+        { provide: Router, useValue: routerMock },
       ],
     });
     fixture = TestBed.createComponent(DfRelationshipDetailsComponent);
@@ -150,6 +154,14 @@ describe('DfRelationshipDetailsComponent - Create View', () => {
       component.relationshipForm.controls['junctionRefField'].enabled
     ).toBeTruthy();
   });
+
+  it('should route to parent when goBack() is called', () => {
+    component.goBack();
+    expect(routerMock.navigate).toHaveBeenCalledWith(
+      ['../'],
+      expect.objectContaining({ relativeTo: activatedRouteMock })
+    );
+  });
 });
 
 describe('DfRelationshipDetailsComponent - Edit View', () => {
@@ -175,19 +187,12 @@ describe('DfRelationshipDetailsComponent - Edit View', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            data: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) =>
-                    fn({
-                      data: ROUTE_DATA,
-                      fields: ROUTE_FIELDS,
-                      services: ROUTE_SERVICES,
-                      type: 'edit',
-                    }),
-                };
-              },
-            },
+            data: of({
+              data: ROUTE_DATA,
+              fields: ROUTE_FIELDS,
+              services: ROUTE_SERVICES,
+              type: 'edit',
+            }),
             snapshot: {
               params: {
                 id: 'testDb',
