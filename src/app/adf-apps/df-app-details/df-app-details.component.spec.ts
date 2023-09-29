@@ -7,11 +7,8 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { Validators } from '@angular/forms';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
-import {
-  CREATE_ACTIVATED_ROUTE,
-  EDIT_ACTIVATED_ROUTE,
-  EDIT_DATA,
-} from './df-app-details.mock';
+import { EDIT_DATA, ROLES } from './df-app-details.mock';
+import { of } from 'rxjs';
 
 describe('DfAppDetailsComponent - Create', () => {
   let component: DfAppDetailsComponent;
@@ -36,7 +33,13 @@ describe('DfAppDetailsComponent - Create', () => {
         TranslocoService,
         {
           provide: ActivatedRoute,
-          useValue: CREATE_ACTIVATED_ROUTE,
+          useValue: {
+            data: of({
+              roles: {
+                resource: [...ROLES],
+              },
+            }),
+          },
         },
       ],
     });
@@ -116,7 +119,14 @@ describe('DfAppDetailsComponent - Edit', () => {
         TranslocoService,
         {
           provide: ActivatedRoute,
-          useValue: EDIT_ACTIVATED_ROUTE,
+          useValue: {
+            data: of({
+              roles: {
+                resource: [...ROLES],
+              },
+              appData: EDIT_DATA,
+            }),
+          },
         },
       ],
     });

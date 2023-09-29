@@ -52,13 +52,7 @@ describe('DfFilesComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            data: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) => fn({}),
-                };
-              },
-            },
+            data: of({}),
             paramMap: of({
               get: (key: string) => {
                 if (key === 'entity') {
