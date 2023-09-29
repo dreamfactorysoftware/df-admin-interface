@@ -17,18 +17,8 @@ import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { LimitTableRowData } from '../types/types';
 
-export type LimitTableRowData = {
-  id: number;
-  name: string;
-  limitType: string;
-  limitRate: string;
-  limitCounter: string;
-  user: number | null;
-  service: number | null;
-  role: number | null;
-  active: boolean;
-};
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-limits-table',
@@ -117,7 +107,7 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
     },
   ];
 
-  mapDataToTable(data: any): LimitTableRowData[] {
+  mapDataToTable(data: LimitType[]): LimitTableRowData[] {
     return data.map((limit: LimitType) => {
       return {
         id: limit.id,
