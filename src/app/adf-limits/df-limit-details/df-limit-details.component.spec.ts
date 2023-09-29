@@ -166,6 +166,16 @@ describe('DfLimitComponent - Edit View', () => {
     });
   });
 
+  it('should submit form if valid', () => {
+    const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'update');
+    component.formGroup.patchValue({
+      active: false,
+    });
+    component.onSubmit();
+    expect(component.formGroup.valid).toBeTruthy();
+    expect(crudServiceSpy).toHaveBeenCalled();
+  });
+
   it('should set formControl validators when limit type is instance', () => {
     component.formGroup.controls['limitType'].setValue('instance');
     expect(component.formGroup.get('limitRate')?.validator).toBeTruthy();
