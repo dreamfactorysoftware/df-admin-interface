@@ -24,6 +24,12 @@
       "log": "Log"
     }
   },
+  "logs": {
+    "title": "Scheduler Task Log",
+    "subtitle": "This interface displays the scheduler task error log.",
+    "statusCode": "Status Code",
+    "error": "Error"
+  },
   "logPageTitle": "Scheduler Task Log",
   "logPageSubtitle": "This interface displays the scheduler task error log.",
   "taskOverview": "Scheduler Task Overview",
