@@ -24,8 +24,11 @@
       "isForeignKey": "Foreign Key",
       "refTable": "Reference Table",
       "refField": "Reference Field",
-      "validation": "validation",
-      "picklist": "picklist"
+      "validation": "Validation",
+      "picklist": "Picklist",
+      "dbFunctionTitle": "DB Function Use",
+      "dbFunctionUseDescription": "Assign Database Function To Uses Of This Field",
+      "noDbFunctions": "No DB Function Uses"
     },
     "errors": {
       "name": "Name is a required field",

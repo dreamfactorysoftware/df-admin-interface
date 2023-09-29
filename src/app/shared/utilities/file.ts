@@ -1,7 +1,6 @@
 import { Observable, Subject } from 'rxjs';
 
 export function readAsText(file: File | Blob): Observable<string> {
-  console.log('readAsText');
   const subject = new Subject<string>();
   const reader = new FileReader();
 

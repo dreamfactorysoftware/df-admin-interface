@@ -1,1 +1,36 @@
-<div #editor class="editor"></div>
+<div class="details-form">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width" *ngIf="!mode">
+    <mat-label>{{ 'scriptType' | transloco }}</mat-label>
+    <mat-select (valueChange)="setMode($event)">
+      <mat-option *ngFor="let type of types" [value]="type.value">
+        {{ type.label | transloco }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+  <div *ngIf="upload || github" class="import full-width">
+    <ng-container *ngIf="upload"
+      ><input
+        type="file"
+        [accept]=""
+        #fileInput
+        (change)="handleFileUpload($event)"
+        style="display: none" />
+      <button
+        mat-mini-fab
+        color="primary"
+        (click)="fileInput.click()"
+        [attr.aria-label]="'desktopFile' | transloco">
+        <fa-icon [icon]="faUpload" size="xl"></fa-icon>
+      </button>
+    </ng-container>
+    <button
+      *ngIf="github"
+      mat-mini-fab
+      color="primary"
+      (click)="handleGithubImport()"
+      [attr.aria-label]="'githubFile' | transloco">
+      <fa-icon [icon]="faGitHub" size="xl"></fa-icon>
+    </button>
+  </div>
+  <div #editor class="editor"></div>
+</div>

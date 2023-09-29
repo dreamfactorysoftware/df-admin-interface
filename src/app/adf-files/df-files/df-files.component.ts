@@ -33,15 +33,11 @@ export class DfFilesComponent {
   faFolderPlus = faFolderPlus;
   currentRoute = '';
   @ViewChild(DfFilesTableComponent) filesTable: DfFilesTableComponent;
-  type: 'files' | 'logs';
+
   constructor(
     private activatedRoute: ActivatedRoute,
     public dialog: MatDialog
-  ) {
-    this.activatedRoute.data.subscribe(({ type }) => {
-      this.type = type;
-    });
-  }
+  ) {}
 
   uploadFile(event: Event): void {
     const input = event.target as HTMLInputElement;

@@ -1,5 +1,5 @@
 <div>
-  <form [formGroup]="fieldDetailsForm">
+  <form [formGroup]="fieldDetailsForm" class="details-form">
     <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.name' | transloco
@@ -156,10 +156,10 @@
       </mat-error>
     </ng-container>
   </form>
-  <div>
-    <button mat-raised-button color="primary" (click)="onSubmit()">
+  <div class="field-details-button-container">
+    <button mat-flat-button (click)="onCancel()">Cancel</button>
+    <button mat-flat-button color="primary" (click)="onSubmit()">
       {{ (databaseFieldToEdit ? 'save' : 'create') | transloco }} Field
     </button>
-    <button mat-raised-button (click)="onCancel()">Cancel</button>
   </div>
 </div>

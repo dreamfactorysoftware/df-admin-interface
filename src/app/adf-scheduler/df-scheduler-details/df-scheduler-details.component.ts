@@ -29,8 +29,8 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-scheduler',
-  templateUrl: './df-scheduler.component.html',
-  styleUrls: ['./df-scheduler.component.scss'],
+  templateUrl: './df-scheduler-details.component.html',
+  styleUrls: ['./df-scheduler-details.component.scss'],
   standalone: true,
   imports: [
     AsyncPipe,
@@ -123,7 +123,9 @@ export class DfSchedulerComponent implements OnInit {
   }
 
   onSubmit() {
-    if (this.formGroup.valid && typeof this.scheduleToEdit === 'undefined') {
+    if (this.formGroup.invalid || this.formGroup.pristine) return;
+
+    if (typeof this.scheduleToEdit === 'undefined') {
       const payload = this.assemblePayload() as CreateSchedulePayload;
 
       this.service
@@ -142,7 +144,7 @@ export class DfSchedulerComponent implements OnInit {
             `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
           ])
         );
-    } else if (this.formGroup.valid && this.scheduleToEdit) {
+    } else if (this.scheduleToEdit) {
       const payload = this.assemblePayload() as UpdateSchedulePayload;
 
       this.service

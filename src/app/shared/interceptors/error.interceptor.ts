@@ -22,7 +22,7 @@ export const errorInterceptor: HttpInterceptorFn = (
     errorService.error = null;
     return next(req).pipe(
       catchError((error: HttpErrorResponse) => {
-        if (error.status === 400 || error.status === 401) {
+        if (error.status === 401) {
           userDataService.clearToken();
           return from(router.navigate([ROUTES.AUTH, ROUTES.LOGIN])).pipe(
             mergeMap(() => throwError(() => error))

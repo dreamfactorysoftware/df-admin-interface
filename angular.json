@@ -30,6 +30,7 @@
               "src/styles.scss",
               "./node_modules/swagger-ui/dist/swagger-ui.css"
             ],
+            "allowedCommonJsDependencies": ["ace-builds"],
             "scripts": []
           },
           "configurations": {

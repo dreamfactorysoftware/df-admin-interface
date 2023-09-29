@@ -8,7 +8,9 @@
     <ng-container [ngTemplateOutlet]="tableDetails"></ng-container>
   </mat-tab>
   <mat-tab label="JSON">
-    <df-ace-editor mode="json" [value]="jsonData"></df-ace-editor>
+    <df-ace-editor
+      [mode]="AceEditorMode.JSON"
+      [value]="jsonData"></df-ace-editor>
   </mat-tab>
 </mat-tab-group>
 
@@ -16,17 +18,13 @@
   <form
     [formGroup]="tableDetailsForm"
     (ngSubmit)="save()"
-    class="table-details-form-container"
+    class="table-details-form-container details-form"
     [class.x-small]="breakpointService.isXSmallScreen | async">
     <mat-form-field class="flex-50">
       <mat-label>
         {{ 'schema.tableName' | transloco }}
       </mat-label>
-      <input
-        matInput
-        formControlName="name"
-        required
-        placeholder="{{ 'schema.enter.tableName' | transloco }}" />
+      <input matInput formControlName="name" required />
       <mat-error *ngIf="tableDetailsForm.controls['name'].hasError('required')">
         {{ 'schema.alert.tableNameError' | transloco }}
       </mat-error>
@@ -36,33 +34,21 @@
       <mat-label>
         {{ 'schema.alias' | transloco }}
       </mat-label>
-      <input
-        matInput
-        formControlName="alias"
-        placeholder="{{ 'schema.enter.alias' | transloco }}" />
+      <input matInput formControlName="alias" />
     </mat-form-field>
     <mat-form-field class="flex-50">
       <mat-label>
         {{ 'schema.label' | transloco }}
       </mat-label>
-      <input
-        matInput
-        formControlName="label"
-        placeholder="{{ 'schema.enter.label' | transloco }}" />
+      <input matInput formControlName="label" />
     </mat-form-field>
     <mat-form-field class="flex-50">
       <mat-label> {{ 'schema.plural' | transloco }} </mat-label>
-      <input
-        matInput
-        formControlName="plural"
-        placeholder="{{ 'schema.enter.plural' | transloco }}" />
+      <input matInput formControlName="plural" />
     </mat-form-field>
     <mat-form-field subscriptSizing="dynamic">
       <mat-label> {{ 'schema.description' | transloco }} </mat-label>
-      <input
-        matInput
-        formControlName="description"
-        placeholder="{{ 'schema.enter.description' | transloco }}" />
+      <input matInput formControlName="description" />
     </mat-form-field>
 
     <div class="flex-100">
@@ -77,12 +63,12 @@
     </div>
 
     <div class="flex-100">
+      <button mat-flat-button type="button" (click)="goBack()">
+        {{ 'cancel' | transloco }}
+      </button>
       <button mat-flat-button color="primary" type="submit">
         <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
         <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
-      </button>
-      <button mat-flat-button type="button" (click)="goBack()">
-        {{ 'cancel' | transloco }}
       </button>
     </div>
   </form>

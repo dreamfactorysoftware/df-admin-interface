@@ -1,12 +1,27 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { DfLimitComponent } from './df-limit-details.component';
-import { TranslocoService, provideTransloco } from '@ngneat/transloco';
-import { TranslocoHttpLoader } from '../../../transloco-loader';
-import { ActivatedRoute } from '@angular/router';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { TranslocoService } from '@ngneat/transloco';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
+import { createTestBedConfig } from 'src/app/shared/utilities/test';
+
+const LIMIT_DETAILS = {
+  id: 17,
+  type: 'instance.user.service.endpoint',
+  keyText: 'instance.user:3.service:6.endpoint:foo.com/bar.verb:GET.day',
+  rate: 2,
+  period: 'hour',
+  userId: 3,
+  roleId: null,
+  serviceId: 6,
+  name: 'test',
+  description: 'test',
+  isActive: true,
+  createdDate: '2023-08-23T19:37:13.000000Z',
+  lastModifiedDate: '2023-08-24T20:25:45.000000Z',
+  endpoint: 'foo.com/bar',
+  verb: 'GET',
+};
 
 const SERVICE = {
   id: 2,
@@ -54,46 +69,21 @@ describe('DfLimitComponent - Create View', () => {
   let fixture: ComponentFixture<DfLimitComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [
-        DfLimitComponent,
-        HttpClientTestingModule,
-        NoopAnimationsModule,
-      ],
-      providers: [
-        provideTransloco({
-          config: {
-            defaultLang: 'en',
-            availableLangs: ['en'],
-          },
-          loader: TranslocoHttpLoader,
-        }),
-        TranslocoService,
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            data: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) =>
-                    fn({
-                      services: {
-                        resource: SERVICE,
-                      },
-                      users: {
-                        resource: USER,
-                      },
-                      roles: {
-                        resource: ROLE,
-                      },
-                    }),
-                };
-              },
-            },
-          },
+    TestBed.configureTestingModule(
+      createTestBedConfig(DfLimitComponent, [TranslocoService], {
+        data: undefined,
+        type: 'create',
+        services: {
+          resource: [SERVICE],
         },
-      ],
-    });
+        users: {
+          resource: [USER],
+        },
+        roles: {
+          resource: [ROLE],
+        },
+      })
+    );
     fixture = TestBed.createComponent(DfLimitComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -118,7 +108,7 @@ describe('DfLimitComponent - Create View', () => {
       limitRate: 2,
       limitPeriod: 'hour',
       verb: 'GET',
-      active: [true],
+      active: true,
     });
     component.onSubmit();
     expect(component.formGroup.valid).toBeTruthy();
@@ -131,56 +121,22 @@ describe('DfLimitComponent - Edit View', () => {
   let fixture: ComponentFixture<DfLimitComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [
-        DfLimitComponent,
-        HttpClientTestingModule,
-        NoopAnimationsModule,
-      ],
-      providers: [
-        provideTransloco({
-          config: {
-            defaultLang: 'en',
-            availableLangs: ['en'],
-          },
-          loader: TranslocoHttpLoader,
-        }),
-        TranslocoService,
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            data: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) =>
-                    fn({
-                      data: {
-                        name: 'test',
-                        description: 'test',
-                        type: 'test',
-                        rate: 2,
-                        period: 'hour',
-                        verb: 'GET',
-                        isActive: true,
-                        id: 2,
-                      },
-                      services: {
-                        resource: SERVICE,
-                      },
-                      users: {
-                        resource: USER,
-                      },
-                      roles: {
-                        resource: ROLE,
-                      },
-                    }),
-                };
-              },
-            },
-          },
+    TestBed.configureTestingModule(
+      createTestBedConfig(DfLimitComponent, [TranslocoService], {
+        data: LIMIT_DETAILS,
+        type: 'edit',
+        services: {
+          resource: [SERVICE],
         },
-      ],
-    });
+        users: {
+          resource: [USER],
+        },
+        roles: {
+          resource: [ROLE],
+        },
+      })
+    );
+
     fixture = TestBed.createComponent(DfLimitComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -189,7 +145,6 @@ describe('DfLimitComponent - Edit View', () => {
   afterEach(() => {
     jest.clearAllMocks();
     component.formGroup.reset();
-    // fixture.detectChanges();
   });
 
   it('should create', () => {
@@ -197,17 +152,28 @@ describe('DfLimitComponent - Edit View', () => {
   });
 
   it('should populate the form with edit data', () => {
-    console.log('FORM VALS', component.formGroup.value);
-    console.log('limitTypeToEdit', component.limitTypeToEdit);
     expect(component.formGroup.value).toEqual({
       limitName: 'test',
       description: 'test',
-      limitType: 'test',
+      limitType: 'instance.user.service.endpoint',
+      serviceId: 6,
+      userId: 3,
+      endpoint: 'foo.com/bar',
       limitRate: 2,
       limitPeriod: 'hour',
       verb: 'GET',
       active: true,
     });
+  });
+
+  it('should submit form if valid', () => {
+    const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'update');
+    component.formGroup.patchValue({
+      active: false,
+    });
+    component.onSubmit();
+    expect(component.formGroup.valid).toBeTruthy();
+    expect(crudServiceSpy).toHaveBeenCalled();
   });
 
   it('should set formControl validators when limit type is instance', () => {

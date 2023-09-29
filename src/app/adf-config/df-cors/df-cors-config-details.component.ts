@@ -53,7 +53,6 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 export class DfCorsConfigDetailsComponent implements OnInit {
   corsForm: FormGroup;
   corsConfigToEdit: CorsConfigData | undefined;
-  @ViewChild('select') select: MatSelect;
   allMethodsSelected = false;
   type = 'create';
 
@@ -108,24 +107,6 @@ export class DfCorsConfigDetailsComponent implements OnInit {
             this.allMethodsSelected = true;
         }
       });
-  }
-
-  toggleAllSelection() {
-    if (this.allMethodsSelected) {
-      this.select.options.forEach((item: MatOption) => item.select());
-    } else {
-      this.select.options.forEach((item: MatOption) => item.deselect());
-    }
-  }
-
-  optionClick() {
-    let newStatus = true;
-    this.select.options.forEach((item: MatOption) => {
-      if (!item.selected) {
-        newStatus = false;
-      }
-    });
-    this.allMethodsSelected = newStatus;
   }
 
   private assemblePayload(): Partial<CorsConfigData> {
