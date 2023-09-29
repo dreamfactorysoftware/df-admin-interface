@@ -1,5 +1,5 @@
 <!-- TODO Add translations -->
-<form [formGroup]="serviceForm" class="details-form">
+<form [formGroup]="serviceForm" class="details-form" (ngSubmit)="save()">
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>{{
       'services.controls.serviceType.label' | transloco
@@ -44,7 +44,7 @@
       [icon]="faCircleInfo"
       [matTooltip]="'services.controls.description.tooltip' | transloco" />
   </mat-form-field>
-  <mat-slide-toggle formControlName="active">{{
+  <mat-slide-toggle formControlName="isActive">{{
     'active' | transloco
   }}</mat-slide-toggle>
   <ng-container *ngIf="configSchema">
@@ -56,34 +56,52 @@
           }}</mat-expansion-panel-header>
           <div class="details-form">
             <ng-container *ngFor="let item of configSchema">
-              <df-dynamic-field
+              <df-ace-editor
                 *ngIf="
-                  [
-                    'integer',
-                    'password',
-                    'string',
-                    'text',
-                    'picklist',
-                    'multi_picklist',
-                    'boolean',
-                    'file_certificate'
-                  ].includes(item.type)
+                  item.type === 'text' && item.name === 'content';
+                  else dynamic
                 "
-                [schema]="item"
-                [formControlName]="item.name"
-                [class.dynamic-width]="item.type !== 'file_certificate'"
-                [class.full-width]="
-                  item.type === 'file_certificate'
-                "></df-dynamic-field>
-              <df-array-field
-                *ngIf="item.type === 'array' || item.type === 'object'"
-                [schema]="item"
-                [formControlName]="item.name"
-                class="full-width"></df-array-field>
+                [formControl]="getConfigControl(item.name)"
+                [mode]="scriptMode"
+                class="full-width"></df-ace-editor>
+              <ng-template #dynamic>
+                <df-dynamic-field
+                  *ngIf="
+                    [
+                      'integer',
+                      'password',
+                      'string',
+                      'text',
+                      'picklist',
+                      'multi_picklist',
+                      'boolean',
+                      'file_certificate'
+                    ].includes(item.type)
+                  "
+                  [schema]="item"
+                  [formControl]="getConfigControl(item.name)"
+                  [class.dynamic-width]="item.type !== 'file_certificate'"
+                  [class.full-width]="
+                    item.type === 'file_certificate'
+                  "></df-dynamic-field>
+                <df-array-field
+                  *ngIf="item.type === 'array' || item.type === 'object'"
+                  [schema]="item"
+                  [formControl]="getConfigControl(item.name)"
+                  class="full-width"></df-array-field>
+              </ng-template>
             </ng-container>
           </div>
         </mat-expansion-panel>
       </mat-accordion>
     </ng-container>
   </ng-container>
+  <div class="full-width">
+    <button mat-flat-button type="button" (click)="goBack()">
+      {{ 'cancel' | transloco }}
+    </button>
+    <button mat-raised-button color="primary" type="submit">
+      {{ 'save' | transloco }}
+    </button>
+  </div>
 </form>

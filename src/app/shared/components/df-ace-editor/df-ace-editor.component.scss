@@ -3,3 +3,9 @@
   min-height: 400px;
   width: 100%;
 }
+
+.import {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+}

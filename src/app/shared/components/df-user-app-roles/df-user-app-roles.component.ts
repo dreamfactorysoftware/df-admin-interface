@@ -19,7 +19,7 @@ import { AppType } from 'src/app/adf-apps/types/df-apps.types';
 import { RoleType } from '../../types/role';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { NgIf } from '@angular/common';
+import { NgFor, NgIf } from '@angular/common';
 import { UntilDestroy } from '@ngneat/until-destroy';
 
 @UntilDestroy({ checkProperties: true })
@@ -39,6 +39,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     MatExpansionModule,
     TranslocoPipe,
     NgIf,
+    NgFor,
   ],
 })
 export class DfUserAppRolesComponent implements OnInit {

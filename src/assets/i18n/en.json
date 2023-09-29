@@ -95,6 +95,15 @@
   "open": "Open",
   "noFileSelected": "No file selected",
   "toggleNav": "Toggle navigation",
+  "desktopFile": "Select a desktop File",
+  "githubFile": "Select a GitHub File",
+  "scriptType": "Script Type",
+  "scriptTypes": {
+    "javascript": "JavaScript",
+    "php": "PHP",
+    "python": "Python",
+    "nodejs": "Node.js"
+  },
   "nav": {
     "home": {
       "nav": "Home",
@@ -125,9 +134,29 @@
             "header": "{{nav.api-connections.api-types.database.edit.nav}}"
           }
         },
-        "custom": {
-          "nav": "Custom",
-          "header": "{{nav.api-connections.api-types.custom.nav}}"
+        "scripting": {
+          "nav": "Scripting",
+          "header": "{{nav.api-connections.api-types.scripting.nav}}",
+          "create": {
+            "nav": "Create Scripting API",
+            "header": "{{nav.api-connections.api-types.scripting.create.nav}}"
+          },
+          "edit": {
+            "nav": "{{edit}}",
+            "header": "{{nav.api-connections.api-types.scripting.edit.nav}}"
+          }
+        },
+        "network": {
+          "nav": "Network",
+          "header": "{{nav.api-connections.api-types.Networking.nav}}",
+          "create": {
+            "nav": "Create Network API",
+            "header": "{{nav.api-connections.api-types.network.create.nav}}"
+          },
+          "edit": {
+            "nav": "{{edit}}",
+            "header": "{{nav.api-connections.api-types.network.edit.nav}}"
+          }
         },
         "file": {
           "nav": "File",

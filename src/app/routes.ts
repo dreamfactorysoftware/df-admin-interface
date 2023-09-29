@@ -46,7 +46,10 @@ import {
   fileResolver,
 } from './adf-files/resolver/df-files.resolver';
 import { DfScriptsComponent } from './adf-scripts/df-scripts/df-scripts.component';
-import { scriptTypeResolver } from './adf-scripts/resolvers/scripts.resolver';
+import {
+  eventScriptsResolver,
+  scriptTypeResolver,
+} from './adf-scripts/resolvers/scripts.resolver';
 
 export const routes: Routes = [
   {
@@ -97,10 +100,17 @@ export const routes: Routes = [
             },
           },
           {
-            path: ROUTES.CUSTOM,
+            path: ROUTES.SCRIPTING,
             children: ServiceRoutes,
             data: {
-              groups: ['Script', 'Remote Service'],
+              groups: ['Script'],
+            },
+          },
+          {
+            path: ROUTES.NETWROK,
+            children: ServiceRoutes,
+            data: {
+              groups: ['Remote Service'],
             },
           },
           {
@@ -198,8 +208,24 @@ export const routes: Routes = [
       },
       {
         path: ROUTES.SCRIPTS,
-        component: DfScriptsComponent,
-        resolve: { data: servicesResolver(), scriptType: scriptTypeResolver },
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import(
+                './adf-scripts/df-manage-scripts/df-manage-scripts-table.component'
+              ).then(m => m.DfManageScriptsTableComponent),
+            resolve: { data: eventScriptsResolver },
+          },
+          {
+            path: ':name',
+            component: DfScriptsComponent,
+            resolve: {
+              data: servicesResolver(),
+              scriptType: scriptTypeResolver,
+            },
+          },
+        ],
         providers: [provideTranslocoScope('scripts')],
       },
       {

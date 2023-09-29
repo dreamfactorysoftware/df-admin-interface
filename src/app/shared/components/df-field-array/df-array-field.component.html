@@ -42,6 +42,7 @@
               *ngIf="schema.type === 'verb_mask'"
               type="number"
               [formControlName]="schema.name"
+              [schema]="schema"
               class="full-width"></df-verb-picker>
             <df-dynamic-field
               *ngIf="schema.type !== 'verb_mask'"

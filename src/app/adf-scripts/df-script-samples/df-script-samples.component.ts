@@ -18,7 +18,7 @@ export class DfScriptSamplesComponent {
   samples: Array<{ label: string; mode: AceEditorMode; value: string }> = [
     {
       label: 'Node.js',
-      mode: 'javascript',
+      mode: AceEditorMode.NODEJS,
       value: `//	Here are a few basic Node.js examples.
       //  See wiki.dreamfactory.com for more examples and Node.js setup info.
       //  console.log() can be used to log script output.
@@ -43,7 +43,7 @@ export class DfScriptSamplesComponent {
     },
     {
       label: 'PHP',
-      mode: 'php',
+      mode: AceEditorMode.PHP,
       value: `// Here are a few basic PHP examples.
       // See wiki.dreamfactory.com for more examples.
 
@@ -71,7 +71,7 @@ export class DfScriptSamplesComponent {
     },
     {
       label: 'Python',
-      mode: 'python',
+      mode: AceEditorMode.PYTHON,
       value: `# Here are a few basic Python examples.
       # Requires Bunch dictionary for dot notation, use PIP to install.
       # See wiki.dreamfactory.com for more examples.
