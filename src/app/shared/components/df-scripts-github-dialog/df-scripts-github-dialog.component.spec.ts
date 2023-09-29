@@ -3,7 +3,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfScriptsGithubDialogComponent } from './df-scripts-github-dialog.component';
 import { createTestBedConfig } from '../../utilities/test';
 import { MatDialogRef } from '@angular/material/dialog';
-import { DfBaseCrudService } from '../../services/df-base-crud.service';
 import { of, throwError } from 'rxjs';
 import { GITHUB_REPO_SERVICE_TOKEN } from '../../constants/tokens';
 
@@ -18,23 +17,14 @@ const mockGithubService = {
 describe('DfScriptsGithubDialogComponent', () => {
   let component: DfScriptsGithubDialogComponent;
   let fixture: ComponentFixture<DfScriptsGithubDialogComponent>;
-  let dfBaseCrudServiceMock: jest.Mocked<Partial<DfBaseCrudService>>;
 
   beforeEach(() => {
-    dfBaseCrudServiceMock = {
-      get: jest.fn().mockReturnValue(of({ private: false })),
-    } as any;
-
     TestBed.configureTestingModule(
       createTestBedConfig(
         DfScriptsGithubDialogComponent,
         [
           { provide: MatDialogRef, useValue: {} },
           { provide: GITHUB_REPO_SERVICE_TOKEN, useValue: mockGithubService },
-          {
-            provide: DfBaseCrudService,
-            useValue: dfBaseCrudServiceMock,
-          },
         ],
         {}
       )
