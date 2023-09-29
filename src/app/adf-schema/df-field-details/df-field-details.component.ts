@@ -128,13 +128,11 @@ export class DfFieldDetailsComponent implements OnInit {
       this.type = data['type'];
     });
 
-    this.dbName = this.activatedRoute.snapshot.paramMap.get('name') as string;
+    this.dbName = this.activatedRoute.snapshot.params['name'];
 
     if (this.type === 'edit') {
-      this.fieldName = this.activatedRoute.snapshot.paramMap.get('fieldName');
-      this.tableName = this.activatedRoute.snapshot.paramMap.get(
-        'id'
-      ) as string;
+      this.fieldName = this.activatedRoute.snapshot.params['fieldName'];
+      this.tableName = this.activatedRoute.snapshot.params['id'];
     }
 
     if (this.fieldName) {
@@ -142,7 +140,6 @@ export class DfFieldDetailsComponent implements OnInit {
         .get(
           `${this.dbName}/_schema/${this.tableName}/_field/${this.fieldName}`
         )
-
         .subscribe((data: any) => {
           this.databaseFieldToEdit = data;
 
@@ -329,7 +326,6 @@ export class DfFieldDetailsComponent implements OnInit {
               snackbarError: 'server',
             }
           )
-
           .subscribe(() => {
             this.router.navigate(['../../'], {
               relativeTo: this.activatedRoute,
@@ -345,7 +341,6 @@ export class DfFieldDetailsComponent implements OnInit {
             },
             `${this.dbName}/_schema/${this.tableName}/_field`
           )
-
           .subscribe(() => {
             this.router.navigate(['../../'], {
               relativeTo: this.activatedRoute,
@@ -356,7 +351,7 @@ export class DfFieldDetailsComponent implements OnInit {
   }
 
   onCancel() {
-    this.router.navigate(['../../'], {
+    this.router.navigate(['../'], {
       relativeTo: this.activatedRoute,
     });
   }

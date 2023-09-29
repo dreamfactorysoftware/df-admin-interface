@@ -1,12 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfFieldDetailsComponent } from './df-field-details.component';
-import { TranslocoService, provideTransloco } from '@ngneat/transloco';
-import { TranslocoHttpLoader } from '../../../transloco-loader';
-import { ActivatedRoute } from '@angular/router';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { TranslocoService } from '@ngneat/transloco';
+import { createTestBedConfig } from 'src/app/shared/utilities/test';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { of } from 'rxjs';
 
-const FIELD_DATA = {
+const MOCK_FORM_DATA = {
   alias: null,
   name: 'test field',
   label: 'Test Field',
@@ -14,7 +13,7 @@ const FIELD_DATA = {
   native: [],
   type: 'id',
   db_type: 'integer',
-  length: null,
+  length: '12',
   precision: null,
   scale: null,
   default: 1,
@@ -38,78 +37,23 @@ const FIELD_DATA = {
   is_aggregate: false,
 };
 
-const FORM_DATA = {
-  alias: null,
-  name: 'test field',
-  label: 'Test Field',
-  description: null,
-  native: [],
-  type: 'id',
-  db_type: 'integer',
-  length: null,
-  precision: null,
-  scale: null,
-  default: 1,
-  required: false,
-  allow_null: false,
-  fixed_length: false,
-  supports_multibyte: false,
-  auto_increment: true,
-  is_primary_key: true,
-  is_unique: false,
-  is_index: false,
-  is_foreign_key: false,
-  ref_table: null,
-  ref_field: null,
-  ref_on_update: null,
-  ref_on_delete: null,
-  picklist: null,
-  validation: null,
-  db_function: null,
-  is_virtual: false,
-  is_aggregate: false,
-};
-
-const ACTIVATED_ROUTE_DATA = {
-  data: {
-    resource: [FIELD_DATA],
-  },
-};
-
-describe('DfFieldDetailsComponent', () => {
+describe('DfFieldDetailsComponent - create field details', () => {
   let component: DfFieldDetailsComponent;
   let fixture: ComponentFixture<DfFieldDetailsComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [
+    TestBed.configureTestingModule(
+      createTestBedConfig(
         DfFieldDetailsComponent,
-        HttpClientTestingModule,
-        NoopAnimationsModule,
-      ],
-      providers: [
-        provideTransloco({
-          config: {
-            defaultLang: 'en',
-            availableLangs: ['en'],
-          },
-          loader: TranslocoHttpLoader,
-        }),
-        TranslocoService,
+        [TranslocoService],
         {
-          provide: ActivatedRoute,
-          useValue: {
-            data: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) => fn({}),
-                };
-              },
-            },
-          },
+          type: 'create',
         },
-      ],
-    });
+        undefined,
+        { name: 'dbName' }
+      )
+    );
+
     fixture = TestBed.createComponent(DfFieldDetailsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -117,6 +61,20 @@ describe('DfFieldDetailsComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should create field given form input is valid and create field button is clicked', () => {
+    const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'create');
+
+    component.fieldDetailsForm.patchValue({
+      name: 'test-field',
+      type: 'string',
+      length: 255,
+    });
+
+    component.onSubmit();
+
+    expect(crudServiceSpy).toHaveBeenCalled();
   });
 
   it('should set isAggregate validation if isVirtual is true', () => {
@@ -342,5 +300,46 @@ describe('DfFieldDetailsComponent', () => {
       false
     );
     expect(component.fieldDetailsForm.controls['scale'].enabled).toBe(false);
+  });
+});
+
+describe('DfFieldDetailsComponent - edit field details', () => {
+  let component: DfFieldDetailsComponent;
+  let fixture: ComponentFixture<DfFieldDetailsComponent>;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule(
+      createTestBedConfig(
+        DfFieldDetailsComponent,
+        [TranslocoService],
+        { data: { ...MOCK_FORM_DATA }, type: 'edit' },
+        undefined,
+        { name: 'dbName', fieldName: 'field-name', tableName: 'table-name' }
+      )
+    );
+
+    jest
+      .spyOn(DfBaseCrudService.prototype, 'get')
+      .mockReturnValue(of({ ...MOCK_FORM_DATA }));
+
+    fixture = TestBed.createComponent(DfFieldDetailsComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should edit existing field given form input is valid and update field button is clicked', () => {
+    const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'update');
+
+    component.fieldDetailsForm.patchValue({
+      name: 'new-field-name',
+    });
+
+    component.onSubmit();
+
+    expect(crudServiceSpy).toHaveBeenCalled();
   });
 });
