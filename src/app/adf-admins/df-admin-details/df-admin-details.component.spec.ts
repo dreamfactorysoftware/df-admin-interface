@@ -1,36 +1,13 @@
-import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { HarnessLoader } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { ActivatedRoute } from '@angular/router';
-import { provideTransloco, TranslocoService } from '@ngneat/transloco';
-import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
-import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
-import { TranslocoHttpLoader } from '../../../transloco-loader';
+import { TranslocoService } from '@ngneat/transloco';
 import { DfAdminDetailsComponent } from './df-admin-details.component';
 import { UserProfile } from '../../shared/types/user';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 import { MatRadioButtonHarness } from '@angular/material/radio/testing';
 import { MatInputHarness } from '@angular/material/input/testing';
-
-const fakeActivatedRoute = (isEdit = false) => {
-  return {
-    data: {
-      subscribe: (fn: (value: any) => void) =>
-        fn({
-          data: isEdit ? mockAdminUserProfile : undefined,
-          type: isEdit ? 'edit' : 'create',
-          apps: {
-            resource: [],
-          },
-          roles: {
-            resource: [],
-          },
-        }),
-    },
-  };
-};
+import { createTestBedConfig } from 'src/app/shared/utilities/test';
 
 const mockAdminUserProfile = {
   adldap: '',
@@ -63,36 +40,24 @@ const mockAdminUserProfile = {
   password: 'password',
 } as UserProfile;
 
-describe('DfAdminDetailsComponent - create', () => {
+describe('DfAdminDetailsComponent - create admin', () => {
   let component: DfAdminDetailsComponent;
   let fixture: ComponentFixture<DfAdminDetailsComponent>;
   let loader: HarnessLoader;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [
-        DfAdminDetailsComponent,
-        HttpClientTestingModule,
-        NoopAnimationsModule,
-      ],
-      declarations: [],
-      providers: [
-        provideTransloco({
-          config: {
-            availableLangs: ['en'],
-            defaultLang: 'en',
-          },
-          loader: TranslocoHttpLoader,
-        }),
-        DfSystemConfigDataService,
-        DfBreakpointService,
-        TranslocoService,
-        {
-          provide: ActivatedRoute,
-          useValue: fakeActivatedRoute(),
+    TestBed.configureTestingModule(
+      createTestBedConfig(DfAdminDetailsComponent, [TranslocoService], {
+        data: undefined,
+        type: 'create',
+        apps: {
+          resource: [],
         },
-      ],
-    });
+        roles: {
+          resource: [],
+        },
+      })
+    );
     fixture = TestBed.createComponent(DfAdminDetailsComponent);
     loader = TestbedHarnessEnvironment.loader(fixture);
 
@@ -191,36 +156,24 @@ describe('DfAdminDetailsComponent - create', () => {
   });
 });
 
-describe('DfAdminDetailsComponent - edit', () => {
+describe('DfAdminDetailsComponent - edit admin', () => {
   let component: DfAdminDetailsComponent;
   let fixture: ComponentFixture<DfAdminDetailsComponent>;
   let loader: HarnessLoader;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [
-        DfAdminDetailsComponent,
-        HttpClientTestingModule,
-        NoopAnimationsModule,
-      ],
-      declarations: [],
-      providers: [
-        provideTransloco({
-          config: {
-            availableLangs: ['en'],
-            defaultLang: 'en',
-          },
-          loader: TranslocoHttpLoader,
-        }),
-        DfSystemConfigDataService,
-        DfBreakpointService,
-        TranslocoService,
-        {
-          provide: ActivatedRoute,
-          useValue: fakeActivatedRoute(true),
+    TestBed.configureTestingModule(
+      createTestBedConfig(DfAdminDetailsComponent, [TranslocoService], {
+        data: mockAdminUserProfile,
+        type: 'edit',
+        apps: {
+          resource: [],
         },
-      ],
-    });
+        roles: {
+          resource: [],
+        },
+      })
+    );
     fixture = TestBed.createComponent(DfAdminDetailsComponent);
     loader = TestbedHarnessEnvironment.loader(fixture);
 
