@@ -1,11 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 import { DfCorsConfigDetailsComponent } from './df-cors-config-details.component';
+import { RouterTestingModule } from '@angular/router/testing';
+import { ROUTES } from 'src/app/shared/constants/routes';
 
 const FORM_DATA = {
   path: 'test',
@@ -34,11 +36,13 @@ const ROUTE_DATA = {
 
 const ACTIVATED_ROUTE_DATA = {
   data: ROUTE_DATA,
+  type: 'edit',
 };
 
 describe('DfCorsConfigDetailsComponent - Create view', () => {
   let component: DfCorsConfigDetailsComponent;
   let fixture: ComponentFixture<DfCorsConfigDetailsComponent>;
+  let router: Router;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -46,6 +50,7 @@ describe('DfCorsConfigDetailsComponent - Create view', () => {
         DfCorsConfigDetailsComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
+        RouterTestingModule,
       ],
       providers: [
         provideTransloco({
@@ -72,6 +77,7 @@ describe('DfCorsConfigDetailsComponent - Create view', () => {
     });
     fixture = TestBed.createComponent(DfCorsConfigDetailsComponent);
     component = fixture.componentInstance;
+    router = TestBed.inject(Router);
     fixture.detectChanges();
   });
 
@@ -102,6 +108,16 @@ describe('DfCorsConfigDetailsComponent - Create view', () => {
 
     expect(component.corsForm.valid).toBeTruthy();
     expect(crudServiceSpy).toHaveBeenCalled();
+  });
+
+  it('should navigate to the expected route on cancel', () => {
+    const navigateSpy = jest.spyOn(router, 'navigate');
+
+    component.onCancel();
+
+    expect(navigateSpy).toHaveBeenCalledWith([
+      `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
+    ]);
   });
 });
 
