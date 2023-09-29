@@ -27,6 +27,8 @@
   </form>
 </div>
 <div mat-dialog-actions>
-  <button mat-flat-button mat-dialog-close>Close</button>
-  <button mat-flat-button color="primary" (click)="onUpload()">Upload</button>
+  <button mat-flat-button mat-dialog-close>{{ 'close' | transloco }}</button>
+  <button mat-flat-button color="primary" (click)="onUpload()">
+    {{ 'upload' | transloco }}
+  </button>
 </div>
