@@ -6,7 +6,7 @@
     [formGroup]="emailTemplateForm"
     (ngSubmit)="onSubmit()"
     class="form-container details-form">
-    <mat-form-field class="flex-50">
+    <mat-form-field class="dynamic-width">
       <mat-label>{{
         'emailTemplates.templateName.label' | transloco
       }}</mat-label>
@@ -23,7 +23,7 @@
       </mat-error>
     </mat-form-field>
 
-    <mat-form-field class="flex-50">
+    <mat-form-field class="dynamic-width">
       <mat-label>{{
         'emailTemplates.templateDescription.label' | transloco
       }}</mat-label>
@@ -77,7 +77,7 @@
         class="email-template-body"></textarea>
     </mat-form-field>
 
-    <mat-form-field class="flex-50">
+    <mat-form-field class="dynamic-width">
       <mat-label>{{ 'emailTemplates.senderName.label' | transloco }}</mat-label>
       <input
         matInput
@@ -87,7 +87,7 @@
         }}" />
     </mat-form-field>
 
-    <mat-form-field class="flex-50">
+    <mat-form-field class="dynamic-width">
       <mat-label>{{
         'emailTemplates.senderEmail.label' | transloco
       }}</mat-label>
@@ -99,7 +99,7 @@
         }}" />
     </mat-form-field>
 
-    <mat-form-field class="flex-50">
+    <mat-form-field class="dynamic-width">
       <mat-label>{{
         'emailTemplates.replyToName.label' | transloco
       }}</mat-label>
@@ -111,7 +111,7 @@
         }}" />
     </mat-form-field>
 
-    <mat-form-field class="flex-50">
+    <mat-form-field class="dynamic-width">
       <mat-label>{{
         'emailTemplates.replyToEmail.label' | transloco
       }}</mat-label>
