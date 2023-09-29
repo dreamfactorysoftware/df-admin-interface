@@ -88,34 +88,10 @@ export class DfRelationshipDetailsComponent implements OnInit {
       refServiceId: [null, Validators.required],
       refTable: [null, Validators.required],
       refField: [null, Validators.required],
-      junctionServiceId: [
-        { value: null, disabled: true },
-        this.relationshipForm &&
-        this.relationshipForm.value.type === 'many_many'
-          ? Validators.required
-          : null,
-      ],
-      junctionTable: [
-        { value: null, disabled: true },
-        this.relationshipForm &&
-        this.relationshipForm.value.type === 'many_many'
-          ? Validators.required
-          : null,
-      ],
-      junctionField: [
-        { value: null, disabled: true },
-        this.relationshipForm &&
-        this.relationshipForm.value.type === 'many_many'
-          ? Validators.required
-          : null,
-      ],
-      junctionRefField: [
-        { value: null, disabled: true },
-        this.relationshipForm &&
-        this.relationshipForm.value.type === 'many_many'
-          ? Validators.required
-          : null,
-      ],
+      junctionServiceId: [{ value: null, disabled: true }],
+      junctionTable: [{ value: null, disabled: true }],
+      junctionField: [{ value: null, disabled: true }],
+      junctionRefField: [{ value: null, disabled: true }],
     });
 
     this.activatedRoute.data.subscribe(data => {
@@ -165,9 +141,21 @@ export class DfRelationshipDetailsComponent implements OnInit {
 
         if (data['data'].type === 'many_many') {
           this.relationshipForm.get('junctionServiceId')?.enable();
+          this.relationshipForm
+            .get('junctionServiceId')
+            ?.addValidators([Validators.required]);
           this.relationshipForm.get('junctionTable')?.enable();
+          this.relationshipForm
+            .get('junctionTable')
+            ?.addValidators([Validators.required]);
           this.relationshipForm.get('junctionField')?.enable();
+          this.relationshipForm
+            .get('junctionField')
+            ?.addValidators([Validators.required]);
           this.relationshipForm.get('junctionRefField')?.enable();
+          this.relationshipForm
+            .get('junctionRefField')
+            ?.addValidators([Validators.required]);
         }
       }
     });
@@ -309,6 +297,9 @@ export class DfRelationshipDetailsComponent implements OnInit {
   }
 
   save() {
+    if (this.relationshipForm.invalid) {
+      return;
+    }
     const payload = {
       resource: [this.relationshipForm.value],
     };
