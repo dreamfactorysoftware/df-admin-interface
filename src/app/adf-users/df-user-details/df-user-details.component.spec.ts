@@ -12,26 +12,20 @@ import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { UserProfile } from 'src/app/shared/types/user';
+import { of } from 'rxjs';
 
 const fakeActivatedRoute = (isEdit = false) => {
   return {
-    data: {
-      pipe: () => {
-        return {
-          subscribe: (fn: (value: any) => void) =>
-            fn({
-              data: isEdit ? mockUserProfile : undefined,
-              type: isEdit ? 'edit' : 'create',
-              apps: {
-                resource: [],
-              },
-              roles: {
-                resource: [],
-              },
-            }),
-        };
+    data: of({
+      data: isEdit ? mockUserProfile : undefined,
+      type: isEdit ? 'edit' : 'create',
+      apps: {
+        resource: [],
       },
-    },
+      roles: {
+        resource: [],
+      },
+    }),
   };
 };
 

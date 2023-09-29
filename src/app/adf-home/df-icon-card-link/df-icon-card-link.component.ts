@@ -1,7 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
 
-import { AsyncPipe } from '@angular/common';
+import { AsyncPipe, NgIf } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { TranslocoPipe } from '@ngneat/transloco';
 
@@ -16,7 +16,7 @@ interface LinkInfo {
   templateUrl: './df-icon-card-link.component.html',
   styleUrls: ['./df-icon-card-link.component.scss'],
   standalone: true,
-  imports: [MatCardModule, AsyncPipe, TranslocoPipe],
+  imports: [MatCardModule, AsyncPipe, TranslocoPipe, NgIf],
 })
 export class DfIconCardLinkComponent {
   constructor(public breakpointService: DfBreakpointService) {}

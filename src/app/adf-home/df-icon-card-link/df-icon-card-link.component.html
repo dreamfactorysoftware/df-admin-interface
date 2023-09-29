@@ -1,11 +1,13 @@
-<a
-  href="{{ linkInfo.url }}"
-  target="_blank"
-  class="icon-link-container"
-  [class.x-small]="breakpointService.isXSmallScreen | async"
-  aria-labelledby="link-label">
-  <mat-card class="icon-link-card">
-    <img src="assets/img/{{ linkInfo.icon }}" class="icon-img" alt="" />
-  </mat-card>
-  <span class="label" id="link-label">{{ linkInfo.name | transloco }}</span>
-</a>
+<ng-container *ngIf="linkInfo">
+  <a
+    href="{{ linkInfo.url }}"
+    target="_blank"
+    class="icon-link-container"
+    [class.x-small]="breakpointService.isXSmallScreen | async"
+    aria-labelledby="link-label">
+    <mat-card class="icon-link-card">
+      <img src="assets/img/{{ linkInfo.icon }}" class="icon-img" alt="" />
+    </mat-card>
+    <span class="label" id="link-label">{{ linkInfo.name | transloco }}</span>
+  </a>
+</ng-container>
