@@ -19,5 +19,8 @@
       "label": "Description",
       "tooltip": "Write a brief description of the API (optional)."
     }
-  }
+  },
+  "deleteSuccessMsg": "Service successfully deleted",
+  "createSuccessMsg": "Service successfully created",
+  "updateSuccessMsg": "Service successfully updated"
 }

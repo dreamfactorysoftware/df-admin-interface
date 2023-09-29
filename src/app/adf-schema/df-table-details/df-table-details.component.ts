@@ -17,7 +17,10 @@ import { DfBreakpointService } from '../../shared/services/df-breakpoint.service
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { MatTabsModule } from '@angular/material/tabs';
-import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
+import {
+  AceEditorMode,
+  DfAceEditorComponent,
+} from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -47,6 +50,7 @@ export class DfTableDetailsComponent implements OnInit {
   tableFields: [];
   tableRelated: [];
   jsonData: string;
+  AceEditorMode = AceEditorMode;
 
   constructor(
     @Inject(BASE_SERVICE_TOKEN)

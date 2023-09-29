@@ -8,7 +8,9 @@
     <ng-container [ngTemplateOutlet]="tableDetails"></ng-container>
   </mat-tab>
   <mat-tab label="JSON">
-    <df-ace-editor mode="json" [value]="jsonData"></df-ace-editor>
+    <df-ace-editor
+      [mode]="AceEditorMode.JSON"
+      [value]="jsonData"></df-ace-editor>
   </mat-tab>
 </mat-tab-group>
 
