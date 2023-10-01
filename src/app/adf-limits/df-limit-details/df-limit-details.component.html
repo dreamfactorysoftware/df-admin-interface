@@ -90,11 +90,11 @@
     }}</mat-slide-toggle>
   </ng-container>
   <div class="full-width">
-    <button mat-raised-button color="primary" (click)="onSubmit()">
-      {{ 'save' | transloco }}
-    </button>
-    <button mat-raised-button (click)="onCancel()">
+    <button mat-flat-button (click)="onCancel()">
       {{ 'cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" (click)="onSubmit()">
+      {{ 'save' | transloco }}
     </button>
   </div>
 </form>
