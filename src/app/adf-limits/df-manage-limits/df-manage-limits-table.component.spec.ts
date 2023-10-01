@@ -1,46 +1,48 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfManageLimitsTableComponent } from './df-manage-limits-table.component';
-import { TranslocoService, provideTransloco } from '@ngneat/transloco';
-import { TranslocoHttpLoader } from '../../../transloco-loader';
-import { ActivatedRoute } from '@angular/router';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
+import { TranslocoService } from '@ngneat/transloco';
+import { createTestBedConfig } from 'src/app/shared/utilities/test';
+import { mockLimitTypes, mockTableData } from './mocks/mocks';
+import { of } from 'rxjs';
+import {
+  LIMIT_CACHE_SERVICE_TOKEN,
+  LIMIT_SERVICE_TOKEN,
+} from 'src/app/shared/constants/tokens';
+
+const mockLimitService = {
+  getAll: jest.fn(),
+  delete: jest.fn(),
+};
+
+const mockLimitCacheService = {
+  delete: jest.fn(),
+};
 
 describe('DfManageLimitsTableComponent', () => {
   let component: DfManageLimitsTableComponent;
   let fixture: ComponentFixture<DfManageLimitsTableComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [
+    TestBed.configureTestingModule(
+      createTestBedConfig(
         DfManageLimitsTableComponent,
-        HttpClientTestingModule,
-        NoopAnimationsModule,
-      ],
-      providers: [
-        provideTransloco({
-          config: {
-            defaultLang: 'en',
-            availableLangs: ['en'],
+        [
+          TranslocoService,
+          {
+            provide: LIMIT_CACHE_SERVICE_TOKEN,
+            useValue: mockLimitCacheService,
           },
-          loader: TranslocoHttpLoader,
-        }),
-        TranslocoService,
+          {
+            provide: LIMIT_SERVICE_TOKEN,
+            useValue: mockLimitService,
+          },
+        ],
         {
-          provide: ActivatedRoute,
-          useValue: {
-            data: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) => fn({}),
-                };
-              },
-            },
-          },
-        },
-      ],
-    });
+          meta: { count: 2 },
+          resource: [...mockLimitTypes],
+        }
+      )
+    );
     fixture = TestBed.createComponent(DfManageLimitsTableComponent);
     component = fixture.componentInstance;
   });
@@ -50,14 +52,16 @@ describe('DfManageLimitsTableComponent', () => {
   });
 
   it('should refresh rows', () => {
-    const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'delete');
-    component.refreshRow(2);
-    expect(crudServiceSpy).toHaveBeenCalled();
+    mockLimitCacheService.delete.mockReturnValue(of({}));
+    mockLimitService.getAll.mockReturnValue(of({}));
+    component.refreshRow(mockTableData[0]);
+    expect(mockLimitCacheService.delete).toHaveBeenCalled();
   });
 
-  it('should throw error on refresh rows if there are no rows', () => {
-    const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'delete');
-    component.refreshRows();
-    expect(crudServiceSpy).toThrowError();
+  it('should delete rows when delete button is clicked', () => {
+    mockLimitService.delete.mockReturnValue(of({}));
+    mockLimitService.getAll.mockReturnValue(of({}));
+    component.deleteRow(mockTableData[0]);
+    expect(mockLimitService.delete).toHaveBeenCalled();
   });
 });
