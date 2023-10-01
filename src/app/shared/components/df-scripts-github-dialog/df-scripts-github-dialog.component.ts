@@ -55,8 +55,6 @@ export class DfScriptsGithubDialogComponent implements OnInit {
   ngOnInit(): void {
     this.formGroup.controls['url'].valueChanges.subscribe((url: string) => {
       if (isValidHttpUrl(url)) {
-        console.log('value: ', url);
-
         if (
           (url.indexOf('.js') > 0 ||
             url.indexOf('.py') > 0 ||
@@ -71,7 +69,6 @@ export class DfScriptsGithubDialogComponent implements OnInit {
           this.repoName = urlArray[1];
           this.fileName = urlArray[4];
           const githubApiEndpoint = `${this.repoOwner}/${this.repoName}`;
-
           this.githubService
             .get(githubApiEndpoint, {
               snackbarError: 'server',
@@ -92,8 +89,8 @@ export class DfScriptsGithubDialogComponent implements OnInit {
                 return throwError(() => new Error(err));
               })
             )
-            .subscribe(data => {
-              console.log('github api response: ', data);
+            .subscribe((data: any) => {
+              this.isGitRepoPrivate = data['private'];
             });
         } else {
           // display error message stating that file needs to have certain extension
@@ -103,6 +100,8 @@ export class DfScriptsGithubDialogComponent implements OnInit {
   }
 
   onUpload() {
+    if (this.formGroup.invalid) return;
+
     const githubApiEndpoint = `${this.repoOwner}/${this.repoName}/contents/${this.fileName}`;
 
     const authData = window.btoa(
