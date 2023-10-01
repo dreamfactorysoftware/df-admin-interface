@@ -10,22 +10,7 @@ import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
-
-const fakeActivatedRoute = (isEdit = false) => {
-  return {
-    data: {
-      pipe: () => {
-        return {
-          subscribe: (fn: (value: any) => void) =>
-            fn({
-              data: isEdit ? mockRole : undefined,
-              type: isEdit ? 'edit' : 'create',
-            }),
-        };
-      },
-    },
-  };
-};
+import { of } from 'rxjs';
 
 const mockRole = {
   id: 3,
@@ -74,13 +59,15 @@ describe('DfRoleDetailsComponent - create', () => {
         TranslocoService,
         {
           provide: ActivatedRoute,
-          useValue: fakeActivatedRoute(),
+          useValue: {
+            data: of({
+              type: 'create',
+            }),
+          },
         },
       ],
     });
     fixture = TestBed.createComponent(DfRoleDetailsComponent);
-    loader = TestbedHarnessEnvironment.loader(fixture);
-
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -151,13 +138,16 @@ describe('DfRoleDetailsComponent - edit', () => {
         TranslocoService,
         {
           provide: ActivatedRoute,
-          useValue: fakeActivatedRoute(true),
+          useValue: {
+            data: of({
+              data: mockRole,
+              type: 'edit',
+            }),
+          },
         },
       ],
     });
     fixture = TestBed.createComponent(DfRoleDetailsComponent);
-    loader = TestbedHarnessEnvironment.loader(fixture);
-
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

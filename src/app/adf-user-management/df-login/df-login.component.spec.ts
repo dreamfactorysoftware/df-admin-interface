@@ -3,6 +3,7 @@ import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-con
 import { createTestBedConfig } from 'src/app/shared/utilities/test';
 import { DfAuthService } from '../services/df-auth.service';
 import { DfLoginComponent } from './df-login.component';
+import { of } from 'rxjs';
 
 describe('DfLoginComponent - email login', () => {
   let component: DfLoginComponent;
@@ -17,23 +18,16 @@ describe('DfLoginComponent - email login', () => {
           {
             provide: DfSystemConfigDataService,
             useValue: {
-              environment$: {
-                pipe: () => {
-                  return {
-                    subscribe: (fn: (value: any) => void) =>
-                      fn({
-                        apps: [],
-                        authentication: {
-                          loginAttribute: 'email',
-                          adldap: [],
-                          oauth: [],
-                          saml: [],
-                        },
-                        platform: { rootAdminExists: true },
-                      }),
-                  };
+              environment$: of({
+                apps: [],
+                authentication: {
+                  loginAttribute: 'email',
+                  adldap: [],
+                  oauth: [],
+                  saml: [],
                 },
-              },
+                platform: { rootAdminExists: true },
+              }),
             },
           },
         ],
@@ -94,36 +88,29 @@ describe('DfLoginComponent - username login', () => {
           {
             provide: DfSystemConfigDataService,
             useValue: {
-              environment$: {
-                pipe: () => {
-                  return {
-                    subscribe: (fn: (value: any) => void) =>
-                      fn({
-                        apps: [],
-                        authentication: {
-                          loginAttribute: 'username',
-                          adldap: [
-                            {
-                              path: 'user/session?service=test-ldap',
-                              name: 'test-ldap',
-                              label: 'ldap1',
-                              verb: 'POST',
-                              payload: {
-                                username: 'string',
-                                password: 'string',
-                                service: 'test-ldap',
-                                remember_me: 'bool',
-                              },
-                            },
-                          ],
-                          oauth: [],
-                          saml: [],
-                        },
-                        platform: { rootAdminExists: true },
-                      }),
-                  };
+              environment$: of({
+                apps: [],
+                authentication: {
+                  loginAttribute: 'username',
+                  adldap: [
+                    {
+                      path: 'user/session?service=test-ldap',
+                      name: 'test-ldap',
+                      label: 'ldap1',
+                      verb: 'POST',
+                      payload: {
+                        username: 'string',
+                        password: 'string',
+                        service: 'test-ldap',
+                        remember_me: 'bool',
+                      },
+                    },
+                  ],
+                  oauth: [],
+                  saml: [],
                 },
-              },
+                platform: { rootAdminExists: true },
+              }),
             },
           },
         ],

@@ -1,5 +1,4 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
 import { DfScriptsGithubDialogComponent } from './df-scripts-github-dialog.component';
 import { createTestBedConfig } from '../../utilities/test';
 import { MatDialogRef } from '@angular/material/dialog';

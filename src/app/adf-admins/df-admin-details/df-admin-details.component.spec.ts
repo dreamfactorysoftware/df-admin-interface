@@ -13,28 +13,7 @@ import { UserProfile } from '../../shared/types/user';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 import { MatRadioButtonHarness } from '@angular/material/radio/testing';
 import { MatInputHarness } from '@angular/material/input/testing';
-
-const fakeActivatedRoute = (isEdit = false) => {
-  return {
-    data: {
-      pipe: () => {
-        return {
-          subscribe: (fn: (value: any) => void) =>
-            fn({
-              data: isEdit ? mockAdminUserProfile : undefined,
-              type: isEdit ? 'edit' : 'create',
-              apps: {
-                resource: [],
-              },
-              roles: {
-                resource: [],
-              },
-            }),
-        };
-      },
-    },
-  };
-};
+import { of } from 'rxjs';
 
 const mockAdminUserProfile = {
   adldap: '',
@@ -93,7 +72,17 @@ describe('DfAdminDetailsComponent - create', () => {
         TranslocoService,
         {
           provide: ActivatedRoute,
-          useValue: fakeActivatedRoute(),
+          useValue: {
+            data: of({
+              type: 'create',
+              apps: {
+                resource: [],
+              },
+              roles: {
+                resource: [],
+              },
+            }),
+          },
         },
       ],
     });
@@ -221,7 +210,18 @@ describe('DfAdminDetailsComponent - edit', () => {
         TranslocoService,
         {
           provide: ActivatedRoute,
-          useValue: fakeActivatedRoute(true),
+          useValue: {
+            data: of({
+              data: mockAdminUserProfile,
+              type: 'edit',
+              apps: {
+                resource: [],
+              },
+              roles: {
+                resource: [],
+              },
+            }),
+          },
         },
       ],
     });

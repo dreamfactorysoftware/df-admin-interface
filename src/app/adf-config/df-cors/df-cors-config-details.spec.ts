@@ -8,6 +8,7 @@ import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 import { DfCorsConfigDetailsComponent } from './df-cors-config-details.component';
 import { RouterTestingModule } from '@angular/router/testing';
 import { ROUTES } from 'src/app/shared/constants/routes';
+import { of } from 'rxjs';
 
 const FORM_DATA = {
   path: 'test',
@@ -64,13 +65,7 @@ describe('DfCorsConfigDetailsComponent - Create view', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            data: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) => fn({}),
-                };
-              },
-            },
+            data: of({}),
           },
         },
       ],
