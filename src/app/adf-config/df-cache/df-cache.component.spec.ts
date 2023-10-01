@@ -1,11 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfCacheComponent } from './df-cache.component';
-import { TranslocoService, provideTransloco } from '@ngneat/transloco';
-import { TranslocoHttpLoader } from '../../../transloco-loader';
-import { ActivatedRoute } from '@angular/router';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { TranslocoService } from '@ngneat/transloco';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
+import { createTestBedConfig } from 'src/app/shared/utilities/test';
 
 const ACTIVATED_ROUTE_DATA = {
   data: {
@@ -25,36 +22,11 @@ describe('DfCacheComponent', () => {
   let fixture: ComponentFixture<DfCacheComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [
-        DfCacheComponent,
-        HttpClientTestingModule,
-        NoopAnimationsModule,
-      ],
-      providers: [
-        provideTransloco({
-          config: {
-            defaultLang: 'en',
-            availableLangs: ['en'],
-          },
-          loader: TranslocoHttpLoader,
-        }),
-        TranslocoService,
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            data: {
-              pipe: () => {
-                return {
-                  subscribe: (fn: (value: any) => void) =>
-                    fn(ACTIVATED_ROUTE_DATA),
-                };
-              },
-            },
-          },
-        },
-      ],
-    });
+    TestBed.configureTestingModule(
+      createTestBedConfig(DfCacheComponent, [TranslocoService], {
+        ...ACTIVATED_ROUTE_DATA,
+      })
+    );
     fixture = TestBed.createComponent(DfCacheComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
