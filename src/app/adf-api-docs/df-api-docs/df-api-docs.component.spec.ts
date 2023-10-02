@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { DfApiDocsComponent } from './df-api-docs.component';
-import { createTestBedConfig } from 'src/app/shared/utilities/test';
-import { mockApiDocsData } from './test-utilities/test';
+import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
+import { mockApiDocsData } from './test-utilities/df-api-docs.mock';
 import { Router } from '@angular/router';
 import { ROUTES } from 'src/app/shared/constants/routes';
 
