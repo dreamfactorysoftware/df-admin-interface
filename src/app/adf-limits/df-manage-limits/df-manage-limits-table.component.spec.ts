@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfManageLimitsTableComponent } from './df-manage-limits-table.component';
 import { TranslocoService } from '@ngneat/transloco';
-import { createTestBedConfig } from 'src/app/shared/utilities/test';
+import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 import { mockLimitTypes, mockTableData } from './mocks/mocks';
 import { of } from 'rxjs';
 import {

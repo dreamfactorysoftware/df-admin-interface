@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { DfConfirmDialogComponent } from './df-confirm-dialog.component';
-import { createTestBedConfig } from '../../utilities/test';
+import { createTestBedConfig } from '../../utilities/testbed-config';
 
 describe('DfConfirmDialogComponent', () => {
   let component: DfConfirmDialogComponent;

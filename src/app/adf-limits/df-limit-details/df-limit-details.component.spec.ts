@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfLimitComponent } from './df-limit-details.component';
 import { TranslocoService } from '@ngneat/transloco';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
-import { createTestBedConfig } from 'src/app/shared/utilities/test';
+import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 
 const LIMIT_DETAILS = {
   id: 17,

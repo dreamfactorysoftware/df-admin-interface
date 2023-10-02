@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfFieldDetailsComponent } from './df-field-details.component';
 import { TranslocoService } from '@ngneat/transloco';
-import { createTestBedConfig } from 'src/app/shared/utilities/test';
+import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { of } from 'rxjs';
 

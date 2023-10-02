@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { createTestBedConfig } from '../../utilities/test';
+import { createTestBedConfig } from '../../utilities/testbed-config';
 import {
   DfManageTableComponent,
   DfManageTableModules,

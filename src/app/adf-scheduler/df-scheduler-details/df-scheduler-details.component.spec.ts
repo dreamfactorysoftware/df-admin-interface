@@ -4,7 +4,7 @@ import { TranslocoService } from '@ngneat/transloco';
 import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
 import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
-import { createTestBedConfig } from 'src/app/shared/utilities/test';
+import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 import { mockSchedulerTaskData, mockServices } from './test-mocks/mocks';
 
 const editModeActivatedRoute = {

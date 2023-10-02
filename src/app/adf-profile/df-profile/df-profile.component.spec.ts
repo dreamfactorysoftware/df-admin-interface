@@ -6,7 +6,7 @@ import { DfProfileComponent } from './df-profile.component';
 import { DfProfileService } from '../services/df-profile.service';
 import { UserProfile } from 'src/app/shared/types/user';
 import { DfPasswordService } from 'src/app/adf-user-management/services/df-password.service';
-import { createTestBedConfig } from 'src/app/shared/utilities/test';
+import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 
 const mockProfile: Partial<UserProfile> = {
   username: 'whenlin',

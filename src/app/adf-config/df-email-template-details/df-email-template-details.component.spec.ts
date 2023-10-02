@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfEmailTemplateDetailsComponent } from './df-email-template-details.component';
-import { createTestBedConfig } from '../../shared/utilities/test';
+import { createTestBedConfig } from '../../shared/utilities/testbed-config';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 
 describe('DfEmailTemplateDetailsComponent - create email template flow', () => {
