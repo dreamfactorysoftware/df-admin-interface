@@ -37,6 +37,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 @Component({
   selector: 'df-app-details',
   templateUrl: './df-app-details.component.html',
+  styleUrls: ['./df-app-details.component.scss'],
   standalone: true,
   imports: [
     ReactiveFormsModule,
