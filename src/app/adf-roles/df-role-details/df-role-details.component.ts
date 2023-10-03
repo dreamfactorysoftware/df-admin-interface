@@ -147,19 +147,19 @@ export class DfRoleDetailsComponent implements OnInit {
       id: formValue.id,
       name: formValue.name,
       description: formValue.description,
-      is_active: formValue.active,
-      role_service_access_by_role_id: formValue.serviceAccess.map(
+      isActive: formValue.active,
+      roleServiceAccessByRoleId: formValue.serviceAccess.map(
         (val: AccessForm) => ({
           id: val.id,
-          service_id: val.service,
+          serviceId: val.service,
           component: val.component,
-          verb_mask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
-          requestor_mask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
+          verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
+          requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
           filters: val.advancedFilters,
-          filter_op: 'AND',
+          filterOp: 'AND',
         })
       ),
-      lookup_by_role_id: formValue.lookupKeys,
+      lookupByRoleId: formValue.lookupKeys,
     };
 
     const createPayload = {

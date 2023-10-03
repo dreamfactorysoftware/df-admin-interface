@@ -187,6 +187,7 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   updateDataSource() {
+    if (!this.serviceAccess) return;
     this.dataSource = new MatTableDataSource(this.serviceAccess.controls);
   }
 
@@ -201,8 +202,8 @@ export class DfRolesAccessComponent implements OnInit {
         component: new FormControl('', Validators.required),
         access: new FormControl('', Validators.required),
         requester: new FormControl([1], Validators.required),
-        advancedFilters: new FormControl([], Validators.required),
-        id: new FormControl([null]),
+        advancedFilters: new FormControl([]),
+        id: new FormControl(null),
       })
     );
     this.updateDataSource();
