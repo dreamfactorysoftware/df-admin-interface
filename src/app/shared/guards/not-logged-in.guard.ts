@@ -13,8 +13,7 @@ export const notLoggedInGuard = () => {
   return userDataService.isLoggedIn$.pipe(
     map(isLoggedIn => {
       if (isLoggedIn) {
-        router.navigate([ROUTES.HOME]);
-        return false;
+        return router.createUrlTree([ROUTES.HOME]);
       }
       return true;
     }),
@@ -23,14 +22,13 @@ export const notLoggedInGuard = () => {
         return authService.checkSession().pipe(
           map(validSession => {
             if (validSession) {
-              router.navigate([ROUTES.HOME]);
-              return false;
+              return router.createUrlTree([ROUTES.HOME]);
             }
             return true;
           })
         );
       }
-      return of(false);
+      return of(true);
     })
   );
 };

@@ -16,8 +16,7 @@ export const loggedInGuard = () => {
         return authService.checkSession().pipe(
           map(validSession => {
             if (!validSession) {
-              router.navigate([ROUTES.AUTH]);
-              return false;
+              return router.createUrlTree([ROUTES.AUTH]);
             }
             return true;
           })
