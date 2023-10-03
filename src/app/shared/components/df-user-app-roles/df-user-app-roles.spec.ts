@@ -18,7 +18,7 @@ import { MatInputModule } from '@angular/material/input';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
-import { AppType } from 'src/app/adf-apps/types/df-apps.types';
+import { AppType } from 'src/app/shared/types/apps';
 import { RoleType } from '../../types/role';
 import { NgIf, NgFor } from '@angular/common';
 

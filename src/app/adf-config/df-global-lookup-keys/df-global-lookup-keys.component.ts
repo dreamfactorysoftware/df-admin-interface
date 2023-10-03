@@ -12,7 +12,7 @@ import { uniqueNameValidator } from 'src/app/shared/validators/unique-name.valid
 import { TranslocoPipe } from '@ngneat/transloco';
 import { MatButtonModule } from '@angular/material/button';
 import { ActivatedRoute } from '@angular/router';
-import { LookupKeyType } from './df-global-lookup-keys.types';
+import { LookupKeyType } from '../../shared/types/global-lookup-keys';
 import { LOOKUP_KEYS_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { UntilDestroy } from '@ngneat/until-destroy';

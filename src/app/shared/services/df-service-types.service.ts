@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { ServiceType } from 'src/app/shared/types/service';
 import { URLS } from '../constants/urls';
 import { SHOW_LOADING_HEADER } from '../constants/http-headers';

@@ -31,7 +31,7 @@ import {
   ScriptDetailsType,
   ScriptObject,
   ScriptType,
-} from '../types/df-scripts.types';
+} from '../../shared/types/scripts';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -39,7 +39,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfScriptsGithubDialogComponent } from '../../shared/components/df-scripts-github-dialog/df-scripts-github-dialog.component';
-import { KeyValuePair } from 'src/app/shared/types/generic-http.type';
+import { KeyValuePair } from 'src/app/shared/types/generic-http';
 import { mapCamelToSnake } from 'src/app/shared/utilities/case';
 import { UntilDestroy } from '@ngneat/until-destroy';
 @UntilDestroy({ checkProperties: true })

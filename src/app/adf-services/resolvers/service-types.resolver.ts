@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { forkJoin, map } from 'rxjs';
 import { SERVICE_TYPE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { ServiceType } from 'src/app/shared/types/service';
 
 export const serviceTypesResolver: ResolveFn<Array<ServiceType>> = (

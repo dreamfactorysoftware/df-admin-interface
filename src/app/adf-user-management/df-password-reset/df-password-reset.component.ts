@@ -6,7 +6,10 @@ import {
   ReactiveFormsModule,
 } from '@angular/forms';
 import { Location, NgIf } from '@angular/common';
-import { UserParams, LoginCredentials } from '../types';
+import {
+  UserParams,
+  LoginCredentials,
+} from '../../shared/types/user-management';
 import { DfPasswordService } from '../services/df-password.service';
 import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import { matchValidator } from '../../shared/validators/match.validator';

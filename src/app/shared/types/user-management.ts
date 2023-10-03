@@ -1,4 +1,4 @@
-import { GenericSuccessResponse } from '../shared/types/generic-http.type';
+import { GenericSuccessResponse } from './generic-http';
 
 export interface LoginCredentials {
   username?: string;

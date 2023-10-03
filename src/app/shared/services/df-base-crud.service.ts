@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { RequestOptions } from 'src/app/shared/types/generic-http.type';
+import { RequestOptions } from 'src/app/shared/types/generic-http';
 import { readAsText } from 'src/app/shared/utilities/file';
 import { switchMap } from 'rxjs';
 import { Inject, Injectable } from '@angular/core';

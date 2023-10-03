@@ -4,7 +4,7 @@ import {
   javaScriptExampleLinks,
   nativeExampleLinks,
   welcomePageResources,
-} from '../constants';
+} from '../../shared/constants/home';
 import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
 
 import { DfIconCardLinkComponent } from '../df-icon-card-link/df-icon-card-link.component';

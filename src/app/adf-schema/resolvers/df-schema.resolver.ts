@@ -1,5 +1,5 @@
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { inject } from '@angular/core';
 import { BASE_SERVICE_TOKEN } from '../../shared/constants/tokens';
 

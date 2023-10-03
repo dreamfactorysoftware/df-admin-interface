@@ -6,8 +6,8 @@ import {
   ForgetPasswordRequest,
   ResetFormData,
   SecurityQuestion,
-} from '../types';
-import { GenericSuccessResponse } from '../../shared/types/generic-http.type';
+} from '../../shared/types/user-management';
+import { GenericSuccessResponse } from '../../shared/types/generic-http';
 import { catchError, tap } from 'rxjs';
 import { URLS } from '../../shared/constants/urls';
 import {

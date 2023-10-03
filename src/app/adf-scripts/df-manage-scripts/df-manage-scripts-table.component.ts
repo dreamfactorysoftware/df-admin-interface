@@ -3,7 +3,7 @@ import {
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import { ScriptObject } from '../types/df-scripts.types';
+import { ScriptObject } from '../../shared/types/scripts';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { Component, Inject } from '@angular/core';
 import { EVENT_SCRIPT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
@@ -12,7 +12,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { UntilDestroy } from '@ngneat/until-destroy';
 
 @UntilDestroy({ checkProperties: true })

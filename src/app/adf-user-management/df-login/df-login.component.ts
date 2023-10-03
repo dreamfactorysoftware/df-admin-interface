@@ -15,7 +15,7 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { ROUTES } from '../../shared/constants/routes';
 import { getIcon, iconExist } from '../../shared/utilities/icons';
-import { LoginCredentials } from '../types';
+import { LoginCredentials } from '../../shared/types/user-management';
 
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';

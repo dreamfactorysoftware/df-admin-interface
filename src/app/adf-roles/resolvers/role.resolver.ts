@@ -1,6 +1,6 @@
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { inject } from '@angular/core';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { RoleType } from 'src/app/shared/types/role';
 import { ROLE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 

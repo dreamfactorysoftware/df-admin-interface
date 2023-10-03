@@ -5,10 +5,7 @@ import {
   SERVICES_SERVICE_TOKEN,
   SERVICE_TYPE_SERVICE_TOKEN,
 } from 'src/app/shared/constants/tokens';
-import {
-  GenericListResponse,
-  Meta,
-} from 'src/app/shared/types/generic-http.type';
+import { GenericListResponse, Meta } from 'src/app/shared/types/generic-http';
 import { Service, ServiceType } from 'src/app/shared/types/service';
 
 export const servicesResolver =

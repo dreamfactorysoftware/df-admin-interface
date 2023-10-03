@@ -13,7 +13,7 @@ import {
   AccessForm,
   RolePayload,
   RoleServiceAccessType,
-} from '../df-roles.types';
+} from '../../shared/types/roles';
 import { AsyncPipe, NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { ROLE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';

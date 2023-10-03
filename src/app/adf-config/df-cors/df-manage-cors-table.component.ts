@@ -8,7 +8,7 @@ import {
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import { CorsConfigData } from '../types';
+import { CorsConfigData } from '../../shared/types/config';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';

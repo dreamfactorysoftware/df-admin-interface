@@ -12,12 +12,12 @@ import {
   LIMIT_SERVICE_TOKEN,
 } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
-import { LimitTableRowData } from '../types/types';
+import { LimitTableRowData } from '../types';
 
 @UntilDestroy({ checkProperties: true })
 @Component({

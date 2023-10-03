@@ -1,5 +1,5 @@
 import { Service } from 'src/app/shared/types/service';
-import { SchedulerTaskData } from '../../types/df-scheduler.types';
+import { SchedulerTaskData } from '../../../shared/types/scheduler';
 
 export const mockServices: Service[] = [
   {

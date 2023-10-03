@@ -12,8 +12,11 @@ import {
   DfUserDataService,
   UserData,
 } from '../../shared/services/df-user-data.service';
-import { GenericSuccessResponse } from 'src/app/shared/types/generic-http.type';
-import { LoginCredentials, RegisterDetails } from '../types';
+import { GenericSuccessResponse } from 'src/app/shared/types/generic-http';
+import {
+  LoginCredentials,
+  RegisterDetails,
+} from '../../shared/types/user-management';
 
 //TODO default role for app enable user to enter without authentication
 @Injectable({

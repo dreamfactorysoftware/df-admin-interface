@@ -1,5 +1,5 @@
 import { LimitType } from 'src/app/shared/types/limit';
-import { LimitTableRowData } from '../../types/types';
+import { LimitTableRowData } from '../../types';
 
 export const mockLimitTypes: LimitType[] = [
   {

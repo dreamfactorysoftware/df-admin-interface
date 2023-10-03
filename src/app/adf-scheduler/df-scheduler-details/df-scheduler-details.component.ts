@@ -12,7 +12,7 @@ import {
   CreateSchedulePayload,
   SchedulerTaskData,
   UpdateSchedulePayload,
-} from '../types/df-scheduler.types';
+} from '../../shared/types/scheduler';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -22,7 +22,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { Service } from 'src/app/shared/types/service';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
 import { UntilDestroy } from '@ngneat/until-destroy';

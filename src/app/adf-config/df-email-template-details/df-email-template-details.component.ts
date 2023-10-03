@@ -17,7 +17,7 @@ import { DfBreakpointService } from '../../shared/services/df-breakpoint.service
 import {
   EmailTemplate,
   EmailTemplatePayload,
-} from '../df-email-templates/df-email-templates.types';
+} from '../../shared/types/email-templates';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { ROUTES } from 'src/app/shared/constants/routes';
 import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';

@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
-import { Files } from '../df-files.types';
+import { Files } from '../../shared/types/files';
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { switchMap } from 'rxjs';
 import { readAsText } from 'src/app/shared/utilities/file';

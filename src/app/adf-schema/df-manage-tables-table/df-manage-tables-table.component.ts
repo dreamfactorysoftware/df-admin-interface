@@ -5,7 +5,7 @@ import {
 } from '../../shared/components/df-manage-table/df-manage-table.component';
 import { MatDialog } from '@angular/material/dialog';
 import { TranslocoService } from '@ngneat/transloco';
-import { DatabaseTableRowData } from '../df-schema.types';
+import { DatabaseTableRowData } from '../../shared/types/schema';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Router, ActivatedRoute } from '@angular/router';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';

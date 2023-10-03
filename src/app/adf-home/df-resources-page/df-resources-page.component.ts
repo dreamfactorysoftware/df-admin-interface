@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { resourcesPageResources } from '../constants';
+import { resourcesPageResources } from '../../shared/constants/home';
 
 import { DfIconLinkComponent } from '../df-icon-link/df-icon-link.component';
 import { NgFor } from '@angular/common';

@@ -1,7 +1,7 @@
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { inject } from '@angular/core';
 import { UserProfile } from '../../shared/types/user';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { map, of, switchMap } from 'rxjs';
 import {
   ADMIN_SERVICE_TOKEN,

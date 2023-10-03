@@ -17,7 +17,7 @@ import { DfPasswordService } from '../services/df-password.service';
 
 import { Router, RouterLink } from '@angular/router';
 import { DfAuthService } from '../services/df-auth.service';
-import { LoginCredentials } from '../types';
+import { LoginCredentials } from '../../shared/types/user-management';
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';

@@ -7,7 +7,7 @@ import {
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { SCHEDULER_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
-import { SchedulerTaskData } from '../types/df-scheduler.types';
+import { SchedulerTaskData } from '../../shared/types/scheduler';
 import { MatDialog } from '@angular/material/dialog';
 import { Service } from 'src/app/shared/types/service';
 import { TranslocoService } from '@ngneat/transloco';

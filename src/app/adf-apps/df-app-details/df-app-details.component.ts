@@ -12,7 +12,7 @@ import {
   ReactiveFormsModule,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AppPayload, AppType } from '../types/df-apps.types';
+import { AppPayload, AppType } from '../../shared/types/apps';
 import { APP_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 

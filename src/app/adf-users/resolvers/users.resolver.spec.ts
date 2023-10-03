@@ -4,7 +4,7 @@ import { USER_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { userResolver, usersResolver } from './users.resolver';
 import { ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import { UserProfile } from 'src/app/shared/types/user';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 
 const mockUserProfile = {
   username: 'admin@test.com',

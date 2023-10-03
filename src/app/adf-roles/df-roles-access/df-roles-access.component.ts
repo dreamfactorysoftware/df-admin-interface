@@ -10,7 +10,7 @@ import {
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { ActivatedRoute } from '@angular/router';
-import { ServiceResponseObj } from '../df-roles.types';
+import { ServiceResponseObj } from '../../shared/types/roles';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';

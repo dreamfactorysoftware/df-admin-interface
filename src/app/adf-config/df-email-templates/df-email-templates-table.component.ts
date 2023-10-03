@@ -8,9 +8,12 @@ import {
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { TranslocoService } from '@ngneat/transloco';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { MatDialog } from '@angular/material/dialog';
-import { EmailTemplate, EmailTemplateRow } from './df-email-templates.types';
+import {
+  EmailTemplate,
+  EmailTemplateRow,
+} from '../../shared/types/email-templates';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
 @UntilDestroy({ checkProperties: true })

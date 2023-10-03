@@ -7,7 +7,7 @@ import { of } from 'rxjs';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { LookupKeyType } from './df-global-lookup-keys.types';
+import { LookupKeyType } from '../../shared/types/global-lookup-keys';
 import { FormArray, FormControl, FormGroup } from '@angular/forms';
 
 describe('DfGlobalLookupKeysComponent', () => {

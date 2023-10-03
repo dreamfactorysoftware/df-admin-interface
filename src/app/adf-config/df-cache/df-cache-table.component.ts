@@ -6,7 +6,7 @@ import {
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
-import { CacheRow, CacheType } from './df-cache.types';
+import { CacheRow, CacheType } from '../../shared/types/df-cache';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { CACHE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { TranslocoService } from '@ngneat/transloco';

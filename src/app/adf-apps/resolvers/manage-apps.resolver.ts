@@ -1,7 +1,7 @@
 import { ResolveFn } from '@angular/router';
 import { inject } from '@angular/core';
-import { AppType } from '../types/df-apps.types';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
+import { AppType } from '../../shared/types/apps';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { APP_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 
 export const appsResolver =

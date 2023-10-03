@@ -22,7 +22,7 @@ import {
 import { ROUTES } from 'src/app/shared/constants/routes';
 import { CONFIG_CORS_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { CorsConfigData } from '../types';
+import { CorsConfigData } from '../../shared/types/config';
 import { catchError, throwError } from 'rxjs';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';

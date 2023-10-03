@@ -1,6 +1,6 @@
 import { ResolveFn } from '@angular/router';
-import { GenericListResponse } from 'src/app/shared/types/generic-http.type';
-import { CacheType } from '../df-cache/df-cache.types';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
+import { CacheType } from '../../shared/types/df-cache';
 import { inject } from '@angular/core';
 import { CACHE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 

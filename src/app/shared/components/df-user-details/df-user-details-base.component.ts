@@ -15,7 +15,7 @@ import { MatCheckboxChange } from '@angular/material/checkbox';
 import { UserProfileType } from '../../types/user';
 import { ROUTES } from 'src/app/shared/constants/routes';
 import { uniqueNameValidator } from '../../validators/unique-name.validator';
-import { AppType } from 'src/app/adf-apps/types/df-apps.types';
+import { AppType } from 'src/app/shared/types/apps';
 import { RoleType } from '../../types/role';
 import { faEnvelope } from '@fortawesome/free-solid-svg-icons';
 import { UntilDestroy } from '@ngneat/until-destroy';

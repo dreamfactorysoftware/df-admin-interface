@@ -8,5 +8,11 @@ module.exports = {
     'node_modules/(?!@angular|swagger-ui|react-syntax-highlighter|swagger-client|@ngneat|@fortawesome)',
   ],
   coverageReporters: ['html'],
-  collectCoverageFrom: ['src/**/*.ts', '!src/index.ts', '!src/**/*.d.ts'],
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/index.ts',
+    '!src/**/*.d.ts',
+    '!src/app/shared/types/*',
+    '!src/app/shared/constants/*',
+  ],
 };

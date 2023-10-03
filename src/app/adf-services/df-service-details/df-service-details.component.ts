@@ -32,7 +32,7 @@ import {
 } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { Service } from 'src/app/adf-files/df-files.types';
+import { Service } from 'src/app/shared/types/files';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-service-details',

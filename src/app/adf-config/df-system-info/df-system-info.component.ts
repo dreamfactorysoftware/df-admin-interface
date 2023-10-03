@@ -3,7 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { Client, Php, Platform, Server } from '../types';
+import { Client, Php, Platform, Server } from '../../shared/types/config';
 import { UntilDestroy } from '@ngneat/until-destroy';
 @UntilDestroy({ checkProperties: true })
 @Component({
