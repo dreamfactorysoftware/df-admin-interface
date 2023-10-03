@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfCacheComponent } from './df-cache.component';
 import { TranslocoService } from '@ngneat/transloco';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
-import { createTestBedConfig } from 'src/app/shared/utilities/test';
+import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 
 const ACTIVATED_ROUTE_DATA = {
   data: {

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
-import { createTestBedConfig } from 'src/app/shared/utilities/test';
+import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 import { DfAuthService } from '../services/df-auth.service';
 import { DfLoginComponent } from './df-login.component';
 import { of } from 'rxjs';

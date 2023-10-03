@@ -4,7 +4,7 @@ import { DfTableDetailsComponent } from './df-table-details.component';
 import {
   createTestBedConfig,
   mockTableDetailsData,
-} from 'src/app/shared/utilities/test';
+} from 'src/app/shared/utilities/testbed-config';
 import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 

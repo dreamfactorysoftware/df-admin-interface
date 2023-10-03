@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfScriptsGithubDialogComponent } from './df-scripts-github-dialog.component';
-import { createTestBedConfig } from '../../utilities/test';
+import { createTestBedConfig } from '../../utilities/testbed-config';
 import { MatDialogRef } from '@angular/material/dialog';
 import { of, throwError } from 'rxjs';
 import { GITHUB_REPO_SERVICE_TOKEN } from '../../constants/tokens';
