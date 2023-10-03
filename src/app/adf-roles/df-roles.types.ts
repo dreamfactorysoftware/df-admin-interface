@@ -2,25 +2,25 @@ export interface RolePayload {
   id?: number;
   name: string;
   description: string;
-  is_active: boolean;
-  role_service_access_by_role_id: RoleServiceAccess[];
-  lookup_by_role_id: Lookup[];
+  isActive: boolean;
+  roleServiceAccessByRoleId: RoleServiceAccess[];
+  lookupByRoleId: Lookup[];
 }
 
 export interface RoleServiceAccess {
   id: number;
-  role_id: number;
-  service_id: number;
+  roleId: number;
+  serviceId: number;
   component: string;
-  verb_mask: number;
-  requestor_mask: number; // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
+  verbMask: number;
+  requestorMask: number; // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
   filters: any[];
-  filter_op: string;
+  filterOp: string;
 }
 
 export interface Lookup {
   id: number;
-  role_id: number;
+  roleId: number;
   name: string;
   value: string;
   private: boolean;
