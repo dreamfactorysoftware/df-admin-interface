@@ -33,6 +33,7 @@ npm install
 ```
 
 #### Install husky
+
 [husky](https://typicode.github.io/husky/) is used to run git hooks for formatting and linting checking code prior to commiting code. To install husky run the following command:
 
 ```
@@ -42,9 +43,11 @@ npm run prepare
 ## Usage
 
 ### Development
+
 ```
 npm start
 ```
+
 Proxying to DreamFactory instance is configured in [proxy.conf.json](./proxy.conf.json).
 
 ### Linting and Formatting
@@ -68,7 +71,9 @@ npm run prettier
 ```
 
 ## Running the tests
+
 [jest](https://jestjs.io/) is used for unit testing. Tests are named with the following convention: [name].spec.ts
+
 #### Run Unit Tests
 
 ```
