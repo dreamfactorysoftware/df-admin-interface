@@ -58,6 +58,9 @@ describe('DfSystemConfigDataService', () => {
         platform: {
           rootAdminExists: true,
         },
+        server: {
+          host: 'localhost',
+        },
       };
 
       service.fetchEnvironmentData().subscribe(data => {

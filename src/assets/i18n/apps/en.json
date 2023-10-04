@@ -44,7 +44,8 @@
     "active": "Active",
     "apiKey": {
       "label": "The API key for this app is",
-      "copy": "Copy API Key"
+      "copy": "Copy API Key",
+      "refresh": "Refresh API Key"
     },
     "appLocation": {
       "label": "App Location",

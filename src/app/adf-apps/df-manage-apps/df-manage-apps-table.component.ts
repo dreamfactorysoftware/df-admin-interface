@@ -14,6 +14,8 @@ import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { generateApiKey } from 'src/app/shared/utilities/hash';
+import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -31,6 +33,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
   constructor(
     @Inject(APP_SERVICE_TOKEN)
     private appsService: DfBaseCrudService,
+    private systemConfigDataService: DfSystemConfigDataService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
@@ -56,6 +59,21 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
         },
         ariaLabel: {
           key: 'apps.createApp.apiKey.copy',
+        },
+      },
+      {
+        label: 'apps.createApp.apiKey.refresh',
+        function: async (row: AppRow) => {
+          const newKey = await generateApiKey(
+            this.systemConfigDataService.environment.server.host,
+            row.name
+          );
+          this.appsService
+            .update(row.id, { apiKey: newKey })
+            .subscribe(() => this.refreshTable());
+        },
+        ariaLabel: {
+          key: 'apps.createApp.apiKey.refresh',
         },
       },
     ];

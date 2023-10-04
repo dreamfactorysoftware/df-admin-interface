@@ -27,11 +27,17 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { NgIf, NgFor } from '@angular/common';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { faCircleInfo, faCopy } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCircleInfo,
+  faCopy,
+  faRefresh,
+} from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { ROUTES } from 'src/app/shared/constants/routes';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { generateApiKey } from 'src/app/shared/utilities/hash';
+import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -66,12 +72,13 @@ export class DfAppDetailsComponent implements OnInit {
   urlOrigin: string;
   faCopy = faCopy;
   faCircleInfo = faCircleInfo;
-  apiKey: string;
+  faRefresh = faRefresh;
 
   constructor(
     private fb: FormBuilder,
     @Inject(APP_SERVICE_TOKEN)
     private appsService: DfBaseCrudService,
+    private systemConfigDataService: DfSystemConfigDataService,
     private activatedRoute: ActivatedRoute,
     private router: Router
   ) {
@@ -109,8 +116,6 @@ export class DfAppDetailsComponent implements OnInit {
         path: this.editApp.path,
         url: this.editApp.url,
       });
-
-      this.apiKey = this.editApp.apiKey;
     }
 
     this.appForm.controls['appLocation'].valueChanges.subscribe(value => {
@@ -167,7 +172,7 @@ export class DfAppDetailsComponent implements OnInit {
 
   copyApiKey() {
     navigator.clipboard
-      .writeText(this.apiKey)
+      .writeText(this.editApp.apiKey)
       .then()
       .catch(error => console.error('Failed to copy to clipboard:', error));
   }
@@ -216,5 +221,15 @@ export class DfAppDetailsComponent implements OnInit {
     } else {
       this.appsService.create({ resource: [payload] }).subscribe();
     }
+  }
+
+  async refreshApiKey() {
+    const newKey = await generateApiKey(
+      this.systemConfigDataService.environment.server.host,
+      this.appForm.getRawValue().name
+    );
+    this.appsService
+      .update(this.editApp.id, { apiKey: newKey })
+      .subscribe(() => (this.editApp.apiKey = newKey));
   }
 }
