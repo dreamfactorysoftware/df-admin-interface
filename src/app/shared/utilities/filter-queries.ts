@@ -6,7 +6,8 @@ export type FilterQueryType =
   | 'serviceReports'
   | 'roles'
   | 'limits'
-  | 'services';
+  | 'services'
+  | 'eventScripts';
 
 export const getFilterQuery = (type?: FilterQueryType) => (value: string) => {
   switch (type) {
@@ -26,6 +27,8 @@ export const getFilterQuery = (type?: FilterQueryType) => (value: string) => {
       return `(name like "%${value}%")`;
     case 'services':
       return `((name like "%${value}%") or (label like "%${value}%") or (description like "%${value}%") or (type like "%${value}%"))`;
+    case 'eventScripts':
+      return `(name like "%${value}%") or (type like "%${value}%")`;
     default:
       return '';
   }

@@ -1,3 +1,5 @@
+import { RoleType } from './role';
+
 export interface AppRow {
   id: number;
   name: string;
@@ -6,17 +8,6 @@ export interface AppRow {
   description?: string;
   active: boolean;
   launchUrl: string;
-}
-
-export interface RoleByRoleId {
-  id: number;
-  name: string;
-  description: string;
-  isActive: boolean;
-  createdDate: string;
-  lastModifiedDate: string;
-  createdById: number;
-  lastModifiedById?: number;
 }
 
 export interface AppType {
@@ -39,7 +30,7 @@ export interface AppType {
   createdById: number;
   lastModifiedById?: number;
   launchUrl: string;
-  roleByRoleId?: RoleByRoleId;
+  roleByRoleId?: RoleType;
 }
 
 export interface AppPayload {

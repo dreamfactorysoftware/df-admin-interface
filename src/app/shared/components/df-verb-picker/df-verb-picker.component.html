@@ -5,7 +5,7 @@
     [multiple]="this.type === 'verb_multiple' || this.type === 'number'"
     [attr.aria-label]="schema.label">
     <mat-option *ngFor="let verb of verbs" [value]="verb.value">
-      {{ verb.label | transloco }}
+      {{ verb.label }}
     </mat-option>
   </mat-select>
   <fa-icon

@@ -16,10 +16,10 @@ export interface ScriptObject {
   content: string;
   isActive: boolean;
   allowEventModification: boolean;
-  storageServiceId: number | null;
-  scmRepository: string | null;
-  scmReference: string | null;
-  storagePath: string | null;
+  storageServiceId?: number;
+  scmRepository?: string;
+  scmReference?: string;
+  storagePath?: string;
   config?: any;
   createdById?: number;
   createdDate?: string;
@@ -42,4 +42,14 @@ export interface GithubFileObject {
   type: string;
   url: string;
   _links: { self: string; git: string; html: string };
+}
+
+export enum AceEditorMode {
+  JSON = 'json',
+  YAML = 'yaml',
+  TEXT = 'text',
+  NODEJS = 'javascript',
+  PHP = 'php',
+  PYTHON = 'python',
+  PYTHON3 = 'python',
 }

@@ -101,3 +101,8 @@ export interface AuthService {
   type: string;
   path: string;
 }
+
+export interface ServiceLink {
+  services: Array<Service>;
+  selectedService?: { id: number; storagePath: string; cache: string };
+}

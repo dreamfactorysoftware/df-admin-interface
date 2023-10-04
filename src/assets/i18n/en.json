@@ -187,9 +187,9 @@
           "header": "{{nav.api-connections.api-keys.import.nav}}"
         }
       },
-      "scripts": {
-        "nav": "Scripts",
-        "header": "{{nav.api-connections.scripts.nav}}"
+      "event-scripts": {
+        "nav": "Event Scripts",
+        "header": "{{nav.api-connections.event-scripts.nav}}"
       },
       "api-docs": {
         "nav": "API Docs",

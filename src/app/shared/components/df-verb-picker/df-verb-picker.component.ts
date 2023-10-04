@@ -9,7 +9,7 @@ import {
 } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
-import { TranslocoPipe } from '@ngneat/transloco';
+import { TranslocoPipe, translate } from '@ngneat/transloco';
 import { ConfigSchema } from '../../types/service';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
@@ -44,27 +44,27 @@ export class DfVerbPickerComponent implements ControlValueAccessor, DoCheck {
     {
       value: 1,
       altValue: 'GET',
-      label: 'verbs.get',
+      label: translate('verbs.get'),
     },
     {
       value: 2,
       altValue: 'POST',
-      label: 'verbs.post',
+      label: translate('verbs.post'),
     },
     {
       value: 4,
       altValue: 'PUT',
-      label: 'verbs.put',
+      label: translate('verbs.put'),
     },
     {
       value: 8,
       altValue: 'PATCH',
-      label: 'verbs.patch',
+      label: translate('verbs.patch'),
     },
     {
       value: 16,
       altValue: 'DELETE',
-      label: 'verbs.delete',
+      label: translate('verbs.delete'),
     },
   ];
 
