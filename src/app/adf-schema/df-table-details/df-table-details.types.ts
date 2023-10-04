@@ -96,3 +96,9 @@ export interface RelationshipsRow {
   type: string;
   isVirtual: boolean;
 }
+
+export interface TableRow {
+  id: string;
+  label: string;
+  name: string;
+}

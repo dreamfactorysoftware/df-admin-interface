@@ -52,7 +52,7 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
     default: {
       label: 'view',
       function: (row: FieldsRow) => {
-        this.router.navigate([row.name], {
+        this.router.navigate([ROUTES.FIELDS, row.name], {
           relativeTo: this._activatedRoute,
         });
       },
@@ -131,7 +131,7 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
   filterQuery = getFilterQuery();
 
   override createRow(): void {
-    this.router.navigate([ROUTES.CREATE, 'field'], {
+    this.router.navigate([ROUTES.FIELDS], {
       relativeTo: this._activatedRoute,
     });
   }

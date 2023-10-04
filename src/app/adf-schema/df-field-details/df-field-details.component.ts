@@ -25,6 +25,8 @@ import { DfFunctionUseComponent } from './df-function-use/df-function-use.compon
 import { DatabaseSchemaFieldType } from './df-field-details.types';
 import { CsvValidator } from '../validators/csv.validator';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import { MatTooltipModule } from '@angular/material/tooltip';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-field-details',
@@ -47,11 +49,12 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     RouterLink,
     AsyncPipe,
     TranslocoPipe,
+    MatTooltipModule,
   ],
 })
 export class DfFieldDetailsComponent implements OnInit {
   fieldDetailsForm: FormGroup;
-
+  faCircleInfo = faCircleInfo;
   databaseFieldToEdit: DatabaseSchemaFieldType | null;
 
   @ViewChild(DfFunctionUseComponent)
@@ -129,10 +132,10 @@ export class DfFieldDetailsComponent implements OnInit {
     });
 
     this.dbName = this.activatedRoute.snapshot.params['name'];
+    this.tableName = this.activatedRoute.snapshot.params['id'];
 
     if (this.type === 'edit') {
       this.fieldName = this.activatedRoute.snapshot.params['fieldName'];
-      this.tableName = this.activatedRoute.snapshot.params['id'];
     }
 
     if (this.fieldName) {
@@ -342,7 +345,7 @@ export class DfFieldDetailsComponent implements OnInit {
             `${this.dbName}/_schema/${this.tableName}/_field`
           )
           .subscribe(() => {
-            this.router.navigate(['../../'], {
+            this.router.navigate(['../'], {
               relativeTo: this.activatedRoute,
             });
           });

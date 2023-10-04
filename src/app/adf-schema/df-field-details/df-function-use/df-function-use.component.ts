@@ -16,10 +16,15 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faTrashCan, faPlus } from '@fortawesome/free-solid-svg-icons';
+import {
+  faTrashCan,
+  faPlus,
+  faCircleInfo,
+} from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { MatSelectModule } from '@angular/material/select';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { MatTooltipModule } from '@angular/material/tooltip';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-function-use',
@@ -41,6 +46,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     FontAwesomeModule,
     MatExpansionModule,
     TranslocoPipe,
+    MatTooltipModule,
   ],
 })
 export class DfFunctionUseComponent implements OnInit {
@@ -50,6 +56,7 @@ export class DfFunctionUseComponent implements OnInit {
   displayedColumns = ['use', 'function', 'actions'];
   faTrashCan = faTrashCan;
   faPlus = faPlus;
+  faCircleInfo = faCircleInfo;
   @Input() showAccordion = true;
 
   functionUsesDropdownOptions = [

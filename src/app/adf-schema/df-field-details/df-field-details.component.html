@@ -2,9 +2,16 @@
   <form [formGroup]="fieldDetailsForm" class="details-form">
     <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
-        'schema.fieldDetailsForm.controls.name' | transloco
+        'schema.fieldDetailsForm.controls.name.label' | transloco
       }}</mat-label>
       <input matInput formControlName="name" />
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="
+          'schema.fieldDetailsForm.controls.name.tooltip' | transloco
+        " />
       <mat-error
         *ngIf="this.fieldDetailsForm.controls['name'].hasError('required')">
         {{ 'schema.fieldDetailsForm.errors.name' | transloco }}
@@ -12,15 +19,29 @@
     </mat-form-field>
     <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
-        'schema.fieldDetailsForm.controls.alias' | transloco
+        'schema.fieldDetailsForm.controls.alias.label' | transloco
       }}</mat-label>
       <input matInput formControlName="alias" />
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="
+          'schema.fieldDetailsForm.controls.alias.tooltip' | transloco
+        " />
     </mat-form-field>
     <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
-        'schema.fieldDetailsForm.controls.label' | transloco
+        'schema.fieldDetailsForm.controls.label.label' | transloco
       }}</mat-label>
       <input matInput formControlName="label" />
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="
+          'schema.fieldDetailsForm.controls.label.tooltip' | transloco
+        " />
     </mat-form-field>
     <div class="slide-toggle-container">
       <mat-slide-toggle formControlName="isVirtual">{{
@@ -32,7 +53,7 @@
     </div>
     <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
-        'schema.fieldDetailsForm.controls.type' | transloco
+        'schema.fieldDetailsForm.controls.type.label' | transloco
       }}</mat-label>
       <mat-select formControlName="type">
         <mat-option
@@ -41,12 +62,26 @@
           {{ option }}
         </mat-option>
       </mat-select>
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="
+          'schema.fieldDetailsForm.controls.type.tooltip' | transloco
+        " />
     </mat-form-field>
     <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
-        'schema.fieldDetailsForm.controls.databaseType' | transloco
+        'schema.fieldDetailsForm.controls.databaseType.label' | transloco
       }}</mat-label>
       <input matInput formControlName="dbType" />
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="
+          'schema.fieldDetailsForm.controls.databaseType.tooltip' | transloco
+        " />
     </mat-form-field>
     <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
@@ -126,13 +161,20 @@
     </mat-form-field>
     <mat-form-field subscriptSizing="dynamic">
       <mat-label>{{
-        'schema.fieldDetailsForm.controls.validation' | transloco
+        'schema.fieldDetailsForm.controls.validation.label' | transloco
       }}</mat-label>
       <textarea
         matInput
         rows="4"
         cols="6"
         formControlName="validation"></textarea>
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="
+          'schema.fieldDetailsForm.controls.validation.tooltip' | transloco
+        " />
       <mat-error
         *ngIf="
           this.fieldDetailsForm.controls['validation'].hasError('jsonInvalid')
@@ -159,7 +201,7 @@
   <div class="field-details-button-container">
     <button mat-flat-button (click)="onCancel()">Cancel</button>
     <button mat-flat-button color="primary" (click)="onSubmit()">
-      {{ (databaseFieldToEdit ? 'save' : 'create') | transloco }} Field
+      {{ (databaseFieldToEdit ? 'save' : 'create') | transloco }}
     </button>
   </div>
 </div>
