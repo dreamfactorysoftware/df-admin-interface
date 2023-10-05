@@ -1,4 +1,11 @@
-import { Component, DoCheck, Input, Optional, Self } from '@angular/core';
+import {
+  Component,
+  DoCheck,
+  Input,
+  OnInit,
+  Optional,
+  Self,
+} from '@angular/core';
 import {
   FormControl,
   NgControl,
@@ -8,7 +15,7 @@ import {
 import { ConfigSchema } from '../../types/service';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { NgFor, NgIf } from '@angular/common';
+import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { DfArrayFieldComponent } from '../df-field-array/df-array-field.component';
@@ -18,6 +25,10 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { Observable, map, startWith } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
+import { addGroupEntries } from '../../utilities/eventScripts';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-dynamic-field',
@@ -36,9 +47,11 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     TranslocoPipe,
     FontAwesomeModule,
     MatTooltipModule,
+    MatAutocompleteModule,
+    AsyncPipe,
   ],
 })
-export class DfDynamicFieldComponent implements DoCheck {
+export class DfDynamicFieldComponent implements OnInit, DoCheck {
   @Input() schema: ConfigSchema;
   @Input() showLabel = true;
   faCircleInfo = faCircleInfo;
@@ -47,8 +60,30 @@ export class DfDynamicFieldComponent implements DoCheck {
   onChange: (value: any) => void;
   onTouched: () => void;
 
-  constructor(@Optional() @Self() public controlDir: NgControl) {
+  constructor(
+    @Optional() @Self() public controlDir: NgControl,
+    private activedRoute: ActivatedRoute
+  ) {
     controlDir.valueAccessor = this;
+  }
+
+  eventList: string[];
+  filteredEventList: Observable<string[]>;
+
+  ngOnInit(): void {
+    if (this.schema.type === 'event_picklist') {
+      this.activedRoute.data.subscribe(({ systemEvents }) => {
+        this.eventList = addGroupEntries(systemEvents.resource);
+      });
+      this.filteredEventList = this.control.valueChanges.pipe(
+        startWith(''),
+        map(value => {
+          return this.eventList.filter(event =>
+            event.toLowerCase().includes(value.toLowerCase())
+          );
+        })
+      );
+    }
   }
 
   ngDoCheck(): void {

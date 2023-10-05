@@ -32,3 +32,19 @@ export function groupEvents(data: ScriptEventResponse) {
     });
   });
 }
+
+export function addGroupEntries(input: string[]): string[] {
+  const output: string[] = [];
+  const seenPrefixes = new Set<string>();
+
+  for (const item of input) {
+    const prefix = item.split('.')[0];
+    if (!seenPrefixes.has(prefix)) {
+      seenPrefixes.add(prefix);
+      output.push(`${prefix}.*`);
+    }
+    output.push(item);
+  }
+
+  return output;
+}

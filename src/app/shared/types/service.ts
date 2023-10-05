@@ -20,7 +20,8 @@ export interface ConfigSchema {
     | 'picklist'
     | 'multi_picklist'
     | 'file_certificate'
-    | 'verb_mask';
+    | 'verb_mask'
+    | 'event_picklist';
   description?: string;
   alias: string;
   native?: any[];

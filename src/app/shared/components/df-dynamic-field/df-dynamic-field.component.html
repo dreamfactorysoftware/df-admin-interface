@@ -63,3 +63,21 @@
     schema.label
   }}</ng-container></mat-slide-toggle
 >
+<mat-form-field
+  *ngIf="schema.type === 'event_picklist'"
+  subscriptSizing="dynamic">
+  <mat-label *ngIf="showLabel">{{ schema.label }}</mat-label>
+  <input
+    type="text"
+    matInput
+    [formControl]="control"
+    [matAutocomplete]="auto"
+    [attr.aria-label]="schema.label" />
+  <mat-autocomplete #auto="matAutocomplete">
+    <mat-option
+      *ngFor="let option of filteredEventList | async"
+      [value]="option">
+      {{ option }}
+    </mat-option>
+  </mat-autocomplete>
+</mat-form-field>

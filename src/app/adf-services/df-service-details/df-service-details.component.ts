@@ -31,6 +31,7 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-service-details',
@@ -67,6 +68,8 @@ export class DfServiceDetailsComponent implements OnInit {
   serviceData: Service;
   configSchema: Array<ConfigSchema>;
 
+  systemEvents: Array<{ label: string; value: string }>;
+
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
@@ -92,7 +95,7 @@ export class DfServiceDetailsComponent implements OnInit {
       this.serviceTypes = serviceTypes;
       this.serviceData = data;
       if (this.edit) {
-        this.configSchema = this.getConfigSchema(data.type) ?? [];
+        this.configSchema = this.getConfigSchema(data.type);
         this.initializeConfig();
         this.serviceForm.patchValue({
           ...data,
@@ -102,7 +105,7 @@ export class DfServiceDetailsComponent implements OnInit {
       } else {
         this.serviceForm.controls['type'].valueChanges.subscribe(value => {
           this.serviceForm.removeControl('config');
-          this.configSchema = this.getConfigSchema(value) ?? [];
+          this.configSchema = this.getConfigSchema(value);
           this.initializeConfig();
         });
       }
@@ -141,12 +144,14 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   getConfigSchema(type: string) {
-    return this.serviceTypes
-      .find(serviceType => serviceType.name === type)
-      ?.configSchema.map(control => ({
-        ...control,
-        name: snakeToCamelString(control.name),
-      }));
+    return (
+      this.serviceTypes
+        .find(serviceType => serviceType.name === type)
+        ?.configSchema.map(control => ({
+          ...control,
+          name: snakeToCamelString(control.name),
+        })) ?? []
+    );
   }
 
   get viewSchema() {

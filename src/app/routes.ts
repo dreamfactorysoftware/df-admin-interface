@@ -50,6 +50,7 @@ import {
   eventScriptsResolver,
 } from './adf-event-scripts/resolvers/scripts.resolver';
 import { eventsResolver } from './adf-event-scripts/resolvers/events.resolver';
+import { systemEventsResolver } from './adf-services/resolvers/system-events.resolver';
 
 export const routes: Routes = [
   {
@@ -132,6 +133,9 @@ export const routes: Routes = [
                 'Source Control',
                 'IoT',
               ],
+            },
+            resolve: {
+              systemEvents: systemEventsResolver,
             },
           },
         ],
@@ -480,6 +484,9 @@ export const routes: Routes = [
         children: ServiceRoutes,
         data: {
           groups: ['Log'],
+        },
+        resolve: {
+          systemEvents: systemEventsResolver,
         },
         providers: [provideTranslocoScope('services')],
       },
