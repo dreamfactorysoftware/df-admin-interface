@@ -26,6 +26,7 @@ export enum ROUTES {
   ROLE_BASED_ACCESS = 'role-based-access',
   API_KEYS = 'api-keys',
   SCRIPTS = 'scripts',
+  EVENT_SCRIPTS = 'event-scripts',
   API_DOCS = 'api-docs',
   API_SECURITY = 'api-security',
   RATE_LIMITING = 'rate-limiting',

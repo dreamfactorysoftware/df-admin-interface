@@ -48,8 +48,8 @@ import {
 import {
   eventScriptResolver,
   eventScriptsResolver,
-  scriptTypeResolver,
-} from './adf-scripts/resolvers/scripts.resolver';
+} from './adf-event-scripts/resolvers/scripts.resolver';
+import { eventsResolver } from './adf-event-scripts/resolvers/events.resolver';
 
 export const routes: Routes = [
   {
@@ -213,19 +213,18 @@ export const routes: Routes = [
             path: '',
             loadComponent: () =>
               import(
-                './adf-scripts/df-manage-scripts/df-manage-scripts-table.component'
+                './adf-event-scripts/df-manage-scripts/df-manage-scripts-table.component'
               ).then(m => m.DfManageScriptsTableComponent),
             resolve: { data: eventScriptsResolver },
           },
           {
             path: ROUTES.CREATE,
             loadComponent: () =>
-              import('./adf-scripts/df-scripts/df-scripts.component').then(
-                m => m.DfScriptsComponent
-              ),
+              import(
+                './adf-event-scripts/df-script-details/df-script-details.component'
+              ).then(m => m.DfScriptDetailsComponent),
             resolve: {
-              scriptType: scriptTypeResolver,
-              services: servicesResolver(0),
+              data: eventsResolver,
             },
             data: { type: 'create' },
           },
@@ -233,20 +232,15 @@ export const routes: Routes = [
             path: ':name',
             loadComponent: () =>
               import(
-                './adf-scripts/df-edit-script/df-edit-script.component'
-              ).then(m => m.DfEditScriptComponent),
+                './adf-event-scripts/df-script-details/df-script-details.component'
+              ).then(m => m.DfScriptDetailsComponent),
             resolve: {
               data: eventScriptResolver,
-              scriptType: scriptTypeResolver,
-              services: servicesResolver(0),
             },
             data: { type: 'edit' },
           },
         ],
         providers: [provideTranslocoScope('scripts')],
-        data: {
-          groups: ['File', 'Source Control'],
-        },
       },
       {
         path: ROUTES.API_DOCS,

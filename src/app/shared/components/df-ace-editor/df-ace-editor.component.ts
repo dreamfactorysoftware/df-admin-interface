@@ -13,27 +13,7 @@ import {
   forwardRef,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { TranslocoPipe } from '@ngneat/transloco';
-import { readAsText } from '../../utilities/file';
-import { NgFor, NgIf } from '@angular/common';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faUpload } from '@fortawesome/free-solid-svg-icons';
-import { faGithub } from '@fortawesome/free-brands-svg-icons';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { DfScriptsGithubDialogComponent } from '../df-scripts-github-dialog/df-scripts-github-dialog.component';
-
-export enum AceEditorMode {
-  JSON = 'json',
-  YAML = 'yaml',
-  TEXT = 'text',
-  NODEJS = 'javascript',
-  PHP = 'php',
-  PYTHON = 'python',
-  PYTHON3 = 'python',
-}
+import { AceEditorMode } from '../../types/scripts';
 
 @Component({
   selector: 'df-ace-editor',
@@ -47,54 +27,18 @@ export enum AceEditorMode {
       multi: true,
     },
   ],
-  imports: [
-    MatButtonModule,
-    TranslocoPipe,
-    NgIf,
-    MatFormFieldModule,
-    MatSelectModule,
-    NgFor,
-    FontAwesomeModule,
-    MatDialogModule,
-  ],
 })
 export class DfAceEditorComponent
   implements AfterViewInit, OnChanges, OnDestroy, ControlValueAccessor
 {
-  @Input() mode: AceEditorMode;
+  @Input() mode: AceEditorMode = AceEditorMode.TEXT;
   @Input() readonly = false;
-  @Input() upload = true;
-  @Input() github = true;
-  @Input() service = true;
   @Input() value: string;
   @Output() valueChange = new EventEmitter<string>();
 
   @ViewChild('editor') elementRef: ElementRef<HTMLElement>;
 
-  faUpload = faUpload;
-  faGitHub = faGithub;
-
-  types = [
-    {
-      label: 'scriptTypes.nodejs',
-      value: AceEditorMode.NODEJS,
-      extension: 'js',
-    },
-    {
-      label: 'scriptTypes.php',
-      value: AceEditorMode.PHP,
-      extension: 'php',
-    },
-    {
-      label: 'scriptTypes.python',
-      value: AceEditorMode.PYTHON,
-      extension: 'py',
-    },
-  ];
-
   private editor: ace.Ace.Editor;
-
-  constructor(public dialog: MatDialog) {}
 
   onChange: (value: string) => void;
   onTouched: () => void;
@@ -105,6 +49,9 @@ export class DfAceEditorComponent
 
   writeValue(value: string): void {
     this.value = value;
+    if (this.editor) {
+      this.editor.setValue(value);
+    }
   }
 
   init(
@@ -113,7 +60,7 @@ export class DfAceEditorComponent
   ): void {
     ace.config.set('basePath', '/assets/ace-builds');
     this.editor = ace.edit(elementRef.nativeElement, {
-      mode: `ace/mode/${mode}`,
+      mode: `ace/mode/${this.getMode(mode)}`,
       value: this.value,
       fontSize: 12,
       showPrintMargin: false,
@@ -126,8 +73,12 @@ export class DfAceEditorComponent
     this.editor.renderer.attachToShadowRoot();
     this.editor.addEventListener('change', () => {
       this.valueChange.emit(this.editor.getValue());
-      this.onChange(this.editor.getValue());
-      this.onTouched();
+      if (this.onChange) {
+        this.onChange(this.editor.getValue());
+      }
+      if (this.onTouched) {
+        this.onTouched();
+      }
     });
   }
 
@@ -144,40 +95,33 @@ export class DfAceEditorComponent
     isDisabled ? this.editor.setReadOnly(true) : this.editor.setReadOnly(false);
   }
 
-  setMode(mode: string): void {
-    this.editor.session.setMode(`ace/mode/${mode}`);
-  }
-
   ngOnChanges(changes: SimpleChanges): void {
     if (!this.editor) return;
     if (changes['mode']) {
-      this.setMode(changes['mode'].currentValue);
+      this.editor.session.setMode(
+        `ace/mode/${this.getMode(changes['mode'].currentValue)}`
+      );
     }
     if (changes['value']) {
-      this.editor.setValue(changes['value'].currentValue);
+      this.setValue(changes['value'].currentValue);
     }
+    if (changes['readonly']) {
+      this.setDisabledState(changes['readonly'].currentValue);
+    }
+  }
+
+  setValue(value: string): void {
+    this.editor.setValue(value);
   }
 
   ngOnDestroy(): void {
     if (this.editor) this.editor.destroy();
   }
 
-  handleFileUpload(event: Event) {
-    const input = event.target as HTMLInputElement;
-    if (input.files) {
-      readAsText(input.files[0]).subscribe(value => {
-        this.editor.setValue(value);
-      });
+  getMode(mode: string) {
+    if (mode === 'nodejs') {
+      return AceEditorMode.JAVASCRIPT;
     }
-  }
-
-  handleGithubImport() {
-    const dialogRef = this.dialog.open(DfScriptsGithubDialogComponent);
-
-    dialogRef.afterClosed().subscribe(res => {
-      if (res) {
-        this.editor.setValue(window.atob(res.data.content));
-      }
-    });
+    return mode;
   }
 }

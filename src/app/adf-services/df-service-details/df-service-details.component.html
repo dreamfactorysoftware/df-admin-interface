@@ -1,5 +1,5 @@
 <!-- TODO Add translations -->
-<form [formGroup]="serviceForm" class="details-form" (ngSubmit)="save()">
+<form [formGroup]="serviceForm" class="details-section" (ngSubmit)="save()">
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>{{
       'services.controls.serviceType.label' | transloco
@@ -50,20 +50,22 @@
   <ng-container *ngIf="configSchema">
     <ng-container formGroupName="config">
       <mat-accordion class="full-width">
-        <mat-expansion-panel>
+        <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
           <mat-expansion-panel-header>{{
             'services.config' | transloco
           }}</mat-expansion-panel-header>
-          <div class="details-form">
+          <div class="details-section">
             <ng-container *ngFor="let item of configSchema">
-              <df-ace-editor
+              <!-- <df-ace-editor
                 *ngIf="
                   item.type === 'text' && item.name === 'content';
                   else dynamic
                 "
                 [formControl]="getConfigControl(item.name)"
                 [mode]="scriptMode"
-                class="full-width"></df-ace-editor>
+                [github]="true"
+                [upload]="true"
+                class="full-width"></df-ace-editor> -->
               <ng-template #dynamic>
                 <df-dynamic-field
                   *ngIf="

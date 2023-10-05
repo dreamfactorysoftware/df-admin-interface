@@ -48,9 +48,24 @@ export enum AceEditorMode {
   JSON = 'json',
   YAML = 'yaml',
   TEXT = 'text',
-  NODEJS = 'javascript',
+  NODEJS = 'nodejs',
   PHP = 'php',
   PYTHON = 'python',
   PYTHON3 = 'python',
   JAVASCRIPT = 'javascript',
+}
+
+export interface ScriptEvent {
+  name: string;
+  endpoints: Array<string>;
+}
+
+export interface ScriptEventResponse {
+  [key: string]: {
+    [key: string]: {
+      type: string;
+      endpoints: Array<string>;
+      parameter?: { [key: string]: Array<string> };
+    };
+  };
 }

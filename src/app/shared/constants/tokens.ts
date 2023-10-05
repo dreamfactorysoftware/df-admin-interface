@@ -55,11 +55,6 @@ export const SERVICES_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   dfBaseCrudServiceProvider(URLS.SYSTEM_SERVICE)
 );
 
-export const SCRIPT_TYPE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'SCRIPT_TYPE_SERVICE_TOKEN',
-  dfBaseCrudServiceProvider(URLS.SCRIPT_TYPE)
-);
-
 export const SCHEDULER_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'SCHEDULER_SERVICE_TOKEN',
   dfBaseCrudServiceProvider(URLS.SCHEDULER)
@@ -85,8 +80,8 @@ export const CONFIG_CORS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   dfBaseCrudServiceProvider(URLS.SYSTEM_CORS)
 );
 
-export const SCRIPTS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'SCRIPTS_SERVICE_TOKEN',
+export const EVENTS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'EVENTS_SERVICE_TOKEN',
   dfBaseCrudServiceProvider(URLS.SYSTEM_EVENT)
 );
 

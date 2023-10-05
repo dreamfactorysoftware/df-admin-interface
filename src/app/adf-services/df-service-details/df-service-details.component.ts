@@ -26,13 +26,11 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatButtonModule } from '@angular/material/button';
 import { UntilDestroy } from '@ngneat/until-destroy';
-import {
-  AceEditorMode,
-  DfAceEditorComponent,
-} from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
+import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { Service } from 'src/app/shared/types/files';
+import { AceEditorMode } from 'src/app/shared/types/scripts';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-service-details',
