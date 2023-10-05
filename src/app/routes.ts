@@ -45,8 +45,8 @@ import {
   entitiesResolver,
   fileResolver,
 } from './adf-files/resolver/df-files.resolver';
-import { DfScriptsComponent } from './adf-scripts/df-scripts/df-scripts.component';
 import {
+  eventScriptResolver,
   eventScriptsResolver,
   scriptTypeResolver,
 } from './adf-scripts/resolvers/scripts.resolver';
@@ -207,7 +207,7 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('apps')],
       },
       {
-        path: ROUTES.SCRIPTS,
+        path: ROUTES.EVENT_SCRIPTS,
         children: [
           {
             path: '',
@@ -218,15 +218,35 @@ export const routes: Routes = [
             resolve: { data: eventScriptsResolver },
           },
           {
-            path: ':name',
-            component: DfScriptsComponent,
+            path: ROUTES.CREATE,
+            loadComponent: () =>
+              import('./adf-scripts/df-scripts/df-scripts.component').then(
+                m => m.DfScriptsComponent
+              ),
             resolve: {
-              data: servicesResolver(),
               scriptType: scriptTypeResolver,
+              services: servicesResolver(0),
             },
+            data: { type: 'create' },
+          },
+          {
+            path: ':name',
+            loadComponent: () =>
+              import(
+                './adf-scripts/df-edit-script/df-edit-script.component'
+              ).then(m => m.DfEditScriptComponent),
+            resolve: {
+              data: eventScriptResolver,
+              scriptType: scriptTypeResolver,
+              services: servicesResolver(0),
+            },
+            data: { type: 'edit' },
           },
         ],
         providers: [provideTranslocoScope('scripts')],
+        data: {
+          groups: ['File', 'Source Control'],
+        },
       },
       {
         path: ROUTES.API_DOCS,

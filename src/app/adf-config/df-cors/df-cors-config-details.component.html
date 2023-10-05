@@ -1,7 +1,7 @@
 <!-- TODO add error banner -->
 <div class="df-cors-config-container">
   <h4>{{ 'cors.pageSubtitle' | transloco }}</h4>
-  <form [formGroup]="corsForm" (ngSubmit)="onSubmit()" class="details-form">
+  <form [formGroup]="corsForm" (ngSubmit)="onSubmit()" class="details-section">
     <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{ 'cors.formControls.path' | transloco }}</mat-label>
       <input matInput type="url" formControlName="path" />

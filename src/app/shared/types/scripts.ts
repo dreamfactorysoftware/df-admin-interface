@@ -52,4 +52,5 @@ export enum AceEditorMode {
   PHP = 'php',
   PYTHON = 'python',
   PYTHON3 = 'python',
+  JAVASCRIPT = 'javascript',
 }

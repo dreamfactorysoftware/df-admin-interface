@@ -30,7 +30,6 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 @Component({
   selector: 'df-scheduler',
   templateUrl: './df-scheduler-details.component.html',
-  styleUrls: ['./df-scheduler-details.component.scss'],
   standalone: true,
   imports: [
     AsyncPipe,
