@@ -1,4 +1,7 @@
-<form [formGroup]="fieldDetailsForm" class="details-section">
+<form
+  [formGroup]="fieldDetailsForm"
+  class="details-section"
+  (ngSubmit)="onSubmit()">
   <div class="full-width">
     <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{
@@ -191,7 +194,7 @@
   </ng-container>
   <div class="field-details-button-container">
     <button type="button" mat-flat-button (click)="onCancel()">Cancel</button>
-    <button mat-flat-button color="primary" (click)="onSubmit()">
+    <button mat-flat-button color="primary">
       {{ (databaseFieldToEdit ? 'save' : 'create') | transloco }}
     </button>
   </div>
