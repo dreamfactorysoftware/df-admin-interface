@@ -61,19 +61,19 @@ export class DfFunctionUseComponent implements OnInit {
 
   functionUsesDropdownOptions = [
     {
-      name: 'SELECT (get)',
+      name: 'SELECT (GET)',
       value: 'SELECT',
     },
     {
-      name: 'FILTER (get)',
+      name: 'FILTER (GET)',
       value: 'FILTER',
     },
     {
-      name: 'INSERT (post)',
+      name: 'INSERT (POST)',
       value: 'INSERT',
     },
     {
-      name: 'UPDATE (patch)',
+      name: 'UPDATE (PATCH)',
       value: 'UPDATE',
     },
   ];

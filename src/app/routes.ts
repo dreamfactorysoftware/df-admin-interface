@@ -564,7 +564,7 @@ export const routes: Routes = [
                     data: { type: 'create' },
                   },
                   {
-                    path: `${ROUTES.CREATE}/field`,
+                    path: ROUTES.FIELDS,
                     loadComponent: () =>
                       import(
                         './adf-schema/df-field-details/df-field-details.component'
