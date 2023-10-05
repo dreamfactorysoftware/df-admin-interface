@@ -122,6 +122,9 @@ export class DfAceEditorComponent
     if (mode === 'nodejs') {
       return AceEditorMode.JAVASCRIPT;
     }
+    if (mode === 'python3') {
+      return AceEditorMode.PYTHON;
+    }
     return mode;
   }
 }

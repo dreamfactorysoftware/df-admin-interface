@@ -19,18 +19,18 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
-import { ServiceType } from 'src/app/shared/types/service';
-import { mapCamelToSnake } from 'src/app/shared/utilities/case';
+import { ConfigSchema, ServiceType } from 'src/app/shared/types/service';
+import { snakeToCamelString } from 'src/app/shared/utilities/case';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatButtonModule } from '@angular/material/button';
 import { UntilDestroy } from '@ngneat/until-destroy';
-import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
+import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-service-details',
@@ -56,7 +56,7 @@ import { AceEditorMode } from 'src/app/shared/types/scripts';
     FontAwesomeModule,
     MatTooltipModule,
     MatButtonModule,
-    DfAceEditorComponent,
+    DfScriptEditorComponent,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -65,6 +65,7 @@ export class DfServiceDetailsComponent implements OnInit {
   serviceForm: FormGroup;
   faCircleInfo = faCircleInfo;
   serviceData: Service;
+  configSchema: Array<ConfigSchema>;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -87,35 +88,42 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.serviceForm.controls['type'].valueChanges.subscribe(() => {
-      this.serviceForm.removeControl('config');
-      if (this.configSchema) {
-        const config = this.fb.group({});
-        this.configSchema.forEach(control => {
-          const validator = [];
-          if (control.required) {
-            validator.push(Validators.required);
-          }
-          config.addControl(
-            control.name,
-            new FormControl(control.default, validator)
-          );
-        });
-        this.serviceForm.addControl('config', config);
-      }
-    });
-
     this.activatedRoute.data.subscribe(({ data, serviceTypes }) => {
       this.serviceTypes = serviceTypes;
       this.serviceData = data;
       if (this.edit) {
-        this.serviceForm.controls['type'].disable();
+        this.configSchema = this.getConfigSchema(data.type) ?? [];
+        this.initializeConfig();
         this.serviceForm.patchValue({
           ...data,
-          config: mapCamelToSnake(data.config),
+          config: data.config,
+        });
+        this.serviceForm.controls['type'].disable();
+      } else {
+        this.serviceForm.controls['type'].valueChanges.subscribe(value => {
+          this.serviceForm.removeControl('config');
+          this.configSchema = this.getConfigSchema(value) ?? [];
+          this.initializeConfig();
         });
       }
     });
+  }
+
+  initializeConfig() {
+    if (this.configSchema) {
+      const config = this.fb.group({});
+      this.configSchema.forEach(control => {
+        const validator = [];
+        if (control.required) {
+          validator.push(Validators.required);
+        }
+        config.addControl(
+          control.name,
+          new FormControl(control.default, validator)
+        );
+      });
+      this.serviceForm.addControl('config', config);
+    }
   }
 
   get scriptMode() {
@@ -132,14 +140,27 @@ export class DfServiceDetailsComponent implements OnInit {
     return AceEditorMode.TEXT;
   }
 
-  get configSchema() {
-    return this.serviceTypes.find(
-      type => type.name === this.serviceForm.getRawValue().type
-    )?.configSchema;
+  getConfigSchema(type: string) {
+    return this.serviceTypes
+      .find(serviceType => serviceType.name === type)
+      ?.configSchema.map(control => ({
+        ...control,
+        name: snakeToCamelString(control.name),
+      }));
+  }
+
+  get viewSchema() {
+    return this.configSchema?.filter(
+      control => !['storageServiceId', 'storagePath'].includes(control.name)
+    );
   }
 
   getConfigControl(name: string) {
     return this.serviceForm.get(`config.${name}`) as FormControl;
+  }
+
+  getControl(name: string) {
+    return this.serviceForm.controls[name] as FormControl;
   }
 
   save() {

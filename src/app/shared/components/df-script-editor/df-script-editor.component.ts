@@ -1,12 +1,6 @@
 import { NgFor, NgIf } from '@angular/common';
 import { Component, Inject, Input, OnInit } from '@angular/core';
-import {
-  FormControl,
-  FormGroup,
-  FormGroupDirective,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -46,29 +40,21 @@ import { switchMap } from 'rxjs';
 })
 export class DfScriptEditorComponent implements OnInit {
   @Input() cache: string;
-  storageServices: Array<Service> = [];
+  @Input({ required: true }) type: FormControl;
+  @Input({ required: true }) storageServiceId: FormControl;
+  @Input({ required: true }) storagePath: FormControl;
+  @Input({ required: true }) content: FormControl;
 
-  type: FormControl;
-  storageServiceId: FormControl;
-  storagePath: FormControl;
-  content: FormControl;
+  storageServices: Array<Service> = [];
 
   constructor(
     private dialog: MatDialog,
     @Inject(BASE_SERVICE_TOKEN) private fileService: DfBaseCrudService,
     @Inject(CACHE_SERVICE_TOKEN) private cacheService: DfBaseCrudService,
-    @Inject(BASE_SERVICE_TOKEN) private baseService: DfBaseCrudService,
-    private rootFormGroup: FormGroupDirective
+    @Inject(BASE_SERVICE_TOKEN) private baseService: DfBaseCrudService
   ) {}
 
   ngOnInit(): void {
-    const rootForm = this.rootFormGroup.control as FormGroup;
-    this.type = rootForm.controls['type'] as FormControl;
-    this.storageServiceId = rootForm.controls[
-      'storageServiceId'
-    ] as FormControl;
-    this.storagePath = rootForm.controls['storagePath'] as FormControl;
-    this.content = rootForm.controls['content'] as FormControl;
     if (this.storageServiceId.getRawValue()) {
       this.storagePath.addValidators([Validators.required]);
     }

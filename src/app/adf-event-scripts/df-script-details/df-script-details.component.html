@@ -25,7 +25,11 @@
   }}</mat-slide-toggle>
   <df-script-editor
     class="full-width"
-    [cache]="scriptForm.getRawValue().name"></df-script-editor>
+    [cache]="scriptForm.getRawValue().name"
+    [type]="getControl('type')"
+    [storageServiceId]="getControl('storageServiceId')"
+    [storagePath]="getControl('storagePath')"
+    [content]="getControl('conten')"></df-script-editor>
   <div class="full-width">
     <button mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}

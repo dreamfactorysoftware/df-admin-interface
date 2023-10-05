@@ -11,6 +11,7 @@ import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { SCRIPT_TYPES } from 'src/app/shared/constants/scripts';
 import {
   FormBuilder,
+  FormControl,
   FormGroup,
   FormsModule,
   ReactiveFormsModule,
@@ -89,6 +90,10 @@ export class DfScriptDetailsComponent implements OnInit {
       map(value => this.filterGroup(value))
     );
     this.loaded = true;
+  }
+
+  getControl(name: string) {
+    return this.scriptForm.controls[name] as FormControl;
   }
 
   goBack(): void {
