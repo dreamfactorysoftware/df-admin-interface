@@ -1,3 +1,9 @@
-<!-- TODO transloco -->
-<button mat-flat-button color="primary" (click)="goBack()">Go Back</button>
-<df-ace-editor [readonly]="true" [value]="content"></df-ace-editor>
+<div class="details-section">
+  <button mat-flat-button color="primary" (click)="goBack()">
+    {{ 'goBack' | transloco }}
+  </button>
+  <df-ace-editor
+    [readonly]="true"
+    [value]="content"
+    class="full-width"></df-ace-editor>
+</div>

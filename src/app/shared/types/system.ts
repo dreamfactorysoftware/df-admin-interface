@@ -14,6 +14,9 @@ export interface Environment {
     rootAdminExists: boolean;
     host?: string;
   };
+  server: {
+    host: string;
+  };
 }
 
 export interface System {

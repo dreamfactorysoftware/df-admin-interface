@@ -74,6 +74,11 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
       header: 'description',
     },
     {
+      columnDef: 'type',
+      cell: (row: ServiceRow) => row.type,
+      header: 'type',
+    },
+    {
       columnDef: 'actions',
     },
   ];

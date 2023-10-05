@@ -32,9 +32,7 @@ export class DfBaseCrudService {
   }
 
   create<T, S>(
-    data: {
-      resource: Array<S>;
-    },
+    data: any,
     options?: Partial<RequestOptions>,
     endpoint?: string
   ) {

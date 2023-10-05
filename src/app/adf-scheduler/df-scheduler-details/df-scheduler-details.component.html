@@ -2,7 +2,10 @@
 <mat-tab-group dynamicHeight mat-stretch-tabs="false" mat-align-tabs="start">
   <mat-tab label="Basic">
     <h4>{{ 'scheduler.taskOverviewSubtitle' | transloco }}</h4>
-    <form [formGroup]="formGroup" (ngSubmit)="onSubmit()" class="details-form">
+    <form
+      [formGroup]="formGroup"
+      (ngSubmit)="onSubmit()"
+      class="details-section">
       <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
         <mat-label>{{ 'scheduler.form.label.name' | transloco }}</mat-label>
         <input matInput placeholder="Name" formControlName="name" />
@@ -77,14 +80,12 @@
     </form>
   </mat-tab>
   <mat-tab label="Log">
-    <div class="scheduler-log-container">
-      <h4>{{ 'scheduler.logs.subtitle' | transloco }}</h4>
+    <div class="details-section">
       <p>
         {{ 'scheduler.logs.statusCode' | transloco }}:
         {{ scheduleToEdit?.taskLogByTaskId?.statusCode }}
       </p>
-      <p>{{ 'scheduler.logs.error' | transloco }}:</p>
-      <df-ace-editor [readonly]="true" [value]="log" />
+      <df-ace-editor [readonly]="true" [value]="log" class="full-width" />
       <button mat-flat-button color="primary" (click)="onCancel()">
         {{ 'goBack' | transloco }}
       </button>

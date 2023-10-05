@@ -75,7 +75,7 @@ export class DfManageScriptsTableComponent extends DfManageTableComponent<Script
   mapDataToTable(data: ScriptObject[]): ScriptObject[] {
     return data;
   }
-  filterQuery = getFilterQuery();
+  filterQuery = getFilterQuery('eventScripts');
 
   override refreshTable(
     limit?: number,
@@ -88,5 +88,11 @@ export class DfManageScriptsTableComponent extends DfManageTableComponent<Script
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;
       });
+  }
+
+  override deleteRow(row: ScriptObject): void {
+    this.eventScriptService
+      .delete(row.name)
+      .subscribe(() => this.refreshTable());
   }
 }

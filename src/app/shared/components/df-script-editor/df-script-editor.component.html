@@ -1,0 +1,67 @@
+<!-- TODO translations -->
+<div class="details-section">
+  <div class="actions full-width">
+    <input
+      type="file"
+      [accept]=""
+      #fileInput
+      (change)="fileUpload($event)"
+      style="display: none" />
+    <button
+      type="button"
+      mat-flat-button
+      color="primary"
+      (click)="fileInput.click()"
+      [disabled]="storageServiceId.getRawValue()">
+      {{ 'desktopFile' | transloco }}
+    </button>
+    <button
+      type="button"
+      mat-flat-button
+      color="primary"
+      (click)="githubImport()"
+      [disabled]="storageServiceId.getRawValue()">
+      {{ 'githubFile' | transloco }}
+    </button>
+  </div>
+  <mat-form-field class="dynamic-width" subscriptSizing="dynamic">
+    <mat-label>{{ 'service' | transloco }}</mat-label>
+    <mat-select [formControl]="storageServiceId">
+      <mat-option></mat-option>
+      <mat-option *ngFor="let service of storageServices" [value]="service.id">
+        {{ service.label }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field
+    *ngIf="!!storageServiceId.getRawValue()"
+    class="dynamic-width"
+    subscriptSizing="dynamic">
+    <mat-label>{{ 'path' | transloco }}</mat-label>
+    <input matInput [formControl]="storagePath" />
+  </mat-form-field>
+  <div class="actions" *ngIf="storageServiceId.getRawValue()">
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      (click)="viewLatest()"
+      [disabled]="!storagePath.getRawValue()">
+      View Latest
+    </button>
+    <button
+      *ngIf="cache"
+      mat-flat-button
+      color="primary"
+      type="button"
+      (click)="deleteCache()">
+      Delete Cache
+    </button>
+  </div>
+
+  <df-ace-editor
+    class="full-width"
+    [formControl]="content"
+    [readonly]="!!storageServiceId.getRawValue()"
+    [mode]="type.getRawValue()"></df-ace-editor>
+</div>

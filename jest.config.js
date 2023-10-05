@@ -14,5 +14,6 @@ module.exports = {
     '!src/**/*.d.ts',
     '!src/app/shared/types/*',
     '!src/app/shared/constants/*',
+    '!src/**/*.mock.ts',
   ],
 };

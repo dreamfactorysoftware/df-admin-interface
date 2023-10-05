@@ -1,6 +1,5 @@
 {
   "scriptName": "Script Name",
-  "scriptType": "Script Type/Language",
   "active": "Active",
   "importScriptFile": "Import a script file",
   "fromDesktop": "From Desktop",

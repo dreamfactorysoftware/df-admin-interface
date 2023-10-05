@@ -12,11 +12,11 @@ import {
 import { catchError, throwError } from 'rxjs';
 import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { isValidHttpUrl } from '../../../adf-scripts/helpers/url-validation';
 import { GITHUB_REPO_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { KeyValuePair } from 'src/app/shared/types/generic-http';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { isValidHttpUrl } from '../../utilities/url-validation';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-scripts-github-dialog',

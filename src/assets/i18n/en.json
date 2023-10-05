@@ -73,6 +73,7 @@
     "patch": "PATCH (update)",
     "delete": "DELETE (remove)"
   },
+  "path": "Path",
   "version": "Version",
   "yes": "Yes",
   "no": "No",
@@ -96,8 +97,8 @@
   "open": "Open",
   "noFileSelected": "No file selected",
   "toggleNav": "Toggle navigation",
-  "desktopFile": "Select a desktop File",
-  "githubFile": "Select a GitHub File",
+  "desktopFile": "Upload File",
+  "githubFile": "Github Import",
   "scriptType": "Script Type",
   "scriptTypes": {
     "javascript": "JavaScript",
@@ -187,9 +188,9 @@
           "header": "{{nav.api-connections.api-keys.import.nav}}"
         }
       },
-      "scripts": {
-        "nav": "Scripts",
-        "header": "{{nav.api-connections.scripts.nav}}"
+      "event-scripts": {
+        "nav": "Event Scripts",
+        "header": "{{nav.api-connections.event-scripts.nav}}"
       },
       "api-docs": {
         "nav": "API Docs",

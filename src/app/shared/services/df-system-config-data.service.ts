@@ -30,6 +30,9 @@ export class DfSystemConfigDataService {
     platform: {
       rootAdminExists: false,
     },
+    server: {
+      host: '',
+    },
   });
   environment$: Observable<Environment> =
     this.environmentSubject.asObservable();

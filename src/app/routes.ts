@@ -45,11 +45,11 @@ import {
   entitiesResolver,
   fileResolver,
 } from './adf-files/resolver/df-files.resolver';
-import { DfScriptsComponent } from './adf-scripts/df-scripts/df-scripts.component';
 import {
+  eventScriptResolver,
   eventScriptsResolver,
-  scriptTypeResolver,
-} from './adf-scripts/resolvers/scripts.resolver';
+} from './adf-event-scripts/resolvers/scripts.resolver';
+import { eventsResolver } from './adf-event-scripts/resolvers/events.resolver';
 
 export const routes: Routes = [
   {
@@ -207,23 +207,37 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('apps')],
       },
       {
-        path: ROUTES.SCRIPTS,
+        path: ROUTES.EVENT_SCRIPTS,
         children: [
           {
             path: '',
             loadComponent: () =>
               import(
-                './adf-scripts/df-manage-scripts/df-manage-scripts-table.component'
+                './adf-event-scripts/df-manage-scripts/df-manage-scripts-table.component'
               ).then(m => m.DfManageScriptsTableComponent),
             resolve: { data: eventScriptsResolver },
           },
           {
-            path: ':name',
-            component: DfScriptsComponent,
+            path: ROUTES.CREATE,
+            loadComponent: () =>
+              import(
+                './adf-event-scripts/df-script-details/df-script-details.component'
+              ).then(m => m.DfScriptDetailsComponent),
             resolve: {
-              data: servicesResolver(),
-              scriptType: scriptTypeResolver,
+              data: eventsResolver,
             },
+            data: { type: 'create' },
+          },
+          {
+            path: ':name',
+            loadComponent: () =>
+              import(
+                './adf-event-scripts/df-script-details/df-script-details.component'
+              ).then(m => m.DfScriptDetailsComponent),
+            resolve: {
+              data: eventScriptResolver,
+            },
+            data: { type: 'edit' },
           },
         ],
         providers: [provideTranslocoScope('scripts')],
