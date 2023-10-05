@@ -1,36 +1,32 @@
 <div>
   <form [formGroup]="fieldDetailsForm" class="details-section">
-    <mat-form-field subscriptSizing="dynamic">
-      <mat-label>{{
-        'schema.fieldDetailsForm.controls.name' | transloco
-      }}</mat-label>
-      <input matInput formControlName="name" />
-      <mat-error
-        *ngIf="this.fieldDetailsForm.controls['name'].hasError('required')">
-        {{ 'schema.fieldDetailsForm.errors.name' | transloco }}
-      </mat-error>
-    </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic">
+    <div class="full-width">
+      <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+        <mat-label>{{
+          'schema.fieldDetailsForm.controls.name' | transloco
+        }}</mat-label>
+        <input matInput formControlName="name" />
+        <mat-error
+          *ngIf="this.fieldDetailsForm.controls['name'].hasError('required')">
+          {{ 'schema.fieldDetailsForm.errors.name' | transloco }}
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.alias' | transloco
       }}</mat-label>
       <input matInput formControlName="alias" />
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic">
+    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.label' | transloco
       }}</mat-label>
       <input matInput formControlName="label" />
     </mat-form-field>
-    <div class="slide-toggle-container">
-      <mat-slide-toggle formControlName="isVirtual">{{
-        'schema.fieldDetailsForm.controls.isVirtual' | transloco
-      }}</mat-slide-toggle>
-      <mat-slide-toggle formControlName="isAggregate">{{
-        'schema.fieldDetailsForm.controls.isAggregate' | transloco
-      }}</mat-slide-toggle>
-    </div>
-    <mat-form-field subscriptSizing="dynamic">
+
+    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.type' | transloco
       }}</mat-label>
@@ -42,65 +38,73 @@
         </mat-option>
       </mat-select>
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic">
+    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.databaseType' | transloco
       }}</mat-label>
       <input matInput formControlName="dbType" />
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic">
+    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.length' | transloco
       }}</mat-label>
       <input type="number" matInput formControlName="length" />
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic">
+    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.precision' | transloco
       }}</mat-label>
       <input type="number" matInput formControlName="precision" />
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic">
+    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.scale' | transloco
       }}</mat-label>
       <input type="number" matInput formControlName="scale" />
     </mat-form-field>
-    <div class="slide-toggle-container">
-      <mat-slide-toggle formControlName="fixedLength">{{
-        'schema.fieldDetailsForm.controls.fixedLength' | transloco
-      }}</mat-slide-toggle>
-      <mat-slide-toggle formControlName="supportsMultibyte">{{
-        'schema.fieldDetailsForm.controls.supportsMultibyte' | transloco
-      }}</mat-slide-toggle>
-      <mat-slide-toggle formControlName="allowNull">{{
-        'schema.fieldDetailsForm.controls.allowNull' | transloco
-      }}</mat-slide-toggle>
-      <mat-slide-toggle formControlName="autoIncrement">{{
-        'schema.fieldDetailsForm.controls.autoIncrement' | transloco
-      }}</mat-slide-toggle>
-    </div>
-    <mat-form-field subscriptSizing="dynamic">
+    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.defaultValue' | transloco
       }}</mat-label>
       <input matInput formControlName="default" />
     </mat-form-field>
-    <div class="slide-toggle-container">
-      <mat-slide-toggle formControlName="isIndex">{{
-        'schema.fieldDetailsForm.controls.isIndex' | transloco
-      }}</mat-slide-toggle>
-      <mat-slide-toggle formControlName="isUnique">{{
-        'schema.fieldDetailsForm.controls.isUnique' | transloco
-      }}</mat-slide-toggle>
-      <mat-slide-toggle formControlName="isPrimaryKey">{{
-        'schema.fieldDetailsForm.controls.isPrimaryKey' | transloco
-      }}</mat-slide-toggle>
-      <mat-slide-toggle formControlName="isForeignKey">{{
-        'schema.fieldDetailsForm.controls.isForeignKey' | transloco
-      }}</mat-slide-toggle>
-    </div>
-    <mat-form-field subscriptSizing="dynamic">
+    <mat-slide-toggle class="dynamic-width" formControlName="isVirtual">{{
+      'schema.fieldDetailsForm.controls.isVirtual' | transloco
+    }}</mat-slide-toggle>
+    <mat-slide-toggle class="dynamic-width" formControlName="isAggregate">{{
+      'schema.fieldDetailsForm.controls.isAggregate' | transloco
+    }}</mat-slide-toggle>
+    <mat-slide-toggle class="dynamic-width" formControlName="fixedLength">{{
+      'schema.fieldDetailsForm.controls.fixedLength' | transloco
+    }}</mat-slide-toggle>
+    <mat-slide-toggle
+      class="dynamic-width"
+      formControlName="supportsMultibyte"
+      >{{
+        'schema.fieldDetailsForm.controls.supportsMultibyte' | transloco
+      }}</mat-slide-toggle
+    >
+    <mat-slide-toggle class="dynamic-width" formControlName="allowNull">{{
+      'schema.fieldDetailsForm.controls.allowNull' | transloco
+    }}</mat-slide-toggle>
+    <mat-slide-toggle class="dynamic-width" formControlName="autoIncrement">{{
+      'schema.fieldDetailsForm.controls.autoIncrement' | transloco
+    }}</mat-slide-toggle>
+
+    <mat-slide-toggle class="dynamic-width" formControlName="isIndex">{{
+      'schema.fieldDetailsForm.controls.isIndex' | transloco
+    }}</mat-slide-toggle>
+    <mat-slide-toggle class="dynamic-width" formControlName="isUnique">{{
+      'schema.fieldDetailsForm.controls.isUnique' | transloco
+    }}</mat-slide-toggle>
+    <mat-slide-toggle class="dynamic-width" formControlName="isPrimaryKey">{{
+      'schema.fieldDetailsForm.controls.isPrimaryKey' | transloco
+    }}</mat-slide-toggle>
+    <mat-slide-toggle class="dynamic-width" formControlName="isForeignKey">{{
+      'schema.fieldDetailsForm.controls.isForeignKey' | transloco
+    }}</mat-slide-toggle>
+
+    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.refTable' | transloco
       }}</mat-label>
@@ -112,7 +116,7 @@
         </mat-option>
       </mat-select>
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic">
+    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.refField' | transloco
       }}</mat-label>
@@ -124,7 +128,7 @@
         >
       </mat-select>
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic">
+    <mat-form-field subscriptSizing="dynamic" class="full-width">
       <mat-label>{{
         'schema.fieldDetailsForm.controls.validation' | transloco
       }}</mat-label>
@@ -140,9 +144,11 @@
         {{ 'schema.fieldDetailsForm.errors.json' | transloco }}
       </mat-error>
     </mat-form-field>
-    <df-function-use formArrayName="dbFunction"></df-function-use>
+    <df-function-use
+      formArrayName="dbFunction"
+      class="full-width"></df-function-use>
     <ng-container *ngIf="this.fieldDetailsForm.controls['picklist']"
-      ><mat-form-field subscriptSizing="dynamic">
+      ><mat-form-field subscriptSizing="dynamic" class="dynamic-width">
         <mat-label>{{
           'schema.fieldDetailsForm.controls.picklist' | transloco
         }}</mat-label>
