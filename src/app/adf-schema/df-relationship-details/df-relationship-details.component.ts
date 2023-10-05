@@ -29,7 +29,6 @@ interface BasicOption {
 @Component({
   selector: 'df-relationship-details',
   templateUrl: './df-relationship-details.component.html',
-  styleUrls: ['./df-relationship-details.component.scss'],
   standalone: true,
   imports: [
     ReactiveFormsModule,

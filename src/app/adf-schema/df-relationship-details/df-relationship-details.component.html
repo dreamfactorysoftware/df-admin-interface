@@ -1,9 +1,9 @@
 <form
   [formGroup]="relationshipForm"
   (ngSubmit)="save()"
-  class="table-relationships-container details-section"
+  class="details-section"
   [class.x-small]="breakpointService.isXSmallScreen | async">
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'name' | transloco }} -
       {{ 'schema.relationships.name.tooltip' | transloco }}
@@ -14,32 +14,32 @@
       placeholder="{{ 'name' | transloco }}" />
   </mat-form-field>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'schema.alias' | transloco }}
     </mat-label>
     <input matInput formControlName="alias" />
   </mat-form-field>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'label' | transloco }}
     </mat-label>
     <input matInput formControlName="label" />
   </mat-form-field>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'description' | transloco }}
     </mat-label>
     <input matInput formControlName="description" />
   </mat-form-field>
 
-  <mat-slide-toggle formControlName="alwaysFetch">{{
+  <mat-slide-toggle formControlName="alwaysFetch" class="dynamic-width">{{
     'schema.relationships.fetch' | transloco
   }}</mat-slide-toggle>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'schema.relationships.type' | transloco }}
     </mat-label>
@@ -53,11 +53,11 @@
     </mat-error>
   </mat-form-field>
 
-  <mat-slide-toggle formControlName="isVirtual">{{
+  <mat-slide-toggle formControlName="isVirtual" class="dynamic-width">{{
     'schema.relationships.virtualRelationship' | transloco
   }}</mat-slide-toggle>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'schema.relationships.field.label' | transloco }}
     </mat-label>
@@ -71,7 +71,7 @@
     </mat-error>
   </mat-form-field>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'schema.relationships.referenceService.label' | transloco }}
     </mat-label>
@@ -86,7 +86,7 @@
     </mat-error>
   </mat-form-field>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'schema.relationships.referenceTable.label' | transloco }}
     </mat-label>
@@ -106,7 +106,7 @@
     </mat-error>
   </mat-form-field>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'schema.relationships.referenceField.label' | transloco }}
     </mat-label>
@@ -126,7 +126,7 @@
     </mat-error>
   </mat-form-field>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'schema.relationships.junctionService.label' | transloco }}
     </mat-label>
@@ -143,7 +143,7 @@
     </mat-error>
   </mat-form-field>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'schema.relationships.junctionTable.label' | transloco }}
     </mat-label>
@@ -163,7 +163,7 @@
     </mat-error>
   </mat-form-field>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'schema.relationships.junctionField.label' | transloco }}
     </mat-label>
@@ -183,7 +183,7 @@
     </mat-error>
   </mat-form-field>
 
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'schema.relationships.junctionReferenceField.label' | transloco }}
     </mat-label>
@@ -207,7 +207,7 @@
     </mat-error>
   </mat-form-field>
 
-  <div class="flex-100">
+  <div class="full-width">
     <button mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
