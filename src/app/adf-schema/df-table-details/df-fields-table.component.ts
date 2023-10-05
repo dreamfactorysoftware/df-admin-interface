@@ -1,4 +1,4 @@
-import { Component, Inject, Input } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import {
   Actions,
   DfManageTableComponent,
@@ -28,7 +28,6 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
   dbName: string;
   tableName: string;
-  @Input() tableFieldArray: any[];
 
   constructor(
     @Inject(BASE_SERVICE_TOKEN)

@@ -24,10 +24,9 @@ import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfFunctionUseComponent } from './df-function-use/df-function-use.component';
 import { DatabaseSchemaFieldType } from './df-field-details.types';
 import { CsvValidator } from '../validators/csv.validator';
-import { UntilDestroy } from '@ngneat/until-destroy';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { MatTooltipModule } from '@angular/material/tooltip';
-@UntilDestroy({ checkProperties: true })
+
 @Component({
   selector: 'df-field-details',
   templateUrl: './df-field-details.component.html',
