@@ -1,9 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfFieldDetailsComponent } from './df-field-details.component';
-import { TranslocoService } from '@ngneat/transloco';
+import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { of } from 'rxjs';
+import { TranslocoHttpLoader } from 'src/transloco-loader';
+import { ActivatedRoute, Router } from '@angular/router';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 
 const MOCK_FORM_DATA = {
   alias: null,
@@ -37,22 +41,52 @@ const MOCK_FORM_DATA = {
   is_aggregate: false,
 };
 
+let routerMock: any;
+let activatedRouteMock: any;
+
 describe('DfFieldDetailsComponent - create field details', () => {
   let component: DfFieldDetailsComponent;
   let fixture: ComponentFixture<DfFieldDetailsComponent>;
+  let router: Router;
 
   beforeEach(() => {
-    TestBed.configureTestingModule(
-      createTestBedConfig(
-        DfFieldDetailsComponent,
-        [TranslocoService],
-        {
-          type: 'create',
+    routerMock = {
+      navigate: jest.fn(),
+    };
+    activatedRouteMock = {
+      data: of({
+        type: 'create',
+      }),
+      snapshot: {
+        params: {
+          id: 'testDb',
+          name: 'testTable',
         },
-        undefined,
-        { name: 'dbName' }
-      )
-    );
+      },
+    };
+
+    TestBed.configureTestingModule({
+      imports: [
+        DfFieldDetailsComponent,
+        HttpClientTestingModule,
+        NoopAnimationsModule,
+      ],
+      providers: [
+        provideTransloco({
+          config: {
+            defaultLang: 'en',
+            availableLangs: ['en'],
+          },
+          loader: TranslocoHttpLoader,
+        }),
+        TranslocoService,
+        {
+          provide: ActivatedRoute,
+          useValue: activatedRouteMock,
+        },
+        { provide: Router, useValue: routerMock },
+      ],
+    });
 
     fixture = TestBed.createComponent(DfFieldDetailsComponent);
     component = fixture.componentInstance;
@@ -301,6 +335,14 @@ describe('DfFieldDetailsComponent - create field details', () => {
     );
     expect(component.fieldDetailsForm.controls['scale'].enabled).toBe(false);
   });
+
+  it('should call router.navigate with correct arguments on onCancel', () => {
+    component.onCancel();
+    expect(routerMock.navigate).toHaveBeenCalledWith(
+      ['../'],
+      expect.objectContaining({ relativeTo: activatedRouteMock })
+    );
+  });
 });
 
 describe('DfFieldDetailsComponent - edit field details', () => {
@@ -308,15 +350,36 @@ describe('DfFieldDetailsComponent - edit field details', () => {
   let fixture: ComponentFixture<DfFieldDetailsComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule(
-      createTestBedConfig(
+    TestBed.configureTestingModule({
+      imports: [
         DfFieldDetailsComponent,
-        [TranslocoService],
-        { data: { ...MOCK_FORM_DATA }, type: 'edit' },
-        undefined,
-        { name: 'dbName', fieldName: 'field-name', tableName: 'table-name' }
-      )
-    );
+        HttpClientTestingModule,
+        NoopAnimationsModule,
+      ],
+      providers: [
+        provideTransloco({
+          config: {
+            defaultLang: 'en',
+            availableLangs: ['en'],
+          },
+          loader: TranslocoHttpLoader,
+        }),
+        TranslocoService,
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            data: of({ type: 'edit', data: { ...MOCK_FORM_DATA } }),
+            snapshot: {
+              params: {
+                name: 'dbName',
+                fieldName: 'field-name',
+                tableName: 'table-name',
+              },
+            },
+          },
+        },
+      ],
+    });
 
     jest
       .spyOn(DfBaseCrudService.prototype, 'get')

@@ -12,6 +12,7 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { TableRow } from '../df-table-details/df-table-details.types';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-tables-table',
@@ -53,6 +54,13 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
     },
   ];
 
+  override deleteRow(row: TableRow): void {
+    const dbName = this._activatedRoute.snapshot.paramMap.get('name');
+    this.service.delete(`${dbName}/_schema/${row.id}`).subscribe(() => {
+      this.refreshTable();
+    });
+  }
+
   mapDataToTable(data: any[]): DatabaseTableRowData[] {
     return data.map((item: any) => {
       return {
@@ -73,8 +81,7 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
         filter,
       })
       .subscribe((data: any) => {
-        this.dataSource.data = this.mapDataToTable(data.data.resource);
-        this.tableLength = data.data.meta.count;
+        this.dataSource.data = this.mapDataToTable(data.resource);
       });
   }
 

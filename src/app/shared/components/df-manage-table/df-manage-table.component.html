@@ -4,7 +4,8 @@
     mat-mini-fab
     color="primary"
     [attr.aria-label]="'newEntry' | transloco"
-    (click)="createRow()">
+    (click)="createRow()"
+    type="button">
     <fa-icon [icon]="faPlus" size="xl"></fa-icon>
   </button>
   <ng-content select="[topActions]"></ng-content>
@@ -116,6 +117,7 @@
               </button>
               <mat-menu #actionsMenu="matMenu">
                 <button
+                  type="button"
                   *ngFor="let action of actions.additional"
                   mat-menu-item
                   [attr.aria-label]="

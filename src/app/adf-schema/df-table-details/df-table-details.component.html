@@ -56,7 +56,7 @@
       <df-fields-table [tableData]="tableFields"></df-fields-table>
     </div>
 
-    <div class="flex-100 margin-2-0">
+    <div *ngIf="type === 'edit'" class="flex-100 margin-2-0">
       <h2>{{ 'schema.relationships.heading' | transloco }}</h2>
       <df-relationships-table
         [tableData]="tableRelated"></df-relationships-table>

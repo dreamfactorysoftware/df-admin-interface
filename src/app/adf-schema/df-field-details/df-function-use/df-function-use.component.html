@@ -2,9 +2,16 @@
   <mat-accordion *ngIf="showAccordion; else dbFunctionUse">
     <mat-expansion-panel>
       <mat-expansion-panel-header>
-        <mat-panel-title>{{
-          'schema.fieldDetailsForm.controls.dbFunctionTitle' | transloco
-        }}</mat-panel-title>
+        <mat-panel-title
+          >{{ 'schema.fieldDetailsForm.controls.dbFunctionTitle' | transloco }}
+          <fa-icon
+            class="tool-tip-trigger"
+            matSuffix
+            [icon]="faCircleInfo"
+            [matTooltip]="
+              'schema.fieldDetailsForm.controls.dfFunctionTooltip' | transloco
+            "
+        /></mat-panel-title>
         <mat-panel-description
           >{{
             'schema.fieldDetailsForm.controls.dbFunctionUseDescription'

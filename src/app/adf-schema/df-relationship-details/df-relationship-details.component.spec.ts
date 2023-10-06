@@ -144,9 +144,13 @@ describe('DfRelationshipDetailsComponent - Create View', () => {
     expect(
       component.relationshipForm.controls['junctionServiceId'].enabled
     ).toBeTruthy();
+
+    component.relationshipForm.controls['junctionServiceId'].setValue(1);
     expect(
       component.relationshipForm.controls['junctionTable'].enabled
     ).toBeTruthy();
+
+    component.relationshipForm.controls['junctionTable'].setValue('testTable');
     expect(
       component.relationshipForm.controls['junctionField'].enabled
     ).toBeTruthy();

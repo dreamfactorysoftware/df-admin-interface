@@ -112,6 +112,12 @@ export class DfRolesAccessComponent implements OnInit {
             this.serviceOptions.find(service => service.id === serviceId)
               ?.name || '';
 
+          // "GET requests without a resource are not currently supported by the 'email' service."
+          if (serviceName === 'email') {
+            this.componentOptions.push({ serviceId, components: ['*'] });
+            return;
+          }
+
           // GET Components for service
           this.baseService
             .get(serviceName, {

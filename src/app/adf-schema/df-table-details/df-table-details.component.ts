@@ -90,15 +90,9 @@ export class DfTableDetailsComponent implements OnInit {
   }
 
   goBack() {
-    if (this.type === 'create') {
-      this.router.navigate(['../'], {
-        relativeTo: this.activatedRoute,
-      });
-    } else if (this.type === 'edit') {
-      this.router.navigate(['../../'], {
-        relativeTo: this.activatedRoute,
-      });
-    }
+    this.router.navigate(['../'], {
+      relativeTo: this.activatedRoute,
+    });
   }
 
   save() {

@@ -29,7 +29,6 @@ interface BasicOption {
 @Component({
   selector: 'df-relationship-details',
   templateUrl: './df-relationship-details.component.html',
-  styleUrls: ['./df-relationship-details.component.scss'],
   standalone: true,
   imports: [
     ReactiveFormsModule,
@@ -93,7 +92,9 @@ export class DfRelationshipDetailsComponent implements OnInit {
       junctionField: [{ value: null, disabled: true }],
       junctionRefField: [{ value: null, disabled: true }],
     });
+  }
 
+  ngOnInit(): void {
     this.activatedRoute.data.subscribe(data => {
       this.type = data['type'];
       this.dbName = this.activatedRoute.snapshot.params['name'];
@@ -130,13 +131,21 @@ export class DfRelationshipDetailsComponent implements OnInit {
         });
 
         if (data['data'].refServiceId) {
-          this.getTables('reference');
-          this.getFields('reference');
+          this.getTables('reference', data['data'].refServiceId);
+          this.getFields(
+            'reference',
+            data['data'].refTable,
+            data['data'].refServiceId
+          );
         }
 
         if (data['data'].junctionServiceId) {
-          this.getTables('junction');
-          this.getFields('junction');
+          this.getTables('junction', data['data'].junctionServiceId);
+          this.getFields(
+            'junction',
+            data['data'].junctionTable,
+            data['data'].junctionServiceId
+          );
         }
 
         if (data['data'].type === 'many_many') {
@@ -159,10 +168,8 @@ export class DfRelationshipDetailsComponent implements OnInit {
         }
       }
     });
-  }
 
-  ngOnInit(): void {
-    // if type is many to many, enable junction fields
+    // form changes
     this.relationshipForm.get('type')?.valueChanges.subscribe(value => {
       if (value === 'many_many') {
         this.relationshipForm.get('junctionServiceId')?.enable();
@@ -174,32 +181,50 @@ export class DfRelationshipDetailsComponent implements OnInit {
       }
     });
 
-    this.relationshipForm.get('refServiceId')?.valueChanges.subscribe(() => {
+    this.relationshipForm.get('refServiceId')?.valueChanges.subscribe(value => {
+      if (!value) return;
+
       this.relationshipForm.get('refTable')?.reset();
       this.relationshipForm.get('refField')?.reset();
-      this.getTables('reference');
+      this.getTables('reference', value);
     });
 
-    this.relationshipForm.get('refTable')?.valueChanges.subscribe(() => {
+    this.relationshipForm.get('refTable')?.valueChanges.subscribe(value => {
+      if (!value) return;
+
       this.relationshipForm.get('refField')?.reset();
-      this.getFields('reference');
+      this.getFields(
+        'reference',
+        value,
+        this.relationshipForm.get('refServiceId')?.value
+      );
     });
 
     this.relationshipForm
       .get('junctionServiceId')
-      ?.valueChanges.subscribe(() => {
+      ?.valueChanges.subscribe(value => {
+        if (!value) return;
+
         this.relationshipForm.get('junctionTable')?.reset();
         this.relationshipForm.get('junctionTable')?.enable();
-        this.getTables('junction');
+        this.getTables('junction', value);
       });
 
-    this.relationshipForm.get('junctionTable')?.valueChanges.subscribe(() => {
-      this.relationshipForm.get('junctionField')?.reset();
-      this.relationshipForm.get('junctionField')?.enable();
-      this.relationshipForm.get('junctionRefField')?.reset();
-      this.relationshipForm.get('junctionRefField')?.enable();
-      this.getFields('junction');
-    });
+    this.relationshipForm
+      .get('junctionTable')
+      ?.valueChanges.subscribe(value => {
+        if (!value) return;
+
+        this.relationshipForm.get('junctionField')?.reset();
+        this.relationshipForm.get('junctionField')?.enable();
+        this.relationshipForm.get('junctionRefField')?.reset();
+        this.relationshipForm.get('junctionRefField')?.enable();
+        this.getFields(
+          'junction',
+          value,
+          this.relationshipForm.get('junctionServiceId')?.value
+        );
+      });
   }
 
   getServiceName(serviceId: number) {
@@ -213,11 +238,9 @@ export class DfRelationshipDetailsComponent implements OnInit {
     return serviceName?.name;
   }
 
-  getTables(source: string) {
+  getTables(source: string, serviceId: number) {
     if (source === 'reference') {
-      const serviceName = this.getServiceName(
-        this.relationshipForm.get('refServiceId')?.value
-      );
+      const serviceName = this.getServiceName(serviceId);
       this.crudService.get(`${serviceName}/_schema`).subscribe((data: any) => {
         this.referenceTableOptions = data.resource.map(
           (table: { name: string }) => {
@@ -229,9 +252,7 @@ export class DfRelationshipDetailsComponent implements OnInit {
         );
       });
     } else if (source === 'junction') {
-      const serviceName = this.getServiceName(
-        this.relationshipForm.get('junctionServiceId')?.value
-      );
+      const serviceName = this.getServiceName(serviceId);
       this.crudService.get(`${serviceName}/_schema`).subscribe((data: any) => {
         this.junctionTableOptions = data.resource.map(
           (table: { name: string }) => {
@@ -245,12 +266,9 @@ export class DfRelationshipDetailsComponent implements OnInit {
     }
   }
 
-  getFields(source: string) {
+  getFields(source: string, tableName: number, serviceId: number) {
     if (source === 'reference') {
-      const serviceName = this.getServiceName(
-        this.relationshipForm.get('refServiceId')?.value
-      );
-      const tableName = this.relationshipForm.get('refTable')?.value;
+      const serviceName = this.getServiceName(serviceId);
 
       this.crudService
         .get(`${serviceName}/_schema/${tableName}`)
@@ -263,10 +281,7 @@ export class DfRelationshipDetailsComponent implements OnInit {
           });
         });
     } else if (source === 'junction') {
-      const serviceName = this.getServiceName(
-        this.relationshipForm.get('junctionServiceId')?.value
-      );
-      const tableName = this.relationshipForm.get('junctionTable')?.value;
+      const serviceName = this.getServiceName(serviceId);
 
       this.crudService
         .get(`${serviceName}/_schema/${tableName}`)
@@ -277,9 +292,6 @@ export class DfRelationshipDetailsComponent implements OnInit {
               value: field.name,
             };
           });
-
-          // TODO: are juctionReferenceFieldOptions ever different from junctionFieldOptions?
-          // this.junctionReferenceFieldOptions = [...this.junctionFieldOptions];
         });
     }
   }
@@ -301,7 +313,7 @@ export class DfRelationshipDetailsComponent implements OnInit {
       return;
     }
     const payload = {
-      resource: [this.relationshipForm.value],
+      resource: [{ ...this.relationshipForm.getRawValue() }],
     };
 
     if (this.type === 'create') {
