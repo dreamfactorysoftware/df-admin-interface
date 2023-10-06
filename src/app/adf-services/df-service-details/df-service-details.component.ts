@@ -179,7 +179,9 @@ export class DfServiceDetailsComponent implements OnInit {
           snackbarError: 'server',
           snackbarSuccess: 'services.updateSuccessMsg',
         })
-        .subscribe();
+        .subscribe(() => {
+          this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+        });
     } else {
       this.servicesService
         .create(

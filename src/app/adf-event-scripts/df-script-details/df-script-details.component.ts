@@ -107,7 +107,9 @@ export class DfScriptDetailsComponent implements OnInit {
     const script = this.scriptForm.getRawValue();
     if (this.type === 'edit') {
       this.scriptDetails = { ...this.scriptDetails, ...script };
-      this.eventScriptService.update(script.name, script).subscribe();
+      this.eventScriptService
+        .update(script.name, script)
+        .subscribe(() => this.goBack());
     } else {
       this.scriptDetails = script;
       this.eventScriptService

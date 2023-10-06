@@ -158,7 +158,7 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
           })
         )
         .subscribe(() => {
-          this.router.navigate([ROUTES.USERS]);
+          this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.USERS]);
         });
     } else {
       if (this.userForm.value.setPassword) {
@@ -174,7 +174,9 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
             return throwError(() => new Error(err));
           })
         )
-        .subscribe();
+        .subscribe(() => {
+          this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.USERS]);
+        });
     }
   }
 }

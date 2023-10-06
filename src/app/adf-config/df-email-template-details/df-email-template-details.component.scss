@@ -1,21 +1,9 @@
 .email-template-details-container {
-  .form-container {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .flex-33 {
-    width: calc(33% - 7px);
-  }
-
   .email-template-body {
     min-height: 300px;
   }
 
   &.x-small {
-    .flex-33 {
-      width: 100%;
-    }
     .email-template-body {
       min-height: 200px;
     }

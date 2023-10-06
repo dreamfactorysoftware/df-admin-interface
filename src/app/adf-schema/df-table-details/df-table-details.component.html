@@ -18,9 +18,9 @@
   <form
     [formGroup]="tableDetailsForm"
     (ngSubmit)="save()"
-    class="table-details-section-container details-section"
+    class="details-section"
     [class.x-small]="breakpointService.isXSmallScreen | async">
-    <mat-form-field class="flex-50">
+    <mat-form-field class="dynamic-width">
       <mat-label>
         {{ 'schema.tableName' | transloco }}
       </mat-label>
@@ -30,19 +30,19 @@
       </mat-error>
     </mat-form-field>
 
-    <mat-form-field class="flex-50">
+    <mat-form-field class="dynamic-width">
       <mat-label>
         {{ 'schema.alias' | transloco }}
       </mat-label>
       <input matInput formControlName="alias" />
     </mat-form-field>
-    <mat-form-field class="flex-50">
+    <mat-form-field class="dynamic-width">
       <mat-label>
         {{ 'schema.label' | transloco }}
       </mat-label>
       <input matInput formControlName="label" />
     </mat-form-field>
-    <mat-form-field class="flex-50">
+    <mat-form-field class="dynamic-width">
       <mat-label> {{ 'schema.plural' | transloco }} </mat-label>
       <input matInput formControlName="plural" />
     </mat-form-field>
@@ -51,22 +51,22 @@
       <input matInput formControlName="description" />
     </mat-form-field>
 
-    <div class="flex-100">
+    <div class="full-width">
       <h2>{{ 'schema.fields' | transloco }}</h2>
       <df-fields-table [tableData]="tableFields"></df-fields-table>
     </div>
 
-    <div *ngIf="type === 'edit'" class="flex-100 margin-2-0">
+    <div *ngIf="type === 'edit'" class="full-width margin-2-0">
       <h2>{{ 'schema.relationships.heading' | transloco }}</h2>
       <df-relationships-table
         [tableData]="tableRelated"></df-relationships-table>
     </div>
 
-    <div class="flex-100">
+    <div class="full-width action-bar">
       <button mat-flat-button type="button" (click)="goBack()">
         {{ 'cancel' | transloco }}
       </button>
-      <button mat-flat-button color="primary" type="submit">
+      <button mat-flat-button color="primary">
         <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
         <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
       </button>

@@ -326,6 +326,11 @@
   "lookupKeys": {
     "label": "Lookup Keys",
     "desc": "Lookup keys for service configuration and credentials must be made private.",
-    "noKeys": "No lookup keys."
+    "noKeys": "No lookup keys.",
+    "fullDesc": "The DreamFactory administrator can create any number of 'key, value' pairs attached to a role. The key values are automatically substituted on the server. For example, key names can be used in the username and password fields required to hook up a SQL or NoSQL database. They can also be used in Email Templates or as parameters for external REST services. Any Lookup Key can be marked as private, and in this case the key value is securely ncrypted on the server and is no longer accessible through the platform interface. Lookup keys for service configuration and credentials must be made private.",
+    "alert": {
+      "createSuccess": "Lookup keys created successfully.",
+      "updateSuccess": "Lookup keys updated successfully."
+    }
   }
 }
