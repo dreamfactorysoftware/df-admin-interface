@@ -11,7 +11,7 @@ import {
 import { URLS } from '../constants/urls';
 import { SHOW_LOADING_HEADER } from '../constants/http-headers';
 import { DfUserDataService } from './df-user-data.service';
-import { Environment } from 'src/app/shared/types/system';
+import { AccountStatus, Environment } from 'src/app/shared/types/system';
 
 @Injectable({
   providedIn: 'root',
@@ -63,5 +63,13 @@ export class DfSystemConfigDataService {
         }),
         retry(1)
       );
+  }
+
+  fetchAccountStatus() {
+    return this.http.get<AccountStatus>(URLS.SUBSCRIPTION_DATA).pipe(
+      catchError(err => {
+        return throwError(() => new Error(err));
+      })
+    );
   }
 }

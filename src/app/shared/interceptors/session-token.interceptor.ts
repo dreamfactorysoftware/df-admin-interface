@@ -26,6 +26,12 @@ export const sessionTokenInterceptor: HttpInterceptorFn = (
         },
       });
     }
+  } else if (req.url === 'https://updates.dreamfactory.com/check') {
+    req = req.clone({
+      setHeaders: {
+        'X-Dreamfactory-License-Key': environment.dfApiKey,
+      },
+    });
   }
   return next(req);
 };

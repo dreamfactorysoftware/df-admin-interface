@@ -2,6 +2,7 @@ export const BASE_URL = '/api/v2';
 
 export enum URLS {
   GITHUB_REPO = 'https://api.github.com/repos',
+  SUBSCRIPTION_DATA = 'https://updates.dreamfactory.com/check',
   SYSTEM = `${BASE_URL}/system`,
   ENVIRONMENT = `${BASE_URL}/system/environment`,
   USER_SESSION = `${BASE_URL}/user/session`,

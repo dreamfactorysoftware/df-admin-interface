@@ -23,3 +23,10 @@ export interface System {
   services: Array<Service>;
   serviceTypes: Array<ServiceType>;
 }
+
+export interface AccountStatus {
+  status_code: string;
+  msg: string;
+  renewal_date: string;
+  disable_ui: string;
+}

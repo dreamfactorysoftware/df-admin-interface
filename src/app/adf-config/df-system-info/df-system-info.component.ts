@@ -5,6 +5,7 @@ import { DfBreakpointService } from '../../shared/services/df-breakpoint.service
 import { TranslocoPipe } from '@ngneat/transloco';
 import { Client, Php, Platform, Server } from '../../shared/types/config';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { AccountStatus } from 'src/app/shared/types/system';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-system-info',
@@ -18,6 +19,7 @@ export class DfSystemInfoComponent implements OnInit {
   server: Server;
   client: Client;
   php: Php;
+  subscriptionData: AccountStatus;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -33,6 +35,7 @@ export class DfSystemInfoComponent implements OnInit {
         phpVersion: data?.data.php.core.phpVersion,
         serverApi: data?.data.php.general.serverApi,
       };
+      this.subscriptionData = data?.subscriptionData;
     });
   }
 }

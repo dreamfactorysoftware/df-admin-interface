@@ -5,3 +5,8 @@ export const DfSystemInfoResolver: ResolveFn<any> = () => {
   const systemService = inject(DfSystemConfigDataService);
   return systemService.environment;
 };
+
+export const DfAccountStatusResolver: ResolveFn<any> = () => {
+  const systemService = inject(DfSystemConfigDataService);
+  return systemService.fetchAccountStatus();
+};
