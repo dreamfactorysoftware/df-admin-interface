@@ -20,7 +20,10 @@ import { DfPasswordService } from './adf-user-management/services/df-password.se
 import { profileResolver } from './adf-profile/resolvers/profile.resolver';
 import { corsConfigResolver } from './adf-config/resolvers/df-cors-config.resolver';
 import { schedulerResolver } from './adf-scheduler/resolvers/scheduler.resolver';
-import { DfSystemInfoResolver } from './adf-config/resolvers/df-system-info.resolver';
+import {
+  DfAccountStatusResolver,
+  DfSystemInfoResolver,
+} from './adf-config/resolvers/df-system-info.resolver';
 import { DfCacheResolver } from './adf-config/resolvers/df-cache.resolver';
 import { apiDocResolver } from './adf-api-docs/resolvers/api-docs.resolver';
 import {
@@ -348,6 +351,7 @@ export const routes: Routes = [
               ).then(m => m.DfSystemInfoComponent),
             resolve: {
               data: DfSystemInfoResolver,
+              subscriptionData: DfAccountStatusResolver,
             },
             providers: [provideTranslocoScope('systemInfo')],
           },
