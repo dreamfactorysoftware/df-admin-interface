@@ -289,16 +289,22 @@
       "schema": {
         "nav": "Schema",
         "header": "{{nav.admin-settings.schema.nav}}",
-        "fields": {
-          "nav": "Update Schema Field",
-          "header": "Create Schema Field",
-          "name": {
-            "header": "{{nav.admin-settings.schema.fields.nav}}"
+        "name": {
+          "create": {
+            "header": "Create a new table"
+          },
+          "id": {
+            "fields": {
+              "create": {
+                "header": "Create a new field"
+              }
+            },
+            "relationships": {
+              "create": {
+                "header": "Create a new relationship"
+              }
+            }
           }
-        },
-        "create": {
-          "nav": "Create a table",
-          "header": "{{nav.admin-settings.schema.create.nav}}"
         }
       },
       "users": {

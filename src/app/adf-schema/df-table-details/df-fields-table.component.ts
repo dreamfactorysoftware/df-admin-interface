@@ -131,7 +131,7 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
   filterQuery = getFilterQuery();
 
   override createRow(): void {
-    this.router.navigate([ROUTES.FIELDS], {
+    this.router.navigate([ROUTES.FIELDS, ROUTES.CREATE], {
       relativeTo: this._activatedRoute,
     });
   }

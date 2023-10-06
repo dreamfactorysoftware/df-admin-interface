@@ -43,7 +43,17 @@
     <mat-sidenav-content class="sidenav-content">
       <ng-container *ngIf="isLoggedIn$ | async">
         <div class="banner" *ngIf="(hasError$ | async) === false">
-          <h1 class="page-header">{{ pageHeader() | transloco }}</h1>
+          <h1 class="page-header">
+            <ng-container *ngFor="let breadcrumb of breadCrumbs; index as i">
+              <ng-container *ngIf="breadcrumb.translationKey; else label">
+                <span>{{ breadcrumb.translationKey | transloco }}</span>
+              </ng-container>
+              <ng-template #label>
+                <span>{{ breadcrumb.label }}</span>
+              </ng-template>
+              <span *ngIf="i !== breadCrumbs.length - 1"> / </span>
+            </ng-container>
+          </h1>
         </div>
       </ng-container>
       <div class="main" [class.no-error]="(hasError$ | async) === false">

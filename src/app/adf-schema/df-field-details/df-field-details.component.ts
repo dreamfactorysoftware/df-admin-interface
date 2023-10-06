@@ -353,7 +353,7 @@ export class DfFieldDetailsComponent implements OnInit {
   }
 
   onCancel() {
-    this.router.navigate(['../'], {
+    this.router.navigate(['../../'], {
       relativeTo: this.activatedRoute,
     });
   }

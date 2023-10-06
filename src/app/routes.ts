@@ -585,14 +585,6 @@ export const routes: Routes = [
                     data: { type: 'create' },
                   },
                   {
-                    path: ROUTES.FIELDS,
-                    loadComponent: () =>
-                      import(
-                        './adf-schema/df-field-details/df-field-details.component'
-                      ).then(m => m.DfFieldDetailsComponent),
-                    data: { type: 'create' },
-                  },
-                  {
                     path: ':fieldName',
                     loadComponent: () =>
                       import(
@@ -616,44 +608,64 @@ export const routes: Routes = [
                   },
                   {
                     path: ROUTES.FIELDS,
-                    loadComponent: () =>
-                      import(
-                        './adf-schema/df-field-details/df-field-details.component'
-                      ).then(m => m.DfFieldDetailsComponent),
-                    data: { type: 'create' },
-                  },
-                  {
-                    path: `${ROUTES.FIELDS}/:fieldName`,
-                    loadComponent: () =>
-                      import(
-                        './adf-schema/df-field-details/df-field-details.component'
-                      ).then(m => m.DfFieldDetailsComponent),
-                    data: { type: 'edit' },
+                    children: [
+                      {
+                        path: '',
+                        redirectTo: ROUTES.CREATE,
+                        pathMatch: 'full',
+                      },
+                      {
+                        path: ROUTES.CREATE,
+                        loadComponent: () =>
+                          import(
+                            './adf-schema/df-field-details/df-field-details.component'
+                          ).then(m => m.DfFieldDetailsComponent),
+                        data: { type: 'create' },
+                      },
+                      {
+                        path: ':fieldName',
+                        loadComponent: () =>
+                          import(
+                            './adf-schema/df-field-details/df-field-details.component'
+                          ).then(m => m.DfFieldDetailsComponent),
+                        data: { type: 'edit' },
+                      },
+                    ],
                   },
                   {
                     path: ROUTES.RELATIONSHIPS,
-                    loadComponent: () =>
-                      import(
-                        './adf-schema/df-relationship-details/df-relationship-details.component'
-                      ).then(m => m.DfRelationshipDetailsComponent),
-                    resolve: {
-                      fields: DfTableFieldResolver,
-                      services: servicesResolver(0),
-                    },
-                    data: { type: 'create' },
-                  },
-                  {
-                    path: `${ROUTES.RELATIONSHIPS}/:relName`,
-                    loadComponent: () =>
-                      import(
-                        './adf-schema/df-relationship-details/df-relationship-details.component'
-                      ).then(m => m.DfRelationshipDetailsComponent),
-                    resolve: {
-                      data: DfTableRelationshipsEditResolver,
-                      fields: DfTableFieldResolver,
-                      services: servicesResolver(0),
-                    },
-                    data: { type: 'edit' },
+                    children: [
+                      {
+                        path: '',
+                        redirectTo: ROUTES.CREATE,
+                        pathMatch: 'full',
+                      },
+                      {
+                        path: ROUTES.CREATE,
+                        loadComponent: () =>
+                          import(
+                            './adf-schema/df-relationship-details/df-relationship-details.component'
+                          ).then(m => m.DfRelationshipDetailsComponent),
+                        resolve: {
+                          fields: DfTableFieldResolver,
+                          services: servicesResolver(0),
+                        },
+                        data: { type: 'create' },
+                      },
+                      {
+                        path: ':relName',
+                        loadComponent: () =>
+                          import(
+                            './adf-schema/df-relationship-details/df-relationship-details.component'
+                          ).then(m => m.DfRelationshipDetailsComponent),
+                        resolve: {
+                          data: DfTableRelationshipsEditResolver,
+                          fields: DfTableFieldResolver,
+                          services: servicesResolver(0),
+                        },
+                        data: { type: 'edit' },
+                      },
+                    ],
                   },
                 ],
               },

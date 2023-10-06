@@ -51,7 +51,7 @@
       <input matInput formControlName="description" />
     </mat-form-field>
 
-    <div class="full-width">
+    <div class="full-width" *ngIf="type === 'edit'">
       <h2>{{ 'schema.fields' | transloco }}</h2>
       <df-fields-table [tableData]="tableFields"></df-fields-table>
     </div>

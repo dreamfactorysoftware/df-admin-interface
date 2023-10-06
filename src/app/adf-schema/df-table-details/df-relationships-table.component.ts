@@ -103,7 +103,7 @@ export class DfRelationshipsTableComponent extends DfManageTableComponent<Relati
   filterQuery = getFilterQuery();
 
   override createRow(): void {
-    this.router.navigate([ROUTES.RELATIONSHIPS], {
+    this.router.navigate([ROUTES.RELATIONSHIPS, ROUTES.CREATE], {
       relativeTo: this._activatedRoute,
     });
   }

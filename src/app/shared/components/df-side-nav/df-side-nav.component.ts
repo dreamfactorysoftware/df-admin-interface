@@ -12,7 +12,7 @@ import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.servi
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 import { faAngleDown, faBars } from '@fortawesome/free-solid-svg-icons';
 import { routes } from 'src/app/routes';
-import { transformRoutes } from '../../utilities/route';
+import { generateBreadcrumb, transformRoutes } from '../../utilities/route';
 import { Nav } from '../../types/nav';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
@@ -69,13 +69,7 @@ export class DfSideNavComponent {
     return `nav.${segments}.nav`;
   }
 
-  pageHeader() {
-    const url = this.router.url.replace('/', '');
-    if (!url) return;
-    const segments = url.split('/');
-    if (/^[+-]?\d+$/.test(segments[segments.length - 1])) {
-      segments.pop();
-    }
-    return `nav.${segments.join('.')}.header`;
+  get breadCrumbs() {
+    return generateBreadcrumb(routes, this.router.url);
   }
 }

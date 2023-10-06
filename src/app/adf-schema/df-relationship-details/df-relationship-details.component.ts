@@ -298,7 +298,7 @@ export class DfRelationshipDetailsComponent implements OnInit {
 
   goBack() {
     if (this.type === 'create') {
-      this.router.navigate(['../'], {
+      this.router.navigate(['../../'], {
         relativeTo: this.activatedRoute,
       });
     } else if (this.type === 'edit') {
