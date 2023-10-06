@@ -143,6 +143,7 @@ export class DfRolesAccessComponent implements OnInit {
     // "GET requests without a resource are not currently supported by the 'email' service."
     if (service === 'email') {
       this.componentOptions.push({ serviceId, components: ['*'] });
+      return;
     }
 
     if (
