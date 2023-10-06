@@ -32,9 +32,8 @@ export class DfCacheComponent {
   ) {}
 
   flushSystemCache() {
-    // TODO move text to en.json
     this.cacheService
-      .delete('system', { snackbarSuccess: 'System-wide cache flushed.' })
+      .delete('system', { snackbarSuccess: 'cache.systemCacheFlushed' })
       .subscribe();
   }
 }
