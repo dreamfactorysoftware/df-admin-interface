@@ -90,10 +90,12 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
     const data: CreateAdmin = {
       ...this.userForm.value.profileDetailsGroup,
       isActive: this.userForm.value.isActive,
-      accessByTabs: this.tabs.controls
-        .filter(c => c.value.checked)
-        .map(c => c.value.name),
-      isRestrictedAdmin: this.tabs.controls.some(c => !c.value.checked),
+      accessByTabs: this.tabs
+        ? this.tabs.controls.filter(c => c.value.checked).map(c => c.value.name)
+        : [],
+      isRestrictedAdmin: this.tabs
+        ? this.tabs.controls.some(c => !c.value.checked)
+        : false,
       lookupByUserId: this.userForm.value.lookupKeys,
     };
     if (this.type === 'create') {
@@ -121,7 +123,7 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
           })
         )
         .subscribe(() => {
-          this.router.navigate([ROUTES.ADMINS]);
+          this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.ADMINS]);
         });
     } else {
       if (this.userForm.value.setPassword) {
@@ -137,7 +139,9 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
             return throwError(() => new Error(err));
           })
         )
-        .subscribe();
+        .subscribe(() => {
+          this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.ADMINS]);
+        });
     }
   }
 }

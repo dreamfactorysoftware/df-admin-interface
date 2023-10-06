@@ -207,11 +207,11 @@
     </mat-error>
   </mat-form-field>
 
-  <div class="full-width">
+  <div class="full-width action-bar">
     <button mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
-    <button mat-flat-button color="primary" type="submit">
+    <button mat-flat-button color="primary">
       <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
       <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
     </button>

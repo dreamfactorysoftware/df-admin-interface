@@ -251,11 +251,11 @@
     </mat-card>
   </div>
   <!-- submit -->
-  <div style="width: 100%">
+  <div class="full-width action-bar">
     <button mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
-    <button mat-flat-button color="primary" type="submit">
+    <button mat-flat-button color="primary">
       <span *ngIf="editApp">{{ 'save' | transloco }}</span>
       <span *ngIf="!editApp">{{ 'create' | transloco }}</span>
     </button>

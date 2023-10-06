@@ -82,14 +82,21 @@ export class DfGlobalLookupKeysComponent implements OnInit {
 
     if (createKeys.length > 0) {
       this.crudService
-        .create({ resource: createKeys }, { fields: '*' })
+        .create(
+          { resource: createKeys },
+          { fields: '*', snackbarSuccess: 'lookupKeys.alerts.createSuccess' }
+        )
         .subscribe();
     }
 
     if (updateKeys.length > 0) {
       updateKeys.forEach((item: LookupKeyType) => {
         if (item.id) {
-          this.crudService.update(item.id, item).subscribe();
+          this.crudService
+            .update(item.id, item, {
+              snackbarSuccess: 'lookupKeys.alerts.updateSuccess',
+            })
+            .subscribe();
         }
       });
     }

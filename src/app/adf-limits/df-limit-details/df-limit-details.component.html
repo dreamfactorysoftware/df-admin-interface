@@ -4,7 +4,7 @@
   (alertClosed)="showAlert = false"
   >{{ alertMsg }}</df-alert
 >
-<form [formGroup]="formGroup" class="details-section">
+<form [formGroup]="formGroup" class="details-section" (ngSubmit)="onSubmit()">
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>{{ 'limits.name' | transloco }}</mat-label>
     <input matInput type="text" formControlName="limitName" />
@@ -89,11 +89,11 @@
       'limits.active' | transloco
     }}</mat-slide-toggle>
   </ng-container>
-  <div class="full-width">
-    <button mat-flat-button (click)="onCancel()">
+  <div class="full-width action-bar">
+    <button type="button" mat-flat-button (click)="onCancel()">
       {{ 'cancel' | transloco }}
     </button>
-    <button mat-flat-button color="primary" (click)="onSubmit()">
+    <button mat-flat-button color="primary">
       {{ 'save' | transloco }}
     </button>
   </div>

@@ -5,7 +5,7 @@
   <form
     [formGroup]="emailTemplateForm"
     (ngSubmit)="onSubmit()"
-    class="form-container details-section">
+    class="details-section">
     <mat-form-field class="dynamic-width">
       <mat-label>{{
         'emailTemplates.templateName.label' | transloco
@@ -35,17 +35,17 @@
         }}" />
     </mat-form-field>
 
-    <mat-form-field class="flex-33">
+    <mat-form-field class="third-width">
       <mat-label>{{ 'emailTemplates.recipient.label' | transloco }}</mat-label>
       <input matInput formControlName="to" />
     </mat-form-field>
 
-    <mat-form-field class="flex-33">
+    <mat-form-field class="third-width">
       <mat-label>{{ 'emailTemplates.cc.label' | transloco }}</mat-label>
       <input matInput formControlName="cc" />
     </mat-form-field>
 
-    <mat-form-field class="flex-33">
+    <mat-form-field class="third-width">
       <mat-label>{{ 'emailTemplates.bcc.label' | transloco }}</mat-label>
       <input matInput formControlName="bcc" />
     </mat-form-field>
@@ -123,11 +123,11 @@
         }}" />
     </mat-form-field>
 
-    <div>
+    <div class="full-width action-bar">
       <button mat-flat-button type="button" (click)="goBack()">
         {{ 'cancel' | transloco }}
       </button>
-      <button mat-flat-button color="primary" type="submit">
+      <button mat-flat-button color="primary">
         <span *ngIf="editApp">{{ 'update' | transloco }}</span>
         <span *ngIf="!editApp">{{ 'save' | transloco }}</span>
       </button>
