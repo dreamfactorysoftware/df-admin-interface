@@ -86,7 +86,7 @@
                     multiple
                     panelWidth="null"
                     (selectionChange)="accessChange(i, $event.value)">
-                    <mat-option [value]="0" checked>All</mat-option>
+                    <!-- <mat-option [value]="0" checked>All</mat-option> -->
                     <mat-option
                       *ngFor="let option of accessOptions"
                       [value]="option.value">

@@ -98,12 +98,45 @@ export class DfTableDetailsComponent implements OnInit {
   save() {
     if (this.tableDetailsForm.invalid) return;
 
-    const data = this.tableDetailsForm.value;
-    const payload = {
-      resource: [data],
-    };
-
     if (this.type === 'create') {
+      const data = this.tableDetailsForm.value;
+      data.field = [
+        {
+          alias: null,
+          name: 'id',
+          label: 'Id',
+          description: null,
+          native: [],
+          type: 'id',
+          dbType: null,
+          length: null,
+          precision: null,
+          scale: null,
+          default: null,
+          required: false,
+          allowNull: false,
+          fixedLength: false,
+          supportsMultibyte: false,
+          autoIncrement: true,
+          isPrimaryKey: false,
+          isUnique: false,
+          isIndex: false,
+          isForeignKey: false,
+          refTable: null,
+          refField: null,
+          refOnUpdate: null,
+          refOnDelete: null,
+          picklist: null,
+          validation: null,
+          dbFunction: null,
+          isVirtual: false,
+          isAggregate: false,
+        },
+      ];
+      const payload = {
+        resource: [data],
+      };
+
       this.crudService
         .create(
           payload,
@@ -114,14 +147,20 @@ export class DfTableDetailsComponent implements OnInit {
           `${this.dbName}/_schema`
         )
         .subscribe(() => {
-          this.goBack();
+          this.router.navigate(['../', this.tableDetailsForm.value.name], {
+            relativeTo: this.activatedRoute,
+          });
         });
     } else if (this.type === 'edit') {
       const tableName = this.tableDetailsForm.get('name')?.value;
       this.crudService
-        .patch(`${this.dbName}/_schema/${tableName}`, data, {
-          snackbarSuccess: 'schema.alerts.updateSuccess',
-        })
+        .patch(
+          `${this.dbName}/_schema/${tableName}`,
+          { resource: [this.tableDetailsForm.getRawValue()] },
+          {
+            snackbarSuccess: 'schema.alerts.updateSuccess',
+          }
+        )
         .subscribe(() => {
           this.goBack();
         });
