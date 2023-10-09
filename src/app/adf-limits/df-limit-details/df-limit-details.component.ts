@@ -27,11 +27,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { DfAlertComponent } from '../../shared/components/df-alert/df-alert.component';
 import { LIMIT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import {
-  TranslocoDirective,
-  TranslocoPipe,
-  TranslocoService,
-} from '@ngneat/transloco';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
 @UntilDestroy({ checkProperties: true })
@@ -51,36 +47,11 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     NgIf,
     MatSlideToggleModule,
     MatButtonModule,
-    TranslocoDirective,
     TranslocoPipe,
     DfVerbPickerComponent,
   ],
 })
 export class DfLimitComponent implements OnInit {
-  limitTypes = [
-    { value: 'instance', name: 'Instance' },
-    { value: 'instance.user', name: 'User' },
-    { value: 'instance.each_user', name: 'Each User' },
-    { value: 'instance.service', name: 'Service' },
-    { value: 'instance.role', name: 'Role' },
-    { value: 'instance.user.service', name: 'Service by User' },
-    { value: 'instance.each_user.service', name: 'Service by Each User' },
-    { value: 'instance.service.endpoint', name: 'Endpoint' },
-    { value: 'instance.user.service.endpoint', name: 'Endpoint by User' },
-    {
-      value: 'instance.each_user.service.endpoint',
-      name: 'Endpoint by Each User',
-    },
-  ];
-
-  limitPeriods = [
-    { value: 'minute', name: 'Minute' },
-    { value: 'hour', name: 'Hour' },
-    { value: 'day', name: 'Day' },
-    { value: '7-day', name: 'Week' },
-    { value: '30-day', name: '30 Days' },
-  ];
-
   formGroup: FormGroup;
 
   isEditMode = false;
@@ -108,13 +79,13 @@ export class DfLimitComponent implements OnInit {
     this.formGroup = this.formBuilder.group({
       limitName: ['', Validators.required],
       description: [''],
-      limitType: [this.limitTypes[0].value, Validators.required],
+      limitType: ['instance', Validators.required],
       serviceId: [],
       roleId: [],
       userId: [],
       endpoint: [],
       limitRate: [null, Validators.required],
-      limitPeriod: [this.limitPeriods[0].value, Validators.required],
+      limitPeriod: ['minute', Validators.required],
       verb: [],
       active: [true],
     });
@@ -161,7 +132,7 @@ export class DfLimitComponent implements OnInit {
 
     if (this.type === 'create') {
       this.removeFormField();
-      this.renderCorrectHiddenFields(this.limitTypes[0].value);
+      this.renderCorrectHiddenFields('instance');
     }
 
     this.activatedRoute.data.subscribe(data => {

@@ -174,7 +174,7 @@ export class DfAppDetailsComponent implements OnInit {
     navigator.clipboard
       .writeText(this.editApp.apiKey)
       .then()
-      .catch(error => console.error('Failed to copy to clipboard:', error));
+      .catch(error => console.error(error));
   }
 
   copyAppUrl() {
@@ -182,7 +182,7 @@ export class DfAppDetailsComponent implements OnInit {
     navigator.clipboard
       .writeText(url)
       .then()
-      .catch(error => console.error('Failed to copy to clipboard:', error));
+      .catch(error => console.error(error));
   }
 
   goBack() {

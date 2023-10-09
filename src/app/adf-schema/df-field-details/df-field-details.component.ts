@@ -64,7 +64,7 @@ export class DfFieldDetailsComponent implements OnInit {
   tableName: string;
 
   typeDropdownMenuOptions = [
-    'I will manually enter a type',
+    'I will manually enter a type', // TODO: translate
     'id',
     'string',
     'integer',

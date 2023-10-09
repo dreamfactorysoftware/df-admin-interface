@@ -27,8 +27,35 @@
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>{{ 'limits.limitType' | transloco }}</mat-label>
     <mat-select formControlName="limitType">
-      <mat-option *ngFor="let limitType of limitTypes" [value]="limitType.value"
-        >{{ limitType.name }}
+      <mat-option value="instance"
+        >{{ 'limits.limitTypes.instance' | transloco }}
+      </mat-option>
+      <mat-option value="instance.user"
+        >{{ 'limits.limitTypes.user' | transloco }}
+      </mat-option>
+      <mat-option value="instance.each_user"
+        >{{ 'limits.limitTypes.eachUser' | transloco }}
+      </mat-option>
+      <mat-option value="instance.service"
+        >{{ 'limits.limitTypes.service' | transloco }}
+      </mat-option>
+      <mat-option value="instance.role"
+        >{{ 'limits.limitTypes.role' | transloco }}
+      </mat-option>
+      <mat-option value="instance.user.service"
+        >{{ 'limits.limitTypes.serviceByUser' | transloco }}
+      </mat-option>
+      <mat-option value="instance.each_user.service"
+        >{{ 'limits.limitTypes.serviceByEachUser' | transloco }}
+      </mat-option>
+      <mat-option value="instance.service.endpoint"
+        >{{ 'limits.limitTypes.endpoint' | transloco }}
+      </mat-option>
+      <mat-option value="instance.user.service.endpoint"
+        >{{ 'limits.limitTypes.endpointByUser' | transloco }}
+      </mat-option>
+      <mat-option value="instance.each_user.service.endpoint"
+        >{{ 'limits.limitTypes.endpointByEachUser' | transloco }}
       </mat-option>
     </mat-select>
   </mat-form-field>
@@ -77,10 +104,20 @@
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>{{ 'limits.limitPeriod' | transloco }}</mat-label>
     <mat-select formControlName="limitPeriod">
-      <mat-option
-        *ngFor="let limitPeriod of limitPeriods"
-        [value]="limitPeriod.value"
-        >{{ limitPeriod.name }}
+      <mat-option value="minute"
+        >{{ 'limits.limitPeriods.minute' | transloco }}
+      </mat-option>
+      <mat-option value="hour"
+        >{{ 'limits.limitPeriods.hour' | transloco }}
+      </mat-option>
+      <mat-option value="day"
+        >{{ 'limits.limitPeriods.day' | transloco }}
+      </mat-option>
+      <mat-option value="7-day"
+        >{{ 'limits.limitPeriods.week' | transloco }}
+      </mat-option>
+      <mat-option value="30-day"
+        >{{ 'limits.limitPeriods.30Days' | transloco }}
       </mat-option>
     </mat-select>
   </mat-form-field>
