@@ -12,7 +12,9 @@
     "lint": "ng lint",
     "lint:fix": "ng lint --fix",
     "prettier": "npx prettier --write .",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "i18n:extract": "transloco-keys-manager extract",
+    "i18n:find": "transloco-keys-manager find"
   },
   "private": true,
   "dependencies": {
@@ -48,6 +50,7 @@
     "@angular-eslint/template-parser": "16.1.0",
     "@angular/cli": "~16.1.6",
     "@angular/compiler-cli": "^16.1.0",
+    "@ngneat/transloco-keys-manager": "^3.8.0",
     "@types/jest": "^29.5.3",
     "@types/swagger-ui": "^3.52.0",
     "@typescript-eslint/eslint-plugin": "5.62.0",
@@ -59,6 +62,7 @@
     "jest": "^29.6.2",
     "jest-environment-jsdom": "^29.6.2",
     "jest-preset-angular": "^13.1.1",
+    "ngx-build-plus": "^16.0.0",
     "prettier": "^3.0.0",
     "prettier-eslint": "^15.0.1",
     "typescript": "~5.1.3"

@@ -1,3 +1,8 @@
+import {
+  API_KEY_HEADER,
+  SESSION_TOKEN_HEADER,
+} from 'src/app/shared/constants/http-headers';
+
 export const mockApiDocsData = {
   openapi: '3.0.0',
   servers: [{ url: '/api/v2/email', description: '' }],
@@ -9,7 +14,7 @@ export const mockApiDocsData = {
       ApiKeyHeader: {
         type: 'apiKey',
         in: 'header',
-        name: 'X-DreamFactory-API-Key',
+        name: API_KEY_HEADER,
       },
       SessionTokenQuery: {
         type: 'apiKey',
@@ -19,7 +24,7 @@ export const mockApiDocsData = {
       SessionTokenHeader: {
         type: 'apiKey',
         in: 'header',
-        name: 'X-DreamFactory-Session-Token',
+        name: SESSION_TOKEN_HEADER,
       },
     },
     responses: {

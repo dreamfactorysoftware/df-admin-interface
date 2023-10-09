@@ -1,3 +1,6 @@
+export const SESSION_TOKEN_HEADER = 'X-DreamFactory-Session-Token';
+export const API_KEY_HEADER = 'X-DreamFactory-API-Key';
+
 export const SHOW_LOADING_HEADER = {
   'show-loading': '',
 };

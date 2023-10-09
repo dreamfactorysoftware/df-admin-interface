@@ -12,6 +12,8 @@ import { TranslocoModule } from '@ngneat/transloco';
 import { ROUTES } from 'src/app/shared/constants/routes';
 import { saveRawAsFile } from 'src/app/shared/utilities/file';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
+import { SESSION_TOKEN_HEADER } from 'src/app/shared/constants/http-headers';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -30,7 +32,8 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
 
   constructor(
     private activatedRoute: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private userDataService: DfUserDataService
   ) {}
 
   ngOnInit(): void {
@@ -44,6 +47,11 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
     SwaggerUI({
       spec: apiDocumentation,
       domNode: this.apiDocElement?.nativeElement,
+      requestInterceptor: (req: SwaggerUI.Request) => {
+        req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
+        return req;
+      },
+      showMutatedRequest: true,
     });
   }
 
