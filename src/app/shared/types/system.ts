@@ -10,12 +10,46 @@ export interface Environment {
     oauth: Array<AuthService>;
     saml: Array<AuthService>;
   };
-  platform: {
-    rootAdminExists: boolean;
-    host?: string;
+  platform?: {
+    version: string;
+    bitnamiDemo: boolean;
+    isHosted: boolean;
+    isTrial: boolean;
+    license: string;
+    securedPackageExport: boolean;
+    licenseKey: string;
+    dbDriver: string;
+    installPath: string;
+    logPath: string;
+    appDebug: boolean;
+    logMode: string;
+    logLevel: string;
+    cacheDriver: string;
+    packages: Array<{
+      name: string;
+      version: string;
+    }>;
+    dfInstanceId: string;
   };
   server: {
     host: string;
+    machine: string;
+    release: string;
+    serverOs: string;
+    version: string;
+  };
+  php?: {
+    core: {
+      phpVersion: string;
+    };
+    general: {
+      serverApi: string;
+    };
+  };
+  client?: {
+    userAgent: string;
+    ipAddress: string;
+    locale: string;
   };
 }
 

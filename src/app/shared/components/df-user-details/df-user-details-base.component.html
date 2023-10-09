@@ -149,10 +149,10 @@
     [roles]="roles"></df-user-app-roles>
   <df-lookup-keys formArrayName="lookupKeys"></df-lookup-keys>
   <div class="full-width action-bar">
-    <button mat-flat-button type="buton" [routerLink]="cancelRoute">
+    <button mat-flat-button type="button" [routerLink]="cancelRoute">
       {{ 'cancel' | transloco }}
     </button>
-    <button mat-flat-button color="primary">
+    <button mat-flat-button color="primary" type="submit">
       {{ 'save' | transloco }}
     </button>
   </div>

@@ -10,58 +10,58 @@
       <ul>
         <li>
           {{ 'systemInfo.instance.licenseLevel' | transloco }}:
-          {{ platform.license }}
+          {{ environment.platform?.license }}
         </li>
         <li>
           {{ 'systemInfo.instance.licenseKey' | transloco }}:
-          {{ platform.licenseKey }}
+          {{ environment.platform?.licenseKey }}
         </li>
         <li>
           {{ 'systemInfo.instance.subscriptionStatus' | transloco }}:
-          {{ subscriptionData.msg }}
+          {{ status.msg }}
         </li>
 
         <li>
           {{ 'systemInfo.instance.subscriptionExpirationDate' | transloco }}:
-          {{ subscriptionData.renewal_date }}
+          {{ status.renewalDate }}
         </li>
         <li>
           DreamFactory
           {{ 'version' | transloco }}:
-          {{ platform.version }}
+          {{ environment.platform?.version }}
         </li>
         <li>
           {{ 'systemInfo.instance.systemDatabase' | transloco }}:
-          {{ platform.dbDriver }}
+          {{ environment.platform?.dbDriver }}
         </li>
         <li>
           {{ 'systemInfo.instance.installPath' | transloco }}:
-          {{ platform.installPath }}
+          {{ environment.platform?.installPath }}
         </li>
         <li>
           {{ 'systemInfo.instance.logPath' | transloco }}:
-          {{ platform.logPath }}
+          {{ environment.platform?.logPath }}
         </li>
         <li>
           {{ 'systemInfo.instance.logMode' | transloco }}:
-          {{ platform.logMode }}
+          {{ environment.platform?.logMode }}
         </li>
         <li>
           {{ 'systemInfo.instance.logLevel' | transloco }}:
-          {{ platform.logLevel }}
+          {{ environment.platform?.logLevel }}
         </li>
         <li>
           {{ 'systemInfo.instance.cacheDriver' | transloco }}:
-          {{ platform.cacheDriver }}
+          {{ environment.platform?.cacheDriver }}
         </li>
         <li>
           {{ 'systemInfo.instance.demo' | transloco }}:
-          {{ platform.isTrial }}
+          {{ environment.platform?.isTrial }}
         </li>
         <li>
           DreamFactory
           {{ 'systemInfo.instance.instanceId' | transloco }}:
-          {{ platform.dfInstanceId }}
+          {{ environment.platform?.dfInstanceId }}
         </li>
       </ul>
     </div>
@@ -73,7 +73,7 @@
       </div>
       <div class="overflow-scroll">
         <ul>
-          <li *ngFor="let package of platform.packages">
+          <li *ngFor="let package of environment.platform?.packages">
             <span>{{ package.name }}</span>
             <span>{{ package.version }}</span>
           </li>
@@ -84,19 +84,29 @@
   <h2>{{ 'systemInfo.server.heading' | transloco }}</h2>
   <div class="system-info-server">
     <ul>
-      <li>{{ 'systemInfo.server.os' | transloco }}: {{ server.serverOs }}</li>
       <li>
-        {{ 'systemInfo.server.release' | transloco }}: {{ server.release }}
+        {{ 'systemInfo.server.os' | transloco }}:
+        {{ environment.server.serverOs }}
       </li>
-      <li>{{ 'version' | transloco }}: {{ server.version }}</li>
-      <li>{{ 'systemInfo.server.host' | transloco }}: {{ server.host }}</li>
       <li>
-        {{ 'systemInfo.server.machine' | transloco }}: {{ server.machine }}
+        {{ 'systemInfo.server.release' | transloco }}:
+        {{ environment.server.release }}
       </li>
-      <li>PHP {{ 'version' | transloco }}: {{ php.phpVersion }}</li>
+      <li>{{ 'version' | transloco }}: {{ environment.server.version }}</li>
+      <li>
+        {{ 'systemInfo.server.host' | transloco }}:
+        {{ environment.server.host }}
+      </li>
+      <li>
+        {{ 'systemInfo.server.machine' | transloco }}:
+        {{ environment.server.machine }}
+      </li>
+      <li>
+        PHP {{ 'version' | transloco }}: {{ environment.php?.core?.phpVersion }}
+      </li>
       <li>
         PHP {{ 'systemInfo.server.serverApi' | transloco }}:
-        {{ php.serverApi }}
+        {{ environment.php?.general?.serverApi }}
       </li>
     </ul>
   </div>
@@ -104,12 +114,17 @@
   <div class="system-info-client">
     <ul>
       <li>
-        {{ 'systemInfo.client.userAgent' | transloco }}: {{ client.userAgent }}
+        {{ 'systemInfo.client.userAgent' | transloco }}:
+        {{ environment.client?.userAgent }}
       </li>
       <li>
-        {{ 'systemInfo.client.ipAddress' | transloco }}: {{ client.ipAddress }}
+        {{ 'systemInfo.client.ipAddress' | transloco }}:
+        {{ environment.client?.ipAddress }}
       </li>
-      <li>{{ 'systemInfo.client.Locale' | transloco }}: {{ client.locale }}</li>
+      <li>
+        {{ 'systemInfo.client.Locale' | transloco }}:
+        {{ environment.client?.locale }}
+      </li>
     </ul>
   </div>
 </div>

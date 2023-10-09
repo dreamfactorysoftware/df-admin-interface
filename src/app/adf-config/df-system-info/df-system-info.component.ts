@@ -1,11 +1,11 @@
 import { AsyncPipe, NgFor } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
 import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { Client, Php, Platform, Server } from '../../shared/types/config';
 import { UntilDestroy } from '@ngneat/until-destroy';
-import { AccountStatus } from 'src/app/shared/types/system';
+import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
+import { ActivatedRoute } from '@angular/router';
+import { CheckResponse } from 'src/app/shared/types/check';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-system-info',
@@ -15,27 +15,18 @@ import { AccountStatus } from 'src/app/shared/types/system';
   imports: [AsyncPipe, NgFor, TranslocoPipe],
 })
 export class DfSystemInfoComponent implements OnInit {
-  platform: Platform;
-  server: Server;
-  client: Client;
-  php: Php;
-  subscriptionData: AccountStatus;
+  environment = this.systemConfigDataService.environment;
+  status: CheckResponse;
 
   constructor(
-    private activatedRoute: ActivatedRoute,
-    public breakpointService: DfBreakpointService
+    public breakpointService: DfBreakpointService,
+    private systemConfigDataService: DfSystemConfigDataService,
+    private activatedRoute: ActivatedRoute
   ) {}
 
-  ngOnInit(): void {
-    this.activatedRoute.data.subscribe((data: any) => {
-      this.platform = data?.data.platform;
-      this.server = data?.data.server;
-      this.client = data?.data.client;
-      this.php = {
-        phpVersion: data?.data.php.core.phpVersion,
-        serverApi: data?.data.php.general.serverApi,
-      };
-      this.subscriptionData = data?.subscriptionData;
+  ngOnInit() {
+    this.activatedRoute.data.subscribe(({ data }) => {
+      this.status = data;
     });
   }
 }

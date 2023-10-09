@@ -11,7 +11,7 @@ import {
 import { URLS } from '../constants/urls';
 import { SHOW_LOADING_HEADER } from '../constants/http-headers';
 import { DfUserDataService } from './df-user-data.service';
-import { AccountStatus, Environment } from 'src/app/shared/types/system';
+import { Environment } from 'src/app/shared/types/system';
 
 @Injectable({
   providedIn: 'root',
@@ -27,11 +27,12 @@ export class DfSystemConfigDataService {
       oauth: [],
       saml: [],
     },
-    platform: {
-      rootAdminExists: false,
-    },
     server: {
       host: '',
+      machine: '',
+      release: '',
+      serverOs: '',
+      version: '',
     },
   });
   environment$: Observable<Environment> =
@@ -63,13 +64,5 @@ export class DfSystemConfigDataService {
         }),
         retry(1)
       );
-  }
-
-  fetchAccountStatus() {
-    return this.http.get<AccountStatus>(URLS.SUBSCRIPTION_DATA).pipe(
-      catchError(err => {
-        return throwError(() => new Error(err));
-      })
-    );
   }
 }

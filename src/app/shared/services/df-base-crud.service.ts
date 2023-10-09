@@ -145,6 +145,7 @@ export class DfBaseCrudService {
   getOptions(options: Partial<RequestOptions>) {
     const headers: any = {};
     const params: any = {};
+    headers['Cache-Control'] = 'no-cache, private';
     if (options.showSpinner !== false) {
       headers['show-loading'] = '';
     }

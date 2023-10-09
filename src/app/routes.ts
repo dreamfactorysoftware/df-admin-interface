@@ -20,10 +20,6 @@ import { DfPasswordService } from './adf-user-management/services/df-password.se
 import { profileResolver } from './adf-profile/resolvers/profile.resolver';
 import { corsConfigResolver } from './adf-config/resolvers/df-cors-config.resolver';
 import { schedulerResolver } from './adf-scheduler/resolvers/scheduler.resolver';
-import {
-  DfAccountStatusResolver,
-  DfSystemInfoResolver,
-} from './adf-config/resolvers/df-system-info.resolver';
 import { DfCacheResolver } from './adf-config/resolvers/df-cache.resolver';
 import { apiDocResolver } from './adf-api-docs/resolvers/api-docs.resolver';
 import {
@@ -54,6 +50,7 @@ import {
 } from './adf-event-scripts/resolvers/scripts.resolver';
 import { eventsResolver } from './adf-event-scripts/resolvers/events.resolver';
 import { systemEventsResolver } from './adf-services/resolvers/system-events.resolver';
+import { checkStatusResolver } from './adf-config/resolvers/df-check-status.resolver';
 
 export const routes: Routes = [
   {
@@ -349,11 +346,10 @@ export const routes: Routes = [
               import(
                 './adf-config/df-system-info/df-system-info.component'
               ).then(m => m.DfSystemInfoComponent),
-            resolve: {
-              data: DfSystemInfoResolver,
-              subscriptionData: DfAccountStatusResolver,
-            },
             providers: [provideTranslocoScope('systemInfo')],
+            resolve: {
+              data: checkStatusResolver,
+            },
           },
           {
             path: ROUTES.CORS,
