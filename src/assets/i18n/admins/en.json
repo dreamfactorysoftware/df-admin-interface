@@ -18,7 +18,7 @@
     "api-docs": "{{nav.api-connections.api-docs.nav}}",
     "schema": "{{nav.admin-settings.schema.nav}}",
     "files": "{{files}}",
-    "scripts": "{{nav.api-connections.scripts.nav}}",
+    "scripts": "{{nav.api-connections.event-scripts.nav}}",
     "config": "{{nav.system-settings.config.nav}}",
     "package-manager": "Packages",
     "limits": "{{nav.api-security.rate-limiting.nav}}",

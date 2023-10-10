@@ -52,6 +52,8 @@ import { eventsResolver } from './adf-event-scripts/resolvers/events.resolver';
 import { systemEventsResolver } from './adf-services/resolvers/system-events.resolver';
 import { checkStatusResolver } from './adf-config/resolvers/df-check-status.resolver';
 import { licenseGuard } from './shared/guards/license.guard';
+import { errorGaurd } from './shared/guards/error.guard';
+import { paywallGuard } from './shared/guards/paywall.guard';
 
 export const routes: Routes = [
   {
@@ -65,6 +67,7 @@ export const routes: Routes = [
       import('./shared/components/df-error/df-error.component').then(
         m => m.DfErrorComponent
       ),
+    canActivate: [errorGaurd],
   },
   {
     path: ROUTES.AUTH,
@@ -226,8 +229,8 @@ export const routes: Routes = [
             path: '',
             loadComponent: () =>
               import(
-                './adf-event-scripts/df-manage-scripts/df-manage-scripts-table.component'
-              ).then(m => m.DfManageScriptsTableComponent),
+                './adf-event-scripts/df-manage-scripts/df-manage-scripts.component'
+              ).then(m => m.DfManageScriptsComponent),
             resolve: { data: eventScriptsResolver },
           },
           {
@@ -240,6 +243,7 @@ export const routes: Routes = [
               data: eventsResolver,
             },
             data: { type: 'create' },
+            canActivate: [paywallGuard(['script_Type', 'event_script'])],
           },
           {
             path: ':name',
@@ -251,6 +255,7 @@ export const routes: Routes = [
               data: eventScriptResolver,
             },
             data: { type: 'edit' },
+            canActivate: [paywallGuard(['script_Type', 'event_script'])],
           },
         ],
         providers: [provideTranslocoScope('scripts')],
@@ -305,7 +310,7 @@ export const routes: Routes = [
             loadComponent: () =>
               import(
                 './adf-limits/df-limit-details/df-limit-details.component'
-              ).then(m => m.DfLimitComponent),
+              ).then(m => m.DfLimitDetailsComponent),
             resolve: {
               data: limitsResolver(),
               users: usersResolver(0),
@@ -313,13 +318,14 @@ export const routes: Routes = [
               services: servicesResolver(0),
             },
             data: { type: 'create' },
+            canActivate: [paywallGuard('limit')],
           },
           {
             path: ':id',
             loadComponent: () =>
               import(
                 './adf-limits/df-limit-details/df-limit-details.component'
-              ).then(m => m.DfLimitComponent),
+              ).then(m => m.DfLimitDetailsComponent),
             resolve: {
               data: limitsResolver(),
               users: usersResolver(0),
@@ -327,6 +333,7 @@ export const routes: Routes = [
               services: servicesResolver(0),
             },
             data: { type: 'edit' },
+            canActivate: [paywallGuard('limit')],
           },
         ],
         providers: [provideTranslocoScope('limits')],
@@ -458,8 +465,8 @@ export const routes: Routes = [
             path: '',
             loadComponent: () =>
               import(
-                './adf-scheduler/df-manage-scheduler/df-manage-scheduler-table.component'
-              ).then(m => m.DfManageSchedulerTableComponent),
+                './adf-scheduler/df-manage-scheduler/df-manage-scheduler.component'
+              ).then(m => m.DfManageSchedulerComponent),
             resolve: {
               data: schedulerResolver,
             },
@@ -469,21 +476,23 @@ export const routes: Routes = [
             loadComponent: () =>
               import(
                 './adf-scheduler/df-scheduler-details/df-scheduler-details.component'
-              ).then(m => m.DfSchedulerComponent),
+              ).then(m => m.DfSchedulerDetailsComponent),
             resolve: {
               data: servicesResolver(0),
             },
+            canActivate: [paywallGuard('scheduler')],
           },
           {
             path: ':id',
             loadComponent: () =>
               import(
                 './adf-scheduler/df-scheduler-details/df-scheduler-details.component'
-              ).then(m => m.DfSchedulerComponent),
+              ).then(m => m.DfSchedulerDetailsComponent),
             resolve: {
               data: servicesResolver(0),
               schedulerObject: schedulerResolver,
             },
+            canActivate: [paywallGuard('scheduler')],
           },
         ],
         providers: [provideTranslocoScope('scheduler')],
@@ -503,8 +512,8 @@ export const routes: Routes = [
         path: ROUTES.REPORTING,
         loadComponent: () =>
           import(
-            './adf-reports/df-manage-service-report/df-manage-service-report-table.component'
-          ).then(m => m.DfManageServiceReportTableComponent),
+            './adf-reports/df-manage-service-report/df-manage-service-report.component'
+          ).then(m => m.DfManageServiceReportComponent),
         resolve: { data: serviceReportsResolver },
       },
       {

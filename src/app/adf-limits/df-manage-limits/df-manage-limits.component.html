@@ -1,11 +1,14 @@
-<df-manage-limits-table>
-  <ng-container topActions>
-    <button
-      mat-mini-fab
-      color="primary"
-      [attr.aria-label]="'clearLimitCounters' | transloco"
-      (click)="refreshTable()">
-      <fa-icon [icon]="faArrowsRotate" size="xl"></fa-icon>
-    </button>
-  </ng-container>
-</df-manage-limits-table>
+<df-paywall *ngIf="paywall; else allowed"></df-paywall>
+<ng-template #allowed>
+  ><df-manage-limits-table>
+    <ng-container topActions>
+      <button
+        mat-mini-fab
+        color="primary"
+        [attr.aria-label]="'clearLimitCounters' | transloco"
+        (click)="refreshTable()">
+        <fa-icon [icon]="faArrowsRotate" size="xl"></fa-icon>
+      </button>
+    </ng-container>
+  </df-manage-limits-table>
+</ng-template>

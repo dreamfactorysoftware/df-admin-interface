@@ -65,6 +65,12 @@
         </div>
       </ng-container>
       <div class="main" [class.no-error]="(hasError$ | async) === false">
+        <!-- <ng-container *ngIf="paywall$ | async; else content">
+          <df-paywall></df-paywall>
+        </ng-container>
+        <ng-template #content>
+          <ng-content></ng-content>
+        </ng-template> -->
         <ng-content></ng-content>
       </div>
     </mat-sidenav-content>

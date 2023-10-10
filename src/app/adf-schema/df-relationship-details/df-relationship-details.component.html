@@ -2,7 +2,7 @@
   [formGroup]="relationshipForm"
   (ngSubmit)="save()"
   class="details-section"
-  [class.x-small]="breakpointService.isXSmallScreen | async">
+  [class.x-small]="isXSmallScreen | async">
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>
       {{ 'name' | transloco }} -

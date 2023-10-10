@@ -47,7 +47,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     DfVerbPickerComponent,
   ],
 })
-export class DfSchedulerComponent implements OnInit {
+export class DfSchedulerDetailsComponent implements OnInit {
   formGroup: FormGroup; // basic form
   userServicesDropdownOptions: Service[];
   selectedService: Service | undefined;

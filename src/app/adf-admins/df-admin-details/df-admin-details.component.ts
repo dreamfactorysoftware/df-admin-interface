@@ -29,6 +29,7 @@ import { DfProfileDetailsComponent } from '../../shared/components/df-profile-de
 import { DfAlertComponent } from '../../shared/components/df-alert/df-alert.component';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { DfPaywallService } from 'src/app/shared/services/df-paywall.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -70,9 +71,16 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
     private translateService: TranslocoService,
     @Inject(ADMIN_SERVICE_TOKEN)
     private adminService: DfBaseCrudService,
-    private router: Router
+    private router: Router,
+    paywallService: DfPaywallService
   ) {
-    super(fb, activatedRoute, systemConfigDataService, breakpointService);
+    super(
+      fb,
+      activatedRoute,
+      systemConfigDataService,
+      breakpointService,
+      paywallService
+    );
   }
 
   sendInvite() {

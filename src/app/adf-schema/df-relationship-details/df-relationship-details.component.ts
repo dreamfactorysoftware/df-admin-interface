@@ -67,13 +67,15 @@ export class DfRelationshipDetailsComponent implements OnInit {
 
   fieldOptions: BasicOption[];
 
+  isXSmallScreen = this.breakpointService.isXSmallScreen;
+
   constructor(
     @Inject(BASE_SERVICE_TOKEN)
     private crudService: DfBaseCrudService,
     private fb: FormBuilder,
     private activatedRoute: ActivatedRoute,
     private router: Router,
-    public breakpointService: DfBreakpointService
+    private breakpointService: DfBreakpointService
   ) {
     this.relationshipForm = this.fb.group({
       name: [{ value: null, disabled: true }],

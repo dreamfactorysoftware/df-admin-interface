@@ -96,6 +96,7 @@
       </ng-container>
       <ng-container
         *ngIf="
+          accessByTabs.length > 0 &&
           userType === 'admins' &&
           (type === 'create' ||
             (type === 'edit' && !currentProfile.isRootAdmin))

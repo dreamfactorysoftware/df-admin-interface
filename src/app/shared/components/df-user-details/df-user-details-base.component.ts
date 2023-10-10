@@ -19,6 +19,8 @@ import { AppType } from 'src/app/shared/types/apps';
 import { RoleType } from '../../types/role';
 import { faEnvelope } from '@fortawesome/free-solid-svg-icons';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { DfPaywallService } from '../../services/df-paywall.service';
+import { forkJoin, of, switchMap } from 'rxjs';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -57,7 +59,8 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
     private fb: FormBuilder,
     private activatedRoute: ActivatedRoute,
     private systemConfigDataService: DfSystemConfigDataService,
-    private breakpointService: DfBreakpointService
+    private breakpointService: DfBreakpointService,
+    private paywallService: DfPaywallService
   ) {
     this.userForm = this.fb.group({
       profileDetailsGroup: this.fb.group({
@@ -90,6 +93,21 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
   abstract save(): void;
 
   ngOnInit(): void {
+    this.paywallService
+      .activatePaywall('limit')
+      .pipe(
+        switchMap(activate => {
+          if (activate) {
+            return this.paywallService.activatePaywall('service_report');
+          }
+          return of(false);
+        })
+      )
+      .subscribe(activate => {
+        if (activate) {
+          this.accessByTabs = [];
+        }
+      });
     this.activatedRoute.data.subscribe(({ type, data, apps, roles }) => {
       this.type = type;
       if (this.userType === 'users') {

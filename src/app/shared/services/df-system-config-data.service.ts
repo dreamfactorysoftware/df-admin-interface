@@ -11,7 +11,7 @@ import {
 import { URLS } from '../constants/urls';
 import { SHOW_LOADING_HEADER } from '../constants/http-headers';
 import { DfUserDataService } from './df-user-data.service';
-import { Environment } from 'src/app/shared/types/system';
+import { Environment, System } from 'src/app/shared/types/system';
 
 @Injectable({
   providedIn: 'root',
@@ -38,6 +38,9 @@ export class DfSystemConfigDataService {
   environment$: Observable<Environment> =
     this.environmentSubject.asObservable();
 
+  private systemSubject = new BehaviorSubject<System>({ resource: [] });
+  system$: Observable<System> = this.systemSubject.asObservable();
+
   constructor(
     private http: HttpClient,
     private userDataService: DfUserDataService
@@ -49,6 +52,14 @@ export class DfSystemConfigDataService {
 
   private set environment(data: Environment) {
     this.environmentSubject.next(data);
+  }
+
+  get system(): System {
+    return this.systemSubject.value;
+  }
+
+  private set system(data: System) {
+    this.systemSubject.next(data);
   }
 
   fetchEnvironmentData() {
@@ -64,5 +75,11 @@ export class DfSystemConfigDataService {
         }),
         retry(1)
       );
+  }
+
+  fetchSystemData() {
+    return this.http.get<System>(URLS.SYSTEM).subscribe(system => {
+      this.system = system;
+    });
   }
 }

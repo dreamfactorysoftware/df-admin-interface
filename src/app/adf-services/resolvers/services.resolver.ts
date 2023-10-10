@@ -63,9 +63,9 @@ export const servicesResolver =
       .getAll<GenericListResponse<Service>>({
         limit,
         sort: 'name',
-        filter: `${system ? '(created_by_id is null)' : ''}${
-          filter ? filter : ''
-        }`,
+        filter: `${
+          system ? '(created_by_id is null) and (name != "api_docs")' : ''
+        }${filter ? filter : ''}`,
       })
       .pipe(map(services => ({ ...services })));
   };

@@ -53,7 +53,7 @@ export interface Environment {
   };
 }
 
-export interface System {
+export interface V2Service {
   services: Array<Service>;
   serviceTypes: Array<ServiceType>;
 }
@@ -63,4 +63,10 @@ export interface AccountStatus {
   msg: string;
   renewal_date: string;
   disable_ui: string;
+}
+
+export interface System {
+  resource: Array<{
+    name: string;
+  }>;
 }

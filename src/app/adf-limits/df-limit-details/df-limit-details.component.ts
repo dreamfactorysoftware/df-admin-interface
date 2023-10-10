@@ -51,7 +51,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     DfVerbPickerComponent,
   ],
 })
-export class DfLimitComponent implements OnInit {
+export class DfLimitDetailsComponent implements OnInit {
   formGroup: FormGroup;
 
   isEditMode = false;
@@ -92,43 +92,33 @@ export class DfLimitComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.activatedRoute.data
-      .pipe(
-        catchError(error => {
-          this.router.navigate([
-            `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
-          ]);
-          return throwError(() => new Error(error));
-        })
-      )
-      .subscribe(resp => {
-        this.type = resp['type'];
-        if (resp['type'] === 'edit') {
-          this.limitTypeToEdit = resp['data'] as LimitType;
-          this.formGroup.patchValue({
-            limitName: this.limitTypeToEdit.name,
-            limitType: this.limitTypeToEdit.type,
-            serviceId: this.limitTypeToEdit.serviceId,
-            roleId: this.limitTypeToEdit.roleId,
-            userId: this.limitTypeToEdit.userId,
-            limitRate: this.limitTypeToEdit.rate,
-            limitPeriod: this.limitTypeToEdit.period,
-            active: this.limitTypeToEdit.isActive,
-            description: this.limitTypeToEdit.description,
-            endpoint: this.limitTypeToEdit.endpoint,
-            verb: this.limitTypeToEdit.verb,
-          });
+    this.activatedRoute.data.subscribe(resp => {
+      this.type = resp['type'];
+      if (resp['type'] === 'edit') {
+        this.limitTypeToEdit = resp['data'] as LimitType;
+        this.formGroup.patchValue({
+          limitName: this.limitTypeToEdit.name,
+          limitType: this.limitTypeToEdit.type,
+          serviceId: this.limitTypeToEdit.serviceId,
+          roleId: this.limitTypeToEdit.roleId,
+          userId: this.limitTypeToEdit.userId,
+          limitRate: this.limitTypeToEdit.rate,
+          limitPeriod: this.limitTypeToEdit.period,
+          active: this.limitTypeToEdit.isActive,
+          description: this.limitTypeToEdit.description,
+          endpoint: this.limitTypeToEdit.endpoint,
+          verb: this.limitTypeToEdit.verb,
+        });
 
-          if (!this.formGroup.value.serviceId)
-            this.removeFormField('serviceId');
+        if (!this.formGroup.value.serviceId) this.removeFormField('serviceId');
 
-          if (!this.formGroup.value.roleId) this.removeFormField('roleId');
+        if (!this.formGroup.value.roleId) this.removeFormField('roleId');
 
-          if (!this.formGroup.value.userId) this.removeFormField('userId');
+        if (!this.formGroup.value.userId) this.removeFormField('userId');
 
-          if (!this.formGroup.value.endpoint) this.removeFormField('endpoint');
-        }
-      });
+        if (!this.formGroup.value.endpoint) this.removeFormField('endpoint');
+      }
+    });
 
     if (this.type === 'create') {
       this.removeFormField();

@@ -6,7 +6,11 @@ import { AsyncPipe, NgIf } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
+import { ActivatedRoute } from '@angular/router';
+import { DfPaywallComponent } from 'src/app/shared/components/df-paywall/df-paywall.component';
+import { UntilDestroy } from '@ngneat/until-destroy';
 
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-limits',
   templateUrl: './df-manage-limits.component.html',
@@ -20,12 +24,21 @@ import { MatMenuModule } from '@angular/material/menu';
     NgIf,
     MatButtonModule,
     MatMenuModule,
+    DfPaywallComponent,
   ],
 })
 export class DfManageLimitsComponent {
   faArrowsRotate = faArrowsRotate;
   @ViewChild(DfManageLimitsTableComponent)
   manageLimitsTableComponent!: DfManageLimitsTableComponent;
+  paywall = false;
+  constructor(private activatedRoute: ActivatedRoute) {
+    this.activatedRoute.data.subscribe(({ data }) => {
+      if (data === 'paywall') {
+        this.paywall = true;
+      }
+    });
+  }
 
   refreshTable() {
     this.manageLimitsTableComponent.refreshTable();

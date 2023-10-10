@@ -5,9 +5,11 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { ResolveFn } from '@angular/router';
 
 export const eventsResolver: ResolveFn<
-  GenericListResponse<ScriptObject>
+  GenericListResponse<ScriptObject> | string
 > = () => {
-  return inject(EVENTS_SERVICE_TOKEN).getAll({
+  const eventService = inject(EVENTS_SERVICE_TOKEN);
+
+  return eventService.getAll<GenericListResponse<ScriptObject>>({
     additionalParams: [
       {
         key: 'scriptable',
