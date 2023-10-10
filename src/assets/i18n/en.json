@@ -338,5 +338,9 @@
       "createSuccess": "Lookup keys created successfully.",
       "updateSuccess": "Lookup keys updated successfully."
     }
+  },
+  "licenseExpired": {
+    "header": "Your DreamFactory subscription has expired.",
+    "subHeader": "Please contact dspsales@dreamfactory.com to renew your subscription."
   }
 }

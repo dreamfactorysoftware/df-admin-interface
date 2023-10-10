@@ -17,6 +17,7 @@ import { Nav } from '../../types/nav';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
+import { DfLicenseCheckService } from '../../services/df-license-check.service';
 
 @Component({
   selector: 'df-side-nav',
@@ -47,13 +48,15 @@ export class DfSideNavComponent {
   faBars = faBars;
   hasError$ = this.errorService.hasError$;
   nav = transformRoutes(routes);
+  licenseCheck$ = this.licenseCheckService.licenseCheck$;
 
   constructor(
     private breakpointService: DfBreakpointService,
     private userDataService: DfUserDataService,
     private authService: DfAuthService,
     private router: Router,
-    private errorService: DfErrorService
+    private errorService: DfErrorService,
+    private licenseCheckService: DfLicenseCheckService
   ) {}
 
   logout() {

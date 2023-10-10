@@ -24,6 +24,14 @@
         </button>
       </mat-menu>
     </mat-toolbar>
+    <div
+      class="license-expired"
+      *ngIf="(licenseCheck$ | async)?.msg === 'Expired'">
+      <span
+        >{{ 'licenseExpired.header' | transloco }}
+        {{ 'licenseExpired.subHeader' | transloco }}</span
+      >
+    </div>
   </ng-container>
   <mat-sidenav-container class="sidenav-container" autosize>
     <mat-sidenav

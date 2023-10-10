@@ -3,6 +3,7 @@ import { DfLoadingSpinnerService } from './shared/services/df-loading-spinner.se
 import { NgIf, AsyncPipe } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.component';
+import { DfLicenseCheckService } from './shared/services/df-license-check.service';
 @Component({
   selector: 'df-root',
   templateUrl: './app.component.html',
@@ -13,5 +14,9 @@ import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.
 export class AppComponent {
   title = 'df-admin-interface';
   activeSpinner$ = this.loadingSpinnerService.active;
-  constructor(private loadingSpinnerService: DfLoadingSpinnerService) {}
+  licenseCheck$ = this.licenseCheckService.licenseCheck$;
+  constructor(
+    private loadingSpinnerService: DfLoadingSpinnerService,
+    private licenseCheckService: DfLicenseCheckService
+  ) {}
 }

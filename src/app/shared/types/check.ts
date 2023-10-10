@@ -1,5 +1,5 @@
 export interface CheckResponse {
-  disableUi: boolean;
+  disableUi: string;
   msg: string;
   renewalDate: string;
   statusCode: string;

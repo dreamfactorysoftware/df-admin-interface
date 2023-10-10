@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { Nav } from '../types/nav';
+import { ROUTES } from '../constants/routes';
 
 export function transformRoutes(routes: Routes, root = '') {
   return routes
@@ -7,14 +8,15 @@ export function transformRoutes(routes: Routes, root = '') {
       route =>
         route.path &&
         ![
-          'CREATE',
-          'IMPORT',
-          'EDIT',
-          'AUTH',
-          'PROFILE',
-          'VIEW',
-          'ERROR',
-        ].includes(route.path.split('/')[0].toUpperCase()) &&
+          ROUTES.CREATE,
+          ROUTES.IMPORT,
+          ROUTES.EDIT,
+          ROUTES.AUTH,
+          ROUTES.PROFILE,
+          ROUTES.VIEW,
+          ROUTES.ERROR,
+          ROUTES.LICENSE_EXPIRED,
+        ].includes(route.path.split('/')[0] as ROUTES) &&
         route.path !== '' &&
         !route.path.includes(':')
     )

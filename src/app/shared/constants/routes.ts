@@ -54,4 +54,5 @@ export enum ROUTES {
   RELATIONSHIPS = 'relationships',
   FIELDS = 'fields',
   ERROR = 'error',
+  LICENSE_EXPIRED = 'license-expired',
 }

@@ -1,6 +1,12 @@
-<df-side-nav>
+<ng-container
+  *ngIf="(licenseCheck$ | async)?.disableUi === 'true'; else enabled">
   <router-outlet />
-</df-side-nav>
+</ng-container>
+<ng-template #enabled>
+  <df-side-nav>
+    <router-outlet />
+  </df-side-nav>
+</ng-template>
 <div *ngIf="activeSpinner$ | async" class="spinner-container">
   <div class="backdrop"></div>
   <img class="spinner" src="assets/img/df-cog.svg" alt="spinner" width="200" />

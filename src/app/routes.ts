@@ -51,6 +51,7 @@ import {
 import { eventsResolver } from './adf-event-scripts/resolvers/events.resolver';
 import { systemEventsResolver } from './adf-services/resolvers/system-events.resolver';
 import { checkStatusResolver } from './adf-config/resolvers/df-check-status.resolver';
+import { licenseGuard } from './shared/guards/license.guard';
 
 export const routes: Routes = [
   {
@@ -74,8 +75,16 @@ export const routes: Routes = [
   {
     path: ROUTES.HOME,
     children: HomeRoutes,
-    canActivate: [loggedInGuard],
+    canActivate: [loggedInGuard, licenseGuard],
     providers: [provideTranslocoScope('home')],
+  },
+  {
+    path: ROUTES.LICENSE_EXPIRED,
+    loadComponent: () =>
+      import(
+        './shared/components/df-license-expired/df-license-expired.component'
+      ).then(m => m.DfLicenseExpiredComponent),
+    canActivate: [licenseGuard],
   },
   {
     path: ROUTES.API_CONNECTIONS,
@@ -274,7 +283,7 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('apiDocs')],
       },
     ],
-    canActivate: [loggedInGuard],
+    canActivate: [loggedInGuard, licenseGuard],
   },
   {
     path: ROUTES.API_SECURITY,
@@ -331,7 +340,7 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('services')],
       },
     ],
-    canActivate: [loggedInGuard],
+    canActivate: [loggedInGuard, licenseGuard],
   },
   {
     path: ROUTES.SYSTEM_SETTINGS,
@@ -507,7 +516,7 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('services')],
       },
     ],
-    canActivate: [loggedInGuard],
+    canActivate: [loggedInGuard, licenseGuard],
   },
   {
     path: ROUTES.ADMIN_SETTINGS,
@@ -778,7 +787,7 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('files')],
       },
     ],
-    canActivate: [loggedInGuard],
+    canActivate: [loggedInGuard, licenseGuard],
   },
   {
     path: ROUTES.PROFILE,
@@ -787,7 +796,7 @@ export const routes: Routes = [
         m => m.DfProfileComponent
       ),
     resolve: { data: profileResolver },
-    canActivate: [loggedInGuard],
+    canActivate: [loggedInGuard, licenseGuard],
     providers: [
       DfProfileService,
       DfPasswordService,

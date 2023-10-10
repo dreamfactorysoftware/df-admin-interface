@@ -1,6 +1,7 @@
 @use '@angular/material' as mat;
 @use 'src/theme' as theme;
 $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
+$red-palette: mat.define-palette(mat.$red-palette);
 
 .logo {
   height: 30px;
@@ -101,4 +102,16 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   .mat-expansion-panel-body {
     overflow-x: auto;
   }
+}
+
+.license-expired {
+  display: flex;
+  flex-direction: column;
+  background-color: mat.get-color-from-palette($red-palette, 600);
+  color: white;
+  border-radius: 0;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  padding: 16px;
 }
