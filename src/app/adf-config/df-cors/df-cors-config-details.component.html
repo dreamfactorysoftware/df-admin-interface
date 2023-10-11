@@ -1,4 +1,9 @@
-<!-- TODO add error banner -->
+<df-alert
+  [showAlert]="showAlert"
+  [alertType]="alertType"
+  (alertClosed)="showAlert = false">
+  {{ alertMsg }}
+</df-alert>
 <div class="df-cors-config-container">
   <h4>{{ 'cors.pageSubtitle' | transloco }}</h4>
   <form [formGroup]="corsForm" (ngSubmit)="onSubmit()" class="details-section">

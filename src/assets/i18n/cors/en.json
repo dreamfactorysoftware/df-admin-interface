@@ -11,5 +11,9 @@
     "methods": "Methods",
     "supportsCredentials": "Supports Credentials",
     "enabled": "Enabled"
+  },
+  "alerts": {
+    "createSuccess": "CORS entry created successfully.",
+    "updateSuccess": "CORS entry updated successfully."
   }
 }

@@ -27,6 +27,10 @@ import { catchError, throwError } from 'rxjs';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import {
+  AlertType,
+  DfAlertComponent,
+} from 'src/app/shared/components/df-alert/df-alert.component';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -48,6 +52,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     TranslocoDirective,
     TranslocoPipe,
     DfVerbPickerComponent,
+    DfAlertComponent,
   ],
 })
 export class DfCorsConfigDetailsComponent implements OnInit {
@@ -55,6 +60,9 @@ export class DfCorsConfigDetailsComponent implements OnInit {
   corsConfigToEdit: CorsConfigData | undefined;
   allMethodsSelected = false;
   type = 'create';
+  alertMsg = '';
+  showAlert = false;
+  alertType: AlertType = 'error';
 
   constructor(
     @Inject(CONFIG_CORS_SERVICE_TOKEN)
@@ -109,6 +117,12 @@ export class DfCorsConfigDetailsComponent implements OnInit {
       });
   }
 
+  triggerAlert(type: AlertType, msg: string) {
+    this.alertType = type;
+    this.alertMsg = msg;
+    this.showAlert = true;
+  }
+
   private assemblePayload(): Partial<CorsConfigData> {
     const payload = {
       path: this.corsForm.value.path,
@@ -146,7 +160,14 @@ export class DfCorsConfigDetailsComponent implements OnInit {
             { resource: [payload] },
             {
               fields: '*',
+              snackbarSuccess: 'cors.alerts.createSuccess',
             }
+          )
+          .pipe(
+            catchError(err => {
+              this.triggerAlert('error', err.error.error.message);
+              return throwError(() => new Error(err));
+            })
           )
           .subscribe(() => {
             this.router.navigate([
@@ -157,7 +178,15 @@ export class DfCorsConfigDetailsComponent implements OnInit {
         // edit mode
         const payload = this.assemblePayload();
         this.corsConfigService
-          .update(this.corsConfigToEdit.id, payload)
+          .update(this.corsConfigToEdit.id, payload, {
+            snackbarSuccess: 'cors.alerts.updateSuccess',
+          })
+          .pipe(
+            catchError(err => {
+              this.triggerAlert('error', err.error.error.message);
+              return throwError(() => new Error(err));
+            })
+          )
           .subscribe(() => {
             this.router.navigate([
               `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
