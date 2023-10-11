@@ -26,6 +26,11 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import {
+  AlertType,
+  DfAlertComponent,
+} from 'src/app/shared/components/df-alert/df-alert.component';
+import { catchError, throwError } from 'rxjs';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-scheduler',
@@ -45,6 +50,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     ReactiveFormsModule,
     DfAceEditorComponent,
     DfVerbPickerComponent,
+    DfAlertComponent,
   ],
 })
 export class DfSchedulerDetailsComponent implements OnInit {
@@ -58,6 +64,9 @@ export class DfSchedulerDetailsComponent implements OnInit {
 
   scheduleToEdit: SchedulerTaskData | undefined;
   log = '';
+  alertMsg = '';
+  showAlert = false;
+  alertType: AlertType = 'error';
 
   constructor(
     @Inject(SCHEDULER_SERVICE_TOKEN)
@@ -117,6 +126,12 @@ export class DfSchedulerDetailsComponent implements OnInit {
     });
   }
 
+  triggerAlert(type: AlertType, msg: string) {
+    this.alertType = type;
+    this.alertMsg = msg;
+    this.showAlert = true;
+  }
+
   onCancel() {
     this.router.navigate([`${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`]);
   }
@@ -132,12 +147,19 @@ export class DfSchedulerDetailsComponent implements OnInit {
           { resource: [payload] },
           {
             snackbarSuccess: 'scheduler.alerts.createdSuccess',
-            snackbarError: 'server',
             fields: '*',
             related: this.relatedParam,
           }
         )
-
+        .pipe(
+          catchError(err => {
+            this.triggerAlert(
+              'error',
+              err.error.error.context.resource[0].message
+            );
+            return throwError(() => new Error(err));
+          })
+        )
         .subscribe(() =>
           this.router.navigate([
             `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
@@ -149,11 +171,15 @@ export class DfSchedulerDetailsComponent implements OnInit {
       this.service
         .update(this.scheduleToEdit.id, payload, {
           snackbarSuccess: 'scheduler.alerts.updateSuccess',
-          snackbarError: 'server',
           fields: '*',
           related: this.relatedParam,
         })
-
+        .pipe(
+          catchError(err => {
+            this.triggerAlert('error', err.error.error.message);
+            return throwError(() => new Error(err));
+          })
+        )
         .subscribe(() =>
           this.router.navigate([
             `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,

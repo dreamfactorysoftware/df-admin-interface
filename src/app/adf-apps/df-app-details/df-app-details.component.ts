@@ -254,7 +254,10 @@ export class DfAppDetailsComponent implements OnInit {
         )
         .pipe(
           catchError(err => {
-            this.triggerAlert('error', err.error.error.message);
+            this.triggerAlert(
+              'error',
+              err.error.error.context.resource[0].message
+            );
             return throwError(() => new Error(err));
           })
         )
