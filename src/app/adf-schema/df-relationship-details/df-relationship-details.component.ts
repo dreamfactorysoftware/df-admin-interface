@@ -19,6 +19,11 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { TableField } from '../df-table-details/df-table-details.types';
 import { Service } from 'src/app/shared/types/service';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import {
+  AlertType,
+  DfAlertComponent,
+} from 'src/app/shared/components/df-alert/df-alert.component';
+import { catchError, throwError } from 'rxjs';
 
 interface BasicOption {
   label: string;
@@ -41,6 +46,7 @@ interface BasicOption {
     AsyncPipe,
     NgFor,
     NgIf,
+    DfAlertComponent,
   ],
 })
 export class DfRelationshipDetailsComponent implements OnInit {
@@ -68,6 +74,9 @@ export class DfRelationshipDetailsComponent implements OnInit {
   fieldOptions: BasicOption[];
 
   isXSmallScreen = this.breakpointService.isXSmallScreen;
+  alertMsg = '';
+  showAlert = false;
+  alertType: AlertType = 'error';
 
   constructor(
     @Inject(BASE_SERVICE_TOKEN)
@@ -298,6 +307,12 @@ export class DfRelationshipDetailsComponent implements OnInit {
     }
   }
 
+  triggerAlert(type: AlertType, msg: string) {
+    this.alertType = type;
+    this.alertMsg = msg;
+    this.showAlert = true;
+  }
+
   goBack() {
     if (this.type === 'create') {
       this.router.navigate(['../../'], {
@@ -327,6 +342,15 @@ export class DfRelationshipDetailsComponent implements OnInit {
           },
           `${this.dbName}/_schema/${this.tableName}/_related`
         )
+        .pipe(
+          catchError(err => {
+            this.triggerAlert(
+              'error',
+              err.error.error.context.resource[0].message
+            );
+            return throwError(() => new Error(err));
+          })
+        )
         .subscribe(() => {
           this.goBack();
         });
@@ -335,6 +359,12 @@ export class DfRelationshipDetailsComponent implements OnInit {
         .patch(`${this.dbName}/_schema/${this.tableName}/_related`, payload, {
           snackbarSuccess: 'schema.relationships.alert.updateSuccess',
         })
+        .pipe(
+          catchError(err => {
+            this.triggerAlert('error', err.error.error.message);
+            return throwError(() => new Error(err));
+          })
+        )
         .subscribe(() => {
           this.goBack();
         });
