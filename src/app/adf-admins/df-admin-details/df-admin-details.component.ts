@@ -106,7 +106,7 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
       isRestrictedAdmin: this.tabs
         ? this.tabs.controls.some(c => !c.value.checked)
         : false,
-      lookupByUserId: this.userForm.value.lookupKeys,
+      lookupByUserId: this.userForm.getRawValue().lookupKeys,
     };
     if (this.type === 'create') {
       const sendInvite = this.userForm.value['pass-invite'] === 'invite';

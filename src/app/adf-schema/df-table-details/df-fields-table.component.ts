@@ -142,8 +142,6 @@ export class DfFieldsTableComponent extends DfManageTableComponent<FieldsRow> {
       .subscribe(() => {
         this.refreshTable();
       });
-    // TODO: implement error handling
-    //  this.triggerAlert
   }
 
   refreshTable(): void {

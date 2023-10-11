@@ -114,7 +114,6 @@ export class DfRelationshipsTableComponent extends DfManageTableComponent<Relati
       .subscribe(() => {
         this.refreshTable();
       });
-    // TODO: implement error handling
   }
 
   refreshTable(): void {

@@ -140,7 +140,7 @@ export class DfRoleDetailsComponent implements OnInit {
   onSubmit() {
     if (this.roleForm.invalid) return;
 
-    const formValue = this.roleForm.value;
+    const formValue = this.roleForm.getRawValue();
 
     const payload: RolePayload = {
       id: formValue.id,
