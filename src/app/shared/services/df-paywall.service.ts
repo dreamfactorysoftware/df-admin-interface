@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { map, of } from 'rxjs';
+import { map, of, switchMap } from 'rxjs';
 import { DfSystemConfigDataService } from './df-system-config-data.service';
 
 @Injectable({
@@ -12,6 +12,13 @@ export class DfPaywallService {
     if (resource) {
       const resources = Array.isArray(resource) ? resource : [resource];
       return this.systemConfigDataService.system$.pipe(
+        switchMap(system => {
+          if (system.resource.length === 0) {
+            return this.systemConfigDataService.fetchSystemData();
+          } else {
+            return of(system);
+          }
+        }),
         map(
           system =>
             !system.resource.some(r => {

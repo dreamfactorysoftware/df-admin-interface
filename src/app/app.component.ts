@@ -27,10 +27,7 @@ export class AppComponent {
   ) {
     this.userDataService.userData$.subscribe(userData => {
       if (userData) {
-        this.systemConfigDataService.fetchEnvironmentData();
-        if (userData.isRootAdmin || userData.isSysAdmin || userData.roleId) {
-          this.systemConfigDataService.fetchSystemData();
-        }
+        this.systemConfigDataService.fetchEnvironmentData().subscribe();
       }
     });
   }

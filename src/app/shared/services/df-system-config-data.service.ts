@@ -78,8 +78,10 @@ export class DfSystemConfigDataService {
   }
 
   fetchSystemData() {
-    return this.http.get<System>(URLS.SYSTEM).subscribe(system => {
-      this.system = system;
-    });
+    return this.http.get<System>(URLS.SYSTEM).pipe(
+      tap(system => {
+        this.system = system;
+      })
+    );
   }
 }

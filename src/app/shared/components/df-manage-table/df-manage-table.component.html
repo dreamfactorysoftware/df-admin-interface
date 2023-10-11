@@ -11,7 +11,7 @@
   <ng-content select="[topActions]"></ng-content>
   <div class="spacer"></div>
   <mat-form-field
-    *ngIf="allowFilter"
+    *ngIf="allowFilter && tableLength > 0"
     class="search-input"
     subscriptSizing="dynamic">
     <mat-label>{{ 'search' | transloco }}</mat-label>
