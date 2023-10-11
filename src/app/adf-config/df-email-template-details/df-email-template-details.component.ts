@@ -21,6 +21,11 @@ import {
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import {
+  AlertType,
+  DfAlertComponent,
+} from 'src/app/shared/components/df-alert/df-alert.component';
+import { catchError, throwError } from 'rxjs';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -39,11 +44,15 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     MatOptionModule,
     TranslocoPipe,
     AsyncPipe,
+    DfAlertComponent,
   ],
 })
 export class DfEmailTemplateDetailsComponent implements OnInit {
   emailTemplateForm: FormGroup;
   editApp: EmailTemplate;
+  alertMsg = '';
+  showAlert = false;
+  alertType: AlertType = 'error';
 
   constructor(
     @Inject(EMAIL_TEMPLATES_SERVICE_TOKEN)
@@ -94,6 +103,12 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
     }
   }
 
+  triggerAlert(type: AlertType, msg: string) {
+    this.alertType = type;
+    this.alertMsg = msg;
+    this.showAlert = true;
+  }
+
   goBack() {
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
@@ -123,6 +138,12 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
         .update(this.emailTemplateForm.value.id, payload, {
           snackbarSuccess: 'emailTemplates.alerts.updateSuccess',
         })
+        .pipe(
+          catchError(err => {
+            this.triggerAlert('error', err.error.error.message);
+            return throwError(() => new Error(err));
+          })
+        )
         .subscribe(() => {
           this.goBack();
         });
@@ -133,6 +154,15 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
           {
             snackbarSuccess: 'emailTemplates.alerts.createSuccess',
           }
+        )
+        .pipe(
+          catchError(err => {
+            this.triggerAlert(
+              'error',
+              err.error.error.context.resource[0].message
+            );
+            return throwError(() => new Error(err));
+          })
         )
         .subscribe(() => {
           this.goBack();
