@@ -8,6 +8,7 @@ export interface AppRow {
   description?: string;
   active: boolean;
   launchUrl: string;
+  createdById: number;
 }
 
 export interface AppType {

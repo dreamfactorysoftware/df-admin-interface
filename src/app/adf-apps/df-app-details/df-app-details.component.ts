@@ -223,6 +223,10 @@ export class DfAppDetailsComponent implements OnInit {
     }
   }
 
+  get disableKeyRefresh(): boolean {
+    return this.editApp.createdById === null;
+  }
+
   async refreshApiKey() {
     const newKey = await generateApiKey(
       this.systemConfigDataService.environment.server.host,

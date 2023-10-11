@@ -79,7 +79,11 @@
 
         {{ 'apps.createApp.apiKey.copy' | transloco }}
       </button>
-      <button mat-button type="button" (click)="refreshApiKey()">
+      <button
+        mat-button
+        type="button"
+        (click)="refreshApiKey()"
+        [disabled]="disableKeyRefresh">
         <fa-icon [icon]="faRefresh"></fa-icon>
 
         {{ 'apps.createApp.apiKey.refresh' | transloco }}

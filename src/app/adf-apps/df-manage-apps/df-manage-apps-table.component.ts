@@ -75,6 +75,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
         ariaLabel: {
           key: 'apps.createApp.apiKey.refresh',
         },
+        disabled: row => row.createdById === null,
       },
     ];
     if (this.actions.additional) {
@@ -124,6 +125,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
         description: app.description,
         active: app.isActive,
         launchUrl: app.launchUrl,
+        createdById: app.createdById,
       };
     });
   }
