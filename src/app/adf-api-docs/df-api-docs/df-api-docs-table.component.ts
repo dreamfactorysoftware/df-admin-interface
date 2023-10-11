@@ -1,6 +1,5 @@
 import { Component, Inject } from '@angular/core';
 import {
-  Actions,
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
@@ -15,6 +14,7 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { Service, ServiceType } from 'src/app/shared/types/service';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { Actions } from 'src/app/shared/types/table';
 
 @UntilDestroy({ checkProperties: true })
 @Component({

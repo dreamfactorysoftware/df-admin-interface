@@ -7,7 +7,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { ScriptEvent, ScriptObject } from 'src/app/shared/types/scripts';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
-import { AsyncPipe, NgFor, NgIf } from '@angular/common';
+import { AsyncPipe, NgFor } from '@angular/common';
 import { SCRIPT_TYPES } from 'src/app/shared/constants/scripts';
 import {
   FormBuilder,

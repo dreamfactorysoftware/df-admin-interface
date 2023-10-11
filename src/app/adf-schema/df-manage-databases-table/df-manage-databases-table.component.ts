@@ -1,6 +1,5 @@
 import { Component, Inject } from '@angular/core';
 import {
-  Actions,
   DfManageTableComponent,
   DfManageTableModules,
 } from '../../shared/components/df-manage-table/df-manage-table.component';
@@ -20,6 +19,7 @@ import {
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { forkJoin, map, switchMap } from 'rxjs';
+import { Actions } from 'src/app/shared/types/table';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-databases-table',

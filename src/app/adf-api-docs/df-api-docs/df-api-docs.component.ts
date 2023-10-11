@@ -9,7 +9,6 @@ import SwaggerUI from 'swagger-ui';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { TranslocoModule } from '@ngneat/transloco';
-import { ROUTES } from 'src/app/shared/types/routes';
 import { saveRawAsFile } from 'src/app/shared/utilities/file';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
@@ -56,7 +55,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
   }
 
   goBackToList(): void {
-    this.router.navigate([`${ROUTES.API_CONNECTIONS}/${ROUTES.API_DOCS}`]);
+    this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 
   downloadApiDoc() {

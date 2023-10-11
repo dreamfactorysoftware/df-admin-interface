@@ -9,8 +9,6 @@ import {
   UserProfileType,
 } from 'src/app/shared/types/user';
 import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
-import { ROUTES } from 'src/app/shared/types/routes';
-
 import { parseError } from 'src/app/shared/utilities/parse-errors';
 import { DfUserDetailsBaseComponent } from 'src/app/shared/components/df-user-details/df-user-details-base.component';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
@@ -30,6 +28,10 @@ import { DfAlertComponent } from '../../shared/components/df-alert/df-alert.comp
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfPaywallService } from 'src/app/shared/services/df-paywall.service';
+import {
+  GenericCreateResponse,
+  GenericUpdateResponse,
+} from 'src/app/shared/types/generic-http';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -112,7 +114,7 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
         data.password = this.userForm.value.password;
       }
       this.adminService
-        .create(
+        .create<GenericCreateResponse>(
           { resource: [data] },
           {
             snackbarSuccess: 'admins.alerts.createdSuccess',
@@ -130,25 +132,33 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
             return throwError(() => new Error(err));
           })
         )
-        .subscribe(() => {
-          this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.ADMINS]);
+        .subscribe(res => {
+          this.router.navigate(['../', res.resource[0].id], {
+            relativeTo: this.activatedRoute,
+          });
         });
     } else {
       if (this.userForm.value.setPassword) {
         data.password = this.userForm.value.password;
       }
       this.adminService
-        .update(this.currentProfile.id, data, {
-          snackbarSuccess: 'admins.alerts.updateSuccess',
-        })
+        .update<GenericUpdateResponse, AdminProfile>(
+          this.currentProfile.id,
+          data,
+          {
+            snackbarSuccess: 'admins.alerts.updateSuccess',
+          }
+        )
         .pipe(
           catchError(err => {
             this.triggerAlert('error', err.error.error.message);
             return throwError(() => new Error(err));
           })
         )
-        .subscribe(() => {
-          this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.ADMINS]);
+        .subscribe(res => {
+          this.router.navigate(['../', res.id], {
+            relativeTo: this.activatedRoute,
+          });
         });
     }
   }

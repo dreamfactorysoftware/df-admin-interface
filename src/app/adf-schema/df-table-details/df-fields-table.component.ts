@@ -1,6 +1,5 @@
 import { Component, Inject } from '@angular/core';
 import {
-  Actions,
   DfManageTableComponent,
   DfManageTableModules,
 } from '../../shared/components/df-manage-table/df-manage-table.component';
@@ -14,6 +13,7 @@ import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { ROUTES } from 'src/app/shared/types/routes';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { Actions } from 'src/app/shared/types/table';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-fields-table',

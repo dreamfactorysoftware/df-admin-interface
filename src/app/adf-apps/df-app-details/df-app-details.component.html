@@ -1,4 +1,9 @@
-<!-- TODO add error banner -->
+<df-alert
+  [showAlert]="showAlert"
+  [alertType]="alertType"
+  (alertClosed)="showAlert = false">
+  {{ alertMsg }}
+</df-alert>
 <form [formGroup]="appForm" (ngSubmit)="save()" class="details-section">
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
     <mat-label>

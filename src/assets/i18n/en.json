@@ -19,6 +19,7 @@
   "inviteSent": "An email invite has been sent.",
   "update": "Update",
   "confirmed": "Confirmed",
+  "sendInvite": "Send Invite",
   "pending": "Pending",
   "id": "ID",
   "email": "Email",

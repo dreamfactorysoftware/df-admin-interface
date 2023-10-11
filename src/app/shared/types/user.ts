@@ -1,5 +1,4 @@
 import { RoleType } from './role';
-import { ROUTES } from './routes';
 
 export type UserProfileType = 'users' | 'admins';
 
@@ -27,7 +26,14 @@ export interface UserProfile {
   lastModifiedDate: string;
   lastModifiedById: number;
   ldapUsername: string;
-  lookupByUserId: Array<any>;
+  lookupByUserId: Array<{
+    id: number;
+    name: string;
+    value: string;
+    private: boolean;
+    description: string;
+    userId: number;
+  }>;
   saml: string;
   userToAppToRoleByUserId: Array<{
     id: number;

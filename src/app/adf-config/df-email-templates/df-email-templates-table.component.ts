@@ -27,8 +27,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
   standalone: true,
   imports: DfManageTableModules,
 })
-//TODO add type
-export class DfEmailTemplatesTableComponent extends DfManageTableComponent<any> {
+export class DfEmailTemplatesTableComponent extends DfManageTableComponent<EmailTemplateRow> {
   constructor(
     @Inject(EMAIL_TEMPLATES_SERVICE_TOKEN)
     private emailTemplateService: DfBaseCrudService,
@@ -41,24 +40,23 @@ export class DfEmailTemplatesTableComponent extends DfManageTableComponent<any> 
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
 
-  override columns = [
+  columns = [
     {
       columnDef: 'name',
       header: 'name',
-      cell: (row: any) => row.name, //TODO add type
+      cell: (row: EmailTemplateRow) => row.name,
     },
     {
       columnDef: 'description',
       header: 'description',
-      cell: (row: any) => row.description, //TODO add type
+      cell: (row: EmailTemplateRow) => row.description,
     },
     {
       columnDef: 'actions',
     },
   ];
 
-  // TODO add type
-  mapDataToTable(data: any): EmailTemplateRow[] {
+  mapDataToTable(data: Array<EmailTemplate>): EmailTemplateRow[] {
     return data.map((app: EmailTemplate) => {
       return {
         id: app.id,

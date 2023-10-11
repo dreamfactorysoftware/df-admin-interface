@@ -5,8 +5,6 @@ import { catchError, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { UserProfile, UserProfileType } from 'src/app/shared/types/user';
 import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
-import { ROUTES } from 'src/app/shared/types/routes';
-
 import { parseError } from 'src/app/shared/utilities/parse-errors';
 import { DfUserDetailsBaseComponent } from 'src/app/shared/components/df-user-details/df-user-details-base.component';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
@@ -26,6 +24,10 @@ import { DfAlertComponent } from '../../shared/components/df-alert/df-alert.comp
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfPaywallService } from 'src/app/shared/services/df-paywall.service';
+import {
+  GenericCreateResponse,
+  GenericUpdateResponse,
+} from 'src/app/shared/types/generic-http';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-user-details',
@@ -147,7 +149,7 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
         data.password = this.userForm.value.password;
       }
       this.userService
-        .create(
+        .create<GenericCreateResponse>(
           { resource: [data] },
           {
             snackbarSuccess: 'admins.alerts.createdSuccess',
@@ -165,25 +167,33 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
             return throwError(() => new Error(err));
           })
         )
-        .subscribe(() => {
-          this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.USERS]);
+        .subscribe(res => {
+          this.router.navigate(['../', res.resource[0].id], {
+            relativeTo: this.activatedRoute,
+          });
         });
     } else {
       if (this.userForm.value.setPassword) {
         data.password = this.userForm.value.password;
       }
       this.userService
-        .update(this.currentProfile.id, data, {
-          snackbarSuccess: 'admins.alerts.updateSuccess',
-        })
+        .update<GenericUpdateResponse, UserProfile>(
+          this.currentProfile.id,
+          data,
+          {
+            snackbarSuccess: 'admins.alerts.updateSuccess',
+          }
+        )
         .pipe(
           catchError(err => {
             this.triggerAlert('error', err.error.error.message);
             return throwError(() => new Error(err));
           })
         )
-        .subscribe(() => {
-          this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.USERS]);
+        .subscribe(res => {
+          this.router.navigate(['../', res.id], {
+            relativeTo: this.activatedRoute,
+          });
         });
     }
   }

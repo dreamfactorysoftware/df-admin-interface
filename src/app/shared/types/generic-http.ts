@@ -41,3 +41,8 @@ export interface RequestOptions {
   additionalParams: KeyValuePair[];
   additionalHeaders: KeyValuePair[];
 }
+
+export type GenericCreateResponse = GenericListResponse<{ id: number }>;
+export interface GenericUpdateResponse {
+  id: number;
+}

@@ -57,7 +57,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private activatedRoute: ActivatedRoute,
+    public activatedRoute: ActivatedRoute,
     private systemConfigDataService: DfSystemConfigDataService,
     private breakpointService: DfBreakpointService,
     private paywallService: DfPaywallService

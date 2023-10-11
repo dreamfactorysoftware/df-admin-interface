@@ -16,34 +16,3 @@ export const EDIT_DATA = {
   apiKey: 'test_api_key',
   roleByRoleId: null,
 };
-
-export const CREATE_ACTIVATED_ROUTE = {
-  data: {
-    pipe: () => {
-      return {
-        subscribe: (fn: (value: any) => void) =>
-          fn({
-            roles: {
-              resource: [...ROLES],
-            },
-          }),
-      };
-    },
-  },
-};
-
-export const EDIT_ACTIVATED_ROUTE = {
-  data: {
-    pipe: () => {
-      return {
-        subscribe: (fn: (value: any) => void) =>
-          fn({
-            roles: {
-              resource: [...ROLES],
-            },
-            appData: EDIT_DATA,
-          }),
-      };
-    },
-  },
-};

@@ -7,7 +7,7 @@ export interface RolePayload {
   lookupByRoleId: Lookup[];
 }
 
-export interface RoleServiceAccess {
+interface RoleServiceAccess {
   id: number;
   roleId: number;
   serviceId: number;
@@ -18,7 +18,7 @@ export interface RoleServiceAccess {
   filterOp: string;
 }
 
-export interface Lookup {
+interface Lookup {
   id: number;
   roleId: number;
   name: string;

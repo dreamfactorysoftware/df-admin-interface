@@ -14,16 +14,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Router, ActivatedRoute } from '@angular/router';
-import {
-  TranslocoDirective,
-  TranslocoPipe,
-  TranslocoService,
-} from '@ngneat/transloco';
-import { ROUTES } from 'src/app/shared/types/routes';
+import { TranslocoDirective, TranslocoPipe } from '@ngneat/transloco';
 import { CONFIG_CORS_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { CorsConfigData } from '../../shared/types/config';
-import { catchError, throwError } from 'rxjs';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
@@ -31,6 +25,11 @@ import {
   AlertType,
   DfAlertComponent,
 } from 'src/app/shared/components/df-alert/df-alert.component';
+import {
+  GenericCreateResponse,
+  GenericUpdateResponse,
+} from 'src/app/shared/types/generic-http';
+import { catchError, throwError } from 'rxjs';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -69,10 +68,9 @@ export class DfCorsConfigDetailsComponent implements OnInit {
     private corsConfigService: DfBaseCrudService,
     private router: Router,
     private activatedRoute: ActivatedRoute,
-    private translateService: TranslocoService,
     private formBuilder: FormBuilder
   ) {
-    this.corsForm = formBuilder.group({
+    this.corsForm = this.formBuilder.group({
       path: ['', Validators.required],
       description: [''],
       origins: ['', Validators.required],
@@ -86,35 +84,26 @@ export class DfCorsConfigDetailsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.activatedRoute.data
-      .pipe(
-        catchError(error => {
-          this.router.navigate([
-            `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
-          ]);
-          return throwError(() => new Error(error));
-        })
-      )
-      .subscribe(data => {
-        this.type = data['type'];
-        if (this.type === 'edit') {
-          this.corsConfigToEdit = data['data'] as CorsConfigData;
-          this.corsForm.setValue({
-            path: this.corsConfigToEdit.path,
-            description: this.corsConfigToEdit.description,
-            origins: this.corsConfigToEdit.origin,
-            headers: this.corsConfigToEdit.header,
-            exposedHeaders: this.corsConfigToEdit.exposedHeader,
-            maxAge: this.corsConfigToEdit.maxAge,
-            methods: this.corsConfigToEdit.method,
-            credentials: this.corsConfigToEdit.supportsCredentials,
-            enabled: this.corsConfigToEdit.enabled,
-          });
+    this.activatedRoute.data.subscribe(data => {
+      this.type = data['type'];
+      if (this.type === 'edit') {
+        this.corsConfigToEdit = data['data'] as CorsConfigData;
+        this.corsForm.setValue({
+          path: this.corsConfigToEdit.path,
+          description: this.corsConfigToEdit.description,
+          origins: this.corsConfigToEdit.origin,
+          headers: this.corsConfigToEdit.header,
+          exposedHeaders: this.corsConfigToEdit.exposedHeader,
+          maxAge: this.corsConfigToEdit.maxAge,
+          methods: this.corsConfigToEdit.method,
+          credentials: this.corsConfigToEdit.supportsCredentials,
+          enabled: this.corsConfigToEdit.enabled,
+        });
 
-          if (this.corsConfigToEdit.method.length === 5)
-            this.allMethodsSelected = true;
-        }
-      });
+        if (this.corsConfigToEdit.method.length === 5)
+          this.allMethodsSelected = true;
+      }
+    });
   }
 
   triggerAlert(type: AlertType, msg: string) {
@@ -156,7 +145,7 @@ export class DfCorsConfigDetailsComponent implements OnInit {
 
         // create mode
         this.corsConfigService
-          .create(
+          .create<GenericCreateResponse>(
             { resource: [payload] },
             {
               fields: '*',
@@ -172,36 +161,38 @@ export class DfCorsConfigDetailsComponent implements OnInit {
               return throwError(() => new Error(err));
             })
           )
-          .subscribe(() => {
-            this.router.navigate([
-              `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
-            ]);
+          .subscribe(res => {
+            this.router.navigate(['../', res.resource[0].id], {
+              relativeTo: this.activatedRoute,
+            });
           });
       } else {
         // edit mode
         const payload = this.assemblePayload();
         this.corsConfigService
-          .update(this.corsConfigToEdit.id, payload, {
-            snackbarSuccess: 'cors.alerts.updateSuccess',
-          })
+          .update<GenericUpdateResponse, Partial<CorsConfigData>>(
+            this.corsConfigToEdit.id,
+            payload,
+            {
+              snackbarSuccess: 'cors.alerts.updateSuccess',
+            }
+          )
           .pipe(
             catchError(err => {
               this.triggerAlert('error', err.error.error.message);
               return throwError(() => new Error(err));
             })
           )
-          .subscribe(() => {
-            this.router.navigate([
-              `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
-            ]);
+          .subscribe(res => {
+            this.router.navigate(['../', res.id], {
+              relativeTo: this.activatedRoute,
+            });
           });
       }
     }
   }
 
   onCancel() {
-    this.router.navigate([
-      `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
-    ]);
+    this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 }

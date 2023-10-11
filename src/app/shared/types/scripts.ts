@@ -1,15 +1,3 @@
-export interface ScriptDetailsType {
-  [serviceName: string]: any;
-}
-
-export interface ScriptType {
-  name: string;
-  label: string;
-  description: string;
-  sandboxed: boolean;
-  supportsInlineExecution: boolean;
-}
-
 export interface ScriptObject {
   name: string;
   type: string;
@@ -27,7 +15,6 @@ export interface ScriptObject {
   lastModifiedDate?: string;
 }
 
-// TODO: may need to update this from snake case to camel case
 // additonal note: this object appears in snake case
 export interface GithubFileObject {
   content: string;

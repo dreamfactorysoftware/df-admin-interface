@@ -3,15 +3,11 @@ export interface Files {
   serviceTypes: ServiceType[];
 }
 
-export interface ServiceType {
+interface ServiceType {
   name: string;
   label: string;
-  group: Group;
+  group: string;
   description: string;
-}
-
-export enum Group {
-  File = 'File',
 }
 
 export interface Service {
@@ -25,23 +21,16 @@ export interface Service {
 export interface FileTableRow {
   path: string;
   name: string;
-  type: 'folder' | 'file';
+  type: EntityType;
   contentType: string;
   lastModified?: string;
 }
-
-export interface FileResponse {
-  path: string;
-  contentType?: string;
-  lastModified?: string;
-  contentLength?: number;
-  name: string;
-  type: string;
-}
-
 export interface FileType {
   path: string;
-  last_modified?: string;
+  lastModified?: string;
   name: string;
-  type: string;
+  type: EntityType;
+  contentType: string;
 }
+
+type EntityType = 'file' | 'folder';

@@ -31,11 +31,7 @@ export class DfBaseCrudService {
     );
   }
 
-  create<T, S>(
-    data: any,
-    options?: Partial<RequestOptions>,
-    endpoint?: string
-  ) {
+  create<T>(data: any, options?: Partial<RequestOptions>, endpoint?: string) {
     return this.http.post<T>(
       `${this.url}${endpoint ? `/${endpoint}` : ''}`,
       data,

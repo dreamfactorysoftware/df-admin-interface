@@ -19,9 +19,13 @@ import {
   EmailTemplatePayload,
 } from '../../shared/types/email-templates';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { ROUTES } from 'src/app/shared/types/routes';
 import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import {
+  AlertType,
+  DfAlertComponent,
+} from 'src/app/shared/components/df-alert/df-alert.component';
+import { catchError, throwError } from 'rxjs';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -40,12 +44,15 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     MatOptionModule,
     TranslocoPipe,
     AsyncPipe,
+    DfAlertComponent,
   ],
 })
 export class DfEmailTemplateDetailsComponent implements OnInit {
   emailTemplateForm: FormGroup;
-  translateService: any;
   editApp: EmailTemplate;
+  alertMsg = '';
+  showAlert = false;
+  alertType: AlertType = 'error';
 
   constructor(
     @Inject(EMAIL_TEMPLATES_SERVICE_TOKEN)
@@ -73,8 +80,8 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.activatedRoute.data.subscribe((data: any) => {
-      this.editApp = data?.data;
+    this.activatedRoute.data.subscribe(({ data }) => {
+      this.editApp = data;
     });
 
     if (this.editApp) {
@@ -86,20 +93,24 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
         bcc: this.editApp.bcc,
         subject: this.editApp.subject,
         attachment: this.editApp.attachment,
-        body: this.editApp.body_html,
-        senderName: this.editApp.from_name,
-        senderEmail: this.editApp.from_email,
-        replyToName: this.editApp.reply_to_name,
-        replyToEmail: this.editApp.reply_to_email,
+        body: this.editApp.bodyHtml,
+        senderName: this.editApp.fromName,
+        senderEmail: this.editApp.fromEmail,
+        replyToName: this.editApp.replyToName,
+        replyToEmail: this.editApp.replyToEmail,
         id: this.editApp.id,
       });
     }
   }
 
+  triggerAlert(type: AlertType, msg: string) {
+    this.alertType = type;
+    this.alertMsg = msg;
+    this.showAlert = true;
+  }
+
   goBack() {
-    this.router.navigate([
-      `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.EMAIL_TEMPLATES}`,
-    ]);
+    this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 
   onSubmit() {
@@ -115,11 +126,11 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
       bcc: this.emailTemplateForm.value.bcc,
       subject: this.emailTemplateForm.value.subject,
       attachment: this.emailTemplateForm.value.attachment,
-      body_html: this.emailTemplateForm.value.body,
-      from_name: this.emailTemplateForm.value.senderName,
-      from_email: this.emailTemplateForm.value.senderEmail,
-      reply_to_name: this.emailTemplateForm.value.replyToName,
-      reply_to_email: this.emailTemplateForm.value.replyToEmail,
+      bodyHtml: this.emailTemplateForm.value.body,
+      fromName: this.emailTemplateForm.value.senderName,
+      fromEmail: this.emailTemplateForm.value.senderEmail,
+      replyToName: this.emailTemplateForm.value.replyToName,
+      replyToEmail: this.emailTemplateForm.value.replyToEmail,
     };
 
     if (this.emailTemplateForm.value.id) {
@@ -127,6 +138,12 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
         .update(this.emailTemplateForm.value.id, payload, {
           snackbarSuccess: 'emailTemplates.alerts.updateSuccess',
         })
+        .pipe(
+          catchError(err => {
+            this.triggerAlert('error', err.error.error.message);
+            return throwError(() => new Error(err));
+          })
+        )
         .subscribe(() => {
           this.goBack();
         });
@@ -137,6 +154,15 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
           {
             snackbarSuccess: 'emailTemplates.alerts.createSuccess',
           }
+        )
+        .pipe(
+          catchError(err => {
+            this.triggerAlert(
+              'error',
+              err.error.error.context.resource[0].message
+            );
+            return throwError(() => new Error(err));
+          })
         )
         .subscribe(() => {
           this.goBack();

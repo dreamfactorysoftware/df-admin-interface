@@ -39,15 +39,17 @@
           >
         </mat-radio-group>
       </ng-container>
-      <!-- // TODO missing translation -->
       <ng-template #editMode
-        ><span>Confirmed: {{ currentProfile.confirmed ? 'Yes' : 'No' }}</span>
+        ><span
+          >{{ 'confirmed' | transloco }}:
+          {{ currentProfile.confirmed ? 'Yes' : 'No' }}</span
+        >
         <button
           mat-flat-button
           color="primary"
           (click)="sendInvite()"
           *ngIf="!currentProfile.confirmed">
-          Send Invite <fa-icon [icon]="faEnvelope"></fa-icon>
+          {{ 'sendInvite' | transloco }} <fa-icon [icon]="faEnvelope"></fa-icon>
         </button>
         <ng-container *ngIf="userForm.contains('setPassword')">
           <mat-checkbox formControlName="setPassword"
@@ -128,7 +130,7 @@
           <mat-checkbox
             [checked]="allTabsSelected"
             (change)="selectAllTabs($event)">
-            Select all</mat-checkbox
+            {{ 'selectAll' | transloco }}</mat-checkbox
           >
           <div class="access-tabs" formArrayName="tabs">
             <ng-container
@@ -154,7 +156,7 @@
       {{ 'cancel' | transloco }}
     </button>
     <button mat-flat-button color="primary" type="submit">
-      {{ 'save' | transloco }}
+      {{ (type === 'create' ? 'create' : 'update') | transloco }}
     </button>
   </div>
 </form>

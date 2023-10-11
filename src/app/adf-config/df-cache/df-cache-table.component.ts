@@ -2,7 +2,6 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Component, Inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
-  Actions,
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
@@ -13,6 +12,7 @@ import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { faRefresh } from '@fortawesome/free-solid-svg-icons';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
+import { Actions } from 'src/app/shared/types/table';
 
 @Component({
   selector: 'df-cache-table',
@@ -66,7 +66,7 @@ export class DfCacheTableComponent extends DfManageTableComponent<CacheRow> {
     ],
   };
 
-  mapDataToTable(data: any): CacheRow[] {
+  mapDataToTable(data: CacheType[]): CacheRow[] {
     return data.map((app: CacheType) => {
       return {
         label: app.label,
