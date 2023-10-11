@@ -56,10 +56,39 @@ describe('DfSystemConfigDataService', () => {
           saml: [],
         },
         platform: {
+          version: '5.0.1',
+          bitnamiDemo: false,
+          isHosted: false,
+          isTrial: false,
+          license: 'GOLD',
+          securedPackageExport: true,
+          licenseKey: '4bc5595cfd2777587e8b578e029198a7',
+          dbDriver: 'mysql',
+          installPath: '/opt/dreamfactory/',
+          logPath: '/opt/dreamfactory/storage/logs/',
+          appDebug: false,
+          logMode: 'stack',
+          logLevel: 'debug',
+          cacheDriver: 'redis',
+          packages: [
+            {
+              name: 'apple/apn-push',
+              version: 'v3.1.6',
+            },
+            {
+              name: 'aws/aws-crt-php',
+              version: 'v1.2.1',
+            },
+          ],
           rootAdminExists: true,
+          dfInstanceId: '0001',
         },
         server: {
+          serverOs: 'linux',
+          release: '5.15.49-linuxkit-pr',
+          version: '#1 SMP Thu May 25 07:17:40 UTC 2023',
           host: 'localhost',
+          machine: 'x86_64',
         },
       };
 
@@ -71,23 +100,5 @@ describe('DfSystemConfigDataService', () => {
       expect(req.request.method).toBe('GET');
       req.flush(mockEnvironmentData);
     });
-
-    // TODO fix test
-    // it('should clear token and throw error when request fails', done => {
-    // service.fetchEnvironmentData();
-
-    // // const req = httpMock.expectOne('/api/v2/system/environment');
-    // const req = httpMock.expectOne(URLS.ENVIRONMENT);
-    // expect(req.request.method).toBe('GET');
-
-    // req.flush(null, { status: 500, statusText: 'Internal Server Error' });
-
-    // setTimeout(() => {
-    //   // expect(authServiceSpy).toHaveBeenCalled();
-    //   expect(userDataServiceMock).toHaveBeenCalled();
-
-    //   done();
-    // }, 1000);
-    // });
   });
 });

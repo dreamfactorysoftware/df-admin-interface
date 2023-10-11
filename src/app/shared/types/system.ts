@@ -30,6 +30,7 @@ export interface Environment {
       version: string;
     }>;
     dfInstanceId: string;
+    rootAdminExists: boolean;
   };
   server: {
     host: string;
