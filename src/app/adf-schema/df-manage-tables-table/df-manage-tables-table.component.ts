@@ -37,17 +37,13 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
 
-  // override allowDelete = false;
-  // override allowCreate = false;
   override allowFilter = false;
-  // override readOnly = true;
 
-  // TODO: update the header names with translation below
   override columns = [
     {
       columnDef: 'tableName',
       cell: (row: DatabaseTableRowData) => row.label,
-      header: 'Table Name',
+      header: 'schema.tableName',
     },
     {
       columnDef: 'actions',

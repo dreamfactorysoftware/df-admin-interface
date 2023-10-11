@@ -42,7 +42,7 @@ export interface TableField {
   refOnDelete?: any;
   picklist?: string[];
   validation?: Validation;
-  dbFunction?: any;
+  dbFunction?: string;
   isVirtual: boolean;
   isAggregate: boolean;
 }
@@ -72,9 +72,9 @@ export interface TableRelated {
   refOnUpdate: string;
   refOnDelete: string;
   junctionServiceID?: number;
-  junctionTable?: any;
-  junctionField?: any;
-  junctionRefField?: any;
+  junctionTable?: string;
+  junctionField?: string;
+  junctionRefField?: string;
   alwaysFetch: boolean;
   flatten: boolean;
   flattenDropPrefix: boolean;
