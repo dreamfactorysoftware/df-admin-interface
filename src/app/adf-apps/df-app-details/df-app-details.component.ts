@@ -94,7 +94,7 @@ export class DfAppDetailsComponent implements OnInit {
     this.appForm = this.fb.group({
       name: ['', Validators.required],
       description: [''],
-      defaultRole: [null], // TODO get role name instead of id
+      defaultRole: [null],
       active: [false],
       appLocation: ['0'], // "type" property
       storageServiceId: [3], // type 2
@@ -118,7 +118,7 @@ export class DfAppDetailsComponent implements OnInit {
         defaultRole: this.editApp.roleByRoleId,
         active: this.editApp.isActive,
         appLocation: `${this.editApp.type}`,
-        storageServiceId: this.editApp.storageServiceId, // TODO fix ui not updating with default value
+        storageServiceId: this.editApp.storageServiceId,
         storageContainer: this.editApp.storageContainer,
         path: this.editApp.path,
         url: this.editApp.url,
