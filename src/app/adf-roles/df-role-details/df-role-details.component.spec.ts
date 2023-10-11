@@ -17,20 +17,22 @@ const mockRole = {
   name: 'name',
   description: 'description',
   isActive: true,
-  roleServiceAccessByRoleId: {
-    id: 6,
-    roleId: 3,
-    serviceId: 7,
-    component: 'profile/',
-    verbMask: 1,
-    requestorMask: 1,
-    filters: [],
-    filterOp: 'AND',
-    createdDate: '2023-09-21T17:51:20.000000Z',
-    lastModifiedDate: '2023-09-21T17:51:20.000000Z',
-    createdById: null,
-    lastModifiedById: null,
-  },
+  roleServiceAccessByRoleId: [
+    {
+      id: 6,
+      roleId: 3,
+      serviceId: 7,
+      component: 'profile/',
+      verbMask: 16,
+      requestorMask: 3,
+      filters: [],
+      filterOp: 'AND',
+      createdDate: '2023-09-21T17:51:20.000000Z',
+      lastModifiedDate: '2023-09-21T17:51:20.000000Z',
+      createdById: null,
+      lastModifiedById: null,
+    },
+  ],
   lookupByRoleId: [],
 };
 
@@ -182,5 +184,19 @@ describe('DfRoleDetailsComponent - edit', () => {
     component.onSubmit();
 
     expect(crudServiceSpy).not.toHaveBeenCalled();
+  });
+
+  it('should convert requester value using handleRequesterValue', () => {
+    const result = component.handleRequesterValue(1);
+    expect(result).toEqual([1]);
+    const result2 = component.handleRequesterValue(3);
+    expect(result2).toEqual([1, 2]);
+  });
+
+  it('should convert access value using handleAccessValue', () => {
+    const result = component.handleAccessValue(1);
+    expect(result).toEqual([1]);
+    const result2 = component.handleAccessValue(32);
+    expect(result2).toEqual([16, 8, 4, 2, 1]);
   });
 });
