@@ -38,6 +38,9 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { generateApiKey } from 'src/app/shared/utilities/hash';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
+import { catchError, throwError } from 'rxjs';
+import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
+import { DfAlertComponent } from 'src/app/shared/components/df-alert/df-alert.component';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -61,6 +64,7 @@ import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-con
     MatSelectModule,
     TranslocoPipe,
     MatTooltipModule,
+    DfAlertComponent,
   ],
 })
 export class DfAppDetailsComponent implements OnInit {
@@ -73,6 +77,9 @@ export class DfAppDetailsComponent implements OnInit {
   faCopy = faCopy;
   faCircleInfo = faCircleInfo;
   faRefresh = faRefresh;
+  alertMsg = '';
+  showAlert = false;
+  alertType: AlertType = 'error';
 
   constructor(
     private fb: FormBuilder,
@@ -87,7 +94,7 @@ export class DfAppDetailsComponent implements OnInit {
     this.appForm = this.fb.group({
       name: ['', Validators.required],
       description: [''],
-      defaultRole: [null], // TODO get role name instead of id
+      defaultRole: [null],
       active: [false],
       appLocation: ['0'], // "type" property
       storageServiceId: [3], // type 2
@@ -111,7 +118,7 @@ export class DfAppDetailsComponent implements OnInit {
         defaultRole: this.editApp.roleByRoleId,
         active: this.editApp.isActive,
         appLocation: `${this.editApp.type}`,
-        storageServiceId: this.editApp.storageServiceId, // TODO fix ui not updating with default value
+        storageServiceId: this.editApp.storageServiceId,
         storageContainer: this.editApp.storageContainer,
         path: this.editApp.path,
         url: this.editApp.url,
@@ -185,6 +192,12 @@ export class DfAppDetailsComponent implements OnInit {
       .catch(error => console.error(error));
   }
 
+  triggerAlert(type: AlertType, msg: string) {
+    this.alertType = type;
+    this.alertMsg = msg;
+    this.showAlert = true;
+  }
+
   goBack() {
     this.router.navigate([`${ROUTES.API_CONNECTIONS}/${ROUTES.API_KEYS}`]);
   }
@@ -197,7 +210,9 @@ export class DfAppDetailsComponent implements OnInit {
       name: this.appForm.value.name,
       description: this.appForm.value.description,
       type: parseInt(this.appForm.value.appLocation),
-      role_id: this.appForm.value.defaultRole,
+      role_id: this.appForm.value.defaultRole
+        ? this.appForm.value.defaultRole.id
+        : null,
       is_active: this.appForm.value.active,
       url:
         this.appForm.value.appLocation === '2' ? this.appForm.value.url : null,
@@ -216,10 +231,36 @@ export class DfAppDetailsComponent implements OnInit {
           : null,
     };
     if (this.editApp) {
-      // TODO include snackbardSuccess and error
-      this.appsService.update(this.editApp.id, payload).subscribe();
+      this.appsService
+        .update(this.editApp.id, payload, {
+          snackbarSuccess: 'apps.updateSuccess',
+        })
+        .pipe(
+          catchError(err => {
+            this.triggerAlert('error', err.error.error.message);
+            return throwError(() => new Error(err));
+          })
+        )
+        .subscribe(() => {
+          this.goBack();
+        });
     } else {
-      this.appsService.create({ resource: [payload] }).subscribe();
+      this.appsService
+        .create(
+          { resource: [payload] },
+          {
+            snackbarSuccess: 'apps.createSuccess',
+          }
+        )
+        .pipe(
+          catchError(err => {
+            this.triggerAlert('error', err.error.error.message);
+            return throwError(() => new Error(err));
+          })
+        )
+        .subscribe(() => {
+          this.goBack();
+        });
     }
   }
 
