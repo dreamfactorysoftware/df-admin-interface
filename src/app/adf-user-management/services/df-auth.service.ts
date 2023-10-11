@@ -15,8 +15,6 @@ import {
   RegisterDetails,
 } from '../../shared/types/user-management';
 import { UserSession } from 'src/app/shared/types/user';
-
-//TODO default role for app enable user to enter without authentication
 @Injectable({
   providedIn: 'root',
 })

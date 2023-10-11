@@ -7,17 +7,17 @@ export interface EmailTemplate {
   bcc?: string;
   subject?: string;
   attachment?: string;
-  body_text?: string;
-  body_html?: string;
-  from_name?: string;
-  from_email?: string;
-  reply_to_name?: string;
-  reply_to_email?: string;
+  bodyText?: string;
+  bodyHtml?: string;
+  fromName?: string;
+  fromEmail?: string;
+  replyToName?: string;
+  replyToEmail?: string;
   defaults?: any;
-  created_date: string;
-  last_modified_date: string;
-  created_by_id?: number;
-  last_modified_by_id?: number;
+  createdDate: string;
+  lastModifiedDate: string;
+  createdById?: number;
+  lastModifiedById?: number;
 }
 
 export interface EmailTemplateRow {
@@ -34,9 +34,9 @@ export interface EmailTemplatePayload {
   bcc?: string;
   subject?: string;
   attachment?: string;
-  body_html?: string;
-  from_name?: string;
-  from_email?: string;
-  reply_to_name?: string;
-  reply_to_email?: string;
+  bodyHtml?: string;
+  fromName?: string;
+  fromEmail?: string;
+  replyToName?: string;
+  replyToEmail?: string;
 }

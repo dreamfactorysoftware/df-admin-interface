@@ -11,14 +11,13 @@ export const serviceReportsResolver: ResolveFn<
   GenericListResponse<ServiceReportData> | string
 > = () => {
   const paywallService = inject(DfPaywallService);
+  const reportService = inject(REPORT_SERVICE_TOKEN);
   return paywallService.activatePaywall('service_report').pipe(
     switchMap(activated => {
       if (activated) {
         return of('paywall');
       }
-      return inject(REPORT_SERVICE_TOKEN).getAll<
-        GenericListResponse<ServiceReportData>
-      >();
+      return reportService.getAll<GenericListResponse<ServiceReportData>>();
     })
   );
 };

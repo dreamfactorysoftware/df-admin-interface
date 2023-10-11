@@ -1,4 +1,3 @@
-<!-- TODO translations -->
 <div class="details-section">
   <div class="actions full-width">
     <input
@@ -47,7 +46,7 @@
       type="button"
       (click)="viewLatest()"
       [disabled]="!storagePath.getRawValue()">
-      View Latest
+      {{ 'scripts.viewLatest' | transloco }}
     </button>
     <button
       *ngIf="cache"
@@ -55,7 +54,7 @@
       color="primary"
       type="button"
       (click)="deleteCache()">
-      Delete Cache
+      {{ 'scripts.deleteCache' | transloco }}
     </button>
   </div>
 

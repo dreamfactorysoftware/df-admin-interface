@@ -27,7 +27,6 @@ export interface ScriptObject {
   lastModifiedDate?: string;
 }
 
-// TODO: may need to update this from snake case to camel case
 // additonal note: this object appears in snake case
 export interface GithubFileObject {
   content: string;

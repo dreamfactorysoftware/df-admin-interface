@@ -86,11 +86,11 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
         bcc: this.editApp.bcc,
         subject: this.editApp.subject,
         attachment: this.editApp.attachment,
-        body: this.editApp.body_html,
-        senderName: this.editApp.from_name,
-        senderEmail: this.editApp.from_email,
-        replyToName: this.editApp.reply_to_name,
-        replyToEmail: this.editApp.reply_to_email,
+        body: this.editApp.bodyHtml,
+        senderName: this.editApp.fromName,
+        senderEmail: this.editApp.fromEmail,
+        replyToName: this.editApp.replyToName,
+        replyToEmail: this.editApp.replyToEmail,
         id: this.editApp.id,
       });
     }
@@ -115,11 +115,11 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
       bcc: this.emailTemplateForm.value.bcc,
       subject: this.emailTemplateForm.value.subject,
       attachment: this.emailTemplateForm.value.attachment,
-      body_html: this.emailTemplateForm.value.body,
-      from_name: this.emailTemplateForm.value.senderName,
-      from_email: this.emailTemplateForm.value.senderEmail,
-      reply_to_name: this.emailTemplateForm.value.replyToName,
-      reply_to_email: this.emailTemplateForm.value.replyToEmail,
+      bodyHtml: this.emailTemplateForm.value.body,
+      fromName: this.emailTemplateForm.value.senderName,
+      fromEmail: this.emailTemplateForm.value.senderEmail,
+      replyToName: this.emailTemplateForm.value.replyToName,
+      replyToEmail: this.emailTemplateForm.value.replyToEmail,
     };
 
     if (this.emailTemplateForm.value.id) {

@@ -60,6 +60,12 @@ export interface DefaultAction<T> {
   disabled?: (row: T) => boolean;
 }
 
+export interface Column<T> {
+  columnDef: string;
+  cell?: (element: T) => unknown;
+  header?: string;
+}
+
 export interface AdditonalAction<T> extends DefaultAction<T> {
   icon?: IconDefinition;
 }
@@ -91,11 +97,8 @@ export abstract class DfManageTableComponent<T>
   allowFilter = true;
   currentFilter = new FormControl('');
 
-  abstract columns: Array<{
-    columnDef: string;
-    cell?: (element: T) => any;
-    header?: string;
-  }>;
+  abstract columns: Array<Column<T>>;
+
   @ViewChild(MatSort) sort: MatSort;
   _activatedRoute = this.activatedRoute;
   _translateService = this.translateService;
