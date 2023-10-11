@@ -42,12 +42,11 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
   override allowFilter = false;
   // override readOnly = true;
 
-  // TODO: update the header names with translation below
   override columns = [
     {
       columnDef: 'tableName',
       cell: (row: DatabaseTableRowData) => row.label,
-      header: 'Table Name',
+      header: 'schema.tableName',
     },
     {
       columnDef: 'actions',
