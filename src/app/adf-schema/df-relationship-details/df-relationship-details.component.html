@@ -1,3 +1,9 @@
+<df-alert
+  [showAlert]="showAlert"
+  [alertType]="alertType"
+  (alertClosed)="showAlert = false">
+  {{ alertMsg }}
+</df-alert>
 <form
   [formGroup]="relationshipForm"
   (ngSubmit)="save()"
