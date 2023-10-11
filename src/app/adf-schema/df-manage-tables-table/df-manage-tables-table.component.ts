@@ -37,10 +37,7 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
 
-  // override allowDelete = false;
-  // override allowCreate = false;
   override allowFilter = false;
-  // override readOnly = true;
 
   override columns = [
     {
