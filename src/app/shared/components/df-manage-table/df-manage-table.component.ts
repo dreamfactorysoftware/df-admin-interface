@@ -11,7 +11,7 @@ import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 import { IconDefinition, IconProp } from '@fortawesome/fontawesome-svg-core';
 import {
   faTrashCan,

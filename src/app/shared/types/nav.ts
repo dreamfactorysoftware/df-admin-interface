@@ -1,4 +1,7 @@
+import { ROUTES } from './routes';
+
 export interface Nav {
-  route: string;
+  path: string;
   subRoutes?: Nav[];
+  route: ROUTES;
 }

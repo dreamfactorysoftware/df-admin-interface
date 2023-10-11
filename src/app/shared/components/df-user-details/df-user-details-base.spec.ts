@@ -14,7 +14,7 @@ import {
 import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
 import { MatCheckboxChange } from '@angular/material/checkbox';
 import { UntilDestroy } from '@ngneat/until-destroy';
-import { ROUTES } from '../../constants/routes';
+import { ROUTES } from '../../types/routes';
 import { BehaviorSubject } from 'rxjs';
 
 @UntilDestroy({ checkProperties: true })

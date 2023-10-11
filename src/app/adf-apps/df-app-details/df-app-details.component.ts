@@ -33,7 +33,7 @@ import {
   faRefresh,
 } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { generateApiKey } from 'src/app/shared/utilities/hash';

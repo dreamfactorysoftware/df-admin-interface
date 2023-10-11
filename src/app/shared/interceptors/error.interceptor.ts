@@ -9,13 +9,13 @@ import { inject } from '@angular/core';
 import { catchError, from, mergeMap, throwError } from 'rxjs';
 import { DfErrorService } from '../services/df-error.service';
 import { Router } from '@angular/router';
-import { ROUTES } from '../constants/routes';
+import { ROUTES } from '../types/routes';
 
 export const errorInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
-  if (req.url.startsWith('/api')) {
+  if (req.url.startsWith('/api') && !req.url.endsWith('system')) {
     const router = inject(Router);
     const userDataService = inject(DfUserDataService);
     const errorService = inject(DfErrorService);

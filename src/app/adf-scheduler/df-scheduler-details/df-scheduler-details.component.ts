@@ -1,7 +1,7 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 import { JsonValidator } from 'src/app/shared/validators/json.validator';
 import {
   BASE_SERVICE_TOKEN,

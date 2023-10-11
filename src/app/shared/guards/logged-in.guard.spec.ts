@@ -2,7 +2,7 @@ import { of, BehaviorSubject } from 'rxjs';
 import { DfAuthService } from '../../adf-user-management/services/df-auth.service';
 import { DfUserDataService } from '../services/df-user-data.service';
 import { Router } from '@angular/router';
-import { ROUTES } from '../constants/routes';
+import { ROUTES } from '../types/routes';
 import { loggedInGuard } from './logged-in.guard';
 import { TestBed, waitForAsync } from '@angular/core/testing';
 

@@ -9,7 +9,7 @@ import SwaggerUI from 'swagger-ui';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { TranslocoModule } from '@ngneat/transloco';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 import { saveRawAsFile } from 'src/app/shared/utilities/file';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';

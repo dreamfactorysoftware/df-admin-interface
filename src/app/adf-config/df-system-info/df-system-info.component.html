@@ -30,42 +30,42 @@
           {{ 'version' | transloco }}:
           {{ environment.platform?.version }}
         </li>
-        <li>
+        <li *ngIf="environment.platform?.dbDriver">
           {{ 'systemInfo.instance.systemDatabase' | transloco }}:
           {{ environment.platform?.dbDriver }}
         </li>
-        <li>
+        <li *ngIf="environment.platform?.installPath">
           {{ 'systemInfo.instance.installPath' | transloco }}:
           {{ environment.platform?.installPath }}
         </li>
-        <li>
+        <li *ngIf="environment.platform?.logPath">
           {{ 'systemInfo.instance.logPath' | transloco }}:
           {{ environment.platform?.logPath }}
         </li>
-        <li>
+        <li *ngIf="environment.platform?.logMode">
           {{ 'systemInfo.instance.logMode' | transloco }}:
           {{ environment.platform?.logMode }}
         </li>
-        <li>
+        <li *ngIf="environment.platform?.logLevel">
           {{ 'systemInfo.instance.logLevel' | transloco }}:
           {{ environment.platform?.logLevel }}
         </li>
-        <li>
+        <li *ngIf="environment.platform?.cacheDriver">
           {{ 'systemInfo.instance.cacheDriver' | transloco }}:
           {{ environment.platform?.cacheDriver }}
         </li>
-        <li>
+        <li *ngIf="environment.platform?.isTrial">
           {{ 'systemInfo.instance.demo' | transloco }}:
           {{ environment.platform?.isTrial }}
         </li>
-        <li>
+        <li *ngIf="environment.platform?.dfInstanceId">
           DreamFactory
           {{ 'systemInfo.instance.instanceId' | transloco }}:
           {{ environment.platform?.dfInstanceId }}
         </li>
       </ul>
     </div>
-    <div class="system-info-packages">
+    <div class="system-info-packages" *ngIf="environment.platform?.packages">
       <h3>{{ 'systemInfo.packages' | transloco }}</h3>
       <div class="package-header">
         <span>{{ 'name' | transloco }}</span
@@ -101,13 +101,16 @@
         {{ 'systemInfo.server.machine' | transloco }}:
         {{ environment.server.machine }}
       </li>
-      <li>
-        PHP {{ 'version' | transloco }}: {{ environment.php?.core?.phpVersion }}
-      </li>
-      <li>
-        PHP {{ 'systemInfo.server.serverApi' | transloco }}:
-        {{ environment.php?.general?.serverApi }}
-      </li>
+      <ng-container *ngIf="environment.php">
+        <li>
+          PHP {{ 'version' | transloco }}:
+          {{ environment.php.core.phpVersion }}
+        </li>
+        <li>
+          PHP {{ 'systemInfo.server.serverApi' | transloco }}:
+          {{ environment.php.general.serverApi }}
+        </li>
+      </ng-container>
     </ul>
   </div>
   <h2>{{ 'systemInfo.client.heading' | transloco }}</h2>

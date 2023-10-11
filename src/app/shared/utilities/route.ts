@@ -1,35 +1,110 @@
 import { Routes } from '@angular/router';
 import { Nav } from '../types/nav';
-import { ROUTES } from '../constants/routes';
+import { ROUTES } from '../types/routes';
 
-export function transformRoutes(routes: Routes, root = '') {
+const filteredFromNav = [
+  ROUTES.CREATE,
+  ROUTES.IMPORT,
+  ROUTES.EDIT,
+  ROUTES.AUTH,
+  ROUTES.PROFILE,
+  ROUTES.VIEW,
+  ROUTES.ERROR,
+  ROUTES.LICENSE_EXPIRED,
+];
+
+export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
   return routes
     .filter(
       route =>
         route.path &&
-        ![
-          ROUTES.CREATE,
-          ROUTES.IMPORT,
-          ROUTES.EDIT,
-          ROUTES.AUTH,
-          ROUTES.PROFILE,
-          ROUTES.VIEW,
-          ROUTES.ERROR,
-          ROUTES.LICENSE_EXPIRED,
-        ].includes(route.path.split('/')[0] as ROUTES) &&
-        route.path !== '' &&
-        !route.path.includes(':')
+        !route.path.includes(':') &&
+        !filteredFromNav.includes(route.path as ROUTES)
     )
     .map(route => {
-      const transformed: Nav = { route: `${root}/${route.path}` };
       if (route.children) {
-        const subroutes = transformRoutes(route.children, transformed.route);
-        if (subroutes.length > 0) {
-          transformed.subRoutes = subroutes;
-        }
+        const subRoutes = transformRoutes(
+          route.children,
+          `${root}/${route.path}`
+        );
+        return {
+          path: `${root}/${route.path}`,
+          subRoutes: subRoutes.length ? subRoutes : undefined,
+          route: route.path as ROUTES,
+        };
       }
-      return transformed;
+      return {
+        path: `${root}/${route.path}`,
+        route: route.path as ROUTES,
+      };
     });
+}
+
+export function accessibleRoutes(
+  navs: Array<Nav>,
+  allowedTabs: Array<string>
+): Array<Nav> {
+  const allowed: Array<ROUTES> = [
+    ROUTES.QUICKSTART,
+    ROUTES.WELCOME,
+    ROUTES.RESOURCES,
+    ROUTES.DOWNLOAD,
+    ROUTES.SYSTEM_INFO,
+  ];
+  allowedTabs?.forEach(tab => {
+    switch (tab) {
+      case 'apps':
+        allowed.push(ROUTES.API_KEYS);
+        break;
+      case 'users':
+        allowed.push(ROUTES.USERS);
+        break;
+      case 'services':
+        allowed.push(
+          ROUTES.DATABASE,
+          ROUTES.SCRIPTING,
+          ROUTES.NETWROK,
+          ROUTES.FILE,
+          ROUTES.UTILITY,
+          ROUTES.AUTHENTICATION,
+          ROUTES.DF_PLATFORM_APIS
+        );
+        break;
+      case 'apidocs':
+        allowed.push(ROUTES.API_DOCS);
+        break;
+      case 'schema/data':
+        allowed.push(ROUTES.SCHEMA);
+        break;
+      case 'files':
+        allowed.push(ROUTES.FILES);
+        break;
+      case 'scripts':
+        allowed.push(ROUTES.EVENT_SCRIPTS);
+        break;
+      case 'config':
+        allowed.push(
+          ROUTES.CORS,
+          ROUTES.CACHE,
+          ROUTES.EMAIL_TEMPLATES,
+          ROUTES.GLOBAL_LOOKUP_KEYS
+        );
+        break;
+      case 'limits':
+        allowed.push(ROUTES.RATE_LIMITING);
+        break;
+      case 'scheduler':
+        allowed.push(ROUTES.SCHEDULER);
+        break;
+    }
+  });
+  return navs.filter(nav => {
+    if (nav.subRoutes) {
+      nav.subRoutes = accessibleRoutes(nav.subRoutes, allowedTabs);
+      return nav.subRoutes.length;
+    }
+    return allowed.includes(nav.route);
+  });
 }
 
 type Breadcrumb = {

@@ -24,7 +24,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatButtonModule } from '@angular/material/button';
 import { DfRolesAccessComponent } from '../df-roles-access/df-roles-access.component';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 import { UntilDestroy } from '@ngneat/until-destroy';
 @UntilDestroy({ checkProperties: true })
 @Component({

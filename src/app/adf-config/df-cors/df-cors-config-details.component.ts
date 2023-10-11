@@ -19,7 +19,7 @@ import {
   TranslocoPipe,
   TranslocoService,
 } from '@ngneat/transloco';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 import { CONFIG_CORS_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { CorsConfigData } from '../../shared/types/config';

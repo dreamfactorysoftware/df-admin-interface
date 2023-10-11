@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { ROUTES } from './shared/constants/routes';
+import { ROUTES } from './shared/types/routes';
 import { loggedInGuard } from './shared/guards/logged-in.guard';
 import { notLoggedInGuard } from './shared/guards/not-logged-in.guard';
 import { appsResolver } from './adf-apps/resolvers/manage-apps.resolver';
@@ -54,6 +54,7 @@ import { checkStatusResolver } from './adf-config/resolvers/df-check-status.reso
 import { licenseGuard } from './shared/guards/license.guard';
 import { errorGaurd } from './shared/guards/error.guard';
 import { paywallGuard } from './shared/guards/paywall.guard';
+import { rootAdminGuard } from './shared/guards/admin.guard';
 
 export const routes: Routes = [
   {
@@ -564,6 +565,7 @@ export const routes: Routes = [
           provideTranslocoScope('admins'),
           provideTranslocoScope('userManagement'),
         ],
+        canActivate: [rootAdminGuard],
       },
       {
         path: ROUTES.SCHEMA,

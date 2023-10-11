@@ -7,16 +7,14 @@ import {
   HTTP_OPTION_LOGIN_FALSE,
   SHOW_LOADING_HEADER,
 } from '../../shared/constants/http-headers';
-import { ROUTES } from '../../shared/constants/routes';
-import {
-  DfUserDataService,
-  UserData,
-} from '../../shared/services/df-user-data.service';
+import { ROUTES } from '../../shared/types/routes';
+import { DfUserDataService } from '../../shared/services/df-user-data.service';
 import { GenericSuccessResponse } from 'src/app/shared/types/generic-http';
 import {
   LoginCredentials,
   RegisterDetails,
 } from '../../shared/types/user-management';
+import { UserSession } from 'src/app/shared/types/user';
 
 //TODO default role for app enable user to enter without authentication
 @Injectable({
@@ -39,7 +37,7 @@ export class DfAuthService {
 
   login(credentials: LoginCredentials) {
     return this.http
-      .post<UserData>(URLS.USER_SESSION, credentials, {
+      .post<UserSession>(URLS.USER_SESSION, credentials, {
         headers: SHOW_LOADING_HEADER,
       })
       .pipe(
@@ -49,7 +47,7 @@ export class DfAuthService {
         }),
         catchError(() => {
           return this.http
-            .post<UserData>(URLS.ADMIN_SESSION, credentials, {})
+            .post<UserSession>(URLS.ADMIN_SESSION, credentials, {})
             .pipe(
               map(userData => {
                 this.userDataService.userData = userData;
@@ -75,7 +73,7 @@ export class DfAuthService {
 
   loginWithToken(token: string) {
     return this.http
-      .get<UserData>(URLS.USER_SESSION, {
+      .get<UserSession>(URLS.USER_SESSION, {
         headers: SHOW_LOADING_HEADER,
         params: {
           session_token: token,
@@ -91,7 +89,7 @@ export class DfAuthService {
 
   oauthLogin(oauthToken: string, code: string, state: string) {
     return this.http
-      .post<UserData>(URLS.USER_SESSION, {
+      .post<UserSession>(URLS.USER_SESSION, {
         headers: SHOW_LOADING_HEADER,
         params: {
           oauth_callback: true,

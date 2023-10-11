@@ -5,7 +5,7 @@ import { catchError, throwError } from 'rxjs';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { UserProfile, UserProfileType } from 'src/app/shared/types/user';
 import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 
 import { parseError } from 'src/app/shared/utilities/parse-errors';
 import { DfUserDetailsBaseComponent } from 'src/app/shared/components/df-user-details/df-user-details-base.component';

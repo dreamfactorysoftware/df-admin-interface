@@ -12,7 +12,7 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { FileTableRow, FileResponse, FileType } from '../../shared/types/files';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { faDownload } from '@fortawesome/free-solid-svg-icons';
 import { NgIf } from '@angular/common';

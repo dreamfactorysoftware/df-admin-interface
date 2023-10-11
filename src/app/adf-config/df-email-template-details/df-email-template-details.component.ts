@@ -19,7 +19,7 @@ import {
   EmailTemplatePayload,
 } from '../../shared/types/email-templates';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { UntilDestroy } from '@ngneat/until-destroy';
 

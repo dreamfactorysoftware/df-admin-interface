@@ -1,4 +1,5 @@
 import { RoleType } from './role';
+import { ROUTES } from './routes';
 
 export type UserProfileType = 'users' | 'admins';
 
@@ -47,7 +48,7 @@ export interface UserRow {
   lastName: string;
   registration: boolean;
 }
-export interface CreateAdmin extends UserProfile {
+export interface AdminProfile extends UserProfile {
   isRestrictedAdmin?: boolean;
   accessByTabs?: string[];
 }
@@ -56,4 +57,20 @@ export interface LookupKey {
   name: string;
   value: string;
   private: boolean;
+}
+
+export interface UserSession {
+  email: string;
+  firstName: string;
+  host: string;
+  id: number;
+  isRootAdmin: boolean;
+  isSysAdmin: boolean;
+  lastLoginDate: string;
+  lastName: string;
+  name: string;
+  sessionId: string;
+  sessionToken: string;
+  tokenExpiryDate: Date;
+  roleId: number;
 }

@@ -65,12 +65,6 @@
         </div>
       </ng-container>
       <div class="main" [class.no-error]="(hasError$ | async) === false">
-        <!-- <ng-container *ngIf="paywall$ | async; else content">
-          <df-paywall></df-paywall>
-        </ng-container>
-        <ng-template #content>
-          <ng-content></ng-content>
-        </ng-template> -->
         <ng-content></ng-content>
       </div>
     </mat-sidenav-content>
@@ -79,19 +73,21 @@
 
 <ng-template #navList let-items>
   <ng-container *ngFor="let item of items">
-    <a
-      *ngIf="!item.subRoutes; else subRoutes"
-      mat-list-item
-      [routerLink]="item.route"
-      [class.active]="isActive(item)">
-      <span>{{ navLabel(item.route) | transloco }}</span>
-    </a>
+    <div mat-list-item *ngIf="!item.subRoutes; else subRoutes">
+      <button
+        mat-flat-button
+        class="nav-item"
+        [class.active]="isActive(item)"
+        (click)="handleNavClick(item)">
+        {{ navLabel(item.path) | transloco }}
+      </button>
+    </div>
     <ng-template #subRoutes>
       <mat-expansion-panel
         [class.mat-elevation-z0]="true"
         [expanded]="isActive(item)">
         <mat-expansion-panel-header class="parent-route">
-          {{ navLabel(item.route) | transloco }}
+          {{ navLabel(item.path) | transloco }}
         </mat-expansion-panel-header>
         <mat-nav-list>
           <ng-container

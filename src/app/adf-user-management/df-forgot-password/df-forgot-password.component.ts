@@ -12,7 +12,7 @@ import {
   DfAlertComponent,
 } from '../../shared/components/df-alert/df-alert.component';
 import { matchValidator } from '../../shared/validators/match.validator';
-import { ROUTES } from '../../shared/constants/routes';
+import { ROUTES } from '../../shared/types/routes';
 import { DfPasswordService } from '../services/df-password.service';
 
 import { Router, RouterLink } from '@angular/router';

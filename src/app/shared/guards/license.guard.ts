@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, Router } from '@angular/router';
-import { ROUTES } from '../constants/routes';
+import { ROUTES } from '../types/routes';
 import { DfLicenseCheckService } from '../services/df-license-check.service';
 import { map } from 'rxjs';
 

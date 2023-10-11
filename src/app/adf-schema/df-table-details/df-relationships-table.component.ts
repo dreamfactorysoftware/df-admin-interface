@@ -11,7 +11,7 @@ import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
 @UntilDestroy({ checkProperties: true })

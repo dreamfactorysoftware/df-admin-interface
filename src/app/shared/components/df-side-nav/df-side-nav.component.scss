@@ -46,11 +46,15 @@ $red-palette: mat.define-palette(mat.$red-palette);
         padding: 0 0 0 16px !important;
       }
     }
-    mat-nav-list {
-      a {
-        &.active {
-          background-color: mat.get-color-from-palette($df-purple-palette, 200);
-        }
+    .nav-item {
+      height: 48px;
+      width: 100%;
+      font-size: 1.6rem;
+      font-weight: 400;
+      border-radius: 0;
+      justify-content: left;
+      &.active {
+        background-color: mat.get-color-from-palette($df-purple-palette, 200);
       }
     }
   }

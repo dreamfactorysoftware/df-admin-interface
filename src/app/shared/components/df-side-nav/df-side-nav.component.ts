@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatListModule } from '@angular/material/list';
@@ -12,12 +12,18 @@ import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.servi
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 import { faAngleDown, faBars } from '@fortawesome/free-solid-svg-icons';
 import { routes } from 'src/app/routes';
-import { generateBreadcrumb, transformRoutes } from '../../utilities/route';
+import {
+  accessibleRoutes,
+  generateBreadcrumb,
+  transformRoutes,
+} from '../../utilities/route';
 import { Nav } from '../../types/nav';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
 import { DfLicenseCheckService } from '../../services/df-license-check.service';
+import { ROUTES } from '../../types/routes';
+import { map, of, switchMap, tap } from 'rxjs';
 
 @Component({
   selector: 'df-side-nav',
@@ -40,14 +46,14 @@ import { DfLicenseCheckService } from '../../services/df-license-check.service';
     NgTemplateOutlet,
   ],
 })
-export class DfSideNavComponent {
+export class DfSideNavComponent implements OnInit {
   isSmallScreen = this.breakpointService.isSmallScreen;
   isLoggedIn$ = this.userDataService.isLoggedIn$;
   userData$ = this.userDataService.userData$;
   faAngleDown = faAngleDown;
   faBars = faBars;
   hasError$ = this.errorService.hasError$;
-  nav = transformRoutes(routes);
+  nav: Array<Nav> = [];
   licenseCheck$ = this.licenseCheckService.licenseCheck$;
 
   constructor(
@@ -59,12 +65,48 @@ export class DfSideNavComponent {
     private licenseCheckService: DfLicenseCheckService
   ) {}
 
+  ngOnInit(): void {
+    this.userData$
+      .pipe(
+        switchMap(userData => {
+          if (userData?.isRootAdmin) {
+            return of(null);
+          }
+          if (userData?.isSysAdmin) {
+            return this.userDataService.restrictedAccess$;
+          }
+          if (userData?.roleId) {
+            return of([
+              'apps',
+              'users',
+              'services',
+              'apidocs',
+              'schema/data',
+              'files',
+              'scripts',
+              'systemInfo',
+              'limits',
+              'scheduler',
+            ]);
+          }
+          return of([]);
+        })
+      )
+      .subscribe(accessByTabs => {
+        if (accessByTabs) {
+          this.nav = accessibleRoutes(transformRoutes(routes), accessByTabs);
+        } else {
+          this.nav = transformRoutes(routes);
+        }
+      });
+  }
+
   logout() {
     this.authService.logout();
   }
 
   isActive(nav: Nav) {
-    return this.router.url.startsWith(nav.route);
+    return this.router.url.startsWith(nav.path);
   }
 
   navLabel(route: string) {
@@ -74,5 +116,10 @@ export class DfSideNavComponent {
 
   get breadCrumbs() {
     return generateBreadcrumb(routes, this.router.url);
+  }
+
+  handleNavClick(nav: Nav) {
+    this.errorService.error = null;
+    this.router.navigate([nav.path]);
   }
 }

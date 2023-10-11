@@ -1,4 +1,4 @@
-import { AsyncPipe, NgFor } from '@angular/common';
+import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
 import { TranslocoPipe } from '@ngneat/transloco';
@@ -12,7 +12,7 @@ import { CheckResponse } from 'src/app/shared/types/check';
   templateUrl: './df-system-info.component.html',
   styleUrls: ['./df-system-info.component.scss'],
   standalone: true,
-  imports: [AsyncPipe, NgFor, TranslocoPipe],
+  imports: [AsyncPipe, NgFor, TranslocoPipe, NgIf],
 })
 export class DfSystemInfoComponent implements OnInit {
   environment = this.systemConfigDataService.environment;

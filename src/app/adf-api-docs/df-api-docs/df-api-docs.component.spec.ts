@@ -4,7 +4,7 @@ import { DfApiDocsComponent } from './df-api-docs.component';
 import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 import { mockApiDocsData } from './test-utilities/df-api-docs.mock';
 import { Router } from '@angular/router';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 
 describe('DfApiDocsComponent', () => {
   let component: DfApiDocsComponent;

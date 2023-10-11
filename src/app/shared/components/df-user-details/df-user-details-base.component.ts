@@ -13,14 +13,14 @@ import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.servi
 import { matchValidator } from '../../validators/match.validator';
 import { MatCheckboxChange } from '@angular/material/checkbox';
 import { UserProfileType } from '../../types/user';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 import { uniqueNameValidator } from '../../validators/unique-name.validator';
 import { AppType } from 'src/app/shared/types/apps';
 import { RoleType } from '../../types/role';
 import { faEnvelope } from '@fortawesome/free-solid-svg-icons';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfPaywallService } from '../../services/df-paywall.service';
-import { forkJoin, of, switchMap } from 'rxjs';
+import { of, switchMap } from 'rxjs';
 
 @UntilDestroy({ checkProperties: true })
 @Component({

@@ -8,7 +8,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { RoleType } from 'src/app/shared/types/role';
-import { ROUTES } from 'src/app/shared/constants/routes';
+import { ROUTES } from 'src/app/shared/types/routes';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 
 import {

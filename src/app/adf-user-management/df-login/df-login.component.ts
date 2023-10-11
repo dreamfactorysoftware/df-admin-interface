@@ -13,7 +13,7 @@ import {
   DfAlertComponent,
 } from '../../shared/components/df-alert/df-alert.component';
 import { Router, RouterLink } from '@angular/router';
-import { ROUTES } from '../../shared/constants/routes';
+import { ROUTES } from '../../shared/types/routes';
 import { getIcon, iconExist } from '../../shared/utilities/icons';
 import { LoginCredentials } from '../../shared/types/user-management';
 

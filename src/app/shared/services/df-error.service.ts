@@ -10,17 +10,9 @@ export class DfErrorService {
   private hasErrorSubject = new BehaviorSubject<boolean>(false);
   hasError$ = this.hasErrorSubject.asObservable();
 
-  get error(): string | null {
-    return this.errorSubject.value;
-  }
-
   set error(error: string | null) {
     this.errorSubject.next(error);
     this.hasError = !!error;
-  }
-
-  get hasError(): boolean {
-    return this.hasErrorSubject.value;
   }
 
   set hasError(hasError: boolean) {
