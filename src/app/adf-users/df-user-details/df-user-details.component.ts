@@ -140,7 +140,7 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
     const data: UserProfile = {
       ...this.userForm.value.profileDetailsGroup,
       isActive: this.userForm.value.isActive,
-      lookupByUserId: this.userForm.value.lookupKeys,
+      lookupByUserId: this.userForm.getRawValue().lookupKeys,
       userToAppToRoleByUserId: this.userAppRoles,
     };
     if (this.type === 'create') {

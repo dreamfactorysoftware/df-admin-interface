@@ -61,6 +61,11 @@ export class DfLookupKeysComponent implements OnInit {
   }
 
   updateDataSource() {
+    this.lookupKeys.controls.forEach(control => {
+      if (control.get('id')?.value) {
+        control.get('name')?.disable();
+      }
+    });
     this.dataSource = new MatTableDataSource(this.lookupKeys.controls);
   }
 
