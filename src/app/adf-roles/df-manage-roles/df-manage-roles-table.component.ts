@@ -60,7 +60,7 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
     },
   ];
 
-  mapDataToTable(data: any): RoleRow[] {
+  mapDataToTable(data: RoleType[]): RoleRow[] {
     return data.map((role: RoleType) => {
       return {
         id: role.id,

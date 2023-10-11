@@ -3,7 +3,7 @@ import { DfBaseCrudService } from '../services/df-base-crud.service';
 import { BASE_URL, URLS } from './urls';
 import { HttpClient } from '@angular/common/http';
 
-export const dfBaseCrudServiceProvider = (
+const dfBaseCrudServiceProvider = (
   url: string
 ): {
   providedIn: 'root' | 'platform' | 'any' | null;
@@ -114,9 +114,4 @@ export const BASE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
 export const FILE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'FILE_SERVICE_TOKEN',
   dfBaseCrudServiceProvider(URLS.FILES)
-);
-
-export const LOGS_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
-  'LOGS_SERVICE_TOKEN',
-  dfBaseCrudServiceProvider(URLS.LOGS)
 );

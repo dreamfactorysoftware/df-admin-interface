@@ -18,8 +18,12 @@ export function readAsText(file: File | Blob): Observable<string> {
   return subject.asObservable();
 }
 
-export function saveRawAsFile(data: any, filename: string, type: string): void {
-  const blob = new Blob([data], { type: getMimeType(type) });
+export function saveRawAsFile(
+  data: unknown,
+  filename: string,
+  type: string
+): void {
+  const blob = new Blob([data as BlobPart], { type: getMimeType(type) });
   saveAsFile(blob, filename);
 }
 
@@ -29,14 +33,14 @@ export function saveAsFile(blob: Blob, filename: string): void {
   window.URL.revokeObjectURL(url);
 }
 
-export function saveFromUrl(url: string, filename: string): void {
+function saveFromUrl(url: string, filename: string): void {
   const anchor = document.createElement('a');
   anchor.download = filename;
   anchor.href = url;
   anchor.click();
 }
 
-export function getMimeType(type: string) {
+function getMimeType(type: string) {
   switch (type) {
     case 'json':
       return 'application/json';

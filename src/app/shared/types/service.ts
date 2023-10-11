@@ -58,7 +58,7 @@ export interface ConfigSchema {
   legend?: string;
 }
 
-export interface LabelType {
+interface LabelType {
   label: string;
   type: string;
 }
@@ -101,9 +101,4 @@ export interface AuthService {
   name: string;
   type: string;
   path: string;
-}
-
-export interface ServiceLink {
-  services: Array<Service>;
-  selectedService?: { id: number; storagePath: string; cache: string };
 }

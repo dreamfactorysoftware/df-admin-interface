@@ -1,5 +1,4 @@
 import {
-  Actions,
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
@@ -14,6 +13,7 @@ import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { Actions } from 'src/app/shared/types/table';
 
 @UntilDestroy({ checkProperties: true })
 @Component({

@@ -117,9 +117,13 @@ export class DfScriptEditorComponent implements OnInit {
       .pipe(switchMap(res => readAsText(res.body as Blob)))
       .subscribe(text => this.content.setValue(text));
   }
-  // TODO add delete success snackbar
+
   deleteCache() {
     if (!this.cache) return;
-    this.cacheService.delete(`_event/${this.cache}`).subscribe();
+    this.cacheService
+      .delete(`_event/${this.cache}`, {
+        snackbarSuccess: 'scripts.deleteCacheSuccessMsg',
+      })
+      .subscribe();
   }
 }

@@ -1,4 +1,4 @@
-export type FilterQueryType =
+type FilterQueryType =
   | 'user'
   | 'apiDocs'
   | 'apps'

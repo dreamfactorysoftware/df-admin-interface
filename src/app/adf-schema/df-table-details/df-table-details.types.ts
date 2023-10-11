@@ -47,13 +47,13 @@ export interface TableField {
   isAggregate: boolean;
 }
 
-export interface Validation {
+interface Validation {
   notEmpty?: Email;
   picklist?: Email;
   email?: Email;
 }
 
-export interface Email {
+interface Email {
   onFail: string;
 }
 

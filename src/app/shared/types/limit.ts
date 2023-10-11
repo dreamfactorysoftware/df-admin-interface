@@ -56,7 +56,3 @@ export type UpdateLimitPayload = Omit<
   lastModifiedDate: string;
   rate: number;
 };
-
-export type DeleteLimitResponse = {
-  id: number;
-};

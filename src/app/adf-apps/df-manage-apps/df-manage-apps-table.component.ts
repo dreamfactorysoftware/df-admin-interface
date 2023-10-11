@@ -2,7 +2,6 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { Component, Inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
-  AdditonalAction,
   DfManageTableComponent,
   DfManageTableModules,
 } from 'src/app/shared/components/df-manage-table/df-manage-table.component';
@@ -16,6 +15,7 @@ import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { generateApiKey } from 'src/app/shared/utilities/hash';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
+import { AdditonalAction } from 'src/app/shared/types/table';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -115,7 +115,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
     },
   ];
 
-  mapDataToTable(data: any): AppRow[] {
+  mapDataToTable(data: AppType[]): AppRow[] {
     return data.map((app: AppType) => {
       return {
         id: app.id,

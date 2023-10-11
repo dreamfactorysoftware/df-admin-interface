@@ -12,7 +12,7 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { ROUTES } from 'src/app/shared/types/routes';
-import { IconDefinition, IconProp } from '@fortawesome/fontawesome-svg-core';
+import { IconProp } from '@fortawesome/fontawesome-svg-core';
 import {
   faTrashCan,
   faPenToSquare,
@@ -33,6 +33,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { Actions, AdditonalAction, Column } from 'src/app/shared/types/table';
 
 export const DfManageTableModules = [
   NgIf,
@@ -49,31 +50,6 @@ export const DfManageTableModules = [
   MatFormFieldModule,
   MatInputModule,
 ];
-
-export interface DefaultAction<T> {
-  label: string;
-  function: (row: T) => void;
-  ariaLabel: {
-    key: string;
-    param?: string;
-  };
-  disabled?: (row: T) => boolean;
-}
-
-export interface Column<T> {
-  columnDef: string;
-  cell?: (element: T) => unknown;
-  header?: string;
-}
-
-export interface AdditonalAction<T> extends DefaultAction<T> {
-  icon?: IconDefinition;
-}
-
-export interface Actions<T> {
-  default: DefaultAction<T> | null;
-  additional: Array<AdditonalAction<T>> | null;
-}
 
 @UntilDestroy({ checkProperties: true })
 @Component({

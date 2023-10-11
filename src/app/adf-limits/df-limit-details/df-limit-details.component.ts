@@ -8,7 +8,6 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { RoleType } from 'src/app/shared/types/role';
-import { ROUTES } from 'src/app/shared/types/routes';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 
 import {
@@ -30,6 +29,11 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { DfVerbPickerComponent } from 'src/app/shared/components/df-verb-picker/df-verb-picker.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import {
+  GenericCreateResponse,
+  GenericUpdateResponse,
+} from 'src/app/shared/types/generic-http';
+import { Service } from 'src/app/shared/types/service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-limit',
@@ -60,7 +64,7 @@ export class DfLimitDetailsComponent implements OnInit {
 
   roleDropdownOptions: RoleType[] = [];
   userDropdownOptions: UserProfile[] = [];
-  serviceDropdownOptions: any[] = [];
+  serviceDropdownOptions: Service[] = [];
 
   alertMsg = '';
   showAlert = false;
@@ -152,7 +156,7 @@ export class DfLimitDetailsComponent implements OnInit {
         const payload = this.assembleLimitPayload() as CreateLimitPayload;
 
         this.limitService
-          .create({ resource: [payload] })
+          .create<GenericCreateResponse>({ resource: [payload] })
           .pipe(
             catchError(err => {
               this.alertMsg = err.error.error.message;
@@ -160,17 +164,20 @@ export class DfLimitDetailsComponent implements OnInit {
               return throwError(() => new Error(err));
             })
           )
-          .subscribe(() => {
-            this.router.navigate([
-              `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
-            ]);
+          .subscribe(res => {
+            this.router.navigate(['../', res.resource[0].id], {
+              relativeTo: this.activatedRoute,
+            });
           });
       } else if (this.type === 'edit') {
         // edit mode
         const payload = this.assembleLimitPayload() as UpdateLimitPayload;
 
         this.limitService
-          .update(payload.id, payload)
+          .update<GenericUpdateResponse, UpdateLimitPayload>(
+            payload.id,
+            payload
+          )
           .pipe(
             catchError(err => {
               this.alertMsg = err.error.error.message;
@@ -178,10 +185,10 @@ export class DfLimitDetailsComponent implements OnInit {
               return throwError(() => new Error(err));
             })
           )
-          .subscribe(() => {
-            this.router.navigate([
-              `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
-            ]);
+          .subscribe(res => {
+            this.router.navigate(['../', res.id], {
+              relativeTo: this.activatedRoute,
+            });
           });
       }
     } else {
@@ -191,7 +198,7 @@ export class DfLimitDetailsComponent implements OnInit {
   }
 
   onCancel(): void {
-    this.router.navigate([`${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`]);
+    this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 
   private assembleLimitPayload(): CreateLimitPayload | UpdateLimitPayload {

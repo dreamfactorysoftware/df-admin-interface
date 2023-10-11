@@ -51,8 +51,8 @@
       <button type="button" mat-flat-button (click)="onCancel()">
         {{ 'cancel' | transloco }}
       </button>
-      <button mat-flat-button color="primary">
-        {{ 'save' | transloco }}
+      <button mat-flat-button color="primary" type="submit">
+        {{ (type === 'create' ? 'create' : 'update') | transloco }}
       </button>
     </div>
   </form>

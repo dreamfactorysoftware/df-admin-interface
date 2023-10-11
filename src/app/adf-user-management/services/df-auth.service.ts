@@ -114,7 +114,7 @@ export class DfAuthService {
       .subscribe(() => {
         this.userDataService.clearToken();
         this.userDataService.userData = null;
-        this.router.navigate([`/${ROUTES.AUTH}/${ROUTES.LOGIN}`]);
+        this.router.navigate([ROUTES.AUTH, ROUTES.LOGIN]);
       });
     this.userDataService.isLoggedIn = false;
   }

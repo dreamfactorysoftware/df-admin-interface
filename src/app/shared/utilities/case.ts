@@ -19,7 +19,7 @@ export function mapSnakeToCamel<T>(obj: T): T {
   }
 }
 
-export const camelToSnakeString = (str: string) =>
+const camelToSnakeString = (str: string) =>
   str.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1_$2').toLowerCase();
 
 export function mapCamelToSnake<T>(obj: T): T {

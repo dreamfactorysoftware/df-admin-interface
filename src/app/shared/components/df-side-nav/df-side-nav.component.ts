@@ -22,8 +22,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
 import { DfLicenseCheckService } from '../../services/df-license-check.service';
-import { ROUTES } from '../../types/routes';
-import { map, of, switchMap, tap } from 'rxjs';
+import { of, switchMap } from 'rxjs';
 
 @Component({
   selector: 'df-side-nav',

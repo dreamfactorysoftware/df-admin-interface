@@ -33,7 +33,6 @@ import {
   faRefresh,
 } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { ROUTES } from 'src/app/shared/types/routes';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { generateApiKey } from 'src/app/shared/utilities/hash';
@@ -41,6 +40,7 @@ import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-con
 import { catchError, throwError } from 'rxjs';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { DfAlertComponent } from 'src/app/shared/components/df-alert/df-alert.component';
+import { RoleType } from 'src/app/shared/types/role';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -70,8 +70,8 @@ import { DfAlertComponent } from 'src/app/shared/components/df-alert/df-alert.co
 export class DfAppDetailsComponent implements OnInit {
   @ViewChild('rolesInput') rolesInput: ElementRef<HTMLInputElement>;
   appForm: FormGroup;
-  roles: any[] = [];
-  filteredRoles: any[] = [];
+  roles: RoleType[] = [];
+  filteredRoles: RoleType[] = [];
   editApp: AppType;
   urlOrigin: string;
   faCopy = faCopy;
@@ -105,10 +105,10 @@ export class DfAppDetailsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.activatedRoute.data.subscribe((data: any) => {
-      this.roles = data?.roles?.resource || [];
-      this.filteredRoles = data?.roles?.resource || [];
-      this.editApp = data?.appData || null;
+    this.activatedRoute.data.subscribe(({ roles, appData }) => {
+      this.roles = roles.resource || [];
+      this.filteredRoles = roles.resource || [];
+      this.editApp = appData || null;
     });
 
     if (this.editApp) {
@@ -151,7 +151,7 @@ export class DfAppDetailsComponent implements OnInit {
     );
   }
 
-  displayFn(role: any): string {
+  displayFn(role: RoleType): string {
     return role && role.name ? role.name : '';
   }
 
@@ -199,7 +199,7 @@ export class DfAppDetailsComponent implements OnInit {
   }
 
   goBack() {
-    this.router.navigate([`${ROUTES.API_CONNECTIONS}/${ROUTES.API_KEYS}`]);
+    this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 
   save() {

@@ -6,6 +6,7 @@ import {
   MatDialogRef,
 } from '@angular/material/dialog';
 import { TranslocoPipe } from '@ngneat/transloco';
+import { ConfirmDialogData } from '../../types/dialog';
 
 @Component({
   selector: 'df-confirm-dialog',
@@ -22,9 +23,4 @@ export class DfConfirmDialogComponent {
   onClose(): void {
     this.dialogRef.close(true);
   }
-}
-
-export interface ConfirmDialogData {
-  title: string;
-  message: string;
 }

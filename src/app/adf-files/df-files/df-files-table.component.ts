@@ -1,6 +1,5 @@
 import { Component, Inject } from '@angular/core';
 import {
-  Actions,
   DfManageTableComponent,
   DfManageTableModules,
 } from '../../shared/components/df-manage-table/df-manage-table.component';
@@ -10,7 +9,7 @@ import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
-import { FileTableRow, FileResponse, FileType } from '../../shared/types/files';
+import { FileTableRow, FileType } from '../../shared/types/files';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { ROUTES } from 'src/app/shared/types/routes';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
@@ -18,6 +17,7 @@ import { faDownload } from '@fortawesome/free-solid-svg-icons';
 import { NgIf } from '@angular/common';
 import { saveAsFile } from 'src/app/shared/utilities/file';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { Actions } from 'src/app/shared/types/table';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-files-table',
@@ -71,10 +71,10 @@ export class DfFilesTableComponent extends DfManageTableComponent<FileTableRow> 
     },
   ];
 
-  override actions: Actions<any> = {
+  override actions: Actions<FileTableRow> = {
     default: {
       label: 'view',
-      function: (row: any) =>
+      function: row =>
         row.type === 'file'
           ? this.router.navigate([ROUTES.VIEW, row.name], {
               relativeTo: this._activatedRoute,
@@ -83,7 +83,7 @@ export class DfFilesTableComponent extends DfManageTableComponent<FileTableRow> 
       ariaLabel: {
         key: 'view',
       },
-      disabled: (row: any) => row.type === 'file' && this.type !== 'logs',
+      disabled: row => row.type === 'file' && this.type !== 'logs',
     },
     additional: [
       {
@@ -122,8 +122,8 @@ export class DfFilesTableComponent extends DfManageTableComponent<FileTableRow> 
       });
   }
 
-  mapDataToTable(data: any): FileTableRow[] {
-    return data.map((app: FileResponse) => {
+  mapDataToTable(data: FileType[]): FileTableRow[] {
+    return data.map(app => {
       return {
         name: app.name,
         path: app.path,

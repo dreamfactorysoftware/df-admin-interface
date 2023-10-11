@@ -45,7 +45,3 @@ export interface AppPayload {
   storage_container?: string;
   path?: string;
 }
-
-export interface EditAppPayload extends AppPayload {
-  id: number;
-}

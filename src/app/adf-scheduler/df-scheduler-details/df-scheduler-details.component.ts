@@ -118,7 +118,7 @@ export class DfSchedulerDetailsComponent implements OnInit {
   }
 
   onCancel() {
-    this.router.navigate([`${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`]);
+    this.router.navigate([ROUTES.SYSTEM_SETTINGS, ROUTES.SCHEDULER]);
   }
 
   onSubmit() {
@@ -139,9 +139,7 @@ export class DfSchedulerDetailsComponent implements OnInit {
         )
 
         .subscribe(() =>
-          this.router.navigate([
-            `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
-          ])
+          this.router.navigate([ROUTES.SYSTEM_SETTINGS, ROUTES.SCHEDULER])
         );
     } else if (this.scheduleToEdit) {
       const payload = this.assemblePayload() as UpdateSchedulePayload;
@@ -155,9 +153,7 @@ export class DfSchedulerDetailsComponent implements OnInit {
         })
 
         .subscribe(() =>
-          this.router.navigate([
-            `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
-          ])
+          this.router.navigate([ROUTES.SYSTEM_SETTINGS, ROUTES.SCHEDULER])
         );
     }
   }

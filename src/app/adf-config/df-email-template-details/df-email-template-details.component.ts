@@ -19,7 +19,6 @@ import {
   EmailTemplatePayload,
 } from '../../shared/types/email-templates';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { ROUTES } from 'src/app/shared/types/routes';
 import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { UntilDestroy } from '@ngneat/until-destroy';
 
@@ -44,7 +43,6 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 })
 export class DfEmailTemplateDetailsComponent implements OnInit {
   emailTemplateForm: FormGroup;
-  translateService: any;
   editApp: EmailTemplate;
 
   constructor(
@@ -73,8 +71,8 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.activatedRoute.data.subscribe((data: any) => {
-      this.editApp = data?.data;
+    this.activatedRoute.data.subscribe(({ data }) => {
+      this.editApp = data;
     });
 
     if (this.editApp) {
@@ -97,9 +95,7 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
   }
 
   goBack() {
-    this.router.navigate([
-      `${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.EMAIL_TEMPLATES}`,
-    ]);
+    this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 
   onSubmit() {

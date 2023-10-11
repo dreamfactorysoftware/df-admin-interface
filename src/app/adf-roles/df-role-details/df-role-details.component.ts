@@ -24,7 +24,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatButtonModule } from '@angular/material/button';
 import { DfRolesAccessComponent } from '../df-roles-access/df-roles-access.component';
-import { ROUTES } from 'src/app/shared/types/routes';
 import { UntilDestroy } from '@ngneat/until-destroy';
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -67,18 +66,18 @@ export class DfRoleDetailsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.activatedRoute.data.subscribe((data: any) => {
-      this.type = data.type;
-      if (data.data) {
+    this.activatedRoute.data.subscribe(({ data, type }) => {
+      this.type = type;
+      if (data) {
         this.roleForm.patchValue({
-          id: data.data.id,
-          name: data.data.name,
-          description: data.data.description,
-          active: data.data.isActive,
+          id: data.id,
+          name: data.name,
+          description: data.description,
+          active: data.isActive,
         });
 
-        if (data.data.roleServiceAccessByRoleId.length > 0) {
-          data.data.roleServiceAccessByRoleId.forEach(
+        if (data.roleServiceAccessByRoleId.length > 0) {
+          data.roleServiceAccessByRoleId.forEach(
             (item: RoleServiceAccessType) => {
               (this.roleForm.controls['serviceAccess'] as FormArray).push(
                 new FormGroup({
@@ -100,8 +99,8 @@ export class DfRoleDetailsComponent implements OnInit {
           );
         }
 
-        if (data.data.lookupByRoleId.length > 0) {
-          data.data.lookupByRoleId.forEach((item: any) => {
+        if (data.lookupByRoleId.length > 0) {
+          data.lookupByRoleId.forEach((item: any) => {
             (this.roleForm.controls['lookupKeys'] as FormArray).push(
               new FormGroup({
                 name: new FormControl(item.name, [Validators.required]),
@@ -187,8 +186,6 @@ export class DfRoleDetailsComponent implements OnInit {
   }
 
   goBack() {
-    this.router.navigate([
-      `${ROUTES.API_CONNECTIONS}/${ROUTES.ROLE_BASED_ACCESS}`,
-    ]);
+    this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 }

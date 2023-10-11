@@ -70,7 +70,7 @@ export class DfGlobalLookupKeysComponent implements OnInit {
 
     const lookupKeysArray = this.lookupKeysForm.get('lookupKeys') as FormArray;
 
-    lookupKeysArray.controls.forEach((control: any) => {
+    lookupKeysArray.controls.forEach(control => {
       if (!control.pristine) {
         if (control.value.id) {
           updateKeys.push(control.value);
