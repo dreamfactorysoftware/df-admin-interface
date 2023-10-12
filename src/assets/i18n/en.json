@@ -109,6 +109,9 @@
     "nodejs": "Node.js"
   },
   "nav": {
+    "error": {
+      "header": "Error"
+    },
     "home": {
       "nav": "Home",
       "welcome": { "nav": "Welcome", "header": "{{nav.home.welcome.nav}}" },

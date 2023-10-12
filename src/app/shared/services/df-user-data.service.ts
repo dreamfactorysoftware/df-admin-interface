@@ -25,7 +25,12 @@ export class DfUserDataService {
     this.userData$
       .pipe(
         switchMap(userData => {
-          if (userData && userData.isSysAdmin && !userData.isRootAdmin) {
+          if (
+            userData &&
+            userData.isSysAdmin &&
+            !userData.isRootAdmin &&
+            userData.roleId
+          ) {
             return this.roleService
               .get<RoleType>(userData.roleId, {
                 related: 'role_service_access_by_role_id',
