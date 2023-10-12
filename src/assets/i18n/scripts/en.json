@@ -17,5 +17,8 @@
   "updateSuccessMsg": "Script successfully updated",
   "getScriptSuccessMsg": "Script file successfully fetched",
   "fetchCacheSuccessMsg": "Successfully pulled the latest script from source.",
-  "deleteCacheSuccessMsg": "Successfully cleared script from cache."
+  "deleteCacheSuccessMsg": "Successfully cleared script from cache.",
+  "errors": {
+    "githubImport": "Error: Invalid file format. Only js, php, py, txt file format(s) allowed"
+  }
 }
