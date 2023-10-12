@@ -152,7 +152,10 @@ export const routes: Routes = [
             },
           },
         ],
-        providers: [provideTranslocoScope('services')],
+        providers: [
+          provideTranslocoScope('services'),
+          provideTranslocoScope('scripts'),
+        ],
       },
       {
         path: ROUTES.ROLE_BASED_ACCESS,

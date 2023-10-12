@@ -116,7 +116,7 @@ export class DfFilesTableComponent extends DfManageTableComponent<FileTableRow> 
     const filePath = `${this.type}/${row.path}`;
     if (row.contentType === 'application/json') {
       this.crudService.downloadJson(filePath).subscribe(res => {
-        saveRawAsFile(res, `${row.name}.json`, 'json');
+        saveRawAsFile(res, row.name, 'json');
       });
     } else {
       this.crudService

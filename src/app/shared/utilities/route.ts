@@ -119,9 +119,9 @@ export function generateBreadcrumb(
 ): Breadcrumb[] {
   const breadcrumbs: Breadcrumb[] = [];
   const urlSegments = decodeURIComponent(currentURL)
+    .replace(/\/$/, '')
     .split('/')
     .filter(segment => segment);
-
   function traverseRoutes(
     routes: Routes,
     pathSoFar: string[] = [],
@@ -184,8 +184,6 @@ export function generateBreadcrumb(
         }
       }
     }
-
-    // If no route matched the current segment, add the segment as a breadcrumb
     if (!matched) {
       breadcrumbs.push({
         label: urlSegments[index],
@@ -203,5 +201,8 @@ export function generateBreadcrumb(
   }
 
   traverseRoutes(routeTable);
+  if (breadcrumbs.length > 0 && breadcrumbs[breadcrumbs.length - 1].path) {
+    delete breadcrumbs[breadcrumbs.length - 1].path;
+  }
   return breadcrumbs;
 }
