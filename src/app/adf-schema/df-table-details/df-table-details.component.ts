@@ -1,6 +1,7 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import {
   FormBuilder,
+  FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators,
@@ -20,6 +21,8 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
+import { TableDetailsType } from './df-table-details.types';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-table-details',
@@ -47,7 +50,7 @@ export class DfTableDetailsComponent implements OnInit {
   dbName: string;
   tableFields: [];
   tableRelated: [];
-  jsonData: string;
+  jsonData = new FormControl();
   AceEditorMode = AceEditorMode;
 
   constructor(
@@ -71,7 +74,7 @@ export class DfTableDetailsComponent implements OnInit {
     this.activatedRoute.data.subscribe(data => {
       this.dbName = this.activatedRoute.snapshot.params['name'];
       this.type = data['type'];
-      this.jsonData = JSON.stringify(data['data'], null, 2);
+      this.jsonData.setValue(JSON.stringify(data['data'], null, 2));
 
       if (this.type === 'edit') {
         this.tableDetailsForm.patchValue({
@@ -95,11 +98,18 @@ export class DfTableDetailsComponent implements OnInit {
     });
   }
 
-  save() {
-    if (this.tableDetailsForm.invalid) return;
-
-    if (this.type === 'create') {
-      const data = this.tableDetailsForm.value;
+  save(value?: string) {
+    let data;
+    if (value) {
+      try {
+        data = JSON.parse(value);
+      } catch (e) {
+        console.log(e);
+        return;
+      }
+    } else {
+      if (this.tableDetailsForm.invalid) return;
+      data = this.tableDetailsForm.value;
       data.field = [
         {
           alias: null,
@@ -133,12 +143,15 @@ export class DfTableDetailsComponent implements OnInit {
           isAggregate: false,
         },
       ];
+    }
+
+    if (this.type === 'create') {
       const payload = {
         resource: [data],
       };
 
       this.crudService
-        .create(
+        .create<GenericListResponse<TableDetailsType>>(
           payload,
           {
             snackbarSuccess: 'schema.alerts.createSuccess',
@@ -146,8 +159,8 @@ export class DfTableDetailsComponent implements OnInit {
           },
           `${this.dbName}/_schema`
         )
-        .subscribe(() => {
-          this.router.navigate(['../', this.tableDetailsForm.value.name], {
+        .subscribe(res => {
+          this.router.navigate(['../', res.resource[0].name], {
             relativeTo: this.activatedRoute,
           });
         });
