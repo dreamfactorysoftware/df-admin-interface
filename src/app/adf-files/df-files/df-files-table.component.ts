@@ -15,7 +15,7 @@ import { ROUTES } from 'src/app/shared/types/routes';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { faDownload } from '@fortawesome/free-solid-svg-icons';
 import { NgIf } from '@angular/common';
-import { saveAsFile } from 'src/app/shared/utilities/file';
+import { saveAsFile, saveRawAsFile } from 'src/app/shared/utilities/file';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { Actions } from 'src/app/shared/types/table';
 @UntilDestroy({ checkProperties: true })
@@ -113,13 +113,20 @@ export class DfFilesTableComponent extends DfManageTableComponent<FileTableRow> 
     if (isFolder) {
       additionalParams.push({ key: 'zip', value: 'true' });
     }
-    this.crudService
-      .downloadFile(`${this.type}/${row.path}`, { additionalParams })
-      .subscribe(({ body }) => {
-        if (body) {
-          saveAsFile(body, `${row.name}${isFolder ? '.zip' : ''}`);
-        }
+    const filePath = `${this.type}/${row.path}`;
+    if (row.contentType === 'application/json') {
+      this.crudService.downloadJson(filePath).subscribe(res => {
+        saveRawAsFile(res, `${row.name}.json`, 'json');
       });
+    } else {
+      this.crudService
+        .downloadFile(filePath, { additionalParams })
+        .subscribe(res => {
+          if (res) {
+            saveAsFile(res, `${row.name}${isFolder ? '.zip' : ''}`);
+          }
+        });
+    }
   }
 
   mapDataToTable(data: FileType[]): FileTableRow[] {

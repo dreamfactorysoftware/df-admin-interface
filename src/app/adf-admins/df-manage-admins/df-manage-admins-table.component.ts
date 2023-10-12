@@ -83,10 +83,24 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
   }
 
   downloadAdminList(type: string) {
-    this.adminService
-      .exportList(type, { snackbarSuccess: 'admins.alerts.exportSuccess' })
-      .subscribe(data => {
-        saveRawAsFile(data, `admin.${type}`, type);
-      });
+    const additionalParams = [{ key: 'file', value: `list.${type}` }];
+    const fileName = `admin.${type}`;
+    if (type === 'json') {
+      this.adminService
+        .downloadJson(undefined, {
+          additionalParams,
+        })
+        .subscribe(data => {
+          saveRawAsFile(data, fileName, type);
+        });
+    } else {
+      this.adminService
+        .downloadFile(undefined, {
+          additionalParams,
+        })
+        .subscribe(data => {
+          saveRawAsFile(data, fileName, type);
+        });
+    }
   }
 }

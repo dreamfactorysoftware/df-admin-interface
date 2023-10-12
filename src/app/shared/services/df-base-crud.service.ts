@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { RequestOptions } from 'src/app/shared/types/generic-http';
 import { readAsText } from 'src/app/shared/utilities/file';
-import { switchMap } from 'rxjs';
+import { map, switchMap } from 'rxjs';
 import { Inject, Injectable } from '@angular/core';
 import { URL_TOKEN } from '../constants/tokens';
 
@@ -99,17 +99,6 @@ export class DfBaseCrudService {
     );
   }
 
-  exportList(type: string, options?: Partial<RequestOptions>) {
-    return this.http.get(
-      this.url,
-      this.getOptions({
-        snackbarError: 'server',
-        additionalParams: [{ key: 'file', value: `list.${type}` }],
-        ...options,
-      })
-    );
-  }
-
   uploadFile(
     location: string,
     files: FileList,
@@ -127,10 +116,22 @@ export class DfBaseCrudService {
     );
   }
 
-  downloadFile(path: string, options?: Partial<RequestOptions>) {
-    return this.http.get(`${this.url}/${path}`, {
+  downloadJson(path?: string, options?: Partial<RequestOptions>) {
+    const url = `${this.url}${path ? `/${path}` : ''}`;
+    return this.http
+      .get(url, {
+        ...this.getOptions({
+          snackbarError: 'server',
+          ...options,
+        }),
+      })
+      .pipe(map(res => JSON.stringify(res)));
+  }
+
+  downloadFile(path?: string, options?: Partial<RequestOptions>) {
+    const url = `${this.url}${path ? `/${path}` : ''}`;
+    return this.http.get(url, {
       responseType: 'blob',
-      observe: 'response',
       ...this.getOptions({
         snackbarError: 'server',
         ...options,

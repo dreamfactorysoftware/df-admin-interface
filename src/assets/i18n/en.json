@@ -192,7 +192,10 @@
       },
       "event-scripts": {
         "nav": "Event Scripts",
-        "header": "{{nav.api-connections.event-scripts.nav}}"
+        "header": "{{nav.api-connections.event-scripts.nav}}",
+        "create": {
+          "header": "Create Event Script"
+        }
       },
       "api-docs": {
         "nav": "API Docs",

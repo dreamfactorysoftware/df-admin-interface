@@ -82,10 +82,24 @@ export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow>
   }
 
   downloadUserList(type: string) {
-    this.userService
-      .exportList(type, { snackbarSuccess: 'users.alerts.exportSuccess' })
-      .subscribe(data => {
-        saveRawAsFile(data, `admin.${type}`, type);
-      });
+    const additionalParams = [{ key: 'file', value: `list.${type}` }];
+    const fileName = `user.${type}`;
+    if (type === 'json') {
+      this.userService
+        .downloadJson(undefined, {
+          additionalParams,
+        })
+        .subscribe(data => {
+          saveRawAsFile(data, fileName, type);
+        });
+    } else {
+      this.userService
+        .downloadFile(undefined, {
+          additionalParams,
+        })
+        .subscribe(data => {
+          saveRawAsFile(data, fileName, type);
+        });
+    }
   }
 }

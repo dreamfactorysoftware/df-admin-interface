@@ -28,7 +28,7 @@ export class DfManageAdminsComponent {
   faDownload = faDownload;
   exportTypes = EXPORT_TYPES;
   @ViewChild(DfManageAdminsTableComponent)
-  manageAdminTableComponent!: DfManageAdminsTableComponent;
+  manageAdminTableComponent: DfManageAdminsTableComponent;
 
   uploadAdminList(event: Event) {
     const input = event.target as HTMLInputElement;

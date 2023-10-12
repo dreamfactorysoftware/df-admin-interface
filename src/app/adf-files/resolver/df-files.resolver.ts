@@ -28,5 +28,5 @@ export const fileResolver: ResolveFn<any> = (route: ActivatedRouteSnapshot) => {
   const type = route.data['type'];
   return crudService
     .downloadFile(`${type}/${entity}`)
-    .pipe(switchMap(res => readAsText(res.body as Blob)));
+    .pipe(switchMap(res => readAsText(res as Blob)));
 };

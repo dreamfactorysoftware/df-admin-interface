@@ -52,7 +52,23 @@ export class DfScriptEditorComponent implements OnInit {
     @Inject(BASE_SERVICE_TOKEN) private fileService: DfBaseCrudService,
     @Inject(CACHE_SERVICE_TOKEN) private cacheService: DfBaseCrudService,
     @Inject(BASE_SERVICE_TOKEN) private baseService: DfBaseCrudService
-  ) {}
+  ) {
+    this.baseService
+      .getAll<{
+        serviceTypes: Array<ServiceType>;
+        services: Array<Service>;
+      }>({
+        additionalParams: [
+          {
+            key: 'group',
+            value: 'source control,file',
+          },
+        ],
+      })
+      .subscribe(res => {
+        this.storageServices = res.services;
+      });
+  }
 
   ngOnInit(): void {
     if (this.storageServiceId.getRawValue()) {
@@ -72,21 +88,6 @@ export class DfScriptEditorComponent implements OnInit {
       }
       this.storagePath.updateValueAndValidity();
     });
-    this.baseService
-      .getAll<{
-        serviceTypes: Array<ServiceType>;
-        services: Array<Service>;
-      }>({
-        additionalParams: [
-          {
-            key: 'group',
-            value: 'source control,file',
-          },
-        ],
-      })
-      .subscribe(res => {
-        this.storageServices = res.services;
-      });
   }
 
   fileUpload(event: Event) {
@@ -108,14 +109,20 @@ export class DfScriptEditorComponent implements OnInit {
   }
 
   viewLatest() {
-    this.fileService
-      .downloadFile(
-        `${this.storageServices.find(
-          service => service.id === this.storageServiceId.getRawValue()
-        )?.name}/${this.storagePath.getRawValue()}`
-      )
-      .pipe(switchMap(res => readAsText(res.body as Blob)))
-      .subscribe(text => this.content.setValue(text));
+    const filePath = `${this.storageServices.find(
+      service => service.id === this.storageServiceId.getRawValue()
+    )?.name}/${this.storagePath.getRawValue()}`;
+    if (filePath.endsWith('.json')) {
+      this.fileService
+        .downloadJson(filePath)
+        .subscribe(text => this.content.setValue(text));
+      return;
+    } else {
+      this.fileService
+        .downloadFile(filePath)
+        .pipe(switchMap(res => readAsText(res as Blob)))
+        .subscribe(text => this.content.setValue(text));
+    }
   }
 
   deleteCache() {
