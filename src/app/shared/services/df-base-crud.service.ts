@@ -172,13 +172,13 @@ export class DfBaseCrudService {
     if (options.related) {
       params.related = options.related;
     }
-    if (options.limit) {
+    if (options.limit !== undefined) {
       params.limit = options.limit;
     }
-    if (options.offset) {
+    if (options.offset !== undefined) {
       params.offset = options.offset;
     }
-    if (options.includeCount) {
+    if (options.includeCount !== undefined) {
       params.include_count = options.includeCount;
     }
 

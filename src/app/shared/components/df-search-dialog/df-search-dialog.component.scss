@@ -1,0 +1,22 @@
+.search-bar {
+  margin-top: 16px;
+  min-width: 275px;
+}
+.search-container {
+  max-height: 500px;
+  min-width: 425px;
+  &.small {
+    min-width: 300px;
+  }
+  overflow: auto;
+  ul {
+    list-style-type: none;
+    padding-left: 0;
+  }
+}
+
+.result-item {
+  width: 100%;
+  justify-content: left;
+  margin: 2px 0;
+}

@@ -270,7 +270,13 @@
           "header": "Update Scheduler"
         }
       },
-      "logs": { "nav": "Logs", "header": "{{nav.system-settings.logs.nav}}" },
+      "logs": {
+        "nav": "Logs",
+        "header": "{{nav.system-settings.logs.nav}}",
+        "create": {
+          "header": "Create Log"
+          }
+        },
       "reporting": {
         "nav": "Reporting",
         "header": "{{nav.system-settings.reporting.nav}}"

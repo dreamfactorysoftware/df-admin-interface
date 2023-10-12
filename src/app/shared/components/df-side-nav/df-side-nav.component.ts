@@ -10,7 +10,12 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { DfAuthService } from 'src/app/adf-user-management/services/df-auth.service';
 import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
-import { faAngleDown, faBars } from '@fortawesome/free-solid-svg-icons';
+import {
+  faAngleDown,
+  faBars,
+  faMagnifyingGlass,
+  faUser,
+} from '@fortawesome/free-solid-svg-icons';
 import { routes } from 'src/app/routes';
 import {
   accessibleRoutes,
@@ -23,6 +28,8 @@ import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
 import { DfLicenseCheckService } from '../../services/df-license-check.service';
 import { of, switchMap } from 'rxjs';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
 
 @Component({
   selector: 'df-side-nav',
@@ -43,6 +50,7 @@ import { of, switchMap } from 'rxjs';
     NgIf,
     NgFor,
     NgTemplateOutlet,
+    MatDialogModule,
   ],
 })
 export class DfSideNavComponent implements OnInit {
@@ -54,6 +62,8 @@ export class DfSideNavComponent implements OnInit {
   hasError$ = this.errorService.hasError$;
   nav: Array<Nav> = [];
   licenseCheck$ = this.licenseCheckService.licenseCheck$;
+  faMagnifyingGlass = faMagnifyingGlass;
+  faUser = faUser;
 
   constructor(
     private breakpointService: DfBreakpointService,
@@ -61,7 +71,8 @@ export class DfSideNavComponent implements OnInit {
     private authService: DfAuthService,
     private router: Router,
     private errorService: DfErrorService,
-    private licenseCheckService: DfLicenseCheckService
+    private licenseCheckService: DfLicenseCheckService,
+    private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -120,5 +131,9 @@ export class DfSideNavComponent implements OnInit {
   handleNavClick(nav: Nav) {
     this.errorService.error = null;
     this.router.navigate([nav.path]);
+  }
+
+  handleSearchClick() {
+    this.dialog.open(DfSearchDialogComponent, { position: { top: '60px' } });
   }
 }

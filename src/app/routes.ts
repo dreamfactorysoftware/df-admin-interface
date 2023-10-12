@@ -55,6 +55,7 @@ import { licenseGuard } from './shared/guards/license.guard';
 import { errorGaurd } from './shared/guards/error.guard';
 import { paywallGuard } from './shared/guards/paywall.guard';
 import { rootAdminGuard } from './shared/guards/admin.guard';
+import { SERVICE_GROUPS } from './shared/constants/serviceGroups';
 
 export const routes: Routes = [
   {
@@ -110,42 +111,35 @@ export const routes: Routes = [
             path: ROUTES.DATABASE,
             children: ServiceRoutes,
             data: {
-              groups: ['Database', 'Big Data'],
+              groups: SERVICE_GROUPS[ROUTES.DATABASE],
             },
           },
           {
             path: ROUTES.SCRIPTING,
             children: ServiceRoutes,
             data: {
-              groups: ['Script'],
+              groups: SERVICE_GROUPS[ROUTES.SCRIPTING],
             },
           },
           {
             path: ROUTES.NETWROK,
             children: ServiceRoutes,
             data: {
-              groups: ['Remote Service'],
+              groups: SERVICE_GROUPS[ROUTES.NETWROK],
             },
           },
           {
             path: ROUTES.FILE,
             children: ServiceRoutes,
             data: {
-              groups: ['File', 'Excel'],
+              groups: SERVICE_GROUPS[ROUTES.FILE],
             },
           },
           {
             path: ROUTES.UTILITY,
             children: ServiceRoutes,
             data: {
-              groups: [
-                'Cache',
-                'Email',
-                'Notification',
-                'Log',
-                'Source Control',
-                'IoT',
-              ],
+              groups: SERVICE_GROUPS[ROUTES.UTILITY],
             },
             resolve: {
               systemEvents: systemEventsResolver,
@@ -346,7 +340,7 @@ export const routes: Routes = [
         path: ROUTES.AUTHENTICATION,
         children: ServiceRoutes,
         data: {
-          groups: ['LDAP', 'SSO', 'OAuth'],
+          groups: SERVICE_GROUPS[ROUTES.AUTHENTICATION],
         },
         providers: [provideTranslocoScope('services')],
       },
@@ -505,7 +499,7 @@ export const routes: Routes = [
         path: ROUTES.LOGS,
         children: ServiceRoutes,
         data: {
-          groups: ['Log'],
+          groups: SERVICE_GROUPS[ROUTES.LOGS],
         },
         resolve: {
           systemEvents: systemEventsResolver,

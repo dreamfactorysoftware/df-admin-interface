@@ -5,18 +5,24 @@
   <ng-container *ngIf="isLoggedIn$ | async">
     <mat-toolbar>
       <button
-        mat-icon-button
+        mat-button
         (click)="sideNav.toggle()"
         [attr.aria-label]="'toggleNav' | transloco">
         <fa-icon [icon]="faBars"></fa-icon>
       </button>
       <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
       <span class="spacer"></span>
+      <button
+        mat-button
+        (click)="handleSearchClick()"
+        [attr.aria-label]="'search' | transloco">
+        <fa-icon [icon]="faMagnifyingGlass"></fa-icon>
+      </button>
       <button mat-button [matMenuTriggerFor]="profileMenu">
         {{ (userData$ | async)?.name }}
       </button>
       <mat-menu #profileMenu="matMenu">
-        <button mat-menu-item [routerLink]="['/profile']">
+        <button mat-menu-item routerLink="profile">
           {{ 'nav.profile.header' | transloco }}
         </button>
         <button mat-menu-item (click)="logout()">
