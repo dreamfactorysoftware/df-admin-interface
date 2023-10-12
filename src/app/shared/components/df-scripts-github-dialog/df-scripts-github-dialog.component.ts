@@ -5,6 +5,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import {
   FormBuilder,
+  FormControl,
   FormGroup,
   ReactiveFormsModule,
   Validators,
@@ -48,7 +49,7 @@ export class DfScriptsGithubDialogComponent implements OnInit {
     private dialogRef: MatDialogRef<DfScriptsGithubDialogComponent>
   ) {
     this.formGroup = formBuilder.group({
-      url: ['', Validators.required],
+      url: ['', [Validators.required, this.urlValidator]],
     });
   }
 
@@ -97,6 +98,25 @@ export class DfScriptsGithubDialogComponent implements OnInit {
         }
       }
     });
+  }
+
+  urlValidator(control: FormControl) {
+    const url = control.value;
+    if (
+      (url.indexOf('.js') > 0 ||
+        url.indexOf('.py') > 0 ||
+        url.indexOf('.php') > 0 ||
+        url.indexOf('.txt') > 0) &&
+      url.includes('github')
+    ) {
+      return null;
+    } else {
+      return { invalidUrl: true };
+    }
+  }
+
+  onFileUrlChange(value: string) {
+    console.log('file url changed', value);
   }
 
   onUpload() {
