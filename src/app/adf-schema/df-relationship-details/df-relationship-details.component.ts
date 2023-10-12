@@ -338,7 +338,7 @@ export class DfRelationshipDetailsComponent implements OnInit {
         .create(
           payload,
           {
-            snackbarSuccess: 'schema.relationships.alert.createSuccess',
+            snackbarSuccess: 'schema.relationships.alerts.createSuccess',
           },
           `${this.dbName}/_schema/${this.tableName}/_related`
         )
@@ -357,7 +357,7 @@ export class DfRelationshipDetailsComponent implements OnInit {
     } else if (this.type === 'edit') {
       this.crudService
         .patch(`${this.dbName}/_schema/${this.tableName}/_related`, payload, {
-          snackbarSuccess: 'schema.relationships.alert.updateSuccess',
+          snackbarSuccess: 'schema.relationships.alerts.updateSuccess',
         })
         .pipe(
           catchError(err => {

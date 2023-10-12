@@ -73,9 +73,9 @@
   "fields": "Fields",
   "addField": "Add Field",
   "addRelationship": "Add Virtual Relationship",
-  "alert": {
+  "alerts": {
     "tableNameError": "Table name is required",
-    "saveSuccess": "Table created",
+    "createSuccecss": "Table created",
     "updateSuccess": "Table updated",
     "deleteSuccess": "Table deleted"
   },
@@ -131,7 +131,7 @@
       "label": "Junction Reference Field",
       "default": "Select Junction Reference Field"
     },
-    "alert": {
+    "alerts": {
       "createSuccecss": "Relationship created",
       "updateSuccess": "Relationship updated"
     }
