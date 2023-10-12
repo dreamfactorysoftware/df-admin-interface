@@ -74,6 +74,7 @@ export class DfScriptsGithubDialogComponent implements OnInit {
             .get(githubApiEndpoint, {
               snackbarError: 'server',
               snackbarSuccess: 'getScriptSuccessMsg',
+              includeCacheControl: false,
             })
             .pipe(
               catchError(err => {
