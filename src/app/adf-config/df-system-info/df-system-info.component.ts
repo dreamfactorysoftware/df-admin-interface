@@ -16,7 +16,7 @@ import { CheckResponse } from 'src/app/shared/types/check';
 })
 export class DfSystemInfoComponent implements OnInit {
   environment = this.systemConfigDataService.environment;
-  status: CheckResponse;
+  status?: CheckResponse;
 
   constructor(
     public breakpointService: DfBreakpointService,

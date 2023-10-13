@@ -12,19 +12,21 @@
           {{ 'systemInfo.instance.licenseLevel' | transloco }}:
           {{ environment.platform?.license }}
         </li>
-        <li>
+        <li *ngIf="environment.platform?.licenseKey">
           {{ 'systemInfo.instance.licenseKey' | transloco }}:
           {{ environment.platform?.licenseKey }}
         </li>
-        <li>
-          {{ 'systemInfo.instance.subscriptionStatus' | transloco }}:
-          {{ status.msg }}
-        </li>
+        <ng-container *ngIf="status">
+          <li>
+            {{ 'systemInfo.instance.subscriptionStatus' | transloco }}:
+            {{ status.msg }}
+          </li>
 
-        <li>
-          {{ 'systemInfo.instance.subscriptionExpirationDate' | transloco }}:
-          {{ status.renewalDate }}
-        </li>
+          <li>
+            {{ 'systemInfo.instance.subscriptionExpirationDate' | transloco }}:
+            {{ status.renewalDate }}
+          </li>
+        </ng-container>
         <li>
           DreamFactory
           {{ 'version' | transloco }}:

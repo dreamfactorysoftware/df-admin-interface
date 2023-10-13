@@ -17,7 +17,7 @@ export interface Environment {
     isTrial: boolean;
     license: string;
     securedPackageExport: boolean;
-    licenseKey: string;
+    licenseKey: string | boolean;
     dbDriver: string;
     installPath: string;
     logPath: string;

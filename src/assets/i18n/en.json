@@ -155,7 +155,7 @@
         },
         "network": {
           "nav": "Network",
-          "header": "{{nav.api-connections.api-types.Networking.nav}}",
+          "header": "{{nav.api-connections.api-types.network.nav}}",
           "create": {
             "nav": "Create Network API",
             "header": "{{nav.api-connections.api-types.network.create.nav}}"
@@ -167,16 +167,28 @@
         },
         "file": {
           "nav": "File",
-          "header": "{{nav.api-connections.api-types.file.nav}}"
+          "header": "{{nav.api-connections.api-types.file.nav}}",
+          "create": {
+            "nav": "Create File API",
+            "header": "{{nav.api-connections.api-types.file.create.nav}}"
+          }
         },
         "utility": {
           "nav": "Utility",
-          "header": "{{nav.api-connections.api-types.utility.nav}}"
+          "header": "{{nav.api-connections.api-types.utility.nav}}",
+          "create": {
+            "nav": "Create Utility API",
+            "header": "{{nav.api-connections.api-types.utility.create.nav}}"
+          }
         }
       },
       "role-based-access": {
         "nav": "Role Based Access",
-        "header": "{{nav.api-connections.role-based-access.nav}}"
+        "header": "{{nav.api-connections.role-based-access.nav}}",
+        "create": {
+          "nav": "Create a new role",
+          "header": "{{nav.api-connections.role-based-access.create.nav}}"
+        }
       },
       "api-keys": {
         "nav": "API Keys",
@@ -220,7 +232,11 @@
       },
       "authentication": {
         "nav": "Authentication",
-        "header": "{{nav.api-security.authentication.nav}}"
+        "header": "{{nav.api-security.authentication.nav}}",
+        "create": {
+          "nav": "Create Authentication API",
+          "header": "{{nav.api-security.authentication.create.nav}}"
+        }
       }
     },
     "system-settings": {
