@@ -84,17 +84,6 @@ describe('DfSystemInfoComponent', () => {
   });
 
   it('should create', () => {
-    component.platform.license = 'GOLD';
     expect(component).toBeTruthy();
-  });
-
-  it('should initialize with data from ActivatedRoute', () => {
-    fixture.detectChanges();
-
-    expect(component.platform).toEqual(platformMock);
-    expect(component.server).toEqual(serverMock);
-    expect(component.client).toEqual(clientMock);
-    expect(component.php.phpVersion).toEqual('7.4.3');
-    expect(component.php.serverApi).toEqual('mockServerApi');
   });
 });

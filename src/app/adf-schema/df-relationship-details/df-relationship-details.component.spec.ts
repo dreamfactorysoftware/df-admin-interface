@@ -162,7 +162,7 @@ describe('DfRelationshipDetailsComponent - Create View', () => {
   it('should route to parent when goBack() is called', () => {
     component.goBack();
     expect(routerMock.navigate).toHaveBeenCalledWith(
-      ['../'],
+      ['../../'],
       expect.objectContaining({ relativeTo: activatedRouteMock })
     );
   });

@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DfFieldDetailsComponent } from './df-field-details.component';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
-import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { of } from 'rxjs';
 import { TranslocoHttpLoader } from 'src/transloco-loader';
@@ -339,7 +338,7 @@ describe('DfFieldDetailsComponent - create field details', () => {
   it('should call router.navigate with correct arguments on onCancel', () => {
     component.onCancel();
     expect(routerMock.navigate).toHaveBeenCalledWith(
-      ['../'],
+      ['../../'],
       expect.objectContaining({ relativeTo: activatedRouteMock })
     );
   });

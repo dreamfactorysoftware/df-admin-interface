@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { DfSchedulerComponent } from './df-scheduler-details.component';
+import { DfSchedulerDetailsComponent } from './df-scheduler-details.component';
 import { TranslocoService } from '@ngneat/transloco';
 import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
 import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
@@ -19,20 +19,20 @@ const createModeActivatedRoute = {
   type: 'create',
 };
 
-describe('DfSchedulerComponent - create scheduler task flow', () => {
-  let component: DfSchedulerComponent;
-  let fixture: ComponentFixture<DfSchedulerComponent>;
+describe('DfSchedulerDetailsComponent - create scheduler task flow', () => {
+  let component: DfSchedulerDetailsComponent;
+  let fixture: ComponentFixture<DfSchedulerDetailsComponent>;
 
   beforeEach(() => {
     TestBed.configureTestingModule(
       createTestBedConfig(
-        DfSchedulerComponent,
+        DfSchedulerDetailsComponent,
         [DfBreakpointService, TranslocoService, DfSystemConfigDataService],
         { ...createModeActivatedRoute }
       )
     );
 
-    fixture = TestBed.createComponent(DfSchedulerComponent);
+    fixture = TestBed.createComponent(DfSchedulerDetailsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -102,20 +102,20 @@ describe('DfSchedulerComponent - create scheduler task flow', () => {
   });
 });
 
-describe('DfSchedulerComponent - edit scheduler task flow', () => {
-  let component: DfSchedulerComponent;
-  let fixture: ComponentFixture<DfSchedulerComponent>;
+describe('DfSchedulerDetailsComponent - edit scheduler task flow', () => {
+  let component: DfSchedulerDetailsComponent;
+  let fixture: ComponentFixture<DfSchedulerDetailsComponent>;
 
   beforeEach(() => {
     TestBed.configureTestingModule(
       createTestBedConfig(
-        DfSchedulerComponent,
+        DfSchedulerDetailsComponent,
         [DfBreakpointService, TranslocoService, DfSystemConfigDataService],
         { ...editModeActivatedRoute }
       )
     );
 
-    fixture = TestBed.createComponent(DfSchedulerComponent);
+    fixture = TestBed.createComponent(DfSchedulerDetailsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

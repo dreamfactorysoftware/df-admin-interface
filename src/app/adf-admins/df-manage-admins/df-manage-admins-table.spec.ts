@@ -50,12 +50,12 @@ describe('DfManageAdminsTableComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should call exportList', () => {
+  it('should call downloadJson', () => {
     const crudServiceSpy = jest.spyOn(
       DfBaseCrudService.prototype,
-      'exportList'
+      'downloadJson'
     );
-    component.downloadAdminList('JSON');
+    component.downloadAdminList('json');
     expect(crudServiceSpy).toHaveBeenCalled();
   });
 

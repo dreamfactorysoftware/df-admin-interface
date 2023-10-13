@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { DfLimitComponent } from './df-limit-details.component';
+import { DfLimitDetailsComponent } from './df-limit-details.component';
 import { TranslocoService } from '@ngneat/transloco';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
@@ -64,13 +64,13 @@ const ROLE = {
   lookup_by_role_id: [],
 };
 
-describe('DfLimitComponent - Create View', () => {
-  let component: DfLimitComponent;
-  let fixture: ComponentFixture<DfLimitComponent>;
+describe('DfLimitDetailsComponent - Create View', () => {
+  let component: DfLimitDetailsComponent;
+  let fixture: ComponentFixture<DfLimitDetailsComponent>;
 
   beforeEach(() => {
     TestBed.configureTestingModule(
-      createTestBedConfig(DfLimitComponent, [TranslocoService], {
+      createTestBedConfig(DfLimitDetailsComponent, [TranslocoService], {
         data: undefined,
         type: 'create',
         services: {
@@ -84,7 +84,7 @@ describe('DfLimitComponent - Create View', () => {
         },
       })
     );
-    fixture = TestBed.createComponent(DfLimitComponent);
+    fixture = TestBed.createComponent(DfLimitDetailsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -116,13 +116,13 @@ describe('DfLimitComponent - Create View', () => {
   });
 });
 
-describe('DfLimitComponent - Edit View', () => {
-  let component: DfLimitComponent;
-  let fixture: ComponentFixture<DfLimitComponent>;
+describe('DfLimitDetailsComponent - Edit View', () => {
+  let component: DfLimitDetailsComponent;
+  let fixture: ComponentFixture<DfLimitDetailsComponent>;
 
   beforeEach(() => {
     TestBed.configureTestingModule(
-      createTestBedConfig(DfLimitComponent, [TranslocoService], {
+      createTestBedConfig(DfLimitDetailsComponent, [TranslocoService], {
         data: LIMIT_DETAILS,
         type: 'edit',
         services: {
@@ -137,7 +137,7 @@ describe('DfLimitComponent - Edit View', () => {
       })
     );
 
-    fixture = TestBed.createComponent(DfLimitComponent);
+    fixture = TestBed.createComponent(DfLimitDetailsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

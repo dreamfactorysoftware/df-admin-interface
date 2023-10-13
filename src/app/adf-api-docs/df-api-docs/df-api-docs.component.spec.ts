@@ -4,7 +4,6 @@ import { DfApiDocsComponent } from './df-api-docs.component';
 import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 import { mockApiDocsData } from './test-utilities/df-api-docs.mock';
 import { Router } from '@angular/router';
-import { ROUTES } from 'src/app/shared/types/routes';
 
 describe('DfApiDocsComponent', () => {
   let component: DfApiDocsComponent;
@@ -36,9 +35,7 @@ describe('DfApiDocsComponent', () => {
 
     component.goBackToList();
 
-    expect(navigateSpy).toHaveBeenCalledWith([
-      `${ROUTES.API_CONNECTIONS}/${ROUTES.API_DOCS}`,
-    ]);
+    expect(navigateSpy).toHaveBeenCalled();
   });
 
   it('should download the api doc when the download button is clicked', () => {

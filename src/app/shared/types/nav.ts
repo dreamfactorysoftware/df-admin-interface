@@ -2,7 +2,7 @@ import { ROUTES } from './routes';
 
 export interface Nav {
   path: string;
-  subRoutes?: Nav[];
   route: ROUTES;
+  subRoutes?: Nav[];
   serviceGroups?: Array<string>;
 }

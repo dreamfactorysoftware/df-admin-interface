@@ -5,7 +5,7 @@
   <ng-container *ngIf="isLoggedIn$ | async">
     <mat-toolbar>
       <button
-        mat-button
+        mat-icon-button
         (click)="sideNav.toggle()"
         [attr.aria-label]="'toggleNav' | transloco">
         <fa-icon [icon]="faBars"></fa-icon>

@@ -6,6 +6,7 @@ import { TranslocoHttpLoader } from 'src/transloco-loader';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { ROUTES } from '../../types/routes';
 
 describe('DfSideNavComponent', () => {
   let component: DfSideNavComponent;
@@ -51,14 +52,14 @@ describe('DfSideNavComponent', () => {
   });
 
   it('should return true when isActive() is called with a matching route', () => {
-    const nav = { route: '/test' };
+    const nav = { path: '/test', route: 'test' as ROUTES };
     const router = TestBed.inject(Router);
     jest.spyOn(router, 'url', 'get').mockReturnValue('/test/123');
     expect(component.isActive(nav)).toBe(true);
   });
 
   it('should return false when isActive() is called with a non-matching route', () => {
-    const nav = { route: '/test' };
+    const nav = { path: '/test', route: 'test' as ROUTES };
     const router = TestBed.inject(Router);
     jest.spyOn(router, 'url', 'get').mockReturnValue('/other');
     expect(component.isActive(nav)).toBe(false);
@@ -67,26 +68,5 @@ describe('DfSideNavComponent', () => {
   it('should return the expected nav label when navLabel() is called', () => {
     const label = component.navLabel('/test/123');
     expect(label).toBe('nav.test.123.nav');
-  });
-
-  it('should return the expected page header when pageHeader() is called', () => {
-    const router = TestBed.inject(Router);
-    jest.spyOn(router, 'url', 'get').mockReturnValue('/test/123');
-    const header = component.pageHeader();
-    expect(header).toBe('nav.test.header');
-  });
-
-  it('should return undefined when pageHeader() is called with an empty URL', () => {
-    const router = TestBed.inject(Router);
-    jest.spyOn(router, 'url', 'get').mockReturnValue('');
-    const header = component.pageHeader();
-    expect(header).toBeUndefined();
-  });
-
-  it('should return the expected page header when pageHeader() is called with a numeric URL segment', () => {
-    const router = TestBed.inject(Router);
-    jest.spyOn(router, 'url', 'get').mockReturnValue('/test/123');
-    const header = component.pageHeader();
-    expect(header).toBe('nav.test.header');
   });
 });
