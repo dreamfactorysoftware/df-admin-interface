@@ -13,7 +13,14 @@ import {
   USER_SERVICE_TOKEN,
 } from '../constants/tokens';
 import { DfBaseCrudService } from './df-base-crud.service';
-import { BehaviorSubject, catchError, forkJoin, of, tap } from 'rxjs';
+import {
+  BehaviorSubject,
+  catchError,
+  forkJoin,
+  of,
+  switchMap,
+  tap,
+} from 'rxjs';
 import { GenericListResponse } from '../types/generic-http';
 import { AdminProfile, UserProfile } from '../types/user';
 import { Service, ServiceType } from '../types/service';
@@ -21,6 +28,7 @@ import { AppType } from '../types/apps';
 import { RoleType } from '../types/role';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { getFilterQuery } from '../utilities/filter-queries';
+import { DfPaywallService } from './df-paywall.service';
 
 type SearchResult = Array<{
   path: string;
@@ -49,7 +57,8 @@ export class DfSearchService {
     private eventScriptService: DfBaseCrudService,
     @Inject(LIMIT_SERVICE_TOKEN) private limitService: DfBaseCrudService,
     @Inject(EMAIL_TEMPLATES_SERVICE_TOKEN)
-    private emailTemplatesService: DfBaseCrudService
+    private emailTemplatesService: DfBaseCrudService,
+    private paywallService: DfPaywallService
   ) {
     this.results$.subscribe(results => {
       if (results.length) {
@@ -245,56 +254,70 @@ export class DfSearchService {
             }
           })
         ),
-      eventScripts: this.eventScriptService
-        .getAll<GenericListResponse<any>>({
-          limit: 0,
-          includeCount: false,
-          filter: getFilterQuery('eventScripts')(value),
-        })
-        .pipe(
-          catchError(() => {
+      eventScripts: this.paywallService.activatePaywall('eventScripts').pipe(
+        switchMap(paywall => {
+          if (paywall) {
             return of(null);
-          }),
-          tap(eventScripts => {
-            if (
-              eventScripts &&
-              eventScripts.resource &&
-              eventScripts.resource.length
-            ) {
-              results.push({
-                path: `${ROUTES.API_CONNECTIONS}/${ROUTES.EVENT_SCRIPTS}`,
-                items: eventScripts.resource.map(eventScript => ({
-                  label: eventScript.name,
-                  segment: eventScript.name,
-                })),
-              });
-              this.resultsSubject.next(results);
-            }
-          })
-        ),
-      limits: this.limitService
-        .getAll<GenericListResponse<any>>({
-          limit: 0,
-          includeCount: false,
-          filter: getFilterQuery('limits')(value),
+          }
+          return this.eventScriptService
+            .getAll<GenericListResponse<any>>({
+              limit: 0,
+              includeCount: false,
+              filter: getFilterQuery('eventScripts')(value),
+            })
+            .pipe(
+              catchError(() => {
+                return of(null);
+              }),
+              tap(eventScripts => {
+                if (
+                  eventScripts &&
+                  eventScripts.resource &&
+                  eventScripts.resource.length
+                ) {
+                  results.push({
+                    path: `${ROUTES.API_CONNECTIONS}/${ROUTES.EVENT_SCRIPTS}`,
+                    items: eventScripts.resource.map(eventScript => ({
+                      label: eventScript.name,
+                      segment: eventScript.name,
+                    })),
+                  });
+                  this.resultsSubject.next(results);
+                }
+              })
+            );
         })
-        .pipe(
-          catchError(() => {
+      ),
+      limits: this.paywallService.activatePaywall('limits').pipe(
+        switchMap(paywall => {
+          if (paywall) {
             return of(null);
-          }),
-          tap(limits => {
-            if (limits && limits.resource && limits.resource.length) {
-              results.push({
-                path: `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
-                items: limits.resource.map(limit => ({
-                  label: limit.name,
-                  segment: limit.id,
-                })),
-              });
-              this.resultsSubject.next(results);
-            }
-          })
-        ),
+          }
+          return this.limitService
+            .getAll<GenericListResponse<any>>({
+              limit: 0,
+              includeCount: false,
+              filter: getFilterQuery('limits')(value),
+            })
+            .pipe(
+              catchError(() => {
+                return of(null);
+              }),
+              tap(limits => {
+                if (limits && limits.resource && limits.resource.length) {
+                  results.push({
+                    path: `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
+                    items: limits.resource.map(limit => ({
+                      label: limit.name,
+                      segment: limit.id,
+                    })),
+                  });
+                  this.resultsSubject.next(results);
+                }
+              })
+            );
+        })
+      ),
       emailTemplates: this.emailTemplatesService
         .getAll<GenericListResponse<any>>({
           limit: 0,
