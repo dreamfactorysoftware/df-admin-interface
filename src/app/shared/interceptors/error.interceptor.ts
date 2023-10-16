@@ -15,11 +15,13 @@ export const errorInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
-  if (req.url.startsWith('/api') && !req.url.endsWith('system')) {
+  const skipError = req.headers.get('skip-error');
+  if (req.url.startsWith('/api') && !skipError) {
     const router = inject(Router);
     const userDataService = inject(DfUserDataService);
     const errorService = inject(DfErrorService);
     errorService.error = null;
+    req = req.clone({ headers: req.headers.delete('skip-error') });
     return next(req).pipe(
       catchError((error: HttpErrorResponse) => {
         if (error.status === 401) {

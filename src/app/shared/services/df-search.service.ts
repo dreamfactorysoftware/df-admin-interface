@@ -57,8 +57,7 @@ export class DfSearchService {
     private eventScriptService: DfBaseCrudService,
     @Inject(LIMIT_SERVICE_TOKEN) private limitService: DfBaseCrudService,
     @Inject(EMAIL_TEMPLATES_SERVICE_TOKEN)
-    private emailTemplatesService: DfBaseCrudService,
-    private paywallService: DfPaywallService
+    private emailTemplatesService: DfBaseCrudService
   ) {
     this.results$.subscribe(results => {
       if (results.length) {
@@ -76,6 +75,7 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('user')(value),
+          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
         })
         .pipe(
           catchError(() => {
@@ -99,6 +99,7 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('user')(value),
+          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
         })
         .pipe(
           catchError(() => {
@@ -122,9 +123,11 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('services')(value),
+          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
         }),
-        serviceTypes:
-          this.serviceTypeService.getAll<GenericListResponse<ServiceType>>(),
+        serviceTypes: this.serviceTypeService.getAll<
+          GenericListResponse<ServiceType>
+        >({ additionalHeaders: [{ key: 'skip-error', value: 'true' }] }),
       }).pipe(
         catchError(() => {
           return of(null);
@@ -213,6 +216,7 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('roles')(value),
+          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
         })
         .pipe(
           catchError(() => {
@@ -236,6 +240,7 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('apps')(value),
+          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
         })
         .pipe(
           catchError(() => {
@@ -254,75 +259,64 @@ export class DfSearchService {
             }
           })
         ),
-      eventScripts: this.paywallService.activatePaywall('eventScripts').pipe(
-        switchMap(paywall => {
-          if (paywall) {
-            return of(null);
-          }
-          return this.eventScriptService
-            .getAll<GenericListResponse<any>>({
-              limit: 0,
-              includeCount: false,
-              filter: getFilterQuery('eventScripts')(value),
-            })
-            .pipe(
-              catchError(() => {
-                return of(null);
-              }),
-              tap(eventScripts => {
-                if (
-                  eventScripts &&
-                  eventScripts.resource &&
-                  eventScripts.resource.length
-                ) {
-                  results.push({
-                    path: `${ROUTES.API_CONNECTIONS}/${ROUTES.EVENT_SCRIPTS}`,
-                    items: eventScripts.resource.map(eventScript => ({
-                      label: eventScript.name,
-                      segment: eventScript.name,
-                    })),
-                  });
-                  this.resultsSubject.next(results);
-                }
-              })
-            );
+      eventScripts: this.eventScriptService
+        .getAll<GenericListResponse<any>>({
+          limit: 0,
+          includeCount: false,
+          filter: getFilterQuery('eventScripts')(value),
+          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
         })
-      ),
-      limits: this.paywallService.activatePaywall('limits').pipe(
-        switchMap(paywall => {
-          if (paywall) {
+        .pipe(
+          catchError(() => {
             return of(null);
-          }
-          return this.limitService
-            .getAll<GenericListResponse<any>>({
-              limit: 0,
-              includeCount: false,
-              filter: getFilterQuery('limits')(value),
-            })
-            .pipe(
-              catchError(() => {
-                return of(null);
-              }),
-              tap(limits => {
-                if (limits && limits.resource && limits.resource.length) {
-                  results.push({
-                    path: `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
-                    items: limits.resource.map(limit => ({
-                      label: limit.name,
-                      segment: limit.id,
-                    })),
-                  });
-                  this.resultsSubject.next(results);
-                }
-              })
-            );
+          }),
+          tap(eventScripts => {
+            if (
+              eventScripts &&
+              eventScripts.resource &&
+              eventScripts.resource.length
+            ) {
+              results.push({
+                path: `${ROUTES.API_CONNECTIONS}/${ROUTES.EVENT_SCRIPTS}`,
+                items: eventScripts.resource.map(eventScript => ({
+                  label: eventScript.name,
+                  segment: eventScript.name,
+                })),
+              });
+              this.resultsSubject.next(results);
+            }
+          })
+        ),
+      limits: this.limitService
+        .getAll<GenericListResponse<any>>({
+          limit: 0,
+          includeCount: false,
+          filter: getFilterQuery('limits')(value),
+          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
         })
-      ),
+        .pipe(
+          catchError(() => {
+            return of(null);
+          }),
+          tap(limits => {
+            if (limits && limits.resource && limits.resource.length) {
+              results.push({
+                path: `${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
+                items: limits.resource.map(limit => ({
+                  label: limit.name,
+                  segment: limit.id,
+                })),
+              });
+              this.resultsSubject.next(results);
+            }
+          })
+        ),
       emailTemplates: this.emailTemplatesService
         .getAll<GenericListResponse<any>>({
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('emailTemplates')(value),
+          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
         })
         .pipe(
           catchError(() => {
