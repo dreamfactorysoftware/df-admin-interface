@@ -14,7 +14,10 @@
       [icon]="faCircleInfo"
       [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
   </mat-form-field>
-  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+  <mat-form-field
+    subscriptSizing="dynamic"
+    class="dynamic-width"
+    *ngIf="!subscriptionRequired">
     <mat-label>{{ 'services.controls.namespace.label' | transloco }}</mat-label>
     <input matInput formControlName="name" />
     <fa-icon
@@ -23,7 +26,10 @@
       [icon]="faCircleInfo"
       [matTooltip]="'services.controls.namespace.tooltip' | transloco" />
   </mat-form-field>
-  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+  <mat-form-field
+    subscriptSizing="dynamic"
+    class="dynamic-width"
+    *ngIf="!subscriptionRequired">
     <mat-label>{{ 'services.controls.label.label' | transloco }}</mat-label>
     <input matInput formControlName="label" />
     <fa-icon
@@ -32,7 +38,10 @@
       [icon]="faCircleInfo"
       [matTooltip]="'services.controls.label.tooltip' | transloco" />
   </mat-form-field>
-  <mat-form-field subscriptSizing="dynamic" class="full-width">
+  <mat-form-field
+    subscriptSizing="dynamic"
+    class="full-width"
+    *ngIf="!subscriptionRequired">
     <mat-label>{{
       'services.controls.description.label' | transloco
     }}</mat-label>
@@ -43,10 +52,10 @@
       [icon]="faCircleInfo"
       [matTooltip]="'services.controls.description.tooltip' | transloco" />
   </mat-form-field>
-  <mat-slide-toggle formControlName="isActive">{{
+  <mat-slide-toggle formControlName="isActive" *ngIf="!subscriptionRequired">{{
     'active' | transloco
   }}</mat-slide-toggle>
-  <ng-container *ngIf="viewSchema">
+  <ng-container *ngIf="viewSchema && !subscriptionRequired">
     <ng-container formGroupName="config">
       <mat-accordion class="full-width">
         <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
@@ -100,7 +109,7 @@
       </mat-accordion>
     </ng-container>
   </ng-container>
-  <div class="full-width action-bar">
+  <div class="full-width action-bar" *ngIf="!subscriptionRequired">
     <button mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
@@ -109,3 +118,4 @@
     </button>
   </div>
 </form>
+<df-paywall *ngIf="subscriptionRequired"></df-paywall>

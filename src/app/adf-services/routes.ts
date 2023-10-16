@@ -10,8 +10,8 @@ export const ServiceRoutes: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('./df-manage-services/df-manage-services-table.component').then(
-        m => m.DfManageServicesTableComponent
+      import('./df-manage-services/df-manage-services.component').then(
+        m => m.DfManageServicesComponent
       ),
     resolve: {
       data: servicesResolver(),

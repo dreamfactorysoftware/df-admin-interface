@@ -31,6 +31,13 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
+import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
+import { forkJoin, map, switchMap } from 'rxjs';
+import {
+  GOLD_SERVICES,
+  SILVER_SERVICES,
+} from 'src/app/shared/constants/services';
+import { DfPaywallComponent } from 'src/app/shared/components/df-paywall/df-paywall.component';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -58,6 +65,7 @@ import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-edi
     MatTooltipModule,
     MatButtonModule,
     DfScriptEditorComponent,
+    DfPaywallComponent,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -75,7 +83,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private fb: FormBuilder,
     @Inject(SERVICES_SERVICE_TOKEN)
     private servicesService: DfBaseCrudService,
-    private router: Router
+    private router: Router,
+    private systemConfigDataService: DfSystemConfigDataService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -91,29 +100,48 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.activatedRoute.data.subscribe(({ data, serviceTypes }) => {
-      this.serviceTypes = serviceTypes;
-      this.serviceData = data;
-      if (this.edit) {
-        this.configSchema = this.getConfigSchema(data.type);
-        this.initializeConfig();
-        this.serviceForm.patchValue({
-          ...data,
-          config: data.config,
-        });
-        this.serviceForm.controls['type'].disable();
-      } else {
-        this.serviceForm.controls['type'].valueChanges.subscribe(value => {
-          this.serviceForm.removeControl('config');
-          this.configSchema = this.getConfigSchema(value);
+    this.systemConfigDataService.environment$
+      .pipe(
+        switchMap(env =>
+          this.activatedRoute.data.pipe(map(route => ({ env, route })))
+        )
+      )
+      .subscribe(({ env, route }) => {
+        const { data, serviceTypes, groups } = route;
+        const licenseType = env.platform?.license;
+        this.serviceTypes = serviceTypes;
+        if (licenseType === 'SILVER') {
+          this.serviceTypes.push(
+            ...GOLD_SERVICES.filter(s => groups.includes(s.group))
+          );
+        }
+        if (licenseType === 'OPEN SOURCE') {
+          this.serviceTypes.push(
+            ...SILVER_SERVICES.filter(s => groups.includes(s.group)),
+            ...GOLD_SERVICES.filter(s => groups.includes(s.group))
+          );
+        }
+        this.serviceData = data;
+        if (this.edit) {
+          this.configSchema = this.getConfigSchema(data.type);
           this.initializeConfig();
-        });
-      }
-    });
+          this.serviceForm.patchValue({
+            ...data,
+            config: data.config,
+          });
+          this.serviceForm.controls['type'].disable();
+        } else {
+          this.serviceForm.controls['type'].valueChanges.subscribe(value => {
+            this.serviceForm.removeControl('config');
+            this.configSchema = this.getConfigSchema(value);
+            this.initializeConfig();
+          });
+        }
+      });
   }
 
   initializeConfig() {
-    if (this.configSchema) {
+    if (this.configSchema && this.configSchema.length > 0) {
       const config = this.fb.group({});
       this.configSchema.forEach(control => {
         const validator = [];
@@ -127,6 +155,12 @@ export class DfServiceDetailsComponent implements OnInit {
       });
       this.serviceForm.addControl('config', config);
     }
+  }
+
+  get subscriptionRequired() {
+    return (
+      this.serviceForm.controls['type'].value && this.configSchema.length === 0
+    );
   }
 
   get scriptMode() {
