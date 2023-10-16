@@ -145,7 +145,7 @@ export class DfLoginComponent implements OnInit {
       )
       .subscribe(() => {
         this.showAlert = false;
-        this.router.navigate(['/']);
+        this.router.navigate([ROUTES.HOME]);
       });
   }
 }

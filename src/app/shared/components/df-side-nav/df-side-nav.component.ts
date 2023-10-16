@@ -30,7 +30,8 @@ import { DfLicenseCheckService } from '../../services/df-license-check.service';
 import { of, switchMap } from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
-
+import { UntilDestroy } from '@ngneat/until-destroy';
+@UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
   templateUrl: './df-side-nav.component.html',

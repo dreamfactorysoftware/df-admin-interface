@@ -116,6 +116,5 @@ export class DfAuthService {
         this.userDataService.userData = null;
         this.router.navigate([ROUTES.AUTH, ROUTES.LOGIN]);
       });
-    this.userDataService.isLoggedIn = false;
   }
 }
