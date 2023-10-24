@@ -1,4 +1,9 @@
 <div class="user-management-card-container">
+  <div class="left-panel">
+    <img src="../../../assets/img/logo.png" alt="DreamFactory Logo" class="logo">
+  </div>
+
+  <div class="right-panel">
   <mat-card class="user-management-card">
     <df-alert
       [showAlert]="showAlert"
@@ -96,6 +101,7 @@
       </div>
     </mat-card-content>
   </mat-card>
+</div>
 </div>
 <ng-template #authServices let-services="services" let-title="title">
   <div class="services-section" *ngIf="services.length">

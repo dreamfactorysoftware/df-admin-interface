@@ -33,7 +33,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 @Component({
   selector: 'df-user-login',
   templateUrl: './df-login.component.html',
-  styleUrls: ['../adf-user-management.scss'],
+  styleUrls: ['../adf-user-management.scss', './df-login.component.scss'],
   standalone: true,
   imports: [
     MatCardModule,
