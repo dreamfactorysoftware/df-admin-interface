@@ -40,6 +40,7 @@ export interface RequestOptions {
   contentType: string;
   additionalParams: KeyValuePair[];
   additionalHeaders: KeyValuePair[];
+  includeCacheControl: boolean;
 }
 
 export type GenericCreateResponse = GenericListResponse<{ id: number }>;
