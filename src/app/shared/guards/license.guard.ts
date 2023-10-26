@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, Router } from '@angular/router';
 import { ROUTES } from '../types/routes';
 import { DfLicenseCheckService } from '../services/df-license-check.service';
-import { map, of, switchMap } from 'rxjs';
+import { catchError, map, of, switchMap } from 'rxjs';
 import { DfSystemConfigDataService } from '../services/df-system-config-data.service';
 
 export const licenseGuard = (route: ActivatedRouteSnapshot) => {
@@ -45,7 +45,8 @@ export const licenseGuard = (route: ActivatedRouteSnapshot) => {
                 return router.createUrlTree([ROUTES.HOME]);
               }
               return true;
-            })
+            }),
+            catchError(() => of(true))
           );
       }
       return of(false);
