@@ -13,6 +13,7 @@ import { saveRawAsFile } from 'src/app/shared/utilities/file';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 import { SESSION_TOKEN_HEADER } from 'src/app/shared/constants/http-headers';
+import { mapCamelToSnake } from 'src/app/shared/utilities/case';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -36,8 +37,10 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
   ) {}
 
   ngOnInit(): void {
-    this.activatedRoute.data.subscribe(data => {
-      this.apiDocJson = data['data'];
+    this.activatedRoute.data.subscribe(({ data }) => {
+      if (data) {
+        this.apiDocJson = mapCamelToSnake(data);
+      }
     });
   }
 
