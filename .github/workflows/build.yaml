@@ -11,11 +11,21 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: alpine-latest
 
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v2
+
+    - name: Cache Node.js modules
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.npm
+          ~/.cache
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
 
     - name: Set Up Node.js
       uses: actions/setup-node@v2
@@ -23,7 +33,7 @@ jobs:
         node-version: '18'
 
     - name: Install Dependencies
-      run: npm install
+      run: npm ci --prefer-offline --no-audit --progress=false
 
     - name: Build Angular Project
       run: npm run build
