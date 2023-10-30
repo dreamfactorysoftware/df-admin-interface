@@ -3,22 +3,16 @@ import { DfAuthService } from '../../adf-user-management/services/df-auth.servic
 import { map, switchMap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { ROUTES } from '../types/routes';
-import { of } from 'rxjs';
 import { DfUserDataService } from '../services/df-user-data.service';
+import { of } from 'rxjs';
 
 export const notLoggedInGuard = () => {
   const authService = inject(DfAuthService);
   const userDataService = inject(DfUserDataService);
   const router = inject(Router);
   return userDataService.isLoggedIn$.pipe(
-    map(isLoggedIn => {
-      if (isLoggedIn) {
-        return router.createUrlTree([ROUTES.HOME]);
-      }
-      return true;
-    }),
-    switchMap(checkSession => {
-      if (checkSession) {
+    switchMap(isLoggedIn => {
+      if (!isLoggedIn) {
         return authService.checkSession().pipe(
           map(validSession => {
             if (validSession) {
@@ -28,7 +22,7 @@ export const notLoggedInGuard = () => {
           })
         );
       }
-      return of(true);
+      return of(router.createUrlTree([ROUTES.HOME]));
     })
   );
 };

@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { URLS } from '../constants/urls';
 import { LICENSE_KEY_HEADER } from '../constants/http-headers';
 import { CheckResponse } from '../types/check';
-import { BehaviorSubject, map, tap } from 'rxjs';
+import { BehaviorSubject, catchError, map, tap, throwError } from 'rxjs';
 import { mapSnakeToCamel } from '../utilities/case';
 
 @Injectable({
@@ -24,7 +24,11 @@ export class DfLicenseCheckService {
       })
       .pipe(
         map(response => mapSnakeToCamel(response)),
-        tap(response => this.licenseCheckSubject.next(response))
+        tap(response => this.licenseCheckSubject.next(response)),
+        catchError(e => {
+          this.licenseCheckSubject.next(e.error);
+          return throwError(() => new Error(e));
+        })
       );
   }
 }
