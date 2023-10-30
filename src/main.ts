@@ -14,6 +14,8 @@ import { TranslocoHttpLoader } from './transloco-loader';
 import { provideTransloco } from '@ngneat/transloco';
 import { errorInterceptor } from './app/shared/interceptors/error.interceptor';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { SUPPORTED_LANGUAGES } from './app/shared/constants/languages';
+import { detectUserLanguage } from './app/shared/utilities/language';
 
 function initEnvironment(systemConfigService: DfSystemConfigDataService) {
   return () => systemConfigService.fetchEnvironmentData();
@@ -41,8 +43,8 @@ bootstrapApplication(AppComponent, {
     provideRouter(routes, withHashLocation()),
     provideTransloco({
       config: {
-        availableLangs: ['en'],
-        defaultLang: 'en',
+        availableLangs: SUPPORTED_LANGUAGES.map(lang => lang.code),
+        defaultLang: detectUserLanguage(),
         reRenderOnLangChange: true,
         prodMode: !isDevMode(),
       },

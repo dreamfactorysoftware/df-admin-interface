@@ -13,6 +13,7 @@ import { DfUserDataService } from 'src/app/shared/services/df-user-data.service'
 import {
   faAngleDown,
   faBars,
+  faLanguage,
   faMagnifyingGlass,
   faUser,
 } from '@fortawesome/free-solid-svg-icons';
@@ -23,7 +24,7 @@ import {
   transformRoutes,
 } from '../../utilities/route';
 import { Nav } from '../../types/nav';
-import { TranslocoPipe } from '@ngneat/transloco';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
 import { DfLicenseCheckService } from '../../services/df-license-check.service';
@@ -65,6 +66,7 @@ export class DfSideNavComponent implements OnInit {
   licenseCheck$ = this.licenseCheckService.licenseCheck$;
   faMagnifyingGlass = faMagnifyingGlass;
   faUser = faUser;
+  faLanguage = faLanguage;
 
   constructor(
     private breakpointService: DfBreakpointService,
@@ -73,7 +75,8 @@ export class DfSideNavComponent implements OnInit {
     private router: Router,
     private errorService: DfErrorService,
     private licenseCheckService: DfLicenseCheckService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private transloco: TranslocoService
   ) {}
 
   ngOnInit(): void {
@@ -139,5 +142,18 @@ export class DfSideNavComponent implements OnInit {
 
   handleSearchClick() {
     this.dialog.open(DfSearchDialogComponent, { position: { top: '60px' } });
+  }
+
+  handleLanguageChange(language: string) {
+    this.transloco.setActiveLang(language);
+    localStorage.setItem('language', language);
+  }
+
+  get activeLanguage() {
+    return this.transloco.getActiveLang();
+  }
+
+  get availableLanguages() {
+    return this.transloco.getAvailableLangs() as string[];
   }
 }

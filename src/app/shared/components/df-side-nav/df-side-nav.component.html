@@ -13,11 +13,27 @@
       <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
       <span class="spacer"></span>
       <button
-        mat-button
+        mat-icon-button
         (click)="handleSearchClick()"
         [attr.aria-label]="'search' | transloco">
         <fa-icon [icon]="faMagnifyingGlass"></fa-icon>
       </button>
+      <ng-container *ngIf="availableLanguages.length > 1">
+        <button
+          mat-icon-button
+          [matMenuTriggerFor]="langMenu"
+          [attr.aria-label]="'language' | transloco">
+          <fa-icon [icon]="faLanguage"></fa-icon>
+        </button>
+        <mat-menu #langMenu="matMenu">
+          <button
+            mat-menu-item
+            *ngFor="let lang of availableLanguages"
+            (click)="handleLanguageChange(lang)">
+            {{ 'languages.' + lang | transloco }}
+          </button>
+        </mat-menu>
+      </ng-container>
       <button mat-button [matMenuTriggerFor]="profileMenu">
         {{ (userData$ | async)?.name }}
       </button>

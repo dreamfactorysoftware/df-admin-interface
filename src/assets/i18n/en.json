@@ -383,5 +383,9 @@
     "trial": "free hosted trial",
     "gain": " and gain access to additional connectors, or schedule time with our team below to install an on-premise enterprise instance and test all enterprise features.",
     "speakToHuman": "Speak to a human"
+  },
+  "language": "Change language",
+  "languages": {
+    "en": "English"
   }
 }
