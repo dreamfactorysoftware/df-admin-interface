@@ -1,0 +1,83 @@
+<mat-tab-group
+  dynamicHeight
+  mat-stretch-tabs="false"
+  mat-align-tabs="start"
+  animationDuration="0ms">
+  <mat-tab label="{{ 'schema.table' | transloco }}">
+    <form
+      [formGroup]="tableDetailsForm"
+      (ngSubmit)="save()"
+      class="details-section"
+      [class.x-small]="breakpointService.isXSmallScreen | async">
+      <mat-form-field class="dynamic-width">
+        <mat-label>
+          {{ 'schema.tableName' | transloco }}
+        </mat-label>
+        <input matInput formControlName="name" required />
+        <mat-error
+          *ngIf="tableDetailsForm.controls['name'].hasError('required')">
+          {{ 'schema.alerts.tableNameError' | transloco }}
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field class="dynamic-width">
+        <mat-label>
+          {{ 'schema.alias' | transloco }}
+        </mat-label>
+        <input matInput formControlName="alias" />
+      </mat-form-field>
+      <mat-form-field class="dynamic-width">
+        <mat-label>
+          {{ 'schema.label' | transloco }}
+        </mat-label>
+        <input matInput formControlName="label" />
+      </mat-form-field>
+      <mat-form-field class="dynamic-width">
+        <mat-label> {{ 'schema.plural' | transloco }} </mat-label>
+        <input matInput formControlName="plural" />
+      </mat-form-field>
+      <mat-form-field subscriptSizing="dynamic">
+        <mat-label> {{ 'schema.description' | transloco }} </mat-label>
+        <input matInput formControlName="description" />
+      </mat-form-field>
+
+      <div class="full-width" *ngIf="type === 'edit'">
+        <h2>{{ 'schema.fields' | transloco }}</h2>
+        <df-fields-table [tableData]="tableFields"></df-fields-table>
+      </div>
+
+      <div *ngIf="type === 'edit'" class="full-width margin-2-0">
+        <h2>{{ 'schema.relationships.heading' | transloco }}</h2>
+        <df-relationships-table
+          [tableData]="tableRelated"></df-relationships-table>
+      </div>
+
+      <div class="full-width action-bar">
+        <button mat-flat-button type="button" (click)="goBack()">
+          {{ 'cancel' | transloco }}
+        </button>
+        <button mat-flat-button color="primary">
+          <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
+          <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
+        </button>
+      </div>
+    </form>
+  </mat-tab>
+  <mat-tab label="JSON">
+    <df-ace-editor
+      [mode]="AceEditorMode.JSON"
+      [formControl]="jsonData"></df-ace-editor>
+    <div class="full-width action-bar">
+      <button mat-flat-button type="button" (click)="goBack()">
+        {{ 'cancel' | transloco }}
+      </button>
+      <button
+        mat-flat-button
+        color="primary"
+        (click)="save(jsonData.getRawValue())">
+        <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
+        <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
+      </button>
+    </div>
+  </mat-tab>
+</mat-tab-group>

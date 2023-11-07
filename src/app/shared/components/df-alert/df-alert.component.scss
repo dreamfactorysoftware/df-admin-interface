@@ -1,0 +1,53 @@
+@use '@angular/material' as mat;
+
+$green-palette: mat.define-palette(mat.$green-palette);
+$red-palette: mat.define-palette(mat.$red-palette);
+$orange-palette: mat.define-palette(mat.$orange-palette);
+$blue-palette: mat.define-palette(mat.$blue-palette);
+
+.alert-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid;
+  border-radius: 5px;
+  box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.2);
+  color: black;
+
+  .alert-message {
+    flex: 1;
+    padding: 8px;
+  }
+  .alert-icon {
+    padding: 0 10px;
+  }
+  &.success {
+    border-color: mat.get-color-from-palette($green-palette, 300);
+    background-color: mat.get-color-from-palette($green-palette, 100);
+    .alert-icon {
+      color: mat.get-color-from-palette($green-palette, 500);
+    }
+  }
+  &.error {
+    border-color: mat.get-color-from-palette($red-palette, 300);
+    background-color: mat.get-color-from-palette($red-palette, 100);
+    .alert-icon {
+      color: mat.get-color-from-palette($red-palette, 500);
+    }
+  }
+  &.warning {
+    border-color: mat.get-color-from-palette($orange-palette, 300);
+    background-color: mat.get-color-from-palette($orange-palette, 100);
+    .alert-icon {
+      color: mat.get-color-from-palette($orange-palette, 500);
+    }
+  }
+  &.info {
+    border-color: mat.get-color-from-palette($blue-palette, 300);
+    background-color: mat.get-color-from-palette($blue-palette, 100);
+    .alert-icon {
+      color: mat.get-color-from-palette($blue-palette, 500);
+    }
+  }
+}

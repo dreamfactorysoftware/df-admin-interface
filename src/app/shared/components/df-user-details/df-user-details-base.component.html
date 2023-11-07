@@ -1,0 +1,162 @@
+<df-alert
+  [showAlert]="showAlert"
+  [alertType]="alertType"
+  (alertClosed)="showAlert = false">
+  {{ alertMsg }}
+</df-alert>
+<form name="admin-form" [formGroup]="userForm" (ngSubmit)="save()">
+  <div class="user-details" [class.small]="isSmallScreen | async">
+    <df-profile-details formGroupName="profileDetailsGroup" />
+    <div class="additional-info">
+      <mat-slide-toggle formControlName="isActive">{{
+        'active' | transloco
+      }}</mat-slide-toggle>
+      <ng-container *ngIf="type === 'create'; else editMode">
+        <df-alert
+          [alertType]="
+            userForm.get('pass-invite')?.touched &&
+            userForm.get('pass-invite')?.invalid
+              ? 'error'
+              : 'info'
+          "
+          [showAlert]="true"
+          [dismissible]="false">
+          {{ userType + '.alerts.new' | transloco }}
+        </df-alert>
+        <mat-radio-group
+          [attr.aria-label]="'selectAnOption' | transloco"
+          formControlName="pass-invite"
+          class="pass-invite">
+          <mat-radio-button class="userform-invite-radio-btn" value="invite">{{
+            'userManagement.controls.sendInvite.label' | transloco
+          }}</mat-radio-button>
+          <mat-radio-button
+            class="userform-password-radio-btn"
+            value="password"
+            >{{
+              'userManagement.controls.setPassword.label' | transloco
+            }}</mat-radio-button
+          >
+        </mat-radio-group>
+      </ng-container>
+      <ng-template #editMode
+        ><span
+          >{{ 'confirmed' | transloco }}:
+          {{ currentProfile.confirmed ? 'Yes' : 'No' }}</span
+        >
+        <button
+          mat-flat-button
+          color="primary"
+          (click)="sendInvite()"
+          *ngIf="!currentProfile.confirmed">
+          {{ 'sendInvite' | transloco }} <fa-icon [icon]="faEnvelope"></fa-icon>
+        </button>
+        <ng-container *ngIf="userForm.contains('setPassword')">
+          <mat-checkbox formControlName="setPassword"
+            >{{ 'userManagement.controls.setPassword.label' | transloco }}
+          </mat-checkbox>
+        </ng-container>
+      </ng-template>
+      <ng-container
+        *ngIf="
+          userForm.get('pass-invite')?.value === 'password' ||
+          userForm.get('setPassword')?.value
+        ">
+        <mat-form-field appearance="fill">
+          <mat-label>{{
+            'userManagement.controls.password.label' | transloco
+          }}</mat-label>
+          <input
+            matInput
+            class="user-details-set-password"
+            type="password"
+            formControlName="password" />
+          <mat-error *ngIf="userForm.get('password')?.errors?.['required']">
+            {{ 'userManagement.controls.password.errors.required' | transloco }}
+          </mat-error>
+          <mat-error *ngIf="userForm.get('password')?.errors?.['minlength']">
+            {{ 'userManagement.controls.password.errors.length' | transloco }}
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="fill">
+          <mat-label>{{
+            'userManagement.controls.confirmPassword.label' | transloco
+          }}</mat-label>
+
+          <input
+            matInput
+            class="user-details-confirm-password"
+            type="password"
+            formControlName="confirmPassword" />
+          <mat-error
+            *ngIf="userForm.get('confirmPassword')?.hasError('doesNotMatch')">
+            {{
+              'userManagement.controls.confirmPassword.errors.match' | transloco
+            }}
+          </mat-error>
+        </mat-form-field>
+      </ng-container>
+      <ng-container
+        *ngIf="
+          accessByTabs.length > 0 &&
+          userType === 'admins' &&
+          (type === 'create' ||
+            (type === 'edit' && !currentProfile.isRootAdmin))
+        ">
+        <div>
+          <h3>{{ userType + '.accessByTabs' | transloco }}</h3>
+          <df-alert
+            alertType="warning"
+            [showAlert]="!allTabsSelected"
+            [dismissible]="false">
+            {{ userType + '.alerts.restrictedAdmin' | transloco }}
+            <ng-container
+              *ngIf="
+                type === 'create' ||
+                  currentProfile.userToAppToRoleByUserId.length === 0;
+                else hasRole
+              "
+              >{{ userType + '.alerts.autoRole' | transloco }}</ng-container
+            >
+            <ng-template #hasRole>{{
+              userType + '.alerts.roleId'
+                | transloco
+                  : {
+                      roleId: currentProfile.userToAppToRoleByUserId[0].roleId
+                    }
+            }}</ng-template>
+          </df-alert>
+
+          <mat-checkbox
+            [checked]="allTabsSelected"
+            (change)="selectAllTabs($event)">
+            {{ 'selectAll' | transloco }}</mat-checkbox
+          >
+          <div class="access-tabs" formArrayName="tabs">
+            <ng-container
+              *ngFor="let tab of tabs.controls; let i = index"
+              [formGroupName]="i">
+              <mat-checkbox formControlName="checked">
+                {{ 'admins.tabs.' + tab.value.title | transloco }}</mat-checkbox
+              >
+            </ng-container>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+  <df-user-app-roles
+    *ngIf="userType === 'users'"
+    formArrayName="appRoles"
+    [apps]="apps"
+    [roles]="roles"></df-user-app-roles>
+  <df-lookup-keys formArrayName="lookupKeys"></df-lookup-keys>
+  <div class="full-width action-bar">
+    <button mat-flat-button type="button" [routerLink]="cancelRoute">
+      {{ 'cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" type="submit">
+      {{ (type === 'create' ? 'create' : 'update') | transloco }}
+    </button>
+  </div>
+</form>

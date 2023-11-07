@@ -1,0 +1,78 @@
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+@import '../adf-home.module.scss';
+
+$df-coral-palette: mat.define-palette(theme.$df-coral-palette);
+
+.two-column-flex-container {
+  display: flex;
+  justify-content: stretch;
+  padding-bottom: 50px;
+
+  &.mobile {
+    flex-direction: column;
+
+    .flex-column:first-child {
+      padding-right: 0;
+      padding-bottom: 25px;
+    }
+
+    .flex-column:last-child {
+      padding: 0;
+    }
+  }
+}
+
+.flex-column {
+  flex-basis: 50%;
+
+  &:first-child {
+    padding-right: 25px;
+  }
+  &:last-child {
+    padding-left: 25px;
+  }
+}
+
+.video-link {
+  position: relative;
+}
+
+.video-image {
+  max-width: 100%;
+}
+
+.video-overlay {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+
+.play-icon {
+  margin-bottom: 15px;
+  margin-top: -90px;
+}
+
+#video-link-description {
+  font-size: 1.8rem;
+  font-weight: bold;
+}
+
+mat-card.notice-card {
+  padding: 30px;
+  margin-bottom: 40px;
+}
+
+.pre-heading-icon {
+  margin-right: 10px;
+  color: mat.get-color-from-palette($df-coral-palette, 300);
+}

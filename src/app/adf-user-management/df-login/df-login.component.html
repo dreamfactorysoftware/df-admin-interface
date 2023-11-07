@@ -1,0 +1,135 @@
+<div class="user-management-card-container">
+  <div class="left-panel">
+    <img src="../../../assets/img/logo.png" alt="DreamFactory Logo" class="logo">
+  </div>
+
+  <div class="right-panel">
+  <mat-card class="user-management-card">
+    <df-alert
+      [showAlert]="showAlert"
+      [alertType]="alertType"
+      (alertClosed)="showAlert = false"
+      >{{ alertMsg }}</df-alert
+    >
+    <mat-card-header>
+      <mat-card-title>
+        {{ 'userManagement.login' | transloco }}
+      </mat-card-title>
+    </mat-card-header>
+    <mat-divider></mat-divider>
+    <mat-card-content>
+      <form name="login-form" [formGroup]="loginForm" (ngSubmit)="login()">
+        <mat-form-field appearance="fill" *ngIf="ldapServices.length">
+          <mat-label>
+            {{
+              'userManagement.controls.services.label' | transloco
+            }}</mat-label
+          >
+          <mat-select formControlName="services">
+            <mat-option></mat-option>
+            <mat-option
+              *ngFor="let service of ldapServices"
+              [value]="service.name">
+              {{ service.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="fill" *ngIf="loginAttribute === 'email'">
+          <mat-label>
+            {{ 'userManagement.controls.email.label' | transloco }}</mat-label
+          >
+          <input matInput type="email" formControlName="email" />
+          <mat-error
+            *ngIf="
+              loginForm.get('email')?.errors?.['email'] &&
+              !loginForm.get('email')?.errors?.['required']
+            ">
+            {{ 'userManagement.controls.email.errors.invalid' | transloco }}
+          </mat-error>
+          <mat-error
+            *ngIf="
+              !loginForm.get('email')?.errors?.['email'] &&
+              loginForm.get('email')?.errors?.['required']
+            ">
+            {{ 'userManagement.controls.email.errors.required' | transloco }}
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" *ngIf="loginAttribute === 'username'">
+          <mat-label>{{
+            'userManagement.controls.username.altLabel' | transloco
+          }}</mat-label>
+          <input matInput type="text" formControlName="username" />
+          <mat-error *ngIf="loginForm.get('username')?.errors?.['required']">
+            {{ 'userManagement.controls.username.errors.required' | transloco }}
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="fill">
+          <mat-label>{{
+            'userManagement.controls.password.label' | transloco
+          }}</mat-label>
+          <input matInput type="password" formControlName="password" />
+          <mat-error *ngIf="loginForm.get('password')?.errors?.['required']">
+            {{ 'userManagement.controls.password.errors.required' | transloco }}
+          </mat-error>
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="submit">
+          {{ 'userManagement.login' | transloco }}
+        </button>
+      </form>
+      <ng-container
+        *ngTemplateOutlet="
+          authServices;
+          context: {
+            services: oauthServices,
+            title: ('userManagement.oAuth' | transloco)
+          }
+        " />
+      <ng-container
+        *ngTemplateOutlet="
+          authServices;
+          context: {
+            services: samlServices,
+            title: ('userManagement.saml' | transloco)
+          }
+        " />
+      <div class="action-links">
+        <a mat-button [routerLink]="fpRoute" target="_self">{{
+          'userManagement.forgotPassword' | transloco
+        }}</a>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
+</div>
+<ng-template #authServices let-services="services" let-title="title">
+  <div class="services-section" *ngIf="services.length">
+    <h3>{{ title }}</h3>
+    <mat-divider></mat-divider>
+    <div class="services-container">
+      <ng-container *ngFor="let service of services">
+        <a
+          mat-flat-button
+          color="primary"
+          [href]="'/' + service.path"
+          *ngIf="iconExist(service.iconClass)"
+          [attr.aria-label]="service.label">
+          <fa-icon
+            *ngIf="iconExist(service.iconClass)"
+            [icon]="getIcon(service.iconClass)"
+            size="2x"
+            >{{ service.label }}</fa-icon
+          >
+        </a>
+        <a
+          mat-flat-button
+          color="primary"
+          [href]="'/' + service.path"
+          *ngIf="!iconExist(service.iconClass)">
+          {{ service.label }}
+        </a>
+      </ng-container>
+    </div>
+  </div>
+</ng-template>

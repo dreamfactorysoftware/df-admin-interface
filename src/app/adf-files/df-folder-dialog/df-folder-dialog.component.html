@@ -1,0 +1,20 @@
+<h1 mat-dialog-title>{{ 'files.createFolder' | transloco }}</h1>
+<div mat-dialog-content>
+  <form
+    [formGroup]="dialogForm"
+    class="files-dialog-form details-section"
+    (ngSubmit)="save()">
+    <mat-form-field subscriptSizing="dynamic">
+      <mat-label>{{ 'files.folderName' | transloco }}</mat-label>
+      <input matInput formControlName="name" />
+    </mat-form-field>
+  </form>
+</div>
+<div mat-dialog-actions>
+  <button mat-flat-button type="button" mat-dialog-close>
+    {{ 'cancel' | transloco }}
+  </button>
+  <button mat-flat-button color="primary">
+    {{ 'save' | transloco }}
+  </button>
+</div>

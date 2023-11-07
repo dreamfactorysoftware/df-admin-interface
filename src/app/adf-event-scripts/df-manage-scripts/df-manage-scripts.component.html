@@ -1,0 +1,4 @@
+<df-paywall *ngIf="paywall; else allowed"></df-paywall>
+<ng-template #allowed>
+  <df-manage-services-table></df-manage-services-table>
+</ng-template>

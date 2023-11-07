@@ -1,0 +1,20 @@
+.paywall-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.calendly-inline-widget {
+  min-width: 320px;
+  width: 100%;
+  height: 100%;
+}
+.details-section {
+  margin: 32px 0;
+  max-width: 690px;
+}
+.paywall-contact {
+  width: 100%;
+  text-align: center;
+  padding-bottom: 32px;
+}

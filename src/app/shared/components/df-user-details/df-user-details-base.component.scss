@@ -1,0 +1,26 @@
+.user-details {
+  display: flex;
+  flex-direction: row;
+  gap: 32px;
+  &.small {
+    flex-direction: column;
+    gap: 16px;
+  }
+  > * {
+    flex: 1;
+  }
+  .additional-info {
+    display: flex;
+    flex-direction: column;
+    button {
+      width: fit-content;
+    }
+    gap: 16px;
+  }
+  .access-tabs {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    max-height: 240px;
+  }
+}

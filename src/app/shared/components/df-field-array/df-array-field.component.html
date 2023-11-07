@@ -1,0 +1,81 @@
+<mat-card>
+  <mat-card-header *ngIf="this.schema.items !== 'string'"
+    >{{ schema.label
+    }}<fa-icon
+      *ngIf="schema.description"
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="schema.description"
+  /></mat-card-header>
+  <table mat-table [dataSource]="dataSource">
+    <ng-container
+      *ngIf="this.schema.items === 'string'; else dynamic"
+      [matColumnDef]="schema.name">
+      <th mat-header-cell *matHeaderCellDef>
+        {{ schema.label
+        }}<fa-icon
+          *ngIf="schema.description"
+          class="tool-tip-trigger"
+          matSuffix
+          [icon]="faCircleInfo"
+          [matTooltip]="schema.description" />
+      </th>
+      <td mat-cell *matCellDef="let row; let i = index">
+        <mat-form-field subscriptSizing="dynamic" class="full-width">
+          <input
+            matInput
+            [formControl]="controls[i]"
+            type="text"
+            [attr.aria-label]="schema.label" />
+        </mat-form-field>
+      </td>
+    </ng-container>
+    <ng-template #dynamic>
+      <ng-container *ngFor="let schema of schemas" [matColumnDef]="schema.name">
+        <th mat-header-cell *matHeaderCellDef>
+          {{ schema.label }}
+        </th>
+        <td mat-cell *matCellDef="let row; let i = index">
+          <ng-container [formGroup]="getFormGroup(i)">
+            <df-verb-picker
+              *ngIf="schema.type === 'verb_mask'"
+              type="number"
+              [formControlName]="schema.name"
+              [schema]="schema"
+              class="full-width"></df-verb-picker>
+            <df-dynamic-field
+              *ngIf="schema.type !== 'verb_mask'"
+              [showLabel]="false"
+              [schema]="schema"
+              [formControlName]="schema.name"
+              class="full-width"></df-dynamic-field>
+          </ng-container>
+        </td>
+      </ng-container>
+    </ng-template>
+    <ng-container matColumnDef="actions" stickyEnd>
+      <th mat-header-cell *matHeaderCellDef>
+        <button
+          type="button"
+          mat-mini-fab
+          color="primary"
+          (click)="add()"
+          [attr.aria-label]="'newEntry' | transloco">
+          <fa-icon [icon]="faPlus" size="lg"></fa-icon>
+        </button>
+      </th>
+      <td mat-cell *matCellDef="let row; let i = index">
+        <button
+          type="button"
+          mat-mini-fab
+          (click)="remove(i)"
+          [attr.aria-label]="'deleteRow' | transloco: { id: i }">
+          <fa-icon [icon]="faTrashCan" size="lg"></fa-icon>
+        </button>
+      </td>
+    </ng-container>
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+  </table>
+</mat-card>

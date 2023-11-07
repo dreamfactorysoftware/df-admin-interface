@@ -1,0 +1,83 @@
+<mat-form-field
+  subscriptSizing="dynamic"
+  *ngIf="
+    [
+      'integer',
+      'password',
+      'string',
+      'string',
+      'picklist',
+      'multi_picklist',
+      'text'
+    ].includes(schema.type)
+  ">
+  <mat-label *ngIf="showLabel">{{ schema.label }}</mat-label>
+  <input
+    *ngIf="['integer', 'string', 'password', 'text'].includes(schema.type)"
+    matInput
+    [formControl]="control"
+    [type]="
+      schema.type === 'integer'
+        ? 'number'
+        : schema.type === 'password'
+        ? 'password'
+        : 'text'
+    "
+    [attr.aria-label]="schema.label" />
+  <mat-select
+    *ngIf="['picklist', 'multi_picklist'].includes(schema.type)"
+    [multiple]="schema.type === 'multi_picklist'"
+    [formControl]="control">
+    <mat-option *ngFor="let option of schema.values" [value]="option.name">
+      {{ option.label }}
+    </mat-option>
+  </mat-select>
+  <fa-icon
+    *ngIf="schema.description"
+    class="tool-tip-trigger"
+    matSuffix
+    [icon]="faCircleInfo"
+    [matTooltip]="schema.description" />
+</mat-form-field>
+<ng-container *ngIf="schema.type === 'file_certificate'"
+  ><input
+    type="file"
+    #fileInput
+    (change)="handleFileInput($event)"
+    style="display: none" />
+  <button
+    mat-flat-button
+    color="primary"
+    (click)="fileInput.click()"
+    [matTooltip]="schema.description ?? ''">
+    {{ schema.label }}
+  </button>
+  {{ control.value ? control.value.name : ('noFileSelected' | transloco) }}
+</ng-container>
+<mat-slide-toggle
+  *ngIf="schema.type === 'boolean'"
+  [formControl]="control"
+  [matTooltip]="schema.description ?? ''"
+  [attr.aria-label]="schema.label"
+  ><ng-container *ngIf="showLabel">{{
+    schema.label
+  }}</ng-container></mat-slide-toggle
+>
+<mat-form-field
+  *ngIf="schema.type === 'event_picklist'"
+  subscriptSizing="dynamic">
+  <mat-label *ngIf="showLabel">{{ schema.label }}</mat-label>
+  <input
+    type="text"
+    matInput
+    [formControl]="control"
+    [matAutocomplete]="auto"
+    [attr.aria-label]="schema.label" />
+  <mat-autocomplete #auto="matAutocomplete">
+    <mat-option
+      *ngFor="let option of filteredEventList | async"
+      [value]="option">
+      {{ option }}
+    </mat-option>
+  </mat-autocomplete>
+</mat-form-field>

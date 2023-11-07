@@ -1,0 +1,49 @@
+<section>
+  <p id="quickstart-instructions-heading">
+    {{ 'home.quickstartPage.quickstartSubHeading' | transloco }}
+  </p>
+
+  <ol aria-labelledby="quickstart-instructions-heading">
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepOne' | transloco }}</li>
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepTwo' | transloco }}</li>
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepThree' | transloco }}</li>
+  </ol>
+</section>
+
+<mat-divider></mat-divider>
+
+<section class="platforms-section">
+  <h3>
+    {{ 'home.quickstartPage.clientPlatformHeading' | transloco }}
+  </h3>
+
+  <article>
+    <h4 id="native-examples-heading">
+      {{ 'home.quickstartPage.nativeExamplesHeading' | transloco }}
+    </h4>
+
+    <ul
+      class="flex-list-container"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
+      aria-labelledby="native-examples-heading">
+      <li *ngFor="let link of nativeExampleLinks">
+        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+      </li>
+    </ul>
+  </article>
+
+  <article>
+    <h4 id="javascript-examples-heading">
+      {{ 'home.quickstartPage.javaScriptExamplesHeading' | transloco }}
+    </h4>
+
+    <ul
+      class="flex-list-container"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
+      aria-labelledby="javascript-examples-heading">
+      <li *ngFor="let link of javaScriptExampleLinks">
+        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+      </li>
+    </ul>
+  </article>
+</section>

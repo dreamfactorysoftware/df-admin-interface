@@ -1,0 +1,10 @@
+<section>
+  <p>
+    {{ 'home.resourcesPage.resourcesSubHeading' | transloco }}
+  </p>
+  <ul aria-labelledby="resources-heading">
+    <li *ngFor="let resource of resourcesPageResources">
+      <df-icon-link [linkItem]="resource"></df-icon-link>
+    </li>
+  </ul>
+</section>

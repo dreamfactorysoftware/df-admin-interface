@@ -1,0 +1,61 @@
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
+$green-palette: mat.define-palette(mat.$green-palette);
+$red-palette: mat.define-palette(mat.$red-palette);
+
+.active {
+  color: mat.get-color-from-palette($green-palette, 500);
+}
+
+.inactive {
+  color: mat.get-color-from-palette($red-palette, 500);
+}
+
+.top-action-bar {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  .search-input {
+    max-width: 300px !important;
+  }
+}
+
+.bottom-action-bar {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+.table-container {
+  width: 100%;
+  overflow-y: auto;
+}
+
+.clickable {
+  &.mat-mdc-row {
+    outline: 0;
+    .mat-mdc-cell {
+      cursor: pointer;
+    }
+  }
+  &.mat-mdc-row:focus,
+  &.mat-mdc-row:focus-within {
+    .mat-mdc-cell:first-child {
+      border-left: 2px solid mat.get-color-from-palette($df-purple-palette, 500);
+    }
+  }
+
+  &.mat-mdc-row:focus,
+  &.mat-mdc-row:focus-within,
+  &.mat-mdc-row:hover {
+    .mat-mdc-cell {
+      background-color: mat.get-color-from-palette($df-purple-palette, 100);
+    }
+  }
+}

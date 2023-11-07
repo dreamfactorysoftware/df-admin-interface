@@ -1,0 +1,33 @@
+<df-manage-admins-table>
+  <ng-container topActions>
+    <input
+      type="file"
+      accept=".csv, application/json, .xml"
+      #fileInput
+      (change)="uploadAdminList($event)"
+      style="display: none" />
+    <button
+      mat-mini-fab
+      color="primary"
+      [attr.aria-label]="'importList' | transloco"
+      (click)="fileInput.click()">
+      <fa-icon [icon]="faUpload" size="xl"></fa-icon>
+    </button>
+    <button
+      mat-mini-fab
+      color="primary"
+      [attr.aria-label]="'exportList' | transloco"
+      [matMenuTriggerFor]="exportMenu">
+      <fa-icon [icon]="faDownload" size="xl"></fa-icon>
+    </button>
+
+    <mat-menu #exportMenu="matMenu">
+      <button
+        *ngFor="let exportType of exportTypes"
+        mat-menu-item
+        (click)="downLoadAdminList(exportType)">
+        {{ exportType | uppercase }}
+      </button>
+    </mat-menu>
+  </ng-container>
+</df-manage-admins-table>

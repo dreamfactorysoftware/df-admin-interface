@@ -1,0 +1,16 @@
+<div class="cache-container">
+  <p>
+    {{ 'cache.description' | transloco }}
+  </p>
+  <df-cache-table>
+    <ng-container topActions
+      ><button
+        mat-flat-button
+        color="primary"
+        [attr.aria-label]="'importList' | transloco"
+        (click)="flushSystemCache()">
+        {{ 'cache.flushSystemCache' | transloco }}
+      </button></ng-container
+    >
+  </df-cache-table>
+</div>

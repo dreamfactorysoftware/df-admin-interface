@@ -1,10 +1,136 @@
 /* You can add global styles to this file, and also import other style files */
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
 html,
 body {
   height: 100%;
+  width: 100%;
+}
+
+html {
+  font-size: 62.5%;
 }
 body {
+  font-size: 1.4rem;
   margin: 0;
   font-family: Roboto, 'Helvetica Neue', sans-serif;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.user-management-card {
+  position: relative;
+  padding: 16px 16px;
+  margin: 70px auto 0;
+  min-width: 300px;
+  max-width: 445px;
+  mat-card-header {
+    padding-bottom: 16px;
+  }
+  mat-card-content {
+    padding-top: 16px;
+  }
+  mat-form-field,
+  button {
+    width: 100%;
+  }
+  .action-links {
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
+.action-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 0;
+}
+.tab-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  .large & {
+    width: 100%;
+  }
+
+  .large & {
+    width: 50%;
+  }
+}
+mat-form-field {
+  width: 100%;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+.mdc-snackbar {
+  > * {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}
+
+.no-data-row {
+  td {
+    text-align: center;
+    padding: 32px;
+  }
+}
+
+.tool-tip-trigger {
+  padding: 0 8px;
+}
+
+.details-section {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px;
+  width: 100%;
+  & .full-width {
+    width: 100%;
+  }
+  & .half-width {
+    width: calc(50% - 8px);
+  }
+  & .dynamic-width {
+    width: calc(50% - 8px);
+    .small & {
+      width: 100%;
+    }
+  }
+  & .third-width {
+    width: calc(33% - 9px);
+    .small & {
+      width: 100%;
+    }
+  }
+}
+
+fa-icon.mat-mdc-tooltip-trigger {
+  color: mat.get-color-from-palette($df-purple-palette, 400);
+}
+
+.mat-mdc-tab-group {
+  height: 100%;
+}
+
+.mat-mdc-tab-body-content {
+  padding: 8px;
+  height: 100%;
 }

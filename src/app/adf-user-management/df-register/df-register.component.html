@@ -1,0 +1,44 @@
+<div class="user-management-card-container">
+  <mat-card class="user-management-card" *ngIf="!complete">
+    <df-alert
+      [showAlert]="showAlert"
+      [alertType]="alertType"
+      (alertClosed)="showAlert = false"
+      >{{ alertMsg }}</df-alert
+    >
+    <mat-card-header>
+      <mat-card-title>
+        {{ 'userManagement.register' | transloco }}
+      </mat-card-title>
+    </mat-card-header>
+    <mat-divider></mat-divider>
+    <mat-card-content>
+      <form
+        name="self-register-form"
+        [formGroup]="registerForm"
+        (ngSubmit)="register()">
+        <df-profile-details formGroupName="profileDetailsGroup" />
+        <button mat-flat-button color="primary" type="submit">
+          {{ 'userManagement.register' | transloco }}
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+  <mat-card class="user-management-card" *ngIf="complete">
+    <mat-card-header>
+      <mat-card-title>
+        {{ 'userManagement.registerSuccess.header' | transloco }}
+      </mat-card-title>
+    </mat-card-header>
+    <mat-divider></mat-divider>
+    <mat-card-content>
+      <h2>{{ 'userManagement.registerSuccess.title' | transloco }}</h2>
+      <p>{{ 'userManagement.registerSuccess.message' | transloco }}</p>
+      <div class="action-links">
+        <a mat-button [routerLink]="loginRoute" target="_self">{{
+          'userManagement.login' | transloco
+        }}</a>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

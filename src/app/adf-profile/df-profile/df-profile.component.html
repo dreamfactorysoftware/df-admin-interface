@@ -1,0 +1,138 @@
+<mat-tab-group
+  [class]="(isSmallScreen | async) ? 'small' : 'large'"
+  dynamicHeight
+  mat-stretch-tabs="false"
+  mat-align-tabs="start"
+  (selectedTabChange)="showAlert = false">
+  <mat-tab [label]="'userManagement.profile.tabs.details' | transloco">
+    <div class="tab-container">
+      <df-alert
+        [showAlert]="showAlert"
+        [alertType]="alertType"
+        (alertClosed)="showAlert = false"
+        >{{ alertMsg }}</df-alert
+      >
+      <form
+        name="user-profile-form"
+        [formGroup]="profileForm"
+        (ngSubmit)="updateProfile()">
+        <df-profile-details formGroupName="profileDetailsGroup" />
+        <mat-form-field appearance="fill" *ngIf="needPassword">
+          <mat-label>{{
+            'userManagement.controls.currentPassword.label' | transloco
+          }}</mat-label>
+          <input matInput type="password" formControlName="currentPassword" />
+          <mat-error
+            *ngIf="profileForm.get('currentPassword')?.errors?.['required']">
+            {{
+              'userManagement.controls.currentPassword.errors.required'
+                | transloco
+            }}
+          </mat-error>
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="submit">
+          {{ 'save' | transloco }}
+        </button>
+      </form>
+    </div>
+  </mat-tab>
+  <mat-tab [label]="'userManagement.profile.tabs.securityQuestion' | transloco">
+    <div class="tab-container">
+      <df-alert
+        [showAlert]="showAlert"
+        [alertType]="alertType"
+        (alertClosed)="showAlert = false"
+        >{{ alertMsg }}</df-alert
+      >
+      <form
+        name="security-question-form"
+        [formGroup]="securityQuestionForm"
+        (ngSubmit)="updateSecurityQuestion()">
+        <mat-form-field appearance="fill">
+          <mat-label>{{
+            'userManagement.controls.securityQuestion.label' | transloco
+          }}</mat-label>
+          <input matInput formControlName="securityQuestion" />
+        </mat-form-field>
+        <mat-form-field appearance="fill">
+          <mat-label>{{
+            'userManagement.controls.securityAnswer.label' | transloco
+          }}</mat-label>
+          <input matInput formControlName="securityAnswer" />
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="submit">
+          {{ 'save' | transloco }}
+        </button>
+      </form>
+    </div>
+  </mat-tab>
+  <mat-tab [label]="'userManagement.profile.tabs.password' | transloco">
+    <div class="tab-container">
+      <df-alert
+        [showAlert]="showAlert"
+        [alertType]="alertType"
+        (alertClosed)="showAlert = false"
+        >{{ alertMsg }}</df-alert
+      >
+      <form
+        name="update-password-form"
+        [formGroup]="updatePasswordForm"
+        (ngSubmit)="updatePassword()">
+        <df-alert
+          [showAlert]="showAlert"
+          [alertType]="alertType"
+          (alertClosed)="showAlert = false"
+          >{{ alertMsg }}</df-alert
+        >
+        <mat-form-field appearance="fill">
+          <mat-label>{{
+            'userManagement.controls.oldPassword.label' | transloco
+          }}</mat-label>
+          <input matInput type="password" formControlName="oldPassword" />
+          <mat-error
+            *ngIf="updatePasswordForm.get('oldPassword')?.errors?.['required']">
+            {{
+              'userManagement.controls.oldPassword.errors.required' | transloco
+            }}
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="fill">
+          <mat-label>{{
+            'userManagement.controls.password.label' | transloco
+          }}</mat-label>
+          <input matInput type="password" formControlName="newPassword" />
+          <mat-error
+            *ngIf="updatePasswordForm.get('newPassword')?.errors?.['required']">
+            {{ 'userManagement.controls.password.errors.required' | transloco }}
+          </mat-error>
+          <mat-error
+            *ngIf="
+              updatePasswordForm.get('newPassword')?.errors?.['minlength']
+            ">
+            {{ 'userManagement.controls.password.errors.length' | transloco }}
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="fill">
+          <mat-label>{{
+            'userManagement.controls.confirmPassword.label' | transloco
+          }}</mat-label>
+
+          <input matInput type="password" formControlName="confirmPassword" />
+          <mat-error
+            *ngIf="
+              updatePasswordForm
+                .get('confirmPassword')
+                ?.hasError('doesNotMatch')
+            ">
+            {{
+              'userManagement.controls.confirmPassword.errors.match' | transloco
+            }}
+          </mat-error>
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="submit">
+          {{ 'save' | transloco }}
+        </button>
+      </form>
+    </div>
+  </mat-tab>
+</mat-tab-group>

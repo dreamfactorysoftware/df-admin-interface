@@ -1,0 +1,42 @@
+{
+  "form": {
+    "label": {
+      "name": "Name",
+      "description": "Description",
+      "active": "Active",
+      "service": "Service",
+      "component": "Component",
+      "method": "Method",
+      "frequency": "Frequency (defined in minutes)",
+      "payload": "Payload (JSON)"
+    }
+  },
+  "table": {
+    "header": {
+      "active": "Active",
+      "id": "ID",
+      "name": "Name",
+      "description": "Description",
+      "service": "Service",
+      "component": "Component",
+      "method": "Method",
+      "frequency": "Frequency",
+      "log": "Log"
+    }
+  },
+  "logs": {
+    "title": "Scheduler Task Log",
+    "subtitle": "This interface displays the scheduler task error log.",
+    "statusCode": "Status Code",
+    "error": "Error"
+  },
+  "logPageTitle": "Scheduler Task Log",
+  "logPageSubtitle": "This interface displays the scheduler task error log.",
+  "taskOverview": "Scheduler Task Overview",
+  "taskOverviewSubtitle": "Scheduler task provide a way to schedule requests to the platform.",
+  "alerts": {
+    "createdSuccess": "Scheduled task created successfully",
+    "updateSuccess": "Scheduled task updated successfully",
+    "deleteSuccess": "Scheduled task deleted successfully"
+  }
+}

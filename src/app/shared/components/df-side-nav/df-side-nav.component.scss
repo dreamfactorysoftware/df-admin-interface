@@ -1,0 +1,126 @@
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
+$red-palette: mat.define-palette(mat.$red-palette);
+
+.logo {
+  height: 30px;
+  cursor: pointer;
+}
+
+.app-container {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.mat-toolbar {
+  min-height: 64px;
+}
+
+.sidenav-container {
+  flex: 1 1 auto;
+  .sidenav {
+    background-color: mat.get-color-from-palette($df-purple-palette, 900);
+    min-width: 40%;
+    border: none;
+    transition: min-width 0.3s ease-out;
+    .small & {
+      min-width: 0;
+    }
+    .logged-in & {
+      min-width: 20%;
+      background-color: white;
+    }
+    .logged-in.small & {
+      min-width: 40%;
+    }
+    .parent-route {
+      font-size: 1.6rem;
+      font-weight: 400;
+      height: 48px;
+      padding: 0 16px;
+    }
+    ::ng-deep {
+      .mat-expansion-panel-body {
+        padding: 0 0 0 16px !important;
+      }
+    }
+    .nav-item {
+      height: 48px;
+      width: 100%;
+      font-size: 1.6rem;
+      font-weight: 400;
+      border-radius: 0;
+      justify-content: left;
+      &.active {
+        background-color: mat.get-color-from-palette($df-purple-palette, 200);
+      }
+    }
+  }
+  .sidenav-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    .banner {
+      flex-shrink: 0;
+      width: 100%;
+      padding-bottom: 60px;
+      background-color: mat.get-color-from-palette($df-purple-palette, 900);
+      .page-header {
+        color: white;
+        padding: 32px 16px 0 16px;
+      }
+    }
+    .main {
+      // height: 100%;
+      flex-grow: 1;
+      &.no-error {
+        .logged-in & {
+          margin: -60px 16px 0 16px;
+          padding: 16px 24px;
+          background-color: white;
+        }
+        .logged-in.small & {
+          margin: 0;
+          margin-top: -60px;
+          padding: 16px 16px 0 16px;
+        }
+      }
+    }
+  }
+}
+
+.small {
+  ::ng-deep {
+    .mat-expansion-panel-header {
+      padding: 0 8px;
+    }
+    .mat-expansion-panel-body {
+      padding: 0 8px 8px 8px !important;
+    }
+  }
+}
+
+::ng-deep {
+  .mat-expansion-panel-body {
+    overflow-x: auto;
+  }
+}
+
+.license-expired {
+  display: flex;
+  flex-direction: column;
+  background-color: mat.get-color-from-palette($red-palette, 600);
+  color: white;
+  border-radius: 0;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  padding: 16px;
+}
+
+.breadcrumb-link {
+  color: white;
+}

@@ -1,0 +1,41 @@
+<form [formGroup]="scriptForm" class="details-section" (ngSubmit)="submit()">
+  <mat-form-field class="dynamic-width" subscriptSizing="dynamic">
+    <mat-label>{{ 'scripts.scriptName' | transloco }}</mat-label>
+    <input matInput formControlName="name" [matAutocomplete]="autoGroup" />
+    <mat-autocomplete #autoGroup="matAutocomplete">
+      <mat-optgroup
+        *ngFor="let group of scriptEventsOptions | async"
+        [label]="group.name">
+        <mat-option *ngFor="let event of group.endpoints" [value]="event">
+          {{ event }}
+        </mat-option>
+      </mat-optgroup>
+    </mat-autocomplete>
+  </mat-form-field>
+  <mat-form-field class="dynamic-width" subscriptSizing="dynamic">
+    <mat-label>{{ 'scriptType' | transloco }}</mat-label>
+    <mat-select formControlName="type">
+      <mat-option *ngFor="let type of types" [value]="type.value">
+        {{ type.label }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-slide-toggle formControlName="isActive" class="dynamic-width">{{
+    'active' | transloco
+  }}</mat-slide-toggle>
+  <df-script-editor
+    class="full-width"
+    [cache]="scriptForm.getRawValue().name"
+    [type]="getControl('type')"
+    [storageServiceId]="getControl('storageServiceId')"
+    [storagePath]="getControl('storagePath')"
+    [content]="getControl('content')"></df-script-editor>
+  <div class="full-width action-bar">
+    <button mat-flat-button type="button" (click)="goBack()">
+      {{ 'cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary">
+      {{ 'save' | transloco }}
+    </button>
+  </div>
+</form>

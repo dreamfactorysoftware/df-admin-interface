@@ -1,0 +1,225 @@
+<df-alert
+  [showAlert]="showAlert"
+  [alertType]="alertType"
+  (alertClosed)="showAlert = false">
+  {{ alertMsg }}
+</df-alert>
+<form
+  [formGroup]="relationshipForm"
+  (ngSubmit)="save()"
+  class="details-section"
+  [class.x-small]="isXSmallScreen | async">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'name' | transloco }} -
+      {{ 'schema.relationships.name.tooltip' | transloco }}
+    </mat-label>
+    <input
+      matInput
+      formControlName="name"
+      placeholder="{{ 'name' | transloco }}" />
+  </mat-form-field>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'schema.alias' | transloco }}
+    </mat-label>
+    <input matInput formControlName="alias" />
+  </mat-form-field>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'label' | transloco }}
+    </mat-label>
+    <input matInput formControlName="label" />
+  </mat-form-field>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'description' | transloco }}
+    </mat-label>
+    <input matInput formControlName="description" />
+  </mat-form-field>
+
+  <mat-slide-toggle formControlName="alwaysFetch" class="dynamic-width">{{
+    'schema.relationships.fetch' | transloco
+  }}</mat-slide-toggle>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'schema.relationships.type' | transloco }}
+    </mat-label>
+    <mat-select formControlName="type">
+      <mat-option *ngFor="let option of typeOptions" [value]="option.value">
+        {{ option.label }}
+      </mat-option>
+    </mat-select>
+    <mat-error *ngIf="relationshipForm.controls['type'].hasError('required')">
+      {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+  </mat-form-field>
+
+  <mat-slide-toggle formControlName="isVirtual" class="dynamic-width">{{
+    'schema.relationships.virtualRelationship' | transloco
+  }}</mat-slide-toggle>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'schema.relationships.field.label' | transloco }}
+    </mat-label>
+    <mat-select formControlName="field">
+      <mat-option *ngFor="let option of fieldOptions" [value]="option.value">
+        {{ option.label }}
+      </mat-option>
+    </mat-select>
+    <mat-error *ngIf="relationshipForm.controls['field'].hasError('required')">
+      {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+  </mat-form-field>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'schema.relationships.referenceService.label' | transloco }}
+    </mat-label>
+    <mat-select formControlName="refServiceId">
+      <mat-option *ngFor="let option of serviceOptions" [value]="option.value">
+        {{ option.label }}
+      </mat-option>
+    </mat-select>
+    <mat-error
+      *ngIf="relationshipForm.controls['refServiceId'].hasError('required')">
+      {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+  </mat-form-field>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'schema.relationships.referenceTable.label' | transloco }}
+    </mat-label>
+    <mat-select formControlName="refTable">
+      <mat-option>
+        - {{ 'schema.relationships.referenceTable.default' | transloco }} -
+      </mat-option>
+      <mat-option
+        *ngFor="let option of referenceTableOptions"
+        [value]="option.value">
+        {{ option.label }}
+      </mat-option>
+    </mat-select>
+    <mat-error
+      *ngIf="relationshipForm.controls['refTable'].hasError('required')">
+      {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+  </mat-form-field>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'schema.relationships.referenceField.label' | transloco }}
+    </mat-label>
+    <mat-select formControlName="refField">
+      <mat-option>
+        - {{ 'schema.relationships.referenceField.default' | transloco }} -
+      </mat-option>
+      <mat-option
+        *ngFor="let option of referenceFieldOptions"
+        [value]="option.value">
+        {{ option.label }}
+      </mat-option>
+    </mat-select>
+    <mat-error
+      *ngIf="relationshipForm.controls['refField'].hasError('required')">
+      {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+  </mat-form-field>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'schema.relationships.junctionService.label' | transloco }}
+    </mat-label>
+    <mat-select formControlName="junctionServiceId">
+      <mat-option *ngFor="let option of serviceOptions" [value]="option.value">
+        {{ option.label }}
+      </mat-option>
+    </mat-select>
+    <mat-error
+      *ngIf="
+        relationshipForm.controls['junctionServiceId'].hasError('required')
+      ">
+      {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+  </mat-form-field>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'schema.relationships.junctionTable.label' | transloco }}
+    </mat-label>
+    <mat-select formControlName="junctionTable">
+      <mat-option>
+        - {{ 'schema.relationships.junctionTable.default' | transloco }} -
+      </mat-option>
+      <mat-option
+        *ngFor="let option of junctionTableOptions"
+        [value]="option.value">
+        {{ option.label }}
+      </mat-option>
+    </mat-select>
+    <mat-error
+      *ngIf="relationshipForm.controls['junctionTable'].hasError('required')">
+      {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+  </mat-form-field>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'schema.relationships.junctionField.label' | transloco }}
+    </mat-label>
+    <mat-select formControlName="junctionField">
+      <mat-option>
+        - {{ 'schema.relationships.junctionField.default' | transloco }} -
+      </mat-option>
+      <mat-option
+        *ngFor="let option of junctionFieldOptions"
+        [value]="option.value">
+        {{ option.label }}
+      </mat-option>
+    </mat-select>
+    <mat-error
+      *ngIf="relationshipForm.controls['junctionField'].hasError('required')">
+      {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+  </mat-form-field>
+
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>
+      {{ 'schema.relationships.junctionReferenceField.label' | transloco }}
+    </mat-label>
+    <mat-select formControlName="junctionRefField">
+      <mat-option>
+        -
+        {{ 'schema.relationships.junctionReferenceField.default' | transloco }}
+        -
+      </mat-option>
+      <mat-option
+        *ngFor="let option of junctionFieldOptions"
+        [value]="option.value">
+        {{ option.label }}
+      </mat-option>
+    </mat-select>
+    <mat-error
+      *ngIf="
+        relationshipForm.controls['junctionRefField'].hasError('required')
+      ">
+      {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+  </mat-form-field>
+
+  <div class="full-width action-bar">
+    <button mat-flat-button type="button" (click)="goBack()">
+      {{ 'cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary">
+      <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
+      <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
+    </button>
+  </div>
+</form>

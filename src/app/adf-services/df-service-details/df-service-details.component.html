@@ -1,0 +1,121 @@
+<form [formGroup]="serviceForm" class="details-section" (ngSubmit)="save()">
+  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-label>{{
+      'services.controls.serviceType.label' | transloco
+    }}</mat-label>
+    <mat-select formControlName="type">
+      <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
+        {{ type.label }}
+      </mat-option>
+    </mat-select>
+    <fa-icon
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
+  </mat-form-field>
+  <mat-form-field
+    subscriptSizing="dynamic"
+    class="dynamic-width"
+    *ngIf="!subscriptionRequired">
+    <mat-label>{{ 'services.controls.namespace.label' | transloco }}</mat-label>
+    <input matInput formControlName="name" />
+    <fa-icon
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="'services.controls.namespace.tooltip' | transloco" />
+  </mat-form-field>
+  <mat-form-field
+    subscriptSizing="dynamic"
+    class="dynamic-width"
+    *ngIf="!subscriptionRequired">
+    <mat-label>{{ 'services.controls.label.label' | transloco }}</mat-label>
+    <input matInput formControlName="label" />
+    <fa-icon
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="'services.controls.label.tooltip' | transloco" />
+  </mat-form-field>
+  <mat-form-field
+    subscriptSizing="dynamic"
+    class="full-width"
+    *ngIf="!subscriptionRequired">
+    <mat-label>{{
+      'services.controls.description.label' | transloco
+    }}</mat-label>
+    <textarea rows="1" matInput formControlName="description"></textarea>
+    <fa-icon
+      class="tool-tip-trigger"
+      matSuffix
+      [icon]="faCircleInfo"
+      [matTooltip]="'services.controls.description.tooltip' | transloco" />
+  </mat-form-field>
+  <mat-slide-toggle formControlName="isActive" *ngIf="!subscriptionRequired">{{
+    'active' | transloco
+  }}</mat-slide-toggle>
+  <ng-container *ngIf="viewSchema && !subscriptionRequired">
+    <ng-container formGroupName="config">
+      <mat-accordion class="full-width">
+        <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
+          <mat-expansion-panel-header>{{
+            'services.config' | transloco
+          }}</mat-expansion-panel-header>
+          <div class="details-section">
+            <ng-container *ngFor="let item of viewSchema">
+              <ng-container
+                *ngIf="
+                  item.type === 'text' && item.name === 'content';
+                  else dynamic
+                ">
+                <df-script-editor
+                  [type]="getControl('type')"
+                  [storageServiceId]="getConfigControl('storageServiceId')"
+                  [storagePath]="getConfigControl('storagePath')"
+                  [content]="getConfigControl('content')"
+                  [cache]="serviceData ? serviceData.name : ''"
+                  class="full-width"></df-script-editor>
+              </ng-container>
+              <ng-template #dynamic>
+                <df-dynamic-field
+                  *ngIf="
+                    [
+                      'integer',
+                      'password',
+                      'string',
+                      'text',
+                      'picklist',
+                      'multi_picklist',
+                      'boolean',
+                      'file_certificate'
+                    ].includes(item.type)
+                  "
+                  [schema]="item"
+                  [formControl]="getConfigControl(item.name)"
+                  [class.dynamic-width]="item.type !== 'file_certificate'"
+                  [class.full-width]="
+                    item.type === 'file_certificate'
+                  "></df-dynamic-field>
+                <df-array-field
+                  *ngIf="item.type === 'array' || item.type === 'object'"
+                  [schema]="item"
+                  [formControl]="getConfigControl(item.name)"
+                  class="full-width"></df-array-field>
+              </ng-template>
+            </ng-container>
+          </div>
+        </mat-expansion-panel>
+      </mat-accordion>
+    </ng-container>
+  </ng-container>
+  <div class="full-width action-bar" *ngIf="!subscriptionRequired">
+    <button mat-flat-button type="button" (click)="goBack()">
+      {{ 'cancel' | transloco }}
+    </button>
+    <button mat-flat-button color="primary">
+      {{ 'save' | transloco }}
+    </button>
+  </div>
+</form>
+<df-paywall *ngIf="subscriptionRequired"></df-paywall>

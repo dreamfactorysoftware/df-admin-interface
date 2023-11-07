@@ -1,0 +1,14 @@
+<ng-container *ngIf="linkItem">
+  <a
+    href="{{ linkItem.link }}"
+    target="_blank"
+    class="plain-icon-link"
+    aria-labelledby="link-label">
+    <fa-icon
+      [icon]="linkItem.icon"
+      class="link-icon"
+      aria-hidden="true"
+      color="primary"></fa-icon>
+    <span id="link-label">{{ linkItem.name | transloco }}</span>
+  </a>
+</ng-container>

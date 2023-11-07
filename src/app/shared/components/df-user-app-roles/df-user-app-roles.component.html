@@ -1,0 +1,97 @@
+<div class="app-roles-keys-accordion">
+  <mat-accordion>
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title> {{ 'roles.label' | transloco }}</mat-panel-title>
+        <mat-panel-description>{{
+          'roles.appRoleAssigned'
+            | transloco
+              : {
+                  assigned: apps.length - availableApps.length,
+                  total: apps.length
+                }
+        }}</mat-panel-description>
+      </mat-expansion-panel-header>
+      <ng-container [formGroup]="rootForm">
+        <ng-container formArrayName="appRoles">
+          <mat-table [dataSource]="dataSource">
+            <ng-container matColumnDef="app">
+              <mat-header-cell *matHeaderCellDef>
+                {{ 'roles.app' | transloco }}
+              </mat-header-cell>
+              <mat-cell
+                *matCellDef="let row; let i = index"
+                [formGroupName]="i">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>{{ 'roles.app' | transloco }}</mat-label>
+                  <input
+                    matInput
+                    formControlName="app"
+                    [matAutocomplete]="auto" />
+                  <mat-autocomplete requireSelection #auto="matAutocomplete">
+                    <mat-option
+                      *ngFor="let app of availableApps"
+                      [value]="app.name">
+                      {{ app.name }}
+                    </mat-option>
+                  </mat-autocomplete>
+                </mat-form-field>
+              </mat-cell>
+            </ng-container>
+
+            <ng-container matColumnDef="role">
+              <mat-header-cell *matHeaderCellDef>
+                {{ 'roles.role' | transloco }}
+              </mat-header-cell>
+              <mat-cell
+                *matCellDef="let row; let i = index"
+                [formGroupName]="i">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>{{ 'roles.role' | transloco }}</mat-label>
+                  <input
+                    matInput
+                    formControlName="role"
+                    [matAutocomplete]="auto" />
+                  <mat-autocomplete requireSelection #auto="matAutocomplete">
+                    <mat-option *ngFor="let role of roles" [value]="role.name">
+                      {{ role.name }}
+                    </mat-option>
+                  </mat-autocomplete>
+                </mat-form-field>
+              </mat-cell>
+            </ng-container>
+
+            <ng-container matColumnDef="actions">
+              <mat-header-cell *matHeaderCellDef>
+                <button
+                  *ngIf="showAddButton"
+                  mat-mini-fab
+                  color="primary"
+                  [attr.aria-label]="'newEntry' | transloco"
+                  type="button"
+                  (click)="add()">
+                  <fa-icon [icon]="faPlus" size="xl"></fa-icon>
+                </button>
+              </mat-header-cell>
+              <mat-cell
+                *matCellDef="let row; let i = index"
+                [formGroupName]="i">
+                <button mat-icon-button (click)="remove(i)" type="button">
+                  <fa-icon [icon]="faTrashCan" size="xs"></fa-icon>
+                </button>
+              </mat-cell>
+            </ng-container>
+            <mat-header-row
+              *matHeaderRowDef="displayedColumns"></mat-header-row>
+            <mat-row *matRowDef="let row; columns: displayedColumns"></mat-row>
+            <tr class="mat-row" *matNoDataRow>
+              <td class="mat-cell" colspan="4">
+                {{ 'roles.noRoles' | transloco }}
+              </td>
+            </tr>
+          </mat-table>
+        </ng-container>
+      </ng-container>
+    </mat-expansion-panel>
+  </mat-accordion>
+</div>

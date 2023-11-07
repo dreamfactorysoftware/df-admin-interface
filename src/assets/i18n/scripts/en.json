@@ -1,0 +1,24 @@
+{
+  "scriptName": "Script Name",
+  "active": "Active",
+  "importScriptFile": "Import a script file",
+  "fromDesktop": "From Desktop",
+  "fromGitHub": "From GitHub",
+  "selectFile": "Select File",
+  "linkToService": "Link to a service",
+  "service": "Service",
+  "repository": "Repository",
+  "branch": "Branch/Tag",
+  "path": "Path",
+  "viewLatest": "View Latest",
+  "deleteCache": "Delete Cache",
+  "deleteSuccessMsg": "Script successfully deleted",
+  "createSuccessMsg": "Script successfully created",
+  "updateSuccessMsg": "Script successfully updated",
+  "getScriptSuccessMsg": "Script file successfully fetched",
+  "fetchCacheSuccessMsg": "Successfully pulled the latest script from source.",
+  "deleteCacheSuccessMsg": "Successfully cleared script from cache.",
+  "errors": {
+    "githubImport": "Error: Invalid file format. Only js, php, py, txt file format(s) allowed"
+  }
+}

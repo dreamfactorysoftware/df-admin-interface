@@ -1,0 +1,11 @@
+.email-template-details-container {
+  .email-template-body {
+    min-height: 300px;
+  }
+
+  &.x-small {
+    .email-template-body {
+      min-height: 200px;
+    }
+  }
+}

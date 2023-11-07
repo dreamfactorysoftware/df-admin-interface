@@ -1,0 +1,37 @@
+<h1 mat-dialog-title>Import a script file from GitHub</h1>
+<div mat-dialog-content>
+  <form [formGroup]="formGroup" class="details-section">
+    <mat-form-field subscriptSizing="dynamic">
+      <mat-label>GitHub File URL</mat-label>
+      <input
+        matInput
+        formControlName="url"
+        placeholder="https://github.com/user/repo/blob/file.json" />
+      <mat-error *ngIf="formGroup.controls['url'].errors?.['invalidUrl']">
+        {{ 'scripts.errors.githubImport' | transloco }}
+      </mat-error>
+    </mat-form-field>
+    <mat-form-field *ngIf="this.formGroup.contains('username')">
+      <mat-label>GitHub Username</mat-label>
+      <input
+        matInput
+        formControlName="username"
+        placeholder="Username"
+        type="text" />
+    </mat-form-field>
+    <mat-form-field *ngIf="this.formGroup.contains('password')">
+      <mat-label>GitHub Password</mat-label>
+      <input
+        matInput
+        formControlName="password"
+        placeholder="Password"
+        type="password" />
+    </mat-form-field>
+  </form>
+</div>
+<div mat-dialog-actions>
+  <button mat-flat-button mat-dialog-close>{{ 'close' | transloco }}</button>
+  <button mat-flat-button color="primary" (click)="onUpload()">
+    {{ 'upload' | transloco }}
+  </button>
+</div>

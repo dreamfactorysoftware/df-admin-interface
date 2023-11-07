@@ -1,0 +1,33 @@
+<section class="installers-section">
+  <p>{{ 'home.downloadPage.downloadText' | transloco }}</p>
+
+  <article>
+    <h3 id="cloud-installers">
+      {{ 'home.downloadPage.cloudInstallersHeading' | transloco }}
+    </h3>
+
+    <ul
+      class="flex-list-container"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
+      aria-labelledby="cloud-installers">
+      <li *ngFor="let link of cloudInstallerLinks">
+        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+      </li>
+    </ul>
+  </article>
+
+  <article>
+    <h3 id="local-installers">
+      {{ 'home.downloadPage.localInstallersHeading' | transloco }}
+    </h3>
+
+    <ul
+      class="flex-list-container"
+      [class.x-small]="breakpointService.isXSmallScreen | async"
+      aria-labelledby="local-installers">
+      <li *ngFor="let link of localInstallerLinks">
+        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
+      </li>
+    </ul>
+  </article>
+</section>
