@@ -17,16 +17,12 @@ export const licenseGuard = (route: ActivatedRouteSnapshot) => {
       return of(environment);
     }),
     switchMap(environment => {
-      if (
-        environment.platform?.license === 'OPEN SOURCE' ||
-        (environment.platform?.licenseKey &&
-          !(environment.platform.licenseKey as boolean))
-      ) {
+      if (environment.platform?.license === 'OPEN SOURCE') {
         return of(true);
       }
-      if (environment.platform?.licenseKey) {
+      if (environment.platform?.licenseKey !== undefined) {
         return licenseCheckService
-          .check(environment.platform.licenseKey as string)
+          .check(`${environment.platform.licenseKey}`)
           .pipe(
             map(response => {
               if (

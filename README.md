@@ -100,20 +100,21 @@ npm run build
 ```
 
 ## Adding additional languages
-When more than one language is supported, the language selector will be displayed in the top right corner of the application. 
 
-- User language will be detected from preference provided by browser. If browser preference is a supported language it will be selected by default. 
+When more than one language is supported, the language selector will be displayed in the top right corner of the application.
+
+- User language will be detected from preference provided by browser. If browser preference is a supported language it will be selected by default.
 - If language selector is enabled and user change language manually, their preference is stored in `localStorage` for future reference. If language preference is found in `localStorage`, than it is treated as default language.
 
 - To add a new language, follow these steps:
   1. Add a new entry to the `SUPPORTED_LANGUAGES` array in [src/app/shared/constants/languages.ts](src/app/shared/constants/languages.ts).
-      - code: The language code. This is used to identify the language in the application.
-      - altCode: Alternative language code that might be provided by browser. eg en-US, en-CA.
+     - code: The language code. This is used to identify the language in the application.
+     - altCode: Alternative language code that might be provided by browser. eg en-US, en-CA.
   2. Create new translation files in [src/assets/i18n](./src/assets/i18n/) and every sub-folder.
-      - Ensure label for languages are created in alternative language in [src/assets/i18n/en.json](src/assets/i18n/en.json)
-          ```json
-          "languages": {
-            "en": "English"
-          }
-          ```
-      - These are used to display language label in dropdown.
+     - Ensure label for languages are created in alternative language in [src/assets/i18n/en.json](src/assets/i18n/en.json)
+       ```json
+       "languages": {
+         "en": "English"
+       }
+       ```
+     - These are used to display language label in dropdown.
