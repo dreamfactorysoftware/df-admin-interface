@@ -110,7 +110,6 @@ export class DfServiceDetailsComponent implements OnInit {
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
         this.serviceTypes = serviceTypes;
-        console.log('serviceTypes', this.serviceData);
         if (licenseType === 'SILVER') {
           this.serviceTypes.push(
             ...GOLD_SERVICES.filter(s => groups.includes(s.group))
