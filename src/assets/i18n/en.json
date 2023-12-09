@@ -290,7 +290,7 @@
         }
       },
       "logs": {
-        "nav": "Logs",
+        "nav": "Logstash",
         "header": "{{nav.system-settings.logs.nav}}",
         "create": {
           "header": "Create Log"
