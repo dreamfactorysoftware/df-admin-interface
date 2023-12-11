@@ -19,6 +19,28 @@ $red-palette: mat.define-palette(mat.$red-palette);
   min-height: 64px;
 }
 
+.search-btn {
+  font-size: 1.6rem;
+  font-weight: 400;
+  height: 46px;
+  background: none;
+  border: none;
+  padding: 0 16px;
+  font-family: var(--mat-expansion-header-text-font);
+  color: var(--mat-expansion-container-text-color);
+  cursor: pointer;
+  display: flex;
+    align-items: center;
+
+    span {
+      margin-left: 6px;
+    }
+}
+
+.profile-icon {
+  color:  #0f0761;
+}
+
 .sidenav-container {
   flex: 1 1 auto;
   .sidenav {

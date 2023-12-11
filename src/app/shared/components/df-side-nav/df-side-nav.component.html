@@ -12,12 +12,6 @@
       </button>
       <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
       <span class="spacer"></span>
-      <button
-        mat-icon-button
-        (click)="handleSearchClick()"
-        [attr.aria-label]="'search' | transloco">
-        <fa-icon [icon]="faMagnifyingGlass"></fa-icon>
-      </button>
       <ng-container *ngIf="availableLanguages.length > 1">
         <button
           mat-icon-button
@@ -34,8 +28,8 @@
           </button>
         </mat-menu>
       </ng-container>
-      <button mat-button [matMenuTriggerFor]="profileMenu">
-        {{ (userData$ | async)?.name }}
+      <button mat-button [matMenuTriggerFor]="profileMenu" class="profile-icon">
+        <fa-icon [icon]="faUser"></fa-icon> {{ (userData$ | async)?.name }}
       </button>
       <mat-menu #profileMenu="matMenu">
         <button mat-menu-item routerLink="profile">
@@ -66,6 +60,12 @@
       class="sidenav"
       [mode]="(isSmallScreen | async) ? 'over' : 'side'">
       <mat-nav-list *ngIf="isLoggedIn$ | async">
+        <button class="search-btn" mat-button (click)="handleSearchClick()">
+          {{ 'Search Features' | transloco }}
+          <span>
+            <fa-icon [icon]="faMagnifyingGlass"></fa-icon>
+          </span>
+        </button>
         <ng-container
           *ngTemplateOutlet="
             navList;

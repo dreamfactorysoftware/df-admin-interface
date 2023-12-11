@@ -126,7 +126,7 @@
       "download": { "nav": "Download", "header": "{{nav.home.download.nav}}" }
     },
     "api-connections": {
-      "nav": "API Connections",
+      "nav": "API Generation & Connections",
       "api-types": {
         "nav": "API Types",
         "database": {
