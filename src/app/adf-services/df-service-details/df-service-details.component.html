@@ -58,9 +58,9 @@
   <ng-container *ngIf="viewSchema && !subscriptionRequired">
     <ng-container formGroupName="config">
       <mat-accordion class="full-width">
-        <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
+        <mat-expansion-panel [expanded]="!serviceForm.getRawValue().type">
           <mat-expansion-panel-header>{{
-            'services.config' | transloco
+            'services.options' | transloco
           }}</mat-expansion-panel-header>
           <div class="details-section">
             <ng-container *ngFor="let item of viewSchema">
