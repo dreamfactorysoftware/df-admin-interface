@@ -1,5 +1,5 @@
 <form [formGroup]="serviceForm" class="details-section" (ngSubmit)="save()">
-  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+  <mat-form-field subscriptSizing="dynamic" class="fourth-width">
     <mat-label>{{
       'services.controls.serviceType.label' | transloco
     }}</mat-label>
@@ -16,7 +16,7 @@
   </mat-form-field>
   <mat-form-field
     subscriptSizing="dynamic"
-    class="dynamic-width"
+    class="fourth-width"
     *ngIf="!subscriptionRequired">
     <mat-label>{{ 'services.controls.namespace.label' | transloco }}</mat-label>
     <input matInput formControlName="name" />
@@ -58,10 +58,15 @@
   <ng-container *ngIf="viewSchema && !subscriptionRequired">
     <ng-container formGroupName="config">
       <mat-accordion class="full-width">
-        <mat-expansion-panel [expanded]="!serviceForm.getRawValue().type">
-          <mat-expansion-panel-header>{{
-            'services.options' | transloco
-          }}</mat-expansion-panel-header>
+        <mat-expansion-panel
+          [expanded]="
+            !serviceForm.getRawValue().type ||
+            serviceForm.getRawValue().type === 'soap' ||
+            serviceForm.getRawValue().type === 'rws'
+          ">
+          <mat-expansion-panel-header
+            >{{ 'services.options' | transloco }}
+          </mat-expansion-panel-header>
           <div class="details-section">
             <ng-container *ngFor="let item of viewSchema">
               <ng-container
