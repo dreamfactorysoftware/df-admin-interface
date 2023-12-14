@@ -1,4 +1,3 @@
-// TODO fix all any types
 export interface TableDetailsType {
   alias?: string;
   name: string;

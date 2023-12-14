@@ -133,15 +133,22 @@ export class DfArrayFieldComponent implements OnInit, ControlValueAccessor {
     this.fieldArray = this.fb.array([]);
   }
 
-  writeValue(value?: Array<any>): void {
-    if (value && this.schema.type === 'array') {
+  writeValue(value?: Array<any> | { [key: string]: any }): void {
+    if (value && Array.isArray(value) && this.schema.type === 'array') {
       if (this.schema.items === 'string') {
         this.fieldArray = this.fb.array(value.map(v => new FormControl(v)));
       } else {
         this.fieldArray = this.fb.array(value.map(v => this.createGroup(v)));
       }
     } else if (value && this.schema.type === 'object') {
-      // TODO do something
+      this.fieldArray = this.fb.array(
+        Object.keys(value).map(key =>
+          this.createGroup({
+            key,
+            value: (value as { [key: string]: any })[key],
+          })
+        )
+      );
     }
     this.fieldArray.valueChanges
       .pipe(
