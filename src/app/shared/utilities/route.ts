@@ -156,7 +156,6 @@ export function generateBreadcrumb(
             return true;
           }
         } else {
-        
           const translationKeySegment = isDynamic ? path.slice(1) : path;
           const translationKey = [...translationKeySoFar, translationKeySegment]
             .join('.')

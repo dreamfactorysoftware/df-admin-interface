@@ -30,15 +30,15 @@ $red-palette: mat.define-palette(mat.$red-palette);
   color: var(--mat-expansion-container-text-color);
   cursor: pointer;
   display: flex;
-    align-items: center;
+  align-items: center;
 
-    span {
-      margin-left: 6px;
-    }
+  span {
+    margin-left: 6px;
+  }
 }
 
 .profile-icon {
-  color:  #0f0761;
+  color: #0f0761;
 }
 
 .sidenav-container {
