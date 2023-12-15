@@ -156,11 +156,14 @@ export function generateBreadcrumb(
             return true;
           }
         } else {
+        
           const translationKeySegment = isDynamic ? path.slice(1) : path;
           const translationKey = [...translationKeySoFar, translationKeySegment]
             .join('.')
             .replace(/\//g, '.');
-          const breadcrumb: Breadcrumb = { label: currentSegment };
+          const parts = currentSegment.split('-');
+          const requiredText = parts[parts.length - 1];
+          const breadcrumb: Breadcrumb = { label: requiredText };
 
           if (index !== urlSegments.length - 1) {
             breadcrumb.path = newPath.join('/');
