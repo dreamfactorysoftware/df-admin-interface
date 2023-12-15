@@ -211,7 +211,7 @@ export abstract class DfManageTableComponent<T>
   }
 
   viewRow(row: T): void {
-    this.router.navigate([(row as any).id], {
+    this.router.navigate([`${(row as any).id}-${(row as any).name}`], {
       relativeTo: this._activatedRoute,
     });
   }
