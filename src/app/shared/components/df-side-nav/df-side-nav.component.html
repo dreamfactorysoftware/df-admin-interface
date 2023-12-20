@@ -59,6 +59,29 @@
       [opened]="(isSmallScreen | async) === false"
       class="sidenav"
       [mode]="(isSmallScreen | async) ? 'over' : 'side'">
+      <ng-container *ngIf="(isLoggedIn$ | async) === false">
+        <div class="login-side-container">
+          <div class="image-wrapper">
+            <img src="assets/img/Server-Stack.gif" alt="Self Hosted" />
+            <h3>Self Hosted</h3>
+          </div>
+          <div class="image-wrapper">
+            <img src="assets/img/API.gif" alt="API Generation" />
+            <h3>
+              Database & Network<br />
+              API Generation
+            </h3>
+          </div>
+          <div class="image-wrapper">
+            <img src="assets/img/Browser.gif" alt="Api Security" />
+            <h3>API Security</h3>
+          </div>
+          <div class="image-wrapper">
+            <img src="assets/img/Tools.gif" alt="API Scripting" />
+            <h3>API Scripting</h3>
+          </div>
+        </div>
+      </ng-container>
       <mat-nav-list *ngIf="isLoggedIn$ | async">
         <button class="search-btn" mat-button (click)="handleSearchClick()">
           {{ 'Search Features' | transloco }}
