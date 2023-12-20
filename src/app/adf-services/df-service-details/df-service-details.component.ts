@@ -226,7 +226,7 @@ export class DfServiceDetailsComponent implements OnInit {
           }
         )
         .subscribe(() => {
-          this.router.navigate(['/api-connections/api-docs']);
+          this.router.navigate([`/api-connections/api-docs/${data.name}`]);
         });
     }
   }
