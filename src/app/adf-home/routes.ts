@@ -9,7 +9,7 @@ export const HomeRoutes: Routes = [
         m => m.DfWelcomePageComponent
       ),
   },
-    // {
+  // {
   //   path: ROUTES.WELCOME,
   //   loadComponent: () =>
   //     import('./df-welcome-page/df-welcome-page.component').then(

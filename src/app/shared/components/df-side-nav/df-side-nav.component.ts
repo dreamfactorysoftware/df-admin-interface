@@ -54,7 +54,7 @@ import { CommonModule } from '@angular/common';
     NgFor,
     NgTemplateOutlet,
     MatDialogModule,
-    CommonModule
+    CommonModule,
   ],
 })
 export class DfSideNavComponent implements OnInit {
