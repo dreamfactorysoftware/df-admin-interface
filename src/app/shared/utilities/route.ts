@@ -44,13 +44,7 @@ export function accessibleRoutes(
   navs: Array<Nav>,
   allowedTabs: Array<string>
 ): Array<Nav> {
-  const allowed: Array<ROUTES> = [
-    ROUTES.QUICKSTART,
-    ROUTES.WELCOME,
-    ROUTES.RESOURCES,
-    ROUTES.DOWNLOAD,
-    ROUTES.SYSTEM_INFO,
-  ];
+  const allowed: Array<ROUTES> = [ROUTES.SYSTEM_INFO];
   allowedTabs?.forEach(tab => {
     switch (tab) {
       case 'apps':
