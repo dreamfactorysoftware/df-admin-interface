@@ -32,6 +32,7 @@ import { of, switchMap } from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { CommonModule } from '@angular/common';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
@@ -53,6 +54,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     NgFor,
     NgTemplateOutlet,
     MatDialogModule,
+    CommonModule,
   ],
 })
 export class DfSideNavComponent implements OnInit {

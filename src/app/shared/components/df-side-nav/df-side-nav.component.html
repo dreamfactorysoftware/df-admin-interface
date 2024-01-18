@@ -12,12 +12,6 @@
       </button>
       <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
       <span class="spacer"></span>
-      <button
-        mat-icon-button
-        (click)="handleSearchClick()"
-        [attr.aria-label]="'search' | transloco">
-        <fa-icon [icon]="faMagnifyingGlass"></fa-icon>
-      </button>
       <ng-container *ngIf="availableLanguages.length > 1">
         <button
           mat-icon-button
@@ -34,8 +28,8 @@
           </button>
         </mat-menu>
       </ng-container>
-      <button mat-button [matMenuTriggerFor]="profileMenu">
-        {{ (userData$ | async)?.name }}
+      <button mat-button [matMenuTriggerFor]="profileMenu" class="profile-icon">
+        <fa-icon [icon]="faUser"></fa-icon> {{ (userData$ | async)?.name }}
       </button>
       <mat-menu #profileMenu="matMenu">
         <button mat-menu-item routerLink="profile">
@@ -65,7 +59,36 @@
       [opened]="(isSmallScreen | async) === false"
       class="sidenav"
       [mode]="(isSmallScreen | async) ? 'over' : 'side'">
+      <ng-container *ngIf="(isLoggedIn$ | async) === false">
+        <div class="login-side-container">
+          <div class="image-wrapper">
+            <img src="assets/img/Server-Stack.gif" alt="Self Hosted" />
+            <h3>Self Hosted</h3>
+          </div>
+          <div class="image-wrapper">
+            <img src="assets/img/API.gif" alt="API Generation" />
+            <h3>
+              Database & Network<br />
+              API Generation
+            </h3>
+          </div>
+          <div class="image-wrapper">
+            <img src="assets/img/Browser.gif" alt="Api Security" />
+            <h3>API Security</h3>
+          </div>
+          <div class="image-wrapper">
+            <img src="assets/img/Tools.gif" alt="API Scripting" />
+            <h3>API Scripting</h3>
+          </div>
+        </div>
+      </ng-container>
       <mat-nav-list *ngIf="isLoggedIn$ | async">
+        <button class="search-btn" mat-button (click)="handleSearchClick()">
+          {{ 'Search Features' | transloco }}
+          <span>
+            <fa-icon [icon]="faMagnifyingGlass"></fa-icon>
+          </span>
+        </button>
         <ng-container
           *ngTemplateOutlet="
             navList;

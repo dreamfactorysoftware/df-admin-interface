@@ -19,6 +19,28 @@ $red-palette: mat.define-palette(mat.$red-palette);
   min-height: 64px;
 }
 
+.search-btn {
+  font-size: 1.6rem;
+  font-weight: 400;
+  height: 46px;
+  background: none;
+  border: none;
+  padding: 0 16px;
+  font-family: var(--mat-expansion-header-text-font);
+  color: var(--mat-expansion-container-text-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+
+  span {
+    margin-left: 6px;
+  }
+}
+
+.profile-icon {
+  color: #0f0761;
+}
+
 .sidenav-container {
   flex: 1 1 auto;
   .sidenav {
@@ -26,6 +48,33 @@ $red-palette: mat.define-palette(mat.$red-palette);
     min-width: 40%;
     border: none;
     transition: min-width 0.3s ease-out;
+    max-width: 450px;
+
+    .login-side-container {
+      display: flex;
+      justify-content: center;
+      align-items: center; // Vertically centers the content
+      flex-wrap: wrap;
+      text-align: center;
+      height: 40%;
+      gap: 8px;
+      width: 100%;
+      margin-top: 15%;
+      .image-wrapper {
+        width: calc(45% - 8px); // 2 columns, so each takes up 50% of the width
+        padding: 10px; // Optional, for spacing
+
+        img {
+          width: 80%; // Makes the image responsive within its wrapper
+          height: auto;
+        }
+
+        h3 {
+          color: #fff;
+        }
+      }
+    }
+
     .small & {
       min-width: 0;
     }

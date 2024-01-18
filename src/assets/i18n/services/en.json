@@ -2,6 +2,7 @@
   "details": "Details",
   "definition": "Service Definition",
   "config": "Configuration",
+  "options": "Advanced Options",
   "controls": {
     "serviceType": {
       "label": "Service Type",

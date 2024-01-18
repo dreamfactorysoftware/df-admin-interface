@@ -61,8 +61,14 @@
 
 <section class="platforms-section">
   <h3>
-    {{ 'home.welcomePage.clientPlatformHeading' | transloco }}
+    {{ 'home.quickstartPage.quickstartSubHeading' | transloco }}
   </h3>
+
+  <ol aria-labelledby="quickstart-instructions-heading">
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepOne' | transloco }}</li>
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepTwo' | transloco }}</li>
+    <li>{{ 'home.quickstartPage.quickstartSteps.stepThree' | transloco }}</li>
+  </ol>
 
   <article>
     <h4 id="native-examples-heading">
@@ -94,3 +100,5 @@
     </ul>
   </article>
 </section>
+<mat-divider></mat-divider>
+<df-download-page></df-download-page>

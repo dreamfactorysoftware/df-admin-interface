@@ -114,19 +114,10 @@
     },
     "home": {
       "nav": "Home",
-      "welcome": { "nav": "Welcome", "header": "{{nav.home.welcome.nav}}" },
-      "resources": {
-        "nav": "Resources",
-        "header": "{{nav.home.resources.nav}}"
-      },
-      "quickstart": {
-        "nav": "Quickstart",
-        "header": "{{nav.home.quickstart.nav}}"
-      },
-      "download": { "nav": "Download", "header": "{{nav.home.download.nav}}" }
+      "header": "{{nav.home.nav}}"
     },
     "api-connections": {
-      "nav": "API Connections",
+      "nav": "API Generation & Connections",
       "api-types": {
         "nav": "API Types",
         "database": {
@@ -290,7 +281,7 @@
         }
       },
       "logs": {
-        "nav": "Logs",
+        "nav": "Logstash",
         "header": "{{nav.system-settings.logs.nav}}",
         "create": {
           "header": "Create Log"
