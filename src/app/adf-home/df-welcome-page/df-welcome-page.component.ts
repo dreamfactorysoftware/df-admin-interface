@@ -19,6 +19,9 @@ import {
   faHeart,
 } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
+import { DfQuickstartPageComponent } from '../df-quickstart-page/df-quickstart-page.component';
+import { DfResourcesPageComponent } from '../df-resources-page/df-resources-page.component';
+import { DfDownloadPageComponent } from '../df-download-page/df-download-page.component';
 
 @Component({
   selector: 'df-welcome-page',
@@ -34,6 +37,9 @@ import { TranslocoPipe } from '@ngneat/transloco';
     DfIconCardLinkComponent,
     AsyncPipe,
     TranslocoPipe,
+    DfQuickstartPageComponent,
+    DfResourcesPageComponent,
+    DfDownloadPageComponent,
   ],
 })
 export class DfWelcomePageComponent {

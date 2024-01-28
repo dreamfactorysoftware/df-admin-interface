@@ -216,7 +216,10 @@
     </mat-stepper>
   </ng-container>
   <ng-template #notDatabase>
-    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-form-field
+      subscriptSizing="dynamic"
+      class="dynamic-width"
+      appearance="outline">
       <mat-label>{{
         'services.controls.serviceType.label' | transloco
       }}</mat-label>
@@ -234,6 +237,7 @@
     <mat-form-field
       subscriptSizing="dynamic"
       class="dynamic-width"
+      appearance="outline"
       *ngIf="!subscriptionRequired">
       <mat-label>{{
         'services.controls.namespace.label' | transloco
@@ -247,6 +251,7 @@
     </mat-form-field>
     <mat-form-field
       subscriptSizing="dynamic"
+      appearance="outline"
       class="dynamic-width"
       *ngIf="!subscriptionRequired">
       <mat-label>{{ 'services.controls.label.label' | transloco }}</mat-label>
@@ -260,6 +265,7 @@
     <mat-form-field
       subscriptSizing="dynamic"
       class="full-width"
+      appearance="outline"
       *ngIf="!subscriptionRequired">
       <mat-label>{{
         'services.controls.description.label' | transloco

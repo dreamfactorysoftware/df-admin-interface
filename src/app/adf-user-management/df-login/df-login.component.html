@@ -22,7 +22,7 @@
       <mat-divider></mat-divider>
       <mat-card-content>
         <form name="login-form" [formGroup]="loginForm" (ngSubmit)="login()">
-          <mat-form-field appearance="fill" *ngIf="ldapServices.length">
+          <mat-form-field appearance="outline" *ngIf="ldapServices.length">
             <mat-label>
               {{
                 'userManagement.controls.services.label' | transloco
@@ -37,7 +37,9 @@
               </mat-option>
             </mat-select>
           </mat-form-field>
-          <mat-form-field appearance="fill" *ngIf="loginAttribute === 'email'">
+          <mat-form-field
+            appearance="outline"
+            *ngIf="loginAttribute === 'email'">
             <mat-label>
               {{ 'userManagement.controls.email.label' | transloco }}</mat-label
             >
@@ -59,7 +61,7 @@
           </mat-form-field>
 
           <mat-form-field
-            appearance="fill"
+            appearance="outline"
             *ngIf="loginAttribute === 'username'">
             <mat-label>{{
               'userManagement.controls.username.altLabel' | transloco
@@ -72,7 +74,7 @@
             </mat-error>
           </mat-form-field>
 
-          <mat-form-field appearance="fill">
+          <mat-form-field appearance="outline">
             <mat-label>{{
               'userManagement.controls.password.label' | transloco
             }}</mat-label>

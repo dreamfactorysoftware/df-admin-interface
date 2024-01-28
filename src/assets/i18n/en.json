@@ -114,16 +114,7 @@
     },
     "home": {
       "nav": "Home",
-      "welcome": { "nav": "Welcome", "header": "{{nav.home.welcome.nav}}" },
-      "resources": {
-        "nav": "Resources",
-        "header": "{{nav.home.resources.nav}}"
-      },
-      "quickstart": {
-        "nav": "Quickstart",
-        "header": "{{nav.home.quickstart.nav}}"
-      },
-      "download": { "nav": "Download", "header": "{{nav.home.download.nav}}" }
+      "header": "{{nav.home.nav}}"
     },
     "api-connections": {
       "nav": "API Generation & Connections",

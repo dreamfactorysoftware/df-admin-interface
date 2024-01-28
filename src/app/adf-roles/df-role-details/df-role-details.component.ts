@@ -25,6 +25,11 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatButtonModule } from '@angular/material/button';
 import { DfRolesAccessComponent } from '../df-roles-access/df-roles-access.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import {
+  AlertType,
+  DfAlertComponent,
+} from 'src/app/shared/components/df-alert/df-alert.component';
+import { catchError, throwError } from 'rxjs';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-role-details',
@@ -42,11 +47,15 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     MatButtonModule,
     DfRolesAccessComponent,
     NgIf,
+    DfAlertComponent,
   ],
 })
 export class DfRoleDetailsComponent implements OnInit {
   roleForm: FormGroup;
   type = '';
+  alertMsg = '';
+  showAlert = false;
+  alertType: AlertType = 'error';
 
   constructor(
     @Inject(ROLE_SERVICE_TOKEN)
@@ -137,6 +146,12 @@ export class DfRoleDetailsComponent implements OnInit {
     return result;
   }
 
+  triggerAlert(type: AlertType, msg: string) {
+    this.alertType = type;
+    this.alertMsg = msg;
+    this.showAlert = true;
+  }
+
   onSubmit() {
     if (this.roleForm.invalid) return;
 
@@ -168,7 +183,12 @@ export class DfRoleDetailsComponent implements OnInit {
     if (this.type === 'edit' && payload.id) {
       this.roleService
         .update(payload.id, payload)
-
+        .pipe(
+          catchError(err => {
+            this.triggerAlert('error', err.error.error.message);
+            return throwError(() => new Error(err));
+          })
+        )
         .subscribe(() => {
           this.goBack();
         });
@@ -178,7 +198,15 @@ export class DfRoleDetailsComponent implements OnInit {
           fields: '*',
           related: 'role_service_access_by_role_id,lookup_by_role_id',
         })
-
+        .pipe(
+          catchError(err => {
+            this.triggerAlert(
+              'error',
+              err.error.error.context.resource[0].message
+            );
+            return throwError(() => new Error(err));
+          })
+        )
         .subscribe(() => {
           this.goBack();
         });
