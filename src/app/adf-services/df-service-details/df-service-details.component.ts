@@ -8,6 +8,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
+import { MatStepper, MatStepperModule } from '@angular/material/stepper';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -38,6 +39,8 @@ import {
   SILVER_SERVICES,
 } from 'src/app/shared/constants/services';
 import { DfPaywallComponent } from 'src/app/shared/components/df-paywall/df-paywall.component';
+import { CommonModule } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -66,15 +69,21 @@ import { DfPaywallComponent } from 'src/app/shared/components/df-paywall/df-payw
     MatButtonModule,
     DfScriptEditorComponent,
     DfPaywallComponent,
+    MatStepperModule,
+    CommonModule,
+    MatIconModule,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
   edit = false;
+  isDatabase = false;
   serviceTypes: Array<ServiceType>;
   serviceForm: FormGroup;
   faCircleInfo = faCircleInfo;
   serviceData: Service;
   configSchema: Array<ConfigSchema>;
+  images: Array<ImageObject>;
+  search = '';
 
   systemEvents: Array<{ label: string; value: string }>;
 
@@ -97,6 +106,118 @@ export class DfServiceDetailsComponent implements OnInit {
     if (id) {
       this.edit = true;
     }
+    this.images = [
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc69_alloy-p-500.png',
+        alt: 'AlloyDB',
+        label: 'alloydb',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc60_API%2520Logo%2520Container-18-p-500.webp',
+        alt: 'aws_dynamodb',
+        label: 'aws_dynamodb',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf5_Redshift-p-500.jpg',
+        alt: 'aws_redshift_db',
+        label: 'aws_redshift_db',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6c_azure-p-500.png',
+        alt: 'azure_documentdb',
+        label: 'azure_documentdb',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6e_API%2520Logo%2520Container-p-500.png',
+        alt: 'azure_table',
+        label: 'azure_table',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf3_API%2520Logo%2520Container-p-500.webp',
+        alt: 'cassandra',
+        label: 'cassandra',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf2_API%2520Logo%2520Container-8-p-500.webp',
+        alt: 'couchdb',
+        label: 'couchdb',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf7_API%2520Logo%2520Container-14-p-500.webp',
+        alt: 'firebird',
+        label: 'firebird',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc63_API%2520Logo%2520Container-p-500.webp',
+        alt: 'ibmdb2',
+        label: 'ibmdb2',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6d_ibm-p-500.png',
+        alt: 'informix',
+        label: 'informix',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6a_mariaDB-p-500.png',
+        alt: 'mariadb',
+        label: 'mariadb',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb5d_API%2520Logo%2520Container-2-p-500.webp',
+        alt: 'memsql',
+        label: 'memsql',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf1_API%2520Logo%2520Container-21-p-500.webp',
+        alt: 'mongodb',
+        label: 'mongodb',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb7e_API%2520Logo%2520Container-3-p-500.webp',
+        alt: 'mysql',
+        label: 'mysql',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb01_API%2520Logo%2520Container-5-p-500.webp',
+        alt: 'oracle',
+        label: 'oracle',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb1a_API%2520Logo%2520Container-7-p-500.webp',
+        alt: 'pgsql',
+        label: 'pgsql',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc68_Salesforce-p-500.png',
+        alt: 'salesforce_db',
+        label: 'salesforce_db',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc66_Sap%2520SQL-p-500.png',
+        alt: 'sqlanywhere',
+        label: 'sqlanywhere',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbab_API%2520Logo%2520Container-11-p-500.webp',
+        alt: 'sqlite',
+        label: 'sqlite',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbd8_API%2520Logo%2520Container-27-p-500.webp',
+        alt: 'sqlsrv',
+        label: 'sqlsrv',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc67_API%2520Logo%2520Container-p-500.png',
+        alt: 'apache_hive',
+        label: 'apache_hive',
+      },
+      {
+        src: 'https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb45_API%2520Logo%2520Container-9-p-500.webp',
+        alt: 'snowflake',
+        label: 'snowflake',
+      },
+    ];
   }
 
   ngOnInit(): void {
@@ -107,6 +228,9 @@ export class DfServiceDetailsComponent implements OnInit {
         )
       )
       .subscribe(({ env, route }) => {
+        if (route['groups'][0] === 'Database') {
+          this.isDatabase = true;
+        }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
         this.serviceTypes = serviceTypes;
@@ -138,6 +262,11 @@ export class DfServiceDetailsComponent implements OnInit {
           });
         }
       });
+    this.serviceForm.controls['type'].valueChanges.subscribe(value => {
+      this.serviceForm.patchValue({
+        label: value,
+      });
+    });
   }
 
   initializeConfig() {
@@ -234,4 +363,30 @@ export class DfServiceDetailsComponent implements OnInit {
   goBack() {
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
+
+  getBackgroundImage(typeLable: string) {
+    const image = this.images.find(img => img.label == typeLable);
+    if (!image) {
+      return '';
+    }
+    return image ? image.src : '';
+  }
+
+  get filteredServiceTypes() {
+    return this.serviceTypes.filter(type =>
+      type.label
+        .replace(/\s/g, '')
+        .toLowerCase()
+        .includes(this.search.toLowerCase())
+    );
+  }
+
+  nextStep(stepper: MatStepper) {
+    stepper.next();
+  }
+}
+interface ImageObject {
+  alt: string;
+  src: string;
+  label: string;
 }
