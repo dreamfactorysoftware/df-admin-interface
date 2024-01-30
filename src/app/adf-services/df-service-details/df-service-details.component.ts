@@ -8,6 +8,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
+import { MatStepper, MatStepperModule } from '@angular/material/stepper';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -38,6 +39,9 @@ import {
   SILVER_SERVICES,
 } from 'src/app/shared/constants/services';
 import { DfPaywallComponent } from 'src/app/shared/components/df-paywall/df-paywall.component';
+import { CommonModule } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon';
+import { HttpClient } from '@angular/common/http';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -66,15 +70,21 @@ import { DfPaywallComponent } from 'src/app/shared/components/df-paywall/df-payw
     MatButtonModule,
     DfScriptEditorComponent,
     DfPaywallComponent,
+    MatStepperModule,
+    CommonModule,
+    MatIconModule,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
   edit = false;
+  isDatabase = false;
   serviceTypes: Array<ServiceType>;
   serviceForm: FormGroup;
   faCircleInfo = faCircleInfo;
   serviceData: Service;
   configSchema: Array<ConfigSchema>;
+  images: Array<ImageObject>;
+  search = '';
 
   systemEvents: Array<{ label: string; value: string }>;
 
@@ -84,7 +94,8 @@ export class DfServiceDetailsComponent implements OnInit {
     @Inject(SERVICES_SERVICE_TOKEN)
     private servicesService: DfBaseCrudService,
     private router: Router,
-    private systemConfigDataService: DfSystemConfigDataService
+    private systemConfigDataService: DfSystemConfigDataService,
+    private http: HttpClient
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -100,6 +111,11 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.http
+      .get<Array<ImageObject>>('assets/img/databaseImages.json')
+      .subscribe(images => {
+        this.images = images;
+      });
     this.systemConfigDataService.environment$
       .pipe(
         switchMap(env =>
@@ -107,6 +123,9 @@ export class DfServiceDetailsComponent implements OnInit {
         )
       )
       .subscribe(({ env, route }) => {
+        if (route['groups'][0] === 'Database') {
+          this.isDatabase = true;
+        }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
         this.serviceTypes = serviceTypes;
@@ -138,6 +157,11 @@ export class DfServiceDetailsComponent implements OnInit {
           });
         }
       });
+    this.serviceForm.controls['type'].valueChanges.subscribe(value => {
+      this.serviceForm.patchValue({
+        label: value,
+      });
+    });
   }
 
   initializeConfig() {
@@ -234,4 +258,30 @@ export class DfServiceDetailsComponent implements OnInit {
   goBack() {
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
+
+  getBackgroundImage(typeLable: string) {
+    const image = this.images.find(img => img.label == typeLable);
+    if (!image) {
+      return '';
+    }
+    return image ? image.src : '';
+  }
+
+  get filteredServiceTypes() {
+    return this.serviceTypes.filter(type =>
+      type.label
+        .replace(/\s/g, '')
+        .toLowerCase()
+        .includes(this.search.toLowerCase())
+    );
+  }
+
+  nextStep(stepper: MatStepper) {
+    stepper.next();
+  }
+}
+interface ImageObject {
+  alt: string;
+  src: string;
+  label: string;
 }
