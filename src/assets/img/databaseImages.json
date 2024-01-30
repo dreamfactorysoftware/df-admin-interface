@@ -108,5 +108,10 @@
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb45_API%2520Logo%2520Container-9-p-500.webp",
       "alt": "snowflake",
       "label": "snowflake"
+    },
+    {
+      "src": "assets/img/bigquery.png",
+      "alt": "bigquery",
+      "label": "bigquery"
     }
   ]
