@@ -1,5 +1,5 @@
 <form [formGroup]="serviceForm" class="details-section" (ngSubmit)="save()">
-  <ng-container *ngIf="this.isDatabase; else notDatabase">
+  <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabase">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
         <ng-template matStepLabel>
