@@ -28,7 +28,7 @@
             <input
               matInput
               [(ngModel)]="search"
-              placeholder="SQL..."
+              placeholder="SQL, AWS, MongoDB, etc."
               [ngModelOptions]="{ standalone: true }" />
           </mat-form-field>
           <!-- <mat-form-field class="dynamic-width" appearance="outline">
@@ -41,26 +41,53 @@
               </mat-option>
             </mat-select>
           </mat-form-field> -->
-          <div class="grid-wrapper grid-col-auto">
-            <label
-              class="radio-card"
-              *ngFor="let type of filteredServiceTypes; let i = index">
-              <input
-                formControlName="type"
-                type="radio"
-                [value]="type.name"
-                (input)="nextStep(stepper)" />
-              <div class="card-content-wrapper">
-                <span class="check-icon"></span>
-                <div class="card-content">
-                  <img
-                    class="card-icon"
-                    [src]="getBackgroundImage(type.name)"
-                    [alt]="type.label" />
-                  <h4 class="text-center">{{ type.label }}</h4>
+          <div class="full-width">
+            <div class="grid-wrapper grid-col-auto">
+              <label
+                class="radio-card"
+                *ngFor="let type of filteredServiceTypes; let i = index">
+                <input
+                  formControlName="type"
+                  type="radio"
+                  [value]="type.name"
+                  (input)="nextStep(stepper)" />
+                <div class="card-content-wrapper" [class]="type.class">
+                  <span class="check-icon"></span>
+                  <div class="card-content">
+                    <img
+                      class="card-icon"
+                      [src]="getBackgroundImage(type.name)"
+                      [alt]="type.label" />
+                    <h4 class="text-center">{{ type.label }}</h4>
+                  </div>
                 </div>
-              </div>
-            </label>
+              </label>
+              <label
+                class="radio-card"
+                *ngFor="let type of notIncludedServices; let i = index">
+                <input
+                  formControlName="type"
+                  type="radio"
+                  [value]="type.name"
+                  (input)="nextStep(stepper)"
+                  [attr.disabled]="true" />
+                <div class="card-content-wrapper" [class]="type.class">
+                  <span class="check-icon"></span>
+                  <div class="card-content">
+                    <img
+                      class="card-icon"
+                      [src]="getBackgroundImage(type.name)"
+                      [alt]="type.label" />
+                    <h4 class="text-center">{{ type.label }}</h4>
+                  </div>
+                </div>
+                <ng-container *ngIf="type.class === 'not-included'">
+                  <button mat-button (click)="openDialog()" class="unlock-btn">
+                    Unlock Now
+                  </button>
+                </ng-container>
+              </label>
+            </div>
           </div>
           <div>
             <button mat-button matStepperNext type="button">Next</button>
