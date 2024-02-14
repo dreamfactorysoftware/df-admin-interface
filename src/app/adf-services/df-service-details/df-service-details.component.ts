@@ -1,5 +1,11 @@
 import { NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
-import { Component, Inject, OnInit } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Inject,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
 import {
   FormBuilder,
   FormControl,
@@ -42,6 +48,7 @@ import { DfPaywallComponent } from 'src/app/shared/components/df-paywall/df-payw
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -79,6 +86,7 @@ export class DfServiceDetailsComponent implements OnInit {
   edit = false;
   isDatabase = false;
   serviceTypes: Array<ServiceType>;
+  notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
   faCircleInfo = faCircleInfo;
   serviceData: Service;
@@ -95,7 +103,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private servicesService: DfBaseCrudService,
     private router: Router,
     private systemConfigDataService: DfSystemConfigDataService,
-    private http: HttpClient
+    private http: HttpClient,
+    public dialog: MatDialog
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -129,16 +138,40 @@ export class DfServiceDetailsComponent implements OnInit {
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
         this.serviceTypes = serviceTypes;
-        if (licenseType === 'SILVER') {
-          this.serviceTypes.push(
-            ...GOLD_SERVICES.filter(s => groups.includes(s.group))
-          );
-        }
-        if (licenseType === 'OPEN SOURCE') {
-          this.serviceTypes.push(
-            ...SILVER_SERVICES.filter(s => groups.includes(s.group)),
-            ...GOLD_SERVICES.filter(s => groups.includes(s.group))
-          );
+        this.notIncludedServices = [];
+        if (this.isDatabase) {
+          if (licenseType === 'SILVER') {
+            this.notIncludedServices.push(
+              ...GOLD_SERVICES.map(s => {
+                s.class = 'not-included';
+                return s;
+              }).filter(s => groups.includes(s.group))
+            );
+          }
+          if (licenseType === 'OPEN SOURCE') {
+            this.notIncludedServices.push(
+              ...SILVER_SERVICES.map(s => {
+                s.class = 'not-included';
+                return s;
+              }).filter(s => groups.includes(s.group)),
+              ...GOLD_SERVICES.map(s => {
+                s.class = 'not-included';
+                return s;
+              }).filter(s => groups.includes(s.group))
+            );
+          }
+        } else {
+          if (licenseType === 'SILVER') {
+            this.serviceTypes.push(
+              ...GOLD_SERVICES.filter(s => groups.includes(s.group))
+            );
+          }
+          if (licenseType === 'OPEN SOURCE') {
+            this.serviceTypes.push(
+              ...SILVER_SERVICES.filter(s => groups.includes(s.group)),
+              ...GOLD_SERVICES.filter(s => groups.includes(s.group))
+            );
+          }
         }
         this.serviceData = data;
         if (this.edit) {
@@ -183,7 +216,7 @@ export class DfServiceDetailsComponent implements OnInit {
 
   get subscriptionRequired() {
     return (
-      this.serviceForm.controls['type'].value && this.configSchema.length === 0
+      this.serviceForm.controls['type'].value && this.configSchema?.length === 0
     );
   }
 
@@ -260,7 +293,7 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   getBackgroundImage(typeLable: string) {
-    const image = this.images.find(img => img.label == typeLable);
+    const image = this.images?.find(img => img.label == typeLable);
     if (!image) {
       return '';
     }
@@ -279,9 +312,40 @@ export class DfServiceDetailsComponent implements OnInit {
   nextStep(stepper: MatStepper) {
     stepper.next();
   }
+
+  openDialog() {
+    const dialogRef = this.dialog.open(DfPaywallModal);
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    dialogRef.afterClosed().subscribe(result => {});
+  }
 }
 interface ImageObject {
   alt: string;
   src: string;
   label: string;
+}
+
+@Component({
+  selector: 'df-paywall-modal',
+  templateUrl: 'df-paywall-modal.html',
+  styleUrls: ['./df-service-details.component.scss'],
+  standalone: true,
+  imports: [
+    MatDialogModule,
+    MatButtonModule,
+    DfPaywallComponent,
+    TranslocoPipe,
+  ],
+})
+// eslint-disable-next-line @angular-eslint/component-class-suffix
+export class DfPaywallModal {
+  @ViewChild('calendlyWidget') calendlyWidget: ElementRef;
+
+  ngAfterViewInit(): void {
+    (window as any)['Calendly'].initInlineWidget({
+      url: 'https://calendly.com/dreamfactory-platform/unlock-all-features',
+      parentElement: this.calendlyWidget.nativeElement,
+      autoLoad: false,
+    });
+  }
 }

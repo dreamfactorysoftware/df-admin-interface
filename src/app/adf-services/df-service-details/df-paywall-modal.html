@@ -1,0 +1,37 @@
+<div class="app-container" style="padding: 12px 20px">
+  <h1 mat-dialog-title style="text-align: center">Unlock Service</h1>
+  <mat-dialog-content>
+    <div class="paywall-container">
+      <h2>{{ 'paywall.header' | transloco }}</h2>
+      <h2>{{ 'paywall.subheader' | transloco }}</h2>
+      <div class="details-section">
+        <div class="dynamic-width">
+          <h4>{{ 'paywall.hostedTrial' | transloco }}</h4>
+          <p>{{ 'paywall.bookTime' | transloco }}</p>
+        </div>
+        <div class="dynamic-width">
+          <h4>{{ 'paywall.ossVersion' | transloco }}</h4>
+          <p>
+            {{ 'paywall.signup' | transloco
+            }}<a
+              href="https://genie.dreamfactory.com/?utm_source=platform&utm_medium=paywall&utm_campaign=hosted"
+              target="_blank"
+              >{{ 'paywall.trial' | transloco }}</a
+            >{{ 'paywall.gain' | transloco }}
+          </p>
+        </div>
+      </div>
+      <h2>{{ 'paywall.speakToHuman' | transloco }}</h2>
+    </div>
+    <h3 class="paywall-contact">
+      <a href="tel:+1 415-993-5877"
+        >{{ 'phone' | transloco }}: +1 415-993-5877</a
+      >
+      |
+      <a href="mailto:info@dreamfactory.com"
+        >{{ 'email' | transloco }}: info@dreamfactory.com</a
+      >
+    </h3>
+    <div #calendlyWidget class="calendly-inline-widget"></div>
+  </mat-dialog-content>
+</div>

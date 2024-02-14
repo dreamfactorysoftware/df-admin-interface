@@ -101,6 +101,7 @@
   "toggleNav": "Toggle navigation",
   "desktopFile": "Upload File",
   "githubFile": "Github Import",
+  "searchFeatures": "Search Features",
   "scriptType": "Script Type",
   "scriptTypes": {
     "javascript": "JavaScript",
