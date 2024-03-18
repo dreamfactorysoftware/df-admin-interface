@@ -1,0 +1,33 @@
+{
+  "label": "Roles",
+  "role": "Role",
+  "app": "App",
+  "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
+  "noRoles": "No roles assigned.",
+
+  "rolesOverview": {
+    "heading": "Roles Overview",
+    "description": "Roles provide a way to grant or deny API access to specific services or apps.",
+    "error": {
+      "name": "The name field is required."
+    }
+  },
+  "accessOverview": {
+    "heading": "Access Overview",
+    "description": "This section allows you set up rules for a role restricting what services and components users assigned to the role will have access to. Advanced Filters are for implementing additional server side filter logic on database transactions.",
+    "tableLabel": "Service Access",
+    "tableDescription": "Access rules for DreamFactory services. Use caution when allowing system access.",
+    "tableHeadings": {
+      "service": "Service",
+      "component": "Component",
+      "access": "Access",
+      "requester": "Requester",
+      "advancedFilters": "Advanced Filters"
+    },
+    "noAccessRules": "No Access Rules"
+  },
+  "lookupKeys": {
+    "heading": "Lookup Keys Overview",
+    "description": "The DreamFactory administrator can create any number of 'key, value' pairs attached to a role. The key values are automatically substituted on the server. For example, key names can be used in the username and password fields required to hook up a SQL or NoSQL database. They can also be used in Email Templates or as parameters for external REST services. Any Lookup Key can be marked as private, and in this case the key value is securely ncrypted on the server and is no longer accessible through the platform interface. Lookup keys for service configuration and credentials must be made private."
+  }
+}
