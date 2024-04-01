@@ -214,6 +214,7 @@ export abstract class DfManageTableComponent<T>
     this.router.navigate([(row as any).id], {
       relativeTo: this._activatedRoute,
     });
+
   }
 
   announceSortChange(sortState: any) {
