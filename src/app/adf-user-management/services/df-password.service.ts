@@ -60,11 +60,9 @@ export class DfPasswordService {
     hasSecurityQuestion = false
   ) {
     return this.http
-      .post<SecurityQuestion | GenericSuccessResponse>(
-        URLS.USER_PASSWORD,
-        data,
-        hasSecurityQuestion ? HTTP_OPTION_LOGIN_FALSE : HTTP_OPTION_RESET_TRUE
-      )
+      .post<
+        SecurityQuestion | GenericSuccessResponse
+      >(URLS.USER_PASSWORD, data, hasSecurityQuestion ? HTTP_OPTION_LOGIN_FALSE : HTTP_OPTION_RESET_TRUE)
       .pipe(
         catchError(() => {
           return this.http.post<SecurityQuestion | GenericSuccessResponse>(

@@ -211,17 +211,10 @@ export abstract class DfManageTableComponent<T>
   }
 
   viewRow(row: T): void {
-    // eslint-disable-next-line no-useless-escape
-    const regex = /\/api\-connections/;
-    if (this.router.url.match(regex)) {
-      this.router.navigate([`${(row as any).id}-${(row as any).name}`], {
-        relativeTo: this._activatedRoute,
-      });
-    } else {
-      this.router.navigate([`${(row as any).id}`], {
-        relativeTo: this._activatedRoute,
-      });
-    }
+    this.router.navigate([(row as any).id], {
+      relativeTo: this._activatedRoute,
+    });
+
   }
 
   announceSortChange(sortState: any) {
