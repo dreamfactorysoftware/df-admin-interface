@@ -66,7 +66,6 @@ export class DfScriptEditorComponent implements OnInit {
         ],
       })
       .subscribe(res => {
-        console.log(res);
         this.storageServices = res.services;
       });
   }
