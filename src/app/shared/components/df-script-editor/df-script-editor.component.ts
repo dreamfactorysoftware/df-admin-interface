@@ -61,7 +61,7 @@ export class DfScriptEditorComponent implements OnInit {
         additionalParams: [
           {
             key: 'group',
-            value: 'source control,file',
+            value: 'source control,file,database',
           },
         ],
       })
