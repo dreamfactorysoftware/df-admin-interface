@@ -1,6 +1,6 @@
 {
   "name": "dreamfactory/df-admin-interface",
-  "type": "dreamfactory-interface",
+  "type": "dreamfactory-app",
   "description": "DreamFactory(tm) Admin Console",
   "homepage": "https://github.com/dreamfactorysoftware/df-admin-interface/",
   "keywords": [
