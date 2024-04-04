@@ -23,8 +23,13 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
 import { Observable, map, startWith } from 'rxjs';
 import { groupEvents } from 'src/app/shared/utilities/eventScripts';
-import { EVENT_SCRIPT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import {
+  BASE_SERVICE_TOKEN,
+  EVENTS_SERVICE_TOKEN,
+  EVENT_SCRIPT_SERVICE_TOKEN,
+} from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { Service, ServiceType } from 'src/app/shared/types/service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -60,7 +65,10 @@ export class DfScriptDetailsComponent implements OnInit {
     private fb: FormBuilder,
     private router: Router,
     @Inject(EVENT_SCRIPT_SERVICE_TOKEN)
-    private eventScriptService: DfBaseCrudService
+    @Inject(EVENTS_SERVICE_TOKEN)
+    // private eventScriptService: DfBaseCrudService,
+    // eventScriptService: DfBaseCrudService,
+    @Inject(BASE_SERVICE_TOKEN) private baseService: DfBaseCrudService
   ) {
     this.scriptForm = this.fb.group({
       name: ['', [Validators.required]],
@@ -70,10 +78,28 @@ export class DfScriptDetailsComponent implements OnInit {
       storagePath: [''],
       isActive: [false],
     });
+    this.baseService
+      .getAll<{
+        serviceTypes: Array<ServiceType>;
+        services: Array<Service>;
+      }>({
+        additionalParams: [
+          {
+            key: 'group',
+            value:
+              'Database, Big Data, Script, Remote Service, File, Excel, Cache, Email, Notification, Log, Source Control, IoT, LDAP, SSO, OAuth',
+          },
+        ],
+      })
+      .subscribe(res => {
+        this.storageServices = res.services;
+      });
   }
 
+  storageServices: Array<Service> = [];
   ngOnInit(): void {
-    this.activatedRoute.data.subscribe(({ data, type }) => {
+    this.activatedRoute.data.subscribe(({ data, systemEvents, type }) => {
+      console.log(systemEvents);
       this.type = type;
       if (type === 'edit') {
         this.scriptDetails = data;
@@ -89,6 +115,11 @@ export class DfScriptDetailsComponent implements OnInit {
       startWith(''),
       map(value => this.filterGroup(value))
     );
+    this.scriptForm.controls['storageServiceId'].valueChanges.subscribe(res => {
+      return this.eventScriptService.get(res.name).subscribe(res => {
+        console.log(res);
+      });
+    });
     this.loaded = true;
   }
 

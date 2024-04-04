@@ -229,7 +229,9 @@ export const routes: Routes = [
               import(
                 './adf-event-scripts/df-manage-scripts/df-manage-scripts.component'
               ).then(m => m.DfManageScriptsComponent),
-            resolve: { data: eventScriptsResolver },
+            resolve: {
+              data: eventScriptsResolver,
+            },
           },
           {
             path: ROUTES.CREATE,
@@ -239,6 +241,7 @@ export const routes: Routes = [
               ).then(m => m.DfScriptDetailsComponent),
             resolve: {
               data: eventsResolver,
+              systemEvents: systemEventsResolver,
             },
             data: { type: 'create' },
             canActivate: [paywallGuard(['script_Type', 'event_script'])],

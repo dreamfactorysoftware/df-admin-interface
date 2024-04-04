@@ -1,5 +1,13 @@
 <form [formGroup]="scriptForm" class="details-section" (ngSubmit)="submit()">
-  <mat-form-field class="dynamic-width" subscriptSizing="dynamic">
+  <mat-form-field class="full-width" subscriptSizing="dynamic">
+    <mat-label>{{ 'service' | transloco }}</mat-label>
+    <mat-select formControlName="storageServiceId">
+      <mat-option *ngFor="let service of storageServices" [value]="service">
+        {{ service.label }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field class="half-width" subscriptSizing="dynamic">
     <mat-label>{{ 'scripts.scriptName' | transloco }}</mat-label>
     <input matInput formControlName="name" [matAutocomplete]="autoGroup" />
     <mat-autocomplete #autoGroup="matAutocomplete">
@@ -12,7 +20,20 @@
       </mat-optgroup>
     </mat-autocomplete>
   </mat-form-field>
-  <mat-form-field class="dynamic-width" subscriptSizing="dynamic">
+  <mat-form-field class="half-width" subscriptSizing="dynamic">
+    <mat-label>{{ 'scripts.scriptName' | transloco }}</mat-label>
+    <input matInput formControlName="name" [matAutocomplete]="autoGroup" />
+    <mat-autocomplete #autoGroup="matAutocomplete">
+      <mat-optgroup
+        *ngFor="let group of scriptEventsOptions | async"
+        [label]="group.name">
+        <mat-option *ngFor="let event of group.endpoints" [value]="event">
+          {{ event }}
+        </mat-option>
+      </mat-optgroup>
+    </mat-autocomplete>
+  </mat-form-field>
+  <mat-form-field class="full-width" subscriptSizing="dynamic">
     <mat-label>{{ 'scriptType' | transloco }}</mat-label>
     <mat-select formControlName="type">
       <mat-option *ngFor="let type of types" [value]="type.value">

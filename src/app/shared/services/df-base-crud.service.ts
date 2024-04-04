@@ -16,7 +16,7 @@ export class DfBaseCrudService {
     return this.http.get<T>(
       this.url,
       this.getOptions({
-        limit: 10,
+        limit: 100,
         offset: 0,
         includeCount: true,
         ...options,
