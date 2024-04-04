@@ -68,7 +68,8 @@ export class DfScriptDetailsComponent implements OnInit {
     @Inject(EVENTS_SERVICE_TOKEN)
     // private eventScriptService: DfBaseCrudService,
     // eventScriptService: DfBaseCrudService,
-    @Inject(BASE_SERVICE_TOKEN) private baseService: DfBaseCrudService
+    @Inject(BASE_SERVICE_TOKEN)
+    private baseService: DfBaseCrudService
   ) {
     this.scriptForm = this.fb.group({
       name: ['', [Validators.required]],
@@ -115,11 +116,11 @@ export class DfScriptDetailsComponent implements OnInit {
       startWith(''),
       map(value => this.filterGroup(value))
     );
-    this.scriptForm.controls['storageServiceId'].valueChanges.subscribe(res => {
-      return this.eventScriptService.get(res.name).subscribe(res => {
-        console.log(res);
-      });
-    });
+    // this.scriptForm.controls['storageServiceId'].valueChanges.subscribe(res => {
+    //   return this.eventScriptService.get(res.name).subscribe(res => {
+    //     console.log(res);
+    //   });
+    // });
     this.loaded = true;
   }
 
@@ -136,17 +137,17 @@ export class DfScriptDetailsComponent implements OnInit {
       return;
     }
     const script = this.scriptForm.getRawValue();
-    if (this.type === 'edit') {
-      this.scriptDetails = { ...this.scriptDetails, ...script };
-      this.eventScriptService
-        .update(script.name, script)
-        .subscribe(() => this.goBack());
-    } else {
-      this.scriptDetails = script;
-      this.eventScriptService
-        .create(script, undefined, script.name)
-        .subscribe(() => this.goBack());
-    }
+    // if (this.type === 'edit') {
+    //   this.scriptDetails = { ...this.scriptDetails, ...script };
+    //   this.eventScriptService
+    //     .update(script.name, script)
+    //     .subscribe(() => this.goBack());
+    // } else {
+    //   this.scriptDetails = script;
+    //   this.eventScriptService
+    //     .create(script, undefined, script.name)
+    //     .subscribe(() => this.goBack());
+    // }
   }
 
   private filterGroup(value: string): Array<ScriptEvent> {
