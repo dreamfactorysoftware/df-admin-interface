@@ -30,6 +30,7 @@ import {
 } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { Service, ServiceType } from 'src/app/shared/types/service';
+import { CommonModule } from '@angular/common';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -50,6 +51,7 @@ import { Service, ServiceType } from 'src/app/shared/types/service';
     MatAutocompleteModule,
     MatInputModule,
     AsyncPipe,
+    CommonModule,
   ],
 })
 export class DfScriptDetailsComponent implements OnInit {
@@ -59,18 +61,28 @@ export class DfScriptDetailsComponent implements OnInit {
   type: 'create' | 'edit' = 'create';
   scriptEvents: Array<ScriptEvent>;
   scriptEventsOptions: Observable<Array<ScriptEvent>>;
+  unGroupedEvents: ScriptEvent;
+  ungroupedEventItems: string[];
+  ungroupedEventOptions: ScriptEvent;
+  ungroupedRouteOptions: string[];
+  storeServiceArray: string[];
+  selectedStorageItem: string;
+  selectedServiceItem: string;
+  selectedEventItem: string;
+  selectedRouteItem: string;
   loaded = false;
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
     private router: Router,
     @Inject(EVENT_SCRIPT_SERVICE_TOKEN)
+    private eventScriptService: DfBaseCrudService,
     @Inject(EVENTS_SERVICE_TOKEN)
-    // private eventScriptService: DfBaseCrudService,
-    // eventScriptService: DfBaseCrudService,
     @Inject(BASE_SERVICE_TOKEN)
     private baseService: DfBaseCrudService
   ) {
+    this.storeServiceArray = [];
+    this.ungroupedEventItems = [];
     this.scriptForm = this.fb.group({
       name: ['', [Validators.required]],
       type: ['nodejs', [Validators.required]],
@@ -88,26 +100,27 @@ export class DfScriptDetailsComponent implements OnInit {
           {
             key: 'group',
             value:
-              'Database, Big Data, Script, Remote Service, File, Excel, Cache, Email, Notification, Log, Source Control, IoT, LDAP, SSO, OAuth',
+              'Database, Big Data, Script, Remote Service, File, Excel, Cache, Email, Notification, Log, Source Control, IoT, LDAP, SSO, OAuth, user, system',
           },
         ],
       })
-      .subscribe(res => {
-        this.storageServices = res.services;
-      });
+      .subscribe();
   }
 
-  storageServices: Array<Service> = [];
+  storageServices: Service;
   ngOnInit(): void {
-    this.activatedRoute.data.subscribe(({ data, systemEvents, type }) => {
-      console.log(systemEvents);
+    this.activatedRoute.data.subscribe(({ data, type }) => {
       this.type = type;
       if (type === 'edit') {
         this.scriptDetails = data;
+        console.log(data);
         this.scriptForm.patchValue(data);
         this.scriptForm.controls['name'].disable();
       } else {
         this.scriptEvents = groupEvents(data);
+        this.unGroupedEvents = data;
+        this.storageServices = data;
+        this.storeServiceArray = Object.keys(this.storageServices) as string[];
       }
     });
     this.scriptEventsOptions = this.scriptForm.controls[
@@ -117,8 +130,15 @@ export class DfScriptDetailsComponent implements OnInit {
       map(value => this.filterGroup(value))
     );
     // this.scriptForm.controls['storageServiceId'].valueChanges.subscribe(res => {
-    //   return this.eventScriptService.get(res.name).subscribe(res => {
-    //     console.log(res);
+    //   let serviceType = res.name;
+    //   if (res.name === 'api_docs') {
+    //     serviceType = 'apiDocs';
+    //     this.ungroupedEventOptions = this.unGroupedEvents[serviceType];
+    //   }
+
+    //   this.ungroupedEventOptions = this.unGroupedEvents[serviceType];
+    //   Object.keys(this.ungroupedEventOptions).forEach(key => {
+    //     this.ungroupedEventItems.push(key);
     //   });
     // });
     this.loaded = true;
@@ -133,21 +153,33 @@ export class DfScriptDetailsComponent implements OnInit {
   }
 
   submit(): void {
-    if (!this.scriptForm.valid) {
-      return;
-    }
-    const script = this.scriptForm.getRawValue();
-    // if (this.type === 'edit') {
-    //   this.scriptDetails = { ...this.scriptDetails, ...script };
-    //   this.eventScriptService
-    //     .update(script.name, script)
-    //     .subscribe(() => this.goBack());
-    // } else {
-    //   this.scriptDetails = script;
-    //   this.eventScriptService
-    //     .create(script, undefined, script.name)
-    //     .subscribe(() => this.goBack());
+    // if (!this.scriptForm.valid) {
+    //   return;
     // }
+    const script = this.scriptForm.getRawValue();
+    const scriptItem = {
+      ...script,
+      storageServiceId:
+        script.storageServiceId?.type === 'local_file'
+          ? script.storageServiceId?.id
+          : null,
+      storage_path:
+        script.storageServiceId?.type === 'local_file'
+          ? script.storagePath
+          : null,
+      name: this.selectedRouteItem,
+    };
+    if (this.type === 'edit') {
+      this.scriptDetails = { ...this.scriptDetails, ...scriptItem };
+      this.eventScriptService
+        .update(script.name, script)
+        .subscribe(() => this.goBack());
+    } else {
+      this.scriptDetails = script;
+      this.eventScriptService
+        .create(scriptItem, undefined, scriptItem.name)
+        .subscribe(() => this.goBack());
+    }
   }
 
   private filterGroup(value: string): Array<ScriptEvent> {
@@ -162,5 +194,23 @@ export class DfScriptDetailsComponent implements OnInit {
         .filter(group => group.endpoints.length > 0);
     }
     return this.scriptEvents;
+  }
+
+  selectedServiceItemEvent() {
+    let serviceType: string = this.selectedServiceItem;
+    if (serviceType === 'api_docs') {
+      serviceType = 'apiDocs';
+    }
+    this.ungroupedEventOptions = this.unGroupedEvents[serviceType];
+    this.ungroupedEventItems = this.ungroupedEventItems || [];
+    Object.keys(this.ungroupedEventOptions).forEach(key => {
+      this.ungroupedEventItems.push(key);
+    });
+  }
+
+  selectedEventItemEvent() {
+    this.ungroupedRouteOptions = [
+      ...this.ungroupedEventOptions[this.selectedEventItem].endpoints,
+    ];
   }
 }
