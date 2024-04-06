@@ -92,8 +92,8 @@ export class DfAceEditorComponent
 
   // setDisabledState(isDisabled: boolean): void {
   //   this.editor.setReadOnly(false);
-    // if (!this.editor) return;
-    // isDisabled ? this.editor.setReadOnly(true) : this.editor.setReadOnly(false);
+  // if (!this.editor) return;
+  // isDisabled ? this.editor.setReadOnly(true) : this.editor.setReadOnly(false);
   // }
 
   ngOnChanges(changes: SimpleChanges): void {
