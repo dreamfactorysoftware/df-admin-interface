@@ -113,7 +113,6 @@ export class DfScriptDetailsComponent implements OnInit {
       this.type = type;
       if (type === 'edit') {
         this.scriptDetails = data;
-        console.log(data);
         this.scriptForm.patchValue(data);
         this.scriptForm.controls['name'].disable();
       } else {
