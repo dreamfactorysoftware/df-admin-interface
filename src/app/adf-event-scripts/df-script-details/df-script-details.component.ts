@@ -77,9 +77,7 @@ export class DfScriptDetailsComponent implements OnInit {
     private router: Router,
     @Inject(EVENT_SCRIPT_SERVICE_TOKEN)
     private eventScriptService: DfBaseCrudService,
-    @Inject(EVENTS_SERVICE_TOKEN)
-    @Inject(BASE_SERVICE_TOKEN)
-    private baseService: DfBaseCrudService
+
   ) {
     this.storeServiceArray = [];
     this.ungroupedEventItems = [];
@@ -91,20 +89,20 @@ export class DfScriptDetailsComponent implements OnInit {
       storagePath: [''],
       isActive: [false],
     });
-    this.baseService
-      .getAll<{
-        serviceTypes: Array<ServiceType>;
-        services: Array<Service>;
-      }>({
-        additionalParams: [
-          {
-            key: 'group',
-            value:
-              'Database, Big Data, Script, Remote Service, File, Excel, Cache, Email, Notification, Log, Source Control, IoT, LDAP, SSO, OAuth, user, system',
-          },
-        ],
-      })
-      .subscribe();
+    // this.baseService
+    //   .getAll<{
+    //     serviceTypes: Array<ServiceType>;
+    //     services: Array<Service>;
+    //   }>({
+    //     additionalParams: [
+    //       {
+    //         key: 'group',
+    //         value:
+    //           'Database, Big Data, Script, Remote Service, File, Excel, Cache, Email, Notification, Log, Source Control, IoT, LDAP, SSO, OAuth, user, system',
+    //       },
+    //     ],
+    //   })
+    //   .subscribe();
   }
 
   storageServices: Service;
