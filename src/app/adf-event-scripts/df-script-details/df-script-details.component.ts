@@ -76,8 +76,7 @@ export class DfScriptDetailsComponent implements OnInit {
     private fb: FormBuilder,
     private router: Router,
     @Inject(EVENT_SCRIPT_SERVICE_TOKEN)
-    private eventScriptService: DfBaseCrudService,
-
+    private eventScriptService: DfBaseCrudService
   ) {
     this.storeServiceArray = [];
     this.ungroupedEventItems = [];
