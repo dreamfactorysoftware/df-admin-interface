@@ -229,7 +229,9 @@ export const routes: Routes = [
               import(
                 './adf-event-scripts/df-manage-scripts/df-manage-scripts.component'
               ).then(m => m.DfManageScriptsComponent),
-            resolve: { data: eventScriptsResolver },
+            resolve: {
+              data: eventScriptsResolver,
+            },
           },
           {
             path: ROUTES.CREATE,

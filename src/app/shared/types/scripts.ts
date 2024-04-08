@@ -45,6 +45,7 @@ export enum AceEditorMode {
 export interface ScriptEvent {
   name: string;
   endpoints: Array<string>;
+  [key: string]: any;
 }
 
 export interface ScriptEventResponse {

@@ -23,8 +23,14 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
 import { Observable, map, startWith } from 'rxjs';
 import { groupEvents } from 'src/app/shared/utilities/eventScripts';
-import { EVENT_SCRIPT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import {
+  BASE_SERVICE_TOKEN,
+  EVENTS_SERVICE_TOKEN,
+  EVENT_SCRIPT_SERVICE_TOKEN,
+} from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { Service, ServiceType } from 'src/app/shared/types/service';
+import { CommonModule } from '@angular/common';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -45,6 +51,7 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
     MatAutocompleteModule,
     MatInputModule,
     AsyncPipe,
+    CommonModule,
   ],
 })
 export class DfScriptDetailsComponent implements OnInit {
@@ -54,6 +61,15 @@ export class DfScriptDetailsComponent implements OnInit {
   type: 'create' | 'edit' = 'create';
   scriptEvents: Array<ScriptEvent>;
   scriptEventsOptions: Observable<Array<ScriptEvent>>;
+  unGroupedEvents: ScriptEvent;
+  ungroupedEventItems: string[];
+  ungroupedEventOptions: ScriptEvent;
+  ungroupedRouteOptions: string[];
+  storeServiceArray: string[];
+  selectedStorageItem: string;
+  selectedServiceItem: string;
+  selectedEventItem: string;
+  selectedRouteItem: string;
   loaded = false;
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -62,6 +78,8 @@ export class DfScriptDetailsComponent implements OnInit {
     @Inject(EVENT_SCRIPT_SERVICE_TOKEN)
     private eventScriptService: DfBaseCrudService
   ) {
+    this.storeServiceArray = [];
+    this.ungroupedEventItems = [];
     this.scriptForm = this.fb.group({
       name: ['', [Validators.required]],
       type: ['nodejs', [Validators.required]],
@@ -70,8 +88,23 @@ export class DfScriptDetailsComponent implements OnInit {
       storagePath: [''],
       isActive: [false],
     });
+    // this.baseService
+    //   .getAll<{
+    //     serviceTypes: Array<ServiceType>;
+    //     services: Array<Service>;
+    //   }>({
+    //     additionalParams: [
+    //       {
+    //         key: 'group',
+    //         value:
+    //           'Database, Big Data, Script, Remote Service, File, Excel, Cache, Email, Notification, Log, Source Control, IoT, LDAP, SSO, OAuth, user, system',
+    //       },
+    //     ],
+    //   })
+    //   .subscribe();
   }
 
+  storageServices: Service;
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data, type }) => {
       this.type = type;
@@ -81,6 +114,9 @@ export class DfScriptDetailsComponent implements OnInit {
         this.scriptForm.controls['name'].disable();
       } else {
         this.scriptEvents = groupEvents(data);
+        this.unGroupedEvents = data;
+        this.storageServices = data;
+        this.storeServiceArray = Object.keys(this.storageServices) as string[];
       }
     });
     this.scriptEventsOptions = this.scriptForm.controls[
@@ -89,6 +125,18 @@ export class DfScriptDetailsComponent implements OnInit {
       startWith(''),
       map(value => this.filterGroup(value))
     );
+    // this.scriptForm.controls['storageServiceId'].valueChanges.subscribe(res => {
+    //   let serviceType = res.name;
+    //   if (res.name === 'api_docs') {
+    //     serviceType = 'apiDocs';
+    //     this.ungroupedEventOptions = this.unGroupedEvents[serviceType];
+    //   }
+
+    //   this.ungroupedEventOptions = this.unGroupedEvents[serviceType];
+    //   Object.keys(this.ungroupedEventOptions).forEach(key => {
+    //     this.ungroupedEventItems.push(key);
+    //   });
+    // });
     this.loaded = true;
   }
 
@@ -101,19 +149,31 @@ export class DfScriptDetailsComponent implements OnInit {
   }
 
   submit(): void {
-    if (!this.scriptForm.valid) {
-      return;
-    }
+    // if (!this.scriptForm.valid) {
+    //   return;
+    // }
     const script = this.scriptForm.getRawValue();
+    const scriptItem = {
+      ...script,
+      storageServiceId:
+        script.storageServiceId?.type === 'local_file'
+          ? script.storageServiceId?.id
+          : null,
+      storage_path:
+        script.storageServiceId?.type === 'local_file'
+          ? script.storagePath
+          : null,
+      name: this.selectedRouteItem,
+    };
     if (this.type === 'edit') {
-      this.scriptDetails = { ...this.scriptDetails, ...script };
+      this.scriptDetails = { ...this.scriptDetails, ...scriptItem };
       this.eventScriptService
         .update(script.name, script)
         .subscribe(() => this.goBack());
     } else {
       this.scriptDetails = script;
       this.eventScriptService
-        .create(script, undefined, script.name)
+        .create(scriptItem, undefined, scriptItem.name)
         .subscribe(() => this.goBack());
     }
   }
@@ -130,5 +190,23 @@ export class DfScriptDetailsComponent implements OnInit {
         .filter(group => group.endpoints.length > 0);
     }
     return this.scriptEvents;
+  }
+
+  selectedServiceItemEvent() {
+    let serviceType: string = this.selectedServiceItem;
+    if (serviceType === 'api_docs') {
+      serviceType = 'apiDocs';
+    }
+    this.ungroupedEventOptions = this.unGroupedEvents[serviceType];
+    this.ungroupedEventItems = this.ungroupedEventItems || [];
+    Object.keys(this.ungroupedEventOptions).forEach(key => {
+      this.ungroupedEventItems.push(key);
+    });
+  }
+
+  selectedEventItemEvent() {
+    this.ungroupedRouteOptions = [
+      ...this.ungroupedEventOptions[this.selectedEventItem].endpoints,
+    ];
   }
 }
