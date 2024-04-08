@@ -1,0 +1,27 @@
+{
+  "details": "Details",
+  "definition": "Service Definition",
+  "config": "Configuration",
+  "options": "Advanced Options",
+  "controls": {
+    "serviceType": {
+      "label": "Service Type",
+      "tooltip": "Select the type of service you're adding."
+    },
+    "namespace": {
+      "label": "Namespace",
+      "tooltip": "Select a namespace used for the API’s URI structure, such as /api/v2/{type}/{namespace}. It should be lowercase and alphanumeric."
+    },
+    "label": {
+      "label": "Label",
+      "tooltip": "The display name or label for the service."
+    },
+    "description": {
+      "label": "Description",
+      "tooltip": "Write a brief description of the API (optional)."
+    }
+  },
+  "deleteSuccessMsg": "Service successfully deleted",
+  "createSuccessMsg": "Service successfully created",
+  "updateSuccessMsg": "Service successfully updated"
+}

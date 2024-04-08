@@ -1,0 +1,38 @@
+{
+  "name": "Limit Name",
+  "description": "Description",
+  "limitType": "Limit Type",
+  "limitRate": "Limit Rate",
+  "limitPeriod": "Limit Period",
+  "role": "Role",
+  "service": "Service",
+  "endpoint": "Endpoint",
+  "user": "User",
+  "verb": "Verb",
+  "active": "Active",
+  "refresh": "Refresh",
+  "invalidForm": "Invalid Form Input",
+  "createSuccessMessage": "Limit successfully created",
+  "updateSuccessMessage": "Limit successfully updated",
+  "deleteSuccessMessage": "Limit successfully deleted",
+  "verbTooltip": "By default, all verbs will be limited unless a specific verb is selected for the limit type.",
+  "limitTypes": {
+    "instance": "Instance",
+    "user": "User",
+    "eachUser": "Each User",
+    "service": "Service",
+    "role": "Role",
+    "serviceByUser": "Service by User",
+    "serviceByEachUser": "Service by Each User",
+    "endpoint": "Endpoint",
+    "endpointByUser": "Endpoint by User",
+    "endpointByEachUser": "Endpoint by Each User"
+  },
+  "limitPeriods": {
+    "minute": "Minute",
+    "hour": "Hour",
+    "day": "Day",
+    "week": "Week",
+    "30Days": "30 Days"
+  }
+}

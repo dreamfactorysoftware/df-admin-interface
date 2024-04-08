@@ -1,0 +1,10 @@
+{
+  "alerts": {
+    "new": "For new Users you can send an email invite so they can set their own password, or set a password for them now.",
+    "createdSuccess": "User created successfully",
+    "updateSuccess": "User updated successfully",
+    "deleteSuccess": "User deleted successfully",
+    "importSuccess": "User imported successfully",
+    "exportSuccess": "User exported successfully"
+  }
+}

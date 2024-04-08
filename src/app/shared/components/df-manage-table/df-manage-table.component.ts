@@ -211,9 +211,10 @@ export abstract class DfManageTableComponent<T>
   }
 
   viewRow(row: T): void {
-    this.router.navigate([`${(row as any).id}-${(row as any).name}`], {
+    this.router.navigate([(row as any).id], {
       relativeTo: this._activatedRoute,
     });
+
   }
 
   announceSortChange(sortState: any) {
