@@ -1,5 +1,9 @@
 {
   "scriptName": "Script Name",
+  "scriptMethod": "Script Method",
+  "scriptType": "Script Type",
+  "scriptLocation": "Script Location",
+  "tableName": "Table Name",
   "active": "Active",
   "importScriptFile": "Import a script file",
   "fromDesktop": "From Desktop",
