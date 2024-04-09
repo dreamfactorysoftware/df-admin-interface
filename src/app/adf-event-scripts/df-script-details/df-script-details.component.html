@@ -68,7 +68,7 @@
   <ng-template #editing>
     <mat-form-field class="full-width">
       <mat-label>{{ 'scripts.tableName' | transloco }}</mat-label>
-      <input matInput disabled [value]="selectedServiceItem" />
+      <input matInput disabled [value]="this.completeScriptName" />
     </mat-form-field>
   </ng-template>
   <mat-form-field class="full-width" subscriptSizing="dynamic">

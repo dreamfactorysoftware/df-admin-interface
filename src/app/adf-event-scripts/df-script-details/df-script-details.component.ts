@@ -101,7 +101,7 @@ export class DfScriptDetailsComponent implements OnInit {
         this.scriptDetails = data;
         this.scriptForm.patchValue(data);
         this.scriptForm.controls['name'].disable();
-        this.selectedServiceItem = data.name;
+        this.completeScriptName = data.name;
       } else {
         this.scriptEvents = groupEvents(data);
         this.unGroupedEvents = data;
