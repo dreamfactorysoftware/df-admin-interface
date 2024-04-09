@@ -65,11 +65,14 @@ export class DfScriptDetailsComponent implements OnInit {
   ungroupedEventItems: string[];
   ungroupedEventOptions: ScriptEvent;
   ungroupedRouteOptions: string[];
+  tableOptions: string[];
   storeServiceArray: string[];
   selectedStorageItem: string;
   selectedServiceItem: string;
   selectedEventItem: string;
   selectedRouteItem: string;
+  selectTable: string;
+  completeScriptName: string;
   loaded = false;
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -88,20 +91,6 @@ export class DfScriptDetailsComponent implements OnInit {
       storagePath: [''],
       isActive: [false],
     });
-    // this.baseService
-    //   .getAll<{
-    //     serviceTypes: Array<ServiceType>;
-    //     services: Array<Service>;
-    //   }>({
-    //     additionalParams: [
-    //       {
-    //         key: 'group',
-    //         value:
-    //           'Database, Big Data, Script, Remote Service, File, Excel, Cache, Email, Notification, Log, Source Control, IoT, LDAP, SSO, OAuth, user, system',
-    //       },
-    //     ],
-    //   })
-    //   .subscribe();
   }
 
   storageServices: Service;
@@ -112,6 +101,7 @@ export class DfScriptDetailsComponent implements OnInit {
         this.scriptDetails = data;
         this.scriptForm.patchValue(data);
         this.scriptForm.controls['name'].disable();
+        this.selectedServiceItem = data.name;
       } else {
         this.scriptEvents = groupEvents(data);
         this.unGroupedEvents = data;
@@ -125,18 +115,6 @@ export class DfScriptDetailsComponent implements OnInit {
       startWith(''),
       map(value => this.filterGroup(value))
     );
-    // this.scriptForm.controls['storageServiceId'].valueChanges.subscribe(res => {
-    //   let serviceType = res.name;
-    //   if (res.name === 'api_docs') {
-    //     serviceType = 'apiDocs';
-    //     this.ungroupedEventOptions = this.unGroupedEvents[serviceType];
-    //   }
-
-    //   this.ungroupedEventOptions = this.unGroupedEvents[serviceType];
-    //   Object.keys(this.ungroupedEventOptions).forEach(key => {
-    //     this.ungroupedEventItems.push(key);
-    //   });
-    // });
     this.loaded = true;
   }
 
@@ -163,7 +141,7 @@ export class DfScriptDetailsComponent implements OnInit {
         script.storageServiceId?.type === 'local_file'
           ? script.storagePath
           : null,
-      name: this.selectedRouteItem,
+      name: this.completeScriptName,
     };
     if (this.type === 'edit') {
       this.scriptDetails = { ...this.scriptDetails, ...scriptItem };
@@ -193,6 +171,9 @@ export class DfScriptDetailsComponent implements OnInit {
   }
 
   selectedServiceItemEvent() {
+    this.ungroupedEventItems = [];
+    this.ungroupedRouteOptions = [];
+    this.selectedRouteItem = '';
     let serviceType: string = this.selectedServiceItem;
     if (serviceType === 'api_docs') {
       serviceType = 'apiDocs';
@@ -205,8 +186,23 @@ export class DfScriptDetailsComponent implements OnInit {
   }
 
   selectedEventItemEvent() {
+    this.tableOptions = [];
     this.ungroupedRouteOptions = [
       ...this.ungroupedEventOptions[this.selectedEventItem].endpoints,
     ];
+
+    if (this.ungroupedEventOptions[this.selectedEventItem].parameter) {
+      this.tableOptions = [
+        ...this.ungroupedEventOptions[this.selectedEventItem].parameter
+          .tableName,
+      ];
+    }
+  }
+
+  selectedTable() {
+    this.completeScriptName = this.selectedRouteItem.replace(
+      '{table_name}',
+      this.selectTable
+    );
   }
 }
