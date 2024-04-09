@@ -23,8 +23,14 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
 import { Observable, map, startWith } from 'rxjs';
 import { groupEvents } from 'src/app/shared/utilities/eventScripts';
-import { EVENT_SCRIPT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import {
+  BASE_SERVICE_TOKEN,
+  EVENTS_SERVICE_TOKEN,
+  EVENT_SCRIPT_SERVICE_TOKEN,
+} from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { Service, ServiceType } from 'src/app/shared/types/service';
+import { CommonModule } from '@angular/common';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -45,6 +51,7 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
     MatAutocompleteModule,
     MatInputModule,
     AsyncPipe,
+    CommonModule,
   ],
 })
 export class DfScriptDetailsComponent implements OnInit {
@@ -54,6 +61,18 @@ export class DfScriptDetailsComponent implements OnInit {
   type: 'create' | 'edit' = 'create';
   scriptEvents: Array<ScriptEvent>;
   scriptEventsOptions: Observable<Array<ScriptEvent>>;
+  unGroupedEvents: ScriptEvent;
+  ungroupedEventItems: string[];
+  ungroupedEventOptions: ScriptEvent;
+  ungroupedRouteOptions: string[];
+  tableOptions: string[];
+  storeServiceArray: string[];
+  selectedStorageItem: string;
+  selectedServiceItem: string;
+  selectedEventItem: string;
+  selectedRouteItem: string;
+  selectTable: string;
+  completeScriptName: string;
   loaded = false;
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -62,6 +81,8 @@ export class DfScriptDetailsComponent implements OnInit {
     @Inject(EVENT_SCRIPT_SERVICE_TOKEN)
     private eventScriptService: DfBaseCrudService
   ) {
+    this.storeServiceArray = [];
+    this.ungroupedEventItems = [];
     this.scriptForm = this.fb.group({
       name: ['', [Validators.required]],
       type: ['nodejs', [Validators.required]],
@@ -69,9 +90,11 @@ export class DfScriptDetailsComponent implements OnInit {
       storageServiceId: [],
       storagePath: [''],
       isActive: [false],
+      allow_event_modification: [false],
     });
   }
 
+  storageServices: Service;
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data, type }) => {
       this.type = type;
@@ -79,8 +102,12 @@ export class DfScriptDetailsComponent implements OnInit {
         this.scriptDetails = data;
         this.scriptForm.patchValue(data);
         this.scriptForm.controls['name'].disable();
+        this.completeScriptName = data.name;
       } else {
         this.scriptEvents = groupEvents(data);
+        this.unGroupedEvents = data;
+        this.storageServices = data;
+        this.storeServiceArray = Object.keys(this.storageServices) as string[];
       }
     });
     this.scriptEventsOptions = this.scriptForm.controls[
@@ -101,19 +128,31 @@ export class DfScriptDetailsComponent implements OnInit {
   }
 
   submit(): void {
-    if (!this.scriptForm.valid) {
-      return;
-    }
+    // if (!this.scriptForm.valid) {
+    //   return;
+    // }
     const script = this.scriptForm.getRawValue();
+    const scriptItem = {
+      ...script,
+      storageServiceId:
+        script.storageServiceId?.type === 'local_file'
+          ? script.storageServiceId?.id
+          : null,
+      storage_path:
+        script.storageServiceId?.type === 'local_file'
+          ? script.storagePath
+          : null,
+      name: this.completeScriptName,
+    };
     if (this.type === 'edit') {
-      this.scriptDetails = { ...this.scriptDetails, ...script };
+      this.scriptDetails = { ...this.scriptDetails, ...scriptItem };
       this.eventScriptService
         .update(script.name, script)
         .subscribe(() => this.goBack());
     } else {
       this.scriptDetails = script;
       this.eventScriptService
-        .create(script, undefined, script.name)
+        .create(scriptItem, undefined, scriptItem.name)
         .subscribe(() => this.goBack());
     }
   }
@@ -130,5 +169,41 @@ export class DfScriptDetailsComponent implements OnInit {
         .filter(group => group.endpoints.length > 0);
     }
     return this.scriptEvents;
+  }
+
+  selectedServiceItemEvent() {
+    this.ungroupedEventItems = [];
+    this.ungroupedRouteOptions = [];
+    this.selectedRouteItem = '';
+    let serviceType: string = this.selectedServiceItem;
+    if (serviceType === 'api_docs') {
+      serviceType = 'apiDocs';
+    }
+    this.ungroupedEventOptions = this.unGroupedEvents[serviceType];
+    this.ungroupedEventItems = this.ungroupedEventItems || [];
+    Object.keys(this.ungroupedEventOptions).forEach(key => {
+      this.ungroupedEventItems.push(key);
+    });
+  }
+
+  selectedEventItemEvent() {
+    this.tableOptions = [];
+    this.ungroupedRouteOptions = [
+      ...this.ungroupedEventOptions[this.selectedEventItem].endpoints,
+    ];
+
+    if (this.ungroupedEventOptions[this.selectedEventItem].parameter) {
+      this.tableOptions = [
+        ...this.ungroupedEventOptions[this.selectedEventItem].parameter
+          .tableName,
+      ];
+    }
+  }
+
+  selectedTable() {
+    this.completeScriptName = this.selectedRouteItem.replace(
+      '{table_name}',
+      this.selectTable
+    );
   }
 }

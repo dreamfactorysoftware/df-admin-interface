@@ -52,25 +52,29 @@ $red-palette: mat.define-palette(mat.$red-palette);
 
     .login-side-container {
       display: flex;
+      flex-direction: column;
       justify-content: center;
-      align-items: center; // Vertically centers the content
-      flex-wrap: wrap;
-      text-align: center;
-      height: 40%;
-      gap: 8px;
-      width: 100%;
-      margin-top: 15%;
-      .image-wrapper {
-        width: calc(45% - 8px); // 2 columns, so each takes up 50% of the width
-        padding: 10px; // Optional, for spacing
+      height: 100%;
+      .image-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+        text-align: center;
+        gap: 8px;
+        width: 100%;
+        .image-wrapper {
+          width: calc(40% - 8px);
+          padding: 10px;
 
-        img {
-          width: 80%; // Makes the image responsive within its wrapper
-          height: auto;
-        }
+          img {
+            width: 60%;
+            height: auto;
+          }
 
-        h3 {
-          color: #fff;
+          h3 {
+            color: #fff;
+          }
         }
       }
     }

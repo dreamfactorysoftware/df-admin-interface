@@ -67,7 +67,7 @@ export class DfAceEditorComponent
       showGutter: true,
       highlightActiveLine: true,
       tabSize: 2,
-      readOnly: this.readonly,
+      readOnly: false,
       maxLines: 50,
     });
     this.editor.renderer.attachToShadowRoot();
@@ -90,10 +90,11 @@ export class DfAceEditorComponent
     this.onTouched = fn;
   }
 
-  setDisabledState(isDisabled: boolean): void {
-    if (!this.editor) return;
-    isDisabled ? this.editor.setReadOnly(true) : this.editor.setReadOnly(false);
-  }
+  // setDisabledState(isDisabled: boolean): void {
+  //   this.editor.setReadOnly(false);
+  // if (!this.editor) return;
+  // isDisabled ? this.editor.setReadOnly(true) : this.editor.setReadOnly(false);
+  // }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!this.editor) return;
@@ -105,9 +106,9 @@ export class DfAceEditorComponent
     if (changes['value']) {
       this.setValue(changes['value'].currentValue);
     }
-    if (changes['readonly']) {
-      this.setDisabledState(changes['readonly'].currentValue);
-    }
+    // if (changes['readonly']) {
+    //   this.setDisabledState(changes['readonly'].currentValue);
+    // }
   }
 
   setValue(value: string): void {

@@ -144,7 +144,10 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
       this.adminService
         .update<GenericUpdateResponse, AdminProfile>(
           this.currentProfile.id,
-          data,
+          {
+            ...data,
+            password: this.userForm.value.password,
+          },
           {
             snackbarSuccess: 'admins.alerts.updateSuccess',
           }

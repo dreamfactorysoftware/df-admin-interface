@@ -3,6 +3,7 @@ export interface ServiceType {
   label: string;
   description: string;
   group: string;
+  class?: string;
   configSchema: Array<ConfigSchema>;
 }
 
