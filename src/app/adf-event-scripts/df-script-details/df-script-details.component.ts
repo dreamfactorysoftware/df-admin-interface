@@ -74,7 +74,6 @@ export class DfScriptDetailsComponent implements OnInit {
   selectTable: string;
   completeScriptName: string;
   loaded = false;
-  // allowEventModification = true;
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
