@@ -82,6 +82,11 @@
   <mat-slide-toggle formControlName="isActive" class="dynamic-width">{{
     'active' | transloco
   }}</mat-slide-toggle>
+  <mat-slide-toggle
+    [(ngModel)]="allowEventModification"
+    class="dynamic-width"
+    >{{ 'Allow Event Modification' | transloco }}</mat-slide-toggle
+  >
   <df-script-editor
     class="full-width"
     [cache]="scriptForm.getRawValue().name"
