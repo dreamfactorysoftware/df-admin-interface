@@ -90,6 +90,7 @@ export class DfScriptDetailsComponent implements OnInit {
       storageServiceId: [],
       storagePath: [''],
       isActive: [false],
+      allow_event_modification: [false],
     });
   }
 
