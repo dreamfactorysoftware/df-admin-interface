@@ -74,7 +74,7 @@ export class DfScriptDetailsComponent implements OnInit {
   selectTable: string;
   completeScriptName: string;
   loaded = false;
-  allowEventModification = false;
+  // allowEventModification = true;
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
@@ -91,6 +91,7 @@ export class DfScriptDetailsComponent implements OnInit {
       storageServiceId: [],
       storagePath: [''],
       isActive: [false],
+      allow_event_modification: [false],
     });
   }
 
@@ -143,7 +144,6 @@ export class DfScriptDetailsComponent implements OnInit {
           ? script.storagePath
           : null,
       name: this.completeScriptName,
-      allow_event_modification: this.allowEventModification,
     };
     if (this.type === 'edit') {
       this.scriptDetails = { ...this.scriptDetails, ...scriptItem };
