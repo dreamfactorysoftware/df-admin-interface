@@ -109,11 +109,9 @@ export class DfScriptEditorComponent implements OnInit {
   }
 
   viewLatest() {
-    const filePath = `${
-      this.storageServices.find(
-        service => service.id === this.storageServiceId.getRawValue()
-      )?.name
-    }/${this.storagePath.getRawValue()}`;
+    const filePath = `${this.storageServices.find(
+      service => service.id === this.storageServiceId.getRawValue()
+    )?.name}/${this.storagePath.getRawValue()}`;
     if (filePath.endsWith('.json')) {
       this.fileService
         .downloadJson(filePath)
