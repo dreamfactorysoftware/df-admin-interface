@@ -11,7 +11,7 @@
         <fa-icon [icon]="faBars"></fa-icon>
       </button>
       <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
-      <div mat-dialog-title class="search-bar" style="">
+      <div mat-dialog-title class="search-bar">
         <mat-form-field
           class="search-input"
           subscriptSizing="dynamic"
@@ -157,7 +157,9 @@
         [class.active]="isActive(item)"
         (click)="handleNavClick(item)">
         <span class="nav-item">
-          <img [src]="item.icon" alt="item.path" />
+          <ng-container *ngIf="item?.icon">
+            <img [src]="item.icon" [alt]="item.path" />
+          </ng-container>
           {{ navLabel(item.path) | transloco }}
         </span>
       </button>
@@ -168,9 +170,9 @@
         [expanded]="isActive(item)">
         <mat-expansion-panel-header class="parent-route">
           <span class="nav-item">
-            <img [src]="item.icon" [alt]="item.path" />{{
-              navLabel(item.path) | transloco
-            }}
+            <ng-container *ngIf="item?.icon">
+              <img [src]="item.icon" [alt]="item.path" /> </ng-container
+            >{{ navLabel(item.path) | transloco }}
           </span>
         </mat-expansion-panel-header>
         <mat-nav-list>
