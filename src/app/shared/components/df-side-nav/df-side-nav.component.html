@@ -11,6 +11,20 @@
         <fa-icon [icon]="faBars"></fa-icon>
       </button>
       <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
+      <div mat-dialog-title class="search-bar" style="">
+        <mat-form-field
+          class="search-input"
+          subscriptSizing="dynamic"
+          appearance="outline">
+          <mat-label
+            ><fa-icon
+              [icon]="faMagnifyingGlass"
+              style="margin-right: 6px"></fa-icon
+            >{{ 'search' | transloco }}</mat-label
+          >
+          <input matInput [formControl]="search" />
+        </mat-form-field>
+      </div>
       <span class="spacer"></span>
       <ng-container *ngIf="availableLanguages.length > 1">
         <button
@@ -85,12 +99,12 @@
         </div>
       </ng-container>
       <mat-nav-list *ngIf="isLoggedIn$ | async">
-        <button class="search-btn" mat-button (click)="handleSearchClick()">
+        <!-- <button class="search-btn" mat-button (click)="handleSearchClick()">
           {{ 'searchFeatures' | transloco }}
           <span>
             <fa-icon [icon]="faMagnifyingGlass"></fa-icon>
           </span>
-        </button>
+        </button> -->
         <ng-container
           *ngTemplateOutlet="
             navList;
@@ -142,7 +156,11 @@
         class="nav-item"
         [class.active]="isActive(item)"
         (click)="handleNavClick(item)">
-        {{ navLabel(item.path) | transloco }}
+        <span class="nav-item">
+          <img [src]="item.icon" alt="item.path" />
+          {{ navLabel(item.path) | transloco }}
+        </span>
+      
       </button>
     </div>
     <ng-template #subRoutes>
@@ -150,7 +168,11 @@
         [class.mat-elevation-z0]="true"
         [expanded]="isActive(item)">
         <mat-expansion-panel-header class="parent-route">
-          {{ navLabel(item.path) | transloco }}
+          <span class="nav-item">
+            <img [src]="item.icon" [alt]="item.path" />{{
+              navLabel(item.path) | transloco
+            }}
+          </span>
         </mat-expansion-panel-header>
         <mat-nav-list>
           <ng-container

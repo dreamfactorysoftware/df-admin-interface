@@ -4,7 +4,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 $red-palette: mat.define-palette(mat.$red-palette);
 
 .logo {
-  height: 30px;
+  height: 40px;
   cursor: pointer;
 }
 
@@ -16,7 +16,24 @@ $red-palette: mat.define-palette(mat.$red-palette);
 }
 
 .mat-toolbar {
-  min-height: 64px;
+  padding: 16px;
+  min-height: 72px;
+
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1 1 auto;
+    margin-left: 24px;
+    .search-input {
+      max-width: 300px !important;
+      border-radius: 50px;
+    }
+  }
+}
+
+::ng-deep .mdc-text-field--outlined {
+  --mdc-outlined-text-field-container-shape: 50px !important;
 }
 
 .search-btn {
@@ -94,6 +111,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
       font-weight: 400;
       height: 48px;
       padding: 0 16px;
+      gap: 4px;
     }
     ::ng-deep {
       .mat-expansion-panel-body {
@@ -107,8 +125,15 @@ $red-palette: mat.define-palette(mat.$red-palette);
       font-weight: 400;
       border-radius: 0;
       justify-content: left;
+      display: flex;
+      align-items: center;
+      gap: 6px;
       &.active {
         background-color: mat.get-color-from-palette($df-purple-palette, 200);
+        border-top-right-radius: 50px;
+        border-bottom-right-radius: 50px;
+        border-top-left-radius: 0;
+        width: 95%;
       }
     }
   }
