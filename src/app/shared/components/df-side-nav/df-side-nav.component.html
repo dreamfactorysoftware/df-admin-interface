@@ -5,14 +5,14 @@
   <ng-container *ngIf="isLoggedIn$ | async">
     <mat-toolbar>
       <div class="button-wrapper">
-      <button
-        mat-icon-button
-        (click)="sideNav.toggle()"
-        [attr.aria-label]="'toggleNav' | transloco">
-        <fa-icon [icon]="faBars"></fa-icon>
-      </button>
-      <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
-    </div>
+        <button
+          mat-icon-button
+          (click)="sideNav.toggle()"
+          [attr.aria-label]="'toggleNav' | transloco">
+          <fa-icon [icon]="faBars"></fa-icon>
+        </button>
+        <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
+      </div>
       <div mat-dialog-title class="search-bar">
         <mat-form-field
           class="search-input"

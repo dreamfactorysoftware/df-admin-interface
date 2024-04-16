@@ -42,7 +42,8 @@ $red-palette: mat.define-palette(mat.$red-palette);
   }
 }
 
-::ng-deep .mdc-text-field--outlined, .mat-mdc-text-field-wrapper {
+::ng-deep .mdc-text-field--outlined,
+.mat-mdc-text-field-wrapper {
   --mdc-outlined-text-field-container-shape: 50px !important;
   --mdc-outlined-text-field-outline-width: 0 !important;
 }
@@ -161,7 +162,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
     flex-direction: column;
     height: 100%;
     padding: 16px;
-    background: var(--mat-toolbar-container-background-color);;
+    background: var(--mat-toolbar-container-background-color);
     div {
       border: 1px solid #fff;
       background: #fff;
