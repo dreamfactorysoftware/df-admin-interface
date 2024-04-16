@@ -101,12 +101,6 @@
         </div>
       </ng-container>
       <mat-nav-list *ngIf="isLoggedIn$ | async">
-        <!-- <button class="search-btn" mat-button (click)="handleSearchClick()">
-          {{ 'searchFeatures' | transloco }}
-          <span>
-            <fa-icon [icon]="faMagnifyingGlass"></fa-icon>
-          </span>
-        </button> -->
         <ng-container
           *ngTemplateOutlet="
             navList;
@@ -115,7 +109,7 @@
       </mat-nav-list>
     </mat-sidenav>
     <mat-sidenav-content class="sidenav-content">
-      <div>
+      <div class="content-wrapper">
         <ng-container *ngIf="isLoggedIn$ | async">
           <div class="banner" *ngIf="(hasError$ | async) === false">
             <h1 class="page-header">

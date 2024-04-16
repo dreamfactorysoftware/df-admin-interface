@@ -35,23 +35,24 @@ $red-palette: mat.define-palette(mat.$red-palette);
     align-items: center;
     gap: 16px;
     flex: 1 1 auto;
-    margin-left: 24px;
+    margin-left: 28px;
+
     .search-input {
       max-width: 300px !important;
     }
+
+    ::ng-deep .mdc-text-field--outlined,
+    .mat-mdc-text-field-wrapper {
+      --mdc-outlined-text-field-container-shape: 50px !important;
+      --mdc-outlined-text-field-outline-width: 0 !important;
+    }
+
+    ::ng-deep .mat-mdc-text-field-wrapper {
+      background: #fff !important;
+      border-radius: 50px !important;
+      border: 0 !important;
+    }
   }
-}
-
-::ng-deep .mdc-text-field--outlined,
-.mat-mdc-text-field-wrapper {
-  --mdc-outlined-text-field-container-shape: 50px !important;
-  --mdc-outlined-text-field-outline-width: 0 !important;
-}
-
-::ng-deep .mat-mdc-text-field-wrapper {
-  background: #fff !important;
-  border-radius: 50px !important;
-  border: 0 !important;
 }
 
 .search-btn {
@@ -148,6 +149,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
       display: flex;
       align-items: center;
       gap: 6px;
+      // background: var(--mat-toolbar-container-background-color);
       &.active {
         background-color: mat.get-color-from-palette($df-purple-palette, 200);
         border-top-right-radius: 50px;
@@ -161,17 +163,19 @@ $red-palette: mat.define-palette(mat.$red-palette);
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: 16px;
+    padding: 8px 20px 24px;
+    // justify-content: center;
     background: var(--mat-toolbar-container-background-color);
-    div {
+    .content-wrapper {
       border: 1px solid #fff;
       background: #fff;
       border-radius: 16px;
+      // margin-top: 72px;
     }
     .banner {
       flex-shrink: 0;
       width: 100%;
-      padding-bottom: 60px;
+      padding-bottom: 40px;
 
       .page-header {
         padding: 32px 16px 0 16px;

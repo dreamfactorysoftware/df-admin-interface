@@ -3,11 +3,13 @@
   flex-direction: column;
   justify-content: center;
   height: 100%;
+  margin: 25% 0;
   .user-management-card {
     padding: 16px 16px;
     margin: 0 auto;
     min-width: 300px;
     max-width: 445px;
+    box-shadow: none;
     mat-card-header {
       padding-bottom: 16px;
     }
