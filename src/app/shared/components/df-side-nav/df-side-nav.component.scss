@@ -18,6 +18,17 @@ $red-palette: mat.define-palette(mat.$red-palette);
 .mat-toolbar {
   padding: 16px;
   min-height: 72px;
+  display: flex;
+  align-items: center;
+
+  .button-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    img {
+      margin-bottom: -4px;
+    }
+  }
 
   .search-bar {
     display: flex;
@@ -27,13 +38,19 @@ $red-palette: mat.define-palette(mat.$red-palette);
     margin-left: 24px;
     .search-input {
       max-width: 300px !important;
-      border-radius: 50px;
     }
   }
 }
 
-::ng-deep .mdc-text-field--outlined {
+::ng-deep .mdc-text-field--outlined, .mat-mdc-text-field-wrapper {
   --mdc-outlined-text-field-container-shape: 50px !important;
+  --mdc-outlined-text-field-outline-width: 0 !important;
+}
+
+::ng-deep .mat-mdc-text-field-wrapper {
+  background: #fff !important;
+  border-radius: 50px !important;
+  border: 0 !important;
 }
 
 .search-btn {
@@ -101,7 +118,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
     }
     .logged-in & {
       min-width: 20%;
-      background-color: white;
+      background-color: var(--mat-toolbar-container-background-color);
     }
     .logged-in.small & {
       min-width: 40%;
@@ -112,10 +129,12 @@ $red-palette: mat.define-palette(mat.$red-palette);
       height: 48px;
       padding: 0 16px;
       gap: 4px;
+      background: var(--mat-toolbar-container-background-color);
     }
     ::ng-deep {
       .mat-expansion-panel-body {
         padding: 0 0 0 16px !important;
+        background: var(--mat-toolbar-container-background-color);
       }
     }
     .nav-item {
@@ -141,13 +160,19 @@ $red-palette: mat.define-palette(mat.$red-palette);
     display: flex;
     flex-direction: column;
     height: 100%;
+    padding: 16px;
+    background: var(--mat-toolbar-container-background-color);;
+    div {
+      border: 1px solid #fff;
+      background: #fff;
+      border-radius: 16px;
+    }
     .banner {
       flex-shrink: 0;
       width: 100%;
       padding-bottom: 60px;
-      background-color: mat.get-color-from-palette($df-purple-palette, 900);
+
       .page-header {
-        color: white;
         padding: 32px 16px 0 16px;
       }
     }
@@ -184,6 +209,9 @@ $red-palette: mat.define-palette(mat.$red-palette);
 ::ng-deep {
   .mat-expansion-panel-body {
     overflow-x: auto;
+  }
+  .mat-expansion-panel {
+    background: var(--mat-toolbar-container-background-color);
   }
 }
 

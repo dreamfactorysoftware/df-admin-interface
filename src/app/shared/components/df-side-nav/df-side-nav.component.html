@@ -4,6 +4,7 @@
   [class.logged-in]="isLoggedIn$ | async">
   <ng-container *ngIf="isLoggedIn$ | async">
     <mat-toolbar>
+      <div class="button-wrapper">
       <button
         mat-icon-button
         (click)="sideNav.toggle()"
@@ -11,6 +12,7 @@
         <fa-icon [icon]="faBars"></fa-icon>
       </button>
       <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
+    </div>
       <div mat-dialog-title class="search-bar">
         <mat-form-field
           class="search-input"
@@ -113,36 +115,38 @@
       </mat-nav-list>
     </mat-sidenav>
     <mat-sidenav-content class="sidenav-content">
-      <ng-container *ngIf="isLoggedIn$ | async">
-        <div class="banner" *ngIf="(hasError$ | async) === false">
-          <h1 class="page-header">
-            <ng-container *ngFor="let breadcrumb of breadCrumbs; index as i">
-              <ng-container *ngIf="breadcrumb.path; else current">
-                <a [routerLink]="breadcrumb.path" class="breadcrumb-link"
-                  ><ng-component
-                    *ngTemplateOutlet="breadcrumbLabel"></ng-component>
-                </a>
-              </ng-container>
-
-              <ng-template #current>
-                <ng-component
-                  *ngTemplateOutlet="breadcrumbLabel"></ng-component>
-              </ng-template>
-              <ng-template #breadcrumbLabel>
-                <ng-container *ngIf="breadcrumb.translationKey; else label">
-                  <span>{{ breadcrumb.translationKey | transloco }}</span>
+      <div>
+        <ng-container *ngIf="isLoggedIn$ | async">
+          <div class="banner" *ngIf="(hasError$ | async) === false">
+            <h1 class="page-header">
+              <ng-container *ngFor="let breadcrumb of breadCrumbs; index as i">
+                <ng-container *ngIf="breadcrumb.path; else current">
+                  <a [routerLink]="breadcrumb.path" class="breadcrumb-link"
+                    ><ng-component
+                      *ngTemplateOutlet="breadcrumbLabel"></ng-component>
+                  </a>
                 </ng-container>
-                <ng-template #label>
-                  <span>{{ breadcrumb.label }}</span>
+
+                <ng-template #current>
+                  <ng-component
+                    *ngTemplateOutlet="breadcrumbLabel"></ng-component>
                 </ng-template>
-              </ng-template>
-              <span *ngIf="i !== breadCrumbs.length - 1"> / </span>
-            </ng-container>
-          </h1>
+                <ng-template #breadcrumbLabel>
+                  <ng-container *ngIf="breadcrumb.translationKey; else label">
+                    <span>{{ breadcrumb.translationKey | transloco }}</span>
+                  </ng-container>
+                  <ng-template #label>
+                    <span>{{ breadcrumb.label }}</span>
+                  </ng-template>
+                </ng-template>
+                <span *ngIf="i !== breadCrumbs.length - 1"> / </span>
+              </ng-container>
+            </h1>
+          </div>
+        </ng-container>
+        <div class="main" [class.no-error]="(hasError$ | async) === false">
+          <ng-content></ng-content>
         </div>
-      </ng-container>
-      <div class="main" [class.no-error]="(hasError$ | async) === false">
-        <ng-content></ng-content>
       </div>
     </mat-sidenav-content>
   </mat-sidenav-container>
