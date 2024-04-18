@@ -13,19 +13,9 @@
         </button>
         <img class="logo" src="assets/img/logo.png" alt="Logo" routerLink="/" />
       </div>
-      <div mat-dialog-title class="search-bar">
-        <mat-form-field
-          class="search-input"
-          subscriptSizing="dynamic"
-          appearance="outline">
-          <mat-label
-            ><fa-icon
-              [icon]="faMagnifyingGlass"
-              style="margin-right: 6px"></fa-icon
-            >{{ 'search' | transloco }}</mat-label
-          >
-          <input matInput [formControl]="search" />
-        </mat-form-field>
+      <div class="search-bar">
+        <fa-icon [icon]="faMagnifyingGlass" class="search-icon"></fa-icon>
+        <input type="text" class="search-input" placeholder="Search" />
       </div>
       <span class="spacer"></span>
       <ng-container *ngIf="availableLanguages.length > 1">
