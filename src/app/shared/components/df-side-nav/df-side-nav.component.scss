@@ -159,7 +159,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
       }
       &.active {
         ::ng-deep .mat-mdc-button-touch-target {
-          background-color: #e3dfff!important;
+          background-color: #e3dfff !important;
           border-top-right-radius: 50px;
           border-bottom-right-radius: 50px;
         }
