@@ -15,6 +15,7 @@ import {
   faBars,
   faLanguage,
   faMagnifyingGlass,
+  faPlus,
   faUser,
 } from '@fortawesome/free-solid-svg-icons';
 import { routes } from 'src/app/routes';
@@ -28,11 +29,16 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
 import { DfLicenseCheckService } from '../../services/df-license-check.service';
-import { of, switchMap } from 'rxjs';
+import { debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { CommonModule } from '@angular/common';
+import { DfSearchService } from '../../services/df-search.service';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
@@ -55,6 +61,9 @@ import { CommonModule } from '@angular/common';
     NgTemplateOutlet,
     MatDialogModule,
     CommonModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
   ],
 })
 export class DfSideNavComponent implements OnInit {
@@ -69,8 +78,14 @@ export class DfSideNavComponent implements OnInit {
   faMagnifyingGlass = faMagnifyingGlass;
   faUser = faUser;
   faLanguage = faLanguage;
+  search = new FormControl();
+  results$ = this.searchService.results$;
+  recents$ = this.searchService.recents$;
+  smallScreen$ = this.breakpointService.isSmallScreen;
+  faPlus = faPlus;
 
   constructor(
+    // public dialogRef: MatDialogRef<DfSearchDialogComponent>,
     private breakpointService: DfBreakpointService,
     private userDataService: DfUserDataService,
     private authService: DfAuthService,
@@ -78,7 +93,8 @@ export class DfSideNavComponent implements OnInit {
     private errorService: DfErrorService,
     private licenseCheckService: DfLicenseCheckService,
     private dialog: MatDialog,
-    private transloco: TranslocoService
+    private transloco: TranslocoService,
+    private searchService: DfSearchService
   ) {}
 
   ngOnInit(): void {
@@ -116,7 +132,19 @@ export class DfSideNavComponent implements OnInit {
           this.nav = accessibleRoutes(transformRoutes(routes), accessByTabs);
         } else {
           this.nav = transformRoutes(routes);
+          console.log('this.nav', this.nav);
         }
+      });
+    this.search.valueChanges
+      .pipe(
+        debounceTime(2000),
+        distinctUntilChanged(),
+        switchMap(value => this.searchService.search(value))
+      )
+      .subscribe(() => {
+        this.dialog.open(DfSearchDialogComponent, {
+          position: { top: '60px' },
+        });
       });
   }
 
@@ -142,10 +170,6 @@ export class DfSideNavComponent implements OnInit {
     this.router.navigate([nav.path]);
   }
 
-  handleSearchClick() {
-    this.dialog.open(DfSearchDialogComponent, { position: { top: '60px' } });
-  }
-
   handleLanguageChange(language: string) {
     this.transloco.setActiveLang(language);
     localStorage.setItem('language', language);
@@ -157,5 +181,9 @@ export class DfSideNavComponent implements OnInit {
 
   get availableLanguages() {
     return this.transloco.getAvailableLangs() as string[];
+  }
+
+  getTranslationKey(path: string) {
+    return `nav.${path.replaceAll('/', '.')}.nav`;
   }
 }
