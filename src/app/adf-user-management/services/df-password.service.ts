@@ -16,7 +16,6 @@ import {
   SHOW_LOADING_HEADER,
 } from '../../shared/constants/http-headers';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
-import { faL } from '@fortawesome/free-solid-svg-icons';
 
 @Injectable({
   providedIn: 'root',
