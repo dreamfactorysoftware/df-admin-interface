@@ -16,6 +16,12 @@
         ">
         {{ 'userManagement.controls.username.errors.required' | transloco }}
       </mat-error>
+      <mat-error
+        *ngIf="
+          rootForm.get('profileDetailsGroup.username')?.errors?.['minlength']
+        ">
+        {{ 'userManagement.controls.username.errors.minLength' | transloco }}
+      </mat-error>
     </mat-form-field>
     <mat-form-field appearance="fill">
       <mat-label>
