@@ -78,11 +78,11 @@ export class DfScriptEditorComponent implements OnInit {
       this.storagePath.reset();
       if (value) {
         this.storagePath.addValidators([Validators.required]);
-        this.content.reset();
-        this.content.disable();
+        // this.content.reset();
+        // this.content.disable();
       } else {
         if (this.storagePath.hasValidator(Validators.required)) {
-          this.content.enable();
+          // this.content.enable();
           this.storagePath.removeValidators([Validators.required]);
         }
       }

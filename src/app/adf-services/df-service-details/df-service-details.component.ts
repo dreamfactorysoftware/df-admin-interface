@@ -132,7 +132,7 @@ export class DfServiceDetailsComponent implements OnInit {
         )
       )
       .subscribe(({ env, route }) => {
-        if (route['groups'][0] === 'Database') {
+        if (route['groups'] && route['groups'][0] === 'Database') {
           this.isDatabase = true;
         }
         const { data, serviceTypes, groups } = route;
@@ -292,8 +292,8 @@ export class DfServiceDetailsComponent implements OnInit {
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 
-  getBackgroundImage(typeLable: string) {
-    const image = this.images?.find(img => img.label == typeLable);
+  getBackgroundImage(typeLabel: string) {
+    const image = this.images?.find(img => img.label == typeLabel);
     if (!image) {
       return '';
     }
@@ -315,8 +315,7 @@ export class DfServiceDetailsComponent implements OnInit {
 
   openDialog() {
     const dialogRef = this.dialog.open(DfPaywallModal);
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    dialogRef.afterClosed().subscribe(result => {});
+    dialogRef.afterClosed().subscribe();
   }
 }
 interface ImageObject {

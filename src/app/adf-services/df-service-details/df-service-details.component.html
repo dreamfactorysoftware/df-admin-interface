@@ -20,7 +20,13 @@
                 " />
             </h3>
             <div>
-              <button mat-button matStepperNext type="button">Next</button>
+              <button
+                mat-button
+                matStepperNext
+                type="button"
+                [disabled]="serviceForm.get('type')?.value === ''">
+                Next
+              </button>
             </div>
           </div>
           <mat-form-field class="dynamic-width" appearance="outline">
@@ -90,7 +96,13 @@
             </div>
           </div>
           <div>
-            <button mat-button matStepperNext type="button">Next</button>
+            <button
+              mat-button
+              matStepperNext
+              type="button"
+              [disabled]="serviceForm.get('type')?.value === ''">
+              Next
+            </button>
           </div>
         </div>
       </mat-step>
@@ -158,7 +170,16 @@
             >
             <div>
               <button mat-button matStepperPrevious type="button">Back</button>
-              <button mat-button matStepperNext type="button">Next</button>
+              <button
+                mat-button
+                matStepperNext
+                type="button"
+                [disabled]="
+                  serviceForm.get('type')?.value === '' &&
+                  serviceForm.get('description')?.value === ''
+                ">
+                Next
+              </button>
             </div>
             <div></div>
           </div>

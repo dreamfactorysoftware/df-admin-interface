@@ -1,18 +1,77 @@
 <form [formGroup]="scriptForm" class="details-section" (ngSubmit)="submit()">
-  <mat-form-field class="dynamic-width" subscriptSizing="dynamic">
-    <mat-label>{{ 'scripts.scriptName' | transloco }}</mat-label>
-    <input matInput formControlName="name" [matAutocomplete]="autoGroup" />
-    <mat-autocomplete #autoGroup="matAutocomplete">
+  <ng-container *ngIf="type !== 'edit'; else editing">
+    <mat-form-field class="full-width" subscriptSizing="dynamic">
+      <mat-label>{{ 'service' | transloco }}</mat-label>
+      <mat-select
+        [(value)]="selectedServiceItem"
+        (selectionChange)="selectedServiceItemEvent()">
+        <mat-option *ngFor="let service of storeServiceArray" [value]="service">
+          {{ service }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field class="half-width" subscriptSizing="dynamic">
+      <mat-label>{{ 'scripts.scriptType' | transloco }}</mat-label>
+      <mat-select
+        [(value)]="selectedEventItem"
+        (selectionChange)="selectedEventItemEvent()">
+        <mat-option *ngFor="let item of ungroupedEventItems" [value]="item">
+          {{ item }}
+        </mat-option>
+      </mat-select>
+      <!-- <input matInput formControlName="name" [matAutocomplete]="autoGroup" /> -->
+      <!-- <mat-autocomplete #autoGroup="matAutocomplete">
       <mat-optgroup
-        *ngFor="let group of scriptEventsOptions | async"
+        *ngFor="let group of ungroupedEventItems"
         [label]="group.name">
         <mat-option *ngFor="let event of group.endpoints" [value]="event">
           {{ event }}
         </mat-option>
       </mat-optgroup>
-    </mat-autocomplete>
-  </mat-form-field>
-  <mat-form-field class="dynamic-width" subscriptSizing="dynamic">
+    </mat-autocomplete> -->
+    </mat-form-field>
+    <mat-form-field class="half-width" subscriptSizing="dynamic">
+      <mat-label>{{ 'scripts.scriptMethod' | transloco }}</mat-label>
+      <mat-select [(value)]="selectedRouteItem">
+        <mat-option *ngFor="let item of ungroupedRouteOptions" [value]="item">
+          {{ item }}
+        </mat-option>
+      </mat-select>
+      <!-- <mat-label>{{ 'scripts.scriptName' | transloco }}</mat-label>
+    <input matInput formControlName="name" [matAutocomplete]="autoGroup" />
+    <mat-autocomplete #autoGroup="matAutocomplete">
+      <mat-option
+        *ngFor="let event of ungroupedRouteOptions"
+        [value]="event"
+        [(value)]="selectedRouteItem">
+        {{ event }}
+      </mat-option>
+    </mat-autocomplete> -->
+    </mat-form-field>
+    <ng-container *ngIf="this.tableOptions">
+      <mat-form-field class="full-width" subscriptSizing="dynamic">
+        <mat-label>{{ 'scripts.tableName' | transloco }}</mat-label>
+        <mat-select [(value)]="selectTable" (selectionChange)="selectedTable()">
+          <mat-option *ngFor="let item of tableOptions" [value]="item">
+            {{ item }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </ng-container>
+    <ng-container *ngIf="this.completeScriptName">
+      <mat-form-field class="full-width">
+        <mat-label>{{ 'scripts.scriptName' | transloco }}</mat-label>
+        <input matInput [value]="this.completeScriptName" />
+      </mat-form-field>
+    </ng-container>
+  </ng-container>
+  <ng-template #editing>
+    <mat-form-field class="full-width">
+      <mat-label>{{ 'scripts.tableName' | transloco }}</mat-label>
+      <input matInput disabled [value]="this.completeScriptName" />
+    </mat-form-field>
+  </ng-template>
+  <mat-form-field class="full-width" subscriptSizing="dynamic">
     <mat-label>{{ 'scriptType' | transloco }}</mat-label>
     <mat-select formControlName="type">
       <mat-option *ngFor="let type of types" [value]="type.value">
@@ -23,6 +82,11 @@
   <mat-slide-toggle formControlName="isActive" class="dynamic-width">{{
     'active' | transloco
   }}</mat-slide-toggle>
+  <mat-slide-toggle
+    formControlName="allow_event_modification"
+    class="dynamic-width"
+    >{{ 'Allow Event Modification' | transloco }}</mat-slide-toggle
+  >
   <df-script-editor
     class="full-width"
     [cache]="scriptForm.getRawValue().name"
