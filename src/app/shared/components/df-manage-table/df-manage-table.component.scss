@@ -62,6 +62,9 @@ $red-palette: mat.define-palette(mat.$red-palette);
 
 .dark-theme {
   .search {
-    background-color: mat.get-color-from-palette($df-purple-palette, 1004)!important;
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1004
+    ) !important;
   }
 }

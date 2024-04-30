@@ -39,9 +39,12 @@ a {
 
 .dark-theme {
   .icon-link-card {
-    background-color: mat.get-color-from-palette($df-purple-palette, 1002)!important;
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1002
+    ) !important;
   }
   .label {
-    color: white!important;
+    color: white !important;
   }
 }

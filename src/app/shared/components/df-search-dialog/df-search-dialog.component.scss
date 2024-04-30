@@ -25,7 +25,9 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 }
 
 .dark-theme {
-  .search-bar, .search-container, .search-action {
+  .search-bar,
+  .search-container,
+  .search-action {
     // background-color: mat.get-color-from-palette($df-purple-palette, 1003)!important;
   }
 }

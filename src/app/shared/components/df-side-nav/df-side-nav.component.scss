@@ -190,26 +190,41 @@ $red-palette: mat.define-palette(mat.$red-palette);
 }
 
 ::ng-deep .parent-route > .mat-expansion-indicator::after {
-  color: unset!important;
+  color: unset !important;
 }
 
 .dark-theme {
-  .tool-bar, .sidenav-container, .sidenav, .nav-item, .expansion-panel {
-    background-color: mat.get-color-from-palette($df-purple-palette, 1003)!important;
+  .tool-bar,
+  .sidenav-container,
+  .sidenav,
+  .nav-item,
+  .expansion-panel {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1003
+    ) !important;
     color: white;
   }
   .nav-item {
     &.active {
-      background-color: mat.get-color-from-palette($df-purple-palette, 600)!important;
+      background-color: mat.get-color-from-palette(
+        $df-purple-palette,
+        600
+      ) !important;
     }
   }
-  .sidenav-content, .banner, .main {
-    background-color: mat.get-color-from-palette($df-purple-palette, 1002)!important;
+  .sidenav-content,
+  .banner,
+  .main {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1002
+    ) !important;
     .page-header {
-      color: mat.get-color-from-palette($df-purple-palette, 10)!important;
+      color: mat.get-color-from-palette($df-purple-palette, 10) !important;
     }
   }
   .search-btn {
-    color: white!important;
+    color: white !important;
   }
 }

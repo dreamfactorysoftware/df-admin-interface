@@ -5,7 +5,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 mat-card {
   word-wrap: break-word;
 }
-.api-card, .location-card{
+.api-card,
+.location-card {
   background-color: mat.get-color-from-palette($df-purple-palette, 100);
 }
 .action-bar {
@@ -21,4 +22,4 @@ mat-card {
     border: 1px solid mat.get-color-from-palette($df-purple-palette, 1001);
     border-radius: 20px;
   }
-} 
+}
