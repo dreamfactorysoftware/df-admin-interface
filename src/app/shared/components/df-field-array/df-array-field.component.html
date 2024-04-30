@@ -58,6 +58,7 @@
       <th mat-header-cell *matHeaderCellDef>
         <button
           type="button"
+          class="add-btn"
           mat-mini-fab
           color="primary"
           (click)="add()"
@@ -68,6 +69,7 @@
       <td mat-cell *matCellDef="let row; let i = index">
         <button
           type="button"
+          class="remove-btn"
           mat-mini-fab
           (click)="remove(i)"
           [attr.aria-label]="'deleteRow' | transloco: { id: i }">

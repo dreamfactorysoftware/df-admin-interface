@@ -5,7 +5,10 @@
   {{ alertMsg }}
 </df-alert>
 <form [formGroup]="appForm" (ngSubmit)="save()" class="details-section">
-  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+  <mat-form-field
+    subscriptSizing="dynamic"
+    appearance="outline"
+    class="dynamic-width">
     <mat-label>
       {{ 'apps.createApp.applicationName.label' | transloco }}
     </mat-label>
@@ -23,7 +26,10 @@
       {{ 'apps.createApp.applicationName.error' | transloco }}
     </mat-error>
   </mat-form-field>
-  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+  <mat-form-field
+    subscriptSizing="dynamic"
+    appearance="outline"
+    class="dynamic-width">
     <mat-label>{{ 'apps.createApp.defaultRole.label' | transloco }}</mat-label>
     <input
       #rolesInput
@@ -48,7 +54,10 @@
       </mat-option>
     </mat-autocomplete>
   </mat-form-field>
-  <mat-form-field subscriptSizing="dynamic" class="full-width">
+  <mat-form-field
+    subscriptSizing="dynamic"
+    appearance="outline"
+    class="full-width">
     <mat-label>{{ 'apps.createApp.description.label' | transloco }}</mat-label>
     <textarea
       rows="1"
@@ -61,13 +70,16 @@
       [icon]="faCircleInfo"
       [matTooltip]="'apps.createApp.description.tooltip' | transloco" />
   </mat-form-field>
-  <mat-slide-toggle formControlName="active" class="full-width">{{
-    'apps.createApp.active' | transloco
-  }}</mat-slide-toggle>
+  <mat-slide-toggle
+    formControlName="active"
+    color="primary"
+    class="full-width"
+    >{{ 'apps.createApp.active' | transloco }}</mat-slide-toggle
+  >
   <!-- API Card -->
   <mat-card
     *ngIf="editApp"
-    class="full-width"
+    class="full-width api-card"
     [style]="{ 'word-break': 'break-all' }">
     <mat-card-header>
       <mat-card-subtitle>{{
@@ -106,6 +118,7 @@
     </p>
     <mat-radio-group
       class="flex-col"
+      color="primary"
       aria-label="Select an option"
       formControlName="appLocation">
       <mat-radio-button value="0">{{
@@ -129,8 +142,10 @@
       appForm.controls['appLocation'].value === '2' ||
       appForm.controls['appLocation'].value === '3'
     "
-    class="half-width">
-    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
+    class="full-width">
+    <mat-form-field
+      appearance="outline"
+      *ngIf="appForm.controls['appLocation'].value === '1'">
       <mat-label>{{
         'apps.createApp.appLocation.options.fileStorage.storageService.label'
           | transloco
@@ -158,7 +173,9 @@
             | transloco
         " />
     </mat-form-field>
-    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
+    <mat-form-field
+      appearance="outline"
+      *ngIf="appForm.controls['appLocation'].value === '1'">
       <mat-label>{{
         'apps.createApp.appLocation.options.fileStorage.storageFolder.label'
           | transloco
@@ -181,6 +198,7 @@
     </mat-form-field>
     <!-- shared path input -->
     <mat-form-field
+      appearance="outline"
       *ngIf="
         appForm.controls['appLocation'].value === '1' ||
         appForm.controls['appLocation'].value === '3'
@@ -216,7 +234,9 @@
             '.tooltip' | transloco
         " />
     </mat-form-field>
-    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '2'">
+    <mat-form-field
+      appearance="outline"
+      *ngIf="appForm.controls['appLocation'].value === '2'">
       <mat-label>
         {{ 'apps.createApp.appLocation.options.remoteUrl.label' | transloco }}
       </mat-label>
@@ -237,6 +257,7 @@
     </mat-form-field>
 
     <mat-card
+      class="location-card"
       *ngIf="
         appForm.controls['appLocation'].value === '1' ||
         appForm.controls['appLocation'].value === '3'
@@ -260,10 +281,10 @@
   </div>
   <!-- submit -->
   <div class="full-width action-bar">
-    <button mat-flat-button type="button" (click)="goBack()">
+    <button mat-flat-button type="button" class="cancel-btn" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
-    <button mat-flat-button color="primary">
+    <button mat-flat-button class="save-btn" color="primary">
       <span *ngIf="editApp">{{ 'save' | transloco }}</span>
       <span *ngIf="!editApp">{{ 'create' | transloco }}</span>
     </button>

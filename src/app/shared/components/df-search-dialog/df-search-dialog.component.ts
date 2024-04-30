@@ -13,6 +13,7 @@ import { DfSearchService } from '../../services/df-search.service';
 import { DfBreakpointService } from '../../services/df-breakpoint.service';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { DfThemeService } from '../../services/df-theme.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -46,8 +47,11 @@ export class DfSearchDialogComponent implements OnInit {
     public dialogRef: MatDialogRef<DfSearchDialogComponent>,
     private searchService: DfSearchService,
     private router: Router,
-    private breakpointService: DfBreakpointService
+    private breakpointService: DfBreakpointService,
+    private themeService: DfThemeService
   ) {}
+
+  isDarkMode = this.themeService.darkMode$;
 
   getTranslationKey(path: string) {
     return `nav.${path.replaceAll('/', '.')}.nav`;

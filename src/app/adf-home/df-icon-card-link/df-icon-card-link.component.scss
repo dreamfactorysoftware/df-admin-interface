@@ -1,3 +1,6 @@
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 .icon-link-container {
   display: flex;
   flex-direction: column;
@@ -32,4 +35,13 @@ a {
 
 .label {
   margin-top: 15px;
+}
+
+.dark-theme {
+  .icon-link-card {
+    background-color: mat.get-color-from-palette($df-purple-palette, 1002)!important;
+  }
+  .label {
+    color: white!important;
+  }
 }

@@ -10,6 +10,8 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { DfAuthService } from 'src/app/adf-user-management/services/df-auth.service';
 import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
+import { DfThemeService } from '../../services/df-theme.service';
+
 import {
   faAngleDown,
   faBars,
@@ -33,6 +35,8 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { CommonModule } from '@angular/common';
+import { DfThemeToggleComponent } from '../df-theme-toggle/df-theme-toggle.component';
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
@@ -55,6 +59,7 @@ import { CommonModule } from '@angular/common';
     NgTemplateOutlet,
     MatDialogModule,
     CommonModule,
+    DfThemeToggleComponent,
   ],
 })
 export class DfSideNavComponent implements OnInit {
@@ -78,7 +83,8 @@ export class DfSideNavComponent implements OnInit {
     private errorService: DfErrorService,
     private licenseCheckService: DfLicenseCheckService,
     private dialog: MatDialog,
-    private transloco: TranslocoService
+    private transloco: TranslocoService,
+    private themeService: DfThemeService
   ) {}
 
   ngOnInit(): void {
@@ -119,7 +125,7 @@ export class DfSideNavComponent implements OnInit {
         }
       });
   }
-
+  isDarkMode = this.themeService.darkMode$;
   logout() {
     this.authService.logout();
   }

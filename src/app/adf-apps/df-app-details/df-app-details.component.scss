@@ -1,3 +1,24 @@
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
+
 mat-card {
   word-wrap: break-word;
 }
+.api-card, .location-card{
+  background-color: mat.get-color-from-palette($df-purple-palette, 100);
+}
+.action-bar {
+  display: flex;
+  justify-content: flex-end;
+  .save-btn {
+    background-color: mat.get-color-from-palette($df-purple-palette, 500);
+    color: white;
+    border-radius: 20px;
+  }
+  .cancel-btn {
+    color: mat.get-color-from-palette($df-purple-palette, 1001);
+    border: 1px solid mat.get-color-from-palette($df-purple-palette, 1001);
+    border-radius: 20px;
+  }
+} 

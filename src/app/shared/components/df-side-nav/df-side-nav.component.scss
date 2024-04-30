@@ -15,7 +15,8 @@ $red-palette: mat.define-palette(mat.$red-palette);
   flex-direction: column;
 }
 
-.mat-toolbar {
+.tool-bar {
+  background-color: mat.get-color-from-palette($df-purple-palette, 100);
   min-height: 64px;
 }
 
@@ -42,6 +43,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
 }
 
 .sidenav-container {
+  background-color: mat.get-color-from-palette($df-purple-palette, 100);
   flex: 1 1 auto;
   .sidenav {
     background-color: mat.get-color-from-palette($df-purple-palette, 900);
@@ -84,7 +86,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
     }
     .logged-in & {
       min-width: 20%;
-      background-color: white;
+      background-color: mat.get-color-from-palette($df-purple-palette, 100);
     }
     .logged-in.small & {
       min-width: 40%;
@@ -101,6 +103,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
       }
     }
     .nav-item {
+      background-color: mat.get-color-from-palette($df-purple-palette, 100);
       height: 48px;
       width: 100%;
       font-size: 1.6rem;
@@ -109,20 +112,28 @@ $red-palette: mat.define-palette(mat.$red-palette);
       justify-content: left;
       &.active {
         background-color: mat.get-color-from-palette($df-purple-palette, 200);
+        border-radius: 0px 50px 50px 0px;
+        width: 95%;
       }
+    }
+    .expansion-panel {
+      background-color: mat.get-color-from-palette($df-purple-palette, 100);
     }
   }
   .sidenav-content {
+    background-color: white;
+    margin: 10px;
     display: flex;
     flex-direction: column;
     height: 100%;
+    border-radius: 20px;
     .banner {
       flex-shrink: 0;
       width: 100%;
       padding-bottom: 60px;
-      background-color: mat.get-color-from-palette($df-purple-palette, 900);
+      background-color: white;
       .page-header {
-        color: white;
+        color: mat.get-color-from-palette($df-purple-palette, 1001);
         padding: 32px 16px 0 16px;
       }
     }
@@ -175,5 +186,30 @@ $red-palette: mat.define-palette(mat.$red-palette);
 }
 
 .breadcrumb-link {
-  color: white;
+  color: mat.get-color-from-palette($df-purple-palette, 500);
+}
+
+::ng-deep .parent-route > .mat-expansion-indicator::after {
+  color: unset!important;
+}
+
+.dark-theme {
+  .tool-bar, .sidenav-container, .sidenav, .nav-item, .expansion-panel {
+    background-color: mat.get-color-from-palette($df-purple-palette, 1003)!important;
+    color: white;
+  }
+  .nav-item {
+    &.active {
+      background-color: mat.get-color-from-palette($df-purple-palette, 600)!important;
+    }
+  }
+  .sidenav-content, .banner, .main {
+    background-color: mat.get-color-from-palette($df-purple-palette, 1002)!important;
+    .page-header {
+      color: mat.get-color-from-palette($df-purple-palette, 10)!important;
+    }
+  }
+  .search-btn {
+    color: white!important;
+  }
 }

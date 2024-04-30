@@ -1,9 +1,10 @@
 <div
   class="app-container"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
   [class.small]="isSmallScreen | async"
   [class.logged-in]="isLoggedIn$ | async">
   <ng-container *ngIf="isLoggedIn$ | async">
-    <mat-toolbar>
+    <mat-toolbar class="tool-bar">
       <button
         mat-icon-button
         (click)="sideNav.toggle()"
@@ -28,6 +29,7 @@
           </button>
         </mat-menu>
       </ng-container>
+      <df-theme-toggle></df-theme-toggle>
       <button mat-button [matMenuTriggerFor]="profileMenu" class="profile-icon">
         <fa-icon [icon]="faUser"></fa-icon> {{ (userData$ | async)?.name }}
       </button>
@@ -147,6 +149,7 @@
     </div>
     <ng-template #subRoutes>
       <mat-expansion-panel
+        class="expansion-panel"
         [class.mat-elevation-z0]="true"
         [expanded]="isActive(item)">
         <mat-expansion-panel-header class="parent-route">

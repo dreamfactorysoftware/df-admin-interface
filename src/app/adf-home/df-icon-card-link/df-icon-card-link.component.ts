@@ -4,6 +4,7 @@ import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.servi
 import { AsyncPipe, NgIf } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { TranslocoPipe } from '@ngneat/transloco';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 
 interface LinkInfo {
   name: string;
@@ -19,7 +20,11 @@ interface LinkInfo {
   imports: [MatCardModule, AsyncPipe, TranslocoPipe, NgIf],
 })
 export class DfIconCardLinkComponent {
-  constructor(public breakpointService: DfBreakpointService) {}
+  constructor(
+    public breakpointService: DfBreakpointService,
+    private themeService: DfThemeService
+  ) {}
 
   @Input() linkInfo: LinkInfo;
+  isDarkMode = this.themeService.darkMode$;
 }
