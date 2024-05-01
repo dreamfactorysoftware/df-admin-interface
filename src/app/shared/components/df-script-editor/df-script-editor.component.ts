@@ -18,6 +18,8 @@ import { DfScriptsGithubDialogComponent } from '../df-scripts-github-dialog/df-s
 import { DfAceEditorComponent } from '../df-ace-editor/df-ace-editor.component';
 import { Service, ServiceType } from '../../types/service';
 import { switchMap } from 'rxjs';
+import { AsyncPipe } from '@angular/common';
+import { DfThemeService } from '../../services/df-theme.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -35,6 +37,7 @@ import { switchMap } from 'rxjs';
     MatDialogModule,
     MatInputModule,
     DfAceEditorComponent,
+    AsyncPipe,
     ReactiveFormsModule,
   ],
 })
@@ -51,7 +54,8 @@ export class DfScriptEditorComponent implements OnInit {
     private dialog: MatDialog,
     @Inject(BASE_SERVICE_TOKEN) private fileService: DfBaseCrudService,
     @Inject(CACHE_SERVICE_TOKEN) private cacheService: DfBaseCrudService,
-    @Inject(BASE_SERVICE_TOKEN) private baseService: DfBaseCrudService
+    @Inject(BASE_SERVICE_TOKEN) private baseService: DfBaseCrudService,
+    private themeService: DfThemeService
   ) {
     this.baseService
       .getAll<{
@@ -69,7 +73,7 @@ export class DfScriptEditorComponent implements OnInit {
         this.storageServices = res.services;
       });
   }
-
+  isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
     if (this.storageServiceId.getRawValue()) {
       this.storagePath.addValidators([Validators.required]);

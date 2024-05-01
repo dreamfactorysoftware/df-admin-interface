@@ -1,4 +1,8 @@
-<form [formGroup]="serviceForm" class="details-section" (ngSubmit)="save()">
+<form
+  [formGroup]="serviceForm"
+  class="details-section"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
+  (ngSubmit)="save()">
   <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabase">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
@@ -329,12 +333,14 @@
       formControlName="isActive"
       color="primary"
       *ngIf="!subscriptionRequired"
-      >{{ 'active' | transloco }}</mat-slide-toggle
+      ><span>{{ 'active' | transloco }}</span></mat-slide-toggle
     >
     <ng-container *ngIf="viewSchema && !subscriptionRequired">
       <ng-container formGroupName="config">
         <mat-accordion class="full-width">
-          <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
+          <mat-expansion-panel
+            class="advanced-option"
+            [expanded]="serviceForm.getRawValue().type">
             <mat-expansion-panel-header
               >{{ 'services.options' | transloco }}
             </mat-expansion-panel-header>

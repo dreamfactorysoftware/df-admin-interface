@@ -33,6 +33,7 @@ import { addGroupEntries } from '../../utilities/eventScripts';
 @Component({
   selector: 'df-dynamic-field',
   templateUrl: './df-dynamic-field.component.html',
+  // styleUrls: ['./df-dynamic-field.component.scss'],
   standalone: true,
   imports: [
     MatFormFieldModule,

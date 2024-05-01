@@ -1,4 +1,4 @@
-<div class="details-section">
+<div class="details-section" [class]="(isDarkMode | async) ? 'dark-theme' : ''">
   <div class="actions full-width">
     <input
       type="file"

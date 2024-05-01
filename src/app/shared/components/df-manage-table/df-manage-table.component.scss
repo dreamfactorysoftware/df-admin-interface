@@ -20,7 +20,11 @@ $red-palette: mat.define-palette(mat.$red-palette);
   align-items: center;
   gap: 12px;
   padding-bottom: 12px;
+  .create-row-btn {
+    background-color: mat.get-color-from-palette($df-purple-palette, 500);
+  }
   .search-input {
+    height: 80% !important;
     max-width: 300px !important;
   }
 }
@@ -60,11 +64,87 @@ $red-palette: mat.define-palette(mat.$red-palette);
   }
 }
 
+.action-btn {
+  color: mat.get-color-from-palette($df-purple-palette, 500);
+}
 .dark-theme {
   .search {
     background-color: mat.get-color-from-palette(
       $df-purple-palette,
       1004
     ) !important;
+  }
+}
+.mat-mdc-form-field
+  .mat-mdc-form-field-type-mat-input
+  .mat-form-field-appearance-outline {
+  .mat-mdc-text-field-wrapper .mdc-text-field,
+  .mdc-text-field--outlined {
+    border: 1px solid !important;
+  }
+}
+
+.dark-theme {
+  .create-row-btn {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      700
+    ) !important;
+  }
+  .search-input {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1002
+    ) !important;
+    input,
+    mat-label {
+      color: white !important;
+    }
+  }
+  table {
+    background-color: mat.get-color-from-palette($df-purple-palette,1002) !important;
+    border: 1px solid white!important;
+
+    .mat-mdc-header-row {
+      .mat-mdc-header-cell {
+        color: white !important;
+        border-color: white !important;
+      }
+    }
+    .mat-mdc-row {
+      .mat-mdc-cell {
+        color: white !important;
+        border-color: white !important;
+      }
+    }
+    .action-btn {
+      color: mat.get-color-from-palette($df-purple-palette, 700) !important;
+    }
+  }
+  .clickable {
+    &.mat-mdc-row {
+      outline: 0;
+      .mat-mdc-cell {
+        cursor: pointer;
+      }
+    }
+    &.mat-mdc-row:focus,
+    &.mat-mdc-row:focus-within {
+      .mat-mdc-cell:first-child {
+        border-left: 2px solid
+          mat.get-color-from-palette($df-purple-palette, 800);
+      }
+    }
+
+    &.mat-mdc-row:focus,
+    &.mat-mdc-row:focus-within,
+    &.mat-mdc-row:hover {
+      .mat-mdc-cell {
+        background-color: mat.get-color-from-palette($df-purple-palette, 600);
+      }
+    }
+  }
+  ::ng-deep .mdc-notched-outline > * {
+    border-color: white !important;
   }
 }

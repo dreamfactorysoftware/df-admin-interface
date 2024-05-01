@@ -2,3 +2,13 @@
   display: flex;
   gap: 16px;
 }
+.dark-theme {
+  input,
+  mat-label,
+  mat-select,
+  mat-option,
+  textarea,
+  span {
+    color: white;
+  }
+}
