@@ -132,9 +132,8 @@ mat-icon {
   }
 }
 
-::ng-deep .mat-expansion-panel-header> 
-.mat-expansion-indicator::after {
-    color: unset!important;
+::ng-deep .mat-expansion-panel-header > .mat-expansion-indicator::after {
+  color: unset !important;
 }
 
 .dark-theme {

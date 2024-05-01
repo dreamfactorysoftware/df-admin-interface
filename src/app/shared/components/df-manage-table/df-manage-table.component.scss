@@ -102,8 +102,11 @@ $red-palette: mat.define-palette(mat.$red-palette);
     }
   }
   table {
-    background-color: mat.get-color-from-palette($df-purple-palette,1002) !important;
-    border: 1px solid white!important;
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1002
+    ) !important;
+    border: 1px solid white !important;
 
     .mat-mdc-header-row {
       .mat-mdc-header-cell {
