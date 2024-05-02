@@ -83,27 +83,27 @@ $red-palette: mat.define-palette(mat.$red-palette);
     border: 1px solid !important;
   }
 }
-::ng-deep .mat-menu{
+::ng-deep .mat-menu {
   background-color: mat.get-color-from-palette(
     $df-purple-palette,
     1002
   ) !important;
-  color: white!important;
+  color: white !important;
 }
 .dark-theme {
-  mat-menu{
+  mat-menu {
     background-color: mat.get-color-from-palette(
       $df-purple-palette,
       1002
     ) !important;
-    color: white!important;
+    color: white !important;
   }
   .tr-action-btn {
     background-color: mat.get-color-from-palette(
       $df-purple-palette,
       1002
     ) !important;
-    color: white!important;
+    color: white !important;
   }
   .table-action-btn {
     background-color: mat.get-color-from-palette(
