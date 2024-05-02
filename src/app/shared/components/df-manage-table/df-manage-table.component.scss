@@ -20,7 +20,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
   align-items: center;
   gap: 12px;
   padding-bottom: 12px;
-  .create-row-btn {
+  .table-action-btn {
     background-color: mat.get-color-from-palette($df-purple-palette, 500);
   }
   .search-input {
@@ -83,9 +83,29 @@ $red-palette: mat.define-palette(mat.$red-palette);
     border: 1px solid !important;
   }
 }
-
+::ng-deep .mat-menu{
+  background-color: mat.get-color-from-palette(
+    $df-purple-palette,
+    1002
+  ) !important;
+  color: white!important;
+}
 .dark-theme {
-  .create-row-btn {
+  mat-menu{
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1002
+    ) !important;
+    color: white!important;
+  }
+  .tr-action-btn {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1002
+    ) !important;
+    color: white!important;
+  }
+  .table-action-btn {
     background-color: mat.get-color-from-palette(
       $df-purple-palette,
       700
