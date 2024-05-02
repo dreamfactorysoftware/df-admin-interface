@@ -22,3 +22,46 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 .add-btn {
   background-color: mat.get-color-from-palette($df-purple-palette, 500);
 }
+
+.dark-theme {
+  &.mat-mdc-card {
+    border: 1px solid white!important;
+  }
+  mat-card-header {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1002
+    ) !important;
+  }
+  
+  table {
+    background-color: mat.get-color-from-palette($df-purple-palette, 1002) !important;
+    .mat-mdc-header-row {
+      .mat-mdc-header-cell {
+        background-color: mat.get-color-from-palette($df-purple-palette, 1002) !important;
+        color: white !important;
+        border-color: white !important;
+      }
+    }
+    .mat-mdc-row {
+      .mat-mdc-cell {
+        color: white !important;
+        border-color: white !important;
+      }
+    }
+    .action-btn {
+      color: mat.get-color-from-palette($df-purple-palette, 700) !important;
+    }
+  }
+  input,
+  mat-label,
+  mat-select,
+  mat-option,
+  textarea,
+  span {
+    color: white!important;
+  }
+  .table-td {
+    color: white!important;
+  }
+}
