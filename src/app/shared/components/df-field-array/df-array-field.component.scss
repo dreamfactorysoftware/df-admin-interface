@@ -25,7 +25,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
 .dark-theme {
   &.mat-mdc-card {
-    border: 1px solid white!important;
+    border: 1px solid white !important;
   }
   mat-card-header {
     background-color: mat.get-color-from-palette(
@@ -33,12 +33,18 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
       1002
     ) !important;
   }
-  
+
   table {
-    background-color: mat.get-color-from-palette($df-purple-palette, 1002) !important;
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1002
+    ) !important;
     .mat-mdc-header-row {
       .mat-mdc-header-cell {
-        background-color: mat.get-color-from-palette($df-purple-palette, 1002) !important;
+        background-color: mat.get-color-from-palette(
+          $df-purple-palette,
+          1002
+        ) !important;
         color: white !important;
         border-color: white !important;
       }
@@ -59,9 +65,9 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   mat-option,
   textarea,
   span {
-    color: white!important;
+    color: white !important;
   }
   .table-td {
-    color: white!important;
+    color: white !important;
   }
 }
