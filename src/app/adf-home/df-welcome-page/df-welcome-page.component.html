@@ -1,102 +1,91 @@
-<section
-  class="two-column-flex-container"
-  [class.mobile]="breakpointService.isSmallScreen | async">
-  <article class="flex-column">
+<div [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <section
+    class="two-column-flex-container"
+    [class.mobile]="breakpointService.isSmallScreen | async">
+    <article class="flex-column">
+      <article>
+        <h2>
+          {{ 'home.welcomePage.welcomeHeading' | transloco }}
+        </h2>
+        <p id="get-started-links">
+          {{ 'home.welcomePage.welcomeSubHeading' | transloco }}
+        </p>
+        <ul aria-labelledby="get-started-links">
+          <li *ngFor="let resource of welcomePageResources">
+            <df-icon-link [linkItem]="resource"></df-icon-link>
+          </li>
+        </ul>
+      </article>
+      <div class="video-link">
+        <a
+          href="https://youtu.be/FOSOm88RxPw"
+          target="_blank"
+          aria-labelledby="video-link-description">
+          <img
+            class="video-image"
+            src="assets/img/macbook-hp-df-1.png"
+            alt="" />
+          <div class="video-overlay">
+            <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
+            <span id="video-link-description">{{
+              'home.welcomePage.watchVideoCta' | transloco
+            }}</span>
+          </div>
+        </a>
+      </div>
+    </article>
+    <aside class="flex-column">
+      <mat-card class="notice-card">
+        <h3>
+          <fa-icon
+            [icon]="faHeart"
+            class="pre-heading-icon"
+            aria-hidden="true"></fa-icon
+          >{{ 'home.welcomePage.ossUsersHeading' | transloco }}
+        </h3>
+        <p [innerHtml]="'home.welcomePage.ossUsersText' | transloco"></p>
+      </mat-card>
+
+      <mat-card class="notice-card">
+        <h3>
+          <fa-icon
+            [icon]="faComment"
+            class="pre-heading-icon"
+            aria-hidden="true"></fa-icon
+          >{{ 'home.welcomePage.hearFromYouHeading' | transloco }}
+        </h3>
+        <p [innerHtml]="'home.welcomePage.hearFromYouText' | transloco"></p>
+      </mat-card>
+    </aside>
+  </section>
+
+  <mat-divider></mat-divider>
+
+  <section class="platforms-section">
+    <h3>
+      {{ 'home.quickstartPage.quickstartSubHeading' | transloco }}
+    </h3>
+
+    <ol aria-labelledby="quickstart-instructions-heading">
+      <p>{{ 'home.quickstartPage.quickstartSteps.stepOne' | transloco }}</p>
+      <p>{{ 'home.quickstartPage.quickstartSteps.stepTwo' | transloco }}</p>
+      <p>{{ 'home.quickstartPage.quickstartSteps.stepThree' | transloco }}</p>
+    </ol>
     <article>
-      <h2>
-        {{ 'home.welcomePage.welcomeHeading' | transloco }}
-      </h2>
-      <p id="get-started-links">
-        {{ 'home.welcomePage.welcomeSubHeading' | transloco }}
-      </p>
-      <ul aria-labelledby="get-started-links">
-        <li *ngFor="let resource of welcomePageResources">
-          <df-icon-link [linkItem]="resource"></df-icon-link>
+      <h4 id="javascript-examples-heading">
+        {{ 'home.welcomePage.javaScriptExamplesHeading' | transloco }}
+      </h4>
+
+      <ul
+        class="flex-list-container"
+        [class.x-small]="breakpointService.isXSmallScreen | async"
+        aria-labelledby="javascript-examples-heading">
+        <li *ngFor="let link of javaScriptExampleLinks">
+          <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
         </li>
       </ul>
     </article>
-    <div class="video-link">
-      <a
-        href="https://youtu.be/FOSOm88RxPw"
-        target="_blank"
-        aria-labelledby="video-link-description">
-        <img class="video-image" src="assets/img/macbook-hp-df-1.png" alt="" />
-        <div class="video-overlay">
-          <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
-          <span id="video-link-description">{{
-            'home.welcomePage.watchVideoCta' | transloco
-          }}</span>
-        </div>
-      </a>
-    </div>
-  </article>
-
-  <aside class="flex-column">
-    <mat-card class="notice-card">
-      <h3>
-        <fa-icon
-          [icon]="faHeart"
-          class="pre-heading-icon"
-          aria-hidden="true"></fa-icon
-        >{{ 'home.welcomePage.ossUsersHeading' | transloco }}
-      </h3>
-      <p [innerHtml]="'home.welcomePage.ossUsersText' | transloco"></p>
-    </mat-card>
-
-    <mat-card class="notice-card">
-      <h3>
-        <fa-icon
-          [icon]="faComment"
-          class="pre-heading-icon"
-          aria-hidden="true"></fa-icon
-        >{{ 'home.welcomePage.hearFromYouHeading' | transloco }}
-      </h3>
-      <p [innerHtml]="'home.welcomePage.hearFromYouText' | transloco"></p>
-    </mat-card>
-  </aside>
-</section>
-
-<mat-divider></mat-divider>
-
-<section class="platforms-section">
-  <h3>
-    {{ 'home.quickstartPage.quickstartSubHeading' | transloco }}
-  </h3>
-
-  <ol aria-labelledby="quickstart-instructions-heading">
-    <p>{{ 'home.quickstartPage.quickstartSteps.stepOne' | transloco }}</p>
-    <p>{{ 'home.quickstartPage.quickstartSteps.stepTwo' | transloco }}</p>
-    <p>{{ 'home.quickstartPage.quickstartSteps.stepThree' | transloco }}</p>
-  </ol>
-  <article>
-    <h4 id="javascript-examples-heading">
-      {{ 'home.welcomePage.javaScriptExamplesHeading' | transloco }}
-    </h4>
-
-    <ul
-      class="flex-list-container"
-      [class.x-small]="breakpointService.isXSmallScreen | async"
-      aria-labelledby="javascript-examples-heading">
-      <li *ngFor="let link of javaScriptExampleLinks">
-        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
-      </li>
-    </ul>
-  </article>
+  </section>
   <mat-divider></mat-divider>
   <df-download-page></df-download-page>
-  <!-- <mat-divider></mat-divider>
-  <article>
-    <h4 id="native-examples-heading">
-      {{ 'home.welcomePage.nativeExamplesHeading' | transloco }}
-    </h4>
-
-    <ul
-      class="flex-list-container"
-      [class.x-small]="breakpointService.isXSmallScreen | async"
-      aria-labelledby="native-examples-heading">
-      <li *ngFor="let link of nativeExampleLinks">
-        <df-icon-card-link [linkInfo]="link"></df-icon-card-link>
-      </li>
-    </ul>
-  </article> -->
-</section>
+</div>

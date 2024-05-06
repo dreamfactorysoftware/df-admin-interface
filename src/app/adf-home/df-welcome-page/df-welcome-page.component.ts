@@ -22,6 +22,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { DfQuickstartPageComponent } from '../df-quickstart-page/df-quickstart-page.component';
 import { DfResourcesPageComponent } from '../df-resources-page/df-resources-page.component';
 import { DfDownloadPageComponent } from '../df-download-page/df-download-page.component';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 
 @Component({
   selector: 'df-welcome-page',
@@ -51,5 +52,9 @@ export class DfWelcomePageComponent {
   nativeExampleLinks = nativeExampleLinks;
   javaScriptExampleLinks = javaScriptExampleLinks;
 
-  constructor(public breakpointService: DfBreakpointService) {}
+  constructor(
+    public breakpointService: DfBreakpointService,
+    private themeService: DfThemeService
+  ) {}
+  isDarkMode = this.themeService.darkMode$;
 }

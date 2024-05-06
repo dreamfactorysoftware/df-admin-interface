@@ -300,7 +300,7 @@
     <mat-form-field
       subscriptSizing="dynamic"
       appearance="outline"
-      class="dynamic-width"
+      class="full-width"
       *ngIf="!subscriptionRequired">
       <mat-label>{{ 'services.controls.label.label' | transloco }}</mat-label>
       <input matInput formControlName="label" />
@@ -327,6 +327,7 @@
     </mat-form-field>
     <mat-slide-toggle
       formControlName="isActive"
+      color="primary"
       *ngIf="!subscriptionRequired"
       >{{ 'active' | transloco }}</mat-slide-toggle
     >
@@ -366,6 +367,7 @@
                         'file_certificate'
                       ].includes(item.type)
                     "
+                    color="primary"
                     [schema]="item"
                     [formControl]="getConfigControl(item.name)"
                     [class.dynamic-width]="item.type !== 'file_certificate'"
@@ -385,10 +387,14 @@
       </ng-container>
     </ng-container>
     <div class="full-width action-bar" *ngIf="!subscriptionRequired">
-      <button mat-flat-button type="button" (click)="goBack()">
+      <button
+        mat-flat-button
+        class="cancel-btn"
+        type="button"
+        (click)="goBack()">
         {{ 'cancel' | transloco }}
       </button>
-      <button mat-flat-button color="primary">
+      <button mat-flat-button class="save-btn" color="primary">
         {{ 'save' | transloco }}
       </button>
     </div>

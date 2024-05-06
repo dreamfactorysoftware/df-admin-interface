@@ -1,15 +1,15 @@
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
+
 mat-card {
   word-wrap: break-word;
 }
-.cancel-btn {
-  color: #5b5891;
-  border: 1px solid #787680;
-  border-radius: 20px;
+.api-card,
+.location-card {
+  background-color: mat.get-color-from-palette($df-purple-palette, 100);
 }
-
-.save-btn {
-  background-color: #5b5891;
-  border: none;
-  color: white;
-  border-radius: 20px;
+.action-bar {
+  display: flex;
+  justify-content: flex-end;
 }

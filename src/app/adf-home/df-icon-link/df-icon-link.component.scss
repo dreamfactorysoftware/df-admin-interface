@@ -1,4 +1,9 @@
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
+
 .plain-icon-link {
+  color: mat.get-color-from-palette($df-purple-palette, 600);
   display: flex;
   justify-content: flex-start;
   align-items: center;
