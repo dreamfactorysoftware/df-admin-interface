@@ -26,6 +26,7 @@ import {
   DfAlertComponent,
 } from 'src/app/shared/components/df-alert/df-alert.component';
 import { catchError, throwError } from 'rxjs';
+import { DfThemeService } from '../../shared/services/df-theme.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -60,7 +61,8 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
     private fb: FormBuilder,
     private router: Router,
     public breakpointService: DfBreakpointService,
-    private activatedRoute: ActivatedRoute
+    private activatedRoute: ActivatedRoute,
+    private themeService: DfThemeService
   ) {
     this.emailTemplateForm = this.fb.group({
       name: ['', Validators.required],
@@ -78,7 +80,7 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
       id: [null],
     });
   }
-
+  isDarkMode = this.themeService.darkMode$;
   ngOnInit() {
     this.activatedRoute.data.subscribe(({ data }) => {
       this.editApp = data;

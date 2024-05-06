@@ -120,16 +120,7 @@ mat-icon {
 .action-bar {
   display: flex;
   justify-content: flex-end;
-  .save-btn {
-    background-color: mat.get-color-from-palette($df-purple-palette, 500);
-    color: white;
-    border-radius: 20px;
-  }
-  .cancel-btn {
-    color: mat.get-color-from-palette($df-purple-palette, 1001);
-    border: 1px solid mat.get-color-from-palette($df-purple-palette, 1001);
-    border-radius: 20px;
-  }
+  
 }
 
 ::ng-deep .mat-expansion-panel-header > .mat-expansion-indicator::after {
@@ -139,48 +130,3 @@ mat-icon {
   color: unset !important;
 }
 
-.dark-theme {
-  ::ng-deep .mdc-notched-outline > * {
-    border-color: white !important;
-  }
-  .mat-accordion {
-    border: 1px solid white !important;
-  }
-  .advanced-option {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    border: 1px soild white !important;
-    color: white !important;
-  }
-  input,
-  mat-label,
-  mat-select,
-  mat-option,
-  textarea,
-  span {
-    color: white;
-  }
-  ::ng-deep .mat-mdc-select-disabled {
-    color: #a3a1a1 !important;
-  }
-  ::ng-deep .mat-mdc-form-field-required-marker {
-    color: white !important;
-  }
-  .save-btn {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      200
-    ) !important;
-    color: mat.get-color-from-palette($df-purple-palette, 700) !important;
-  }
-  .cancel-btn {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    color: mat.get-color-from-palette($df-purple-palette, 200) !important;
-    border: 1px solid mat.get-color-from-palette($df-purple-palette, 200) !important;
-  }
-}

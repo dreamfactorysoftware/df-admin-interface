@@ -1,17 +1,1 @@
-@use '@angular/material' as mat;
-@use 'src/theme' as theme;
 
-$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
-
-.table-action-btn {
-  background-color: mat.get-color-from-palette($df-purple-palette, 500);
-}
-
-.dark-theme {
-  &.table-action-btn {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      700
-    ) !important;
-  }
-}

@@ -30,6 +30,8 @@ import {
   GenericUpdateResponse,
 } from 'src/app/shared/types/generic-http';
 import { catchError, throwError } from 'rxjs';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { AsyncPipe } from '@angular/common';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -52,6 +54,7 @@ import { catchError, throwError } from 'rxjs';
     TranslocoPipe,
     DfVerbPickerComponent,
     DfAlertComponent,
+    AsyncPipe,
   ],
 })
 export class DfCorsConfigDetailsComponent implements OnInit {
@@ -68,7 +71,8 @@ export class DfCorsConfigDetailsComponent implements OnInit {
     private corsConfigService: DfBaseCrudService,
     private router: Router,
     private activatedRoute: ActivatedRoute,
-    private formBuilder: FormBuilder
+    private formBuilder: FormBuilder,
+    private themeService: DfThemeService
   ) {
     this.corsForm = this.formBuilder.group({
       path: ['', Validators.required],
@@ -82,6 +86,7 @@ export class DfCorsConfigDetailsComponent implements OnInit {
       enabled: [true],
     });
   }
+  isDarkMode = this.themeService.darkMode$;
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(data => {

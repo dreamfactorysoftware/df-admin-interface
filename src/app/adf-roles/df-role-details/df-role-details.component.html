@@ -7,8 +7,15 @@
   (alertClosed)="showAlert = false">
   {{ alertMsg }}
 </df-alert>
-<form [formGroup]="roleForm" (ngSubmit)="onSubmit()" class="details-section">
-  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+<form
+  [formGroup]="roleForm"
+  (ngSubmit)="onSubmit()"
+  class="details-section"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <mat-form-field
+    appearance="outline"
+    subscriptSizing="dynamic"
+    class="dynamic-width">
     <mat-label>{{ 'name' | transloco }}</mat-label>
     <input matInput formControlName="name" required />
     <mat-error *ngIf="roleForm.controls['name'].hasError('required')">
@@ -18,7 +25,7 @@
   <mat-slide-toggle formControlName="active" class="dynamic-width">{{
     'active' | transloco
   }}</mat-slide-toggle>
-  <mat-form-field subscriptSizing="dynamic">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
     <mat-label>{{ 'description' | transloco }}</mat-label>
     <textarea rows="1" matInput formControlName="description"></textarea>
   </mat-form-field>
@@ -36,10 +43,10 @@
     class="full-width"></df-lookup-keys>
 
   <div class="full-width action-bar">
-    <button mat-flat-button type="button" (click)="goBack()">
+    <button class="cancel-btn" mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
-    <button mat-flat-button color="primary">
+    <button class="save-btn" mat-flat-button color="primary">
       <span *ngIf="type === 'create'">
         {{ 'save' | transloco }}
       </span>

@@ -9,7 +9,7 @@
     <button
       type="button"
       mat-flat-button
-      color="primary"
+      class="save-btn"
       (click)="fileInput.click()"
       [disabled]="storageServiceId.getRawValue()">
       {{ 'desktopFile' | transloco }}
@@ -17,7 +17,7 @@
     <button
       type="button"
       mat-flat-button
-      color="primary"
+      class="save-btn"
       (click)="githubImport()"
       [disabled]="storageServiceId.getRawValue()">
       {{ 'githubFile' | transloco }}

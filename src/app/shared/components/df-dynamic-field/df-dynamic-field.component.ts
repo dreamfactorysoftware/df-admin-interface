@@ -34,7 +34,6 @@ import { DfThemeService } from '../../services/df-theme.service';
 @Component({
   selector: 'df-dynamic-field',
   templateUrl: './df-dynamic-field.component.html',
-  styleUrls: ['./df-dynamic-field.component.scss'],
   standalone: true,
   imports: [
     MatFormFieldModule,

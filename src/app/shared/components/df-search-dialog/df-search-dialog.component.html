@@ -1,4 +1,4 @@
-<div class="search-dialog" [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+<div class="search-dialog">
   <div mat-dialog-title class="search-bar">
     <mat-form-field
       class="search-input"
@@ -45,6 +45,8 @@
     </ng-template>
   </div>
   <div mat-dialog-actions class="search-action">
-    <button mat-button [mat-dialog-close]>{{ 'close' | transloco }}</button>
+    <button class="close-btn" mat-button [mat-dialog-close]>
+      {{ 'close' | transloco }}
+    </button>
   </div>
 </div>

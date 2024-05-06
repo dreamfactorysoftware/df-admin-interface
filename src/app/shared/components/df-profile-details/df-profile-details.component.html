@@ -1,6 +1,9 @@
-<ng-container name="user-details-section" [formGroup]="rootForm">
+<ng-container
+  name="user-details-section"
+  [formGroup]="rootForm"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
   <ng-container formGroupName="profileDetailsGroup">
-    <mat-form-field appearance="fill">
+    <mat-form-field appearance="outline">
       <mat-label
         >{{ 'userManagement.controls.username.altLabel' | transloco
         }}{{
@@ -17,7 +20,7 @@
         {{ 'userManagement.controls.username.errors.required' | transloco }}
       </mat-error>
     </mat-form-field>
-    <mat-form-field appearance="fill">
+    <mat-form-field appearance="outline">
       <mat-label>
         {{ 'userManagement.controls.email.label' | transloco }}</mat-label
       >
@@ -37,7 +40,7 @@
         {{ 'userManagement.controls.email.errors.required' | transloco }}
       </mat-error>
     </mat-form-field>
-    <mat-form-field appearance="fill">
+    <mat-form-field appearance="outline">
       <mat-label>
         {{ 'userManagement.controls.firstName.label' | transloco }}</mat-label
       >
@@ -49,7 +52,7 @@
         {{ 'userManagement.controls.firstName.errors.required' | transloco }}
       </mat-error>
     </mat-form-field>
-    <mat-form-field appearance="fill">
+    <mat-form-field appearance="outline">
       <mat-label>{{
         'userManagement.controls.lastName.label' | transloco
       }}</mat-label>
@@ -62,7 +65,7 @@
       </mat-error>
     </mat-form-field>
 
-    <mat-form-field appearance="fill">
+    <mat-form-field appearance="outline">
       <mat-label>{{
         'userManagement.controls.displayName.label' | transloco
       }}</mat-label>
@@ -73,7 +76,7 @@
       </mat-error>
     </mat-form-field>
     <mat-form-field
-      appearance="fill"
+      appearance="outline"
       *ngIf="controlExists('profileDetailsGroup.phone')">
       <mat-label>{{
         'userManagement.controls.phone.label' | transloco

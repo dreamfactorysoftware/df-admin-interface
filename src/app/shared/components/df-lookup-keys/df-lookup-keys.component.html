@@ -1,4 +1,6 @@
-<div class="lookup-keys-accordion">
+<div
+  class="lookup-keys-accordion"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
   <mat-accordion *ngIf="showAccordion; else lookupKeys">
     <mat-expansion-panel>
       <mat-expansion-panel-header>
@@ -20,7 +22,7 @@
               {{ 'name' | transloco }}
             </mat-header-cell>
             <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
-              <mat-form-field subscriptSizing="dynamic">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
                 <mat-label>{{ 'name' | transloco }}</mat-label>
                 <input matInput formControlName="name" />
               </mat-form-field>
@@ -32,7 +34,7 @@
               {{ 'value' | transloco }}
             </mat-header-cell>
             <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
-              <mat-form-field subscriptSizing="dynamic">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
                 <mat-label>{{ 'value' | transloco }}</mat-label>
                 <input matInput formControlName="value" />
               </mat-form-field>
@@ -45,6 +47,7 @@
             </mat-header-cell>
             <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
               <mat-slide-toggle
+                color="primary"
                 formControlName="private"
                 [attr.aria-label]="'name' | transloco"></mat-slide-toggle>
             </mat-cell>
@@ -53,7 +56,7 @@
             <mat-header-cell *matHeaderCellDef>
               <button
                 mat-mini-fab
-                color="primary"
+                class="save-btn"
                 [attr.aria-label]="'newEntry' | transloco"
                 type="button"
                 (click)="add()">
@@ -61,7 +64,11 @@
               </button>
             </mat-header-cell>
             <mat-cell *matCellDef="let row; let i = index" [formGroupName]="i">
-              <button mat-icon-button (click)="remove(i)" type="button">
+              <button
+                class="remove-btn"
+                mat-icon-button
+                (click)="remove(i)"
+                type="button">
                 <fa-icon [icon]="faTrashCan" size="xs"></fa-icon>
               </button>
             </mat-cell>

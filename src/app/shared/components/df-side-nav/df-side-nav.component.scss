@@ -185,13 +185,9 @@ $red-palette: mat.define-palette(mat.$red-palette);
   padding: 16px;
 }
 
-.breadcrumb-link {
-  color: mat.get-color-from-palette($df-purple-palette, 500);
-}
-
-::ng-deep .parent-route > .mat-expansion-indicator::after {
-  color: unset !important;
-}
+// ::ng-deep .parent-route > .mat-expansion-indicator::after {
+//   color: unset !important;
+// }
 
 .dark-theme {
   .tool-bar,
@@ -203,7 +199,6 @@ $red-palette: mat.define-palette(mat.$red-palette);
       $df-purple-palette,
       1003
     ) !important;
-    color: white;
   }
   .nav-item {
     &.active {
@@ -220,11 +215,9 @@ $red-palette: mat.define-palette(mat.$red-palette);
       $df-purple-palette,
       1002
     ) !important;
+    color: white;
     .page-header {
       color: mat.get-color-from-palette($df-purple-palette, 10) !important;
     }
-  }
-  .search-btn {
-    color: white !important;
   }
 }

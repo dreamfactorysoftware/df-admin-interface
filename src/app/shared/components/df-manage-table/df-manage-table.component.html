@@ -2,7 +2,7 @@
   <button
     *ngIf="allowCreate"
     mat-mini-fab
-    class="table-action-btn"
+    class="save-btn"
     [attr.aria-label]="'newEntry' | transloco"
     (click)="createRow()"
     type="button">
@@ -118,7 +118,6 @@
               </button>
               <mat-menu #actionsMenu="matMenu">
                 <button
-                  class="tr-action-btn"
                   type="button"
                   *ngFor="let action of actions.additional"
                   mat-menu-item

@@ -26,6 +26,7 @@ import { DatabaseSchemaFieldType } from './df-field-details.types';
 import { CsvValidator } from '../validators/csv.validator';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 
 @Component({
   selector: 'df-field-details',
@@ -95,7 +96,8 @@ export class DfFieldDetailsComponent implements OnInit {
     private service: DfBaseCrudService,
     private formBuilder: FormBuilder,
     private activatedRoute: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private themeService: DfThemeService
   ) {
     this.fieldDetailsForm = this.formBuilder.group({
       name: ['', Validators.required],
@@ -124,6 +126,8 @@ export class DfFieldDetailsComponent implements OnInit {
       picklist: ['', CsvValidator],
     });
   }
+
+  isDarkMode = this.themeService.darkMode$;
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(data => {

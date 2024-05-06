@@ -11,15 +11,18 @@ import {
   SimpleChanges,
   ViewChild,
   forwardRef,
+  inject,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { AceEditorMode } from '../../types/scripts';
-
+import { DfThemeService } from '../../services/df-theme.service';
+import { AsyncPipe } from '@angular/common';
 @Component({
   selector: 'df-ace-editor',
   templateUrl: './df-ace-editor.component.html',
   styleUrls: ['./df-ace-editor.component.scss'],
   standalone: true,
+  imports: [AsyncPipe],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -42,6 +45,8 @@ export class DfAceEditorComponent
 
   onChange: (value: string) => void;
   onTouched: () => void;
+  themeService = inject(DfThemeService);
+  isDarkMode = this.themeService.darkMode$;
 
   ngAfterViewInit(): void {
     this.init(this.elementRef, this.mode);

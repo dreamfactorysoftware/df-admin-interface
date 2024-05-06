@@ -4,11 +4,15 @@
   (alertClosed)="showAlert = false">
   {{ alertMsg }}
 </df-alert>
-<form name="admin-form" [formGroup]="userForm" (ngSubmit)="save()">
+<form
+  name="admin-form"
+  [formGroup]="userForm"
+  (ngSubmit)="save()"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
   <div class="user-details" [class.small]="isSmallScreen | async">
     <df-profile-details formGroupName="profileDetailsGroup" />
     <div class="additional-info">
-      <mat-slide-toggle formControlName="isActive">{{
+      <mat-slide-toggle color="primary" formControlName="isActive">{{
         'active' | transloco
       }}</mat-slide-toggle>
       <ng-container *ngIf="type === 'create'; else editMode">
@@ -62,7 +66,7 @@
           userForm.get('pass-invite')?.value === 'password' ||
           userForm.get('setPassword')?.value
         ">
-        <mat-form-field appearance="fill">
+        <mat-form-field appearance="outline">
           <mat-label>{{
             'userManagement.controls.password.label' | transloco
           }}</mat-label>
@@ -78,7 +82,7 @@
             {{ 'userManagement.controls.password.errors.length' | transloco }}
           </mat-error>
         </mat-form-field>
-        <mat-form-field appearance="fill">
+        <mat-form-field appearance="outline">
           <mat-label>{{
             'userManagement.controls.confirmPassword.label' | transloco
           }}</mat-label>
@@ -152,10 +156,14 @@
     [roles]="roles"></df-user-app-roles>
   <df-lookup-keys formArrayName="lookupKeys"></df-lookup-keys>
   <div class="full-width action-bar">
-    <button mat-flat-button type="button" [routerLink]="cancelRoute">
+    <button
+      class="cancel-btn"
+      mat-flat-button
+      type="button"
+      [routerLink]="cancelRoute">
       {{ 'cancel' | transloco }}
     </button>
-    <button mat-flat-button color="primary" type="submit">
+    <button class="save-btn" mat-flat-button color="primary" type="submit">
       {{ (type === 'create' ? 'create' : 'update') | transloco }}
     </button>
   </div>
