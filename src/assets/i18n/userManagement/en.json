@@ -22,7 +22,8 @@
       "altLabel": "Enter Username",
       "optional": "(Optional, defaults to email address)",
       "errors": {
-        "required": "Username is required"
+        "required": "Username is required",
+        "minLength": "Username must be at least 6 characters long"
       }
     },
     "email": {
