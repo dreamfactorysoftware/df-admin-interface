@@ -28,7 +28,10 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
 .dark-theme {
   &.search-dialog {
-    background-color: mat.get-color-from-palette($df-purple-palette, 1003) !important;
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1003
+    ) !important;
     border: 1px solid white;
   }
 }

@@ -9,7 +9,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   .breadcrumb-link > span {
     color: mat.get-color-from-palette($df-purple-palette, 500) !important;
   }
- 
+
   // Divider
   .mat-divider {
     border-color: white !important;
@@ -164,7 +164,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   .mat-expansion-panel-header-description {
     color: #a3a1a1;
   }
-  
+
   // Table
   table,
   .mat-mdc-table {
@@ -244,5 +244,4 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     ) !important;
     border: 1px solid white;
   }
-
 }

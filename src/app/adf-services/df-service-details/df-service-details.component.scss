@@ -120,7 +120,6 @@ mat-icon {
 .action-bar {
   display: flex;
   justify-content: flex-end;
-  
 }
 
 ::ng-deep .mat-expansion-panel-header > .mat-expansion-indicator::after {
@@ -129,4 +128,3 @@ mat-icon {
 ::ng-deep .mat-mdc-select-arrow {
   color: unset !important;
 }
-
