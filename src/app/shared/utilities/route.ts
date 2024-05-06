@@ -13,6 +13,14 @@ const filteredFromNav = [
   ROUTES.LICENSE_EXPIRED,
 ];
 
+const navIcons = [
+  'home',
+  'admin-settings',
+  'api-connections',
+  'api-security',
+  'system-settings',
+];
+
 export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
   return routes
     .filter(
@@ -31,14 +39,26 @@ export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
           path: `${root}/${route.path}`,
           subRoutes: subRoutes.length ? subRoutes : undefined,
           route: route.path as ROUTES,
+          icon: findIconForRoute(route as string),
         };
       }
       return {
         path: `${root}/${route.path}`,
         route: route.path as ROUTES,
+        icon: findIconForRoute(route as string),
       };
     });
 }
+
+const findIconForRoute = (routeName: any) => {
+  if (navIcons.includes(routeName.path)) {
+    return `assets/img/nav/${routeName?.path}.svg`;
+  } else {
+    return '';
+  }
+  // Replace parts of route names to match them to icon filenames if needed
+  // return `assets/img/nav/${routeName?.path}.svg`;
+};
 
 export function accessibleRoutes(
   navs: Array<Nav>,

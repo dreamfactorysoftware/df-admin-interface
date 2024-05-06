@@ -87,7 +87,7 @@
         </div>
       </ng-container>
       <mat-nav-list *ngIf="isLoggedIn$ | async">
-        <button class="search-btn" mat-button (click)="handleSearchClick()">
+        <button mat-button (click)="handleSearchClick()">
           {{ 'searchFeatures' | transloco }}
           <span>
             <fa-icon [icon]="faMagnifyingGlass"></fa-icon>

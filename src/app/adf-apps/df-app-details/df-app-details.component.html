@@ -6,8 +6,8 @@
 </df-alert>
 <form [formGroup]="appForm" (ngSubmit)="save()" class="details-section">
   <mat-form-field
-    subscriptSizing="dynamic"
     appearance="outline"
+    subscriptSizing="dynamic"
     class="dynamic-width">
     <mat-label>
       {{ 'apps.createApp.applicationName.label' | transloco }}
@@ -27,8 +27,8 @@
     </mat-error>
   </mat-form-field>
   <mat-form-field
-    subscriptSizing="dynamic"
     appearance="outline"
+    subscriptSizing="dynamic"
     class="dynamic-width">
     <mat-label>{{ 'apps.createApp.defaultRole.label' | transloco }}</mat-label>
     <input
@@ -55,8 +55,8 @@
     </mat-autocomplete>
   </mat-form-field>
   <mat-form-field
-    subscriptSizing="dynamic"
     appearance="outline"
+    subscriptSizing="dynamic"
     class="full-width">
     <mat-label>{{ 'apps.createApp.description.label' | transloco }}</mat-label>
     <textarea
@@ -117,6 +117,7 @@
         [matTooltip]="'apps.createApp.appLocation.tooltip' | transloco" />
     </p>
     <mat-radio-group
+      color="primary"
       class="flex-col"
       color="primary"
       aria-label="Select an option"
@@ -284,7 +285,7 @@
     <button mat-flat-button type="button" class="cancel-btn" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
-    <button mat-flat-button class="save-btn" color="primary">
+    <button mat-flat-button class="save-btn">
       <span *ngIf="editApp">{{ 'save' | transloco }}</span>
       <span *ngIf="!editApp">{{ 'create' | transloco }}</span>
     </button>
