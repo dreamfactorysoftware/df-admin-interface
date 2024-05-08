@@ -19,6 +19,10 @@ body {
   font-family: Roboto, 'Helvetica Neue', sans-serif;
 }
 
+a {
+  color: mat.get-color-from-palette($df-purple-palette, 600);
+}
+
 .flex-col {
   display: flex;
   flex-direction: column;

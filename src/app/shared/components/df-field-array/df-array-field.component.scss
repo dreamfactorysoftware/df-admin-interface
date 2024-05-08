@@ -18,3 +18,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 .mat-mdc-card {
   overflow-y: auto;
 }
+
+.add-btn {
+  background-color: mat.get-color-from-palette($df-purple-palette, 500);
+}

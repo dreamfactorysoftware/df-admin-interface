@@ -82,6 +82,10 @@ mat-card.notice-card {
 }
 
 .dark-theme {
+  h2,
+  p {
+    color: white;
+  }
   .notice-card {
     background-color: mat.get-color-from-palette(
       $df-purple-palette,
