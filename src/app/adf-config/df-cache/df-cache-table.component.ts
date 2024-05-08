@@ -27,7 +27,7 @@ import { Actions } from 'src/app/shared/types/table';
 export class DfCacheTableComponent extends DfManageTableComponent<CacheRow> {
   constructor(
     @Inject(CACHE_SERVICE_TOKEN)
-    private cacheService: DfBaseCrudService,
+    cacheService: DfBaseCrudService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,

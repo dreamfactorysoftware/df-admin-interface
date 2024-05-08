@@ -41,6 +41,7 @@ export interface RequestOptions {
   additionalParams: KeyValuePair[];
   additionalHeaders: KeyValuePair[];
   includeCacheControl: boolean;
+  refresh: boolean;
 }
 
 export type GenericCreateResponse = GenericListResponse<{ id: number }>;

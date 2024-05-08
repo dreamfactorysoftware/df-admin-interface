@@ -17,6 +17,7 @@ import {
   faMagnifyingGlass,
   faPlus,
   faUser,
+  faRefresh,
 } from '@fortawesome/free-solid-svg-icons';
 import { routes } from 'src/app/routes';
 import {
@@ -38,7 +39,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { CommonModule } from '@angular/common';
 import { DfSearchService } from '../../services/df-search.service';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
@@ -83,6 +84,7 @@ export class DfSideNavComponent implements OnInit {
   recents$ = this.searchService.recents$;
   smallScreen$ = this.breakpointService.isSmallScreen;
   faPlus = faPlus;
+  faRefresh = faRefresh;
 
   constructor(
     // public dialogRef: MatDialogRef<DfSearchDialogComponent>,
@@ -132,7 +134,6 @@ export class DfSideNavComponent implements OnInit {
           this.nav = accessibleRoutes(transformRoutes(routes), accessByTabs);
         } else {
           this.nav = transformRoutes(routes);
-          console.log('this.nav', this.nav);
         }
       });
     this.search.valueChanges
