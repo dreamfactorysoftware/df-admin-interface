@@ -71,16 +71,16 @@
       [matTooltip]="'apps.createApp.description.tooltip' | transloco" />
   </mat-form-field>
   <mat-slide-toggle
-    color="#5B5891"
     formControlName="active"
+    color="primary"
     class="full-width"
     >{{ 'apps.createApp.active' | transloco }}</mat-slide-toggle
   >
   <!-- API Card -->
   <mat-card
     *ngIf="editApp"
-    class="full-width"
-    [style]="{ 'word-break': 'break-all', 'background-color': '#F6F2FA' }">
+    class="full-width api-card"
+    [style]="{ 'word-break': 'break-all' }">
     <mat-card-header>
       <mat-card-subtitle>{{
         'apps.createApp.apiKey.label' | transloco
@@ -119,6 +119,7 @@
     <mat-radio-group
       color="primary"
       class="flex-col"
+      color="primary"
       aria-label="Select an option"
       formControlName="appLocation">
       <mat-radio-button value="0">{{
@@ -143,7 +144,9 @@
       appForm.controls['appLocation'].value === '3'
     "
     class="full-width">
-    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
+    <mat-form-field
+      appearance="outline"
+      *ngIf="appForm.controls['appLocation'].value === '1'">
       <mat-label>{{
         'apps.createApp.appLocation.options.fileStorage.storageService.label'
           | transloco
@@ -171,7 +174,9 @@
             | transloco
         " />
     </mat-form-field>
-    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
+    <mat-form-field
+      appearance="outline"
+      *ngIf="appForm.controls['appLocation'].value === '1'">
       <mat-label>{{
         'apps.createApp.appLocation.options.fileStorage.storageFolder.label'
           | transloco
@@ -230,7 +235,9 @@
             '.tooltip' | transloco
         " />
     </mat-form-field>
-    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '2'">
+    <mat-form-field
+      appearance="outline"
+      *ngIf="appForm.controls['appLocation'].value === '2'">
       <mat-label>
         {{ 'apps.createApp.appLocation.options.remoteUrl.label' | transloco }}
       </mat-label>
@@ -251,7 +258,7 @@
     </mat-form-field>
 
     <mat-card
-      [style]="{ 'background-color': '#F6F2FA' }"
+      class="location-card"
       *ngIf="
         appForm.controls['appLocation'].value === '1' ||
         appForm.controls['appLocation'].value === '3'
@@ -275,7 +282,7 @@
   </div>
   <!-- submit -->
   <div class="full-width action-bar">
-    <button mat-flat-button type="button" (click)="goBack()" class="cancel-btn">
+    <button mat-flat-button type="button" class="cancel-btn" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
     <button mat-flat-button class="save-btn">

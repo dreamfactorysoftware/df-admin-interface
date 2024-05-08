@@ -19,6 +19,7 @@ $df-typography-config: mat.define-typography-config(
 //   $subtitle-2: mat.define-typography-level(20px, 28px, 300),
 
 $df-purple-palette: (
+  10: #e5e1e9,
   50: #f1f0f6,
   100: #e2e1ed,
   200: #c6c4db,
@@ -29,6 +30,10 @@ $df-purple-palette: (
   700: #423c89,
   800: #29227a,
   900: #0f0761,
+  1001: #1c1b21,
+  1002: #0f0e13,
+  1003: #1c1b20,
+  1004: #2a292f,
   contrast: (
     50: #000000,
     100: #000000,

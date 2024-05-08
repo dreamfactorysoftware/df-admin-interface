@@ -3,6 +3,7 @@
     href="{{ linkInfo.url }}"
     target="_blank"
     class="icon-link-container"
+    [class]="(isDarkMode | async) ? 'dark-theme' : ''"
     [class.x-small]="breakpointService.isXSmallScreen | async"
     aria-labelledby="link-label">
     <mat-card class="icon-link-card">

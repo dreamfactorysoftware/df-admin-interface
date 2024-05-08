@@ -58,6 +58,7 @@
 <mat-slide-toggle
   *ngIf="schema.type === 'boolean'"
   [formControl]="control"
+  color="primary"
   [matTooltip]="schema.description ?? ''"
   [attr.aria-label]="schema.label"
   ><ng-container *ngIf="showLabel">{{

@@ -1,3 +1,7 @@
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
+
 .mat-column-actions {
   width: 50px;
   padding: 0 8px;
@@ -13,4 +17,8 @@
 
 .mat-mdc-card {
   overflow-y: auto;
+}
+
+.add-btn {
+  background-color: mat.get-color-from-palette($df-purple-palette, 500);
 }
