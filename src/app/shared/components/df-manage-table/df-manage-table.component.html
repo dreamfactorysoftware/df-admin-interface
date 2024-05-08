@@ -8,6 +8,15 @@
     type="button">
     <fa-icon [icon]="faPlus" size="xl"></fa-icon>
   </button>
+  <button
+    *ngIf="schema"
+    mat-mini-fab
+    color="alternate"
+    [attr.aria-label]="'importList' | transloco"
+    (click)="refreshSchema()"
+    type="button">
+    <fa-icon [icon]="faRefresh" size="xl"></fa-icon>
+  </button>
   <ng-content select="[topActions]"></ng-content>
   <div class="spacer"></div>
   <mat-form-field

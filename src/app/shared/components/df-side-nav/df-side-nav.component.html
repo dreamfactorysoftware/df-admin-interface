@@ -109,6 +109,16 @@
                 <a [routerLink]="breadcrumb.path" class="breadcrumb-link"
                   ><ng-component
                     *ngTemplateOutlet="breadcrumbLabel"></ng-component>
+                </ng-template>
+                <ng-template #breadcrumbLabel>
+                  <ng-container *ngIf="breadcrumb.translationKey; else label">
+                    <span>{{ breadcrumb.translationKey | transloco }}</span>
+                  </ng-container>
+                  <ng-template #label>
+                    <span>{{ breadcrumb.label }}</span>
+                  </ng-template>
+                </ng-template>
+                <span *ngIf="i !== breadCrumbs.length - 1"> / </span>
                 </a>
               </ng-container>
 

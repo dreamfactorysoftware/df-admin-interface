@@ -183,6 +183,9 @@ export class DfBaseCrudService {
     if (options.includeCount !== undefined) {
       params.include_count = options.includeCount;
     }
+    if (options.refresh) {
+      params.refresh = options.refresh;
+    }
 
     if (options.additionalParams) {
       options.additionalParams.forEach(param => {

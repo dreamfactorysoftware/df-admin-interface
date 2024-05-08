@@ -22,6 +22,7 @@ import {
   faTriangleExclamation,
   faCheckCircle,
   faXmarkCircle,
+  faRefresh,
 } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -71,9 +72,11 @@ export abstract class DfManageTableComponent<T>
   faPlus = faPlus;
   faEllipsisV = faEllipsisV;
   faTriangleExclamation = faTriangleExclamation;
+  faRefresh = faRefresh;
   allowCreate = true;
   allowFilter = true;
   currentFilter = new FormControl('');
+  schema = false;
 
   abstract columns: Array<Column<T>>;
 
@@ -102,6 +105,7 @@ export abstract class DfManageTableComponent<T>
       },
     ],
   };
+  cacheService: any;
 
   constructor(
     protected router: Router,
@@ -116,6 +120,7 @@ export abstract class DfManageTableComponent<T>
   ngOnInit(): void {
     if (!this.tableData) {
       this.activatedRoute.data.subscribe(({ data }) => {
+        this.schema = this.router.url.includes('schema');
         if (data && data.resource) {
           this.dataSource.data = this.mapDataToTable(data.resource);
         }
@@ -179,7 +184,12 @@ export abstract class DfManageTableComponent<T>
 
   abstract mapDataToTable(data: Array<any>): Array<T>;
 
-  abstract refreshTable(limit?: number, offset?: number, filter?: string): void;
+  abstract refreshTable(
+    limit?: number,
+    offset?: number,
+    filter?: string,
+    refresh?: true
+  ): void;
 
   abstract filterQuery(value: string): string;
 
@@ -246,5 +256,9 @@ export abstract class DfManageTableComponent<T>
       ((this.actions.default.disabled && !this.actions.default.disabled(row)) ||
         !this.actions.default.disabled)
     );
+  }
+
+  refreshSchema() {
+    this.refreshTable(undefined, undefined, undefined, true);
   }
 }

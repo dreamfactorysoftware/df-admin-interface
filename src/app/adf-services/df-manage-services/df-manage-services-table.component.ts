@@ -110,7 +110,8 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
   refreshTable(
     limit?: number | undefined,
     offset?: number | undefined,
-    filter?: string | undefined
+    filter?: string | undefined,
+    refresh?: true
   ): void {
     if (this.serviceTypes && this.serviceTypes.length !== 0) {
       filter = `${filter ? `${filter} and ` : ''}(type in ("${this.serviceTypes
@@ -120,12 +121,12 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
     filter = `${filter ? `${filter} and ` : ''}(created_by_id is${
       !this.system ? ' not ' : ' '
     }null)`;
-
     this.serviceService
       .getAll<GenericListResponse<Service>>({
         limit,
         offset,
         filter,
+        refresh,
       })
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);

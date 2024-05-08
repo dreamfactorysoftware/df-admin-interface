@@ -18,6 +18,7 @@ import {
   faLanguage,
   faMagnifyingGlass,
   faUser,
+  faRefresh,
 } from '@fortawesome/free-solid-svg-icons';
 import { routes } from 'src/app/routes';
 import {
@@ -35,6 +36,8 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { CommonModule } from '@angular/common';
+import { DfSearchService } from '../../services/df-search.service';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { DfThemeToggleComponent } from '../df-theme-toggle/df-theme-toggle.component';
 
 @UntilDestroy({ checkProperties: true })
@@ -74,6 +77,12 @@ export class DfSideNavComponent implements OnInit {
   faMagnifyingGlass = faMagnifyingGlass;
   faUser = faUser;
   faLanguage = faLanguage;
+  search = new FormControl();
+  results$ = this.searchService.results$;
+  recents$ = this.searchService.recents$;
+  smallScreen$ = this.breakpointService.isSmallScreen;
+  faPlus = faPlus;
+  faRefresh = faRefresh;
 
   constructor(
     private breakpointService: DfBreakpointService,
