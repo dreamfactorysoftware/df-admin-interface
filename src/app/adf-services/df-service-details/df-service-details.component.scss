@@ -120,14 +120,11 @@ mat-icon {
 .action-bar {
   display: flex;
   justify-content: flex-end;
-  .save-btn {
-    background-color: mat.get-color-from-palette($df-purple-palette, 500);
-    color: white;
-    border-radius: 20px;
-  }
-  .cancel-btn {
-    color: mat.get-color-from-palette($df-purple-palette, 1001);
-    border: 1px solid mat.get-color-from-palette($df-purple-palette, 1001);
-    border-radius: 20px;
-  }
+}
+
+::ng-deep .mat-expansion-panel-header > .mat-expansion-indicator::after {
+  color: unset !important;
+}
+::ng-deep .mat-mdc-select-arrow {
+  color: unset !important;
 }

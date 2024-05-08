@@ -11,7 +11,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { UntilDestroy } from '@ngneat/until-destroy';
-
+import { DfThemeService } from '../../services/df-theme.service';
+import { AsyncPipe } from '@angular/common';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-profile-details',
@@ -24,11 +25,16 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     ReactiveFormsModule,
     TranslocoPipe,
     NgIf,
+    AsyncPipe,
   ],
 })
 export class DfProfileDetailsComponent implements OnInit {
   rootForm: FormGroup;
-  constructor(private rootFormGroup: FormGroupDirective) {}
+  constructor(
+    private rootFormGroup: FormGroupDirective,
+    private themeService: DfThemeService
+  ) {}
+  isDarkMode = this.themeService.darkMode$;
 
   ngOnInit() {
     this.rootForm = this.rootFormGroup.control;

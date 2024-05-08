@@ -31,6 +31,7 @@ import {
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { Service, ServiceType } from 'src/app/shared/types/service';
 import { CommonModule } from '@angular/common';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -79,7 +80,8 @@ export class DfScriptDetailsComponent implements OnInit {
     private fb: FormBuilder,
     private router: Router,
     @Inject(EVENT_SCRIPT_SERVICE_TOKEN)
-    private eventScriptService: DfBaseCrudService
+    private eventScriptService: DfBaseCrudService,
+    private themeService: DfThemeService
   ) {
     this.storeServiceArray = [];
     this.ungroupedEventItems = [];
@@ -93,6 +95,7 @@ export class DfScriptDetailsComponent implements OnInit {
       allow_event_modification: [false],
     });
   }
+  isDarkMode = this.themeService.darkMode$;
 
   storageServices: Service;
   ngOnInit(): void {

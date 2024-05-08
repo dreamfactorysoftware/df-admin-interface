@@ -2,6 +2,7 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import {
   AfterViewInit,
   Component,
+  inject,
   Input,
   OnInit,
   ViewChild,
@@ -34,6 +35,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { Actions, AdditonalAction, Column } from 'src/app/shared/types/table';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 
 export const DfManageTableModules = [
   NgIf,
@@ -108,7 +110,9 @@ export abstract class DfManageTableComponent<T>
     private translateService: TranslocoService,
     public dialog: MatDialog
   ) {}
+  themeService = inject(DfThemeService);
 
+  isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
     if (!this.tableData) {
       this.activatedRoute.data.subscribe(({ data }) => {

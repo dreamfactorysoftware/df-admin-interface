@@ -10,6 +10,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfFolderDialogComponent } from '../df-folder-dialog/df-folder-dialog.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-files',
@@ -36,8 +37,10 @@ export class DfFilesComponent {
 
   constructor(
     private activatedRoute: ActivatedRoute,
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private themeService: DfThemeService
   ) {}
+  isDarkMode = this.themeService.darkMode$;
 
   uploadFile(event: Event): void {
     const input = event.target as HTMLInputElement;

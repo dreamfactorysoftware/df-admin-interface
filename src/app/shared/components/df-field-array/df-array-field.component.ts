@@ -1,4 +1,4 @@
-import { NgFor, NgIf } from '@angular/common';
+import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { Component, Input, OnInit, forwardRef } from '@angular/core';
 import {
   ControlValueAccessor,
@@ -28,6 +28,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { DfVerbPickerComponent } from '../df-verb-picker/df-verb-picker.component';
 import { MatSelectModule } from '@angular/material/select';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { DfThemeService } from '../../services/df-theme.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-array-field',
@@ -56,6 +57,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     TranslocoPipe,
     DfVerbPickerComponent,
     MatSelectModule,
+    AsyncPipe,
   ],
 })
 export class DfArrayFieldComponent implements OnInit, ControlValueAccessor {
@@ -73,8 +75,12 @@ export class DfArrayFieldComponent implements OnInit, ControlValueAccessor {
     this.dataSource = new MatTableDataSource(this.fieldArray.controls);
   }
 
-  constructor(private fb: FormBuilder) {}
+  constructor(
+    private fb: FormBuilder,
+    private themeService: DfThemeService
+  ) {}
 
+  isDarkMode = this.themeService.darkMode$;
   get controls() {
     return this.fieldArray.controls as FormControl[];
   }

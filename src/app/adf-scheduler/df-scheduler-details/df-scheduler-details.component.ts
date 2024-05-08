@@ -30,6 +30,8 @@ import {
   AlertType,
   DfAlertComponent,
 } from 'src/app/shared/components/df-alert/df-alert.component';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+
 import { catchError, throwError } from 'rxjs';
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -75,8 +77,11 @@ export class DfSchedulerDetailsComponent implements OnInit {
     private activatedRoute: ActivatedRoute,
     private router: Router,
     @Inject(BASE_SERVICE_TOKEN)
-    private accessListService: DfBaseCrudService
+    private accessListService: DfBaseCrudService,
+    private themeService: DfThemeService
   ) {}
+
+  isDarkMode = this.themeService.darkMode$;
 
   ngOnInit(): void {
     this.formGroup = this.formBuilder.group({

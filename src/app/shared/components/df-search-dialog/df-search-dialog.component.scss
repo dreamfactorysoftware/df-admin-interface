@@ -1,6 +1,9 @@
 @use '@angular/material' as mat;
 @use 'src/theme' as theme;
 $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
+.search-dialog {
+  padding-top: 20px;
+}
 
 .search-bar {
   min-width: 275px;
@@ -25,9 +28,11 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 }
 
 .dark-theme {
-  .search-bar,
-  .search-container,
-  .search-action {
-    // background-color: mat.get-color-from-palette($df-purple-palette, 1003)!important;
+  &.search-dialog {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1003
+    ) !important;
+    border: 1px solid white;
   }
 }

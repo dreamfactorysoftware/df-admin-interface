@@ -20,7 +20,9 @@ $red-palette: mat.define-palette(mat.$red-palette);
   align-items: center;
   gap: 12px;
   padding-bottom: 12px;
+
   .search-input {
+    height: 80% !important;
     max-width: 300px !important;
   }
 }

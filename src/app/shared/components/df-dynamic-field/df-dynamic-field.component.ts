@@ -29,6 +29,7 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { Observable, map, startWith } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 import { addGroupEntries } from '../../utilities/eventScripts';
+import { DfThemeService } from '../../services/df-theme.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-dynamic-field',
@@ -62,13 +63,15 @@ export class DfDynamicFieldComponent implements OnInit, DoCheck {
 
   constructor(
     @Optional() @Self() public controlDir: NgControl,
-    private activedRoute: ActivatedRoute
+    private activedRoute: ActivatedRoute,
+    private themeService: DfThemeService
   ) {
     controlDir.valueAccessor = this;
   }
 
   eventList: string[];
   filteredEventList: Observable<string[]>;
+  isDarkMode = this.themeService.darkMode$;
 
   ngOnInit(): void {
     if (this.schema.type === 'event_picklist') {

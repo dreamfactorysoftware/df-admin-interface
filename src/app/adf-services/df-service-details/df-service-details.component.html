@@ -1,4 +1,8 @@
-<form [formGroup]="serviceForm" class="details-section" (ngSubmit)="save()">
+<form
+  [formGroup]="serviceForm"
+  class="details-section"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
+  (ngSubmit)="save()">
   <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabase">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
@@ -64,7 +68,9 @@
                       class="card-icon"
                       [src]="getBackgroundImage(type.name)"
                       [alt]="type.label" />
-                    <h4 class="text-center">{{ type.label }}</h4>
+                    <h4 class="text-center" style="color: black !important">
+                      {{ type.label }}
+                    </h4>
                   </div>
                 </div>
               </label>
@@ -84,7 +90,9 @@
                       class="card-icon"
                       [src]="getBackgroundImage(type.name)"
                       [alt]="type.label" />
-                    <h4 class="text-center">{{ type.label }}</h4>
+                    <h4 class="text-center" style="color: black !important">
+                      {{ type.label }}
+                    </h4>
                   </div>
                 </div>
                 <ng-container *ngIf="type.class === 'not-included'">
@@ -164,6 +172,7 @@
           </mat-form-field>
           <div class="action-container">
             <mat-slide-toggle
+              color="primary"
               formControlName="isActive"
               *ngIf="!subscriptionRequired"
               >{{ 'active' | transloco }}</mat-slide-toggle
@@ -238,10 +247,14 @@
           </ng-container>
         </ng-container>
         <div class="full-width action-bar" *ngIf="!subscriptionRequired">
-          <button mat-flat-button type="button" (click)="goBack()">
+          <button
+            class="cancel-btn"
+            mat-flat-button
+            type="button"
+            (click)="goBack()">
             {{ 'cancel' | transloco }}
           </button>
-          <button mat-flat-button color="primary">
+          <button class="save-btn" mat-flat-button color="primary">
             {{ 'save' | transloco }}
           </button>
         </div>
@@ -329,7 +342,7 @@
       formControlName="isActive"
       color="primary"
       *ngIf="!subscriptionRequired"
-      >{{ 'active' | transloco }}</mat-slide-toggle
+      ><span>{{ 'active' | transloco }}</span></mat-slide-toggle
     >
     <ng-container *ngIf="viewSchema && !subscriptionRequired">
       <ng-container formGroupName="config">

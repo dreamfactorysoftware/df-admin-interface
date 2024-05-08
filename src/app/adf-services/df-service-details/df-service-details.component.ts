@@ -49,6 +49,7 @@ import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -104,7 +105,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private router: Router,
     private systemConfigDataService: DfSystemConfigDataService,
     private http: HttpClient,
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private themeService: DfThemeService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -118,7 +120,7 @@ export class DfServiceDetailsComponent implements OnInit {
       this.edit = true;
     }
   }
-
+  isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
     this.http
       .get<Array<ImageObject>>('assets/img/databaseImages.json')

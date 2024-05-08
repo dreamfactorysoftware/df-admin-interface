@@ -1,8 +1,10 @@
-<div class="api-doc-button-container">
-  <button mat-raised-button (click)="goBackToList()">
+<div
+  class="api-doc-button-container"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <button class="cancel-btn" mat-raised-button (click)="goBackToList()">
     {{ 'goBack' | transloco }}
   </button>
-  <button mat-raised-button color="primary" (click)="downloadApiDoc()">
+  <button class="save-btn" mat-raised-button (click)="downloadApiDoc()">
     {{ 'apiDocs.downloadApiDoc' | transloco }}
   </button>
 </div>

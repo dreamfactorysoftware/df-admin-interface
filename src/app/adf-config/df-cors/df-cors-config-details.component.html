@@ -4,18 +4,29 @@
   (alertClosed)="showAlert = false">
   {{ alertMsg }}
 </df-alert>
-<div class="df-cors-config-container">
+<div
+  class="df-cors-config-container"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
   <h4>{{ 'cors.pageSubtitle' | transloco }}</h4>
   <form [formGroup]="corsForm" (ngSubmit)="onSubmit()" class="details-section">
-    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-form-field
+      appearance="outline"
+      subscriptSizing="dynamic"
+      class="dynamic-width">
       <mat-label>{{ 'cors.formControls.path' | transloco }}</mat-label>
       <input matInput type="url" formControlName="path" />
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-form-field
+      appearance="outline"
+      subscriptSizing="dynamic"
+      class="dynamic-width">
       <mat-label>{{ 'cors.formControls.origins' | transloco }}</mat-label>
       <input matInput type="text" formControlName="origins" />
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic" class="full-width">
+    <mat-form-field
+      appearance="outline"
+      subscriptSizing="dynamic"
+      class="full-width">
       <mat-label>{{ 'cors.formControls.description' | transloco }}</mat-label>
       <textarea
         rows="1"
@@ -23,17 +34,26 @@
         type="text"
         formControlName="description"></textarea>
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-form-field
+      appearance="outline"
+      subscriptSizing="dynamic"
+      class="dynamic-width">
       <mat-label>{{ 'cors.formControls.headers' | transloco }}</mat-label>
       <input matInput type="text" formControlName="headers" />
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-form-field
+      appearance="outline"
+      subscriptSizing="dynamic"
+      class="dynamic-width">
       <mat-label>{{
         'cors.formControls.exposedHeaders' | transloco
       }}</mat-label>
       <input matInput type="text" formControlName="exposedHeaders" />
     </mat-form-field>
-    <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
+    <mat-form-field
+      appearance="outline"
+      subscriptSizing="dynamic"
+      class="dynamic-width">
       <mat-label>{{ 'cors.formControls.maxAge' | transloco }}</mat-label>
       <input matInput type="number" formControlName="maxAge" />
     </mat-form-field>
@@ -44,19 +64,29 @@
         label: 'cors.formControls.methods' | transloco
       }"
       type="verb_multiple"></df-verb-picker>
-    <mat-slide-toggle formControlName="credentials" class="dynamic-width">
+    <mat-slide-toggle
+      color="primary"
+      formControlName="credentials"
+      class="dynamic-width">
       {{ 'cors.formControls.supportsCredentials' | transloco }}
     </mat-slide-toggle>
 
-    <mat-slide-toggle formControlName="enabled" class="dynamic-width">
+    <mat-slide-toggle
+      color="primary"
+      formControlName="enabled"
+      class="dynamic-width">
       {{ 'cors.formControls.enabled' | transloco }}
     </mat-slide-toggle>
 
     <div class="full-width action-bar">
-      <button type="button" mat-flat-button (click)="onCancel()">
+      <button
+        class="cancel-btn"
+        type="button"
+        mat-flat-button
+        (click)="onCancel()">
         {{ 'cancel' | transloco }}
       </button>
-      <button mat-flat-button color="primary" type="submit">
+      <button class="save-btn" mat-flat-button color="primary" type="submit">
         {{ (type === 'create' ? 'create' : 'update') | transloco }}
       </button>
     </div>
