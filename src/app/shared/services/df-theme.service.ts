@@ -7,7 +7,19 @@ import { BehaviorSubject } from 'rxjs';
 export class DfThemeService {
   darkMode$ = new BehaviorSubject<boolean>(false);
 
-  setThemeMode(isDarkMode: boolean) {
+  constructor() {
+    this.loadInitialTheme();
+  }
+
+  setThemeMode(isDarkMode: boolean): void {
     this.darkMode$.next(isDarkMode);
+    localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
+  }
+
+  loadInitialTheme(): void {
+    const storedTheme = localStorage.getItem('isDarkMode');
+    if (storedTheme) {
+      this.darkMode$.next(JSON.parse(storedTheme));
+    }
   }
 }
