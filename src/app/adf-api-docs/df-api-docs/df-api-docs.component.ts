@@ -42,11 +42,10 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data }) => {
       if (data) {
-        this.apiDocJson = mapCamelToSnake(data);
+        this.apiDocJson = { ...data, paths: mapCamelToSnake(data.paths) };
       }
     });
   }
-
   ngAfterContentInit(): void {
     const apiDocumentation = this.apiDocJson;
     SwaggerUI({
