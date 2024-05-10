@@ -39,7 +39,7 @@ import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
-import { forkJoin, map, switchMap } from 'rxjs';
+import { map, switchMap } from 'rxjs';
 import {
   GOLD_SERVICES,
   SILVER_SERVICES,

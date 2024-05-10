@@ -17,7 +17,7 @@
         [formGroup]="profileForm"
         (ngSubmit)="updateProfile()">
         <df-profile-details formGroupName="profileDetailsGroup" />
-        <mat-form-field appearance="fill" *ngIf="needPassword">
+        <mat-form-field appearance="outline" *ngIf="needPassword">
           <mat-label>{{
             'userManagement.controls.currentPassword.label' | transloco
           }}</mat-label>
@@ -48,13 +48,13 @@
         name="security-question-form"
         [formGroup]="securityQuestionForm"
         (ngSubmit)="updateSecurityQuestion()">
-        <mat-form-field appearance="fill">
+        <mat-form-field appearance="outline">
           <mat-label>{{
             'userManagement.controls.securityQuestion.label' | transloco
           }}</mat-label>
           <input matInput formControlName="securityQuestion" />
         </mat-form-field>
-        <mat-form-field appearance="fill">
+        <mat-form-field appearance="outline">
           <mat-label>{{
             'userManagement.controls.securityAnswer.label' | transloco
           }}</mat-label>
@@ -84,7 +84,7 @@
           (alertClosed)="showAlert = false"
           >{{ alertMsg }}</df-alert
         >
-        <mat-form-field appearance="fill">
+        <mat-form-field appearance="outline">
           <mat-label>{{
             'userManagement.controls.oldPassword.label' | transloco
           }}</mat-label>
@@ -96,7 +96,7 @@
             }}
           </mat-error>
         </mat-form-field>
-        <mat-form-field appearance="fill">
+        <mat-form-field appearance="outline">
           <mat-label>{{
             'userManagement.controls.password.label' | transloco
           }}</mat-label>
@@ -112,7 +112,7 @@
             {{ 'userManagement.controls.password.errors.length' | transloco }}
           </mat-error>
         </mat-form-field>
-        <mat-form-field appearance="fill">
+        <mat-form-field appearance="outline">
           <mat-label>{{
             'userManagement.controls.confirmPassword.label' | transloco
           }}</mat-label>
