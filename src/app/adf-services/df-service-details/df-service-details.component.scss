@@ -84,10 +84,14 @@ label.radio-card {
 
   .card-content {
     width: 100%;
+    text-align: center;
     img {
       margin-bottom: 10px;
       width: 100%;
       height: 110px;
+    }
+    h4 {
+      color: #000;
     }
   }
 }
@@ -127,4 +131,25 @@ mat-icon {
 }
 ::ng-deep .mat-mdc-select-arrow {
   color: unset !important;
+}
+
+.dark-theme {
+
+label.radio-card {
+
+  .card-content-wrapper {
+    background: #000;
+    border: 1px solid #fff;
+  }
+
+  .check-icon {
+    border: solid 2px #2d2d2d;
+  }
+
+  .card-content {
+    h4 {
+      color: #fff;
+    }
+  }
+}
 }
