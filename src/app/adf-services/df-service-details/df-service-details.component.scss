@@ -134,22 +134,20 @@ mat-icon {
 }
 
 .dark-theme {
+  label.radio-card {
+    .card-content-wrapper {
+      background: #000;
+      border: 1px solid #fff;
+    }
 
-label.radio-card {
+    .check-icon {
+      border: solid 2px #2d2d2d;
+    }
 
-  .card-content-wrapper {
-    background: #000;
-    border: 1px solid #fff;
-  }
-
-  .check-icon {
-    border: solid 2px #2d2d2d;
-  }
-
-  .card-content {
-    h4 {
-      color: #fff;
+    .card-content {
+      h4 {
+        color: #fff;
+      }
     }
   }
-}
 }
