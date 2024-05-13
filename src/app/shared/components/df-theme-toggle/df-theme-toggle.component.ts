@@ -6,12 +6,11 @@ import { BehaviorSubject } from 'rxjs';
 @Component({
   selector: 'df-theme-toggle',
   templateUrl: './df-theme-toggle.component.html',
-  // styleUrls: ['./df-theme-toggle.component.scss'],
   standalone: true,
   imports: [MatSlideToggleModule],
 })
 export class DfThemeToggleComponent {
-  isDarkMode$: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(true);
+  isDarkMode$: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
   themeService = inject(DfThemeService);
 
   toggle() {

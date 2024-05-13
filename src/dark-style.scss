@@ -57,7 +57,19 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   .mat-step-label {
     color: white !important;
   }
-
+  .parent-route,
+  .mat-expansion-panel-body {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1003
+    ) !important;
+  }
+  .nav-item .active > .mdc-button__label > .mat-mdc-button-touch-target {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      700
+    ) !important;
+  }
   // Radio Button
   .mat-mdc-radio-button
     .mdc-radio

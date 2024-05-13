@@ -56,8 +56,6 @@ const findIconForRoute = (routeName: any) => {
   } else {
     return '';
   }
-  // Replace parts of route names to match them to icon filenames if needed
-  // return `assets/img/nav/${routeName?.path}.svg`;
 };
 
 export function accessibleRoutes(
