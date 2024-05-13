@@ -184,7 +184,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
     background: #f6f2fa;
     .content-wrapper {
       padding: 2px;
-      border: 1px solid  #f6f2fa;
+      border: 1px solid #f6f2fa;
       background-color: #f6f2fa;
       border-radius: 6px !important;
     }
@@ -263,29 +263,29 @@ $red-palette: mat.define-palette(mat.$red-palette);
     ) !important;
   }
 
-    .parent-route {
+  .parent-route {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1003
+    ) !important;
+  }
+
+  .nav-item {
+    ::ng-deep .mat-mdc-button-touch-target {
       background-color: mat.get-color-from-palette(
         $df-purple-palette,
         1003
       ) !important;
     }
+  }
+  &.active {
+    ::ng-deep .mat-mdc-button-touch-target {
+      background-color: #e3dfff;
+      border-top-right-radius: 50px;
+      border-bottom-right-radius: 50px;
+    }
+  }
 
-    .nav-item {
-      ::ng-deep .mat-mdc-button-touch-target {
-        background-color: mat.get-color-from-palette(
-          $df-purple-palette,
-          1003
-        ) !important;
-      }
-    }
-    &.active {
-      ::ng-deep .mat-mdc-button-touch-target {
-        background-color: #e3dfff;
-        border-top-right-radius: 50px;
-        border-bottom-right-radius: 50px;
-      }
-    }
-  
   .nav-item {
     &.active {
       ::ng-deep .mat-mdc-button-touch-target {
@@ -304,7 +304,6 @@ $red-palette: mat.define-palette(mat.$red-palette);
 
     img {
       filter: invert(1) !important;
-    
     }
   }
   .banner,
@@ -329,11 +328,13 @@ $red-palette: mat.define-palette(mat.$red-palette);
     }
   }
 
-  
   .content-wrapper {
     padding: 2px;
-    border: 1px solid  mat.get-color-from-palette($df-purple-palette, 1001) !important;
-    background-color: mat.get-color-from-palette($df-purple-palette, 1002) !important;
+    border: 1px solid mat.get-color-from-palette($df-purple-palette, 1001) !important;
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1002
+    ) !important;
     border-radius: 6px !important;
   }
 }
