@@ -65,7 +65,7 @@ export abstract class DfManageTableComponent<T>
   @Input() tableData?: Array<T>;
   dataSource = new MatTableDataSource<T>();
   tableLength = 0;
-  pageSizes = [2, 5, 100];
+  pageSizes = [10, 50, 100];
   currentPageSize = this.defaultPageSize;
   faTrashCan = faTrashCan;
   faPenToSquare = faPenToSquare;
