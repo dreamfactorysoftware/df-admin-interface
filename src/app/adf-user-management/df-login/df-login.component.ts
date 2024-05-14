@@ -29,6 +29,8 @@ import { MatCardModule } from '@angular/material/card';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { AuthService, LdapService } from 'src/app/shared/types/service';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { CommonModule } from '@angular/common';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-user-login',
@@ -51,6 +53,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     RouterLink,
     FontAwesomeModule,
     TranslocoPipe,
+    CommonModule
   ],
 })
 export class DfLoginComponent implements OnInit {
@@ -65,12 +68,15 @@ export class DfLoginComponent implements OnInit {
 
   fpRoute = `/${ROUTES.AUTH}/${ROUTES.FORGOT_PASSWORD}`;
 
+  isDarkMode = this.themeService.darkMode$;
+
   loginForm: FormGroup;
   constructor(
     private fb: FormBuilder,
     private systemConfigDataService: DfSystemConfigDataService,
     private authService: DfAuthService,
-    private router: Router
+    private router: Router,
+    private themeService: DfThemeService
   ) {
     this.loginForm = this.fb.group({
       services: [''],

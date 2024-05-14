@@ -183,6 +183,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
     padding: 8px 20px 24px;
     background: #f6f2fa;
     .content-wrapper {
+      height: 100%;
       padding: 2px;
       border: 1px solid #f6f2fa;
       background-color: #f6f2fa;
@@ -248,7 +249,8 @@ $red-palette: mat.define-palette(mat.$red-palette);
 }
 
 .breadcrumb-link {
-  color: white;
+  color: inherit;
+  text-decoration: none;
 }
 
 .dark-theme {

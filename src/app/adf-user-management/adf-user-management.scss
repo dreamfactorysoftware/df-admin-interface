@@ -38,3 +38,13 @@
     }
   }
 }
+
+
+  .user-management-card-container{
+    margin-top: 30%;
+
+    &.dark-theme {
+      background-color: #1e1e1e;
+      color: #fff;
+    }
+  }

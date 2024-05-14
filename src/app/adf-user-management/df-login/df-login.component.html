@@ -1,4 +1,6 @@
-<div class="user-management-card-container">
+<div
+  class="user-management-card-container"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
   <div class="left-panel">
     <img
       src="../../../assets/img/logo.png"
