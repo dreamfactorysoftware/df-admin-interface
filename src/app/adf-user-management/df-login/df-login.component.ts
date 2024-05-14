@@ -53,7 +53,7 @@ import { CommonModule } from '@angular/common';
     RouterLink,
     FontAwesomeModule,
     TranslocoPipe,
-    CommonModule
+    CommonModule,
   ],
 })
 export class DfLoginComponent implements OnInit {
