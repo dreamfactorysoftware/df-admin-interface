@@ -349,9 +349,31 @@
         <mat-accordion class="full-width">
           <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
             <mat-expansion-panel-header
-              >{{ 'services.options' | transloco }}
+              >{{ 'services.options' | transloco }}s
             </mat-expansion-panel-header>
             <div class="details-section">
+              <ng-container *ngIf="this.isNetworkService">
+                <mat-form-field class="full-width" appearance="outline">
+                  <mat-label>Service Definition</mat-label>
+                  <textarea
+                    matInput
+                    rows="10"
+                    [(ngModel)]="serviceDefinition"
+                    [ngModelOptions]="{ standalone: true }"></textarea>
+                </mat-form-field>
+              </ng-container>
+
+              <!-- <ng-container *ngIf="this.isNetworkService">
+                <df-script-editor
+                  [type]="getControl('type')"
+                  formControlName="content"
+                  [storageServiceId]="getConfigControl('storageServiceId')"
+                  [storagePath]="getConfigControl('storagePath')"
+                  [content]="getConfigControl('content')"
+                  [cache]="serviceData ? serviceData.name : ''"
+                  class="full-width"></df-script-editor
+              ></ng-container> -->
+
               <ng-container *ngFor="let item of viewSchema">
                 <ng-container
                   *ngIf="

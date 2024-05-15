@@ -86,6 +86,7 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 export class DfServiceDetailsComponent implements OnInit {
   edit = false;
   isDatabase = false;
+  isNetworkService = false;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -94,6 +95,7 @@ export class DfServiceDetailsComponent implements OnInit {
   configSchema: Array<ConfigSchema>;
   images: Array<ImageObject>;
   search = '';
+  serviceDefinition: string;
 
   systemEvents: Array<{ label: string; value: string }>;
 
@@ -114,6 +116,9 @@ export class DfServiceDetailsComponent implements OnInit {
       label: [''],
       description: [''],
       isActive: [true],
+      service_doc_by_service_id: this.fb.group({
+        content: [''],
+      }),
     });
     const id = this.activatedRoute.snapshot.paramMap.get('id');
     if (id) {
@@ -136,6 +141,9 @@ export class DfServiceDetailsComponent implements OnInit {
       .subscribe(({ env, route }) => {
         if (route['groups'] && route['groups'][0] === 'Database') {
           this.isDatabase = true;
+        }
+        if (route['groups'] && route['groups'][0] === 'Remote Service') {
+          this.isNetworkService = true;
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
@@ -183,20 +191,24 @@ export class DfServiceDetailsComponent implements OnInit {
             ...data,
             config: data.config,
           });
-          this.serviceForm.controls['type'].disable();
+          (this.serviceDefinition = data?.serviceDocByServiceId.content),
+            this.serviceForm.controls['type'].disable();
         } else {
-          this.serviceForm.controls['type'].valueChanges.subscribe(value => {
-            this.serviceForm.removeControl('config');
-            this.configSchema = this.getConfigSchema(value);
-            this.initializeConfig();
-          });
+          (this.serviceDefinition = data?.serviceDocByServiceId.content),
+            this.serviceForm.controls['type'].valueChanges.subscribe(value => {
+              this.serviceForm.removeControl('config');
+              this.configSchema = this.getConfigSchema(value);
+              this.initializeConfig();
+            });
         }
       });
-    this.serviceForm.controls['type'].valueChanges.subscribe(value => {
-      this.serviceForm.patchValue({
-        label: value,
+    if (this.isDatabase) {
+      this.serviceForm.controls['type'].valueChanges.subscribe(value => {
+        this.serviceForm.patchValue({
+          label: value,
+        });
       });
-    });
+    }
   }
 
   initializeConfig() {
@@ -207,12 +219,12 @@ export class DfServiceDetailsComponent implements OnInit {
         if (control.required) {
           validator.push(Validators.required);
         }
-        config.addControl(
+        config?.addControl(
           control.name,
           new FormControl(control.default, validator)
         );
       });
-      this.serviceForm.addControl('config', config);
+      this.serviceForm?.addControl('config', config);
     }
   }
 
@@ -266,6 +278,27 @@ export class DfServiceDetailsComponent implements OnInit {
       return;
     }
     const data = this.serviceForm.getRawValue();
+    data.service_doc_by_service_id.content = this.serviceDefinition;
+    type Params = {
+      snackbarError: string;
+      snackbarSuccess: string;
+      fields?: string;
+      related?: string;
+    };
+
+    let params: Params = {
+      snackbarError: 'server',
+      snackbarSuccess: 'services.createSuccessMsg',
+    };
+
+    if (this.isNetworkService) {
+      params = {
+        ...params,
+        fields: '*',
+        related: 'service_doc_by_service_id',
+      };
+    }
+
     if (this.edit) {
       this.servicesService
         .update(this.serviceData.id, data, {
@@ -278,11 +311,10 @@ export class DfServiceDetailsComponent implements OnInit {
     } else {
       this.servicesService
         .create(
-          { resource: [data] },
           {
-            snackbarError: 'server',
-            snackbarSuccess: 'services.createSuccessMsg',
-          }
+            resource: [data],
+          },
+          params
         )
         .subscribe(() => {
           this.router.navigate([`/api-connections/api-docs/${data.name}`]);
