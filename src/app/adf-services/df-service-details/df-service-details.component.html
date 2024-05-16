@@ -353,6 +353,16 @@
             </mat-expansion-panel-header>
             <div class="details-section">
               <ng-container *ngIf="this.isNetworkService">
+                <mat-button-toggle-group
+                  aria-label="Service Definition Type"
+                  [(ngModel)]="serviceDefinitionType"
+                  [ngModelOptions]="{ standalone: true }"
+                  (change)="
+                    onServiceDefinitionTypeChange(serviceDefinitionType)
+                  ">
+                  <mat-button-toggle value="0">JSON</mat-button-toggle>
+                  <mat-button-toggle value="1">YAML</mat-button-toggle>
+                </mat-button-toggle-group>
                 <mat-form-field class="full-width" appearance="outline">
                   <mat-label>Service Definition</mat-label>
                   <textarea

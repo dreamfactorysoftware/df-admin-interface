@@ -32,15 +32,16 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
 import { DfLicenseCheckService } from '../../services/df-license-check.service';
-import { of, switchMap } from 'rxjs';
+import { debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { CommonModule } from '@angular/common';
 import { DfSearchService } from '../../services/df-search.service';
-import { FormControl } from '@angular/forms';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { DfThemeToggleComponent } from '../df-theme-toggle/df-theme-toggle.component';
-
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
@@ -63,7 +64,10 @@ import { DfThemeToggleComponent } from '../df-theme-toggle/df-theme-toggle.compo
     NgTemplateOutlet,
     MatDialogModule,
     CommonModule,
+    MatFormFieldModule,
     DfThemeToggleComponent,
+    ReactiveFormsModule,
+    MatInputModule,
   ],
 })
 export class DfSideNavComponent implements OnInit {
@@ -83,7 +87,6 @@ export class DfSideNavComponent implements OnInit {
   smallScreen$ = this.breakpointService.isSmallScreen;
   faPlus = faPlus;
   faRefresh = faRefresh;
-
   constructor(
     private breakpointService: DfBreakpointService,
     private userDataService: DfUserDataService,
@@ -134,6 +137,17 @@ export class DfSideNavComponent implements OnInit {
           this.nav = transformRoutes(routes);
         }
       });
+    this.search.valueChanges
+      .pipe(
+        debounceTime(1000),
+        distinctUntilChanged(),
+        switchMap(value => this.searchService.search(value))
+      )
+      .subscribe(() => {
+        this.dialog.open(DfSearchDialogComponent, {
+          position: { top: '60px' },
+        });
+      });
   }
   isDarkMode = this.themeService.darkMode$;
   logout() {
@@ -165,6 +179,12 @@ export class DfSideNavComponent implements OnInit {
   handleLanguageChange(language: string) {
     this.transloco.setActiveLang(language);
     localStorage.setItem('language', language);
+  }
+
+  onSubmit() {
+    this.searchService.search(this.search.value).subscribe(() => {
+      this.dialog.open(DfSearchDialogComponent, { position: { top: '60px' } });
+    });
   }
 
   get activeLanguage() {

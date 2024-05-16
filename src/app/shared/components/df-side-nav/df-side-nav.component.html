@@ -17,7 +17,12 @@
       </div>
       <div class="search-bar">
         <fa-icon [icon]="faMagnifyingGlass" class="search-icon"></fa-icon>
-        <input type="text" class="search-input" placeholder="Search" />
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Search"
+          [formControl]="search"
+          (keydown.enter)="onSubmit()" />
       </div>
       <span class="spacer"></span>
       <ng-container *ngIf="availableLanguages.length > 1">
