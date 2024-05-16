@@ -143,10 +143,14 @@ export class DfServiceDetailsComponent implements OnInit {
         )
       )
       .subscribe(({ env, route }) => {
+        console.log(route);
         if (route['groups'] && route['groups'][0] === 'Database') {
           this.isDatabase = true;
         }
-        if (route['groups'] && route['groups'][0] === 'Remote Service') {
+        if (
+          (route['groups'] && route['groups'][0] === 'Remote Service') ||
+          (route['groups'] && route['groups'][0] === 'Script')
+        ) {
           this.isNetworkService = true;
         }
         const { data, serviceTypes, groups } = route;
@@ -198,12 +202,11 @@ export class DfServiceDetailsComponent implements OnInit {
           (this.serviceDefinition = data?.serviceDocByServiceId.content),
             this.serviceForm.controls['type'].disable();
         } else {
-          (this.serviceDefinition = data?.serviceDocByServiceId.content),
-            this.serviceForm.controls['type'].valueChanges.subscribe(value => {
-              this.serviceForm.removeControl('config');
-              this.configSchema = this.getConfigSchema(value);
-              this.initializeConfig();
-            });
+          this.serviceForm.controls['type'].valueChanges.subscribe(value => {
+            this.serviceForm.removeControl('config');
+            this.configSchema = this.getConfigSchema(value);
+            this.initializeConfig();
+          });
         }
       });
     if (this.isDatabase) {
