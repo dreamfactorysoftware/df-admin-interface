@@ -143,7 +143,6 @@ export class DfServiceDetailsComponent implements OnInit {
         )
       )
       .subscribe(({ env, route }) => {
-        console.log(route);
         if (route['groups'] && route['groups'][0] === 'Database') {
           this.isDatabase = true;
         }
