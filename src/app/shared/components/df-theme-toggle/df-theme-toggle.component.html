@@ -1,4 +1,4 @@
 <mat-slide-toggle
   color="primary"
-  checked="true"
+  [checked]="isDarkMode$ | async"
   (change)="toggle()"></mat-slide-toggle>
