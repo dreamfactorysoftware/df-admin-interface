@@ -1,24 +1,34 @@
-<div class="top-action-bar">
+<div class="top-action-bar" [class]="(isDarkMode | async) ? 'dark-theme' : ''">
   <button
     *ngIf="allowCreate"
     mat-mini-fab
-    color="primary"
+    class="save-btn"
     [attr.aria-label]="'newEntry' | transloco"
     (click)="createRow()"
     type="button">
     <fa-icon [icon]="faPlus" size="xl"></fa-icon>
+  </button>
+  <button
+    *ngIf="schema"
+    mat-mini-fab
+    color="alternate"
+    [attr.aria-label]="'importList' | transloco"
+    (click)="refreshSchema()"
+    type="button">
+    <fa-icon [icon]="faRefresh" size="xl"></fa-icon>
   </button>
   <ng-content select="[topActions]"></ng-content>
   <div class="spacer"></div>
   <mat-form-field
     *ngIf="allowFilter && tableLength > 0"
     class="search-input"
+    appearance="outline"
     subscriptSizing="dynamic">
     <mat-label>{{ 'search' | transloco }}</mat-label>
     <input matInput [formControl]="currentFilter" />
   </mat-form-field>
 </div>
-<div class="table-container">
+<div class="table-container" [class]="(isDarkMode | async) ? 'dark-theme' : ''">
   <table
     mat-table
     [dataSource]="dataSource"
@@ -75,9 +85,9 @@
             <ng-container
               *ngIf="actions.additional.length === 1; else multiple">
               <button
+                class="action-btn"
                 *ngIf="actions.additional[0].icon; else regular"
                 mat-icon-button
-                color="primary"
                 [attr.aria-label]="
                   actions.additional[0].ariaLabel.key
                     | transloco

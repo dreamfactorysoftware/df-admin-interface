@@ -1,6 +1,13 @@
-<form [formGroup]="scriptForm" class="details-section" (ngSubmit)="submit()">
+<form
+  [formGroup]="scriptForm"
+  class="details-section"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
+  (ngSubmit)="submit()">
   <ng-container *ngIf="type !== 'edit'; else editing">
-    <mat-form-field class="full-width" subscriptSizing="dynamic">
+    <mat-form-field
+      appearance="outline"
+      class="full-width"
+      subscriptSizing="dynamic">
       <mat-label>{{ 'service' | transloco }}</mat-label>
       <mat-select
         [(value)]="selectedServiceItem"
@@ -10,7 +17,10 @@
         </mat-option>
       </mat-select>
     </mat-form-field>
-    <mat-form-field class="half-width" subscriptSizing="dynamic">
+    <mat-form-field
+      appearance="outline"
+      class="half-width"
+      subscriptSizing="dynamic">
       <mat-label>{{ 'scripts.scriptType' | transloco }}</mat-label>
       <mat-select
         [(value)]="selectedEventItem"
@@ -30,7 +40,10 @@
       </mat-optgroup>
     </mat-autocomplete> -->
     </mat-form-field>
-    <mat-form-field class="half-width" subscriptSizing="dynamic">
+    <mat-form-field
+      appearance="outline"
+      class="half-width"
+      subscriptSizing="dynamic">
       <mat-label>{{ 'scripts.scriptMethod' | transloco }}</mat-label>
       <mat-select [(value)]="selectedRouteItem">
         <mat-option *ngFor="let item of ungroupedRouteOptions" [value]="item">
@@ -49,7 +62,10 @@
     </mat-autocomplete> -->
     </mat-form-field>
     <ng-container *ngIf="this.tableOptions">
-      <mat-form-field class="full-width" subscriptSizing="dynamic">
+      <mat-form-field
+        appearance="outline"
+        class="full-width"
+        subscriptSizing="dynamic">
         <mat-label>{{ 'scripts.tableName' | transloco }}</mat-label>
         <mat-select [(value)]="selectTable" (selectionChange)="selectedTable()">
           <mat-option *ngFor="let item of tableOptions" [value]="item">
@@ -59,19 +75,22 @@
       </mat-form-field>
     </ng-container>
     <ng-container *ngIf="this.completeScriptName">
-      <mat-form-field class="full-width">
+      <mat-form-field appearance="outline" class="full-width">
         <mat-label>{{ 'scripts.scriptName' | transloco }}</mat-label>
         <input matInput [value]="this.completeScriptName" />
       </mat-form-field>
     </ng-container>
   </ng-container>
   <ng-template #editing>
-    <mat-form-field class="full-width">
+    <mat-form-field appearance="outline" class="full-width">
       <mat-label>{{ 'scripts.tableName' | transloco }}</mat-label>
       <input matInput disabled [value]="this.completeScriptName" />
     </mat-form-field>
   </ng-template>
-  <mat-form-field class="full-width" subscriptSizing="dynamic">
+  <mat-form-field
+    appearance="outline"
+    class="full-width"
+    subscriptSizing="dynamic">
     <mat-label>{{ 'scriptType' | transloco }}</mat-label>
     <mat-select formControlName="type">
       <mat-option *ngFor="let type of types" [value]="type.value">
@@ -95,10 +114,10 @@
     [storagePath]="getControl('storagePath')"
     [content]="getControl('content')"></df-script-editor>
   <div class="full-width action-bar">
-    <button mat-flat-button type="button" (click)="goBack()">
+    <button class="cancel-btn" mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
-    <button mat-flat-button color="primary">
+    <button class="save-btn" mat-flat-button color="primary">
       {{ 'save' | transloco }}
     </button>
   </div>

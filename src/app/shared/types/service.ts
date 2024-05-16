@@ -79,6 +79,7 @@ export interface Service {
   lastModifiedById: number | null;
   config: any;
   serviceDocByServiceId: number | null;
+  refresh: boolean;
 }
 
 export interface ServiceRow {

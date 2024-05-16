@@ -1,1 +1,4 @@
-<div #editor class="editor"></div>
+<div
+  #editor
+  class="editor"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''"></div>

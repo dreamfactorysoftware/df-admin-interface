@@ -1,271 +1,307 @@
-<df-alert
-  [showAlert]="showAlert"
-  [alertType]="alertType"
-  (alertClosed)="showAlert = false">
-  {{ alertMsg }}
-</df-alert>
-<form [formGroup]="appForm" (ngSubmit)="save()" class="details-section">
-  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
-    <mat-label>
-      {{ 'apps.createApp.applicationName.label' | transloco }}
-    </mat-label>
-    <input
-      matInput
-      placeholder="{{ 'apps.createApp.applicationName.label' | transloco }}"
-      formControlName="name"
-      required />
-    <fa-icon
-      class="tool-tip-trigger"
-      matSuffix
-      [icon]="faCircleInfo"
-      [matTooltip]="'apps.createApp.applicationName.tooltip' | transloco" />
-    <mat-error *ngIf="appForm.controls['name'].hasError('required')">
-      {{ 'apps.createApp.applicationName.error' | transloco }}
-    </mat-error>
-  </mat-form-field>
-  <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
-    <mat-label>{{ 'apps.createApp.defaultRole.label' | transloco }}</mat-label>
-    <input
-      #rolesInput
-      type="text"
-      placeholder="Pick one"
-      matInput
-      formControlName="defaultRole"
-      [matAutocomplete]="auto"
-      (input)="filter()"
-      (focus)="filter()" />
-    <fa-icon
-      class="tool-tip-trigger"
-      matSuffix
-      [icon]="faCircleInfo"
-      [matTooltip]="'apps.createApp.defaultRole.tooltip' | transloco" />
-    <mat-autocomplete
-      requireSelection
-      #auto="matAutocomplete"
-      [displayWith]="displayFn">
-      <mat-option *ngFor="let role of filteredRoles" [value]="role">
-        {{ role.name }}
-      </mat-option>
-    </mat-autocomplete>
-  </mat-form-field>
-  <mat-form-field subscriptSizing="dynamic" class="full-width">
-    <mat-label>{{ 'apps.createApp.description.label' | transloco }}</mat-label>
-    <textarea
-      rows="1"
-      matInput
-      placeholder="{{ 'apps.createApp.description.label' | transloco }}"
-      formControlName="description"></textarea>
-    <fa-icon
-      class="tool-tip-trigger"
-      matSuffix
-      [icon]="faCircleInfo"
-      [matTooltip]="'apps.createApp.description.tooltip' | transloco" />
-  </mat-form-field>
-  <mat-slide-toggle formControlName="active" class="full-width">{{
-    'apps.createApp.active' | transloco
-  }}</mat-slide-toggle>
-  <!-- API Card -->
-  <mat-card
-    *ngIf="editApp"
-    class="full-width"
-    [style]="{ 'word-break': 'break-all' }">
-    <mat-card-header>
-      <mat-card-subtitle>{{
-        'apps.createApp.apiKey.label' | transloco
-      }}</mat-card-subtitle>
-    </mat-card-header>
-    <mat-card-content>
-      {{ editApp.apiKey }}
-    </mat-card-content>
-    <mat-card-actions>
-      <button mat-button type="button" (click)="copyApiKey()">
-        <fa-icon [icon]="faCopy"></fa-icon>
-
-        {{ 'apps.createApp.apiKey.copy' | transloco }}
-      </button>
-      <button
-        mat-button
-        type="button"
-        (click)="refreshApiKey()"
-        [disabled]="disableKeyRefresh">
-        <fa-icon [icon]="faRefresh"></fa-icon>
-
-        {{ 'apps.createApp.apiKey.refresh' | transloco }}
-      </button>
-    </mat-card-actions>
-  </mat-card>
-  <!-- app location -->
-  <div class="flex-col full-width">
-    <p>
-      {{ 'apps.createApp.appLocation.label' | transloco
-      }}<fa-icon
-        class="tool-tip-trigger"
-        matSuffix
-        [icon]="faCircleInfo"
-        [matTooltip]="'apps.createApp.appLocation.tooltip' | transloco" />
-    </p>
-    <mat-radio-group
-      class="flex-col"
-      aria-label="Select an option"
-      formControlName="appLocation">
-      <mat-radio-button value="0">{{
-        'apps.createApp.appLocation.options.noStorage' | transloco
-      }}</mat-radio-button>
-      <mat-radio-button value="1">{{
-        'apps.createApp.appLocation.options.fileStorage.label' | transloco
-      }}</mat-radio-button>
-      <mat-radio-button value="3">{{
-        'apps.createApp.appLocation.options.webServer.label' | transloco
-      }}</mat-radio-button>
-      <mat-radio-button value="2">{{
-        'apps.createApp.appLocation.options.remoteUrl.label' | transloco
-      }}</mat-radio-button>
-    </mat-radio-group>
-  </div>
-  <!-- conditional inputs -->
-  <div
-    *ngIf="
-      appForm.controls['appLocation'].value === '1' ||
-      appForm.controls['appLocation'].value === '2' ||
-      appForm.controls['appLocation'].value === '3'
-    "
-    class="half-width">
-    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
-      <mat-label>{{
-        'apps.createApp.appLocation.options.fileStorage.storageService.label'
-          | transloco
-      }}</mat-label>
-      <mat-select formControlName="storageServiceId" name="defaultRole">
-        <mat-option [value]="3">
-          {{
-            'apps.createApp.appLocation.options.fileStorage.storageService.options.file'
-              | transloco
-          }}
-        </mat-option>
-        <mat-option [value]="4">
-          {{
-            'apps.createApp.appLocation.options.fileStorage.storageService.options.log'
-              | transloco
-          }}
-        </mat-option>
-      </mat-select>
-      <fa-icon
-        class="tool-tip-trigger"
-        matSuffix
-        [icon]="faCircleInfo"
-        [matTooltip]="
-          'apps.createApp.appLocation.options.fileStorage.storageService.tooltip'
-            | transloco
-        " />
-    </mat-form-field>
-    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '1'">
-      <mat-label>{{
-        'apps.createApp.appLocation.options.fileStorage.storageFolder.label'
-          | transloco
-      }}</mat-label>
-      <input
-        matInput
-        placeholder="{{
-          'apps.createApp.appLocation.options.fileStorage.storageFolder.placeholder'
-            | transloco
-        }}"
-        formControlName="storageContainer" />
-      <fa-icon
-        class="tool-tip-trigger"
-        matSuffix
-        [icon]="faCircleInfo"
-        [matTooltip]="
-          'apps.createApp.appLocation.options.fileStorage.storageFolder.tooltip'
-            | transloco
-        " />
-    </mat-form-field>
-    <!-- shared path input -->
+<div [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <df-alert
+    [showAlert]="showAlert"
+    [alertType]="alertType"
+    (alertClosed)="showAlert = false">
+    {{ alertMsg }}
+  </df-alert>
+  <form [formGroup]="appForm" (ngSubmit)="save()" class="details-section">
     <mat-form-field
-      *ngIf="
-        appForm.controls['appLocation'].value === '1' ||
-        appForm.controls['appLocation'].value === '3'
-      ">
-      <mat-label *ngIf="appForm.controls['appLocation'].value === '1'">
-        {{
-          'apps.createApp.appLocation.options.fileStorage.launchPath.label'
-            | transloco
-        }}
-      </mat-label>
-      <mat-label *ngIf="appForm.controls['appLocation'].value === '3'">
-        {{
-          'apps.createApp.appLocation.options.webServer.pathToApp.label'
-            | transloco
-        }}
-      </mat-label>
-      <input
-        matInput
-        placeholder="{{
-          'apps.createApp.appLocation.options.fileStorage.launchPath.placeholder'
-            | transloco
-        }}"
-        formControlName="path" />
-      <fa-icon
-        class="tool-tip-trigger"
-        matSuffix
-        [icon]="faCircleInfo"
-        [matTooltip]="
-          'apps.createApp.appLocation.options.' +
-            (appForm.controls['appLocation'].value === '1'
-              ? 'fileStorage.launchPath'
-              : 'webServer.pathToApp') +
-            '.tooltip' | transloco
-        " />
-    </mat-form-field>
-    <mat-form-field *ngIf="appForm.controls['appLocation'].value === '2'">
+      subscriptSizing="dynamic"
+      appearance="outline"
+      class="dynamic-width">
       <mat-label>
-        {{ 'apps.createApp.appLocation.options.remoteUrl.label' | transloco }}
+        {{ 'apps.createApp.applicationName.label' | transloco }}
       </mat-label>
       <input
         matInput
-        placeholder="{{
-          'apps.createApp.appLocation.options.fileStorage.launchPath.placeholder'
-            | transloco
-        }}"
-        formControlName="url" />
+        placeholder="{{ 'apps.createApp.applicationName.label' | transloco }}"
+        formControlName="name"
+        required />
       <fa-icon
         class="tool-tip-trigger"
         matSuffix
         [icon]="faCircleInfo"
-        [matTooltip]="
-          'apps.createApp.appLocation.options.remoteUrl.url.tooltip' | transloco
-        " />
+        [matTooltip]="'apps.createApp.applicationName.tooltip' | transloco" />
+      <mat-error *ngIf="appForm.controls['name'].hasError('required')">
+        {{ 'apps.createApp.applicationName.error' | transloco }}
+      </mat-error>
     </mat-form-field>
-
+    <mat-form-field
+      subscriptSizing="dynamic"
+      appearance="outline"
+      class="dynamic-width">
+      <mat-label>{{
+        'apps.createApp.defaultRole.label' | transloco
+      }}</mat-label>
+      <input
+        #rolesInput
+        type="text"
+        placeholder="Pick one"
+        matInput
+        formControlName="defaultRole"
+        [matAutocomplete]="auto"
+        (input)="filter()"
+        (focus)="filter()" />
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="'apps.createApp.defaultRole.tooltip' | transloco" />
+      <mat-autocomplete
+        requireSelection
+        #auto="matAutocomplete"
+        [displayWith]="displayFn">
+        <mat-option *ngFor="let role of filteredRoles" [value]="role">
+          {{ role.name }}
+        </mat-option>
+      </mat-autocomplete>
+    </mat-form-field>
+    <mat-form-field
+      subscriptSizing="dynamic"
+      appearance="outline"
+      class="full-width">
+      <mat-label>{{
+        'apps.createApp.description.label' | transloco
+      }}</mat-label>
+      <textarea
+        rows="1"
+        matInput
+        placeholder="{{ 'apps.createApp.description.label' | transloco }}"
+        formControlName="description"></textarea>
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="'apps.createApp.description.tooltip' | transloco" />
+    </mat-form-field>
+    <mat-slide-toggle
+      formControlName="active"
+      color="primary"
+      class="full-width"
+      >{{ 'apps.createApp.active' | transloco }}</mat-slide-toggle
+    >
+    <!-- API Card -->
     <mat-card
-      *ngIf="
-        appForm.controls['appLocation'].value === '1' ||
-        appForm.controls['appLocation'].value === '3'
-      ">
+      *ngIf="editApp"
+      class="full-width api-card"
+      [style]="{ 'word-break': 'break-all' }">
       <mat-card-header>
         <mat-card-subtitle>{{
-          'apps.createApp.appLocation.options.urlPath.label' | transloco
+          'apps.createApp.apiKey.label' | transloco
         }}</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        {{ getAppLocationUrl() }}
+        {{ editApp.apiKey }}
       </mat-card-content>
       <mat-card-actions>
-        <button mat-button type="button" (click)="copyAppUrl()">
-          <fa-icon [icon]="faCopy" class="copy-icon"></fa-icon>
+        <button
+          mat-button
+          class="copy-btn"
+          type="button"
+          (click)="copyApiKey()">
+          <fa-icon [icon]="faCopy"></fa-icon>
 
-          {{ 'apps.createApp.appLocation.options.urlPath.copy' | transloco }}
+          {{ 'apps.createApp.apiKey.copy' | transloco }}
+        </button>
+        <button
+          mat-button
+          class="refresh-btn"
+          type="button"
+          (click)="refreshApiKey()"
+          [disabled]="disableKeyRefresh">
+          <fa-icon [icon]="faRefresh"></fa-icon>
+
+          {{ 'apps.createApp.apiKey.refresh' | transloco }}
         </button>
       </mat-card-actions>
     </mat-card>
-  </div>
-  <!-- submit -->
-  <div class="full-width action-bar">
-    <button mat-flat-button type="button" (click)="goBack()">
-      {{ 'cancel' | transloco }}
-    </button>
-    <button mat-flat-button color="primary">
-      <span *ngIf="editApp">{{ 'save' | transloco }}</span>
-      <span *ngIf="!editApp">{{ 'create' | transloco }}</span>
-    </button>
-  </div>
-</form>
+    <!-- app location -->
+    <div class="flex-col full-width">
+      <p>
+        {{ 'apps.createApp.appLocation.label' | transloco
+        }}<fa-icon
+          class="tool-tip-trigger"
+          matSuffix
+          [icon]="faCircleInfo"
+          [matTooltip]="'apps.createApp.appLocation.tooltip' | transloco" />
+      </p>
+      <mat-radio-group
+        class="flex-col"
+        aria-label="Select an option"
+        formControlName="appLocation">
+        <mat-radio-button value="0">{{
+          'apps.createApp.appLocation.options.noStorage' | transloco
+        }}</mat-radio-button>
+        <mat-radio-button value="1">{{
+          'apps.createApp.appLocation.options.fileStorage.label' | transloco
+        }}</mat-radio-button>
+        <mat-radio-button value="3">{{
+          'apps.createApp.appLocation.options.webServer.label' | transloco
+        }}</mat-radio-button>
+        <mat-radio-button value="2">{{
+          'apps.createApp.appLocation.options.remoteUrl.label' | transloco
+        }}</mat-radio-button>
+      </mat-radio-group>
+    </div>
+    <!-- conditional inputs -->
+    <div
+      *ngIf="
+        appForm.controls['appLocation'].value === '1' ||
+        appForm.controls['appLocation'].value === '2' ||
+        appForm.controls['appLocation'].value === '3'
+      "
+      class="full-width">
+      <mat-form-field
+        appearance="outline"
+        *ngIf="appForm.controls['appLocation'].value === '1'">
+        <mat-label>{{
+          'apps.createApp.appLocation.options.fileStorage.storageService.label'
+            | transloco
+        }}</mat-label>
+        <mat-select formControlName="storageServiceId" name="defaultRole">
+          <mat-option [value]="3">
+            {{
+              'apps.createApp.appLocation.options.fileStorage.storageService.options.file'
+                | transloco
+            }}
+          </mat-option>
+          <mat-option [value]="4">
+            {{
+              'apps.createApp.appLocation.options.fileStorage.storageService.options.log'
+                | transloco
+            }}
+          </mat-option>
+        </mat-select>
+        <fa-icon
+          class="tool-tip-trigger"
+          matSuffix
+          [icon]="faCircleInfo"
+          [matTooltip]="
+            'apps.createApp.appLocation.options.fileStorage.storageService.tooltip'
+              | transloco
+          " />
+      </mat-form-field>
+      <mat-form-field
+        appearance="outline"
+        *ngIf="appForm.controls['appLocation'].value === '1'">
+        <mat-label>{{
+          'apps.createApp.appLocation.options.fileStorage.storageFolder.label'
+            | transloco
+        }}</mat-label>
+        <input
+          matInput
+          placeholder="{{
+            'apps.createApp.appLocation.options.fileStorage.storageFolder.placeholder'
+              | transloco
+          }}"
+          formControlName="storageContainer" />
+        <fa-icon
+          class="tool-tip-trigger"
+          matSuffix
+          [icon]="faCircleInfo"
+          [matTooltip]="
+            'apps.createApp.appLocation.options.fileStorage.storageFolder.tooltip'
+              | transloco
+          " />
+      </mat-form-field>
+      <!-- shared path input -->
+      <mat-form-field
+        appearance="outline"
+        *ngIf="
+          appForm.controls['appLocation'].value === '1' ||
+          appForm.controls['appLocation'].value === '3'
+        ">
+        <mat-label *ngIf="appForm.controls['appLocation'].value === '1'">
+          {{
+            'apps.createApp.appLocation.options.fileStorage.launchPath.label'
+              | transloco
+          }}
+        </mat-label>
+        <mat-label *ngIf="appForm.controls['appLocation'].value === '3'">
+          {{
+            'apps.createApp.appLocation.options.webServer.pathToApp.label'
+              | transloco
+          }}
+        </mat-label>
+        <input
+          matInput
+          placeholder="{{
+            'apps.createApp.appLocation.options.fileStorage.launchPath.placeholder'
+              | transloco
+          }}"
+          formControlName="path" />
+        <fa-icon
+          class="tool-tip-trigger"
+          matSuffix
+          [icon]="faCircleInfo"
+          [matTooltip]="
+            'apps.createApp.appLocation.options.' +
+              (appForm.controls['appLocation'].value === '1'
+                ? 'fileStorage.launchPath'
+                : 'webServer.pathToApp') +
+              '.tooltip' | transloco
+          " />
+      </mat-form-field>
+      <mat-form-field
+        appearance="outline"
+        *ngIf="appForm.controls['appLocation'].value === '2'">
+        <mat-label>
+          {{ 'apps.createApp.appLocation.options.remoteUrl.label' | transloco }}
+        </mat-label>
+        <input
+          matInput
+          placeholder="{{
+            'apps.createApp.appLocation.options.fileStorage.launchPath.placeholder'
+              | transloco
+          }}"
+          formControlName="url" />
+        <fa-icon
+          class="tool-tip-trigger"
+          matSuffix
+          [icon]="faCircleInfo"
+          [matTooltip]="
+            'apps.createApp.appLocation.options.remoteUrl.url.tooltip'
+              | transloco
+          " />
+      </mat-form-field>
+
+      <mat-card
+        class="location-card"
+        *ngIf="
+          appForm.controls['appLocation'].value === '1' ||
+          appForm.controls['appLocation'].value === '3'
+        ">
+        <mat-card-header>
+          <mat-card-subtitle>{{
+            'apps.createApp.appLocation.options.urlPath.label' | transloco
+          }}</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          {{ getAppLocationUrl() }}
+        </mat-card-content>
+        <mat-card-actions>
+          <button mat-button type="button" (click)="copyAppUrl()">
+            <fa-icon [icon]="faCopy" class="copy-icon"></fa-icon>
+
+            {{ 'apps.createApp.appLocation.options.urlPath.copy' | transloco }}
+          </button>
+        </mat-card-actions>
+      </mat-card>
+    </div>
+    <!-- submit -->
+    <div class="full-width action-bar">
+      <button
+        mat-flat-button
+        type="button"
+        class="cancel-btn"
+        (click)="goBack()">
+        {{ 'cancel' | transloco }}
+      </button>
+      <button mat-flat-button class="save-btn" color="primary">
+        <span *ngIf="editApp">{{ 'save' | transloco }}</span>
+        <span *ngIf="!editApp">{{ 'create' | transloco }}</span>
+      </button>
+    </div>
+  </form>
+</div>

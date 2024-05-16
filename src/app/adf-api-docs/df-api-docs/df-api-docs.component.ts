@@ -14,6 +14,8 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 import { SESSION_TOKEN_HEADER } from 'src/app/shared/constants/http-headers';
 import { mapCamelToSnake } from 'src/app/shared/utilities/case';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { AsyncPipe } from '@angular/common';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -21,7 +23,7 @@ import { mapCamelToSnake } from 'src/app/shared/utilities/case';
   templateUrl: './df-api-docs.component.html',
   styleUrls: ['./df-api-docs.component.scss'],
   standalone: true,
-  imports: [MatButtonModule, TranslocoModule],
+  imports: [MatButtonModule, TranslocoModule, AsyncPipe],
 })
 export class DfApiDocsComponent implements OnInit, AfterContentInit {
   @ViewChild('apiDocumentation', { static: true }) apiDocElement:
@@ -33,17 +35,17 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
   constructor(
     private activatedRoute: ActivatedRoute,
     private router: Router,
-    private userDataService: DfUserDataService
+    private userDataService: DfUserDataService,
+    private themeService: DfThemeService
   ) {}
-
+  isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data }) => {
       if (data) {
-        this.apiDocJson = mapCamelToSnake(data);
+        this.apiDocJson = { ...data, paths: mapCamelToSnake(data.paths) };
       }
     });
   }
-
   ngAfterContentInit(): void {
     const apiDocumentation = this.apiDocJson;
     SwaggerUI({

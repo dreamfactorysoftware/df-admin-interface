@@ -90,7 +90,8 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
   }
 
   override mapDataToTable(data: Service[]): ApiDocsRowData[] {
-    return data.map(val => {
+    const sortedData = data.sort((a, b) => a.id - b.id);
+    return sortedData.map(val => {
       const type = this.getServiceType(val.type);
       return {
         name: val.name,

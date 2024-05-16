@@ -66,12 +66,17 @@ export class DfManageTablesTableComponent extends DfManageTableComponent<Databas
       };
     });
   }
-  refreshTable(limit?: number, offset?: number, filter?: string): void {
+  refreshTable(
+    limit?: number,
+    offset?: number,
+    filter?: string,
+    refresh?: boolean
+  ): void {
     const dbName = this._activatedRoute.snapshot.paramMap.get('name');
-
     this.service
       .get(`${dbName}/_schema`, {
         fields: ['name', 'label'].join(','),
+        refresh: refresh,
         limit,
         offset,
         filter,

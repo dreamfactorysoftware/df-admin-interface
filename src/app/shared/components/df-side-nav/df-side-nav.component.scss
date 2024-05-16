@@ -4,7 +4,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 $red-palette: mat.define-palette(mat.$red-palette);
 
 .logo {
-  height: 30px;
+  height: 40px;
   cursor: pointer;
 }
 
@@ -16,7 +16,48 @@ $red-palette: mat.define-palette(mat.$red-palette);
 }
 
 .mat-toolbar {
-  min-height: 64px;
+  background-color: #f6f2fa;
+  padding: 16px;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+
+  .button-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    img {
+      margin-bottom: -4px;
+    }
+  }
+
+  .search-bar {
+    margin-left: 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1 1 auto;
+    border: 1px solid #ebe7ef;
+    border-radius: 50px;
+    background-color: #ebe7ef;
+    overflow: hidden;
+    width: 300px;
+    height: 50px;
+    font-size: 24px;
+  }
+  .search-input {
+    border: none;
+    background-color: #ebe7ef;
+    color: #47464f;
+    font-size: 20px;
+    &:focus {
+      outline: none;
+    }
+  }
+  .search-icon {
+    color: #47464f;
+    padding-left: 14px;
+  }
 }
 
 .search-btn {
@@ -42,9 +83,10 @@ $red-palette: mat.define-palette(mat.$red-palette);
 }
 
 .sidenav-container {
+  background-color: #f6f2fa;
   flex: 1 1 auto;
   .sidenav {
-    background-color: mat.get-color-from-palette($df-purple-palette, 900);
+    background-color: #0f0761;
     min-width: 40%;
     border: none;
     transition: min-width 0.3s ease-out;
@@ -84,7 +126,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
     }
     .logged-in & {
       min-width: 20%;
-      background-color: white;
+      background-color: #f6f2fa;
     }
     .logged-in.small & {
       min-width: 40%;
@@ -94,21 +136,43 @@ $red-palette: mat.define-palette(mat.$red-palette);
       font-weight: 400;
       height: 48px;
       padding: 0 16px;
+      gap: 4px;
+      background: #f6f2fa;
     }
     ::ng-deep {
       .mat-expansion-panel-body {
         padding: 0 0 0 16px !important;
+        background: #f6f2fa;
       }
     }
     .nav-item {
+      // background-color: #f6f2fa;
       height: 48px;
       width: 100%;
       font-size: 1.6rem;
       font-weight: 400;
       border-radius: 0;
       justify-content: left;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      ::ng-deep .mat-mdc-button-touch-target {
+        background-color: #f6f2fa;
+      }
       &.active {
-        background-color: mat.get-color-from-palette($df-purple-palette, 200);
+        ::ng-deep .mat-mdc-button-touch-target {
+          background-color: #e3dfff;
+          border-top-right-radius: 50px;
+          border-bottom-right-radius: 50px;
+        }
+        background-color: #e3dfff !important;
+        border-top-right-radius: 50px;
+        border-bottom-right-radius: 50px;
+        border-top-left-radius: 0;
+        width: 95%;
+      }
+      .expansion-panel {
+        background-color: #f6f2fa;
       }
     }
   }
@@ -116,29 +180,36 @@ $red-palette: mat.define-palette(mat.$red-palette);
     display: flex;
     flex-direction: column;
     height: 100%;
+    padding: 8px 20px 24px;
+    background: #f6f2fa;
+    .content-wrapper {
+      height: 100%;
+      padding: 2px;
+      border: 1px solid #f6f2fa;
+      background-color: #f6f2fa;
+      border-radius: 6px !important;
+    }
     .banner {
       flex-shrink: 0;
       width: 100%;
-      padding-bottom: 60px;
-      background-color: mat.get-color-from-palette($df-purple-palette, 900);
+      padding-bottom: 40px;
+      background-color: #fff;
       .page-header {
-        color: white;
         padding: 32px 16px 0 16px;
       }
     }
     .main {
-      // height: 100%;
       flex-grow: 1;
       &.no-error {
         .logged-in & {
-          margin: -60px 16px 0 16px;
-          padding: 16px 24px;
+          margin-top: -60px;
+          padding: 16px 20px;
           background-color: white;
         }
         .logged-in.small & {
           margin: 0;
           margin-top: -60px;
-          padding: 16px 16px 0 16px;
+          padding: 16px 20px;
         }
       }
     }
@@ -160,6 +231,9 @@ $red-palette: mat.define-palette(mat.$red-palette);
   .mat-expansion-panel-body {
     overflow-x: auto;
   }
+  .mat-expansion-panel {
+    background: #f6f2fa;
+  }
 }
 
 .license-expired {
@@ -175,5 +249,94 @@ $red-palette: mat.define-palette(mat.$red-palette);
 }
 
 .breadcrumb-link {
-  color: white;
+  color: inherit;
+  text-decoration: none;
+}
+
+.dark-theme {
+  .tool-bar,
+  .sidenav-container,
+  .sidenav,
+  .nav-item,
+  .expansion-panel {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1003
+    ) !important;
+  }
+
+  .parent-route {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1003
+    ) !important;
+  }
+
+  .nav-item {
+    ::ng-deep .mat-mdc-button-touch-target {
+      background-color: mat.get-color-from-palette(
+        $df-purple-palette,
+        1003
+      ) !important;
+    }
+  }
+  &.active {
+    ::ng-deep .mat-mdc-button-touch-target {
+      background-color: #e3dfff;
+      border-top-right-radius: 50px;
+      border-bottom-right-radius: 50px;
+    }
+  }
+
+  .nav-item {
+    &.active {
+      ::ng-deep .mat-mdc-button-touch-target {
+        background-color: mat.get-color-from-palette(
+          $df-purple-palette,
+          600
+        ) !important;
+      }
+      ::ng-deep .mdc-button__label > span {
+        background-color: mat.get-color-from-palette(
+          $df-purple-palette,
+          600
+        ) !important;
+      }
+    }
+
+    img {
+      filter: invert(1) !important;
+    }
+  }
+  .banner,
+  .main {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1002
+    ) !important;
+    color: white;
+    .page-header {
+      color: mat.get-color-from-palette($df-purple-palette, 10) !important;
+    }
+  }
+  .sidenav-content {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1003
+    ) !important;
+    color: white;
+    .page-header {
+      color: mat.get-color-from-palette($df-purple-palette, 10) !important;
+    }
+  }
+
+  .content-wrapper {
+    padding: 2px;
+    border: 1px solid mat.get-color-from-palette($df-purple-palette, 1001) !important;
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1002
+    ) !important;
+    border-radius: 6px !important;
+  }
 }

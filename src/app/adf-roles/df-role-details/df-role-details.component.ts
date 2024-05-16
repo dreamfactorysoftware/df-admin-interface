@@ -30,6 +30,8 @@ import {
   DfAlertComponent,
 } from 'src/app/shared/components/df-alert/df-alert.component';
 import { catchError, throwError } from 'rxjs';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-role-details',
@@ -48,6 +50,7 @@ import { catchError, throwError } from 'rxjs';
     DfRolesAccessComponent,
     NgIf,
     DfAlertComponent,
+    AsyncPipe,
   ],
 })
 export class DfRoleDetailsComponent implements OnInit {
@@ -62,7 +65,8 @@ export class DfRoleDetailsComponent implements OnInit {
     private roleService: DfBaseCrudService,
     private fb: FormBuilder,
     private router: Router,
-    private activatedRoute: ActivatedRoute
+    private activatedRoute: ActivatedRoute,
+    private themeService: DfThemeService
   ) {
     this.roleForm = this.fb.group({
       id: [null],
@@ -73,6 +77,7 @@ export class DfRoleDetailsComponent implements OnInit {
       lookupKeys: this.fb.array([]),
     });
   }
+  isDarkMode = this.themeService.darkMode$;
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data, type }) => {

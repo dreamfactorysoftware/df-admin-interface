@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import {
   FormArray,
   FormBuilder,
@@ -21,6 +21,7 @@ import { faEnvelope } from '@fortawesome/free-solid-svg-icons';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfPaywallService } from '../../services/df-paywall.service';
 import { of, switchMap } from 'rxjs';
+import { DfThemeService } from '../../services/df-theme.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -64,7 +65,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
   ) {
     this.userForm = this.fb.group({
       profileDetailsGroup: this.fb.group({
-        username: [''],
+        username: ['', Validators.minLength(6)],
         email: ['', Validators.email],
         firstName: [''],
         lastName: [''],
@@ -77,6 +78,8 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
       appRoles: this.fb.array([]),
     });
   }
+  themeService = inject(DfThemeService);
+  isDarkMode = this.themeService.darkMode$;
 
   get cancelRoute() {
     let route = `/${ROUTES.ADMIN_SETTINGS}/`;

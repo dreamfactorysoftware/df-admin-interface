@@ -1,45 +1,52 @@
-<div mat-dialog-title class="search-bar">
-  <mat-form-field class="search-input" subscriptSizing="dynamic">
-    <mat-label>{{ 'search' | transloco }}</mat-label>
-    <input matInput [formControl]="search" />
-  </mat-form-field>
-</div>
-<div
-  mat-dialog-content
-  class="search-container"
-  [class.small]="smallScreen$ | async">
-  <ng-container *ngIf="search.value; else recent">
-    <ng-component
-      *ngTemplateOutlet="results; context: { resultArray: results$ | async }">
-    </ng-component>
-  </ng-container>
-  <ng-template #recent>
-    <ng-component
-      *ngTemplateOutlet="results; context: { resultArray: recents$ | async }">
-    </ng-component>
-  </ng-template>
-  <ng-template #results let-resultArray="resultArray">
-    <ul *ngFor="let result of resultArray" class="result-groups">
-      <li>
-        {{ getTranslationKey(result.path) | transloco }}
-        <ul>
-          <li *ngFor="let item of result.items">
-            <button
-              color="primary"
-              class="result-item"
-              mat-stroked-button
-              (click)="navigate(result.path + '/' + item.segment)">
-              <fa-icon
-                *ngIf="item.segment === 'create'"
-                [icon]="faPlus"></fa-icon>
-              {{ item.label }}
-            </button>
-          </li>
-        </ul>
-      </li>
-    </ul>
-  </ng-template>
-</div>
-<div mat-dialog-actions>
-  <button mat-button [mat-dialog-close]>{{ 'close' | transloco }}</button>
+<div class="search-dialog">
+  <div mat-dialog-title class="search-bar">
+    <mat-form-field
+      class="search-input"
+      appearance="outline"
+      subscriptSizing="dynamic">
+      <mat-label>{{ 'search' | transloco }}</mat-label>
+      <input matInput [formControl]="search" />
+    </mat-form-field>
+  </div>
+  <div
+    mat-dialog-content
+    class="search-container"
+    [class.small]="smallScreen$ | async">
+    <ng-container *ngIf="search.value; else recent">
+      <ng-component
+        *ngTemplateOutlet="results; context: { resultArray: results$ | async }">
+      </ng-component>
+    </ng-container>
+    <ng-template #recent>
+      <ng-component
+        *ngTemplateOutlet="results; context: { resultArray: recents$ | async }">
+      </ng-component>
+    </ng-template>
+    <ng-template #results let-resultArray="resultArray">
+      <ul *ngFor="let result of resultArray" class="result-groups">
+        <li>
+          {{ getTranslationKey(result.path) | transloco }}
+          <ul>
+            <li *ngFor="let item of result.items">
+              <button
+                color="primary"
+                class="result-item"
+                mat-stroked-button
+                (click)="navigate(result.path + '/' + item.segment)">
+                <fa-icon
+                  *ngIf="item.segment === 'create'"
+                  [icon]="faPlus"></fa-icon>
+                {{ item.label }}
+              </button>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </ng-template>
+  </div>
+  <div mat-dialog-actions class="search-action">
+    <button class="close-btn" mat-button [mat-dialog-close]>
+      {{ 'close' | transloco }}
+    </button>
+  </div>
 </div>

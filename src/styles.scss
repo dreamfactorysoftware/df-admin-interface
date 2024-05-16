@@ -1,7 +1,7 @@
 /* You can add global styles to this file, and also import other style files */
 @use '@angular/material' as mat;
 @use 'src/theme' as theme;
-
+@import 'src/dark-style.scss';
 $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
 html,
@@ -17,6 +17,10 @@ body {
   font-size: 1.4rem;
   margin: 0;
   font-family: Roboto, 'Helvetica Neue', sans-serif;
+}
+
+a {
+  color: mat.get-color-from-palette($df-purple-palette, 600);
 }
 
 .flex-col {
@@ -140,4 +144,89 @@ fa-icon.mat-mdc-tooltip-trigger {
 .mat-mdc-tab-body-content {
   padding: 8px;
   height: 100%;
+}
+
+// light mode
+a {
+  color: mat.get-color-from-palette($df-purple-palette, 600);
+}
+
+// Step
+.mat-step-icon-selected {
+  background-color: mat.get-color-from-palette(
+    $df-purple-palette,
+    400
+  ) !important;
+}
+.mat-step-icon-state-edit {
+  background-color: mat.get-color-from-palette(
+    $df-purple-palette,
+    400
+  ) !important;
+}
+
+// Radio Button
+.mat-mdc-radio-button
+  .mdc-radio
+  .mdc-radio__native-control
+  + .mdc-radio__background
+  .mdc-radio__outer-circle {
+  border-color: black !important;
+}
+
+.mat-mdc-radio-button
+  .mdc-radio
+  .mdc-radio__native-control:enabled:checked
+  + .mdc-radio__background
+  .mdc-radio__outer-circle {
+  border-color: mat.get-color-from-palette($df-purple-palette, 600) !important;
+}
+
+.mat-mdc-radio-button
+  .mdc-radio
+  .mdc-radio__native-control:enabled
+  + .mdc-radio__background
+  .mdc-radio__inner-circle {
+  border-color: mat.get-color-from-palette($df-purple-palette, 600) !important;
+}
+
+// Checkbox
+.mat-mdc-checkbox.mat-mdc-checkbox-checked .mdc-checkbox__background,
+.mdc-checkbox__ripple {
+  background-color: mat.get-color-from-palette(
+    $df-purple-palette,
+    600
+  ) !important;
+  border-color: mat.get-color-from-palette($df-purple-palette, 600) !important;
+}
+
+// Button
+.save-btn {
+  background-color: mat.get-color-from-palette(
+    $df-purple-palette,
+    400
+  ) !important;
+  color: white !important;
+  border-radius: 20px !important;
+}
+.cancel-btn {
+  color: mat.get-color-from-palette($df-purple-palette, 1001) !important;
+  border: 1px solid mat.get-color-from-palette($df-purple-palette, 1001) !important;
+  border-radius: 20px !important;
+}
+.action-btn {
+  color: mat.get-color-from-palette($df-purple-palette, 500) !important;
+}
+// Select
+.mat-mdc-select-arrow {
+  color: unset !important;
+}
+// Tab
+.mat-mdc-tab .mdc-tab-indicator__content--underline {
+  border-color: mat.get-color-from-palette($df-purple-palette, 500) !important;
+}
+
+// Swagger
+.swagger-ui .opblock .opblock-section-header {
+  background: unset !important;
 }

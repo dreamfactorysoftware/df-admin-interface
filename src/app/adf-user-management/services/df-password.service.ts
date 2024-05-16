@@ -35,9 +35,14 @@ export class DfPasswordService {
   }
 
   updatePassword(data: UpdatePasswordRequest) {
-    const url = this.userDataService.userData?.isSysAdmin
-      ? URLS.ADMIN_PASSWORD
-      : URLS.USER_PASSWORD;
+    let isSysAdmin = false;
+    // const url = this.userDataService.userData?.isSysAdmin
+    //   ? URLS.ADMIN_PASSWORD
+    //   : URLS.USER_PASSWORD;
+    this.userDataService.userData$.subscribe(userData => {
+      isSysAdmin = !!userData?.isSysAdmin;
+    });
+    const url = isSysAdmin ? URLS.ADMIN_PASSWORD : URLS.USER_PASSWORD;
     return this.http
       .post<UpdatePasswordResponse>(url, data, {
         headers: SHOW_LOADING_HEADER,

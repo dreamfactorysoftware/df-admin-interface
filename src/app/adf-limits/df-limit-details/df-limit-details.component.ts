@@ -34,6 +34,8 @@ import {
   GenericUpdateResponse,
 } from 'src/app/shared/types/generic-http';
 import { Service } from 'src/app/shared/types/service';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { AsyncPipe } from '@angular/common';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-limit',
@@ -53,6 +55,7 @@ import { Service } from 'src/app/shared/types/service';
     MatButtonModule,
     TranslocoPipe,
     DfVerbPickerComponent,
+    AsyncPipe,
   ],
 })
 export class DfLimitDetailsComponent implements OnInit {
@@ -78,7 +81,8 @@ export class DfLimitDetailsComponent implements OnInit {
     private router: Router,
     private activatedRoute: ActivatedRoute,
     private translateService: TranslocoService,
-    private formBuilder: FormBuilder
+    private formBuilder: FormBuilder,
+    private themeService: DfThemeService
   ) {
     this.formGroup = this.formBuilder.group({
       limitName: ['', Validators.required],
@@ -94,6 +98,7 @@ export class DfLimitDetailsComponent implements OnInit {
       active: [true],
     });
   }
+  isDarkMode = this.themeService.darkMode$;
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(resp => {

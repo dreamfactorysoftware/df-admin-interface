@@ -19,6 +19,9 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { AsyncPipe } from '@angular/common';
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-lookup-keys',
@@ -38,6 +41,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     FontAwesomeModule,
     MatExpansionModule,
     TranslocoPipe,
+    AsyncPipe,
   ],
 })
 export class DfLookupKeysComponent implements OnInit {
@@ -49,8 +53,11 @@ export class DfLookupKeysComponent implements OnInit {
   faPlus = faPlus;
   @Input() showAccordion = true;
 
-  constructor(private rootFormGroup: FormGroupDirective) {}
-
+  constructor(
+    private rootFormGroup: FormGroupDirective,
+    private themeService: DfThemeService
+  ) {}
+  isDarkMode = this.themeService.darkMode$;
   ngOnInit() {
     this.rootForm = this.rootFormGroup.control;
     this.rootFormGroup.ngSubmit.subscribe(() => {

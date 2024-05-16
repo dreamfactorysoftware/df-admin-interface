@@ -7,6 +7,8 @@
       (change)="uploadUserList($event)"
       style="display: none" />
     <button
+      class="save-btn"
+      [class]="(isDarkMode | async) ? 'dark-theme' : ''"
       mat-mini-fab
       color="primary"
       [attr.aria-label]="'importList' | transloco"
@@ -14,6 +16,8 @@
       <fa-icon [icon]="faUpload" size="xl"></fa-icon>
     </button>
     <button
+      class="save-btn"
+      [class]="(isDarkMode | async) ? 'dark-theme' : ''"
       mat-mini-fab
       color="primary"
       [attr.aria-label]="'exportList' | transloco"

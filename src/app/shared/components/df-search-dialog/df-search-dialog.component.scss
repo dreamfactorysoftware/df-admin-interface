@@ -1,5 +1,11 @@
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
+.search-dialog {
+  padding-top: 20px;
+}
+
 .search-bar {
-  margin-top: 16px;
   min-width: 275px;
 }
 .search-container {
@@ -19,4 +25,14 @@
   width: 100%;
   justify-content: left;
   margin: 2px 0;
+}
+
+.dark-theme {
+  &.search-dialog {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1003
+    ) !important;
+    border: 1px solid white;
+  }
 }

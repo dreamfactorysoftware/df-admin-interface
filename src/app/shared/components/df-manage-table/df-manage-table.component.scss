@@ -20,7 +20,9 @@ $red-palette: mat.define-palette(mat.$red-palette);
   align-items: center;
   gap: 12px;
   padding-bottom: 12px;
+
   .search-input {
+    height: 80% !important;
     max-width: 300px !important;
   }
 }
@@ -57,5 +59,14 @@ $red-palette: mat.define-palette(mat.$red-palette);
     .mat-mdc-cell {
       background-color: mat.get-color-from-palette($df-purple-palette, 100);
     }
+  }
+}
+
+.dark-theme {
+  .search {
+    background-color: mat.get-color-from-palette(
+      $df-purple-palette,
+      1004
+    ) !important;
   }
 }

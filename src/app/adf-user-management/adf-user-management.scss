@@ -3,11 +3,16 @@
   flex-direction: column;
   justify-content: center;
   height: 100%;
+
   .user-management-card {
     padding: 16px 16px;
     margin: 0 auto;
     min-width: 300px;
     max-width: 445px;
+    box-shadow: var(--mdc-elevated-card-container-elevation);
+    --mdc-elevated-card-container-shape: 4px;
+    --mdc-outlined-card-container-shape: 4px;
+    --mdc-outlined-card-outline-width: 1px;
     mat-card-header {
       padding-bottom: 16px;
     }
@@ -31,5 +36,14 @@
       display: flex;
       justify-content: flex-end;
     }
+  }
+}
+
+.user-management-card-container {
+  margin-top: 20vh;
+
+  &.dark-theme {
+    background-color: #1e1e1e;
+    color: #fff;
   }
 }

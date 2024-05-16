@@ -2,6 +2,7 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import {
   AfterViewInit,
   Component,
+  inject,
   Input,
   OnInit,
   ViewChild,
@@ -21,6 +22,7 @@ import {
   faTriangleExclamation,
   faCheckCircle,
   faXmarkCircle,
+  faRefresh,
 } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -34,6 +36,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { Actions, AdditonalAction, Column } from 'src/app/shared/types/table';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 
 export const DfManageTableModules = [
   NgIf,
@@ -69,9 +72,11 @@ export abstract class DfManageTableComponent<T>
   faPlus = faPlus;
   faEllipsisV = faEllipsisV;
   faTriangleExclamation = faTriangleExclamation;
+  faRefresh = faRefresh;
   allowCreate = true;
   allowFilter = true;
   currentFilter = new FormControl('');
+  schema = false;
 
   abstract columns: Array<Column<T>>;
 
@@ -100,6 +105,7 @@ export abstract class DfManageTableComponent<T>
       },
     ],
   };
+  cacheService: any;
 
   constructor(
     protected router: Router,
@@ -108,10 +114,13 @@ export abstract class DfManageTableComponent<T>
     private translateService: TranslocoService,
     public dialog: MatDialog
   ) {}
+  themeService = inject(DfThemeService);
 
+  isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
     if (!this.tableData) {
       this.activatedRoute.data.subscribe(({ data }) => {
+        this.schema = this.router.url.includes('schema');
         if (data && data.resource) {
           this.dataSource.data = this.mapDataToTable(data.resource);
         }
@@ -175,7 +184,12 @@ export abstract class DfManageTableComponent<T>
 
   abstract mapDataToTable(data: Array<any>): Array<T>;
 
-  abstract refreshTable(limit?: number, offset?: number, filter?: string): void;
+  abstract refreshTable(
+    limit?: number,
+    offset?: number,
+    filter?: string,
+    refresh?: true
+  ): void;
 
   abstract filterQuery(value: string): string;
 
@@ -242,5 +256,9 @@ export abstract class DfManageTableComponent<T>
       ((this.actions.default.disabled && !this.actions.default.disabled(row)) ||
         !this.actions.default.disabled)
     );
+  }
+
+  refreshSchema() {
+    this.refreshTable(undefined, undefined, undefined, true);
   }
 }

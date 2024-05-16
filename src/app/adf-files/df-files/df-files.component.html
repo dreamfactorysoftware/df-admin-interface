@@ -1,6 +1,8 @@
 <df-files-table>
   <ng-container topActions>
     <button
+      class="save-btn"
+      [class]="(isDarkMode | async) ? 'dark-theme' : ''"
       mat-mini-fab
       color="primary"
       [attr.aria-label]="'files.createFolder' | transloco"
@@ -8,6 +10,8 @@
       <fa-icon [icon]="faFolderPlus" size="xl"></fa-icon>
     </button>
     <button
+      class="save-btn"
+      [class]="(isDarkMode | async) ? 'dark-theme' : ''"
       mat-mini-fab
       color="primary"
       [attr.aria-label]="'importList' | transloco"

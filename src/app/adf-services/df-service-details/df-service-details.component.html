@@ -1,4 +1,8 @@
-<form [formGroup]="serviceForm" class="details-section" (ngSubmit)="save()">
+<form
+  [formGroup]="serviceForm"
+  class="details-section"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
+  (ngSubmit)="save()">
   <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabase">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
@@ -64,7 +68,9 @@
                       class="card-icon"
                       [src]="getBackgroundImage(type.name)"
                       [alt]="type.label" />
-                    <h4 class="text-center">{{ type.label }}</h4>
+                    <h4>
+                      {{ type.label }}
+                    </h4>
                   </div>
                 </div>
               </label>
@@ -84,7 +90,9 @@
                       class="card-icon"
                       [src]="getBackgroundImage(type.name)"
                       [alt]="type.label" />
-                    <h4 class="text-center">{{ type.label }}</h4>
+                    <h4 class="text-center" style="color: black !important">
+                      {{ type.label }}
+                    </h4>
                   </div>
                 </div>
                 <ng-container *ngIf="type.class === 'not-included'">
@@ -164,6 +172,7 @@
           </mat-form-field>
           <div class="action-container">
             <mat-slide-toggle
+              color="primary"
               formControlName="isActive"
               *ngIf="!subscriptionRequired"
               >{{ 'active' | transloco }}</mat-slide-toggle
@@ -238,10 +247,14 @@
           </ng-container>
         </ng-container>
         <div class="full-width action-bar" *ngIf="!subscriptionRequired">
-          <button mat-flat-button type="button" (click)="goBack()">
+          <button
+            class="cancel-btn"
+            mat-flat-button
+            type="button"
+            (click)="goBack()">
             {{ 'cancel' | transloco }}
           </button>
-          <button mat-flat-button color="primary">
+          <button class="save-btn" mat-flat-button color="primary">
             {{ 'save' | transloco }}
           </button>
         </div>
@@ -300,7 +313,7 @@
     <mat-form-field
       subscriptSizing="dynamic"
       appearance="outline"
-      class="dynamic-width"
+      class="full-width"
       *ngIf="!subscriptionRequired">
       <mat-label>{{ 'services.controls.label.label' | transloco }}</mat-label>
       <input matInput formControlName="label" />
@@ -327,17 +340,50 @@
     </mat-form-field>
     <mat-slide-toggle
       formControlName="isActive"
+      color="primary"
       *ngIf="!subscriptionRequired"
-      >{{ 'active' | transloco }}</mat-slide-toggle
+      ><span>{{ 'active' | transloco }}</span></mat-slide-toggle
     >
     <ng-container *ngIf="viewSchema && !subscriptionRequired">
       <ng-container formGroupName="config">
         <mat-accordion class="full-width">
           <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
             <mat-expansion-panel-header
-              >{{ 'services.options' | transloco }}
+              >{{ 'services.options' | transloco }}s
             </mat-expansion-panel-header>
             <div class="details-section">
+              <ng-container *ngIf="this.isNetworkService">
+                <mat-button-toggle-group
+                  aria-label="Service Definition Type"
+                  [(ngModel)]="serviceDefinitionType"
+                  [ngModelOptions]="{ standalone: true }"
+                  (change)="
+                    onServiceDefinitionTypeChange(serviceDefinitionType)
+                  ">
+                  <mat-button-toggle value="0">JSON</mat-button-toggle>
+                  <mat-button-toggle value="1">YAML</mat-button-toggle>
+                </mat-button-toggle-group>
+                <mat-form-field class="full-width" appearance="outline">
+                  <mat-label>Service Definition</mat-label>
+                  <textarea
+                    matInput
+                    rows="10"
+                    [(ngModel)]="serviceDefinition"
+                    [ngModelOptions]="{ standalone: true }"></textarea>
+                </mat-form-field>
+              </ng-container>
+
+              <!-- <ng-container *ngIf="this.isNetworkService">
+                <df-script-editor
+                  [type]="getControl('type')"
+                  formControlName="content"
+                  [storageServiceId]="getConfigControl('storageServiceId')"
+                  [storagePath]="getConfigControl('storagePath')"
+                  [content]="getConfigControl('content')"
+                  [cache]="serviceData ? serviceData.name : ''"
+                  class="full-width"></df-script-editor
+              ></ng-container> -->
+
               <ng-container *ngFor="let item of viewSchema">
                 <ng-container
                   *ngIf="
@@ -366,6 +412,7 @@
                         'file_certificate'
                       ].includes(item.type)
                     "
+                    color="primary"
                     [schema]="item"
                     [formControl]="getConfigControl(item.name)"
                     [class.dynamic-width]="item.type !== 'file_certificate'"
@@ -385,10 +432,14 @@
       </ng-container>
     </ng-container>
     <div class="full-width action-bar" *ngIf="!subscriptionRequired">
-      <button mat-flat-button type="button" (click)="goBack()">
+      <button
+        mat-flat-button
+        class="cancel-btn"
+        type="button"
+        (click)="goBack()">
         {{ 'cancel' | transloco }}
       </button>
-      <button mat-flat-button color="primary">
+      <button mat-flat-button class="save-btn" color="primary">
         {{ 'save' | transloco }}
       </button>
     </div>

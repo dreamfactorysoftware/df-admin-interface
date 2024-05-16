@@ -39,7 +39,7 @@ import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
-import { forkJoin, map, switchMap } from 'rxjs';
+import { map, switchMap } from 'rxjs';
 import {
   GOLD_SERVICES,
   SILVER_SERVICES,
@@ -49,6 +49,8 @@ import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -80,11 +82,13 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
     MatStepperModule,
     CommonModule,
     MatIconModule,
+    MatButtonToggleModule,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
   edit = false;
   isDatabase = false;
+  isNetworkService = false;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -93,6 +97,8 @@ export class DfServiceDetailsComponent implements OnInit {
   configSchema: Array<ConfigSchema>;
   images: Array<ImageObject>;
   search = '';
+  serviceDefinition: string;
+  serviceDefinitionType: string;
 
   systemEvents: Array<{ label: string; value: string }>;
 
@@ -104,7 +110,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private router: Router,
     private systemConfigDataService: DfSystemConfigDataService,
     private http: HttpClient,
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private themeService: DfThemeService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -112,13 +119,17 @@ export class DfServiceDetailsComponent implements OnInit {
       label: [''],
       description: [''],
       isActive: [true],
+      service_doc_by_service_id: this.fb.group({
+        format: [],
+        content: [''],
+      }),
     });
     const id = this.activatedRoute.snapshot.paramMap.get('id');
     if (id) {
       this.edit = true;
     }
   }
-
+  isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
     this.http
       .get<Array<ImageObject>>('assets/img/databaseImages.json')
@@ -134,6 +145,12 @@ export class DfServiceDetailsComponent implements OnInit {
       .subscribe(({ env, route }) => {
         if (route['groups'] && route['groups'][0] === 'Database') {
           this.isDatabase = true;
+        }
+        if (
+          (route['groups'] && route['groups'][0] === 'Remote Service') ||
+          (route['groups'] && route['groups'][0] === 'Script')
+        ) {
+          this.isNetworkService = true;
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
@@ -181,7 +198,8 @@ export class DfServiceDetailsComponent implements OnInit {
             ...data,
             config: data.config,
           });
-          this.serviceForm.controls['type'].disable();
+          (this.serviceDefinition = data?.serviceDocByServiceId.content),
+            this.serviceForm.controls['type'].disable();
         } else {
           this.serviceForm.controls['type'].valueChanges.subscribe(value => {
             this.serviceForm.removeControl('config');
@@ -190,11 +208,13 @@ export class DfServiceDetailsComponent implements OnInit {
           });
         }
       });
-    this.serviceForm.controls['type'].valueChanges.subscribe(value => {
-      this.serviceForm.patchValue({
-        label: value,
+    if (this.isDatabase) {
+      this.serviceForm.controls['type'].valueChanges.subscribe(value => {
+        this.serviceForm.patchValue({
+          label: value,
+        });
       });
-    });
+    }
   }
 
   initializeConfig() {
@@ -205,12 +225,12 @@ export class DfServiceDetailsComponent implements OnInit {
         if (control.required) {
           validator.push(Validators.required);
         }
-        config.addControl(
+        config?.addControl(
           control.name,
           new FormControl(control.default, validator)
         );
       });
-      this.serviceForm.addControl('config', config);
+      this.serviceForm?.addControl('config', config);
     }
   }
 
@@ -264,6 +284,28 @@ export class DfServiceDetailsComponent implements OnInit {
       return;
     }
     const data = this.serviceForm.getRawValue();
+    data.service_doc_by_service_id.content = this.serviceDefinition;
+    data.service_doc_by_service_id.format = Number(this.serviceDefinitionType);
+    type Params = {
+      snackbarError: string;
+      snackbarSuccess: string;
+      fields?: string;
+      related?: string;
+    };
+
+    let params: Params = {
+      snackbarError: 'server',
+      snackbarSuccess: 'services.createSuccessMsg',
+    };
+
+    if (this.isNetworkService) {
+      params = {
+        ...params,
+        fields: '*',
+        related: 'service_doc_by_service_id',
+      };
+    }
+
     if (this.edit) {
       this.servicesService
         .update(this.serviceData.id, data, {
@@ -276,11 +318,10 @@ export class DfServiceDetailsComponent implements OnInit {
     } else {
       this.servicesService
         .create(
-          { resource: [data] },
           {
-            snackbarError: 'server',
-            snackbarSuccess: 'services.createSuccessMsg',
-          }
+            resource: [data],
+          },
+          params
         )
         .subscribe(() => {
           this.router.navigate([`/api-connections/api-docs/${data.name}`]);
@@ -292,8 +333,8 @@ export class DfServiceDetailsComponent implements OnInit {
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 
-  getBackgroundImage(typeLable: string) {
-    const image = this.images?.find(img => img.label == typeLable);
+  getBackgroundImage(typeLabel: string) {
+    const image = this.images?.find(img => img.label == typeLabel);
     if (!image) {
       return '';
     }
@@ -315,8 +356,11 @@ export class DfServiceDetailsComponent implements OnInit {
 
   openDialog() {
     const dialogRef = this.dialog.open(DfPaywallModal);
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    dialogRef.afterClosed().subscribe(result => {});
+    dialogRef.afterClosed().subscribe();
+  }
+
+  onServiceDefinitionTypeChange(value: string) {
+    this.serviceDefinitionType = value;
   }
 }
 interface ImageObject {

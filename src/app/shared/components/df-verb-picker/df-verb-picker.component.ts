@@ -15,7 +15,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { UntilDestroy } from '@ngneat/until-destroy';
-
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { AsyncPipe } from '@angular/common';
 type Verb = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -31,6 +32,7 @@ type Verb = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     NgIf,
     MatTooltipModule,
     FontAwesomeModule,
+    AsyncPipe,
   ],
 })
 export class DfVerbPickerComponent implements ControlValueAccessor, DoCheck {
@@ -71,9 +73,13 @@ export class DfVerbPickerComponent implements ControlValueAccessor, DoCheck {
   onChange: (value: number | Verb | Array<Verb>) => void;
   onTouched: () => void;
 
-  constructor(@Self() public controlDir: NgControl) {
+  constructor(
+    @Self() public controlDir: NgControl,
+    private themeService: DfThemeService
+  ) {
     controlDir.valueAccessor = this;
   }
+  isDarkMode = this.themeService.darkMode$;
 
   ngDoCheck(): void {
     if (

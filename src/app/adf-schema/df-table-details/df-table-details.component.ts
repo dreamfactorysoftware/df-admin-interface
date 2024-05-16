@@ -23,6 +23,8 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { TableDetailsType } from './df-table-details.types';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-table-details',
@@ -59,7 +61,8 @@ export class DfTableDetailsComponent implements OnInit {
     private fb: FormBuilder,
     private activatedRoute: ActivatedRoute,
     public breakpointService: DfBreakpointService,
-    private router: Router
+    private router: Router,
+    private themeService: DfThemeService
   ) {
     this.tableDetailsForm = this.fb.group({
       name: ['', Validators.required],
@@ -69,6 +72,7 @@ export class DfTableDetailsComponent implements OnInit {
       description: [null],
     });
   }
+  isDarkMode = this.themeService.darkMode$;
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(data => {

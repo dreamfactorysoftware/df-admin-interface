@@ -24,7 +24,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatOptionModule } from '@angular/material/core';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
-import { NgIf, NgFor } from '@angular/common';
+import { NgIf, NgFor, AsyncPipe } from '@angular/common';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import {
@@ -41,7 +41,7 @@ import { catchError, throwError } from 'rxjs';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { DfAlertComponent } from 'src/app/shared/components/df-alert/df-alert.component';
 import { RoleType } from 'src/app/shared/types/role';
-
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-app-details',
@@ -65,6 +65,7 @@ import { RoleType } from 'src/app/shared/types/role';
     TranslocoPipe,
     MatTooltipModule,
     DfAlertComponent,
+    AsyncPipe,
   ],
 })
 export class DfAppDetailsComponent implements OnInit {
@@ -87,7 +88,8 @@ export class DfAppDetailsComponent implements OnInit {
     private appsService: DfBaseCrudService,
     private systemConfigDataService: DfSystemConfigDataService,
     private activatedRoute: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private themeService: DfThemeService
   ) {
     this.urlOrigin = window.location.origin;
 
@@ -103,7 +105,7 @@ export class DfAppDetailsComponent implements OnInit {
       url: [''], // type 2
     });
   }
-
+  isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ roles, appData }) => {
       this.roles = roles.resource || [];
