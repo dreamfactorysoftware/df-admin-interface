@@ -50,6 +50,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -81,6 +82,7 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
     MatStepperModule,
     CommonModule,
     MatIconModule,
+    MatButtonToggleModule,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -96,6 +98,7 @@ export class DfServiceDetailsComponent implements OnInit {
   images: Array<ImageObject>;
   search = '';
   serviceDefinition: string;
+  serviceDefinitionType: string;
 
   systemEvents: Array<{ label: string; value: string }>;
 
@@ -117,6 +120,7 @@ export class DfServiceDetailsComponent implements OnInit {
       description: [''],
       isActive: [true],
       service_doc_by_service_id: this.fb.group({
+        format: [],
         content: [''],
       }),
     });
@@ -279,6 +283,7 @@ export class DfServiceDetailsComponent implements OnInit {
     }
     const data = this.serviceForm.getRawValue();
     data.service_doc_by_service_id.content = this.serviceDefinition;
+    data.service_doc_by_service_id.format = Number(this.serviceDefinitionType);
     type Params = {
       snackbarError: string;
       snackbarSuccess: string;
@@ -350,6 +355,10 @@ export class DfServiceDetailsComponent implements OnInit {
   openDialog() {
     const dialogRef = this.dialog.open(DfPaywallModal);
     dialogRef.afterClosed().subscribe();
+  }
+
+  onServiceDefinitionTypeChange(value: string) {
+    this.serviceDefinitionType = value;
   }
 }
 interface ImageObject {
