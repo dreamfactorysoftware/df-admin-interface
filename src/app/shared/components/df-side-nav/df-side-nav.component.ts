@@ -67,7 +67,7 @@ import { MatInputModule } from '@angular/material/input';
     MatFormFieldModule,
     DfThemeToggleComponent,
     ReactiveFormsModule,
-    MatInputModule
+    MatInputModule,
   ],
 })
 export class DfSideNavComponent implements OnInit {
