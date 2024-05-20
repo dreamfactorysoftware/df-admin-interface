@@ -90,7 +90,7 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
   }
 
   override mapDataToTable(data: Service[]): ApiDocsRowData[] {
-    const sortedData = data.sort((a, b) => a.id - b.id);
+    const sortedData = data.sort((a, b) => a.name.localeCompare(b.name));
     return sortedData.map(val => {
       const type = this.getServiceType(val.type);
       return {
@@ -114,7 +114,7 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
   ): void {
     this.servicesService
       .getAll<GenericListResponse<Service>>({
-        limit,
+        limit: 100 || limit,
         offset,
         filter: `(type not like "%swagger%")${filter ? ` and ${filter}` : ''}`,
       })
