@@ -53,6 +53,16 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
       domNode: this.apiDocElement?.nativeElement,
       requestInterceptor: (req: SwaggerUI.Request) => {
         req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
+        // Parse the request URL
+        const url = new URL(req['url']);
+        const params = new URLSearchParams(url.search);
+        // Decode all parameters
+        params.forEach((value, key) => {
+          params.set(key, decodeURIComponent(value));
+        });
+        // Update the URL with decoded parameters
+        url.search = params.toString();
+        req['url'] = url.toString();
         return req;
       },
       showMutatedRequest: true,
