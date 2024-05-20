@@ -284,8 +284,7 @@ export class DfServiceDetailsComponent implements OnInit {
       return;
     }
     const data = this.serviceForm.getRawValue();
-    data.service_doc_by_service_id.content = this.serviceDefinition;
-    data.service_doc_by_service_id.format = Number(this.serviceDefinitionType);
+
     type Params = {
       snackbarError: string;
       snackbarSuccess: string;
@@ -304,6 +303,12 @@ export class DfServiceDetailsComponent implements OnInit {
         fields: '*',
         related: 'service_doc_by_service_id',
       };
+      data.service_doc_by_service_id.content = this.serviceDefinition;
+      data.service_doc_by_service_id.format = Number(
+        this.serviceDefinitionType
+      );
+    } else {
+      delete data.service_doc_by_service_id; // Remove service_doc_by_service_id if it's not a network service
     }
 
     if (this.edit) {
