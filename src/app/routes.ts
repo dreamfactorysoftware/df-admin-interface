@@ -270,7 +270,7 @@ export const routes: Routes = [
                 './adf-api-docs/df-api-docs/df-api-docs-table.component'
               ).then(m => m.DfApiDocsTableComponent),
             resolve: {
-              data: servicesResolver(10, '(type not like "%swagger%")'),
+              data: servicesResolver(100, '(type not like "%swagger%")'),
               serviceTypes: serviceTypesResolver,
             },
           },

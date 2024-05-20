@@ -7,7 +7,11 @@ import {
   OnInit,
   ViewChild,
 } from '@angular/core';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import {
+  MatPaginator,
+  MatPaginatorModule,
+  PageEvent,
+} from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -81,6 +85,7 @@ export abstract class DfManageTableComponent<T>
   abstract columns: Array<Column<T>>;
 
   @ViewChild(MatSort) sort: MatSort;
+  @ViewChild(MatPaginator) paginator: MatPaginator;
   _activatedRoute = this.activatedRoute;
   _translateService = this.translateService;
 
@@ -123,6 +128,7 @@ export abstract class DfManageTableComponent<T>
         this.schema = this.router.url.includes('schema');
         if (data && data.resource) {
           this.dataSource.data = this.mapDataToTable(data.resource);
+          this.dataSource.paginator = this.paginator;
         }
         if (data && data.meta) {
           this.tableLength = data.meta.count;
@@ -143,6 +149,7 @@ export abstract class DfManageTableComponent<T>
 
   ngAfterViewInit(): void {
     this.dataSource.sort = this.sort;
+    this.dataSource.paginator = this.paginator;
   }
 
   activeIcon(active: boolean): IconProp {
@@ -212,12 +219,14 @@ export abstract class DfManageTableComponent<T>
   }
 
   changePage(event: PageEvent): void {
-    if (event.previousPageIndex !== event.pageIndex) {
-      this.refreshTable(this.currentPageSize, event.pageIndex * event.pageSize);
-    } else {
-      this.currentPageSize = event.pageSize;
-      this.refreshTable(event.pageSize);
-    }
+    // if (event.previousPageIndex !== event.pageIndex) {
+    //   console.log(event);
+    //   this.refreshTable(undefined, event.pageIndex * event.pageSize);
+    // } else {
+    //   console.log(event);
+    //   this.currentPageSize = event.pageSize;
+    //   this.refreshTable(event.pageSize);
+    // }
   }
 
   createRow(): void {
