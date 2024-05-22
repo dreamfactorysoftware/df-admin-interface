@@ -352,7 +352,8 @@
               >{{ 'services.options' | transloco }}
             </mat-expansion-panel-header>
             <div class="details-section">
-              <ng-container *ngIf="this.isNetworkService">
+              <ng-container
+                *ngIf="this.isNetworkService || this.isScriptService">
                 <mat-button-toggle-group
                   aria-label="Service Definition Type"
                   [(ngModel)]="serviceDefinitionType"

@@ -2,6 +2,7 @@
   "cache": "Cache",
   "overview": "Cache Overview",
   "flushService": "Flush {{serviceName}} Cache",
+  "flushCache": "Flush Cache",
   "description": "Flush system-wide cache or per-service caches. Use the cache clearing buttons below to refresh any changes made to your system configuration values.",
   "flushSystemCache": "Flush System-Wide Cache",
   "perServiceCaches": "Per-Service Caches",

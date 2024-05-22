@@ -89,6 +89,7 @@ export class DfServiceDetailsComponent implements OnInit {
   edit = false;
   isDatabase = false;
   isNetworkService = false;
+  isScriptService = false;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -146,11 +147,11 @@ export class DfServiceDetailsComponent implements OnInit {
         if (route['groups'] && route['groups'][0] === 'Database') {
           this.isDatabase = true;
         }
-        if (
-          (route['groups'] && route['groups'][0] === 'Remote Service') ||
-          (route['groups'] && route['groups'][0] === 'Script')
-        ) {
+        if (route['groups'] && route['groups'][0] === 'Remote Service') {
           this.isNetworkService = true;
+        }
+        if (route['groups'] && route['groups'][0] === 'Script') {
+          this.isScriptService = true;
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
@@ -307,8 +308,16 @@ export class DfServiceDetailsComponent implements OnInit {
       data.service_doc_by_service_id.format = Number(
         this.serviceDefinitionType
       );
+    } else if (this.isScriptService) {
+      params = {
+        ...params,
+        fields: '*',
+        related: 'service_doc_by_service_id',
+      };
+      data.service_doc_by_service_id = null;
+      data.config.content = this.serviceDefinition;
     } else {
-      delete data.service_doc_by_service_id; // Remove service_doc_by_service_id if it's not a network service
+      delete data.service_doc_by_service_id;
     }
 
     if (this.edit) {
