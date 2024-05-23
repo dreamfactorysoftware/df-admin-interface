@@ -16,11 +16,21 @@ import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
+import { MatInputModule } from '@angular/material/input';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
 import { NgFor, NgIf } from '@angular/common';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { BehaviorSubject } from 'rxjs';
+import { AsyncPipe } from '@angular/common';
+import {
+  animate,
+  state,
+  style,
+  transition,
+  trigger,
+} from '@angular/animations';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-roles-access',
@@ -33,11 +43,23 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     ReactiveFormsModule,
     MatFormFieldModule,
     MatSelectModule,
+    MatInputModule,
     MatExpansionModule,
     FontAwesomeModule,
     MatButtonModule,
     NgFor,
     NgIf,
+    AsyncPipe,
+  ],
+  animations: [
+    trigger('detailExpand', [
+      state('collapsed,void', style({ height: '0px', minHeight: '0' })),
+      state('expanded', style({ height: '*' })),
+      transition(
+        'expanded <=> collapsed',
+        animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')
+      ),
+    ]),
   ],
 })
 export class DfRolesAccessComponent implements OnInit {
@@ -71,6 +93,22 @@ export class DfRolesAccessComponent implements OnInit {
     { value: 2, label: 'SCRIPT' },
   ];
 
+  operatorOptions = [
+    { value: 1, label: '=' },
+    { value: 2, label: '!=' },
+    { value: 3, label: '>' },
+    { value: 4, label: '<' },
+    { value: 5, label: '>=' },
+    { value: 6, label: '<=' },
+    { value: 7, label: 'in' },
+    { value: 8, label: 'not in' },
+    { value: 9, label: 'start with' },
+    { value: 10, label: 'end with' },
+    { value: 11, label: 'contains' },
+    { value: 12, label: 'is null' },
+    { value: 13, label: 'is not null' },
+  ];
+
   constructor(
     private rootFormGroup: FormGroupDirective,
     private activatedRoute: ActivatedRoute,
@@ -84,7 +122,7 @@ export class DfRolesAccessComponent implements OnInit {
       this.rootForm.markAllAsTouched();
     });
     this.serviceAccess = this.rootForm.get('serviceAccess') as FormArray;
-
+    console.log(this.serviceAccess.controls);
     // get services options
     this.activatedRoute.data.subscribe((data: any) => {
       // sort service options by name
@@ -173,6 +211,20 @@ export class DfRolesAccessComponent implements OnInit {
     return components || [];
   }
 
+  getExtendOperator(index: number) {
+    const serviceId = this.serviceAccess.at(index).get('extend-operator')
+      ?.value;
+    const operators = this.componentOptions.find(
+      option => option.serviceId === serviceId
+    )?.components;
+    return operators || [];
+  }
+
+  expandedElement$ = new BehaviorSubject<number | 1>(1);
+  expandedElement: number | null = null;
+  toggleRow(element: any) {
+    this.expandedElement = this.expandedElement === element ? null : element;
+  }
   // TODO finish implementing "all" option
   accessChange(index: number, value: number[]) {
     const access = this.serviceAccess.at(index).get('access');
@@ -211,6 +263,9 @@ export class DfRolesAccessComponent implements OnInit {
         requester: new FormControl([1], Validators.required),
         advancedFilters: new FormControl([]),
         id: new FormControl(null),
+        expandField: new FormControl(''),
+        expandOperator: new FormControl(''),
+        expandValue: new FormControl(''),
       })
     );
     this.updateDataSource();

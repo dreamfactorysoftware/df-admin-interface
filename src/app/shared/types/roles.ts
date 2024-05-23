@@ -73,4 +73,8 @@ export interface RoleServiceAccessType {
   lastModifiedDate: string;
   createdById?: number;
   lastModifiedById?: number;
+
+  extendField: string;
+  extendOperator: number;
+  extendValue: string;
 }

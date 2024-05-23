@@ -13,6 +13,13 @@ import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import {
+  trigger,
+  state,
+  style,
+  animate,
+  transition,
+} from '@angular/animations';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-roles-table',
@@ -23,8 +30,19 @@ import { UntilDestroy } from '@ngneat/until-destroy';
   ],
   standalone: true,
   imports: DfManageTableModules,
+  animations: [
+    trigger('detailExpand', [
+      state('collapsed,void', style({ height: '0px', minHeight: '0' })),
+      state('expanded', style({ height: '*' })),
+      transition(
+        'expanded <=> collapsed',
+        animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')
+      ),
+    ]),
+  ],
 })
 export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow> {
+  expandedElement: any | null;
   constructor(
     @Inject(ROLE_SERVICE_TOKEN)
     private roleService: DfBaseCrudService,

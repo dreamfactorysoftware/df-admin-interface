@@ -107,6 +107,9 @@ export class DfRoleDetailsComponent implements OnInit {
                   ),
                   advancedFilters: new FormControl(item.filters),
                   id: new FormControl(item.id),
+                  extendField: new FormControl(item.extendField),
+                  extendOperator: new FormControl(item.extendOperator),
+                  extendValue: new FormControl(item.extendValue),
                 })
               );
             }
