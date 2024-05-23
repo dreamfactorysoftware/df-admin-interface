@@ -171,15 +171,26 @@ export class DfRoleDetailsComponent implements OnInit {
       description: formValue.description,
       isActive: formValue.active,
       roleServiceAccessByRoleId: formValue.serviceAccess.map(
-        (val: AccessForm) => ({
-          id: val.id,
-          serviceId: val.service,
-          component: val.component,
-          verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
-          requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
-          filters: val.advancedFilters,
-          filterOp: 'AND',
-        })
+        (val: AccessForm) => {
+          const advancedFilters = {
+            field: val.expandField,
+            operator: val.expandOperator,
+            value: val.expandValue,
+          };
+
+          const filtersArray = [];
+          filtersArray.push(advancedFilters);
+
+          return {
+            id: val.id,
+            serviceId: val.service,
+            component: val.component,
+            verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
+            requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
+            filters: filtersArray,
+            filterOp: 'AND',
+          };
+        }
       ),
       lookupByRoleId: formValue.lookupKeys,
     };

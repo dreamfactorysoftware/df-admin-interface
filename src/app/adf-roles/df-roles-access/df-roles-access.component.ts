@@ -94,19 +94,19 @@ export class DfRolesAccessComponent implements OnInit {
   ];
 
   operatorOptions = [
-    { value: 1, label: '=' },
-    { value: 2, label: '!=' },
-    { value: 3, label: '>' },
-    { value: 4, label: '<' },
-    { value: 5, label: '>=' },
-    { value: 6, label: '<=' },
-    { value: 7, label: 'in' },
-    { value: 8, label: 'not in' },
-    { value: 9, label: 'start with' },
-    { value: 10, label: 'end with' },
-    { value: 11, label: 'contains' },
-    { value: 12, label: 'is null' },
-    { value: 13, label: 'is not null' },
+    { value: '=', label: '=' },
+    { value: '!=', label: '!=' },
+    { value: '>', label: '>' },
+    { value: '<', label: '<' },
+    { value: '>=', label: '>=' },
+    { value: '<=', label: '<=' },
+    { value: 'in', label: 'in' },
+    { value: 'not in', label: 'not in' },
+    { value: 'start with', label: 'start with' },
+    { value: 'end with', label: 'end with' },
+    { value: 'contains', label: 'contains' },
+    { value: 'is null', label: 'is null' },
+    { value: 'is not null', label: 'is not null' },
   ];
 
   constructor(
@@ -122,7 +122,6 @@ export class DfRolesAccessComponent implements OnInit {
       this.rootForm.markAllAsTouched();
     });
     this.serviceAccess = this.rootForm.get('serviceAccess') as FormArray;
-    console.log(this.serviceAccess.controls);
     // get services options
     this.activatedRoute.data.subscribe((data: any) => {
       // sort service options by name

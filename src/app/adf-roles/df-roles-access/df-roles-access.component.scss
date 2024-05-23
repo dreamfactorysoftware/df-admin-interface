@@ -27,6 +27,8 @@ tr.element-row:not(.example-expanded-row):active {
 .element-detail {
   overflow: hidden;
   display: flex;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .detail-input {

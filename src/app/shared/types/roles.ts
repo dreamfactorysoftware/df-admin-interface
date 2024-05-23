@@ -28,10 +28,14 @@ interface Lookup {
 }
 
 export interface AccessForm {
+  expandField?: string;
+  expandOperator?: string;
+  expandValue?: string;
   service: number;
   component: number;
   access: number[];
   requester: number[];
+  filters: any[];
   advancedFilters?: string;
   id?: number;
 }
