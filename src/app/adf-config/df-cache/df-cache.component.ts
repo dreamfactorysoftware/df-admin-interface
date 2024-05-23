@@ -22,6 +22,7 @@ import { DfCacheTableComponent } from './df-cache-table.component';
     MatTableModule,
     NgFor,
   ],
+  providers: [DfBaseCrudService],
 })
 export class DfCacheComponent {
   faRotate = faRotate;
@@ -33,7 +34,7 @@ export class DfCacheComponent {
 
   flushSystemCache() {
     this.cacheService
-      .delete('system', { snackbarSuccess: 'cache.systemCacheFlushed' })
+      .delete('', { snackbarSuccess: 'cache.systemCacheFlushed' })
       .subscribe();
   }
 }
