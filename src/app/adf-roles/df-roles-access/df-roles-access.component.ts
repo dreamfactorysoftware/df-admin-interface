@@ -260,7 +260,7 @@ export class DfRolesAccessComponent implements OnInit {
         component: new FormControl('', Validators.required),
         access: new FormControl('', Validators.required),
         requester: new FormControl([1], Validators.required),
-        advancedFilters: new FormControl([]),
+        advancedFilters: new FormArray([]),
         id: new FormControl(null),
         expandField: new FormControl(''),
         expandOperator: new FormControl(''),
@@ -276,16 +276,22 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   addFilter(index: number) {
+    console.log('add filter');
     const filters = this.serviceAccess
       .at(index)
       .get('advancedFilters') as FormArray;
-    filters.push(
-      new FormGroup({
-        field: new FormControl(''),
-        operator: new FormControl(''),
-        value: new FormControl(''),
-      })
-    );
+    console.log(filters instanceof FormArray);
+    if (filters instanceof FormArray) {
+      filters.push(
+        new FormGroup({
+          field: new FormControl(''),
+          operator: new FormControl(''),
+          value: new FormControl(''),
+        })
+      );
+    } else {
+      console.error('advancedFilters is not a FormArray');
+    }
   }
 
   removeFilter(serviceIndex: number, filterIndex: number) {
