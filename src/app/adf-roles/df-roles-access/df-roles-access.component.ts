@@ -274,6 +274,26 @@ export class DfRolesAccessComponent implements OnInit {
     this.serviceAccess.removeAt(index);
     this.updateDataSource();
   }
+
+  addFilter(index: number) {
+    const filters = this.serviceAccess
+      .at(index)
+      .get('advancedFilters') as FormArray;
+    filters.push(
+      new FormGroup({
+        field: new FormControl(''),
+        operator: new FormControl(''),
+        value: new FormControl(''),
+      })
+    );
+  }
+
+  removeFilter(serviceIndex: number, filterIndex: number) {
+    const filters = this.serviceAccess
+      .at(serviceIndex)
+      .get('advancedFilters') as FormArray;
+    filters.removeAt(filterIndex);
+  }
 }
 
 interface ComponentOption {
