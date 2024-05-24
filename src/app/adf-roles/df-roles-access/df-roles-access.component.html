@@ -43,7 +43,6 @@
               </td>
             </ng-container>
 
-            <!-- COMPONENT -->
             <ng-container matColumnDef="component">
               <th mat-header-cell *matHeaderCellDef>
                 {{ 'roles.accessOverview.tableHeadings.component' | transloco }}
@@ -144,14 +143,6 @@
                     | transloco
                 }}
               </th>
-              <!-- <td
-                mat-cell
-                *matCellDef="let row; let i = dataIndex"
-                [formGroupName]="i"
-                (click)="toggleRow(row)">
- 
-                Show/Hide
-              </td> -->
               <td
                 mat-cell
                 *matCellDef="let row; let i = dataIndex"
