@@ -35,8 +35,8 @@ export interface AccessForm {
   component: number;
   access: number[];
   requester: number[];
-  filters: any[];
-  advancedFilters?: string;
+  // filters: any[];
+  advancedFilters: any[];
   id?: number;
 }
 
