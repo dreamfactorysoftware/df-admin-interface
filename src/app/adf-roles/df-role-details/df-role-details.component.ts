@@ -93,11 +93,22 @@ export class DfRoleDetailsComponent implements OnInit {
         if (data.roleServiceAccessByRoleId.length > 0) {
           data.roleServiceAccessByRoleId.forEach(
             (item: RoleServiceAccessType) => {
+              const advancedFilters = new FormArray(
+                (item.filters || []).map(
+                  (each: any) =>
+                    new FormGroup({
+                      expandField: new FormControl(each.name),
+                      expandOperator: new FormControl(each.operator),
+                      expandValue: new FormControl(each.value),
+                    })
+                )
+              );
               (this.roleForm.controls['serviceAccess'] as FormArray).push(
                 new FormGroup({
-                  service: new FormControl(item.serviceId, [
-                    Validators.required,
-                  ]),
+                  service: new FormControl(
+                    item.serviceId ? item.serviceId : 0,
+                    [Validators.required]
+                  ),
                   component: new FormControl(item.component),
                   access: new FormControl(
                     this.handleAccessValue(item.verbMask)
@@ -105,7 +116,7 @@ export class DfRoleDetailsComponent implements OnInit {
                   requester: new FormControl(
                     this.handleRequesterValue(item.requestorMask)
                   ),
-                  advancedFilters: new FormControl(item.filters),
+                  advancedFilters: advancedFilters,
                   id: new FormControl(item.id),
                   extendField: new FormControl(item.extendField),
                   extendOperator: new FormControl(item.extendOperator),

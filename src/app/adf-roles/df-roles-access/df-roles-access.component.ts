@@ -3,7 +3,6 @@ import {
   FormArray,
   FormControl,
   FormGroup,
-  FormGroupDirective,
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
@@ -115,25 +114,12 @@ export class DfRolesAccessComponent implements OnInit {
   ];
 
   constructor(
-    private rootFormGroup: FormGroupDirective,
     private activatedRoute: ActivatedRoute,
     @Inject(BASE_SERVICE_TOKEN)
     private baseService: DfBaseCrudService
   ) {}
 
   ngOnInit() {
-    this.rootForm = this.rootFormGroup.control;
-    this.rootFormGroup.ngSubmit.subscribe(() => {
-      this.rootForm.markAllAsTouched();
-    });
-
-    if (!this.rootForm.contains('serviceAccess')) {
-      this.serviceAccess = new FormArray<any>([]);
-      this.rootForm.addControl('serviceAccess', this.serviceAccess);
-    } else {
-      this.serviceAccess = this.rootForm.get('serviceAccess') as FormArray;
-    }
-
     // get services options
     this.activatedRoute.data.subscribe((data: any) => {
       // sort service options by name
@@ -184,7 +170,7 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   async getComponents(index: number) {
-    const serviceId = this.formArray.at(index).get('service')?.value;
+    const serviceId = this.formArray.controls[index].get('service')?.value;
     const service =
       this.serviceOptions.find(service => service.id === serviceId)?.name || '';
 
@@ -203,7 +189,6 @@ export class DfRolesAccessComponent implements OnInit {
         .get(service, {
           additionalParams: [{ key: 'as_access_list', value: true }],
         })
-
         .subscribe((data: any) => {
           this.componentOptions.push({
             serviceId,

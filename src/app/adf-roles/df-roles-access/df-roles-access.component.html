@@ -144,6 +144,7 @@
               <button
                 mat-icon-button
                 color="primary"
+                type="button"
                 (click)="toggleRow(row, i)">
                 <fa-icon [icon]="faPlus" size="xs"></fa-icon>
               </button>
@@ -215,11 +216,15 @@
                       <mat-label>Value</mat-label>
                       <input formControlName="expandValue" matInput />
                     </mat-form-field>
-                    <button mat-icon-button (click)="addAdvancedFilter(i)">
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="addAdvancedFilter(i)">
                       <fa-icon [icon]="faPlus" size="xs"></fa-icon>
                     </button>
                     <button
                       mat-icon-button
+                      type="button"
                       (click)="removeAdvancedFilter(i, j)">
                       <fa-icon [icon]="faTrashCan" size="xs"></fa-icon>
                     </button>
