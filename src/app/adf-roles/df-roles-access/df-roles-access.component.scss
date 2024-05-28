@@ -4,3 +4,39 @@ mat-expansion-panel {
 .mat-mdc-cell {
   padding: 8px;
 }
+table {
+  width: 100%;
+}
+
+tr.detail-row {
+  height: 0;
+}
+
+tr.element-row:not(.example-expanded-row):hover {
+  background: whitesmoke;
+}
+
+tr.element-row:not(.example-expanded-row):active {
+  background: #efefef;
+}
+
+.element-row td {
+  border-bottom-width: 0;
+}
+
+.element-detail {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  .expandedItems {
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+  }
+}
+
+.detail-input {
+  margin-right: 20px;
+}

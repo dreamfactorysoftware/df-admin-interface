@@ -1,9 +1,8 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnInit, Input } from '@angular/core';
 import {
   FormArray,
   FormControl,
   FormGroup,
-  FormGroupDirective,
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
@@ -16,11 +15,22 @@ import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
+import { MatInputModule } from '@angular/material/input';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
-import { NgFor, NgIf } from '@angular/common';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { BehaviorSubject } from 'rxjs';
+import { AsyncPipe } from '@angular/common';
+import {
+  animate,
+  state,
+  style,
+  transition,
+  trigger,
+} from '@angular/animations';
+import { CommonModule } from '@angular/common';
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-roles-access',
@@ -33,14 +43,27 @@ import { UntilDestroy } from '@ngneat/until-destroy';
     ReactiveFormsModule,
     MatFormFieldModule,
     MatSelectModule,
+    MatInputModule,
     MatExpansionModule,
     FontAwesomeModule,
     MatButtonModule,
-    NgFor,
-    NgIf,
+    AsyncPipe,
+    CommonModule,
+  ],
+  animations: [
+    trigger('detailExpand', [
+      state('collapsed,void', style({ height: '0px', minHeight: '0' })),
+      state('expanded', style({ height: '*' })),
+      transition(
+        'expanded <=> collapsed',
+        animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')
+      ),
+    ]),
   ],
 })
 export class DfRolesAccessComponent implements OnInit {
+  @Input() formArray: FormArray;
+  @Input() roleForm: FormGroup;
   rootForm: FormGroup;
   serviceAccess: FormArray;
   dataSource: MatTableDataSource<any>;
@@ -52,9 +75,12 @@ export class DfRolesAccessComponent implements OnInit {
     'advancedFilters',
     'actions',
   ];
+  expandField: FormControl = new FormControl('');
   faTrashCan = faTrashCan;
   faPlus = faPlus;
   serviceOptions = [{ id: 0, name: '' }];
+  expandOperator: FormControl = new FormControl('');
+  expandValue: FormControl = new FormControl('');
 
   componentOptions: ComponentOption[] = [{ serviceId: 0, components: ['*'] }];
 
@@ -71,20 +97,29 @@ export class DfRolesAccessComponent implements OnInit {
     { value: 2, label: 'SCRIPT' },
   ];
 
+  operatorOptions = [
+    { value: '=', label: '=' },
+    { value: '!=', label: '!=' },
+    { value: '>', label: '>' },
+    { value: '<', label: '<' },
+    { value: '>=', label: '>=' },
+    { value: '<=', label: '<=' },
+    { value: 'in', label: 'in' },
+    { value: 'not in', label: 'not in' },
+    { value: 'start with', label: 'start with' },
+    { value: 'end with', label: 'end with' },
+    { value: 'contains', label: 'contains' },
+    { value: 'is null', label: 'is null' },
+    { value: 'is not null', label: 'is not null' },
+  ];
+
   constructor(
-    private rootFormGroup: FormGroupDirective,
     private activatedRoute: ActivatedRoute,
     @Inject(BASE_SERVICE_TOKEN)
     private baseService: DfBaseCrudService
   ) {}
 
   ngOnInit() {
-    this.rootForm = this.rootFormGroup.control;
-    this.rootFormGroup.ngSubmit.subscribe(() => {
-      this.rootForm.markAllAsTouched();
-    });
-    this.serviceAccess = this.rootForm.get('serviceAccess') as FormArray;
-
     // get services options
     this.activatedRoute.data.subscribe((data: any) => {
       // sort service options by name
@@ -123,7 +158,6 @@ export class DfRolesAccessComponent implements OnInit {
             .get(serviceName, {
               additionalParams: [{ key: 'as_access_list', value: true }],
             })
-
             .subscribe((response: any) => {
               const components = response.resource;
               this.componentOptions.push({ serviceId, components });
@@ -136,7 +170,7 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   async getComponents(index: number) {
-    const serviceId = this.serviceAccess.at(index).get('service')?.value;
+    const serviceId = this.formArray.controls[index].get('service')?.value;
     const service =
       this.serviceOptions.find(service => service.id === serviceId)?.name || '';
 
@@ -155,7 +189,6 @@ export class DfRolesAccessComponent implements OnInit {
         .get(service, {
           additionalParams: [{ key: 'as_access_list', value: true }],
         })
-
         .subscribe((data: any) => {
           this.componentOptions.push({
             serviceId,
@@ -166,59 +199,114 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   getComponentArray(index: number) {
-    const serviceId = this.serviceAccess.at(index).get('service')?.value;
+    const serviceId = this.formArray.at(index).get('service')?.value;
     const components = this.componentOptions.find(
       option => option.serviceId === serviceId
     )?.components;
     return components || [];
   }
 
-  // TODO finish implementing "all" option
+  getExtendOperator(index: number) {
+    const serviceId = this.serviceAccess.at(index).get('extend-operator')
+      ?.value;
+    const operators = this.componentOptions.find(
+      option => option.serviceId === serviceId
+    )?.components;
+    return operators || [];
+  }
+
+  expandedElement$ = new BehaviorSubject<number | 1>(1);
+  expandedElement: number | null = null;
+  toggleRow(element: any, index: number) {
+    this.expandedElement = this.expandedElement === element ? null : element;
+    if (this.expandedElement) {
+      if (this.getAdvancedFilters(index).length === 0) {
+        this.addAdvancedFilter(index);
+      }
+    }
+  }
+
   accessChange(index: number, value: number[]) {
-    const access = this.serviceAccess.at(index).get('access');
-
-    // if value.length === 1 and value[0] === 0 then add all
-    // if value.length < 6 and value.includes(0) then remove 0
-    // if value.length === 5 then add 0
-
-    // if (value.length === 1 && value[0] === 0) {
-    //   console.log('add All');
-    //   access?.patchValue([0, 1, 2, 4, 8, 16]);
-    // } else if (value.length === 5 && value.includes(0)) {
-    //   console.log('remove All');
-    //   access?.patchValue(value.filter((value: number) => value !== 0));
-    // } else if (value.length === 5 && !value.includes(0)) {
-    //   console.log('add All');
-    //   access?.patchValue([0, ...value]);
-    // }
+    const access = this.formArray.at(index).get('access');
   }
 
   updateDataSource() {
-    if (!this.serviceAccess) return;
-    this.dataSource = new MatTableDataSource(this.serviceAccess.controls);
+    if (!this.formArray) return;
+    this.dataSource = new MatTableDataSource(this.formArray.controls);
   }
 
   get hasServiceAccess() {
     return this.rootForm.controls['serviceAccess'].value.length > 0;
   }
 
-  add() {
-    this.serviceAccess.push(
+  add(): void {
+    const advancedFilters = new FormArray([]);
+
+    this.formArray.push(
       new FormGroup({
         service: new FormControl(0, Validators.required),
         component: new FormControl('', Validators.required),
         access: new FormControl('', Validators.required),
         requester: new FormControl([1], Validators.required),
-        advancedFilters: new FormControl([]),
+        advancedFilters: advancedFilters,
         id: new FormControl(null),
+      })
+    );
+
+    this.updateDataSource();
+  }
+
+  getAdvancedFilters(index: number): FormArray {
+    return this.formArray.controls[index].get('advancedFilters') as FormArray;
+  }
+
+  addAdvancedFilter(index: number) {
+    const advancedFilters = this.getAdvancedFilters(index);
+    advancedFilters.push(
+      new FormGroup({
+        expandField: new FormControl('', Validators.required),
+        expandOperator: new FormControl('', Validators.required),
+        expandValue: new FormControl('', Validators.required),
       })
     );
     this.updateDataSource();
   }
 
-  remove(index: number) {
-    this.serviceAccess.removeAt(index);
+  removeAdvancedFilter(serviceAccessIdx: number, filterIdx: number) {
+    this.getAdvancedFilters(serviceAccessIdx).removeAt(filterIdx);
+    if (this.getAdvancedFilters(serviceAccessIdx).length === 0) {
+      this.expandedElement = null;
+    }
     this.updateDataSource();
+  }
+
+  remove(index: number) {
+    this.formArray.removeAt(index);
+    this.updateDataSource();
+  }
+
+  addFilter(index: number) {
+    const filters = this.serviceAccess
+      .at(index)
+      .get('advancedFilters') as FormArray;
+    if (filters instanceof FormArray) {
+      filters.push(
+        new FormGroup({
+          expandField: new FormControl('', Validators.required),
+          expandOperator: new FormControl('', Validators.required),
+          expandValue: new FormControl('', Validators.required),
+        })
+      );
+    } else {
+      console.error('advancedFilters is not a FormArray');
+    }
+  }
+
+  removeFilter(serviceIndex: number, filterIndex: number) {
+    const filters = this.serviceAccess
+      .at(serviceIndex)
+      .get('advancedFilters') as FormArray;
+    filters.removeAt(filterIndex);
   }
 }
 

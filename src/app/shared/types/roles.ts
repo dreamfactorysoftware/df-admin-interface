@@ -28,11 +28,15 @@ interface Lookup {
 }
 
 export interface AccessForm {
+  expandField?: string;
+  expandOperator?: string;
+  expandValue?: string;
   service: number;
   component: number;
   access: number[];
   requester: number[];
-  advancedFilters?: string;
+  // filters: any[];
+  advancedFilters: any[];
   id?: number;
 }
 
@@ -73,4 +77,8 @@ export interface RoleServiceAccessType {
   lastModifiedDate: string;
   createdById?: number;
   lastModifiedById?: number;
+
+  extendField: string;
+  extendOperator: number;
+  extendValue: string;
 }
