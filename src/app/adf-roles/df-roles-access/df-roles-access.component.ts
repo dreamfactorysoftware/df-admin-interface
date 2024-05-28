@@ -52,7 +52,7 @@ import { CommonModule } from '@angular/common';
   ],
   animations: [
     trigger('detailExpand', [
-      state('collapsed,void', style({ height: '0px', minHeight: '0' })),
+      state('collapsed,void', style({ height: '*', minHeight: '0' })),
       state('expanded', style({ height: '*' })),
       transition(
         'expanded <=> collapsed',
