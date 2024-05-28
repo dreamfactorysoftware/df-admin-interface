@@ -52,7 +52,7 @@ import { CommonModule } from '@angular/common';
   ],
   animations: [
     trigger('detailExpand', [
-      state('collapsed,void', style({ height: '0px', minHeight: '0' })),
+      state('collapsed,void', style({ height: '*', minHeight: '0' })),
       state('expanded', style({ height: '*' })),
       transition(
         'expanded <=> collapsed',
@@ -286,7 +286,6 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   addFilter(index: number) {
-    console.log(index);
     const filters = this.serviceAccess
       .at(index)
       .get('advancedFilters') as FormArray;
