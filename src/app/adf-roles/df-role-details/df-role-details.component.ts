@@ -172,10 +172,10 @@ export class DfRoleDetailsComponent implements OnInit {
   }
 
   // onSubmit() {
+    // OLD function
   //   if (this.roleForm.invalid) return;
 
   //   const formValue = this.roleForm.getRawValue();
-  //   console.log(formValue);
 
   //   const payload: RolePayload = {
   //     id: formValue.id,
@@ -251,7 +251,6 @@ export class DfRoleDetailsComponent implements OnInit {
     if (this.roleForm.invalid) return;
 
     const formValue = this.roleForm.getRawValue();
-    console.log(formValue);
 
     const payload: RolePayload = {
       id: formValue.id,
