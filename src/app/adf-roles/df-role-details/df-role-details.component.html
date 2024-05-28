@@ -30,9 +30,12 @@
     <textarea rows="1" matInput formControlName="description"></textarea>
   </mat-form-field>
 
-  <df-roles-access
-    formArrayName="serviceAccess"
-    class="full-width"></df-roles-access>
+  <div formArrayName="serviceAccess">
+    <df-roles-access
+      [formArray]="serviceAccess"
+      [roleForm]="roleForm"
+      class="full-width"></df-roles-access>
+  </div>
 
   <p>
     {{ 'roles.lookupKeys.description' | transloco }}

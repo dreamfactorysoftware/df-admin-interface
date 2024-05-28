@@ -93,11 +93,22 @@ export class DfRoleDetailsComponent implements OnInit {
         if (data.roleServiceAccessByRoleId.length > 0) {
           data.roleServiceAccessByRoleId.forEach(
             (item: RoleServiceAccessType) => {
+              const advancedFilters = new FormArray(
+                (item.filters || []).map(
+                  (each: any) =>
+                    new FormGroup({
+                      expandField: new FormControl(each.name),
+                      expandOperator: new FormControl(each.operator),
+                      expandValue: new FormControl(each.value),
+                    })
+                )
+              );
               (this.roleForm.controls['serviceAccess'] as FormArray).push(
                 new FormGroup({
-                  service: new FormControl(item.serviceId, [
-                    Validators.required,
-                  ]),
+                  service: new FormControl(
+                    item.serviceId ? item.serviceId : 0,
+                    [Validators.required]
+                  ),
                   component: new FormControl(item.component),
                   access: new FormControl(
                     this.handleAccessValue(item.verbMask)
@@ -105,8 +116,11 @@ export class DfRoleDetailsComponent implements OnInit {
                   requester: new FormControl(
                     this.handleRequesterValue(item.requestorMask)
                   ),
-                  advancedFilters: new FormControl(item.filters),
+                  advancedFilters: advancedFilters,
                   id: new FormControl(item.id),
+                  extendField: new FormControl(item.extendField),
+                  extendOperator: new FormControl(item.extendOperator),
+                  extendValue: new FormControl(item.extendValue),
                 })
               );
             }
@@ -157,6 +171,82 @@ export class DfRoleDetailsComponent implements OnInit {
     this.showAlert = true;
   }
 
+  // onSubmit() {
+  // OLD function
+  //   if (this.roleForm.invalid) return;
+
+  //   const formValue = this.roleForm.getRawValue();
+
+  //   const payload: RolePayload = {
+  //     id: formValue.id,
+  //     name: formValue.name,
+  //     description: formValue.description,
+  //     isActive: formValue.active,
+  //     roleServiceAccessByRoleId: formValue.serviceAccess.map(
+  //       (val: AccessForm) => {
+  //         const advancedFilters = {
+  //           field: val.expandField,
+  //           operator: val.expandOperator,
+  //           value: val.expandValue,
+  //         };
+
+  //         const filtersArray = [];
+  //         filtersArray.push(advancedFilters);
+
+  //         return {
+  //           id: val.id,
+  //           serviceId: val.service,
+  //           component: val.component,
+  //           verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
+  //           requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
+  //           filters: filtersArray,
+  //           filterOp: 'AND',
+  //         };
+  //       }
+  //     ),
+  //     lookupByRoleId: formValue.lookupKeys,
+  //   };
+
+  //   const createPayload = {
+  //     resource: [payload],
+  //   };
+
+  //   if (this.type === 'edit' && payload.id) {
+  //     this.roleService
+  //       .update(payload.id, payload)
+  //       .pipe(
+  //         catchError(err => {
+  //           this.triggerAlert('error', err.error.error.message);
+  //           return throwError(() => new Error(err));
+  //         })
+  //       )
+  //       .subscribe(() => {
+  //         this.goBack();
+  //       });
+  //   } else {
+  //     console.log(23);
+  //     this.roleService
+  //       .create(createPayload, {
+  //         fields: '*',
+  //         related: 'role_service_access_by_role_id,lookup_by_role_id',
+  //       })
+  //       .pipe(
+  //         catchError(err => {
+  //           this.triggerAlert(
+  //             'error',
+  //             err.error.error.context.resource[0].message
+  //           );
+  //           return throwError(() => new Error(err));
+  //         })
+  //       )
+  //       .subscribe(() => {
+  //         this.goBack();
+  //       });
+  //   }
+  get serviceAccess(): FormArray {
+    return this.roleForm.get('serviceAccess') as FormArray;
+  }
+
   onSubmit() {
     if (this.roleForm.invalid) return;
 
@@ -168,15 +258,23 @@ export class DfRoleDetailsComponent implements OnInit {
       description: formValue.description,
       isActive: formValue.active,
       roleServiceAccessByRoleId: formValue.serviceAccess.map(
-        (val: AccessForm) => ({
-          id: val.id,
-          serviceId: val.service,
-          component: val.component,
-          verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
-          requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
-          filters: val.advancedFilters,
-          filterOp: 'AND',
-        })
+        (val: AccessForm) => {
+          const filtersArray = val.advancedFilters.map((filter: any) => ({
+            name: filter.expandField,
+            operator: filter.expandOperator,
+            value: filter.expandValue,
+          }));
+
+          return {
+            id: val.id,
+            serviceId: val.service === 0 ? null : val.service,
+            component: val.component,
+            verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
+            requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
+            filters: filtersArray,
+            filterOp: 'AND',
+          };
+        }
       ),
       lookupByRoleId: formValue.lookupKeys,
     };
