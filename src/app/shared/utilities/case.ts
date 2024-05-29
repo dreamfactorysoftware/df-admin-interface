@@ -50,13 +50,14 @@ export function mapCamelToSnake<T>(obj: T): T {
     const newObj: Record<string, unknown> = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        if (key === 'requestBody') {
-          newObj[key] = (obj as Record<string, unknown>)[key];
-        } else {
-          newObj[camelToSnakeString(key)] = mapCamelToSnake(
-            (obj as Record<string, unknown>)[key]
-          );
-        }
+        newObj[key] = (obj as Record<string, unknown>)[key];
+        // if (key === 'requestBody') {
+        //   newObj[key] = (obj as Record<string, unknown>)[key];
+        // } else {
+        //   newObj[camelToSnakeString(key)] = mapCamelToSnake(
+        //     (obj as Record<string, unknown>)[key]
+        //   );
+        // }
       }
     }
     return newObj as unknown as T;

@@ -267,9 +267,11 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   get viewSchema() {
-    return this.configSchema?.filter(
+    const result = this.configSchema?.filter(
       control => !['storageServiceId', 'storagePath'].includes(control.name)
     );
+    console.log(result, '====== view schema');
+    return result;
   }
 
   getConfigControl(name: string) {
@@ -287,8 +289,8 @@ export class DfServiceDetailsComponent implements OnInit {
     const data = this.serviceForm.getRawValue();
 
     type Params = {
-      snackbarError: string;
-      snackbarSuccess: string;
+      snackbarError?: string;
+      snackbarSuccess?: string;
       fields?: string;
       related?: string;
     };
@@ -320,9 +322,42 @@ export class DfServiceDetailsComponent implements OnInit {
       delete data.service_doc_by_service_id;
     }
 
+    if (!data.config.default_role) {
+      data.config.default_role = 1;
+    }
+
+    console.log(data.config, '====== params');
+    let payload;
+    if (data.type === 'okta_saml') {
+      params = {
+        ...params,
+        fields: '*',
+        related: 'service_doc_by_service_id',
+      };
+      data.service_doc_by_service_id = null;
+      payload = {
+        ...data,
+        is_active: data.isActive,
+        id: null,
+        config: {
+          sp_nameIDFormat: data.config.spNameIDFormat,
+          default_role: data.config.defaultRole,
+          sp_x509cert: data.config.spX509cert,
+          sp_privateKey: data.config.spPrivateKey,
+          idp_entityId: data.config.idpEntityId,
+          idp_singleSignOnService_url: data.config.idpSingleSignOnServiceUrl,
+          idp_x509cert: data.config.idpX509cert,
+          relay_state: data.config.relayState,
+        },
+      };
+      delete payload.isActive;
+      console.log(data, '===== payload');
+    } else {
+      payload = { ...data };
+    }
     if (this.edit) {
       this.servicesService
-        .update(this.serviceData.id, data, {
+        .update(this.serviceData.id, payload, {
           snackbarError: 'server',
           snackbarSuccess: 'services.updateSuccessMsg',
         })
@@ -333,7 +368,7 @@ export class DfServiceDetailsComponent implements OnInit {
       this.servicesService
         .create(
           {
-            resource: [data],
+            resource: [payload],
           },
           params
         )
