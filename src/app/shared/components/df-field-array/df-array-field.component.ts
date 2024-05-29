@@ -73,6 +73,7 @@ export class DfArrayFieldComponent implements OnInit, ControlValueAccessor {
 
   updateDataSource() {
     this.dataSource = new MatTableDataSource(this.fieldArray.controls);
+    console.log(this.fieldArray.controls, '===== controls');
   }
 
   constructor(

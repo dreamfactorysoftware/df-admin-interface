@@ -27,7 +27,10 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
 import { ConfigSchema, ServiceType } from 'src/app/shared/types/service';
-import { snakeToCamelString } from 'src/app/shared/utilities/case';
+import {
+  camelToSnakeString,
+  snakeToCamelString,
+} from 'src/app/shared/utilities/case';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -262,6 +265,17 @@ export class DfServiceDetailsComponent implements OnInit {
         ?.configSchema.map(control => ({
           ...control,
           name: snakeToCamelString(control.name),
+          items:
+            control.type === 'array'
+              ? [
+                  ...((control.items as ConfigSchema[]) || []).map(
+                    (each: ConfigSchema) => ({
+                      ...each,
+                      name: snakeToCamelString(each.name),
+                    })
+                  ),
+                ]
+              : control.items,
         })) ?? []
     );
   }
@@ -270,7 +284,6 @@ export class DfServiceDetailsComponent implements OnInit {
     const result = this.configSchema?.filter(
       control => !['storageServiceId', 'storagePath'].includes(control.name)
     );
-    console.log(result, '====== view schema');
     return result;
   }
 
@@ -322,13 +335,8 @@ export class DfServiceDetailsComponent implements OnInit {
       delete data.service_doc_by_service_id;
     }
 
-    if (!data.config.default_role) {
-      data.config.default_role = 1;
-    }
-
-    console.log(data.config, '====== params');
     let payload;
-    if (data.type === 'okta_saml') {
+    if (data.type.toLowerCase().includes('saml')) {
       params = {
         ...params,
         fields: '*',
@@ -338,7 +346,7 @@ export class DfServiceDetailsComponent implements OnInit {
       payload = {
         ...data,
         is_active: data.isActive,
-        id: null,
+        id: this.edit ? this.serviceData.id : null,
         config: {
           sp_nameIDFormat: data.config.spNameIDFormat,
           default_role: data.config.defaultRole,
@@ -350,8 +358,21 @@ export class DfServiceDetailsComponent implements OnInit {
           relay_state: data.config.relayState,
         },
       };
+      if (data.config.appRoleMap) {
+        payload.config.app_role_map = data.config.appRoleMap.map(
+          (item: any) => {
+            return Object.keys(item).reduce(
+              (acc, cur) =>
+                (acc = { ...acc, [camelToSnakeString(cur)]: item[cur] }),
+              {}
+            );
+          }
+        );
+      }
+      if (data.config.iconClass) {
+        payload.config.icon_class = data.config.iconClass;
+      }
       delete payload.isActive;
-      console.log(data, '===== payload');
     } else {
       payload = { ...data };
     }
@@ -373,7 +394,8 @@ export class DfServiceDetailsComponent implements OnInit {
           params
         )
         .subscribe(() => {
-          this.router.navigate([`/api-connections/api-docs/${data.name}`]);
+          this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+          // this.router.navigate([`/api-connections/api-docs/${data.name}`]);
         });
     }
   }
