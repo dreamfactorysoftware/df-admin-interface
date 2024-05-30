@@ -420,7 +420,7 @@ export class DfServiceDetailsComponent implements OnInit {
           ...(this.serviceData.config || {}),
           ...data.config,
         },
-        service_doc_by_service_id: data.data.service_doc_by_service_id
+        service_doc_by_service_id: data.service_doc_by_service_id
           ? {
               ...(this.serviceData.serviceDocByServiceId || {}),
               ...data.service_doc_by_service_id,
