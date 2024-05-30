@@ -194,7 +194,7 @@ export class DfServiceDetailsComponent implements OnInit {
             );
           }
         }
-        if (data?.serviceDocByServiceId.content) {
+        if (data?.serviceDocByServiceId) {
           data.config.serviceDefinition = data?.serviceDocByServiceId.content;
         }
         this.serviceData = data;
@@ -205,8 +205,10 @@ export class DfServiceDetailsComponent implements OnInit {
             ...data,
             config: data.config,
           });
-
-          this.serviceDefinitionType = '' + data?.serviceDocByServiceId.format;
+          if (data?.serviceDocByServiceId) {
+            this.serviceDefinitionType =
+              '' + data?.serviceDocByServiceId.format;
+          }
           this.serviceForm.controls['type'].disable();
         } else {
           this.serviceForm.controls['type'].valueChanges.subscribe(value => {
@@ -340,10 +342,14 @@ export class DfServiceDetailsComponent implements OnInit {
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      data.service_doc_by_service_id.content = this.serviceDefinition;
-      data.service_doc_by_service_id.format = Number(
-        this.serviceDefinitionType
-      );
+      if (!data.config.serviceDefinition) {
+        data.service_doc_by_service_id = null;
+      } else {
+        data.service_doc_by_service_id.content = data.config.serviceDefinition;
+        data.service_doc_by_service_id.format = Number(
+          this.serviceDefinitionType
+        );
+      }
     } else if (this.isScriptService) {
       params = {
         ...params,
@@ -352,10 +358,14 @@ export class DfServiceDetailsComponent implements OnInit {
       };
       // data.service_doc_by_service_id = null;
       // data.config.content = this.serviceDefinition;
-      data.service_doc_by_service_id.content = data.config.serviceDefinition;
-      data.service_doc_by_service_id.format = Number(
-        this.serviceDefinitionType
-      );
+      if (!data.config.serviceDefinition) {
+        data.service_doc_by_service_id = null;
+      } else {
+        data.service_doc_by_service_id.content = data.config.serviceDefinition;
+        data.service_doc_by_service_id.format = Number(
+          this.serviceDefinitionType
+        );
+      }
       delete data.config.serviceDefinition;
     } else {
       delete data.service_doc_by_service_id;
@@ -410,10 +420,12 @@ export class DfServiceDetailsComponent implements OnInit {
           ...(this.serviceData.config || {}),
           ...data.config,
         },
-        service_doc_by_service_id: {
-          ...(this.serviceData.serviceDocByServiceId || {}),
-          ...data.service_doc_by_service_id,
-        },
+        service_doc_by_service_id: data.data.service_doc_by_service_id
+          ? {
+              ...(this.serviceData.serviceDocByServiceId || {}),
+              ...data.service_doc_by_service_id,
+            }
+          : null,
       };
       delete payload.config.serviceDefinition;
       this.servicesService
