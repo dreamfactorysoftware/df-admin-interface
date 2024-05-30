@@ -125,7 +125,7 @@
         <a
           mat-flat-button
           color="primary"
-          [href]="'/' + service.path"
+          [href]="'/api/v2/' + service.path"
           *ngIf="iconExist(service.iconClass)"
           [attr.aria-label]="service.label">
           <fa-icon
@@ -138,7 +138,7 @@
         <a
           mat-flat-button
           color="primary"
-          [href]="'/' + service.path"
+          [href]="'/api/v2/' + service.path"
           *ngIf="!iconExist(service.iconClass)">
           {{ service.label }}
         </a>
