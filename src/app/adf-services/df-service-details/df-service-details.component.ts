@@ -27,7 +27,10 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
 import { ConfigSchema, ServiceType } from 'src/app/shared/types/service';
-import { snakeToCamelString } from 'src/app/shared/utilities/case';
+import {
+  camelToSnakeString,
+  snakeToCamelString,
+} from 'src/app/shared/utilities/case';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -191,6 +194,9 @@ export class DfServiceDetailsComponent implements OnInit {
             );
           }
         }
+        if (data?.serviceDocByServiceId.content) {
+          data.config.serviceDefinition = data?.serviceDocByServiceId.content;
+        }
         this.serviceData = data;
         if (this.edit) {
           this.configSchema = this.getConfigSchema(data.type);
@@ -199,8 +205,9 @@ export class DfServiceDetailsComponent implements OnInit {
             ...data,
             config: data.config,
           });
-          (this.serviceDefinition = data?.serviceDocByServiceId.content),
-            this.serviceForm.controls['type'].disable();
+
+          this.serviceDefinitionType = '' + data?.serviceDocByServiceId.format;
+          this.serviceForm.controls['type'].disable();
         } else {
           this.serviceForm.controls['type'].valueChanges.subscribe(value => {
             this.serviceForm.removeControl('config');
@@ -231,6 +238,19 @@ export class DfServiceDetailsComponent implements OnInit {
           new FormControl(control.default, validator)
         );
       });
+      const contentConfigControl = this.configSchema.filter(
+        control => control.name === 'content'
+      )?.[0];
+      if (contentConfigControl) {
+        const validator = [];
+        if (contentConfigControl.required) {
+          validator.push(Validators.required);
+        }
+        config?.addControl(
+          'serviceDefinition',
+          new FormControl(contentConfigControl.default, validator)
+        );
+      }
       this.serviceForm?.addControl('config', config);
     }
   }
@@ -262,18 +282,34 @@ export class DfServiceDetailsComponent implements OnInit {
         ?.configSchema.map(control => ({
           ...control,
           name: snakeToCamelString(control.name),
+          items:
+            control.type === 'array'
+              ? [
+                  ...((control.items as ConfigSchema[]) || []).map(
+                    (each: ConfigSchema) => ({
+                      ...each,
+                      name: snakeToCamelString(each.name),
+                    })
+                  ),
+                ]
+              : control.items,
         })) ?? []
     );
   }
 
   get viewSchema() {
-    return this.configSchema?.filter(
+    const result = this.configSchema?.filter(
       control => !['storageServiceId', 'storagePath'].includes(control.name)
     );
+    return result;
   }
 
   getConfigControl(name: string) {
     return this.serviceForm.get(`config.${name}`) as FormControl;
+  }
+
+  getServiceDefinitionControl() {
+    return this.serviceForm.get('serviceDefinition') as FormControl;
   }
 
   getControl(name: string) {
@@ -287,8 +323,8 @@ export class DfServiceDetailsComponent implements OnInit {
     const data = this.serviceForm.getRawValue();
 
     type Params = {
-      snackbarError: string;
-      snackbarSuccess: string;
+      snackbarError?: string;
+      snackbarSuccess?: string;
       fields?: string;
       related?: string;
     };
@@ -314,15 +350,74 @@ export class DfServiceDetailsComponent implements OnInit {
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      data.service_doc_by_service_id = null;
-      data.config.content = this.serviceDefinition;
+      // data.service_doc_by_service_id = null;
+      // data.config.content = this.serviceDefinition;
+      data.service_doc_by_service_id.content = data.config.serviceDefinition;
+      data.service_doc_by_service_id.format = Number(
+        this.serviceDefinitionType
+      );
+      delete data.config.serviceDefinition;
     } else {
       delete data.service_doc_by_service_id;
     }
 
+    let payload;
+    if (data.type.toLowerCase().includes('saml')) {
+      params = {
+        ...params,
+        fields: '*',
+        related: 'service_doc_by_service_id',
+      };
+      data.service_doc_by_service_id = null;
+      payload = {
+        ...data,
+        is_active: data.isActive,
+        id: this.edit ? this.serviceData.id : null,
+        config: {
+          sp_nameIDFormat: data.config.spNameIDFormat,
+          default_role: data.config.defaultRole,
+          sp_x509cert: data.config.spX509cert,
+          sp_privateKey: data.config.spPrivateKey,
+          idp_entityId: data.config.idpEntityId,
+          idp_singleSignOnService_url: data.config.idpSingleSignOnServiceUrl,
+          idp_x509cert: data.config.idpX509cert,
+          relay_state: data.config.relayState,
+        },
+      };
+      if (data.config.appRoleMap) {
+        payload.config.app_role_map = data.config.appRoleMap.map(
+          (item: any) => {
+            return Object.keys(item).reduce(
+              (acc, cur) =>
+                (acc = { ...acc, [camelToSnakeString(cur)]: item[cur] }),
+              {}
+            );
+          }
+        );
+      }
+      if (data.config.iconClass) {
+        payload.config.icon_class = data.config.iconClass;
+      }
+      delete payload.isActive;
+    } else {
+      payload = { ...data };
+    }
     if (this.edit) {
+      const payload = {
+        ...this.serviceData,
+        ...data,
+        config: {
+          ...(this.serviceData.config || {}),
+          ...data.config,
+        },
+        service_doc_by_service_id: {
+          ...(this.serviceData.serviceDocByServiceId || {}),
+          ...data.service_doc_by_service_id,
+        },
+      };
+      delete payload.config.serviceDefinition;
       this.servicesService
-        .update(this.serviceData.id, data, {
+        .update(this.serviceData.id, payload, {
           snackbarError: 'server',
           snackbarSuccess: 'services.updateSuccessMsg',
         })
@@ -333,12 +428,13 @@ export class DfServiceDetailsComponent implements OnInit {
       this.servicesService
         .create(
           {
-            resource: [data],
+            resource: [payload],
           },
           params
         )
         .subscribe(() => {
-          this.router.navigate([`/api-connections/api-docs/${data.name}`]);
+          this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+          // this.router.navigate([`/api-connections/api-docs/${data.name}`]);
         });
     }
   }
