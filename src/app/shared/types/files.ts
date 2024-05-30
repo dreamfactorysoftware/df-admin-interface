@@ -16,6 +16,8 @@ export interface Service {
   label: string;
   description: string;
   type: string;
+  config?: any;
+  serviceDocByServiceId?: any;
 }
 
 export interface FileTableRow {

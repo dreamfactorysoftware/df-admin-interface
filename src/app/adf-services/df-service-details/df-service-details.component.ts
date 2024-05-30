@@ -194,6 +194,9 @@ export class DfServiceDetailsComponent implements OnInit {
             );
           }
         }
+        if (data?.serviceDocByServiceId.content) {
+          data.config.serviceDefinition = data?.serviceDocByServiceId.content;
+        }
         this.serviceData = data;
         if (this.edit) {
           this.configSchema = this.getConfigSchema(data.type);
@@ -202,8 +205,9 @@ export class DfServiceDetailsComponent implements OnInit {
             ...data,
             config: data.config,
           });
-          (this.serviceDefinition = data?.serviceDocByServiceId.content),
-            this.serviceForm.controls['type'].disable();
+
+          this.serviceDefinitionType = '' + data?.serviceDocByServiceId.format;
+          this.serviceForm.controls['type'].disable();
         } else {
           this.serviceForm.controls['type'].valueChanges.subscribe(value => {
             this.serviceForm.removeControl('config');
@@ -234,6 +238,19 @@ export class DfServiceDetailsComponent implements OnInit {
           new FormControl(control.default, validator)
         );
       });
+      const contentConfigControl = this.configSchema.filter(
+        control => control.name === 'content'
+      )?.[0];
+      if (contentConfigControl) {
+        const validator = [];
+        if (contentConfigControl.required) {
+          validator.push(Validators.required);
+        }
+        config?.addControl(
+          'serviceDefinition',
+          new FormControl(contentConfigControl.default, validator)
+        );
+      }
       this.serviceForm?.addControl('config', config);
     }
   }
@@ -291,6 +308,10 @@ export class DfServiceDetailsComponent implements OnInit {
     return this.serviceForm.get(`config.${name}`) as FormControl;
   }
 
+  getServiceDefinitionControl() {
+    return this.serviceForm.get('serviceDefinition') as FormControl;
+  }
+
   getControl(name: string) {
     return this.serviceForm.controls[name] as FormControl;
   }
@@ -329,8 +350,13 @@ export class DfServiceDetailsComponent implements OnInit {
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      data.service_doc_by_service_id = null;
-      data.config.content = this.serviceDefinition;
+      // data.service_doc_by_service_id = null;
+      // data.config.content = this.serviceDefinition;
+      data.service_doc_by_service_id.content = data.config.serviceDefinition;
+      data.service_doc_by_service_id.format = Number(
+        this.serviceDefinitionType
+      );
+      delete data.config.serviceDefinition;
     } else {
       delete data.service_doc_by_service_id;
     }
@@ -377,6 +403,19 @@ export class DfServiceDetailsComponent implements OnInit {
       payload = { ...data };
     }
     if (this.edit) {
+      const payload = {
+        ...this.serviceData,
+        ...data,
+        config: {
+          ...(this.serviceData.config || {}),
+          ...data.config,
+        },
+        service_doc_by_service_id: {
+          ...(this.serviceData.serviceDocByServiceId || {}),
+          ...data.service_doc_by_service_id,
+        },
+      };
+      delete payload.config.serviceDefinition;
       this.servicesService
         .update(this.serviceData.id, payload, {
           snackbarError: 'server',

@@ -364,14 +364,22 @@
                   <mat-button-toggle value="0">JSON</mat-button-toggle>
                   <mat-button-toggle value="1">YAML</mat-button-toggle>
                 </mat-button-toggle-group>
-                <mat-form-field class="full-width" appearance="outline">
+                <mat-label class="full-width">Service Definition</mat-label>
+                <df-script-editor
+                  [type]="getControl('type')"
+                  [storageServiceId]="getConfigControl('storageServiceId')"
+                  [storagePath]="getConfigControl('storagePath')"
+                  [content]="getConfigControl('serviceDefinition')"
+                  [cache]="serviceData ? serviceData.name : ''"
+                  class="full-width"></df-script-editor>
+                <!-- <mat-form-field class="full-width" appearance="outline">
                   <mat-label>Service Definition</mat-label>
                   <textarea
                     matInput
                     rows="10"
                     [(ngModel)]="serviceDefinition"
                     [ngModelOptions]="{ standalone: true }"></textarea>
-                </mat-form-field>
+                </mat-form-field> -->
               </ng-container>
 
               <!-- <ng-container *ngIf="this.isNetworkService">
