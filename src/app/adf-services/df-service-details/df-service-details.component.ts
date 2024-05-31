@@ -281,21 +281,21 @@ export class DfServiceDetailsComponent implements OnInit {
     return (
       this.serviceTypes
         .find(serviceType => serviceType.name === type)
-        ?.configSchema.map(control => ({
-          ...control,
-          name: snakeToCamelString(control.name),
-          items:
-            control.type === 'array'
-              ? [
-                  ...((control.items as ConfigSchema[]) || []).map(
-                    (each: ConfigSchema) => ({
-                      ...each,
-                      name: snakeToCamelString(each.name),
-                    })
-                  ),
-                ]
-              : control.items,
-        })) ?? []
+        ?.configSchema.map(control => {
+          const items =
+            control.type === 'array' && Array.isArray(control.items)
+              ? control.items.map((each: ConfigSchema) => ({
+                  ...each,
+                  name: snakeToCamelString(each.name),
+                }))
+              : control.items;
+
+          return {
+            ...control,
+            name: snakeToCamelString(control.name),
+            items: items,
+          };
+        }) ?? []
     );
   }
 
