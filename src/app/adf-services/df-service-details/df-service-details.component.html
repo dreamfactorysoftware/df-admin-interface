@@ -2,7 +2,7 @@
   [formGroup]="serviceForm"
   class="details-section"
   [class]="(isDarkMode | async) ? 'dark-theme' : ''"
-  (ngSubmit)="save()">
+  (ngSubmit)="save(false)">
   <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabase">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
@@ -448,6 +448,29 @@
         (click)="goBack()">
         {{ 'cancel' | transloco }}
       </button>
+      <ng-container *ngIf="this.edit">
+        <!-- <mat-button-toggle-group
+          [(ngModel)]="clearCache"
+          [ngModelOptions]="{ standalone: true }"
+          appearance="legacy">
+          <mat-button-toggle
+            [value]="true"
+            mat-flat-button
+            class="save-btn"
+            color="primary"
+            (click)="save()">
+            {{ 'saveAndClear' | transloco }}</mat-button-toggle
+          >
+        </mat-button-toggle-group> -->
+        <button
+          [value]="true"
+          mat-flat-button
+          class="save-btn"
+          color="primary"
+          (click)="save(true)">
+          {{ 'saveAndClear' | transloco }}
+        </button>
+      </ng-container>
       <button mat-flat-button class="save-btn" color="primary">
         {{ 'save' | transloco }}
       </button>
