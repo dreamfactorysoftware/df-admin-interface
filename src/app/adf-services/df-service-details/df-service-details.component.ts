@@ -36,7 +36,10 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatButtonModule } from '@angular/material/button';
 import { UntilDestroy } from '@ngneat/until-destroy';
-import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import {
+  CACHE_SERVICE_TOKEN,
+  SERVICES_SERVICE_TOKEN,
+} from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
@@ -103,14 +106,13 @@ export class DfServiceDetailsComponent implements OnInit {
   search = '';
   serviceDefinition: string;
   serviceDefinitionType: string;
-
   systemEvents: Array<{ label: string; value: string }>;
 
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
-    @Inject(SERVICES_SERVICE_TOKEN)
-    private servicesService: DfBaseCrudService,
+    @Inject(SERVICES_SERVICE_TOKEN) private servicesService: DfBaseCrudService,
+    @Inject(CACHE_SERVICE_TOKEN) private cacheService: DfBaseCrudService,
     private router: Router,
     private systemConfigDataService: DfSystemConfigDataService,
     private http: HttpClient,
@@ -158,7 +160,9 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
-        this.serviceTypes = serviceTypes;
+        this.serviceTypes = serviceTypes.filter(
+          (s: { name: string }) => s.name.toLowerCase() !== 'python'
+        );
         this.notIncludedServices = [];
         if (this.isDatabase) {
           if (licenseType === 'SILVER') {
@@ -318,7 +322,7 @@ export class DfServiceDetailsComponent implements OnInit {
     return this.serviceForm.controls[name] as FormControl;
   }
 
-  save() {
+  save(clearCache: boolean) {
     if (this.serviceForm.invalid) {
       return;
     }
@@ -434,7 +438,21 @@ export class DfServiceDetailsComponent implements OnInit {
           snackbarSuccess: 'services.updateSuccessMsg',
         })
         .subscribe(() => {
-          this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+          if (clearCache) {
+            this.cacheService
+              .delete(payload.name, {
+                snackbarSuccess: 'cache.serviceCacheFlushed',
+              })
+              .subscribe({
+                next: () => {
+                  console.log('Cache flushed');
+                  this.router.navigate(['../'], {
+                    relativeTo: this.activatedRoute,
+                  });
+                },
+                error: (err: any) => console.error('Error flushing cache', err),
+              });
+          }
         });
     } else {
       this.servicesService
@@ -446,7 +464,6 @@ export class DfServiceDetailsComponent implements OnInit {
         )
         .subscribe(() => {
           this.router.navigate(['../'], { relativeTo: this.activatedRoute });
-          // this.router.navigate([`/api-connections/api-docs/${data.name}`]);
         });
     }
   }
