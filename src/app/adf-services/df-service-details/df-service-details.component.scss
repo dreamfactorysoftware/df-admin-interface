@@ -152,17 +152,14 @@ mat-icon {
   }
 
   .details-section {
-
     ::ng-deep .mat-button-toggle-group {
+      button {
+        background: inherit !important;
 
-    
-   button {
-      background: inherit !important;
-
-      span {
-        color: #2d2d2d !important;
+        span {
+          color: #2d2d2d !important;
+        }
       }
     }
-  }
   }
 }
