@@ -23,15 +23,12 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
 import { Observable, map, startWith } from 'rxjs';
 import { groupEvents } from 'src/app/shared/utilities/eventScripts';
-import {
-  BASE_SERVICE_TOKEN,
-  EVENTS_SERVICE_TOKEN,
-  EVENT_SCRIPT_SERVICE_TOKEN,
-} from 'src/app/shared/constants/tokens';
+import { EVENT_SCRIPT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { Service, ServiceType } from 'src/app/shared/types/service';
+import { Service } from 'src/app/shared/types/service';
 import { CommonModule } from '@angular/common';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { camelToSnakeString } from 'src/app/shared/utilities/case';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -103,7 +100,13 @@ export class DfScriptDetailsComponent implements OnInit {
       this.type = type;
       if (type === 'edit') {
         this.scriptDetails = data;
-        this.scriptForm.patchValue(data);
+        let editData = Object.keys(data).reduce(
+          (acc, cur) =>
+            (acc = { ...acc, [camelToSnakeString(cur)]: data[cur] }),
+          {}
+        );
+        editData = { ...editData, isActive: data.isActive };
+        this.scriptForm.patchValue(editData);
         this.scriptForm.controls['name'].disable();
         this.completeScriptName = data.name;
       } else {
@@ -190,7 +193,6 @@ export class DfScriptDetailsComponent implements OnInit {
   }
 
   selectedEventItemEvent() {
-    this.tableOptions = [];
     this.ungroupedRouteOptions = [
       ...this.ungroupedEventOptions[this.selectedEventItem].endpoints,
     ];
@@ -208,5 +210,15 @@ export class DfScriptDetailsComponent implements OnInit {
       '{table_name}',
       this.selectTable
     );
+  }
+
+  selectedRoute() {
+    this.completeScriptName = this.selectedRouteItem;
+    if (this.selectTable) {
+      this.completeScriptName = this.completeScriptName.replace(
+        '{table_name}',
+        this.selectTable
+      );
+    }
   }
 }
