@@ -134,7 +134,6 @@ export class DfCacheModal {
     this.cacheService
       .delete(this.row.name, { snackbarSuccess: 'cache.serviceCacheFlushed' })
       .subscribe({
-        next: () => console.log('Cache flushed'),
         error: (err: any) => console.error('Error flushing cache', err),
       });
   }

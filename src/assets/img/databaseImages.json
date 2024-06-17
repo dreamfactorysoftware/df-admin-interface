@@ -5,12 +5,12 @@
       "label": "alloydb"
     },
     {
-      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc60_API%2520Logo%2520Container-18-p-500.webp",
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/663d4b60d4c482cefa684e84_dynamodb%20logo.png",
       "alt": "aws_dynamodb",
       "label": "aws_dynamodb"
     },
     {
-      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf5_Redshift-p-500.jpg",
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/663d4aeec92f326a1b4d7aba_redshift.png",
       "alt": "aws_redshift_db",
       "label": "aws_redshift_db"
     },
@@ -55,7 +55,7 @@
       "label": "mariadb"
     },
     {
-      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb5d_API%2520Logo%2520Container-2-p-500.webp",
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/663d4c15c6896a7cbc6606d4_singlestore.png",
       "alt": "memsql",
       "label": "memsql"
     },
