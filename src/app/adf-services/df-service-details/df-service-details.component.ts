@@ -160,7 +160,9 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
-        this.serviceTypes = serviceTypes;
+        this.serviceTypes = serviceTypes.filter(
+          (s: { name: string }) => s.name.toLowerCase() !== 'python'
+        );
         this.notIncludedServices = [];
         if (this.isDatabase) {
           if (licenseType === 'SILVER') {
