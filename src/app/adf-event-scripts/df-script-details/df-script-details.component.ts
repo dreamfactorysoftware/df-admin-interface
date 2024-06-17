@@ -28,7 +28,9 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { Service } from 'src/app/shared/types/service';
 import { CommonModule } from '@angular/common';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
 import { camelToSnakeString } from 'src/app/shared/utilities/case';
+
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -50,6 +52,7 @@ import { camelToSnakeString } from 'src/app/shared/utilities/case';
     MatInputModule,
     AsyncPipe,
     CommonModule,
+    DfLinkServiceComponent,
   ],
 })
 export class DfScriptDetailsComponent implements OnInit {
