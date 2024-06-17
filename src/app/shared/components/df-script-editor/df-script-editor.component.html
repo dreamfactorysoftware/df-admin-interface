@@ -11,7 +11,7 @@
       mat-flat-button
       class="save-btn"
       (click)="fileInput.click()"
-      [disabled]="storageServiceId.getRawValue()">
+      [disabled]="!storageServiceId || !storageServiceId.getRawValue()">
       {{ 'desktopFile' | transloco }}
     </button>
     <button
@@ -19,7 +19,7 @@
       mat-flat-button
       class="save-btn"
       (click)="githubImport()"
-      [disabled]="storageServiceId.getRawValue()">
+      [disabled]="!storageServiceId || !storageServiceId.getRawValue()">
       {{ 'githubFile' | transloco }}
     </button>
   </div>
@@ -33,7 +33,7 @@
     </mat-select>
   </mat-form-field> -->
   <mat-form-field
-    *ngIf="!!storageServiceId.getRawValue()"
+    *ngIf="!storageServiceId || !storageServiceId.getRawValue()"
     class="dynamic-width"
     subscriptSizing="dynamic">
     <mat-label>{{ 'path' | transloco }}</mat-label>
@@ -45,7 +45,7 @@
       color="primary"
       type="button"
       (click)="viewLatest()"
-      [disabled]="!storagePath.getRawValue()">
+      [disabled]="!storageServiceId || !storageServiceId.getRawValue()">
       {{ 'scripts.viewLatest' | transloco }}
     </button>
     <button
