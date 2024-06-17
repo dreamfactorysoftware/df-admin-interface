@@ -32,6 +32,7 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { Service, ServiceType } from 'src/app/shared/types/service';
 import { CommonModule } from '@angular/common';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -53,6 +54,7 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
     MatInputModule,
     AsyncPipe,
     CommonModule,
+    DfLinkServiceComponent,
   ],
 })
 export class DfScriptDetailsComponent implements OnInit {
