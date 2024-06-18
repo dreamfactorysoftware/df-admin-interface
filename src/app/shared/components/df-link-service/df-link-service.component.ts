@@ -35,7 +35,7 @@ import { Service, ServiceType } from '../../types/service';
 @Component({
   selector: 'df-link-service',
   templateUrl: './df-link-service.component.html',
-  styleUrls: ['./df-link-service.component.scss'],
+  // styleUrls: ['./df-link-service.component.scss'],
   standalone: true,
   imports: [
     MatFormFieldModule,
