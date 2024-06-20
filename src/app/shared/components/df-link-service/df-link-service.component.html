@@ -1,79 +1,81 @@
-<form
-  [formGroup]="roleForm"
-  class="details-section"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
-  <mat-accordion>
-    <mat-expansion-panel [expanded]="true">
-      <mat-expansion-panel-header>
-        <mat-panel-title> Link to Service </mat-panel-title>
-        <mat-panel-description> </mat-panel-description>
-      </mat-expansion-panel-header>
-      <mat-form-field
-        appearance="outline"
-        class="full-width form-field-gap"
-        subscriptSizing="dynamic">
-        <mat-label>Select Service</mat-label>
-        <mat-select formControlName="serviceList">
-          <mat-option
-            *ngFor="let service of storageServices"
-            [value]="service.label">
-            {{ service.label }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-      <mat-form-field
-        appearance="outline"
-        subscriptSizing="dynamic"
-        class="full-width form-field-gap">
-        <mat-label>Repository: </mat-label>
-        <input
-          matInput
-          type="text"
-          placeholder="path"
-          formControlName="repoInput" />
-      </mat-form-field>
-      <mat-form-field
-        appearance="outline"
-        subscriptSizing="dynamic"
-        class="full-width form-field-gap">
-        <mat-label>Branch/Tag: </mat-label>
-        <input
-          matInput
-          type="text"
-          placeholder="path"
-          formControlName="branchInput" />
-      </mat-form-field>
-      <mat-form-field
-        appearance="outline"
-        subscriptSizing="dynamic"
-        class="full-width form-field-gap">
-        <mat-label>Path</mat-label>
-        <input
-          matInput
-          type="text"
-          placeholder="path"
-          formControlName="pathInput" />
-      </mat-form-field>
-      <div class="full-width action-bar">
-        <button
-          class="save-btn"
-          mat-flat-button
-          type="button"
-          (click)="onViewLatest()"
-          color="primary">
-          <i class="fa fa-refresh"></i>
-          View Latest
-        </button>
-        <button
-          class="save-btn"
-          mat-flat-button
-          type="button"
-          (click)="onDeleteCache()"
-          color="primary">
-          <i class="fa fa-refresh"></i>
-          Delete Cache
-        </button>
-      </div>
-    </mat-expansion-panel>
-  </mat-accordion>
-</form>
+<ng-container *ngIf="selectType">
+  <form
+    [formGroup]="roleForm"
+    class="details-section"
+    [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+    <mat-accordion>
+      <mat-expansion-panel [expanded]="false">
+        <mat-expansion-panel-header>
+          <mat-panel-title> Link to Service </mat-panel-title>
+          <mat-panel-description> </mat-panel-description>
+        </mat-expansion-panel-header>
+        <mat-form-field
+          appearance="outline"
+          class="full-width form-field-gap"
+          subscriptSizing="dynamic">
+          <mat-label>Select Service</mat-label>
+          <mat-select formControlName="serviceList">
+            <mat-option
+              *ngFor="let service of storageServices"
+              [value]="service.label">
+              {{ service.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field
+          appearance="outline"
+          subscriptSizing="dynamic"
+          class="full-width form-field-gap">
+          <mat-label>Repository: </mat-label>
+          <input
+            matInput
+            type="text"
+            placeholder="path"
+            formControlName="repoInput" />
+        </mat-form-field>
+        <mat-form-field
+          appearance="outline"
+          subscriptSizing="dynamic"
+          class="full-width form-field-gap">
+          <mat-label>Branch/Tag: </mat-label>
+          <input
+            matInput
+            type="text"
+            placeholder="path"
+            formControlName="branchInput" />
+        </mat-form-field>
+        <mat-form-field
+          appearance="outline"
+          subscriptSizing="dynamic"
+          class="full-width form-field-gap">
+          <mat-label>Path</mat-label>
+          <input
+            matInput
+            type="text"
+            placeholder="path"
+            formControlName="pathInput" />
+        </mat-form-field>
+        <div class="full-width action-bar">
+          <button
+            class="save-btn"
+            mat-flat-button
+            type="button"
+            (click)="onViewLatest()"
+            color="primary">
+            <i class="fa fa-refresh"></i>
+            View Latest
+          </button>
+          <button
+            class="save-btn"
+            mat-flat-button
+            type="button"
+            (click)="onDeleteCache()"
+            color="primary">
+            <i class="fa fa-refresh"></i>
+            Delete Cache
+          </button>
+        </div>
+      </mat-expansion-panel>
+    </mat-accordion>
+  </form>
+</ng-container>

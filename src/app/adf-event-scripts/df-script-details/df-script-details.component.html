@@ -45,9 +45,7 @@
       class="half-width"
       subscriptSizing="dynamic">
       <mat-label>{{ 'scripts.scriptMethod' | transloco }}</mat-label>
-      <mat-select
-        [(value)]="selectedRouteItem"
-        (selectionChange)="selectedRoute()">
+      <mat-select [(value)]="selectedRouteItem">
         <mat-option *ngFor="let item of ungroupedRouteOptions" [value]="item">
           {{ item }}
         </mat-option>
@@ -63,7 +61,7 @@
       </mat-option>
     </mat-autocomplete> -->
     </mat-form-field>
-    <ng-container *ngIf="!!this.tableOptions">
+    <ng-container *ngIf="this.tableOptions">
       <mat-form-field
         appearance="outline"
         class="full-width"
@@ -110,7 +108,7 @@
   >
   <df-link-service
     [cache]="scriptForm.getRawValue().name"
-    [storageServiceId]="getControl('storageServiceId')"
+    [storageServiceId]="selectedServiceItem"
     [storagePath]="getControl('storagePath')"
     [content]="getControl('content')"></df-link-service>
   <df-script-editor
