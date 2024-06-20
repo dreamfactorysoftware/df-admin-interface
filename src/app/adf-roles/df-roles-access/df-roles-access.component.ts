@@ -5,6 +5,7 @@ import {
   FormGroup,
   ReactiveFormsModule,
   Validators,
+  FormBuilder,
 } from '@angular/forms';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
@@ -19,6 +20,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
+
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { BehaviorSubject } from 'rxjs';
 import { AsyncPipe } from '@angular/common';
@@ -112,13 +114,24 @@ export class DfRolesAccessComponent implements OnInit {
     { value: 'is null', label: 'is null' },
     { value: 'is not null', label: 'is not null' },
   ];
-
+  form: FormGroup;
   constructor(
     private activatedRoute: ActivatedRoute,
     @Inject(BASE_SERVICE_TOKEN)
-    private baseService: DfBaseCrudService
-  ) {}
-
+    private baseService: DfBaseCrudService,
+    private fb: FormBuilder
+  ) {
+    this.form = this.fb.group({
+      cFormArray: this.fb.array([this.createItem()]),
+    });
+  }
+  createItem(): FormGroup {
+    return this.fb.group({
+      service: [''],
+      component: [''],
+    });
+  }
+  filteredComponentArray: Array<Array<string>> = [];
   ngOnInit() {
     // get services options
     this.activatedRoute.data.subscribe((data: any) => {
@@ -165,10 +178,41 @@ export class DfRolesAccessComponent implements OnInit {
         });
       }
     });
+    this.initializeFilteredComponents();
 
     this.updateDataSource();
   }
+  get cFormArray(): FormArray {
+    return this.form.get('formArray') as FormArray;
+  }
 
+  initializeFilteredComponents() {
+    this.filteredComponentArray = this.formArray.controls.map((_, i) =>
+      this.getComponentArray(i)
+    );
+  }
+  getComponentArray(index: number): Array<string> {
+    const serviceId = this.formArray.at(index).get('service')?.value;
+    const components = this.componentOptions.find(
+      option => option.serviceId === serviceId
+    )?.components;
+    return components || [];
+  }
+
+  filterOptions(event: Event, index: number) {
+    const input = (event.target as HTMLInputElement).value.toLowerCase();
+    const serviceId = this.formArray.at(index).get('service')?.value;
+    const components =
+      this.componentOptions.find(option => option.serviceId === serviceId)
+        ?.components || [];
+    this.filteredComponentArray[index] = components.filter(option =>
+      option.toLowerCase().includes(input)
+    );
+  }
+
+  onSelectOpened(index: number) {
+    this.filteredComponentArray[index] = this.getComponentArray(index);
+  }
   async getComponents(index: number) {
     const serviceId = this.formArray.controls[index].get('service')?.value;
     const service =
@@ -196,14 +240,6 @@ export class DfRolesAccessComponent implements OnInit {
           });
         });
     }
-  }
-
-  getComponentArray(index: number) {
-    const serviceId = this.formArray.at(index).get('service')?.value;
-    const components = this.componentOptions.find(
-      option => option.serviceId === serviceId
-    )?.components;
-    return components || [];
   }
 
   getExtendOperator(index: number) {

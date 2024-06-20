@@ -31,7 +31,6 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
 import { camelToSnakeString } from 'src/app/shared/utilities/case';
 
-
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-script-details',

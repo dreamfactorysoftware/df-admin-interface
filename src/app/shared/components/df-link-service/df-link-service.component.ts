@@ -1,4 +1,11 @@
-import { Component, Inject, OnInit, Input } from '@angular/core';
+import {
+  Component,
+  Inject,
+  OnInit,
+  Input,
+  SimpleChanges,
+  OnChanges,
+} from '@angular/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTableModule } from '@angular/material/table';
@@ -46,14 +53,16 @@ import { Service, ServiceType } from '../../types/service';
   ],
   providers: [DfBaseCrudService],
 })
-export class DfLinkServiceComponent implements OnInit {
+export class DfLinkServiceComponent implements OnInit, OnChanges {
   @Input() cache: string;
-  @Input({ required: true }) storageServiceId: FormControl;
+  @Input({ required: true }) storageServiceId!: string;
+
   @Input({ required: true }) storagePath: FormControl;
   @Input({ required: true }) content: FormControl;
 
   roleForm: FormGroup;
   storageServices: Array<Service> = [];
+  selectType = false;
 
   constructor(
     private themeService: DfThemeService,
@@ -87,6 +96,24 @@ export class DfLinkServiceComponent implements OnInit {
   ngOnInit() {
     this.updateDataSource();
   }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['storageServiceId']) {
+      this.findServiceById();
+    }
+  }
+
+  findServiceById() {
+    const select = this.storageServices.find(
+      service => service.name === this.storageServiceId
+    );
+    if (select?.type === 'github') {
+      this.selectType = true;
+    } else {
+      this.selectType = false;
+    }
+  }
+
   updateDataSource() {
     //
   }

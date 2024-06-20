@@ -110,7 +110,7 @@
   >
   <df-link-service
     [cache]="scriptForm.getRawValue().name"
-    [storageServiceId]="getControl('storageServiceId')"
+    [storageServiceId]="selectedServiceItem"
     [storagePath]="getControl('storagePath')"
     [content]="getControl('content')"></df-link-service>
   <df-script-editor
