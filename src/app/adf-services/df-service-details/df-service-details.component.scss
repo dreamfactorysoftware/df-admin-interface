@@ -126,6 +126,11 @@ mat-icon {
   justify-content: flex-end;
 }
 
+.actions {
+  display: flex;
+  gap: 16px;
+}
+
 ::ng-deep .mat-expansion-panel-header > .mat-expansion-indicator::after {
   color: unset !important;
 }

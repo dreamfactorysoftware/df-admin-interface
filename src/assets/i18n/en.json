@@ -101,6 +101,8 @@
   "toggleNav": "Toggle navigation",
   "desktopFile": "Upload File",
   "githubFile": "Github Import",
+  "schema": "Schema",
+  "apiDocs": "API docs",
   "searchFeatures": "Search Features",
   "scriptType": "Script Type",
   "scriptTypes": {

@@ -344,6 +344,16 @@
       *ngIf="!subscriptionRequired"
       ><span>{{ 'active' | transloco }}</span></mat-slide-toggle
     >
+    <ng-container *ngIf="this.edit">
+      <div class="full-width actions">
+        <button type="button" mat-flat-button class="save-btn">
+          {{ 'schema' | transloco }}
+        </button>
+        <button type="button" mat-flat-button class="save-btn">
+          {{ 'apiDocs' | transloco }}
+        </button>
+      </div>
+    </ng-container>
     <ng-container *ngIf="viewSchema && !subscriptionRequired">
       <ng-container formGroupName="config">
         <mat-accordion class="full-width">
