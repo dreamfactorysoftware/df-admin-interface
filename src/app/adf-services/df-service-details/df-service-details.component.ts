@@ -455,6 +455,16 @@ export class DfServiceDetailsComponent implements OnInit {
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 
+  gotoSchema() {
+    const data = this.serviceForm.getRawValue();
+    this.router.navigate([`/admin-settings/schema/${data.name}`]);
+  }
+
+  gotoAPIDocs() {
+    const data = this.serviceForm.getRawValue();
+    this.router.navigate([`/api-connections/api-docs/${data.name}`]);
+  }
+
   getBackgroundImage(typeLabel: string) {
     const image = this.images?.find(img => img.label == typeLabel);
     if (!image) {

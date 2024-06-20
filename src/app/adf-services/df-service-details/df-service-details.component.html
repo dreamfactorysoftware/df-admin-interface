@@ -3,7 +3,7 @@
   class="details-section"
   [class]="(isDarkMode | async) ? 'dark-theme' : ''"
   (ngSubmit)="save()">
-  <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabase">
+  <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabaseEdit">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
         <ng-template matStepLabel>
@@ -276,7 +276,7 @@
       </ng-template>
     </mat-stepper>
   </ng-container>
-  <ng-template #notDatabase>
+  <ng-template #notDatabaseEdit>
     <mat-form-field
       subscriptSizing="dynamic"
       class="dynamic-width"
@@ -344,16 +344,28 @@
       *ngIf="!subscriptionRequired"
       ><span>{{ 'active' | transloco }}</span></mat-slide-toggle
     >
-    <ng-container *ngIf="this.edit">
-      <div class="full-width actions">
-        <button type="button" mat-flat-button class="save-btn">
-          {{ 'schema' | transloco }}
-        </button>
-        <button type="button" mat-flat-button class="save-btn">
-          {{ 'apiDocs' | transloco }}
-        </button>
-      </div>
-    </ng-container>
+    <div class="full-width">
+      <ng-container *ngIf="this.edit">
+        <ng-container *ngIf="this.isDatabase; else notDatabase">
+          <button
+            type="button"
+            mat-flat-button
+            class="save-btn"
+            (click)="gotoSchema()">
+            {{ 'schema' | transloco }}
+          </button>
+        </ng-container>
+        <ng-template #notDatabase>
+          <button
+            type="button"
+            mat-flat-button
+            class="save-btn"
+            (click)="gotoAPIDocs()">
+            {{ 'apiDocs' | transloco }}
+          </button>
+        </ng-template>
+      </ng-container>
+    </div>
     <ng-container *ngIf="viewSchema && !subscriptionRequired">
       <ng-container formGroupName="config">
         <mat-accordion class="full-width">
