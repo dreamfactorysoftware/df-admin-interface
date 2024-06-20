@@ -4,7 +4,6 @@ import {
   OnInit,
   Input,
   SimpleChanges,
-  Output,
   OnChanges,
 } from '@angular/core';
 import { MatFormFieldModule } from '@angular/material/form-field';

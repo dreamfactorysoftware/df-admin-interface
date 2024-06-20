@@ -23,22 +23,19 @@
       {{ 'githubFile' | transloco }}
     </button>
   </div>
-  <!-- <mat-form-field class="dynamic-width" subscriptSizing="dynamic">
-    <mat-label>{{ 'service' | transloco }}</mat-label>
-    <mat-select [formControl]="storageServiceId">
-      <mat-option></mat-option>
-      <mat-option *ngFor="let service of storageServices" [value]="service.id">
-        {{ service.label }}
-      </mat-option>
-    </mat-select>
-  </mat-form-field> -->
-  <mat-form-field
-    *ngIf="!!storageServiceId.getRawValue()"
-    class="dynamic-width"
-    subscriptSizing="dynamic">
-    <mat-label>{{ 'path' | transloco }}</mat-label>
-    <input matInput [formControl]="storagePath" />
-  </mat-form-field>
+  <mat-checkbox [(ngModel)]="checked">
+    {{ 'scripts.path' | transloco }}?</mat-checkbox
+  >
+  <ng-container *ngIf="checked">
+    <mat-form-field
+      *ngIf="!storageServiceId || !storageServiceId.getRawValue()"
+      class="full-width"
+      subscriptSizing="dynamic">
+      <mat-label>{{ 'path' | transloco }}</mat-label>
+      <input matInput [formControl]="storagePath" />
+    </mat-form-field>
+  </ng-container>
+
   <div class="actions" *ngIf="storageServiceId.getRawValue()">
     <button
       mat-flat-button
