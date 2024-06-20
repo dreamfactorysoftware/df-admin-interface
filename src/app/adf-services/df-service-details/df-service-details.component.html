@@ -277,24 +277,46 @@
     </mat-stepper>
   </ng-container>
   <ng-template #notDatabaseEdit>
-    <mat-form-field
-      subscriptSizing="dynamic"
-      class="dynamic-width"
-      appearance="outline">
-      <mat-label>{{
-        'services.controls.serviceType.label' | transloco
-      }}</mat-label>
-      <mat-select formControlName="type">
-        <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
-          {{ type.label }}
-        </mat-option>
-      </mat-select>
-      <fa-icon
-        class="tool-tip-trigger"
-        matSuffix
-        [icon]="faCircleInfo"
-        [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
-    </mat-form-field>
+    <ng-container *ngIf="this.isNetworkService; else notNetwork">
+      <mat-form-field
+        subscriptSizing="dynamic"
+        class="dynamic-width"
+        appearance="outline">
+        <mat-label>{{
+          'services.controls.serviceType.label' | transloco
+        }}</mat-label>
+        <mat-select formControlName="type">
+          <mat-option *ngFor="let type of serviceTypes" [value]="type.label">
+            {{ type.label }}
+          </mat-option>
+        </mat-select>
+        <fa-icon
+          class="tool-tip-trigger"
+          matSuffix
+          [icon]="faCircleInfo"
+          [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
+      </mat-form-field>
+    </ng-container>
+    <ng-template #notNetwork>
+      <mat-form-field
+        subscriptSizing="dynamic"
+        class="dynamic-width"
+        appearance="outline">
+        <mat-label>{{
+          'services.controls.serviceType.label' | transloco
+        }}</mat-label>
+        <mat-select formControlName="type">
+          <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
+            {{ type.label }}
+          </mat-option>
+        </mat-select>
+        <fa-icon
+          class="tool-tip-trigger"
+          matSuffix
+          [icon]="faCircleInfo"
+          [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
+      </mat-form-field>
+    </ng-template>
     <mat-form-field
       subscriptSizing="dynamic"
       class="dynamic-width"
