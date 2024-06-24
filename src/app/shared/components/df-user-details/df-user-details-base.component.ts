@@ -185,6 +185,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
           });
         }
       } else {
+        this.currentProfile = { id: 0 } as T;
         this.userForm.addControl(
           'pass-invite',
           new FormControl('', [Validators.required])
