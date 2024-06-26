@@ -469,6 +469,16 @@ export class DfServiceDetailsComponent implements OnInit {
     }
   }
 
+  gotoSchema() {
+    const data = this.serviceForm.getRawValue();
+    this.router.navigate([`/admin-settings/schema/${data.name}`]);
+  }
+
+  gotoAPIDocs() {
+    const data = this.serviceForm.getRawValue();
+    this.router.navigate([`/api-connections/api-docs/${data.name}`]);
+  }
+
   goBack() {
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }

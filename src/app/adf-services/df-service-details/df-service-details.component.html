@@ -1,9 +1,8 @@
 <form
   [formGroup]="serviceForm"
   class="details-section"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
-  (ngSubmit)="save(false)">
-  <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabase">
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabaseEdit">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
         <ng-template matStepLabel>
@@ -280,25 +279,47 @@
       </ng-template>
     </mat-stepper>
   </ng-container>
-  <ng-template #notDatabase>
-    <mat-form-field
-      subscriptSizing="dynamic"
-      class="dynamic-width"
-      appearance="outline">
-      <mat-label>{{
-        'services.controls.serviceType.label' | transloco
-      }}</mat-label>
-      <mat-select formControlName="type">
-        <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
-          {{ type.label }}
-        </mat-option>
-      </mat-select>
-      <fa-icon
-        class="tool-tip-trigger"
-        matSuffix
-        [icon]="faCircleInfo"
-        [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
-    </mat-form-field>
+  <ng-template #notDatabaseEdit>
+    <ng-container *ngIf="this.isNetworkService; else notNetwork">
+      <mat-form-field
+        subscriptSizing="dynamic"
+        class="dynamic-width"
+        appearance="outline">
+        <mat-label>{{
+          'services.controls.serviceType.label' | transloco
+        }}</mat-label>
+        <mat-select formControlName="type">
+          <mat-option *ngFor="let type of serviceTypes" [value]="type.label">
+            {{ type.label }}
+          </mat-option>
+        </mat-select>
+        <fa-icon
+          class="tool-tip-trigger"
+          matSuffix
+          [icon]="faCircleInfo"
+          [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
+      </mat-form-field>
+    </ng-container>
+    <ng-template #notNetwork>
+      <mat-form-field
+        subscriptSizing="dynamic"
+        class="dynamic-width"
+        appearance="outline">
+        <mat-label>{{
+          'services.controls.serviceType.label' | transloco
+        }}</mat-label>
+        <mat-select formControlName="type">
+          <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
+            {{ type.label }}
+          </mat-option>
+        </mat-select>
+        <fa-icon
+          class="tool-tip-trigger"
+          matSuffix
+          [icon]="faCircleInfo"
+          [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
+      </mat-form-field>
+    </ng-template>
     <mat-form-field
       subscriptSizing="dynamic"
       class="dynamic-width"
@@ -348,6 +369,28 @@
       *ngIf="!subscriptionRequired"
       ><span>{{ 'active' | transloco }}</span></mat-slide-toggle
     >
+    <div class="full-width">
+      <ng-container *ngIf="this.edit">
+        <ng-container *ngIf="this.isDatabase; else notDatabase">
+          <button
+            type="button"
+            mat-flat-button
+            class="save-btn"
+            (click)="gotoSchema()">
+            {{ 'schema' | transloco }}
+          </button>
+        </ng-container>
+        <ng-template #notDatabase>
+          <button
+            type="button"
+            mat-flat-button
+            class="save-btn"
+            (click)="gotoAPIDocs()">
+            {{ 'apiDocs' | transloco }}
+          </button>
+        </ng-template>
+      </ng-container>
+    </div>
     <ng-container *ngIf="viewSchema && !subscriptionRequired">
       <ng-container formGroupName="config">
         <mat-accordion class="full-width">

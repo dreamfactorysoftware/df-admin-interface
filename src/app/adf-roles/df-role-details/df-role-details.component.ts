@@ -69,7 +69,7 @@ export class DfRoleDetailsComponent implements OnInit {
     private themeService: DfThemeService
   ) {
     this.roleForm = this.fb.group({
-      id: [null],
+      id: [0],
       name: ['', Validators.required],
       description: [''],
       active: [false],
@@ -248,10 +248,9 @@ export class DfRoleDetailsComponent implements OnInit {
   }
 
   onSubmit() {
-    if (this.roleForm.invalid) return;
-
+    // if (this.roleForm.invalid) return;
     const formValue = this.roleForm.getRawValue();
-
+    if (formValue.name === '' || formValue.name === null) return;
     const payload: RolePayload = {
       id: formValue.id,
       name: formValue.name,

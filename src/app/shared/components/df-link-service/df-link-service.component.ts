@@ -58,10 +58,10 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
   @Input({ required: true }) storageServiceId!: string;
   @Input({ required: true }) storagePath: FormControl;
   @Input({ required: true }) content: FormControl;
-
+  selectType = false;
   roleForm: FormGroup;
   storageServices: Array<Service> = [];
-  selectType = false;
+
   constructor(
     private themeService: DfThemeService,
     @Inject(CACHE_SERVICE_TOKEN) private cacheService: DfBaseCrudService,
@@ -95,12 +95,6 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
     this.updateDataSource();
   }
 
-  ngOnChanges(changes: SimpleChanges) {
-    if (changes['storageServiceId']) {
-      this.findServiceById();
-    }
-  }
-
   findServiceById() {
     const select = this.storageServices.find(
       service => service.name === this.storageServiceId
@@ -109,6 +103,12 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
       this.selectType = true;
     } else {
       this.selectType = false;
+    }
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['storageServiceId']) {
+      this.findServiceById();
     }
   }
 
