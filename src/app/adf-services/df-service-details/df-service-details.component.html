@@ -1,7 +1,8 @@
 <form
   [formGroup]="serviceForm"
   class="details-section"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
+  (ngSubmit)="save()">
   <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabaseEdit">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
