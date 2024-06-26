@@ -29,13 +29,7 @@
     "email": "dspsupport@dreamfactory.com",
     "wiki": "https://wiki.dreamfactory.com"
   },
-  "require": {
-    "dreamfactory/installer": "*"
-  },
   "extra": {
-    "branch-alias": {
-      "dev-develop": "2.16.x-dev"
-    },
     "installer-name": "dreamfactory"
   }
 }
