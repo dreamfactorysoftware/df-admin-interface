@@ -281,46 +281,24 @@
     </mat-stepper>
   </ng-container>
   <ng-template #notDatabaseEdit>
-    <ng-container *ngIf="this.isNetworkService; else notNetwork">
-      <mat-form-field
-        subscriptSizing="dynamic"
-        class="dynamic-width"
-        appearance="outline">
-        <mat-label>{{
-          'services.controls.serviceType.label' | transloco
-        }}</mat-label>
-        <mat-select formControlName="type">
-          <mat-option *ngFor="let type of serviceTypes" [value]="type.label">
-            {{ type.label }}
-          </mat-option>
-        </mat-select>
-        <fa-icon
-          class="tool-tip-trigger"
-          matSuffix
-          [icon]="faCircleInfo"
-          [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
-      </mat-form-field>
-    </ng-container>
-    <ng-template #notNetwork>
-      <mat-form-field
-        subscriptSizing="dynamic"
-        class="dynamic-width"
-        appearance="outline">
-        <mat-label>{{
-          'services.controls.serviceType.label' | transloco
-        }}</mat-label>
-        <mat-select formControlName="type">
-          <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
-            {{ type.label }}
-          </mat-option>
-        </mat-select>
-        <fa-icon
-          class="tool-tip-trigger"
-          matSuffix
-          [icon]="faCircleInfo"
-          [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
-      </mat-form-field>
-    </ng-template>
+    <mat-form-field
+      subscriptSizing="dynamic"
+      class="dynamic-width"
+      appearance="outline">
+      <mat-label>{{
+        'services.controls.serviceType.label' | transloco
+      }}</mat-label>
+      <mat-select formControlName="type">
+        <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
+          {{ type.label }}
+        </mat-option>
+      </mat-select>
+      <fa-icon
+        class="tool-tip-trigger"
+        matSuffix
+        [icon]="faCircleInfo"
+        [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
+    </mat-form-field>
     <mat-form-field
       subscriptSizing="dynamic"
       class="dynamic-width"
@@ -413,6 +391,7 @@
                   <mat-button-toggle value="1">YAML</mat-button-toggle>
                 </mat-button-toggle-group>
                 <mat-label class="full-width">Service Definition</mat-label>
+
                 <ng-container *ngIf="getConfigControl('storageServiceId')">
                   <df-script-editor
                     [type]="getControl('type')"
@@ -422,6 +401,7 @@
                     [cache]="serviceData ? serviceData.name : ''"
                     class="full-width"></df-script-editor>
                 </ng-container>
+
                 <!-- <mat-form-field class="full-width" appearance="outline">
                   <mat-label>Service Definition</mat-label>
                   <textarea
@@ -431,7 +411,30 @@
                     [ngModelOptions]="{ standalone: true }"></textarea>
                 </mat-form-field> -->
               </ng-container>
-
+              <ng-container
+                *ngIf="
+                  this.isFile && serviceForm.getRawValue().type === 'local_file'
+                ">
+                <div class="actions full-width">
+                  <input
+                    type="file"
+                    [accept]=""
+                    #fileInput
+                    (change)="excelUpload($event)"
+                    style="display: none" />
+                  <button
+                    type="button"
+                    mat-flat-button
+                    class="save-btn"
+                    (click)="fileInput.click()">
+                    Upload Excel
+                  </button>
+                </div>
+                <df-ace-editor
+                  class="full-width"
+                  [formControl]="getConfigControl('excelContent')"
+                  [mode]="serviceForm.getRawValue().type"></df-ace-editor>
+              </ng-container>
               <!-- <ng-container *ngIf="this.isNetworkService">
                 <df-script-editor
                   [type]="getControl('type')"

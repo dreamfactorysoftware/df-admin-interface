@@ -26,6 +26,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
+import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
+
 import { ConfigSchema, ServiceType } from 'src/app/shared/types/service';
 import {
   camelToSnakeString,
@@ -57,6 +59,7 @@ import { HttpClient } from '@angular/common/http';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { readAsText } from '../../shared/utilities/file';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -80,6 +83,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
     NgTemplateOutlet,
     DfDynamicFieldComponent,
     DfArrayFieldComponent,
+    DfAceEditorComponent,
     FontAwesomeModule,
     MatTooltipModule,
     MatButtonModule,
@@ -96,6 +100,7 @@ export class DfServiceDetailsComponent implements OnInit {
   isDatabase = false;
   isNetworkService = false;
   isScriptService = false;
+  isFile = false;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -158,6 +163,9 @@ export class DfServiceDetailsComponent implements OnInit {
         if (route['groups'] && route['groups'][0] === 'Script') {
           this.isScriptService = true;
         }
+        if (route['groups'] && route['groups'][0] === 'File') {
+          this.isFile = true;
+        }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
         this.serviceTypes = serviceTypes.filter(
@@ -204,7 +212,7 @@ export class DfServiceDetailsComponent implements OnInit {
         this.serviceData = data;
         if (this.edit) {
           this.configSchema = this.getConfigSchema(data.type);
-          this.initializeConfig();
+          this.initializeConfig('');
           this.serviceForm.patchValue({
             ...data,
             config: data.config,
@@ -218,7 +226,7 @@ export class DfServiceDetailsComponent implements OnInit {
           this.serviceForm.controls['type'].valueChanges.subscribe(value => {
             this.serviceForm.removeControl('config');
             this.configSchema = this.getConfigSchema(value);
-            this.initializeConfig();
+            this.initializeConfig(value);
           });
         }
       });
@@ -231,7 +239,7 @@ export class DfServiceDetailsComponent implements OnInit {
     }
   }
 
-  initializeConfig() {
+  initializeConfig(value: string) {
     if (this.configSchema && this.configSchema.length > 0) {
       const config = this.fb.group({});
       this.configSchema.forEach(control => {
@@ -244,6 +252,9 @@ export class DfServiceDetailsComponent implements OnInit {
           new FormControl(control.default, validator)
         );
       });
+      if (this.isFile && value === 'local_file') {
+        config?.addControl('excelContent', new FormControl(''));
+      }
       const contentConfigControl = this.configSchema.filter(
         control => control.name === 'content'
       )?.[0];
@@ -279,6 +290,21 @@ export class DfServiceDetailsComponent implements OnInit {
       return AceEditorMode.PHP;
     }
     return AceEditorMode.TEXT;
+  }
+
+  excelUpload(event: Event) {
+    const config = this.serviceForm.get('config');
+    const input = event.target as HTMLInputElement;
+    if (input.files) {
+      if (config && config.get('excelContent')) {
+        readAsText(input.files[0]).subscribe(value => {
+          const excelContentControl = config.get('excelContent');
+          if (excelContentControl) {
+            excelContentControl.setValue(value);
+          }
+        });
+      }
+    }
   }
 
   getConfigSchema(type: string) {
