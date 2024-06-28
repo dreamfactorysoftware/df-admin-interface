@@ -29,7 +29,7 @@
     "email": "dspsupport@dreamfactory.com",
     "wiki": "https://wiki.dreamfactory.com"
   },
-  "require":           {
+  "require": {
     "dreamfactory/installer": "*"
   },
   "extra": {
