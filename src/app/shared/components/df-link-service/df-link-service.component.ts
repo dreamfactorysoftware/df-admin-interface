@@ -59,7 +59,7 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
 
   @Input({ required: true }) storagePath: FormControl;
   @Input({ required: true }) content: FormControl;
-
+  selectType = false;
   roleForm: FormGroup;
   storageServices: Array<Service> = [];
   selectType = false;
