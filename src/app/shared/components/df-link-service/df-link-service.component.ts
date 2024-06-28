@@ -34,7 +34,7 @@ import { Service, ServiceType } from '../../types/service';
 @Component({
   selector: 'df-link-service',
   templateUrl: './df-link-service.component.html',
-  // styleUrls: ['./df-link-service.component.scss'],
+  styleUrls: ['./df-link-service.component.scss'],
   standalone: true,
   imports: [
     MatFormFieldModule,
@@ -56,12 +56,14 @@ import { Service, ServiceType } from '../../types/service';
 export class DfLinkServiceComponent implements OnInit, OnChanges {
   @Input() cache: string;
   @Input({ required: true }) storageServiceId!: string;
+
   @Input({ required: true }) storagePath: FormControl;
   @Input({ required: true }) content: FormControl;
 
   roleForm: FormGroup;
   storageServices: Array<Service> = [];
   selectType = false;
+
   constructor(
     private themeService: DfThemeService,
     @Inject(CACHE_SERVICE_TOKEN) private cacheService: DfBaseCrudService,

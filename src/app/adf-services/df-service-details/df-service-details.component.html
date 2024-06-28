@@ -207,13 +207,17 @@
                       item.type === 'text' && item.name === 'content';
                       else dynamic
                     ">
-                    <df-script-editor
-                      [type]="getControl('type')"
-                      [storageServiceId]="getConfigControl('storageServiceId')"
-                      [storagePath]="getConfigControl('storagePath')"
-                      [content]="getConfigControl('content')"
-                      [cache]="serviceData ? serviceData.name : ''"
-                      class="full-width"></df-script-editor>
+                    <ng-container *ngIf="getConfigControl('storageServiceId')">
+                      <df-script-editor
+                        [type]="getControl('type')"
+                        [storageServiceId]="
+                          getConfigControl('storageServiceId')
+                        "
+                        [storagePath]="getConfigControl('storagePath')"
+                        [content]="getConfigControl('content')"
+                        [cache]="serviceData ? serviceData.name : ''"
+                        class="full-width"></df-script-editor>
+                    </ng-container>
                   </ng-container>
                   <ng-template #dynamic>
                     <df-dynamic-field
@@ -387,6 +391,17 @@
                   <mat-button-toggle value="1">YAML</mat-button-toggle>
                 </mat-button-toggle-group>
                 <mat-label class="full-width">Service Definition</mat-label>
+
+                <ng-container *ngIf="getConfigControl('storageServiceId')">
+                  <df-script-editor
+                    [type]="getControl('type')"
+                    [storageServiceId]="getConfigControl('storageServiceId')"
+                    [storagePath]="getConfigControl('storagePath')"
+                    [content]="getConfigControl('serviceDefinition')"
+                    [cache]="serviceData ? serviceData.name : ''"
+                    class="full-width"></df-script-editor>
+                </ng-container>
+
                 <!-- <mat-form-field class="full-width" appearance="outline">
                   <mat-label>Service Definition</mat-label>
                   <textarea
@@ -437,13 +452,15 @@
                     item.type === 'text' && item.name === 'content';
                     else dynamic
                   ">
-                  <df-script-editor
-                    [type]="getControl('type')"
-                    [storageServiceId]="getConfigControl('storageServiceId')"
-                    [storagePath]="getConfigControl('storagePath')"
-                    [content]="getConfigControl('content')"
-                    [cache]="serviceData ? serviceData.name : ''"
-                    class="full-width"></df-script-editor>
+                  <ng-container *ngIf="getConfigControl('storageServiceId')">
+                    <df-script-editor
+                      [type]="getControl('type')"
+                      [storageServiceId]="getConfigControl('storageServiceId')"
+                      [storagePath]="getConfigControl('storagePath')"
+                      [content]="getConfigControl('content')"
+                      [cache]="serviceData ? serviceData.name : ''"
+                      class="full-width"></df-script-editor>
+                  </ng-container>
                 </ng-container>
                 <ng-template #dynamic>
                   <df-dynamic-field
@@ -486,6 +503,29 @@
         (click)="goBack()">
         {{ 'cancel' | transloco }}
       </button>
+      <ng-container *ngIf="this.edit">
+        <!-- <mat-button-toggle-group
+          [(ngModel)]="clearCache"
+          [ngModelOptions]="{ standalone: true }"
+          appearance="legacy">
+          <mat-button-toggle
+            [value]="true"
+            mat-flat-button
+            class="save-btn"
+            color="primary"
+            (click)="save()">
+            {{ 'saveAndClear' | transloco }}</mat-button-toggle
+          >
+        </mat-button-toggle-group> -->
+        <button
+          [value]="true"
+          mat-flat-button
+          class="save-btn"
+          color="primary"
+          (click)="save(true)">
+          {{ 'saveAndClear' | transloco }}
+        </button>
+      </ng-container>
       <button mat-flat-button class="save-btn" color="primary">
         {{ 'save' | transloco }}
       </button>
