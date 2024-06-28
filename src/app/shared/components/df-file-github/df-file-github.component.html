@@ -1,0 +1,28 @@
+<div class="details-section" [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <div class="actions full-width">
+    <input
+      type="file"
+      [accept]=""
+      #fileInput
+      (change)="fileUpload($event)"
+      style="display: none" />
+    <button
+      type="button"
+      mat-flat-button
+      class="save-btn"
+      (click)="fileInput.click()">
+      {{ 'desktopFile' | transloco }}
+    </button>
+    <button
+      type="button"
+      mat-flat-button
+      class="save-btn"
+      (click)="githubImport()">
+      {{ 'githubFile' | transloco }}
+    </button>
+  </div>
+  <df-ace-editor
+    class="full-width"
+    [formControl]="content"
+    [mode]="type.getRawValue()"></df-ace-editor>
+</div>

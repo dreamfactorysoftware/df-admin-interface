@@ -403,16 +403,26 @@
                     [cache]="serviceData ? serviceData.name : ''"
                     class="full-width"></df-script-editor>
                 </ng-container>
-                <!-- <ng-container *ngIf="serviceForm.getRawValue().type === 'rws'">
-                  <mat-form-field class="full-width" appearance="outline">
+                <ng-container *ngIf="serviceForm.getRawValue().type === 'rws'">
+                  <!-- <mat-form-field class="full-width" appearance="outline">
                     <mat-label>Service Definition</mat-label>
                     <textarea
                       matInput
                       rows="10"
                       [(ngModel)]="serviceDefinition"
                       [ngModelOptions]="{ standalone: true }"></textarea>
-                  </mat-form-field>
-                </ng-container> -->
+                  </mat-form-field> -->
+                  <df-file-github
+                    [type]="getControl('type')"
+                    [content]="getConfigControl('content')"
+                    [contentText]="
+                      serviceData.serviceDocByServiceId
+                        ? serviceData.serviceDocByServiceId.content
+                        : ''
+                    "
+                    class="full-width">
+                  </df-file-github>
+                </ng-container>
               </ng-container>
               <ng-container
                 *ngIf="
