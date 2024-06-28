@@ -509,7 +509,6 @@ export class DfServiceDetailsComponent implements OnInit {
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 
-
   getBackgroundImage(typeLabel: string) {
     const image = this.images?.find(img => img.label == typeLabel);
     if (!image) {
