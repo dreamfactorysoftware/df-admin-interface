@@ -13,7 +13,10 @@ import { saveRawAsFile } from 'src/app/shared/utilities/file';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 import { SESSION_TOKEN_HEADER } from 'src/app/shared/constants/http-headers';
-import { mapSnakeToCamel } from 'src/app/shared/utilities/case';
+import {
+  mapCamelToSnake,
+  mapSnakeToCamel,
+} from 'src/app/shared/utilities/case';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { AsyncPipe } from '@angular/common';
 
@@ -42,9 +45,14 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data }) => {
       if (data) {
-        const updatedPaths = mapSnakeToCamel(data.paths);
-        const updatedData = { ...data, paths: updatedPaths };
-        this.apiDocJson = updatedData;
+        if (
+          data.paths['/'].get.operationId &&
+          data.paths['/'].get.operationId === 'getSoapResources'
+        ) {
+          this.apiDocJson = { ...data, paths: mapSnakeToCamel(data.paths) };
+        } else {
+          this.apiDocJson = { ...data, paths: mapCamelToSnake(data.paths) };
+        }
       }
     });
   }

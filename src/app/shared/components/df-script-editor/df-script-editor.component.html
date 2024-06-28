@@ -11,7 +11,7 @@
       mat-flat-button
       class="save-btn"
       (click)="fileInput.click()"
-      [disabled]="!storageServiceId || !storageServiceId.getRawValue()">
+      [disabled]="!storageServiceId">
       {{ 'desktopFile' | transloco }}
     </button>
     <button
@@ -19,13 +19,11 @@
       mat-flat-button
       class="save-btn"
       (click)="githubImport()"
-      [disabled]="!storageServiceId || !storageServiceId.getRawValue()">
+      [disabled]="!storageServiceId">
       {{ 'githubFile' | transloco }}
     </button>
   </div>
-  <mat-checkbox [(ngModel)]="checked">
-    {{ 'scripts.path' | transloco }}?</mat-checkbox
-  >
+  <mat-checkbox [(ngModel)]="checked"> Add path to file</mat-checkbox>
   <ng-container *ngIf="checked">
     <mat-form-field
       *ngIf="!storageServiceId || !storageServiceId.getRawValue()"

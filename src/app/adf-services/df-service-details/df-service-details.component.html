@@ -1,8 +1,8 @@
 <form
   [formGroup]="serviceForm"
   class="details-section"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
-  (ngSubmit)="save()">
+  (ngSubmit)="save(false)"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
   <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabaseEdit">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
@@ -380,16 +380,18 @@
             <div class="details-section">
               <ng-container
                 *ngIf="this.isNetworkService || this.isScriptService">
-                <mat-button-toggle-group
-                  aria-label="Service Definition Type"
-                  [(ngModel)]="serviceDefinitionType"
-                  [ngModelOptions]="{ standalone: true }"
-                  (change)="
-                    onServiceDefinitionTypeChange(serviceDefinitionType)
-                  ">
-                  <mat-button-toggle value="0">JSON</mat-button-toggle>
-                  <mat-button-toggle value="1">YAML</mat-button-toggle>
-                </mat-button-toggle-group>
+                <ng-container *ngIf="serviceForm.getRawValue().type !== 'soap'">
+                  <mat-button-toggle-group
+                    aria-label="Service Definition Type"
+                    [(ngModel)]="serviceDefinitionType"
+                    [ngModelOptions]="{ standalone: true }"
+                    (change)="
+                      onServiceDefinitionTypeChange(serviceDefinitionType)
+                    ">
+                    <mat-button-toggle value="0">JSON</mat-button-toggle>
+                    <mat-button-toggle value="1">YAML</mat-button-toggle>
+                  </mat-button-toggle-group>
+                </ng-container>
                 <mat-label class="full-width">Service Definition</mat-label>
 
                 <ng-container *ngIf="getConfigControl('storageServiceId')">
@@ -401,15 +403,16 @@
                     [cache]="serviceData ? serviceData.name : ''"
                     class="full-width"></df-script-editor>
                 </ng-container>
-
-                <!-- <mat-form-field class="full-width" appearance="outline">
-                  <mat-label>Service Definition</mat-label>
-                  <textarea
-                    matInput
-                    rows="10"
-                    [(ngModel)]="serviceDefinition"
-                    [ngModelOptions]="{ standalone: true }"></textarea>
-                </mat-form-field> -->
+                <!-- <ng-container *ngIf="serviceForm.getRawValue().type === 'rws'">
+                  <mat-form-field class="full-width" appearance="outline">
+                    <mat-label>Service Definition</mat-label>
+                    <textarea
+                      matInput
+                      rows="10"
+                      [(ngModel)]="serviceDefinition"
+                      [ngModelOptions]="{ standalone: true }"></textarea>
+                  </mat-form-field>
+                </ng-container> -->
               </ng-container>
               <ng-container
                 *ngIf="
@@ -439,7 +442,7 @@
                 <df-script-editor
                   [type]="getControl('type')"
                   formControlName="content"
-                  [storageServiceId]="getConfigControl('storageServiceId')"
+                  [storageServiceId]="getServiceDefinitionControl()"
                   [storagePath]="getConfigControl('storagePath')"
                   [content]="getConfigControl('content')"
                   [cache]="serviceData ? serviceData.name : ''"
@@ -452,7 +455,7 @@
                     item.type === 'text' && item.name === 'content';
                     else dynamic
                   ">
-                  <ng-container *ngIf="getConfigControl('storageServiceId')">
+                  <!-- <ng-container *ngIf="getConfigControl('storageServiceId')">
                     <df-script-editor
                       [type]="getControl('type')"
                       [storageServiceId]="getConfigControl('storageServiceId')"
@@ -460,7 +463,7 @@
                       [content]="getConfigControl('content')"
                       [cache]="serviceData ? serviceData.name : ''"
                       class="full-width"></df-script-editor>
-                  </ng-container>
+                  </ng-container> -->
                 </ng-container>
                 <ng-template #dynamic>
                   <df-dynamic-field
