@@ -114,7 +114,7 @@ export class DfServiceDetailsComponent implements OnInit {
   serviceDefinition: string;
   serviceDefinitionType: string;
   systemEvents: Array<{ label: string; value: string }>;
-
+  content = '';
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
@@ -212,6 +212,11 @@ export class DfServiceDetailsComponent implements OnInit {
           data.config.serviceDefinition = data?.serviceDocByServiceId.content;
         }
         this.serviceData = data;
+        if (data) {
+          this.content = data.serviceDocByServiceId.content;
+        } else {
+          this.content = '';
+        }
         if (this.edit) {
           this.configSchema = this.getConfigSchema(data.type);
           this.initializeConfig('');

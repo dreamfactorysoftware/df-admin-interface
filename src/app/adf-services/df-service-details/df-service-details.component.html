@@ -415,11 +415,7 @@
                   <df-file-github
                     [type]="getControl('type')"
                     [content]="getConfigControl('content')"
-                    [contentText]="
-                      serviceData.serviceDocByServiceId
-                        ? serviceData.serviceDocByServiceId.content
-                        : ''
-                    "
+                    [contentText]="content"
                     class="full-width">
                   </df-file-github>
                 </ng-container>

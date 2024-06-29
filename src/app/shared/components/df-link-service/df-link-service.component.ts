@@ -61,7 +61,7 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
   @Input({ required: true }) content: FormControl;
   roleForm: FormGroup;
   storageServices: Array<Service> = [];
-
+  selectType = false;
   constructor(
     private themeService: DfThemeService,
     @Inject(CACHE_SERVICE_TOKEN) private cacheService: DfBaseCrudService,
