@@ -46,6 +46,7 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
+import { DfFileGithubComponent } from 'src/app/shared/components/df-file-github/df-file-github.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { map, switchMap } from 'rxjs';
 import {
@@ -88,6 +89,7 @@ import { readAsText } from '../../shared/utilities/file';
     MatTooltipModule,
     MatButtonModule,
     DfScriptEditorComponent,
+    DfFileGithubComponent,
     DfPaywallComponent,
     MatStepperModule,
     CommonModule,
@@ -112,7 +114,7 @@ export class DfServiceDetailsComponent implements OnInit {
   serviceDefinition: string;
   serviceDefinitionType: string;
   systemEvents: Array<{ label: string; value: string }>;
-
+  content = '';
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
@@ -210,6 +212,11 @@ export class DfServiceDetailsComponent implements OnInit {
           data.config.serviceDefinition = data?.serviceDocByServiceId.content;
         }
         this.serviceData = data;
+        if (data) {
+          this.content = data.serviceDocByServiceId.content;
+        } else {
+          this.content = '';
+        }
         if (this.edit) {
           this.configSchema = this.getConfigSchema(data.type);
           this.initializeConfig('');
@@ -267,6 +274,10 @@ export class DfServiceDetailsComponent implements OnInit {
           'serviceDefinition',
           new FormControl(contentConfigControl.default, validator)
         );
+      }
+      if (this.isNetworkService) {
+        this.serviceForm.addControl('type', new FormControl(''));
+        config.addControl('content', new FormControl(''));
       }
       this.serviceForm?.addControl('config', config);
     }
@@ -349,11 +360,10 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   save(clearCache: boolean) {
-    if (this.serviceForm.invalid) {
+    const data = this.serviceForm.getRawValue();
+    if (data.type === '' || data.name === '') {
       return;
     }
-    const data = this.serviceForm.getRawValue();
-
     type Params = {
       snackbarError?: string;
       snackbarSuccess?: string;
@@ -365,21 +375,20 @@ export class DfServiceDetailsComponent implements OnInit {
       snackbarError: 'server',
       snackbarSuccess: 'services.createSuccessMsg',
     };
-
     if (this.isNetworkService) {
       params = {
         ...params,
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      if (!data.config.serviceDefinition) {
-        data.service_doc_by_service_id = null;
-      } else {
-        data.service_doc_by_service_id.content = data.config.serviceDefinition;
-        data.service_doc_by_service_id.format = Number(
-          this.serviceDefinitionType
-        );
-      }
+      // if (!data.config.serviceDefinition) {
+      //   data.service_doc_by_service_id = null;
+      // } else {
+      data.service_doc_by_service_id.content = data.config.content;
+      data.service_doc_by_service_id.format = Number(
+        this.serviceDefinitionType
+      );
+      // }
     } else if (this.isScriptService) {
       params = {
         ...params,
