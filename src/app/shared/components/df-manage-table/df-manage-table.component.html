@@ -50,9 +50,11 @@
         <td mat-cell *matCellDef="let row">
           <fa-icon
             *ngIf="column.columnDef === 'active'"
-            [icon]="activeIcon(!!column?.cell(row))"
+            [icon]="activeIcon(isCellActive(column?.cell(row)))"
             size="lg"
-            [class]="!!column?.cell(row) ? 'active' : 'inactive'"></fa-icon>
+            [class]="
+              isCellActive(column?.cell(row)) ? 'active' : 'inactive'
+            "></fa-icon>
           <ng-container *ngIf="column.columnDef === 'registration'">
             {{ (!!column?.cell(row) ? 'confirmed' : 'pending') | transloco }}
           </ng-container>

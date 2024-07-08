@@ -85,7 +85,7 @@ export class DfScriptDetailsComponent implements OnInit {
     this.storeServiceArray = [];
     this.ungroupedEventItems = [];
     this.scriptForm = this.fb.group({
-      name: ['', [Validators.required]],
+      name: [''],
       type: ['nodejs', [Validators.required]],
       content: [''],
       storageServiceId: [],
@@ -136,9 +136,10 @@ export class DfScriptDetailsComponent implements OnInit {
   }
 
   submit(): void {
-    // if (!this.scriptForm.valid) {
-    //   return;
-    // }
+    if (!this.scriptForm.valid) {
+      return;
+    }
+    console.log(this.selectedRouteItem);
     const script = this.scriptForm.getRawValue();
     const scriptItem = {
       ...script,
@@ -150,7 +151,7 @@ export class DfScriptDetailsComponent implements OnInit {
         script.storageServiceId?.type === 'local_file'
           ? script.storagePath
           : null,
-      name: this.completeScriptName,
+      name: this.completeScriptName ?? this.selectedRouteItem,
     };
     if (this.type === 'edit') {
       this.scriptDetails = { ...this.scriptDetails, ...scriptItem };

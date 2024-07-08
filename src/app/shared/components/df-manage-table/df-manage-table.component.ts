@@ -128,6 +128,7 @@ export abstract class DfManageTableComponent<T>
         this.schema = this.router.url.includes('schema');
         if (data && data.resource) {
           this.dataSource.data = this.mapDataToTable(data.resource);
+          console.log(this.dataSource.data);
           this.dataSource.paginator = this.paginator;
         }
         if (data && data.meta) {
@@ -154,6 +155,18 @@ export abstract class DfManageTableComponent<T>
 
   activeIcon(active: boolean): IconProp {
     return active ? faCheckCircle : faXmarkCircle;
+  }
+
+  isCellActive(
+    cellValue: string | number | boolean | null | undefined
+  ): boolean {
+    if (typeof cellValue === 'boolean') {
+      return cellValue;
+    }
+    if (typeof cellValue === 'string') {
+      return cellValue.toLowerCase() === 'true';
+    }
+    return !!cellValue;
   }
 
   get displayedColumns() {
