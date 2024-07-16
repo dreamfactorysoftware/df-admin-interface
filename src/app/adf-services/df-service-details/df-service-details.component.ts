@@ -61,6 +61,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { readAsText } from '../../shared/utilities/file';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -124,7 +125,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private systemConfigDataService: DfSystemConfigDataService,
     private http: HttpClient,
     public dialog: MatDialog,
-    private themeService: DfThemeService
+    private themeService: DfThemeService,
+    private snackbarService: DfSnackbarService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -174,6 +176,10 @@ export class DfServiceDetailsComponent implements OnInit {
           (s: { name: string }) => s.name.toLowerCase() !== 'python'
         );
         this.notIncludedServices = [];
+        this.snackbarService.setSnackbarLastEle(
+          data.label ? data.label : data.name,
+          false
+        );
         if (this.isDatabase) {
           if (licenseType === 'SILVER') {
             this.notIncludedServices.push(

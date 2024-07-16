@@ -36,6 +36,8 @@ import {
 import { Service } from 'src/app/shared/types/service';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { AsyncPipe } from '@angular/common';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-limit',
@@ -82,7 +84,8 @@ export class DfLimitDetailsComponent implements OnInit {
     private activatedRoute: ActivatedRoute,
     private translateService: TranslocoService,
     private formBuilder: FormBuilder,
-    private themeService: DfThemeService
+    private themeService: DfThemeService,
+    private snackbarService: DfSnackbarService
   ) {
     this.formGroup = this.formBuilder.group({
       limitName: ['', Validators.required],
@@ -105,6 +108,10 @@ export class DfLimitDetailsComponent implements OnInit {
       this.type = resp['type'];
       if (resp['type'] === 'edit') {
         this.limitTypeToEdit = resp['data'] as LimitType;
+        this.snackbarService.setSnackbarLastEle(
+          this.limitTypeToEdit.name,
+          true
+        );
         this.formGroup.patchValue({
           limitName: this.limitTypeToEdit.name,
           limitType: this.limitTypeToEdit.type,

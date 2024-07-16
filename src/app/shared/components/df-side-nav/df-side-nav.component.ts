@@ -32,7 +32,15 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
 import { DfLicenseCheckService } from '../../services/df-license-check.service';
-import { debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
+import {
+  debounceTime,
+  distinctUntilChanged,
+  of,
+  switchMap,
+  Subject,
+  filter,
+  takeUntil,
+} from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
@@ -42,6 +50,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { DfThemeToggleComponent } from '../df-theme-toggle/df-theme-toggle.component';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
@@ -97,9 +106,10 @@ export class DfSideNavComponent implements OnInit {
     private dialog: MatDialog,
     private transloco: TranslocoService,
     private themeService: DfThemeService,
-    private searchService: DfSearchService
+    private searchService: DfSearchService,
+    private snackbarService: DfSnackbarService
   ) {}
-
+  private isDestroyed$ = new Subject<void>();
   ngOnInit(): void {
     this.userData$
       .pipe(
@@ -162,9 +172,25 @@ export class DfSideNavComponent implements OnInit {
     const segments = route.replace('/', '').split('/').join('.');
     return `nav.${segments}.nav`;
   }
-
+  private hasAddedLastEle = false;
   get breadCrumbs() {
-    return generateBreadcrumb(routes, this.router.url);
+    const urlParts = this.router.url.split('/');
+    // this.snackbarService.isEditPage$.
+    // if () {
+    let url = '';
+    // }
+    this.snackbarService.isEditPage$.subscribe(isEdit => {
+      if (isEdit) {
+        urlParts.pop();
+        this.snackbarService.snackbarLastEle$.subscribe(lastEle => {
+          urlParts.push(lastEle);
+        });
+        url = urlParts.join('/');
+      } else {
+        url = this.router.url;
+      }
+    });
+    return generateBreadcrumb(routes, url);
   }
 
   handleNavClick(nav: Nav) {

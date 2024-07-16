@@ -16,6 +16,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { generateApiKey } from 'src/app/shared/utilities/hash';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { AdditonalAction } from 'src/app/shared/types/table';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -38,9 +39,11 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
     translateService: TranslocoService,
-    dialog: MatDialog
+    dialog: MatDialog,
+    private snackbarService: DfSnackbarService
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
+    this.snackbarService.setSnackbarLastEle('', false);
     const extraActions: Array<AdditonalAction<AppRow>> = [
       {
         label: 'apps.launchApp',
