@@ -6,6 +6,7 @@ import {
   ReactiveFormsModule,
   Validators,
   FormBuilder,
+  FormsModule,
 } from '@angular/forms';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
@@ -20,7 +21,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
-
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { BehaviorSubject } from 'rxjs';
 import { AsyncPipe } from '@angular/common';
@@ -51,6 +52,8 @@ import { CommonModule } from '@angular/common';
     MatButtonModule,
     AsyncPipe,
     CommonModule,
+    MatButtonToggleModule,
+    FormsModule,
   ],
   animations: [
     trigger('detailExpand', [
@@ -83,6 +86,7 @@ export class DfRolesAccessComponent implements OnInit {
   serviceOptions = [{ id: 0, name: '' }];
   expandOperator: FormControl = new FormControl('');
   expandValue: FormControl = new FormControl('');
+  filterOp: '';
 
   componentOptions: ComponentOption[] = [{ serviceId: 0, components: ['*'] }];
 
@@ -286,6 +290,7 @@ export class DfRolesAccessComponent implements OnInit {
         requester: new FormControl([1], Validators.required),
         advancedFilters: advancedFilters,
         id: new FormControl(null),
+        serviceAccess: new FormControl(this.filterOp),
       })
     );
 
@@ -303,6 +308,7 @@ export class DfRolesAccessComponent implements OnInit {
         expandField: new FormControl('', Validators.required),
         expandOperator: new FormControl('', Validators.required),
         expandValue: new FormControl('', Validators.required),
+        filterOp: new FormControl(this.filterOp),
       })
     );
     this.updateDataSource();
@@ -331,6 +337,7 @@ export class DfRolesAccessComponent implements OnInit {
           expandField: new FormControl('', Validators.required),
           expandOperator: new FormControl('', Validators.required),
           expandValue: new FormControl('', Validators.required),
+          filterOp: new FormControl(this.filterOp),
         })
       );
     } else {
@@ -343,6 +350,11 @@ export class DfRolesAccessComponent implements OnInit {
       .at(serviceIndex)
       .get('advancedFilters') as FormArray;
     filters.removeAt(filterIndex);
+  }
+
+  filterOpChange(event: any) {
+    console.log(event);
+    this.filterOp = event.value;
   }
 }
 

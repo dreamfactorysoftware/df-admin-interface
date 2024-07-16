@@ -80,7 +80,7 @@ export class DfRoleDetailsComponent implements OnInit {
     });
   }
   isDarkMode = this.themeService.darkMode$;
-
+  filterOp = '';
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data, type }) => {
       this.type = type;
@@ -97,6 +97,8 @@ export class DfRoleDetailsComponent implements OnInit {
         });
 
         if (data.roleServiceAccessByRoleId.length > 0) {
+          console.log(data.roleServiceAccessByRoleId[0].filterOp);
+          this.filterOp = data.roleServiceAccessByRoleId[0].filterOp;
           data.roleServiceAccessByRoleId.forEach(
             (item: RoleServiceAccessType) => {
               const advancedFilters = new FormArray(
@@ -206,16 +208,16 @@ export class DfRoleDetailsComponent implements OnInit {
   //           verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
   //           requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
   //           filters: filtersArray,
-  //           filterOp: 'AND',
+  //           filterOp: this.filterOp,
   //         };
   //       }
   //     ),
   //     lookupByRoleId: formValue.lookupKeys,
   //   };
 
-  //   const createPayload = {
-  //     resource: [payload],
-  //   };
+  // const createPayload = {
+  //   resource: [payload],
+  // };
 
   //   if (this.type === 'edit' && payload.id) {
   //     this.roleService
@@ -269,7 +271,6 @@ export class DfRoleDetailsComponent implements OnInit {
             operator: filter.expandOperator,
             value: filter.expandValue,
           }));
-
           return {
             id: val.id,
             serviceId: val.service === 0 ? null : val.service,
@@ -277,13 +278,12 @@ export class DfRoleDetailsComponent implements OnInit {
             verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
             requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
             filters: filtersArray,
-            filterOp: 'AND',
+            filterOp: this.filterOp,
           };
         }
       ),
       lookupByRoleId: formValue.lookupKeys,
     };
-
     const createPayload = {
       resource: [payload],
     };

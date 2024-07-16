@@ -172,14 +172,19 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
+        console.log('License type:', serviceTypes);
         this.serviceTypes = serviceTypes.filter(
           (s: { name: string }) => s.name.toLowerCase() !== 'python'
         );
         this.notIncludedServices = [];
-        this.snackbarService.setSnackbarLastEle(
-          data.label ? data.label : data.name,
-          false
-        );
+        if (data && (data.label || data.name)) {
+          this.snackbarService.setSnackbarLastEle(
+            data.label ? data.label : data.name,
+            false
+          );
+        } else {
+          this.snackbarService.setSnackbarLastEle('Unknown label', false);
+        }
         if (this.isDatabase) {
           if (licenseType === 'SILVER') {
             this.notIncludedServices.push(
@@ -533,11 +538,10 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   get filteredServiceTypes() {
-    return this.serviceTypes.filter(type =>
-      type.label
-        .replace(/\s/g, '')
-        .toLowerCase()
-        .includes(this.search.toLowerCase())
+    return this.serviceTypes.filter(
+      type =>
+        type.label.toLowerCase().includes(this.search.toLowerCase()) ||
+        type.name.toLowerCase().includes(this.search.toLowerCase())
     );
   }
 
