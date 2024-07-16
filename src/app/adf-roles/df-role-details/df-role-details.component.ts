@@ -31,6 +31,7 @@ import {
 } from 'src/app/shared/components/df-alert/df-alert.component';
 import { catchError, throwError } from 'rxjs';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -66,7 +67,8 @@ export class DfRoleDetailsComponent implements OnInit {
     private fb: FormBuilder,
     private router: Router,
     private activatedRoute: ActivatedRoute,
-    private themeService: DfThemeService
+    private themeService: DfThemeService,
+    private snackbarService: DfSnackbarService
   ) {
     this.roleForm = this.fb.group({
       id: [0],
@@ -83,6 +85,10 @@ export class DfRoleDetailsComponent implements OnInit {
     this.activatedRoute.data.subscribe(({ data, type }) => {
       this.type = type;
       if (data) {
+        this.snackbarService.setSnackbarLastEle(
+          data.label ? data.label : data.name,
+          true
+        );
         this.roleForm.patchValue({
           id: data.id,
           name: data.name,

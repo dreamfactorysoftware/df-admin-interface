@@ -22,6 +22,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfPaywallService } from '../../services/df-paywall.service';
 import { of, switchMap } from 'rxjs';
 import { DfThemeService } from '../../services/df-theme.service';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -79,6 +80,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
     });
   }
   themeService = inject(DfThemeService);
+  snackbarService = inject(DfSnackbarService);
   isDarkMode = this.themeService.darkMode$;
 
   get cancelRoute() {
@@ -112,6 +114,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
         }
       });
     this.activatedRoute.data.subscribe(({ type, data, apps, roles }) => {
+      this.snackbarService.setSnackbarLastEle(data.name, true);
       this.type = type;
       if (this.userType === 'users') {
         this.apps = apps.resource;

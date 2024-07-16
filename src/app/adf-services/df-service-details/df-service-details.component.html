@@ -28,6 +28,7 @@
                 mat-button
                 matStepperNext
                 type="button"
+                class="cancel-btn"
                 [disabled]="serviceForm.get('type')?.value === ''">
                 Next
               </button>
@@ -108,6 +109,7 @@
               mat-button
               matStepperNext
               type="button"
+              class="cancel-btn"
               [disabled]="serviceForm.get('type')?.value === ''">
               Next
             </button>
@@ -178,11 +180,18 @@
               >{{ 'active' | transloco }}</mat-slide-toggle
             >
             <div>
-              <button mat-button matStepperPrevious type="button">Back</button>
+              <button
+                mat-button
+                matStepperPrevious
+                class="cancel-btn"
+                type="button">
+                Back
+              </button>
               <button
                 mat-button
                 matStepperNext
                 type="button"
+                class="cancel-btn"
                 [disabled]="
                   serviceForm.get('type')?.value === '' &&
                   serviceForm.get('description')?.value === ''

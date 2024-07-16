@@ -42,6 +42,7 @@ import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component
 import { DfAlertComponent } from 'src/app/shared/components/df-alert/df-alert.component';
 import { RoleType } from 'src/app/shared/types/role';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-app-details',
@@ -89,7 +90,8 @@ export class DfAppDetailsComponent implements OnInit {
     private systemConfigDataService: DfSystemConfigDataService,
     private activatedRoute: ActivatedRoute,
     private router: Router,
-    private themeService: DfThemeService
+    private themeService: DfThemeService,
+    private snackbarService: DfSnackbarService
   ) {
     this.urlOrigin = window.location.origin;
 
@@ -112,7 +114,7 @@ export class DfAppDetailsComponent implements OnInit {
       this.filteredRoles = roles.resource || [];
       this.editApp = appData || null;
     });
-
+    this.snackbarService.setSnackbarLastEle(this.editApp.name, true);
     if (this.editApp) {
       this.appForm.patchValue({
         name: this.editApp.name,
