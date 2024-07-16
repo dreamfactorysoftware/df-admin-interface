@@ -29,7 +29,7 @@ import {
   AlertType,
   DfAlertComponent,
 } from 'src/app/shared/components/df-alert/df-alert.component';
-import { catchError, throwError } from 'rxjs';
+import { catchError, filter, throwError } from 'rxjs';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 
@@ -97,7 +97,6 @@ export class DfRoleDetailsComponent implements OnInit {
         });
 
         if (data.roleServiceAccessByRoleId.length > 0) {
-          console.log(data.roleServiceAccessByRoleId[0].filterOp);
           this.filterOp = data.roleServiceAccessByRoleId[0].filterOp;
           data.roleServiceAccessByRoleId.forEach(
             (item: RoleServiceAccessType) => {
@@ -108,6 +107,7 @@ export class DfRoleDetailsComponent implements OnInit {
                       expandField: new FormControl(each.name),
                       expandOperator: new FormControl(each.operator),
                       expandValue: new FormControl(each.value),
+                      filterOp: new FormControl(item.filterOp),
                     })
                 )
               );
@@ -129,6 +129,7 @@ export class DfRoleDetailsComponent implements OnInit {
                   extendField: new FormControl(item.extendField),
                   extendOperator: new FormControl(item.extendOperator),
                   extendValue: new FormControl(item.extendValue),
+                  filterOp: new FormControl(item.filterOp),
                 })
               );
             }
