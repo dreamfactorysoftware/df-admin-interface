@@ -230,9 +230,8 @@
                     <div>
                       <mat-button-toggle-group
                         aria-label="Service Definition Type"
-                        [(ngModel)]="filterOp"
-                        [ngModelOptions]="{ standalone: true }"
-                        (change)="filterOpChange($event)">
+                        formControlName="filterOp"
+                        (change)="filterOpChange($event, i)">
                         <mat-button-toggle value="AND">AND</mat-button-toggle>
                         <mat-button-toggle value="OR">OR</mat-button-toggle>
                       </mat-button-toggle-group>

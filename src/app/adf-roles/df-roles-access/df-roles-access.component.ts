@@ -86,7 +86,6 @@ export class DfRolesAccessComponent implements OnInit {
   serviceOptions = [{ id: 0, name: '' }];
   expandOperator: FormControl = new FormControl('');
   expandValue: FormControl = new FormControl('');
-  filterOp: '';
 
   componentOptions: ComponentOption[] = [{ serviceId: 0, components: ['*'] }];
 
@@ -290,7 +289,7 @@ export class DfRolesAccessComponent implements OnInit {
         requester: new FormControl([1], Validators.required),
         advancedFilters: advancedFilters,
         id: new FormControl(null),
-        serviceAccess: new FormControl(this.filterOp),
+        serviceAccess: new FormControl(''),
       })
     );
 
@@ -308,7 +307,7 @@ export class DfRolesAccessComponent implements OnInit {
         expandField: new FormControl('', Validators.required),
         expandOperator: new FormControl('', Validators.required),
         expandValue: new FormControl('', Validators.required),
-        filterOp: new FormControl(this.filterOp),
+        filterOp: new FormControl(''),
       })
     );
     this.updateDataSource();
@@ -337,7 +336,7 @@ export class DfRolesAccessComponent implements OnInit {
           expandField: new FormControl('', Validators.required),
           expandOperator: new FormControl('', Validators.required),
           expandValue: new FormControl('', Validators.required),
-          filterOp: new FormControl(this.filterOp),
+          filterOp: new FormControl(''),
         })
       );
     } else {
@@ -352,9 +351,10 @@ export class DfRolesAccessComponent implements OnInit {
     filters.removeAt(filterIndex);
   }
 
-  filterOpChange(event: any) {
-    console.log(event);
-    this.filterOp = event.value;
+  filterOpChange(event: any, i: number) {
+    this.getAdvancedFilters(i).controls.forEach(filters => {
+      filters.get('filterOp')?.setValue(event.value);
+    });
   }
 }
 

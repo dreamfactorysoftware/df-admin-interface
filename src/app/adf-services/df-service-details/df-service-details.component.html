@@ -381,6 +381,17 @@
     </div>
     <ng-container *ngIf="viewSchema && !subscriptionRequired">
       <ng-container formGroupName="config">
+        <ng-container *ngIf="this.isNetworkService || this.isScriptService">
+          <ng-container *ngIf="getConfigControl('storageServiceId')">
+            <df-script-editor
+              [type]="getControl('type')"
+              [storageServiceId]="getConfigControl('storageServiceId')"
+              [storagePath]="getConfigControl('storagePath')"
+              [content]="getConfigControl('serviceDefinition')"
+              [cache]="serviceData ? serviceData.name : ''"
+              class="full-width"></df-script-editor>
+          </ng-container>
+        </ng-container>
         <mat-accordion class="full-width">
           <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
             <mat-expansion-panel-header
@@ -403,15 +414,6 @@
                 </ng-container>
                 <mat-label class="full-width">Service Definition</mat-label>
 
-                <ng-container *ngIf="getConfigControl('storageServiceId')">
-                  <df-script-editor
-                    [type]="getControl('type')"
-                    [storageServiceId]="getConfigControl('storageServiceId')"
-                    [storagePath]="getConfigControl('storagePath')"
-                    [content]="getConfigControl('serviceDefinition')"
-                    [cache]="serviceData ? serviceData.name : ''"
-                    class="full-width"></df-script-editor>
-                </ng-container>
                 <ng-container *ngIf="serviceForm.getRawValue().type === 'rws'">
                   <!-- <mat-form-field class="full-width" appearance="outline">
                     <mat-label>Service Definition</mat-label>
