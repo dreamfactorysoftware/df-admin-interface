@@ -227,6 +227,16 @@
                       <mat-label>Value</mat-label>
                       <input formControlName="expandValue" matInput />
                     </mat-form-field>
+                    <div>
+                      <mat-button-toggle-group
+                        aria-label="Service Definition Type"
+                        formControlName="filterOp"
+                        (change)="filterOpChange($event, i)">
+                        <mat-button-toggle value="AND">AND</mat-button-toggle>
+                        <mat-button-toggle value="OR">OR</mat-button-toggle>
+                      </mat-button-toggle-group>
+                    </div>
+
                     <button
                       mat-icon-button
                       type="button"
