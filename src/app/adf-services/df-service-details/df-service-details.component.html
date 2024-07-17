@@ -1,7 +1,7 @@
 <form
   [formGroup]="serviceForm"
   class="details-section"
-  (ngSubmit)="save(false)"
+  (ngSubmit)="save(false, false)"
   [class]="(isDarkMode | async) ? 'dark-theme' : ''">
   <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabaseEdit">
     <mat-stepper linear #stepper>
@@ -542,8 +542,16 @@
           mat-flat-button
           class="save-btn"
           color="primary"
-          (click)="save(true)">
+          (click)="save(true, false)">
           {{ 'saveAndClear' | transloco }}
+        </button>
+        <button
+          [value]="true"
+          mat-flat-button
+          class="save-btn"
+          color="primary"
+          (click)="save(true, true)">
+          Save and Continue
         </button>
       </ng-container>
       <button mat-flat-button class="save-btn" color="primary">
