@@ -18,6 +18,7 @@
   "value": "Value",
   "private": "Private",
   "inviteSent": "An email invite has been sent.",
+  "eventModification": "Allow Event modification",
   "update": "Update",
   "confirmed": "Confirmed",
   "sendInvite": "Send Invite",

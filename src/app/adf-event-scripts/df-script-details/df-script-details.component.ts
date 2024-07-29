@@ -30,6 +30,7 @@ import { CommonModule } from '@angular/common';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
 import { camelToSnakeString } from 'src/app/shared/utilities/case';
+import { ConstantPool } from '@angular/compiler';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -71,6 +72,7 @@ export class DfScriptDetailsComponent implements OnInit {
   selectedServiceItem: string;
   selectedEventItem: string;
   selectedRouteItem: string;
+  tableProcedureFlag: string;
   selectTable: string;
   completeScriptName: string;
   loaded = false;
@@ -199,12 +201,27 @@ export class DfScriptDetailsComponent implements OnInit {
     this.ungroupedRouteOptions = [
       ...this.ungroupedEventOptions[this.selectedEventItem].endpoints,
     ];
-
-    if (this.ungroupedEventOptions[this.selectedEventItem].parameter) {
-      this.tableOptions = [
-        ...this.ungroupedEventOptions[this.selectedEventItem].parameter
-          .tableName,
-      ];
+    const data = this.ungroupedEventOptions[this.selectedEventItem].parameter;
+    if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+      if (Object.keys(data)[0] === 'tableName') {
+        this.tableProcedureFlag = 'table';
+        this.tableOptions = [
+          ...this.ungroupedEventOptions[this.selectedEventItem].parameter
+            .tableName,
+        ];
+      } else if (Object.keys(data)[0] === 'procedureName') {
+        this.tableProcedureFlag = 'procedure';
+        this.tableOptions = [
+          ...this.ungroupedEventOptions[this.selectedEventItem].parameter
+            .procedureName,
+        ];
+      } else if (Object.keys(data)[0] === 'functionName') {
+        this.tableProcedureFlag = 'function';
+        this.tableOptions = [
+          ...this.ungroupedEventOptions[this.selectedEventItem].parameter
+            .procedureName,
+        ];
+      }
     }
   }
 
