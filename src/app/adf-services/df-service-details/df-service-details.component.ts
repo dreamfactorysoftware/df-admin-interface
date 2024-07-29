@@ -172,7 +172,6 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
-        console.log('License type:', serviceTypes);
         this.serviceTypes = serviceTypes.filter(
           (s: { name: string }) => s.name.toLowerCase() !== 'python'
         );
@@ -223,7 +222,7 @@ export class DfServiceDetailsComponent implements OnInit {
           data.config.serviceDefinition = data?.serviceDocByServiceId.content;
         }
         this.serviceData = data;
-        if (data) {
+        if (data.serviceDocByServiceId) {
           this.content = data.serviceDocByServiceId.content;
         } else {
           this.content = '';
