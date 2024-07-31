@@ -460,7 +460,13 @@ export class DfServiceDetailsComponent implements OnInit {
       }
       delete payload.isActive;
     } else {
+      data.service_doc_by_service_id = null;
+      payload = {
+        ...data,
+        id: this.edit ? this.serviceData.id : null,
+      };
       payload = { ...data };
+      console.log(payload);
     }
     if (this.edit) {
       const payload = {
