@@ -213,7 +213,7 @@ export class DfAppDetailsComponent implements OnInit {
     const payload: AppPayload = {
       name: this.appForm.value.name,
       description: this.appForm.value.description,
-      type: parseInt(this.appForm.value.appLocation),
+      type: this.appForm.value.appLocation,
       role_id: this.appForm.value.defaultRole
         ? this.appForm.value.defaultRole.id
         : null,
@@ -254,6 +254,8 @@ export class DfAppDetailsComponent implements OnInit {
           { resource: [payload] },
           {
             snackbarSuccess: 'apps.createSuccess',
+            fields: '*',
+            related: 'role_by_role_id',
           }
         )
         .pipe(

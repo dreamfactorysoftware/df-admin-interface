@@ -244,6 +244,7 @@ export abstract class DfManageTableComponent<T>
 
   createRow(): void {
     this.router.navigate([ROUTES.CREATE], { relativeTo: this._activatedRoute });
+    console.log(ROUTES.CREATE);
   }
 
   viewRow(row: T): void {
