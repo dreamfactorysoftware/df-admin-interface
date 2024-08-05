@@ -172,7 +172,6 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
-        console.log('License type:', serviceTypes);
         this.serviceTypes = serviceTypes.filter(
           (s: { name: string }) => s.name.toLowerCase() !== 'python'
         );
@@ -466,7 +465,6 @@ export class DfServiceDetailsComponent implements OnInit {
         id: this.edit ? this.serviceData.id : null,
       };
       payload = { ...data };
-      console.log(payload);
     }
     if (this.edit) {
       const payload = {
@@ -497,7 +495,6 @@ export class DfServiceDetailsComponent implements OnInit {
               })
               .subscribe({
                 next: () => {
-                  console.log('Cache flushed');
                   if (!Continue) {
                     this.router.navigate(['../'], {
                       relativeTo: this.activatedRoute,

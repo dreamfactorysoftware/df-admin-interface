@@ -84,7 +84,6 @@ export class DfFileGithubComponent implements OnInit {
   isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
     this.content.setValue(this.contentText);
-    console.log();
   }
 
   fileUpload(event: Event) {
