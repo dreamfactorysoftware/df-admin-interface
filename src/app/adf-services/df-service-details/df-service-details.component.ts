@@ -465,7 +465,6 @@ export class DfServiceDetailsComponent implements OnInit {
         id: this.edit ? this.serviceData.id : null,
       };
       payload = { ...data };
-      console.log(payload);
     }
     if (this.edit) {
       const payload = {
@@ -496,7 +495,6 @@ export class DfServiceDetailsComponent implements OnInit {
               })
               .subscribe({
                 next: () => {
-                  console.log('Cache flushed');
                   if (!Continue) {
                     this.router.navigate(['../'], {
                       relativeTo: this.activatedRoute,

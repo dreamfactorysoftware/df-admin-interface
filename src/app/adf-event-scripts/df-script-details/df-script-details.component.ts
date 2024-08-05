@@ -141,7 +141,6 @@ export class DfScriptDetailsComponent implements OnInit {
     if (!this.scriptForm.valid) {
       return;
     }
-    console.log(this.selectedRouteItem);
     const script = this.scriptForm.getRawValue();
     const scriptItem = {
       ...script,

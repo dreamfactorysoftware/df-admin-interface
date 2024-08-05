@@ -128,7 +128,6 @@ export abstract class DfManageTableComponent<T>
         this.schema = this.router.url.includes('schema');
         if (data && data.resource) {
           this.dataSource.data = this.mapDataToTable(data.resource);
-          console.log(this.dataSource.data);
           this.dataSource.paginator = this.paginator;
         }
         if (data && data.meta) {

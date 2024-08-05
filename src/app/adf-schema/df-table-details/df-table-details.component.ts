@@ -108,7 +108,6 @@ export class DfTableDetailsComponent implements OnInit {
       try {
         data = JSON.parse(value);
       } catch (e) {
-        console.log(e);
         return;
       }
     } else {

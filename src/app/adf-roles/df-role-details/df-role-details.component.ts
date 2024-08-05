@@ -100,7 +100,6 @@ export class DfRoleDetailsComponent implements OnInit {
           this.filterOp = data.roleServiceAccessByRoleId[0].filterOp;
           data.roleServiceAccessByRoleId.forEach(
             (item: RoleServiceAccessType) => {
-              console.log(item.component);
               const advancedFilters = new FormArray(
                 (item.filters || []).map(
                   (each: any) =>
@@ -273,7 +272,6 @@ export class DfRoleDetailsComponent implements OnInit {
             operator: filter.expandOperator,
             value: filter.expandValue,
           }));
-          console.log(val);
           const filterOp = val.advancedFilters.map(
             (filter: any) => filter.filterOp
           );
