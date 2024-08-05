@@ -222,7 +222,7 @@ export class DfServiceDetailsComponent implements OnInit {
           data.config.serviceDefinition = data?.serviceDocByServiceId.content;
         }
         this.serviceData = data;
-        if (data.serviceDocByServiceId) {
+        if (data) {
           this.content = data.serviceDocByServiceId.content;
         } else {
           this.content = '';
@@ -407,15 +407,16 @@ export class DfServiceDetailsComponent implements OnInit {
       };
       // data.service_doc_by_service_id = null;
       // data.config.content = this.serviceDefinition;
-      if (!data.config.serviceDefinition) {
+      console.log(data.config);
+      if (!data.config) {
         data.service_doc_by_service_id = null;
       } else {
         data.service_doc_by_service_id.content = data.config.serviceDefinition;
         data.service_doc_by_service_id.format = Number(
           this.serviceDefinitionType
         );
+        delete data.config.serviceDefinition;
       }
-      delete data.config.serviceDefinition;
     } else {
       delete data.service_doc_by_service_id;
     }
