@@ -407,7 +407,6 @@ export class DfServiceDetailsComponent implements OnInit {
       };
       // data.service_doc_by_service_id = null;
       // data.config.content = this.serviceDefinition;
-      console.log(data.config);
       if (!data.config) {
         data.service_doc_by_service_id = null;
       } else {
