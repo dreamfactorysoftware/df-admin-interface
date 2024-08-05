@@ -32,6 +32,9 @@ export class DfBaseCrudService {
   }
 
   create<T>(data: any, options?: Partial<RequestOptions>, endpoint?: string) {
+    console.log('dat', data);
+    console.log('op', options);
+    console.log('end', endpoint);
     return this.http.post<T>(
       `${this.url}${endpoint ? `/${endpoint}` : ''}`,
       data,

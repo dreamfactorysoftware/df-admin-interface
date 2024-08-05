@@ -54,9 +54,10 @@
                   'roles.accessOverview.tableHeadings.component' | transloco
                 }}</mat-label>
                 <mat-select
+                  formControlName="component"
                   (openedChange)="onSelectOpened(i)"
                   panelClass="select-search-panel">
-                  <mat-option>
+                  <mat-option [value]="'search'">
                     <mat-form-field>
                       <input
                         matInput
