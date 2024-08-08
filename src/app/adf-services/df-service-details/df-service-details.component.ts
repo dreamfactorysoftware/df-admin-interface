@@ -223,7 +223,7 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         this.serviceData = data;
         if (data) {
-          this.content = data.serviceDocByServiceId.content;
+          this.content = data.config.serviceDefinition;
         } else {
           this.content = '';
         }
