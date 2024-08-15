@@ -65,11 +65,8 @@ export function accessibleRoutes(
   const allowed: Array<ROUTES> = [ROUTES.SYSTEM_INFO];
   allowedTabs?.forEach(tab => {
     switch (tab) {
-      case 'apps':
-        allowed.push(ROUTES.API_KEYS);
-        break;
-      case 'users':
-        allowed.push(ROUTES.USERS);
+      case 'home':
+        allowed.push(ROUTES.HOME);
         break;
       case 'services':
         allowed.push(
@@ -82,31 +79,47 @@ export function accessibleRoutes(
           ROUTES.DF_PLATFORM_APIS
         );
         break;
+      case 'role':
+        allowed.push(ROUTES.ROLE_BASED_ACCESS);
+        break;
+      case 'apps':
+        allowed.push(ROUTES.API_KEYS);
+        break;
+      case 'scripts':
+        allowed.push(ROUTES.EVENT_SCRIPTS);
+        break;
       case 'apidocs':
         allowed.push(ROUTES.API_DOCS);
         break;
+      case 'limits':
+        allowed.push(ROUTES.RATE_LIMITING);
+        break;
+      case 'system-config':
+        allowed.push(ROUTES.CORS);
+        allowed.push(ROUTES.CACHE);
+        allowed.push(ROUTES.EMAIL_TEMPLATES);
+        allowed.push(ROUTES.GLOBAL_LOOKUP_KEYS);
+        break;
+      case 'scheduler':
+        allowed.push(ROUTES.SCHEDULER);
+        break;
+      case 'reports':
+        allowed.push(ROUTES.REPORTING);
+        break;
+      case 'users':
+        allowed.push(ROUTES.USERS);
+        break;
+
       case 'schema/data':
         allowed.push(ROUTES.SCHEMA);
         break;
       case 'files':
         allowed.push(ROUTES.FILES);
         break;
-      case 'scripts':
-        allowed.push(ROUTES.EVENT_SCRIPTS);
-        break;
-      case 'config':
-        allowed.push(
-          ROUTES.CORS,
-          ROUTES.CACHE,
-          ROUTES.EMAIL_TEMPLATES,
-          ROUTES.GLOBAL_LOOKUP_KEYS
-        );
-        break;
-      case 'limits':
-        allowed.push(ROUTES.RATE_LIMITING);
-        break;
-      case 'scheduler':
-        allowed.push(ROUTES.SCHEDULER);
+
+      case 'admin-setting':
+        allowed.push(ROUTES.ADMINS);
+        allowed.push(ROUTES.LOGS);
         break;
     }
   });
