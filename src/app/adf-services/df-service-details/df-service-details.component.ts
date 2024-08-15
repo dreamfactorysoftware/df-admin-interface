@@ -234,6 +234,9 @@ export class DfServiceDetailsComponent implements OnInit {
             ...data,
             config: data.config,
           });
+          this.getConfigControl('serviceDefinition').setValue(
+            data.config.content
+          );
           if (data?.serviceDocByServiceId) {
             this.serviceDefinitionType =
               '' + data?.serviceDocByServiceId.format;
@@ -289,7 +292,7 @@ export class DfServiceDetailsComponent implements OnInit {
         this.serviceForm.addControl('type', new FormControl(''));
         config.addControl('content', new FormControl(''));
       }
-      this.serviceForm?.addControl('config', config);
+      this.serviceForm.addControl('config', config);
     }
   }
 
@@ -410,7 +413,7 @@ export class DfServiceDetailsComponent implements OnInit {
       if (!data.config) {
         data.service_doc_by_service_id = null;
       } else {
-        data.service_doc_by_service_id.content = data.config.serviceDefinition;
+        data.config.content = data.config.serviceDefinition;
         data.service_doc_by_service_id.format = Number(
           this.serviceDefinitionType
         );
@@ -419,7 +422,6 @@ export class DfServiceDetailsComponent implements OnInit {
     } else {
       delete data.service_doc_by_service_id;
     }
-
     let payload;
     if (data.type.toLowerCase().includes('saml')) {
       params = {
