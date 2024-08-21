@@ -114,7 +114,9 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
         }
       });
     this.activatedRoute.data.subscribe(({ type, data, apps, roles }) => {
-      this.snackbarService.setSnackbarLastEle(data.name, true);
+      if (data) {
+        this.snackbarService.setSnackbarLastEle(data.name, true);
+      }
       this.type = type;
       if (this.userType === 'users') {
         this.apps = apps.resource;
