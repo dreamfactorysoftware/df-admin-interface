@@ -429,7 +429,7 @@ export class DfServiceDetailsComponent implements OnInit {
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      data.service_doc_by_service_id = null;
+      // data.service_doc_by_service_id = null;
       payload = {
         ...data,
         is_active: data.isActive,
@@ -461,7 +461,7 @@ export class DfServiceDetailsComponent implements OnInit {
       }
       delete payload.isActive;
     } else {
-      data.service_doc_by_service_id = null;
+      // data.service_doc_by_service_id = null;
       payload = {
         ...data,
         id: this.edit ? this.serviceData.id : null,
