@@ -184,7 +184,7 @@ export class DfRolesAccessComponent implements OnInit {
     this.initializeFilteredComponents();
 
     this.updateDataSource();
-    this.add();
+    // this.add();
   }
   get cFormArray(): FormArray {
     return this.form.get('formArray') as FormArray;
