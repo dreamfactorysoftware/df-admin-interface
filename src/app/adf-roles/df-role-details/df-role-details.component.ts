@@ -119,7 +119,8 @@ export class DfRoleDetailsComponent implements OnInit {
                   ),
                   component: new FormControl(item.component),
                   access: new FormControl(
-                    this.handleAccessValue(item.verbMask)
+                    this.handleAccessValue(item.verbMask),
+                    [Validators.required]
                   ),
                   requester: new FormControl(
                     this.handleRequesterValue(item.requestorMask)
@@ -257,7 +258,7 @@ export class DfRoleDetailsComponent implements OnInit {
   }
 
   onSubmit() {
-    // if (this.roleForm.invalid) return;
+    if (this.roleForm.invalid) return;
     const formValue = this.roleForm.getRawValue();
     if (formValue.name === '' || formValue.name === null) return;
     const payload: RolePayload = {
