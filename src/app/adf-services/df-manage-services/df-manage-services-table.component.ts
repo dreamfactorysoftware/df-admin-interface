@@ -79,22 +79,39 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
       header: 'type',
     },
     {
+      columnDef: 'scripting',
+      cell: (row: ServiceRow) => row.scripting,
+      header: 'Scripting',
+    },
+    {
       columnDef: 'actions',
     },
   ];
 
   override mapDataToTable(data: any[]): ServiceRow[] {
-    return data.map(service => {
-      return {
-        id: service.id,
-        name: service.name,
-        label: service.label,
-        description: service.description,
-        active: service.isActive,
-        deletable: service.deletable,
-        type: service.type,
-      };
-    });
+    let serviceRows: ServiceRow[] = [];
+    this.serviceService
+      .getEventScripts<GenericListResponse<Service>>()
+      .subscribe(scriptsData => {
+        const scripts = scriptsData.resource;
+        serviceRows = data.map(service => {
+          const match = scripts.find(script =>
+            script.name.includes(service.name)
+          );
+          return {
+            id: service.id,
+            name: service.name,
+            label: service.label,
+            description: service.description,
+            scripting: match ? match.name : 'not',
+            active: service.isActive,
+            deletable: service.deletable,
+            type: service.type,
+          };
+        });
+        this.dataSource.data = serviceRows; // Update dataSource here
+      });
+    return serviceRows; // Return the initialized array
   }
 
   filterQuery = getFilterQuery('services');

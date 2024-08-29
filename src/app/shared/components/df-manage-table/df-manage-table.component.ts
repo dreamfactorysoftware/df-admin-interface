@@ -15,7 +15,7 @@ import {
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
-import { debounceTime, distinctUntilChanged } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, map } from 'rxjs';
 import { ROUTES } from 'src/app/shared/types/routes';
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
 import {
@@ -41,6 +41,7 @@ import { MatInputModule } from '@angular/material/input';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { Actions, AdditonalAction, Column } from 'src/app/shared/types/table';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 
 export const DfManageTableModules = [
   NgIf,
@@ -120,8 +121,9 @@ export abstract class DfManageTableComponent<T>
     public dialog: MatDialog
   ) {}
   themeService = inject(DfThemeService);
-
+  systemConfigDataService = inject(DfSystemConfigDataService);
   isDarkMode = this.themeService.darkMode$;
+  isDatabase = false;
   ngOnInit(): void {
     if (!this.tableData) {
       this.activatedRoute.data.subscribe(({ data }) => {
@@ -144,6 +146,18 @@ export abstract class DfManageTableComponent<T>
         filter
           ? this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter))
           : this.refreshTable();
+      });
+
+    this.systemConfigDataService.environment$
+      .pipe(
+        switchMap(env =>
+          this.activatedRoute.data.pipe(map(route => ({ env, route })))
+        )
+      )
+      .subscribe(({ env, route }) => {
+        if (route['groups'] && route['groups'][0] === 'Database') {
+          this.isDatabase = true;
+        }
       });
   }
 
@@ -174,6 +188,14 @@ export abstract class DfManageTableComponent<T>
 
   get defaultPageSize() {
     return this.pageSizes[0];
+  }
+
+  goEventScriptsPage(url: string) {
+    if (url !== 'not') {
+      this.router.navigate([
+        ROUTES.API_CONNECTIONS + '/' + ROUTES.EVENT_SCRIPTS + '/' + url,
+      ]);
+    }
   }
 
   isActionDisabled(action: AdditonalAction<T>, row: T): boolean {
@@ -243,7 +265,6 @@ export abstract class DfManageTableComponent<T>
 
   createRow(): void {
     this.router.navigate([ROUTES.CREATE], { relativeTo: this._activatedRoute });
-    console.log(ROUTES.CREATE);
   }
 
   viewRow(row: T): void {
