@@ -37,7 +37,9 @@
     <ng-container *ngFor="let column of columns">
       <ng-container
         [matColumnDef]="column.columnDef"
-        *ngIf="column.columnDef !== 'actions'">
+        *ngIf="
+          column.columnDef !== 'actions' && column.columnDef !== 'scripting'
+        ">
         <th
           mat-header-cell
           *matHeaderCellDef
@@ -75,6 +77,26 @@
             <span *ngIf="!!column?.cell(row) === false">{{ '-' }}</span>
           </ng-container>
         </td>
+      </ng-container>
+      <ng-container
+        [matColumnDef]="column.columnDef"
+        *ngIf="column.columnDef === 'scripting'">
+        <ng-container *ngIf="isDatabase; else notDatabase">
+          <th mat-header-cell *matHeaderCellDef>Scripting</th>
+          <td class="actions" mat-cell *matCellDef="let row">
+            <fa-icon
+              (click)="goEventScriptsPage(column?.cell(row)?.toString() || '')"
+              (click)="$event.stopPropagation()"
+              [icon]="activeIcon(column?.cell(row) !== 'not')"
+              size="lg"
+              [class]="
+                column?.cell(row) !== 'not' ? 'active' : 'inactive'
+              "></fa-icon></td
+        ></ng-container>
+        <ng-template #notDatabase>
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td class="actions" mat-cell *matCellDef="let row"></td>
+        </ng-template>
       </ng-container>
       <ng-container
         [matColumnDef]="column.columnDef"

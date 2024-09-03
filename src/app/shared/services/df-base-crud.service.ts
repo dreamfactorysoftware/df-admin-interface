@@ -31,6 +31,17 @@ export class DfBaseCrudService {
     );
   }
 
+  getEventScripts<T>() {
+    return this.http.get<T>(
+      '/api/v2/system/event_script',
+      this.getOptions({
+        limit: 100,
+        offset: 0,
+        includeCount: true,
+      })
+    );
+  }
+
   create<T>(data: any, options?: Partial<RequestOptions>, endpoint?: string) {
     return this.http.post<T>(
       `${this.url}${endpoint ? `/${endpoint}` : ''}`,

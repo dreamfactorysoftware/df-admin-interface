@@ -34,7 +34,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
   constructor(
     @Inject(APP_SERVICE_TOKEN)
     private appsService: DfBaseCrudService,
-    private systemConfigDataService: DfSystemConfigDataService,
+    override systemConfigDataService: DfSystemConfigDataService,
     router: Router,
     activatedRoute: ActivatedRoute,
     liveAnnouncer: LiveAnnouncer,
