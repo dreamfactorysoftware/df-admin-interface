@@ -32,7 +32,6 @@
           {{ 'version' | transloco }}:
           {{ environment.platform?.version }}
         </li>
-        <li>UI {{ 'version' | transloco }}: 1.3.6</li>
         <li *ngIf="environment.platform?.dbDriver">
           {{ 'systemInfo.instance.systemDatabase' | transloco }}:
           {{ environment.platform?.dbDriver }}
