@@ -16,7 +16,7 @@ export class DfBaseCrudService {
     return this.http.get<T>(
       this.url,
       this.getOptions({
-        limit: 100,
+        limit: 50,
         offset: 0,
         includeCount: true,
         ...options,
@@ -35,11 +35,17 @@ export class DfBaseCrudService {
     return this.http.get<T>(
       '/api/v2/system/event_script',
       this.getOptions({
-        limit: 100,
+        limit: 50,
         offset: 0,
         includeCount: true,
       })
     );
+  }
+
+  getReleases() {
+    const apiUrl =
+      'https://api.github.com/repos/dreamfactorysoftware/df-admin-interface/releases';
+    return this.http.get(apiUrl);
   }
 
   create<T>(data: any, options?: Partial<RequestOptions>, endpoint?: string) {

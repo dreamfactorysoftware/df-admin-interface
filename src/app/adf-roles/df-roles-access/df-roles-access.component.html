@@ -53,24 +53,12 @@
                 <mat-label>{{
                   'roles.accessOverview.tableHeadings.component' | transloco
                 }}</mat-label>
-                <mat-select
-                  formControlName="component"
-                  (openedChange)="onSelectOpened(i)"
-                  panelClass="select-search-panel">
-                  <mat-option [value]="'search'">
-                    <mat-form-field>
-                      <input
-                        matInput
-                        (click)="$event.stopPropagation()"
-                        (input)="filterOptions($event, i)"
-                        placeholder="Search" />
-                    </mat-form-field>
-                  </mat-option>
+                <mat-select formControlName="component" panelWdith="null">
                   <mat-option
-                    *ngFor="let option of filteredComponentArray[i]"
-                    [value]="option">
-                    {{ option }}
-                  </mat-option>
+                    *ngFor="let option of getComponentArray(i)"
+                    [value]="option"
+                    >{{ option }}</mat-option
+                  >
                 </mat-select>
               </mat-form-field>
             </td>

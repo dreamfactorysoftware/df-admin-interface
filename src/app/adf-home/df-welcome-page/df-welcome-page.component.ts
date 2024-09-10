@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
+import { CommonModule } from '@angular/common'; // Add this import
 
 import {
   javaScriptExampleLinks,
@@ -23,13 +24,16 @@ import { DfQuickstartPageComponent } from '../df-quickstart-page/df-quickstart-p
 import { DfResourcesPageComponent } from '../df-resources-page/df-resources-page.component';
 import { DfDownloadPageComponent } from '../df-download-page/df-download-page.component';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
-
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import { DFStorageService } from 'src/app/shared/services/df-storage.service';
 @Component({
   selector: 'df-welcome-page',
   templateUrl: './df-welcome-page.component.html',
   styleUrls: ['./df-welcome-page.component.scss'],
   standalone: true,
   imports: [
+    CommonModule,
     FontAwesomeModule,
     NgFor,
     DfIconLinkComponent,
@@ -42,6 +46,7 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
     DfResourcesPageComponent,
     DfDownloadPageComponent,
   ],
+  providers: [DfBaseCrudService],
 })
 export class DfWelcomePageComponent {
   faCirclePlay = faCirclePlay;
@@ -54,7 +59,24 @@ export class DfWelcomePageComponent {
 
   constructor(
     public breakpointService: DfBreakpointService,
-    private themeService: DfThemeService
+    private themeService: DfThemeService,
+    private storageService: DFStorageService,
+    @Inject(SERVICES_SERVICE_TOKEN) private servicesService: DfBaseCrudService
   ) {}
   isDarkMode = this.themeService.darkMode$;
+  isFirstTimeUser$ = this.storageService.isFirstTimeUser$;
+  releases: any[] = [];
+
+  ngOnInit(): void {
+    this.servicesService.getReleases().subscribe((data: any) => {
+      this.releases = data;
+    });
+    this.storageService.setIsFirstUser();
+  }
+
+  convertDateType(originalDate: string): string {
+    const dateObject = new Date(originalDate);
+    const formattedDate = dateObject.toISOString().split('T')[0];
+    return formattedDate;
+  }
 }

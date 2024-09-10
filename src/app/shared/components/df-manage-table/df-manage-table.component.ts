@@ -12,7 +12,7 @@ import {
   MatPaginatorModule,
   PageEvent,
 } from '@angular/material/paginator';
-import { MatSort } from '@angular/material/sort';
+import { MatSort, Sort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
 import { debounceTime, distinctUntilChanged, switchMap, map } from 'rxjs';
@@ -57,6 +57,7 @@ export const DfManageTableModules = [
   MatPaginatorModule,
   MatFormFieldModule,
   MatInputModule,
+  MatSortModule,
 ];
 
 @UntilDestroy({ checkProperties: true })
