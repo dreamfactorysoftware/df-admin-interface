@@ -210,13 +210,10 @@ export class DfRolesAccessComponent implements OnInit {
       this.componentOptions.find(option => option.serviceId === serviceId)
         ?.components || [];
     this.filteredComponentArray[index] = components.filter(option =>
-      option.toLowerCase().includes(input)
+      option.includes(input)
     );
   }
 
-  onSelectOpened(index: number) {
-    this.filteredComponentArray[index] = this.getComponentArray(index);
-  }
   async getComponents(index: number) {
     const serviceId = this.formArray.controls[index].get('service')?.value;
     const service =

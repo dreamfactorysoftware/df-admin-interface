@@ -516,8 +516,11 @@ export class DfServiceDetailsComponent implements OnInit {
           params
         )
         .subscribe(() => {
-          this.router.navigate([`/api-connections/api-docs/${data.name}`]);
-          // this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+          if (data.type.toLowerCase().includes('saml')) {
+            this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+          } else {
+            this.router.navigate([`/api-connections/api-docs/${data.name}`]);
+          }
         });
     }
   }
