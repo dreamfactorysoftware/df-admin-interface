@@ -141,6 +141,7 @@ export class DfSideNavComponent implements OnInit {
           if (userData?.roleId) {
             return of([
               'apps',
+              'role',
               'users',
               'services',
               'apidocs',
