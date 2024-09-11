@@ -31,16 +31,9 @@
               </ng-template>
             </li>
           </ul>
-          <h2>GitHub Releases</h2>
-          <ul>
-            <li *ngFor="let release of releases">
-              <h3>{{ release.name }}</h3>
-              <p>Tag: {{ release.tag_name }}</p>
-              <p>Published at: {{ convertDateType(release.published_at) }}</p>
-              <a [href]="release.html_url" target="_blank">View Release</a>
-            </li>
-          </ul>
         </article>
+      </article>
+      <aside class="flex-column">
         <div class="video-link">
           <a
             href="https://youtu.be/FOSOm88RxPw"
@@ -58,9 +51,7 @@
             </div>
           </a>
         </div>
-      </article>
-      <aside class="flex-column">
-        <mat-card class="notice-card">
+        <!-- <mat-card class="notice-card">
           <h3>
             <fa-icon
               [icon]="faHeart"
@@ -80,10 +71,34 @@
             >{{ 'home.welcomePage.hearFromYouHeading' | transloco }}
           </h3>
           <p [innerHtml]="'home.welcomePage.hearFromYouText' | transloco"></p>
-        </mat-card>
+        </mat-card> -->
       </aside>
     </section>
-
+    <section class="platforms-section">
+      <div>
+        <h2>GitHub Releases</h2>
+        <div class="release-container">
+          <div *ngFor="let release of releases">
+            <mat-card
+              class="full-width release-card"
+              [style]="{ 'word-break': 'break-all' }">
+              <mat-card-header>
+                <mat-card-subtitle>{{ release.name }}</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <p>Tag: {{ release.tag_name }}</p>
+                <p>Published at: {{ convertDateType(release.published_at) }}</p>
+              </mat-card-content>
+              <mat-card-actions>
+                <a [href]="release.html_url" target="_blank" class="release-btn"
+                  >View Release</a
+                >
+              </mat-card-actions>
+            </mat-card>
+          </div>
+        </div>
+      </div>
+    </section>
     <!-- <mat-divider></mat-divider>
 
   <section class="platforms-section">

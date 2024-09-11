@@ -69,7 +69,7 @@ export class DfWelcomePageComponent {
 
   ngOnInit(): void {
     this.servicesService.getReleases().subscribe((data: any) => {
-      this.releases = data;
+      this.releases = data.slice(0, 3);
     });
     this.storageService.setIsFirstUser();
   }
