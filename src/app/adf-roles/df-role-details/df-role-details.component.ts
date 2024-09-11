@@ -234,7 +234,6 @@ export class DfRoleDetailsComponent implements OnInit {
   //         this.goBack();
   //       });
   //   } else {
-  //     console.log(23);
   //     this.roleService
   //       .create(createPayload, {
   //         fields: '*',

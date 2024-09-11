@@ -93,3 +93,13 @@ mat-card.notice-card {
     ) !important;
   }
 }
+.release-container {
+  display: flex;
+  gap: 15px;
+}
+.release-card {
+  background-color: mat.get-color-from-palette($df-purple-palette, 100);
+}
+.release-btn {
+  margin-left: 10px;
+}

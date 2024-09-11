@@ -220,6 +220,9 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         if (data?.serviceDocByServiceId) {
           data.config.serviceDefinition = data?.serviceDocByServiceId.content;
+          this.getServiceDocByServicIdControl('content').setValue(
+            data?.serviceDocByServiceId.content
+          );
         }
         this.serviceData = data;
         if (data) {
@@ -364,6 +367,12 @@ export class DfServiceDetailsComponent implements OnInit {
     return this.serviceForm.get(`config.${name}`) as FormControl;
   }
 
+  getServiceDocByServicIdControl(name: string) {
+    return this.serviceForm.get(
+      `service_doc_by_service_id.${name}`
+    ) as FormControl;
+  }
+
   getServiceDefinitionControl() {
     return this.serviceForm.get('serviceDefinition') as FormControl;
   }
@@ -490,21 +499,26 @@ export class DfServiceDetailsComponent implements OnInit {
           snackbarSuccess: 'services.updateSuccessMsg',
         })
         .subscribe(() => {
-          if (Cache) {
-            this.cacheService
-              .delete(payload.name, {
-                snackbarSuccess: 'cache.serviceCacheFlushed',
-              })
-              .subscribe({
-                next: () => {
-                  if (!Continue) {
-                    this.router.navigate(['../'], {
-                      relativeTo: this.activatedRoute,
-                    });
-                  }
-                },
-                error: (err: any) => console.error('Error flushing cache', err),
-              });
+          if (data.type.toLowerCase().includes('saml')) {
+            this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+          } else {
+            if (Cache) {
+              this.cacheService
+                .delete(payload.name, {
+                  snackbarSuccess: 'cache.serviceCacheFlushed',
+                })
+                .subscribe({
+                  next: () => {
+                    if (!Continue) {
+                      this.router.navigate(['../'], {
+                        relativeTo: this.activatedRoute,
+                      });
+                    }
+                  },
+                  error: (err: any) =>
+                    console.error('Error flushing cache', err),
+                });
+            }
           }
         });
     } else {

@@ -354,8 +354,8 @@ export class DfSearchService {
         types: SERVICE_GROUPS[ROUTES.SCRIPTING],
       },
       {
-        route: `${apiTypeRoute}/${ROUTES.NETWROK}`,
-        types: SERVICE_GROUPS[ROUTES.NETWROK],
+        route: `${apiTypeRoute}/${ROUTES.NETWORK}`,
+        types: SERVICE_GROUPS[ROUTES.NETWORK],
       },
       {
         route: `${apiTypeRoute}/${ROUTES.FILE}`,

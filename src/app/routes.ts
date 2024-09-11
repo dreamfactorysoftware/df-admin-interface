@@ -122,10 +122,10 @@ export const routes: Routes = [
             },
           },
           {
-            path: ROUTES.NETWROK,
+            path: ROUTES.NETWORK,
             children: ServiceRoutes,
             data: {
-              groups: SERVICE_GROUPS[ROUTES.NETWROK],
+              groups: SERVICE_GROUPS[ROUTES.NETWORK],
             },
           },
           {

@@ -255,10 +255,8 @@ export abstract class DfManageTableComponent<T>
 
   changePage(event: PageEvent): void {
     // if (event.previousPageIndex !== event.pageIndex) {
-    //   console.log(event);
     //   this.refreshTable(undefined, event.pageIndex * event.pageSize);
     // } else {
-    //   console.log(event);
     //   this.currentPageSize = event.pageSize;
     //   this.refreshTable(event.pageSize);
     // }

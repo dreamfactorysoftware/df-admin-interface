@@ -23,7 +23,4 @@ export class DfIconLinkComponent {
   storageService = inject(DFStorageService);
   @Input() linkItem: LinkItem;
   isFirstTimeUser$ = this.storageService.isFirstTimeUser$;
-  ngOnInit(): void {
-    console.log(this.linkItem);
-  }
 }

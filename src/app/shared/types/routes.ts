@@ -20,7 +20,7 @@ export enum ROUTES {
   API_TYPES = 'api-types',
   DATABASE = 'database',
   SCRIPTING = 'scripting',
-  NETWROK = 'network',
+  NETWORK = 'network',
   FILE = 'file',
   UTILITY = 'utility',
   ROLE_BASED_ACCESS = 'role-based-access',
