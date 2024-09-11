@@ -53,7 +53,6 @@ export class DfAceEditorComponent
   }
 
   writeValue(value: string): void {
-    console.log(value);
     this.value = value;
     if (this.editor) {
       this.editor.setValue(value);
