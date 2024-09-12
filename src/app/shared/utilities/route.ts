@@ -118,7 +118,7 @@ export function accessibleRoutes(
         break;
 
       case 'admin-setting':
-        allowed.push(ROUTES.ADMINS);
+        // allowed.push(ROUTES.ADMINS);
         allowed.push(ROUTES.LOGS);
         break;
     }

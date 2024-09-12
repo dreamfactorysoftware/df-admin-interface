@@ -52,6 +52,8 @@
   "sortDescription": "Sort by {{header}}",
   "selectPage": "Select Page",
   "role": "Role",
+  "admins.tabs.role-based-access": "Role",
+  "admins.tabs.logs": "Logs",
   "apiKey": "API Key",
   "type": "Type",
   "rate": "Rate",
