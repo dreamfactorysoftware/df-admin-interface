@@ -47,6 +47,8 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
     { control: 'apps' },
     { control: 'users' },
     { control: 'services' },
+    { control: 'role', label: 'role-based-access' },
+    { control: 'admin-setting', label: 'logs' },
     { control: 'apidocs', label: 'api-docs' },
     { control: 'schema/data', label: 'schema' },
     { control: 'files' },
