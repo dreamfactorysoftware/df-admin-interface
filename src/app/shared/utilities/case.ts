@@ -48,7 +48,11 @@ export function mapCamelToSnake<T>(obj: T): T {
     return obj.map(item => mapCamelToSnake(item)) as unknown as T;
   } else if (typeof obj === 'object' && obj !== null) {
     const newObj: Record<string, unknown> = {};
-    if ('type' in obj && obj['type'] === 'okta_saml') {
+    if (
+      'type' in obj &&
+      (obj['type'] === 'okta_saml' || obj['type'] === 'saml')
+    ) {
+      console.log('okta_saml');
       for (const key in obj) {
         if (Object.prototype.hasOwnProperty.call(obj, key)) {
           newObj[key] = (obj as Record<string, unknown>)[key];
