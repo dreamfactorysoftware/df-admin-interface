@@ -98,7 +98,8 @@ export class DfManageDatabasesTableComponent extends DfManageTableComponent<Data
   ];
 
   mapDataToTable(data: any[]): DatabaseRowData[] {
-    return data.map(val => {
+    const filteredData = data.filter(val => val.isActive === true);
+    return filteredData.map(val => {
       return {
         id: val.id,
         name: val.name,

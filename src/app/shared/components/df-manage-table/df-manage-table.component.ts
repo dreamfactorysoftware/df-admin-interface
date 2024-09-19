@@ -72,7 +72,6 @@ export abstract class DfManageTableComponent<T>
   dataSource = new MatTableDataSource<T>();
   tableLength = 0;
   pageSizes = [10, 50, 100];
-  currentPageSize = this.defaultPageSize;
   faTrashCan = faTrashCan;
   faPenToSquare = faPenToSquare;
   faPlus = faPlus;
@@ -125,6 +124,7 @@ export abstract class DfManageTableComponent<T>
   systemConfigDataService = inject(DfSystemConfigDataService);
   isDarkMode = this.themeService.darkMode$;
   isDatabase = false;
+  currentPageSize$ = this.themeService.currentTableRowNum$;
   ngOnInit(): void {
     if (!this.tableData) {
       this.activatedRoute.data.subscribe(({ data }) => {
@@ -141,13 +141,15 @@ export abstract class DfManageTableComponent<T>
       this.allowFilter = false;
       this.dataSource.data = this.mapDataToTable(this.tableData);
     }
-    this.currentFilter.valueChanges
-      .pipe(debounceTime(1000), distinctUntilChanged())
-      .subscribe(filter => {
-        filter
-          ? this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter))
-          : this.refreshTable();
-      });
+    this.currentPageSize$.subscribe(currentPageSize => {
+      this.currentFilter.valueChanges
+        .pipe(debounceTime(1000), distinctUntilChanged())
+        .subscribe(filter => {
+          filter
+            ? this.refreshTable(currentPageSize, 0, this.filterQuery(filter))
+            : this.refreshTable();
+        });
+    });
 
     this.systemConfigDataService.environment$
       .pipe(
@@ -187,9 +189,14 @@ export abstract class DfManageTableComponent<T>
     return this.columns.map(c => c.columnDef);
   }
 
-  get defaultPageSize() {
-    return this.pageSizes[0];
-  }
+  // get defaultPageSize() {
+  //   let currentPageSize = 10;
+  //   this.storageService.setCurrentPage$.subscribe(num => {
+  //     currentPageSize = num;
+  //   });
+  //   return currentPageSize;
+  //   // return this.pageSizes[0];
+  // }
 
   goEventScriptsPage(url: string) {
     if (url !== 'not') {
@@ -254,6 +261,7 @@ export abstract class DfManageTableComponent<T>
   }
 
   changePage(event: PageEvent): void {
+    this.themeService.setCurrentTableRowNum(event.pageSize);
     // if (event.previousPageIndex !== event.pageIndex) {
     //   this.refreshTable(undefined, event.pageIndex * event.pageSize);
     // } else {
