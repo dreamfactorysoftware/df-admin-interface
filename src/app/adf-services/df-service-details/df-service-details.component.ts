@@ -411,6 +411,9 @@ export class DfServiceDetailsComponent implements OnInit {
         this.serviceDefinitionType
       );
       // }
+      if (data.service_doc_by_service_id.content === '') {
+        data.service_doc_by_service_id = null;
+      }
     } else if (this.isScriptService) {
       params = {
         ...params,
@@ -426,6 +429,9 @@ export class DfServiceDetailsComponent implements OnInit {
         data.service_doc_by_service_id.format = Number(
           this.serviceDefinitionType
         );
+        if (data.service_doc_by_service_id.content === '') {
+          data.service_doc_by_service_id = null;
+        }
         delete data.config.serviceDefinition;
       }
     } else {
