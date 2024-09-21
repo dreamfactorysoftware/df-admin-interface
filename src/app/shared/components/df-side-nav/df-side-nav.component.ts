@@ -32,15 +32,7 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
 import { DfLicenseCheckService } from '../../services/df-license-check.service';
-import {
-  debounceTime,
-  distinctUntilChanged,
-  of,
-  switchMap,
-  Subject,
-  filter,
-  takeUntil,
-} from 'rxjs';
+import { debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
@@ -109,7 +101,7 @@ export class DfSideNavComponent implements OnInit {
     private searchService: DfSearchService,
     private snackbarService: DfSnackbarService
   ) {}
-  private isDestroyed$ = new Subject<void>();
+
   ngOnInit(): void {
     this.userData$
       .pipe(
@@ -118,46 +110,14 @@ export class DfSideNavComponent implements OnInit {
             return of(null);
           }
           if (userData?.isSysAdmin && !userData.roleId) {
-            return of([
-              'home',
-              'apps',
-              'role',
-              'users',
-              'services',
-              'apidocs',
-              'schema/data',
-              'files',
-              'scripts',
-              'systemInfo',
-              'limits',
-              'scheduler',
-              'system-config',
-              'admin-setting',
-            ]);
+            return of(null);
           }
           if (userData?.isSysAdmin && userData.roleId) {
-            return of([
-              'home',
-              'apps',
-              'role',
-              'users',
-              'services',
-              'apidocs',
-              'schema/data',
-              'files',
-              'scripts',
-              'systemInfo',
-              'limits',
-              'scheduler',
-              'system-config',
-              'admin-setting',
-            ]);
-            // return this.userDataService.restrictedAccess$;
+            return this.userDataService.restrictedAccess$;
           }
           if (userData?.roleId) {
             return of([
               'apps',
-              'role',
               'users',
               'services',
               'apidocs',
