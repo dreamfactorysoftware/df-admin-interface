@@ -220,7 +220,7 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         if (data?.serviceDocByServiceId) {
           data.config.serviceDefinition = data?.serviceDocByServiceId.content;
-          this.getServiceDocByServicIdControl('content').setValue(
+          this.getServiceDocByServiceIdControl('content').setValue(
             data?.serviceDocByServiceId.content
           );
         }
@@ -237,12 +237,13 @@ export class DfServiceDetailsComponent implements OnInit {
             ...data,
             config: data.config,
           });
-          this.getConfigControl('serviceDefinition').setValue(
-            data.config.content
-          );
+
           if (data?.serviceDocByServiceId) {
             this.serviceDefinitionType =
               '' + data?.serviceDocByServiceId.format;
+            this.getConfigControl('serviceDefinition').setValue(
+              data.config.content
+            );
           }
           this.serviceForm.controls['type'].disable();
         } else {
@@ -367,7 +368,7 @@ export class DfServiceDetailsComponent implements OnInit {
     return this.serviceForm.get(`config.${name}`) as FormControl;
   }
 
-  getServiceDocByServicIdControl(name: string) {
+  getServiceDocByServiceIdControl(name: string) {
     return this.serviceForm.get(
       `service_doc_by_service_id.${name}`
     ) as FormControl;
@@ -411,9 +412,7 @@ export class DfServiceDetailsComponent implements OnInit {
         this.serviceDefinitionType
       );
       // }
-      if (data.service_doc_by_service_id.content === '') {
-        data.service_doc_by_service_id = null;
-      }
+
     } else if (this.isScriptService) {
       params = {
         ...params,

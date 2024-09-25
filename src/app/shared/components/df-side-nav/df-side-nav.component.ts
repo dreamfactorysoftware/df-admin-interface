@@ -109,13 +109,19 @@ export class DfSideNavComponent implements OnInit {
           if (userData?.isRootAdmin) {
             return of(null);
           }
-          if (userData?.isSysAdmin && !userData.roleId) {
+          if (
+            userData?.isSysAdmin &&
+            (!userData.roleId || !userData?.id || !userData?.role_id)
+          ) {
             return of(null);
           }
-          if (userData?.isSysAdmin && userData.roleId) {
+          if (
+            userData?.isSysAdmin &&
+            (userData.roleId || userData?.id || userData?.role_id)
+          ) {
             return this.userDataService.restrictedAccess$;
           }
-          if (userData?.roleId) {
+          if (userData?.roleId || userData?.id || userData?.role_id) {
             return of([
               'apps',
               'users',
