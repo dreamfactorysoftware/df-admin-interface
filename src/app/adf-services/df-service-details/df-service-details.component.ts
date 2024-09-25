@@ -412,7 +412,6 @@ export class DfServiceDetailsComponent implements OnInit {
         this.serviceDefinitionType
       );
       // }
-
     } else if (this.isScriptService) {
       params = {
         ...params,
