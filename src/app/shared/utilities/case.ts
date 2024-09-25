@@ -40,34 +40,38 @@ export function mapSnakeToCamel<T>(obj: T): T {
 //   }
 // }
 
-export const camelToSnakeString = (str: string) =>
-  str.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1_$2').toLowerCase();
+export const camelToSnakeString = (str: string) => {
+  if (
+    str === 'idpSingleSignOnServiceUrl' ||
+    str === 'idp_singleSignOnService_url'
+  ) {
+    return 'idp_singleSignOnService_url';
+  }
+  if (str === 'idpEntityId' || str === 'idp_entityId') {
+    return 'idp_entityId';
+  }
+  if (str === 'spNameIDFormat' || str === 'sp_nameIDFormat') {
+    return 'sp_nameIDFormat';
+  }
+  if (str === 'spPrivateKey' || str === 'sp_privateKey') {
+    return 'sp_privateKey';
+  }
+  return str.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1_$2').toLowerCase();
+};
 
 export function mapCamelToSnake<T>(obj: T): T {
   if (Array.isArray(obj)) {
     return obj.map(item => mapCamelToSnake(item)) as unknown as T;
   } else if (typeof obj === 'object' && obj !== null) {
     const newObj: Record<string, unknown> = {};
-    if (
-      'type' in obj &&
-      (obj['type'] === 'okta_saml' || obj['type'] === 'saml')
-    ) {
-      console.log('okta_saml');
-      for (const key in obj) {
-        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        if (key === 'requestBody') {
           newObj[key] = (obj as Record<string, unknown>)[key];
-        }
-      }
-    } else {
-      for (const key in obj) {
-        if (Object.prototype.hasOwnProperty.call(obj, key)) {
-          if (key === 'requestBody') {
-            newObj[key] = (obj as Record<string, unknown>)[key];
-          } else {
-            newObj[camelToSnakeString(key)] = mapCamelToSnake(
-              (obj as Record<string, unknown>)[key]
-            );
-          }
+        } else {
+          newObj[camelToSnakeString(key)] = mapCamelToSnake(
+            (obj as Record<string, unknown>)[key]
+          );
         }
       }
     }

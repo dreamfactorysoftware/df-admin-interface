@@ -104,6 +104,7 @@ export class DfServiceDetailsComponent implements OnInit {
   isNetworkService = false;
   isScriptService = false;
   isFile = false;
+  isAuth = false;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -158,6 +159,7 @@ export class DfServiceDetailsComponent implements OnInit {
         )
       )
       .subscribe(({ env, route }) => {
+        console.log(route['groups'][0]);
         if (route['groups'] && route['groups'][0] === 'Database') {
           this.isDatabase = true;
         }
@@ -169,6 +171,9 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         if (route['groups'] && route['groups'][0] === 'File') {
           this.isFile = true;
+        }
+        if (route['groups'] && route['groups'][0] === 'LDAP') {
+          this.isAuth = true;
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
@@ -237,9 +242,11 @@ export class DfServiceDetailsComponent implements OnInit {
             ...data,
             config: data.config,
           });
-          this.getConfigControl('serviceDefinition').setValue(
-            data.config.content
-          );
+          if (!this.isAuth) {
+            this.getConfigControl('serviceDefinition').setValue(
+              data.config.content
+            );
+          }
           if (data?.serviceDocByServiceId) {
             this.serviceDefinitionType =
               '' + data?.serviceDocByServiceId.format;
