@@ -5,7 +5,6 @@ import {
 } from '@angular/common/http';
 import { DfUserDataService } from '../services/df-user-data.service';
 import { inject } from '@angular/core';
-import { environment } from '../../../../environments/environment';
 import {
   API_KEY_HEADER,
   SESSION_TOKEN_HEADER,
@@ -16,11 +15,6 @@ export const sessionTokenInterceptor: HttpInterceptorFn = (
   next: HttpHandlerFn
 ) => {
   if (req.url.startsWith('/api')) {
-    req = req.clone({
-      setHeaders: {
-        [API_KEY_HEADER]: environment.dfApiKey,
-      },
-    });
     const userDataService = inject(DfUserDataService);
     const token = userDataService.token;
     if (token) {
