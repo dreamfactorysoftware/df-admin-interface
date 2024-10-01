@@ -159,7 +159,6 @@ export class DfServiceDetailsComponent implements OnInit {
         )
       )
       .subscribe(({ env, route }) => {
-        console.log(route['groups'][0]);
         if (route['groups'] && route['groups'][0] === 'Database') {
           this.isDatabase = true;
         }
@@ -427,17 +426,16 @@ export class DfServiceDetailsComponent implements OnInit {
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      // data.service_doc_by_service_id = null;
-      // data.config.content = this.serviceDefinition;
+      data.config.content = this.serviceDefinition;
       if (!data.config) {
         data.service_doc_by_service_id = null;
       } else {
-        data.config.content = data.config.serviceDefinition;
-        data.service_doc_by_service_id.format = Number(
-          this.serviceDefinitionType
-        );
         if (data.service_doc_by_service_id.content === '') {
           data.service_doc_by_service_id = null;
+        } else {
+          data.service_doc_by_service_id.format = this.serviceDefinitionType
+            ? Number(this.serviceDefinitionType)
+            : 0;
         }
         delete data.config.serviceDefinition;
       }
