@@ -58,7 +58,7 @@ export class DfAuthService {
 
   checkSession() {
     if (this.userDataService.token) {
-      return this.loginWithToken(this.userDataService.token).pipe(
+      return this.loginWithToken().pipe(
         map(() => true),
         catchError(() => {
           this.userDataService.clearToken();
@@ -69,13 +69,10 @@ export class DfAuthService {
     return of(false);
   }
 
-  loginWithToken(token: string) {
+  loginWithToken() {
     return this.http
       .get<UserSession>(URLS.USER_SESSION, {
         headers: SHOW_LOADING_HEADER,
-        params: {
-          session_token: token,
-        },
       })
       .pipe(
         map(userData => {
