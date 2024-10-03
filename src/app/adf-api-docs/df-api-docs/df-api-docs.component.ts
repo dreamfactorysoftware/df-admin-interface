@@ -46,8 +46,8 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
     this.activatedRoute.data.subscribe(({ data }) => {
       if (data) {
         if (
-          data.paths['/'].get.operationId &&
-          data.paths['/'].get.operationId === 'getSoapResources'
+          data.paths['/']?.get.operationId &&
+          data.paths['/']?.get.operationId === 'getSoapResources'
         ) {
           this.apiDocJson = { ...data, paths: mapSnakeToCamel(data.paths) };
         } else {
