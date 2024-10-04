@@ -65,7 +65,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
   ) {
     this.userForm = this.fb.group({
       profileDetailsGroup: this.fb.group({
-        username: ['', Validators.minLength(6)],
+        username: ['', Validators.minLength(16)],
         email: ['', Validators.email],
         firstName: [''],
         lastName: [''],
@@ -215,7 +215,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
   addPasswordControls() {
     this.userForm.addControl(
       'password',
-      new FormControl('', [Validators.required, Validators.minLength(6)])
+      new FormControl('', [Validators.required, Validators.minLength(16)])
     );
     this.userForm.addControl(
       'confirmPassword',

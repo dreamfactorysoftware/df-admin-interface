@@ -71,7 +71,7 @@ export class DfForgotPasswordComponent implements OnInit {
     this.securityQuestionForm = this.fb.group({
       securityQuestion: [''],
       securityAnswer: ['', Validators.required],
-      newPassword: ['', [Validators.required, Validators.minLength(6)]],
+      newPassword: ['', [Validators.required, Validators.minLength(16)]],
       confirmPassword: [
         '',
         [Validators.required, matchValidator('newPassword')],
