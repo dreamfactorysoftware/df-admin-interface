@@ -46,6 +46,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
     this.activatedRoute.data.subscribe(({ data }) => {
       if (data) {
         if (
+          data.paths['/']?.get &&
           data.paths['/']?.get.operationId &&
           data.paths['/']?.get.operationId === 'getSoapResources'
         ) {
