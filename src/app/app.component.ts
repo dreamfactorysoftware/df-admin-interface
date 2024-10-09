@@ -64,7 +64,7 @@ export class AppComponent implements OnInit {
       );
     } else {
       this.loggingService.log('No JWT found in URL');
-      if (!this.authService.isLoggedIn()) {
+      if (!this.authService.isAuthenticated()) {
         this.loggingService.log(
           'User not logged in, redirecting to login page'
         );
@@ -73,6 +73,12 @@ export class AppComponent implements OnInit {
         this.loggingService.log('User is already logged in');
         window.location.href = '/#/home';
       }
+    }
+  }
+
+  someMethod() {
+    if (!this.authService.isAuthenticated()) {
+      // Handle not logged in state
     }
   }
 }
