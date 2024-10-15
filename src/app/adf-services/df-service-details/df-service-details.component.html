@@ -42,16 +42,6 @@
               placeholder="SQL, AWS, MongoDB, etc."
               [ngModelOptions]="{ standalone: true }" />
           </mat-form-field>
-          <!-- <mat-form-field class="dynamic-width" appearance="outline">
-            <mat-label>{{
-              'services.controls.serviceType.label' | transloco
-            }}</mat-label>
-            <mat-select formControlName="type">
-              <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
-                {{ type.label }}
-              </mat-option>
-            </mat-select>
-          </mat-form-field> -->
           <div class="full-width">
             <div class="grid-wrapper grid-col-auto">
               <label
@@ -415,14 +405,6 @@
                 <mat-label class="full-width">Service Definition</mat-label>
 
                 <ng-container *ngIf="serviceForm.getRawValue().type === 'rws'">
-                  <!-- <mat-form-field class="full-width" appearance="outline">
-                    <mat-label>Service Definition</mat-label>
-                    <textarea
-                      matInput
-                      rows="10"
-                      [(ngModel)]="serviceDefinition"
-                      [ngModelOptions]="{ standalone: true }"></textarea>
-                  </mat-form-field> -->
                   <df-file-github
                     [type]="getControl('type')"
                     [content]="getConfigControl('content')"
@@ -455,16 +437,6 @@
                   [formControl]="getConfigControl('excelContent')"
                   [mode]="serviceForm.getRawValue().type"></df-ace-editor>
               </ng-container>
-              <!-- <ng-container *ngIf="this.isNetworkService">
-                <df-script-editor
-                  [type]="getControl('type')"
-                  formControlName="content"
-                  [storageServiceId]="getServiceDefinitionControl()"
-                  [storagePath]="getConfigControl('storagePath')"
-                  [content]="getConfigControl('content')"
-                  [cache]="serviceData ? serviceData.name : ''"
-                  class="full-width"></df-script-editor
-              ></ng-container> -->
               <ng-container *ngFor="let item of viewSchema">
                 <ng-container
                   *ngIf="
