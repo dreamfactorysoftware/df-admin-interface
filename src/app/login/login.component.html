@@ -3,11 +3,21 @@
   <form (ngSubmit)="onSubmit()">
     <div>
       <label for="username">{{ 'login.username' | transloco }}:</label>
-      <input type="text" id="username" name="username" [(ngModel)]="username" required>
+      <input
+        type="text"
+        id="username"
+        name="username"
+        [(ngModel)]="username"
+        required />
     </div>
     <div>
       <label for="password">{{ 'login.password' | transloco }}:</label>
-      <input type="password" id="password" name="password" [(ngModel)]="password" required>
+      <input
+        type="password"
+        id="password"
+        name="password"
+        [(ngModel)]="password"
+        required />
     </div>
     <button type="submit">{{ 'login.submit' | transloco }}</button>
   </form>

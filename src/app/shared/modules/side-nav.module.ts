@@ -5,6 +5,6 @@ import { RouterModule } from '@angular/router';
 
 @NgModule({
   imports: [CommonModule, RouterModule, DfSideNavComponent],
-  exports: [DfSideNavComponent, RouterModule]
+  exports: [DfSideNavComponent, RouterModule],
 })
-export class SideNavModule { }
+export class SideNavModule {}

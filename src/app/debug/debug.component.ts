@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  selector: 'app-debug',
+  selector: 'df-app-debug',
   template: `
     <div *ngIf="debugInfo.length > 0">
       <h3>Debug Information:</h3>

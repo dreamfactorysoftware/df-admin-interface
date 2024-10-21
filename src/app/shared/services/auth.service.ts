@@ -5,7 +5,7 @@ import { DfAuthService } from '../../adf-user-management/services/df-auth.servic
 import { DfUserDataService } from './df-user-data.service';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AuthService {
   constructor(
@@ -14,9 +14,9 @@ export class AuthService {
   ) {}
 
   loginWithJwt(jwt: string): Observable<any> {
-    return this.dfAuthService.loginWithToken(jwt).pipe(
-      tap(user => this.dfUserDataService.userData = user)
-    );
+    return this.dfAuthService
+      .loginWithToken(jwt)
+      .pipe(tap(user => (this.dfUserDataService.userData = user)));
   }
 
   setCurrentUser(user: any) {

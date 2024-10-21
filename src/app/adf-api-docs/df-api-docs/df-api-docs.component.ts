@@ -12,13 +12,17 @@ import { TranslocoModule } from '@ngneat/transloco';
 import { saveRawAsFile } from 'src/app/shared/utilities/file';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
-import { SESSION_TOKEN_HEADER } from 'src/app/shared/constants/http-headers';
+import {
+  SESSION_TOKEN_HEADER,
+  API_KEY_HEADER,
+} from 'src/app/shared/constants/http-headers';
 import {
   mapCamelToSnake,
   mapSnakeToCamel,
 } from 'src/app/shared/utilities/case';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { AsyncPipe } from '@angular/common';
+import { environment } from '../../../../environments/environment';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -64,6 +68,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit {
       domNode: this.apiDocElement?.nativeElement,
       requestInterceptor: (req: SwaggerUI.Request) => {
         req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
+        req['headers'][API_KEY_HEADER] = environment.dfApiKey;
         // Parse the request URL
         const url = new URL(req['url']);
         const params = new URLSearchParams(url.search);

@@ -5,7 +5,7 @@ import { UserService } from '../shared/services/user.service';
 import { NotificationService } from '../shared/services/notification.service';
 
 @Component({
-  selector: 'app-login',
+  selector: 'df-app-login',
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss'],
 })

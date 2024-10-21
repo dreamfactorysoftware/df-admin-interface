@@ -28,7 +28,7 @@ export class SamlCallbackComponent implements OnInit {
 
   private handleSamlLogin(jwt: string) {
     this.authService.loginWithJwt(jwt).subscribe(
-      (result) => {
+      result => {
         if (result && result.session_token) {
           this.loggingService.log('SAML login successful');
           this.router.navigate(['/home']);
