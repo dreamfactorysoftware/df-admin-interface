@@ -62,7 +62,7 @@
       "altLabel": "Confirm new password",
       "errors": {
         "required": "Password is required",
-        "length": "Password must be at least 5 characters long"
+        "length": "Password must be at least 16 characters long"
       }
     },
     "verifyPassword": {
