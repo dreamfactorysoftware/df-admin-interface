@@ -31,6 +31,7 @@ import { AuthService, LdapService } from 'src/app/shared/types/service';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { CommonModule } from '@angular/common';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-user-login',
@@ -76,7 +77,8 @@ export class DfLoginComponent implements OnInit {
     private systemConfigDataService: DfSystemConfigDataService,
     private authService: DfAuthService,
     private router: Router,
-    private themeService: DfThemeService
+    private themeService: DfThemeService,
+    private snackbarService: DfSnackbarService
   ) {
     this.loginForm = this.fb.group({
       services: [''],
@@ -107,6 +109,7 @@ export class DfLoginComponent implements OnInit {
         }
       }
     );
+    this.snackbarService.setSnackbarLastEle('', false);
   }
 
   setLoginAttribute(attribute: string) {
