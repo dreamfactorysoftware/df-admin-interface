@@ -29,8 +29,9 @@ import {
   AlertType,
   DfAlertComponent,
 } from 'src/app/shared/components/df-alert/df-alert.component';
-import { catchError, throwError } from 'rxjs';
+import { catchError, filter, throwError } from 'rxjs';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -66,10 +67,11 @@ export class DfRoleDetailsComponent implements OnInit {
     private fb: FormBuilder,
     private router: Router,
     private activatedRoute: ActivatedRoute,
-    private themeService: DfThemeService
+    private themeService: DfThemeService,
+    private snackbarService: DfSnackbarService
   ) {
     this.roleForm = this.fb.group({
-      id: [null],
+      id: [0],
       name: ['', Validators.required],
       description: [''],
       active: [false],
@@ -78,11 +80,15 @@ export class DfRoleDetailsComponent implements OnInit {
     });
   }
   isDarkMode = this.themeService.darkMode$;
-
+  filterOp = '';
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data, type }) => {
       this.type = type;
       if (data) {
+        this.snackbarService.setSnackbarLastEle(
+          data.label ? data.label : data.name,
+          true
+        );
         this.roleForm.patchValue({
           id: data.id,
           name: data.name,
@@ -91,6 +97,7 @@ export class DfRoleDetailsComponent implements OnInit {
         });
 
         if (data.roleServiceAccessByRoleId.length > 0) {
+          this.filterOp = data.roleServiceAccessByRoleId[0].filterOp;
           data.roleServiceAccessByRoleId.forEach(
             (item: RoleServiceAccessType) => {
               const advancedFilters = new FormArray(
@@ -100,6 +107,7 @@ export class DfRoleDetailsComponent implements OnInit {
                       expandField: new FormControl(each.name),
                       expandOperator: new FormControl(each.operator),
                       expandValue: new FormControl(each.value),
+                      filterOp: new FormControl(item.filterOp),
                     })
                 )
               );
@@ -111,7 +119,8 @@ export class DfRoleDetailsComponent implements OnInit {
                   ),
                   component: new FormControl(item.component),
                   access: new FormControl(
-                    this.handleAccessValue(item.verbMask)
+                    this.handleAccessValue(item.verbMask),
+                    [Validators.required]
                   ),
                   requester: new FormControl(
                     this.handleRequesterValue(item.requestorMask)
@@ -121,6 +130,7 @@ export class DfRoleDetailsComponent implements OnInit {
                   extendField: new FormControl(item.extendField),
                   extendOperator: new FormControl(item.extendOperator),
                   extendValue: new FormControl(item.extendValue),
+                  filterOp: new FormControl(item.filterOp),
                 })
               );
             }
@@ -200,16 +210,16 @@ export class DfRoleDetailsComponent implements OnInit {
   //           verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
   //           requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
   //           filters: filtersArray,
-  //           filterOp: 'AND',
+  //           filterOp: this.filterOp,
   //         };
   //       }
   //     ),
   //     lookupByRoleId: formValue.lookupKeys,
   //   };
 
-  //   const createPayload = {
-  //     resource: [payload],
-  //   };
+  // const createPayload = {
+  //   resource: [payload],
+  // };
 
   //   if (this.type === 'edit' && payload.id) {
   //     this.roleService
@@ -224,7 +234,6 @@ export class DfRoleDetailsComponent implements OnInit {
   //         this.goBack();
   //       });
   //   } else {
-  //     console.log(23);
   //     this.roleService
   //       .create(createPayload, {
   //         fields: '*',
@@ -249,9 +258,8 @@ export class DfRoleDetailsComponent implements OnInit {
 
   onSubmit() {
     if (this.roleForm.invalid) return;
-
     const formValue = this.roleForm.getRawValue();
-
+    if (formValue.name === '' || formValue.name === null) return;
     const payload: RolePayload = {
       id: formValue.id,
       name: formValue.name,
@@ -264,7 +272,9 @@ export class DfRoleDetailsComponent implements OnInit {
             operator: filter.expandOperator,
             value: filter.expandValue,
           }));
-
+          const filterOp = val.advancedFilters.map(
+            (filter: any) => filter.filterOp
+          );
           return {
             id: val.id,
             serviceId: val.service === 0 ? null : val.service,
@@ -272,17 +282,15 @@ export class DfRoleDetailsComponent implements OnInit {
             verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
             requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
             filters: filtersArray,
-            filterOp: 'AND',
+            filterOp: filterOp[0],
           };
         }
       ),
       lookupByRoleId: formValue.lookupKeys,
     };
-
     const createPayload = {
       resource: [payload],
     };
-
     if (this.type === 'edit' && payload.id) {
       this.roleService
         .update(payload.id, payload)

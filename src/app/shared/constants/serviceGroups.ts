@@ -3,7 +3,7 @@ import { ROUTES } from '../types/routes';
 export const SERVICE_GROUPS = {
   [ROUTES.DATABASE]: ['Database', 'Big Data'],
   [ROUTES.SCRIPTING]: ['Script'],
-  [ROUTES.NETWROK]: ['Remote Service'],
+  [ROUTES.NETWORK]: ['Remote Service'],
   [ROUTES.FILE]: ['File', 'Excel'],
   [ROUTES.UTILITY]: [
     'Cache',

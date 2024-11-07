@@ -159,14 +159,14 @@ export const SILVER_SERVICES: Array<ServiceType> = [
     group: 'Script',
     configSchema: [],
   },
-  {
-    name: 'python',
-    label: 'Python',
-    description:
-      'Service that allows client-callable scripts utilizing the system scripting.',
-    group: 'Script',
-    configSchema: [],
-  },
+  // {
+  //   name: 'python',
+  //   label: 'Python',
+  //   description:
+  //     'Service that allows client-callable scripts utilizing the system scripting.',
+  //   group: 'Script',
+  //   configSchema: [],
+  // },
   {
     name: 'python3',
     label: 'Python3',

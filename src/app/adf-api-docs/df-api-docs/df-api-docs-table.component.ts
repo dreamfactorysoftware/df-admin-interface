@@ -90,8 +90,10 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
   }
 
   override mapDataToTable(data: Service[]): ApiDocsRowData[] {
-    const sortedData = data.sort((a, b) => a.name.localeCompare(b.name));
-    return sortedData.map(val => {
+    const filteredData = data
+      .filter(val => val.isActive === true)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return filteredData.map(val => {
       const type = this.getServiceType(val.type);
       return {
         name: val.name,

@@ -1,9 +1,9 @@
 <form
   [formGroup]="serviceForm"
   class="details-section"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
-  (ngSubmit)="save()">
-  <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabase">
+  (ngSubmit)="save(false, false)"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabaseEdit">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
         <ng-template matStepLabel>
@@ -28,6 +28,7 @@
                 mat-button
                 matStepperNext
                 type="button"
+                class="cancel-btn"
                 [disabled]="serviceForm.get('type')?.value === ''">
                 Next
               </button>
@@ -108,6 +109,7 @@
               mat-button
               matStepperNext
               type="button"
+              class="cancel-btn"
               [disabled]="serviceForm.get('type')?.value === ''">
               Next
             </button>
@@ -178,11 +180,18 @@
               >{{ 'active' | transloco }}</mat-slide-toggle
             >
             <div>
-              <button mat-button matStepperPrevious type="button">Back</button>
+              <button
+                mat-button
+                matStepperPrevious
+                class="cancel-btn"
+                type="button">
+                Back
+              </button>
               <button
                 mat-button
                 matStepperNext
                 type="button"
+                class="cancel-btn"
                 [disabled]="
                   serviceForm.get('type')?.value === '' &&
                   serviceForm.get('description')?.value === ''
@@ -207,13 +216,17 @@
                       item.type === 'text' && item.name === 'content';
                       else dynamic
                     ">
-                    <df-script-editor
-                      [type]="getControl('type')"
-                      [storageServiceId]="getConfigControl('storageServiceId')"
-                      [storagePath]="getConfigControl('storagePath')"
-                      [content]="getConfigControl('content')"
-                      [cache]="serviceData ? serviceData.name : ''"
-                      class="full-width"></df-script-editor>
+                    <ng-container *ngIf="getConfigControl('storageServiceId')">
+                      <df-script-editor
+                        [type]="getControl('type')"
+                        [storageServiceId]="
+                          getConfigControl('storageServiceId')
+                        "
+                        [storagePath]="getConfigControl('storagePath')"
+                        [content]="getConfigControl('content')"
+                        [cache]="serviceData ? serviceData.name : ''"
+                        class="full-width"></df-script-editor>
+                    </ng-container>
                   </ng-container>
                   <ng-template #dynamic>
                     <df-dynamic-field
@@ -276,7 +289,7 @@
       </ng-template>
     </mat-stepper>
   </ng-container>
-  <ng-template #notDatabase>
+  <ng-template #notDatabaseEdit>
     <mat-form-field
       subscriptSizing="dynamic"
       class="dynamic-width"
@@ -344,8 +357,41 @@
       *ngIf="!subscriptionRequired"
       ><span>{{ 'active' | transloco }}</span></mat-slide-toggle
     >
+    <div class="full-width">
+      <ng-container *ngIf="this.edit">
+        <ng-container *ngIf="this.isDatabase; else notDatabase">
+          <button
+            type="button"
+            mat-flat-button
+            class="save-btn"
+            (click)="gotoSchema()">
+            {{ 'schema' | transloco }}
+          </button>
+        </ng-container>
+        <ng-template #notDatabase>
+          <button
+            type="button"
+            mat-flat-button
+            class="save-btn"
+            (click)="gotoAPIDocs()">
+            {{ 'apiDocs' | transloco }}
+          </button>
+        </ng-template>
+      </ng-container>
+    </div>
     <ng-container *ngIf="viewSchema && !subscriptionRequired">
       <ng-container formGroupName="config">
+        <ng-container *ngIf="this.isNetworkService || this.isScriptService">
+          <ng-container *ngIf="getConfigControl('storageServiceId')">
+            <df-script-editor
+              [type]="getControl('type')"
+              [storageServiceId]="getConfigControl('storageServiceId')"
+              [storagePath]="getConfigControl('storagePath')"
+              [content]="getConfigControl('serviceDefinition')"
+              [cache]="serviceData ? serviceData.name : ''"
+              class="full-width"></df-script-editor>
+          </ng-container>
+        </ng-container>
         <mat-accordion class="full-width">
           <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
             <mat-expansion-panel-header
@@ -354,58 +400,86 @@
             <div class="details-section">
               <ng-container
                 *ngIf="this.isNetworkService || this.isScriptService">
-                <mat-button-toggle-group
-                  aria-label="Service Definition Type"
-                  [(ngModel)]="serviceDefinitionType"
-                  [ngModelOptions]="{ standalone: true }"
-                  (change)="
-                    onServiceDefinitionTypeChange(serviceDefinitionType)
-                  ">
-                  <mat-button-toggle value="0">JSON</mat-button-toggle>
-                  <mat-button-toggle value="1">YAML</mat-button-toggle>
-                </mat-button-toggle-group>
+                <ng-container *ngIf="serviceForm.getRawValue().type !== 'soap'">
+                  <mat-button-toggle-group
+                    aria-label="Service Definition Type"
+                    [(ngModel)]="serviceDefinitionType"
+                    [ngModelOptions]="{ standalone: true }"
+                    (change)="
+                      onServiceDefinitionTypeChange(serviceDefinitionType)
+                    ">
+                    <mat-button-toggle value="0">JSON</mat-button-toggle>
+                    <mat-button-toggle value="1">YAML</mat-button-toggle>
+                  </mat-button-toggle-group>
+                </ng-container>
                 <mat-label class="full-width">Service Definition</mat-label>
-                <df-script-editor
-                  [type]="getControl('type')"
-                  [storageServiceId]="getConfigControl('storageServiceId')"
-                  [storagePath]="getConfigControl('storagePath')"
-                  [content]="getConfigControl('serviceDefinition')"
-                  [cache]="serviceData ? serviceData.name : ''"
-                  class="full-width"></df-script-editor>
-                <!-- <mat-form-field class="full-width" appearance="outline">
-                  <mat-label>Service Definition</mat-label>
-                  <textarea
-                    matInput
-                    rows="10"
-                    [(ngModel)]="serviceDefinition"
-                    [ngModelOptions]="{ standalone: true }"></textarea>
-                </mat-form-field> -->
-              </ng-container>
 
+                <ng-container *ngIf="serviceForm.getRawValue().type === 'rws'">
+                  <!-- <mat-form-field class="full-width" appearance="outline">
+                    <mat-label>Service Definition</mat-label>
+                    <textarea
+                      matInput
+                      rows="10"
+                      [(ngModel)]="serviceDefinition"
+                      [ngModelOptions]="{ standalone: true }"></textarea>
+                  </mat-form-field> -->
+                  <df-file-github
+                    [type]="getControl('type')"
+                    [content]="getConfigControl('content')"
+                    [contentText]="content"
+                    class="full-width">
+                  </df-file-github>
+                </ng-container>
+              </ng-container>
+              <ng-container
+                *ngIf="
+                  this.isFile && serviceForm.getRawValue().type === 'local_file'
+                ">
+                <div class="actions full-width">
+                  <input
+                    type="file"
+                    [accept]=""
+                    #fileInput
+                    (change)="excelUpload($event)"
+                    style="display: none" />
+                  <button
+                    type="button"
+                    mat-flat-button
+                    class="save-btn"
+                    (click)="fileInput.click()">
+                    Upload Excel
+                  </button>
+                </div>
+                <df-ace-editor
+                  class="full-width"
+                  [formControl]="getConfigControl('excelContent')"
+                  [mode]="serviceForm.getRawValue().type"></df-ace-editor>
+              </ng-container>
               <!-- <ng-container *ngIf="this.isNetworkService">
                 <df-script-editor
                   [type]="getControl('type')"
                   formControlName="content"
-                  [storageServiceId]="getConfigControl('storageServiceId')"
+                  [storageServiceId]="getServiceDefinitionControl()"
                   [storagePath]="getConfigControl('storagePath')"
                   [content]="getConfigControl('content')"
                   [cache]="serviceData ? serviceData.name : ''"
                   class="full-width"></df-script-editor
               ></ng-container> -->
-
               <ng-container *ngFor="let item of viewSchema">
                 <ng-container
                   *ngIf="
                     item.type === 'text' && item.name === 'content';
                     else dynamic
                   ">
-                  <df-script-editor
-                    [type]="getControl('type')"
-                    [storageServiceId]="getConfigControl('storageServiceId')"
-                    [storagePath]="getConfigControl('storagePath')"
-                    [content]="getConfigControl('content')"
-                    [cache]="serviceData ? serviceData.name : ''"
-                    class="full-width"></df-script-editor>
+                  <ng-container *ngIf="getConfigControl('storageServiceId')">
+                    <df-script-editor
+                      [type]="getControl('type')"
+                      [storageServiceId]="getConfigControl('storageServiceId')"
+                      [storagePath]="getConfigControl('storagePath')"
+                      [content]="getServiceDocByServiceIdControl('content')"
+                      [cache]="serviceData ? serviceData.name : ''"
+                      class="full-width"></df-script-editor>
+                  </ng-container>
                 </ng-container>
                 <ng-template #dynamic>
                   <df-dynamic-field
@@ -448,6 +522,37 @@
         (click)="goBack()">
         {{ 'cancel' | transloco }}
       </button>
+      <ng-container *ngIf="this.edit">
+        <!-- <mat-button-toggle-group
+          [(ngModel)]="clearCache"
+          [ngModelOptions]="{ standalone: true }"
+          appearance="legacy">
+          <mat-button-toggle
+            [value]="true"
+            mat-flat-button
+            class="save-btn"
+            color="primary"
+            (click)="save()">
+            {{ 'saveAndClear' | transloco }}</mat-button-toggle
+          >
+        </mat-button-toggle-group> -->
+        <button
+          [value]="true"
+          mat-flat-button
+          class="save-btn"
+          color="primary"
+          (click)="save(true, false)">
+          {{ 'saveAndClear' | transloco }}
+        </button>
+        <button
+          [value]="true"
+          mat-flat-button
+          class="save-btn"
+          color="primary"
+          (click)="save(true, true)">
+          {{ 'saveAndContinue' | transloco }}
+        </button>
+      </ng-container>
       <button mat-flat-button class="save-btn" color="primary">
         {{ 'save' | transloco }}
       </button>

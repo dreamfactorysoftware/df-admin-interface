@@ -23,15 +23,14 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
 import { Observable, map, startWith } from 'rxjs';
 import { groupEvents } from 'src/app/shared/utilities/eventScripts';
-import {
-  BASE_SERVICE_TOKEN,
-  EVENTS_SERVICE_TOKEN,
-  EVENT_SCRIPT_SERVICE_TOKEN,
-} from 'src/app/shared/constants/tokens';
+import { EVENT_SCRIPT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { Service, ServiceType } from 'src/app/shared/types/service';
+import { Service } from 'src/app/shared/types/service';
 import { CommonModule } from '@angular/common';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
+import { camelToSnakeString } from 'src/app/shared/utilities/case';
+import { ConstantPool } from '@angular/compiler';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -53,6 +52,7 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
     MatInputModule,
     AsyncPipe,
     CommonModule,
+    DfLinkServiceComponent,
   ],
 })
 export class DfScriptDetailsComponent implements OnInit {
@@ -72,6 +72,7 @@ export class DfScriptDetailsComponent implements OnInit {
   selectedServiceItem: string;
   selectedEventItem: string;
   selectedRouteItem: string;
+  tableProcedureFlag: string;
   selectTable: string;
   completeScriptName: string;
   loaded = false;
@@ -86,7 +87,7 @@ export class DfScriptDetailsComponent implements OnInit {
     this.storeServiceArray = [];
     this.ungroupedEventItems = [];
     this.scriptForm = this.fb.group({
-      name: ['', [Validators.required]],
+      name: [''],
       type: ['nodejs', [Validators.required]],
       content: [''],
       storageServiceId: [],
@@ -103,7 +104,13 @@ export class DfScriptDetailsComponent implements OnInit {
       this.type = type;
       if (type === 'edit') {
         this.scriptDetails = data;
-        this.scriptForm.patchValue(data);
+        let editData = Object.keys(data).reduce(
+          (acc, cur) =>
+            (acc = { ...acc, [camelToSnakeString(cur)]: data[cur] }),
+          {}
+        );
+        editData = { ...editData, isActive: data.isActive };
+        this.scriptForm.patchValue(editData);
         this.scriptForm.controls['name'].disable();
         this.completeScriptName = data.name;
       } else {
@@ -131,9 +138,9 @@ export class DfScriptDetailsComponent implements OnInit {
   }
 
   submit(): void {
-    // if (!this.scriptForm.valid) {
-    //   return;
-    // }
+    if (!this.scriptForm.valid) {
+      return;
+    }
     const script = this.scriptForm.getRawValue();
     const scriptItem = {
       ...script,
@@ -145,7 +152,7 @@ export class DfScriptDetailsComponent implements OnInit {
         script.storageServiceId?.type === 'local_file'
           ? script.storagePath
           : null,
-      name: this.completeScriptName,
+      name: this.completeScriptName ?? this.selectedRouteItem,
     };
     if (this.type === 'edit') {
       this.scriptDetails = { ...this.scriptDetails, ...scriptItem };
@@ -190,16 +197,30 @@ export class DfScriptDetailsComponent implements OnInit {
   }
 
   selectedEventItemEvent() {
-    this.tableOptions = [];
     this.ungroupedRouteOptions = [
       ...this.ungroupedEventOptions[this.selectedEventItem].endpoints,
     ];
-
-    if (this.ungroupedEventOptions[this.selectedEventItem].parameter) {
-      this.tableOptions = [
-        ...this.ungroupedEventOptions[this.selectedEventItem].parameter
-          .tableName,
-      ];
+    const data = this.ungroupedEventOptions[this.selectedEventItem].parameter;
+    if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+      if (Object.keys(data)[0] === 'tableName') {
+        this.tableProcedureFlag = 'table';
+        this.tableOptions = [
+          ...this.ungroupedEventOptions[this.selectedEventItem].parameter
+            .tableName,
+        ];
+      } else if (Object.keys(data)[0] === 'procedureName') {
+        this.tableProcedureFlag = 'procedure';
+        this.tableOptions = [
+          ...this.ungroupedEventOptions[this.selectedEventItem].parameter
+            .procedureName,
+        ];
+      } else if (Object.keys(data)[0] === 'functionName') {
+        this.tableProcedureFlag = 'function';
+        this.tableOptions = [
+          ...this.ungroupedEventOptions[this.selectedEventItem].parameter
+            .procedureName,
+        ];
+      }
     }
   }
 
@@ -208,5 +229,15 @@ export class DfScriptDetailsComponent implements OnInit {
       '{table_name}',
       this.selectTable
     );
+  }
+
+  selectedRoute() {
+    this.completeScriptName = this.selectedRouteItem;
+    if (this.selectTable) {
+      this.completeScriptName = this.completeScriptName.replace(
+        '{table_name}',
+        this.selectTable
+      );
+    }
   }
 }

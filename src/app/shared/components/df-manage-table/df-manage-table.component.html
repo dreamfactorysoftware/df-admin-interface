@@ -20,7 +20,7 @@
   <ng-content select="[topActions]"></ng-content>
   <div class="spacer"></div>
   <mat-form-field
-    *ngIf="allowFilter && tableLength > 0"
+    *ngIf="allowFilter"
     class="search-input"
     appearance="outline"
     subscriptSizing="dynamic">
@@ -28,82 +28,98 @@
     <input matInput [formControl]="currentFilter" />
   </mat-form-field>
 </div>
-<div class="table-container" [class]="(isDarkMode | async) ? 'dark-theme' : ''">
-  <table
-    mat-table
-    [dataSource]="dataSource"
-    matSort
-    (matSortChange)="announceSortChange($event)">
-    <ng-container *ngFor="let column of columns">
-      <ng-container
-        [matColumnDef]="column.columnDef"
-        *ngIf="column.columnDef !== 'actions'">
-        <th
-          mat-header-cell
-          *matHeaderCellDef
-          mat-sort-header
-          [attr.sortActionDescription]="
-            sortDescription(column.header!) | async
+<ng-container
+  *ngIf="{
+    currentPageSize: currentPageSize$ | async
+  } as data">
+  <div
+    class="table-container"
+    [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+    <table
+      mat-table
+      [dataSource]="dataSource"
+      matSort
+      (matSortChange)="announceSortChange($event)">
+      <ng-container *ngFor="let column of columns">
+        <ng-container
+          [matColumnDef]="column.columnDef"
+          *ngIf="
+            column.columnDef !== 'actions' && column.columnDef !== 'scripting'
           ">
-          {{ column.header | transloco }}
-        </th>
-        <td mat-cell *matCellDef="let row">
-          <fa-icon
-            *ngIf="column.columnDef === 'active'"
-            [icon]="activeIcon(!!column?.cell(row))"
-            size="lg"
-            [class]="!!column?.cell(row) ? 'active' : 'inactive'"></fa-icon>
-          <ng-container *ngIf="column.columnDef === 'registration'">
-            {{ (!!column?.cell(row) ? 'confirmed' : 'pending') | transloco }}
-          </ng-container>
-          <ng-container
-            *ngIf="
-              column.columnDef !== 'active' &&
-              column.columnDef !== 'registration' &&
-              column.columnDef !== 'log'
+          <th
+            mat-header-cell
+            *matHeaderCellDef
+            mat-sort-header
+            [attr.sortActionDescription]="
+              sortDescription(column.header!) | async
             ">
-            {{ column?.cell(row) }}
-          </ng-container>
-          <ng-container *ngIf="column.columnDef === 'log'">
+            {{ column.header | transloco }}
+          </th>
+          <td mat-cell *matCellDef="let row">
             <fa-icon
-              *ngIf="!!column?.cell(row)"
-              [icon]="faTriangleExclamation"
+              *ngIf="column.columnDef === 'active'"
+              [icon]="activeIcon(isCellActive(column?.cell(row)))"
               size="lg"
-              style="color: red"></fa-icon>
-            <span *ngIf="!!column?.cell(row) === false">{{ '-' }}</span>
-          </ng-container>
-        </td>
-      </ng-container>
-      <ng-container
-        [matColumnDef]="column.columnDef"
-        *ngIf="column.columnDef === 'actions'"
-        stickyEnd>
-        <th mat-header-cell *matHeaderCellDef></th>
-        <td class="actions" mat-cell *matCellDef="let row">
-          <ng-container
-            *ngIf="actions.additional && actions.additional.length > 0">
+              [class]="
+                isCellActive(column?.cell(row)) ? 'active' : 'inactive'
+              "></fa-icon>
+            <ng-container *ngIf="column.columnDef === 'registration'">
+              {{ (!!column?.cell(row) ? 'confirmed' : 'pending') | transloco }}
+            </ng-container>
             <ng-container
-              *ngIf="actions.additional.length === 1; else multiple">
-              <button
-                class="action-btn"
-                *ngIf="actions.additional[0].icon; else regular"
-                mat-icon-button
-                [attr.aria-label]="
-                  actions.additional[0].ariaLabel.key
-                    | transloco
-                      : { param: actions.additional[0].ariaLabel.param }
+              *ngIf="
+                column.columnDef !== 'active' &&
+                column.columnDef !== 'registration' &&
+                column.columnDef !== 'log'
+              ">
+              {{ column?.cell(row) }}
+            </ng-container>
+            <ng-container *ngIf="column.columnDef === 'log'">
+              <fa-icon
+                *ngIf="!!column?.cell(row)"
+                [icon]="faTriangleExclamation"
+                size="lg"
+                style="color: red"></fa-icon>
+              <span *ngIf="!!column?.cell(row) === false">{{ '-' }}</span>
+            </ng-container>
+          </td>
+        </ng-container>
+        <ng-container
+          [matColumnDef]="column.columnDef"
+          *ngIf="column.columnDef === 'scripting'">
+          <ng-container *ngIf="isDatabase; else notDatabase">
+            <th mat-header-cell *matHeaderCellDef>Scripting</th>
+            <td class="actions" mat-cell *matCellDef="let row">
+              <fa-icon
+                (click)="
+                  goEventScriptsPage(column?.cell(row)?.toString() || '')
                 "
-                (click)="actions.additional[0].function(row)"
                 (click)="$event.stopPropagation()"
-                type="button">
-                <fa-icon
-                  [icon]="actions.additional[0].icon"
-                  size="xs"></fa-icon>
-              </button>
-              <ng-template #regular>
+                [icon]="activeIcon(column?.cell(row) !== 'not')"
+                size="lg"
+                [class]="
+                  column?.cell(row) !== 'not' ? 'active' : 'inactive'
+                "></fa-icon></td
+          ></ng-container>
+          <ng-template #notDatabase>
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td class="actions" mat-cell *matCellDef="let row"></td>
+          </ng-template>
+        </ng-container>
+        <ng-container
+          [matColumnDef]="column.columnDef"
+          *ngIf="column.columnDef === 'actions'"
+          stickyEnd>
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td class="actions" mat-cell *matCellDef="let row">
+            <ng-container
+              *ngIf="actions.additional && actions.additional.length > 0">
+              <ng-container
+                *ngIf="actions.additional.length === 1; else multiple">
                 <button
-                  mat-flat-button
-                  color="primary"
+                  class="action-btn"
+                  *ngIf="actions.additional[0].icon; else regular"
+                  mat-icon-button
                   [attr.aria-label]="
                     actions.additional[0].ariaLabel.key
                       | transloco
@@ -112,61 +128,78 @@
                   (click)="actions.additional[0].function(row)"
                   (click)="$event.stopPropagation()"
                   type="button">
-                  {{ actions.additional[0].label | transloco }}
+                  <fa-icon
+                    [icon]="actions.additional[0].icon"
+                    size="xs"></fa-icon>
                 </button>
+                <ng-template #regular>
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    [attr.aria-label]="
+                      actions.additional[0].ariaLabel.key
+                        | transloco
+                          : { param: actions.additional[0].ariaLabel.param }
+                    "
+                    (click)="actions.additional[0].function(row)"
+                    (click)="$event.stopPropagation()"
+                    type="button">
+                    {{ actions.additional[0].label | transloco }}
+                  </button>
+                </ng-template>
+              </ng-container>
+              <ng-template #multiple>
+                <button
+                  mat-icon-button
+                  [matMenuTriggerFor]="actionsMenu"
+                  (click)="$event.stopPropagation()"
+                  aria-label="Actions"
+                  type="button">
+                  <fa-icon [icon]="faEllipsisV" size="xs"></fa-icon>
+                </button>
+                <mat-menu #actionsMenu="matMenu">
+                  <button
+                    type="button"
+                    *ngFor="let action of actions.additional"
+                    mat-menu-item
+                    [attr.aria-label]="
+                      action.ariaLabel.key
+                        | transloco: { param: action.ariaLabel.param }
+                    "
+                    (click)="action.function(row)"
+                    [disabled]="isActionDisabled(action, row)">
+                    {{ action.label | transloco }}
+                  </button>
+                </mat-menu>
               </ng-template>
             </ng-container>
-            <ng-template #multiple>
-              <button
-                mat-icon-button
-                [matMenuTriggerFor]="actionsMenu"
-                (click)="$event.stopPropagation()"
-                aria-label="Actions"
-                type="button">
-                <fa-icon [icon]="faEllipsisV" size="xs"></fa-icon>
-              </button>
-              <mat-menu #actionsMenu="matMenu">
-                <button
-                  type="button"
-                  *ngFor="let action of actions.additional"
-                  mat-menu-item
-                  [attr.aria-label]="
-                    action.ariaLabel.key
-                      | transloco: { param: action.ariaLabel.param }
-                  "
-                  (click)="action.function(row)"
-                  [disabled]="isActionDisabled(action, row)">
-                  {{ action.label | transloco }}
-                </button>
-              </mat-menu>
-            </ng-template>
-          </ng-container>
-        </td>
+          </td>
+        </ng-container>
       </ng-container>
-    </ng-container>
-    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr
-      [attr.tabindex]="isClickable(row) ? 0 : -1"
-      mat-row
-      *matRowDef="let row; columns: displayedColumns"
-      [class.clickable]="isClickable(row)"
-      (click)="callDefaultAction(row)"
-      (keydown)="handleKeyDown($event, row)"></tr>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr
+        [attr.tabindex]="isClickable(row) ? 0 : -1"
+        mat-row
+        *matRowDef="let row; columns: displayedColumns"
+        [class.clickable]="isClickable(row)"
+        (click)="callDefaultAction(row)"
+        (keydown)="handleKeyDown($event, row)"></tr>
 
-    <tr class="mat-row no-data-row" *matNoDataRow>
-      <td class="mat-cell" [attr.colspan]="columns.length">
-        {{ 'noEnteries' | transloco }}
-      </td>
-    </tr>
-  </table>
-  <div class="bottom-action-bar">
-    <mat-paginator
-      *ngIf="tableLength > defaultPageSize"
-      [pageSizeOptions]="pageSizes"
-      showFirstLastButtons
-      aria-label="'selectPage' | transloco"
-      [length]="tableLength"
-      (page)="changePage($event)">
-    </mat-paginator>
+      <tr class="mat-row no-data-row" *matNoDataRow>
+        <td class="mat-cell" [attr.colspan]="columns.length">
+          {{ 'noEnteries' | transloco }}
+        </td>
+      </tr>
+    </table>
+    <div class="bottom-action-bar">
+      <mat-paginator
+        [pageSize]="data.currentPageSize"
+        [pageSizeOptions]="pageSizes"
+        showFirstLastButtons
+        aria-label="'selectPage' | transloco"
+        [length]="tableLength"
+        (page)="changePage($event)">
+      </mat-paginator>
+    </div>
   </div>
-</div>
+</ng-container>

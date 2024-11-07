@@ -26,6 +26,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
+import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
+
 import { ConfigSchema, ServiceType } from 'src/app/shared/types/service';
 import {
   camelToSnakeString,
@@ -36,11 +38,15 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatButtonModule } from '@angular/material/button';
 import { UntilDestroy } from '@ngneat/until-destroy';
-import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import {
+  CACHE_SERVICE_TOKEN,
+  SERVICES_SERVICE_TOKEN,
+} from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
+import { DfFileGithubComponent } from 'src/app/shared/components/df-file-github/df-file-github.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { map, switchMap } from 'rxjs';
 import {
@@ -54,6 +60,8 @@ import { HttpClient } from '@angular/common/http';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { readAsText } from '../../shared/utilities/file';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -77,10 +85,12 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
     NgTemplateOutlet,
     DfDynamicFieldComponent,
     DfArrayFieldComponent,
+    DfAceEditorComponent,
     FontAwesomeModule,
     MatTooltipModule,
     MatButtonModule,
     DfScriptEditorComponent,
+    DfFileGithubComponent,
     DfPaywallComponent,
     MatStepperModule,
     CommonModule,
@@ -93,6 +103,8 @@ export class DfServiceDetailsComponent implements OnInit {
   isDatabase = false;
   isNetworkService = false;
   isScriptService = false;
+  isFile = false;
+  isAuth = false;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -103,19 +115,19 @@ export class DfServiceDetailsComponent implements OnInit {
   search = '';
   serviceDefinition: string;
   serviceDefinitionType: string;
-
   systemEvents: Array<{ label: string; value: string }>;
-
+  content = '';
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
-    @Inject(SERVICES_SERVICE_TOKEN)
-    private servicesService: DfBaseCrudService,
+    @Inject(SERVICES_SERVICE_TOKEN) private servicesService: DfBaseCrudService,
+    @Inject(CACHE_SERVICE_TOKEN) private cacheService: DfBaseCrudService,
     private router: Router,
     private systemConfigDataService: DfSystemConfigDataService,
     private http: HttpClient,
     public dialog: MatDialog,
-    private themeService: DfThemeService
+    private themeService: DfThemeService,
+    private snackbarService: DfSnackbarService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -147,6 +159,7 @@ export class DfServiceDetailsComponent implements OnInit {
         )
       )
       .subscribe(({ env, route }) => {
+        console.log(route['groups'][0]);
         if (route['groups'] && route['groups'][0] === 'Database') {
           this.isDatabase = true;
         }
@@ -156,10 +169,26 @@ export class DfServiceDetailsComponent implements OnInit {
         if (route['groups'] && route['groups'][0] === 'Script') {
           this.isScriptService = true;
         }
+        if (route['groups'] && route['groups'][0] === 'File') {
+          this.isFile = true;
+        }
+        if (route['groups'] && route['groups'][0] === 'LDAP') {
+          this.isAuth = true;
+        }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
-        this.serviceTypes = serviceTypes;
+        this.serviceTypes = serviceTypes.filter(
+          (s: { name: string }) => s.name.toLowerCase() !== 'python'
+        );
         this.notIncludedServices = [];
+        if (data && (data.label || data.name)) {
+          this.snackbarService.setSnackbarLastEle(
+            data.label ? data.label : data.name,
+            false
+          );
+        } else {
+          this.snackbarService.setSnackbarLastEle('Unknown label', false);
+        }
         if (this.isDatabase) {
           if (licenseType === 'SILVER') {
             this.notIncludedServices.push(
@@ -196,25 +225,41 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         if (data?.serviceDocByServiceId) {
           data.config.serviceDefinition = data?.serviceDocByServiceId.content;
+          this.getServiceDocByServiceIdControl('content').setValue(
+            data?.serviceDocByServiceId.content
+          );
         }
         this.serviceData = data;
+        if (data) {
+          this.content = data.config.serviceDefinition;
+        } else {
+          this.content = '';
+        }
         if (this.edit) {
           this.configSchema = this.getConfigSchema(data.type);
-          this.initializeConfig();
+          this.initializeConfig('');
           this.serviceForm.patchValue({
             ...data,
             config: data.config,
           });
+          if (!this.isAuth) {
+            this.getConfigControl('serviceDefinition').setValue(
+              data.config.content
+            );
+          }
           if (data?.serviceDocByServiceId) {
             this.serviceDefinitionType =
               '' + data?.serviceDocByServiceId.format;
+            this.getConfigControl('serviceDefinition').setValue(
+              data.config.content
+            );
           }
           this.serviceForm.controls['type'].disable();
         } else {
           this.serviceForm.controls['type'].valueChanges.subscribe(value => {
             this.serviceForm.removeControl('config');
             this.configSchema = this.getConfigSchema(value);
-            this.initializeConfig();
+            this.initializeConfig(value);
           });
         }
       });
@@ -227,7 +272,7 @@ export class DfServiceDetailsComponent implements OnInit {
     }
   }
 
-  initializeConfig() {
+  initializeConfig(value: string) {
     if (this.configSchema && this.configSchema.length > 0) {
       const config = this.fb.group({});
       this.configSchema.forEach(control => {
@@ -240,6 +285,9 @@ export class DfServiceDetailsComponent implements OnInit {
           new FormControl(control.default, validator)
         );
       });
+      if (this.isFile && value === 'local_file') {
+        config?.addControl('excelContent', new FormControl(''));
+      }
       const contentConfigControl = this.configSchema.filter(
         control => control.name === 'content'
       )?.[0];
@@ -253,7 +301,11 @@ export class DfServiceDetailsComponent implements OnInit {
           new FormControl(contentConfigControl.default, validator)
         );
       }
-      this.serviceForm?.addControl('config', config);
+      if (this.isNetworkService) {
+        this.serviceForm.addControl('type', new FormControl(''));
+        config.addControl('content', new FormControl(''));
+      }
+      this.serviceForm.addControl('config', config);
     }
   }
 
@@ -275,6 +327,21 @@ export class DfServiceDetailsComponent implements OnInit {
       return AceEditorMode.PHP;
     }
     return AceEditorMode.TEXT;
+  }
+
+  excelUpload(event: Event) {
+    const config = this.serviceForm.get('config');
+    const input = event.target as HTMLInputElement;
+    if (input.files) {
+      if (config && config.get('excelContent')) {
+        readAsText(input.files[0]).subscribe(value => {
+          const excelContentControl = config.get('excelContent');
+          if (excelContentControl) {
+            excelContentControl.setValue(value);
+          }
+        });
+      }
+    }
   }
 
   getConfigSchema(type: string) {
@@ -310,6 +377,12 @@ export class DfServiceDetailsComponent implements OnInit {
     return this.serviceForm.get(`config.${name}`) as FormControl;
   }
 
+  getServiceDocByServiceIdControl(name: string) {
+    return this.serviceForm.get(
+      `service_doc_by_service_id.${name}`
+    ) as FormControl;
+  }
+
   getServiceDefinitionControl() {
     return this.serviceForm.get('serviceDefinition') as FormControl;
   }
@@ -318,12 +391,11 @@ export class DfServiceDetailsComponent implements OnInit {
     return this.serviceForm.controls[name] as FormControl;
   }
 
-  save() {
-    if (this.serviceForm.invalid) {
+  save(Cache: boolean, Continue: boolean) {
+    const data = this.serviceForm.getRawValue();
+    if (data.type === '' || data.name === '') {
       return;
     }
-    const data = this.serviceForm.getRawValue();
-
     type Params = {
       snackbarError?: string;
       snackbarSuccess?: string;
@@ -335,21 +407,20 @@ export class DfServiceDetailsComponent implements OnInit {
       snackbarError: 'server',
       snackbarSuccess: 'services.createSuccessMsg',
     };
-
     if (this.isNetworkService) {
       params = {
         ...params,
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      if (!data.config.serviceDefinition) {
-        data.service_doc_by_service_id = null;
-      } else {
-        data.service_doc_by_service_id.content = data.config.serviceDefinition;
-        data.service_doc_by_service_id.format = Number(
-          this.serviceDefinitionType
-        );
-      }
+      // if (!data.config.serviceDefinition) {
+      //   data.service_doc_by_service_id = null;
+      // } else {
+      data.service_doc_by_service_id.content = data.config.content;
+      data.service_doc_by_service_id.format = Number(
+        this.serviceDefinitionType
+      );
+      // }
     } else if (this.isScriptService) {
       params = {
         ...params,
@@ -358,19 +429,21 @@ export class DfServiceDetailsComponent implements OnInit {
       };
       // data.service_doc_by_service_id = null;
       // data.config.content = this.serviceDefinition;
-      if (!data.config.serviceDefinition) {
+      if (!data.config) {
         data.service_doc_by_service_id = null;
       } else {
-        data.service_doc_by_service_id.content = data.config.serviceDefinition;
+        data.config.content = data.config.serviceDefinition;
         data.service_doc_by_service_id.format = Number(
           this.serviceDefinitionType
         );
+        if (data.service_doc_by_service_id.content === '') {
+          data.service_doc_by_service_id = null;
+        }
+        delete data.config.serviceDefinition;
       }
-      delete data.config.serviceDefinition;
     } else {
       delete data.service_doc_by_service_id;
     }
-
     let payload;
     if (data.type.toLowerCase().includes('saml')) {
       params = {
@@ -378,7 +451,7 @@ export class DfServiceDetailsComponent implements OnInit {
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      data.service_doc_by_service_id = null;
+      // data.service_doc_by_service_id = null;
       payload = {
         ...data,
         is_active: data.isActive,
@@ -410,6 +483,11 @@ export class DfServiceDetailsComponent implements OnInit {
       }
       delete payload.isActive;
     } else {
+      // data.service_doc_by_service_id = null;
+      payload = {
+        ...data,
+        id: this.edit ? this.serviceData.id : null,
+      };
       payload = { ...data };
     }
     if (this.edit) {
@@ -434,7 +512,27 @@ export class DfServiceDetailsComponent implements OnInit {
           snackbarSuccess: 'services.updateSuccessMsg',
         })
         .subscribe(() => {
-          this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+          if (data.type.toLowerCase().includes('saml')) {
+            this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+          } else {
+            if (Cache) {
+              this.cacheService
+                .delete(payload.name, {
+                  snackbarSuccess: 'cache.serviceCacheFlushed',
+                })
+                .subscribe({
+                  next: () => {
+                    if (!Continue) {
+                      this.router.navigate(['../'], {
+                        relativeTo: this.activatedRoute,
+                      });
+                    }
+                  },
+                  error: (err: any) =>
+                    console.error('Error flushing cache', err),
+                });
+            }
+          }
         });
     } else {
       this.servicesService
@@ -445,10 +543,23 @@ export class DfServiceDetailsComponent implements OnInit {
           params
         )
         .subscribe(() => {
-          this.router.navigate(['../'], { relativeTo: this.activatedRoute });
-          // this.router.navigate([`/api-connections/api-docs/${data.name}`]);
+          if (data.type.toLowerCase().includes('saml')) {
+            this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+          } else {
+            this.router.navigate([`/api-connections/api-docs/${data.name}`]);
+          }
         });
     }
+  }
+
+  gotoSchema() {
+    const data = this.serviceForm.getRawValue();
+    this.router.navigate([`/admin-settings/schema/${data.name}`]);
+  }
+
+  gotoAPIDocs() {
+    const data = this.serviceForm.getRawValue();
+    this.router.navigate([`/api-connections/api-docs/${data.name}`]);
   }
 
   goBack() {
@@ -464,11 +575,10 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   get filteredServiceTypes() {
-    return this.serviceTypes.filter(type =>
-      type.label
-        .replace(/\s/g, '')
-        .toLowerCase()
-        .includes(this.search.toLowerCase())
+    return this.serviceTypes.filter(
+      type =>
+        type.label.toLowerCase().includes(this.search.toLowerCase()) ||
+        type.name.toLowerCase().includes(this.search.toLowerCase())
     );
   }
 
