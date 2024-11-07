@@ -62,7 +62,6 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { readAsText } from '../../shared/utilities/file';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
-import { format } from 'prettier';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
