@@ -242,14 +242,14 @@ export class DfServiceDetailsComponent implements OnInit {
             ...data,
             config: data.config,
           });
-          if (!this.isAuth) {
+          if (data?.serviceDocByServiceId) {
+            this.serviceDefinitionType =
+              '' + data?.serviceDocByServiceId.format;
             this.getConfigControl('serviceDefinition').setValue(
               data.config.content
             );
           }
-          if (data?.serviceDocByServiceId) {
-            this.serviceDefinitionType =
-              '' + data?.serviceDocByServiceId.format;
+          if (!this.isAuth) {
             this.getConfigControl('serviceDefinition').setValue(
               data.config.content
             );
