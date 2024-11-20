@@ -69,6 +69,7 @@ import { CommonModule } from '@angular/common';
 export class DfRolesAccessComponent implements OnInit {
   @Input() formArray: FormArray;
   @Input() roleForm: FormGroup;
+  @Input() visible: boolean[];
   rootForm: FormGroup;
   serviceAccess: FormArray;
   dataSource: MatTableDataSource<any>;
@@ -268,8 +269,10 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   updateDataSource() {
-    if (!this.formArray) return;
-    this.dataSource = new MatTableDataSource(this.formArray.controls);
+    const visibleControls = this.formArray.controls.filter(
+      (control, index) => this.visible[index]
+    );
+    this.dataSource = new MatTableDataSource(visibleControls);
   }
 
   get hasServiceAccess() {
@@ -290,7 +293,7 @@ export class DfRolesAccessComponent implements OnInit {
         serviceAccess: new FormControl(''),
       })
     );
-
+    this.visible.push(true);
     this.updateDataSource();
   }
 
@@ -320,7 +323,9 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   remove(index: number) {
-    this.formArray.removeAt(index);
+    if (index >= 0 && index < this.formArray.length) {
+      this.visible[index] = false;
+    }
     this.updateDataSource();
   }
 
