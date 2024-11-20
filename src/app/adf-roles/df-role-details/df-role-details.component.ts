@@ -60,6 +60,7 @@ export class DfRoleDetailsComponent implements OnInit {
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
+  visibilityArray: boolean[] = [];
 
   constructor(
     @Inject(ROLE_SERVICE_TOKEN)
@@ -100,6 +101,7 @@ export class DfRoleDetailsComponent implements OnInit {
           this.filterOp = data.roleServiceAccessByRoleId[0].filterOp;
           data.roleServiceAccessByRoleId.forEach(
             (item: RoleServiceAccessType) => {
+              this.visibilityArray.push(true);
               const advancedFilters = new FormArray(
                 (item.filters || []).map(
                   (each: any) =>
@@ -266,7 +268,7 @@ export class DfRoleDetailsComponent implements OnInit {
       description: formValue.description,
       isActive: formValue.active,
       roleServiceAccessByRoleId: formValue.serviceAccess.map(
-        (val: AccessForm) => {
+        (val: AccessForm, index: number) => {
           const filtersArray = val.advancedFilters.map((filter: any) => ({
             name: filter.expandField,
             operator: filter.expandOperator,
@@ -275,8 +277,10 @@ export class DfRoleDetailsComponent implements OnInit {
           const filterOp = val.advancedFilters.map(
             (filter: any) => filter.filterOp
           );
+          const roleId = this.visibilityArray[index] ? formValue.id : null;
           return {
             id: val.id,
+            roleId: roleId,
             serviceId: val.service === 0 ? null : val.service,
             component: val.component,
             verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
