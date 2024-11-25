@@ -114,6 +114,7 @@
     "javascript": "JavaScript",
     "php": "PHP",
     "python": "Python",
+    "python3": "Python3",
     "nodejs": "Node.js"
   },
   "nav": {

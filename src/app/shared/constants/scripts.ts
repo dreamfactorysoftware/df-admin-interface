@@ -13,8 +13,8 @@ export const SCRIPT_TYPES = [
     extension: 'php',
   },
   {
-    label: translate('scriptTypes.python'),
-    value: AceEditorMode.PYTHON,
+    label: translate('scriptTypes.python3'),
+    value: AceEditorMode.PYTHON3,
     extension: 'py',
   },
 ];
