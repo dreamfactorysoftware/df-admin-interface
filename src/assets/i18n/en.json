@@ -374,14 +374,12 @@
   },
   "paywall": {
     "header": "Access to this feature is available via our commercial product.",
-    "subheader": "Gain access to the features you want now. No credit card required.",
-    "hostedTrial": "Are you currently on a hosted trial?",
-    "bookTime": "Book some time with our team below and gain access to enterprise features including restricted administrators, request limiting, API scheduling, and lifecycle reporting.",
-    "ossVersion": "Using our OSS version?",
-    "signup": "Sign up for a ",
-    "trial": "free hosted trial",
-    "gain": " and gain access to additional connectors, or schedule time with our team below to install an on-premise enterprise instance and test all enterprise features.",
-    "speakToHuman": "Speak to a human"
+    "subheader": "Gain access to the features you want now.",
+    "hostedTrial": "What is in the commercial tool?",
+    "bookTime": "A comprehensive matrix of all the features in our commercial offering can be found <a href=\"https://dreamfactory.com\" target=\"_blank\">here</a> on our website.",
+    "learnMoreTitle": "Want to learn more?",
+    "gain": "Schedule time with our team to discuss enterprise features including restricted administrators, request limiting, API scheduling, and lifecycle reporting.",
+    "speakToHuman": "Free consultation with an engineer"
   },
   "language": "Change language",
   "languages": {
