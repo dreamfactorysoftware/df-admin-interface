@@ -174,6 +174,31 @@ $red-palette: mat.define-palette(mat.$red-palette);
       .expansion-panel {
         background-color: #f6f2fa;
       }
+      &.commercial-feature {
+        opacity: 0.7;
+        position: relative;
+        
+        &::after {
+          content: '';
+          background-image: url('/assets/img/lock-icon.svg');
+          background-size: contain;
+          width: 14px;
+          height: 14px;
+          position: absolute;
+          right: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          opacity: 0.6;
+        }
+
+        &:hover {
+          opacity: 1;
+          
+          &::after {
+            opacity: 0.8;
+          }
+        }
+      }
     }
   }
   .sidenav-content {
