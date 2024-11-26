@@ -177,7 +177,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
       &.commercial-feature {
         opacity: 0.7;
         position: relative;
-        
+
         &::after {
           content: '';
           background-image: url('/assets/img/lock-icon.svg');
@@ -193,7 +193,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
 
         &:hover {
           opacity: 1;
-          
+
           &::after {
             opacity: 0.8;
           }
