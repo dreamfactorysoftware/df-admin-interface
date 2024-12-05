@@ -159,7 +159,6 @@ export class DfServiceDetailsComponent implements OnInit {
         )
       )
       .subscribe(({ env, route }) => {
-        console.log(route['groups'][0]);
         if (route['groups'] && route['groups'][0] === 'Database') {
           this.isDatabase = true;
         }
@@ -390,12 +389,19 @@ export class DfServiceDetailsComponent implements OnInit {
   getControl(name: string) {
     return this.serviceForm.controls[name] as FormControl;
   }
+  warnings: string[] = [];
 
   save(Cache: boolean, Continue: boolean) {
     const data = this.serviceForm.getRawValue();
     if (data.type === '' || data.name === '') {
       return;
     }
+    if (!this.validateServiceName(data.name)) {
+      console.warn(this.warnings);
+    }
+
+    const formattedName = this.formatServiceName(data.name);
+    this.serviceForm.patchValue({ name: formattedName });
     type Params = {
       snackbarError?: string;
       snackbarSuccess?: string;
@@ -550,6 +556,24 @@ export class DfServiceDetailsComponent implements OnInit {
           }
         });
     }
+  }
+
+  validateServiceName(name: string): boolean {
+    const regex = /^[a-zA-Z0-9_]+$/; // Example regex for valid characters
+    if (!regex.test(name)) {
+      this.warnings.push(
+        'Service name can only contain letters, numbers, and underscores.'
+      );
+      return false;
+    }
+    return true;
+  }
+
+  formatServiceName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[^a-z0-9_]/g, '');
   }
 
   gotoSchema() {
