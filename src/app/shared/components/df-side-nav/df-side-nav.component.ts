@@ -43,6 +43,7 @@ import { DfThemeToggleComponent } from '../df-theme-toggle/df-theme-toggle.compo
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
+import { DfPaywallService } from '../../services/df-paywall.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
@@ -99,7 +100,8 @@ export class DfSideNavComponent implements OnInit {
     private transloco: TranslocoService,
     private themeService: DfThemeService,
     private searchService: DfSearchService,
-    private snackbarService: DfSnackbarService
+    private snackbarService: DfSnackbarService,
+    private paywallService: DfPaywallService
   ) {}
 
   ngOnInit(): void {
@@ -217,5 +219,9 @@ export class DfSideNavComponent implements OnInit {
 
   get availableLanguages() {
     return this.transloco.getAvailableLangs() as string[];
+  }
+
+  isCommercialFeature(route: string): boolean {
+    return this.paywallService.isCommercialFeature(route);
   }
 }

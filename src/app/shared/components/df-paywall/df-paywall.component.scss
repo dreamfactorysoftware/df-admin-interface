@@ -2,19 +2,42 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
 .calendly-inline-widget {
   min-width: 320px;
   width: 100%;
-  height: 100%;
+  height: 700px;
+  margin: 20px 0;
 }
+
 .details-section {
   margin: 32px 0;
   max-width: 690px;
+  width: 100%;
 }
+
+.info-columns {
+  display: flex;
+  gap: 32px;
+  justify-content: space-between;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+}
+
+.info-column {
+  flex: 1;
+  min-width: 0;
+}
+
 .paywall-contact {
   width: 100%;
   text-align: center;
-  padding-bottom: 32px;
+  padding: 32px 0;
+  margin-top: 20px;
 }

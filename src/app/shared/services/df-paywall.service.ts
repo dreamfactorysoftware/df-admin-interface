@@ -7,6 +7,17 @@ import { DfErrorService } from './df-error.service';
   providedIn: 'root',
 })
 export class DfPaywallService {
+  private commercialFeatures = [
+    'event-scripts',
+    'rate-limiting',
+    'scheduler',
+    'reporting',
+  ];
+
+  isCommercialFeature(route: string): boolean {
+    return this.commercialFeatures.some(feature => route.includes(feature));
+  }
+
   constructor(
     private systemConfigDataService: DfSystemConfigDataService,
     private errorService: DfErrorService

@@ -6,19 +6,15 @@
       <h2>{{ 'paywall.header' | transloco }}</h2>
       <h2>{{ 'paywall.subheader' | transloco }}</h2>
       <div class="details-section">
-        <div class="dynamic-width">
-          <h4>{{ 'paywall.hostedTrial' | transloco }}</h4>
-          <p>{{ 'paywall.bookTime' | transloco }}</p>
-        </div>
-        <div class="dynamic-width">
-          <h4>{{ 'paywall.ossVersion' | transloco }}</h4>
-          <p>
-            {{ 'paywall.signup' | transloco }}<a
-              href="https://genie.dreamfactory.com/?utm_source=platform&utm_medium=paywall&utm_campaign=hosted"
-              target="_blank"
-              >{{ 'paywall.trial' | transloco }}</a
-            >{{ 'paywall.gain' | transloco }}
-          </p>
+        <div class="info-columns">
+          <div class="info-column">
+            <h4>{{ 'paywall.hostedTrial' | transloco }}</h4>
+            <p [innerHTML]="'paywall.bookTime' | transloco"></p>
+          </div>
+          <div class="info-column">
+            <h4>{{ 'paywall.learnMoreTitle' | transloco }}</h4>
+            <p>{{ 'paywall.gain' | transloco }}</p>
+          </div>
         </div>
       </div>
       <h2>{{ 'paywall.speakToHuman' | transloco }}</h2>
@@ -29,7 +25,7 @@
       >
       |
       <a href="mailto:info@dreamfactory.com">
-        {{ 'email' | transloco }}: info\&#64;dreamfactory.com
+        {{ 'email' | transloco }}: info&#64;dreamfactory.com
       </a>
     </h3>
     <div #calendlyWidget class="calendly-inline-widget"></div>
