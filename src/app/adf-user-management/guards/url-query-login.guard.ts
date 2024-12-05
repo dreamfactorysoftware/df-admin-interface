@@ -10,7 +10,7 @@ export const urlQueryLoginGuard = (next: ActivatedRouteSnapshot) => {
   const sessionToken = next.queryParams['session_token'];
 
   if (sessionToken) {
-    return authService.loginWithToken(sessionToken).pipe(
+    return authService.loginWithToken().pipe(
       map(() => {
         router.navigate([]);
         return false;
