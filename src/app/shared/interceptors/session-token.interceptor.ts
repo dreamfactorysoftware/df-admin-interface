@@ -16,15 +16,9 @@ export const sessionTokenInterceptor: HttpInterceptorFn = (
   next: HttpHandlerFn
 ) => {
   if (req.url.startsWith('/api')) {
-    const isApiDocs =
-      req.urlWithParams.includes('swagger') ||
-      req.url.includes('service_type') ||
-      req.url.includes('api_docs');
     req = req.clone({
       setHeaders: {
-        [API_KEY_HEADER]: isApiDocs
-          ? environment.dfApiDocsApiKey
-          : environment.dfAdminApiKey,
+        [API_KEY_HEADER]: environment.dfAdminApiKey
       },
     });
     const userDataService = inject(DfUserDataService);
