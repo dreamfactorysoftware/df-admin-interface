@@ -439,11 +439,12 @@ export class DfServiceDetailsComponent implements OnInit {
         data.service_doc_by_service_id = null;
       } else {
         data.config.content = data.config.serviceDefinition;
-        data.service_doc_by_service_id.format = Number(
-          this.serviceDefinitionType
-        );
         if (data.service_doc_by_service_id.content === '') {
           data.service_doc_by_service_id = null;
+        } else {
+          data.service_doc_by_service_id.format = this.serviceDefinitionType
+            ? Number(this.serviceDefinitionType)
+            : 0;
         }
         delete data.config.serviceDefinition;
       }
