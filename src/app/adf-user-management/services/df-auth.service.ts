@@ -69,7 +69,7 @@ export class DfAuthService {
     return of(false);
   }
 
-  loginWithToken() {
+  loginWithToken(jwt?: string) {
     return this.http
       .get<UserSession>(URLS.USER_SESSION, {
         headers: SHOW_LOADING_HEADER,
