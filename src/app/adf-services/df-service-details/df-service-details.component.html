@@ -374,6 +374,7 @@
         <ng-container *ngIf="this.isNetworkService || this.isScriptService">
           <ng-container *ngIf="getConfigControl('storageServiceId')">
             <df-script-editor
+              [isScript]="this.isScriptService"
               [type]="getControl('type')"
               [storageServiceId]="getConfigControl('storageServiceId')"
               [storagePath]="getConfigControl('storagePath')"

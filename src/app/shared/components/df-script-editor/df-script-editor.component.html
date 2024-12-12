@@ -52,9 +52,11 @@
       {{ 'scripts.deleteCache' | transloco }}
     </button>
   </div>
-
-  <df-ace-editor
-    class="full-width"
-    [formControl]="content"
-    [mode]="type.getRawValue()"></df-ace-editor>
+  <div class="content">
+    <span *ngIf="isScript">Script Contents</span>
+    <df-ace-editor
+      class="full-width"
+      [formControl]="content"
+      [mode]="type.getRawValue()"></df-ace-editor>
+  </div>
 </div>
