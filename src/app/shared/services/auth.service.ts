@@ -15,7 +15,7 @@ export class AuthService {
 
   loginWithJwt(jwt: string): Observable<any> {
     return this.dfAuthService
-      .loginWithToken(jwt)
+      .loginWithToken()
       .pipe(tap(user => (this.dfUserDataService.userData = user)));
   }
 

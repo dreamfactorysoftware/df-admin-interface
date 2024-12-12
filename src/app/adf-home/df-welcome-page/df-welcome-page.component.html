@@ -1,78 +1,159 @@
 <ng-container
   *ngIf="{
-    isFirstTimeUser: isFirstTimeUser$ | async
+    isFirstTimeUser: isFirstTimeUser$ | async,
+    apiKeyNum: apiKeyNum$ | async,
+    latestVideoLink: latestVideoLink$ | async
   } as data">
   <div [class]="(isDarkMode | async) ? 'dark-theme' : ''">
-    <section
-      class="two-column-flex-container"
-      [class.mobile]="breakpointService.isSmallScreen | async">
-      <article class="flex-column">
-        <article>
-          <h2>
-            {{ 'home.welcomePage.welcomeHeading' | transloco }}
-          </h2>
-          <p id="get-started-links">
-            {{ 'home.welcomePage.welcomeSubHeading' | transloco }}
-          </p>
-          <ul aria-labelledby="get-started-links">
-            <li *ngFor="let resource of welcomePageResources">
-              <ng-container *ngIf="data.isFirstTimeUser; else notFirst">
-                <df-icon-link [linkItem]="resource"></df-icon-link>
-              </ng-container>
-              <ng-template #notFirst>
-                <ng-container
-                  *ngIf="
-                    resource.name === 'home.resourceLinks.fullDocumentation' ||
-                    resource.name === 'home.resourceLinks.blog' ||
-                    resource.name === 'home.resourceLinks.contactSupport'
-                  "
-                  ><df-icon-link [linkItem]="resource"></df-icon-link
-                ></ng-container>
-              </ng-template>
-            </li>
-          </ul>
-        </article>
-      </article>
-      <aside class="flex-column">
-        <div class="video-link">
-          <a
-            href="https://youtu.be/FOSOm88RxPw"
-            target="_blank"
-            aria-labelledby="video-link-description">
-            <img
-              class="video-image"
-              src="assets/img/macbook-hp-df-1.png"
-              alt="" />
-            <div class="video-overlay">
-              <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
-              <span id="video-link-description">{{
-                'home.welcomePage.watchVideoCta' | transloco
-              }}</span>
-            </div>
-          </a>
-        </div>
-        <!-- <mat-card class="notice-card">
-          <h3>
-            <fa-icon
-              [icon]="faHeart"
-              class="pre-heading-icon"
-              aria-hidden="true"></fa-icon
-            >{{ 'home.welcomePage.ossUsersHeading' | transloco }}
-          </h3>
-          <p [innerHtml]="'home.welcomePage.ossUsersText' | transloco"></p>
+    <section>
+      <h2>Connections</h2>
+      <div class="connection-container">
+        <mat-card
+          class="connection-card release-card"
+          [style]="{ 'word-break': 'break-all' }">
+          <mat-card-header>
+            <mat-card-subtitle class="title"
+              >Database<br />
+              Connections</mat-card-subtitle
+            >
+          </mat-card-header>
+          <mat-card-content>
+            <br />
+            <p
+              class="num"
+              *ngIf="getServiceCardByName('Database Connections') as card">
+              {{ card.num }}
+            </p>
+          </mat-card-content>
         </mat-card>
-
-        <mat-card class="notice-card">
-          <h3>
-            <fa-icon
-              [icon]="faComment"
-              class="pre-heading-icon"
-              aria-hidden="true"></fa-icon
-            >{{ 'home.welcomePage.hearFromYouHeading' | transloco }}
-          </h3>
-          <p [innerHtml]="'home.welcomePage.hearFromYouText' | transloco"></p>
-        </mat-card> -->
-      </aside>
+        <mat-card
+          class="connection-card release-card"
+          [style]="{ 'word-break': 'break-all' }">
+          <mat-card-header>
+            <mat-card-subtitle class="title">API Keys</mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <br />
+            <p class="num">{{ data.apiKeyNum }}</p>
+          </mat-card-content>
+        </mat-card>
+        <mat-card
+          class="connection-card release-card"
+          [style]="{ 'word-break': 'break-all' }">
+          <mat-card-header>
+            <mat-card-subtitle class="title">Scripting </mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <br />
+            <p class="num" *ngIf="getServiceCardByName('Scripting') as card">
+              {{ card.num }}
+            </p>
+          </mat-card-content>
+        </mat-card>
+        <mat-card
+          class="connection-card release-card"
+          [style]="{ 'word-break': 'break-all' }">
+          <mat-card-header>
+            <mat-card-subtitle class="title"
+              >Network<br />
+              Connection</mat-card-subtitle
+            >
+          </mat-card-header>
+          <mat-card-content>
+            <br />
+            <p
+              class="num"
+              *ngIf="getServiceCardByName('Network Connections') as card">
+              {{ card.num }}
+            </p>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </section>
+    <section>
+      <h2>News</h2>
+      <div class="news-container">
+        <div class="main-content">
+          <mat-card
+            class="full-width news-card release-card"
+            [style]="{ 'word-break': 'break-all' }">
+            <mat-card-header>
+              <mat-card-subtitle class="title"
+                >DreamFactory <br />Documentation</mat-card-subtitle
+              >
+            </mat-card-header>
+            <mat-card-content>
+              <br /><a
+                href="https://wiki.dreamfactory.com/"
+                target="_blank"
+                class="link"
+                >View</a
+              ></mat-card-content
+            >
+          </mat-card>
+          <mat-card
+            class="full-width news-card release-card"
+            [style]="{ 'word-break': 'break-all' }">
+            <mat-card-header>
+              <mat-card-subtitle class="title"
+                >DreamFactory <br />Blog</mat-card-subtitle
+              >
+            </mat-card-header>
+            <mat-card-content>
+              <br />
+              <a
+                href="https://blog.dreamfactory.com/"
+                target="_blank"
+                class="link"
+                >View</a
+              ></mat-card-content
+            >
+          </mat-card>
+          <mat-card
+            class="full-width news-card release-card"
+            [style]="{ 'word-break': 'break-all' }">
+            <mat-card-header>
+              <mat-card-subtitle class="title"
+                >DreamFactory <br />Guide</mat-card-subtitle
+              >
+            </mat-card-header>
+            <mat-card-content>
+              <br /><a
+                href="https://guide.dreamfactory.com"
+                target="_blank"
+                class="link"
+                >View</a
+              ></mat-card-content
+            >
+          </mat-card>
+          <mat-card
+            class="full-width news-card release-card"
+            [style]="{ 'word-break': 'break-all' }">
+            <mat-card-header>
+              <mat-card-subtitle class="title"
+                >Contact Support</mat-card-subtitle
+              >
+            </mat-card-header>
+            <mat-card-content
+              ><br /><a
+                href="https://www.dreamfactory.com/support"
+                target="_blank"
+                class="link"
+                >View</a
+              ></mat-card-content
+            >
+          </mat-card>
+        </div>
+        <div *ngIf="data.latestVideoLink">
+          <iframe
+            id="youtube_video"
+            width="560"
+            height="315"
+            frameborder="0"
+            allowfullscreen
+            [src]="data.latestVideoLink"></iframe>
+        </div>
+      </div>
     </section>
     <section class="platforms-section">
       <div>

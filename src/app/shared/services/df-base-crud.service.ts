@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { RequestOptions } from 'src/app/shared/types/generic-http';
 import { readAsText } from 'src/app/shared/utilities/file';
 import { map, switchMap } from 'rxjs';
@@ -21,6 +21,29 @@ export class DfBaseCrudService {
         includeCount: true,
         ...options,
       })
+    );
+  }
+
+  getCustomData<T>(url: string, options?: Partial<RequestOptions>) {
+    return this.http.get<T>(
+      url,
+      this.getOptions({
+        limit: 50,
+        offset: 0,
+        includeCount: true,
+        ...options,
+      })
+    );
+  }
+
+  getLatestVideo() {
+    const channelID = 'UCZEEBhAmBWMi8x9diJK5Pyw';
+    const reqURL = 'https://api.rss2json.com/v1/api.json?rss_url=';
+
+    return this.http.get(
+      `${reqURL}${encodeURIComponent(
+        'https://www.youtube.com/feeds/videos.xml?channel_id='
+      )}${channelID}`
     );
   }
 
