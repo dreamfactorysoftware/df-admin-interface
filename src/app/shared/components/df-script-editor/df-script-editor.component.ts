@@ -50,6 +50,7 @@ import { DfThemeService } from '../../services/df-theme.service';
   ],
 })
 export class DfScriptEditorComponent implements OnInit {
+  @Input() isScript: boolean;
   @Input() cache: string;
   @Input({ required: true }) type: FormControl;
   @Input({ required: true }) storageServiceId: FormControl;
