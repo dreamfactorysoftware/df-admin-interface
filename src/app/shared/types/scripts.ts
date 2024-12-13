@@ -38,7 +38,7 @@ export enum AceEditorMode {
   NODEJS = 'nodejs',
   PHP = 'php',
   PYTHON = 'python',
-  PYTHON3 = 'python',
+  PYTHON3 = 'python3',
   JAVASCRIPT = 'javascript',
 }
 
