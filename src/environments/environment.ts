@@ -1,4 +1,6 @@
 export const environment = {
   production: false,
-  apiUrl: '/api/v2',
+  dfAdminApiKey: '',
+  dfApiDocsApiKey: '',
+  dfFileManagerApiKey: '',
 };
