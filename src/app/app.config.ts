@@ -15,7 +15,7 @@ export const appConfig: ApplicationConfig = {
     importProvidersFrom(TranslocoRootModule),
     {
       provide: DF_PAYWALL_SERVICE_TOKEN,
-      useClass: DfPaywallService
-    }
-  ]
-}; 
+      useClass: DfPaywallService,
+    },
+  ],
+};

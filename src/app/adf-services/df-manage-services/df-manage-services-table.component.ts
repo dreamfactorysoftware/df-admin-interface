@@ -90,9 +90,10 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
 
   override mapDataToTable(data: any[]): ServiceRow[] {
     // Skip event scripts request if we're only looking at API Types
-    const isApiTypesOnly = this.serviceTypes.length === 1 && 
+    const isApiTypesOnly =
+      this.serviceTypes.length === 1 &&
       this.serviceTypes[0].name === 'api_type';
-      
+
     // Map the data without checking event scripts for API Types
     return data.map(service => ({
       id: service.id,
@@ -130,7 +131,7 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
     filter = `${filter ? `${filter} and ` : ''}(created_by_id is${
       !this.system ? ' not ' : ' '
     }null)`;
-    
+
     this.serviceService
       .getAll<GenericListResponse<Service>>({
         limit,
@@ -140,11 +141,12 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
       })
       .subscribe(data => {
         const mappedData = this.mapDataToTable(data.resource);
-        
+
         // Only make event scripts request if not viewing API Types
-        const isApiTypesOnly = this.serviceTypes.length === 1 && 
+        const isApiTypesOnly =
+          this.serviceTypes.length === 1 &&
           this.serviceTypes[0].name === 'api_type';
-          
+
         if (!isApiTypesOnly) {
           this.serviceService
             .getEventScripts<GenericListResponse<Service>>()

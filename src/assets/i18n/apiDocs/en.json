@@ -8,5 +8,9 @@
       "type": "Type"
     }
   },
-  "downloadApiDoc": "Download Api Documentation"
+  "downloadApiDoc": "Download Api Documentation",
+  "apiKeys": {
+    "label": "Available API Keys",
+    "copied": "API Key copied to clipboard"
+  }
 }

@@ -7,7 +7,7 @@ import {
   translocoConfig,
   TranslocoModule,
   TRANSLOCO_TRANSPILER,
-  DefaultTranspiler
+  DefaultTranspiler,
 } from '@ngneat/transloco';
 import { Injectable, NgModule } from '@angular/core';
 import { environment } from '../environments/environment';
@@ -22,7 +22,7 @@ export class TranslocoHttpLoader implements TranslocoLoader {
 }
 
 @NgModule({
-  exports: [ TranslocoModule ],
+  exports: [TranslocoModule],
   providers: [
     {
       provide: TRANSLOCO_CONFIG,
@@ -32,10 +32,10 @@ export class TranslocoHttpLoader implements TranslocoLoader {
         fallbackLang: 'en',
         reRenderOnLangChange: true,
         prodMode: environment.production,
-      })
+      }),
     },
     { provide: TRANSLOCO_LOADER, useClass: TranslocoHttpLoader },
-    { provide: TRANSLOCO_TRANSPILER, useClass: DefaultTranspiler }
-  ]
+    { provide: TRANSLOCO_TRANSPILER, useClass: DefaultTranspiler },
+  ],
 })
-export class TranslocoRootModule {} 
+export class TranslocoRootModule {}

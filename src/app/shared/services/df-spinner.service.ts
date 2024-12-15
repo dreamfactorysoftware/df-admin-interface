@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class DfSpinnerService {
   private activeSpinnerSubject = new BehaviorSubject<boolean>(false);
@@ -15,4 +15,4 @@ export class DfSpinnerService {
   hide() {
     this.activeSpinnerSubject.next(false);
   }
-} 
+}

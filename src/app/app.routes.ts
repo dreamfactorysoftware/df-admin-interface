@@ -16,7 +16,7 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./adf-user-management/df-login/df-login.component').then(
         m => m.DfLoginComponent
-      )
+      ),
   },
   // Add other routes as needed
-]; 
+];

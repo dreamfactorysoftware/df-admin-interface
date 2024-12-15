@@ -48,7 +48,7 @@ import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
 import { DfFileGithubComponent } from 'src/app/shared/components/df-file-github/df-file-github.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
-import { map, switchMap } from 'rxjs';
+import { map, switchMap, catchError, mergeMap, of, throwError } from 'rxjs';
 import {
   GOLD_SERVICES,
   SILVER_SERVICES,
@@ -62,6 +62,9 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { readAsText } from '../../shared/utilities/file';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
+import { BASE_URL } from 'src/app/shared/constants/urls';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { DfCurrentServiceService } from 'src/app/shared/services/df-current-service.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -95,7 +98,7 @@ import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
     MatStepperModule,
     CommonModule,
     MatIconModule,
-    MatButtonToggleModule,
+    MatButtonToggleModule
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -127,7 +130,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private http: HttpClient,
     public dialog: MatDialog,
     private themeService: DfThemeService,
-    private snackbarService: DfSnackbarService
+    private snackbarService: DfSnackbarService,
+    private currentServiceService: DfCurrentServiceService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -543,17 +547,46 @@ export class DfServiceDetailsComponent implements OnInit {
         });
     } else {
       this.servicesService
-        .create(
+        .create<ServiceResponse>(
           {
             resource: [payload],
           },
           params
         )
-        .subscribe(() => {
-          if (data.type.toLowerCase().includes('saml')) {
-            this.router.navigate(['../'], { relativeTo: this.activatedRoute });
-          } else {
-            this.router.navigate([`/api-connections/api-docs/${data.name}`]);
+        .pipe(
+          // After creating the service, test the connection for database services
+          switchMap((response: ServiceResponse) => {
+            if (this.isDatabase) {
+              // Test database connection by requesting schema
+              return this.http.get(`${BASE_URL}/${formattedName}/_schema`).pipe(
+                map(() => response), // If successful, pass through the original response
+                catchError(error => {
+                  // If connection fails, delete the service and show error
+                  return this.servicesService.delete(response.resource[0].id).pipe(
+                    mergeMap(() => {
+                      return throwError(() => new Error('Database connection failed. Please check your connection details.'));
+                    })
+                  );
+                })
+              );
+            }
+            return of(response);
+          })
+        )
+        .subscribe({
+          next: () => {
+            if (data.type.toLowerCase().includes('saml')) {
+              this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+            } else {
+              this.router.navigate([`/api-connections/api-docs/${formattedName}`]);
+            }
+          },
+          error: (error) => {
+            // Use openSnackBar instead of error
+            this.snackbarService.openSnackBar(
+              error.message || 'Failed to create service',
+              'error'
+            );
           }
         });
     }
@@ -584,6 +617,7 @@ export class DfServiceDetailsComponent implements OnInit {
 
   gotoAPIDocs() {
     const data = this.serviceForm.getRawValue();
+    this.currentServiceService.setCurrentServiceId(this.serviceData.id);
     this.router.navigate([`/api-connections/api-docs/${data.name}`]);
   }
 
@@ -649,4 +683,12 @@ export class DfPaywallModal {
       autoLoad: false,
     });
   }
+}
+
+interface ServiceResponse {
+  resource: Array<{
+    id: number;
+    name: string;
+    [key: string]: any;
+  }>;
 }
