@@ -11,16 +11,16 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  
+
   .key-info {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    
+
     .key-name {
       font-weight: 500;
     }
-    
+
     .key-preview {
       font-size: 0.85em;
       color: rgba(0, 0, 0, 0.6);
@@ -32,7 +32,7 @@
 .api-keys-container {
   margin: 16px 0;
   max-width: 400px;
-  
+
   .api-keys-select {
     width: 100%;
   }

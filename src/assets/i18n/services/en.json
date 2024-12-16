@@ -19,7 +19,9 @@
     "description": {
       "label": "Description",
       "tooltip": "Write a brief description of the API (optional)."
-    }
+    },
+    "createAndTest": "Create & Test",
+    "securityConfig": "Security Config"
   },
   "deleteSuccessMsg": "Service successfully deleted",
   "createSuccessMsg": "Service successfully created",

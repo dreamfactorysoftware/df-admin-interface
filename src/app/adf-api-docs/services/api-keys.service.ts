@@ -1,6 +1,13 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, map, switchMap, forkJoin, of } from 'rxjs';
+import {
+  BehaviorSubject,
+  Observable,
+  map,
+  switchMap,
+  forkJoin,
+  of,
+} from 'rxjs';
 import { URLS } from 'src/app/shared/constants/urls';
 import { ApiKeyInfo, ServiceApiKeys } from 'src/app/shared/types/api-keys';
 
@@ -45,7 +52,7 @@ interface AppsResponse {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ApiKeysService {
   private serviceApiKeysCache = new Map<number, ServiceApiKeys>();
@@ -66,52 +73,56 @@ export class ApiKeysService {
       }
     }
 
-    return this.http.get<RolesResponse>(`${URLS.ROLES}?related=role_service_access_by_role_id`).pipe(
-      switchMap((roles) => {
-        const relevantRoles = roles.resource.filter(role => {
-          if (!role.roleServiceAccessByRoleId) {
-            return false;
-          }
-          
-          return role.roleServiceAccessByRoleId.some(access => 
-            access.serviceId === serviceId
-          );
-        });
-
-        if (!relevantRoles.length) {
-          return of([]);
-        }
-
-        const appRequests = relevantRoles.map(role => 
-          this.http.get<AppsResponse>(`${URLS.APP}`, {
-            params: {
-              filter: `role_id=${role.id}`,
-              fields: '*'
+    return this.http
+      .get<RolesResponse>(
+        `${URLS.ROLES}?related=role_service_access_by_role_id`
+      )
+      .pipe(
+        switchMap(roles => {
+          const relevantRoles = roles.resource.filter(role => {
+            if (!role.roleServiceAccessByRoleId) {
+              return false;
             }
-          })
-        );
 
-        return forkJoin(appRequests).pipe(
-          map((appsResponses) => {
-            const keys: ApiKeyInfo[] = appsResponses
-              .flatMap(response => response.resource)
-              .filter((app): app is App => !!app && !!app.apiKey)
-              .map(app => ({
-                name: app.name,
-                apiKey: app.apiKey
-              }));
+            return role.roleServiceAccessByRoleId.some(
+              access => access.serviceId === serviceId
+            );
+          });
 
-            this.serviceApiKeysCache.set(serviceId, { serviceId, keys });
-            this.currentServiceKeys.next(keys);
-            return keys;
-          })
-        );
-      })
-    );
+          if (!relevantRoles.length) {
+            return of([]);
+          }
+
+          const appRequests = relevantRoles.map(role =>
+            this.http.get<AppsResponse>(`${URLS.APP}`, {
+              params: {
+                filter: `role_id=${role.id}`,
+                fields: '*',
+              },
+            })
+          );
+
+          return forkJoin(appRequests).pipe(
+            map(appsResponses => {
+              const keys: ApiKeyInfo[] = appsResponses
+                .flatMap(response => response.resource)
+                .filter((app): app is App => !!app && !!app.apiKey)
+                .map(app => ({
+                  name: app.name,
+                  apiKey: app.apiKey,
+                }));
+
+              this.serviceApiKeysCache.set(serviceId, { serviceId, keys });
+              this.currentServiceKeys.next(keys);
+              return keys;
+            })
+          );
+        })
+      );
   }
 
   clearCache() {
     this.serviceApiKeysCache.clear();
     this.currentServiceKeys.next([]);
   }
-} 
+}

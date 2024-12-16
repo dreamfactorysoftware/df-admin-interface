@@ -4,7 +4,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 const CURRENT_SERVICE_ID_KEY = 'currentServiceId';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class DfCurrentServiceService {
   private currentServiceId: BehaviorSubject<number>;
@@ -12,7 +12,9 @@ export class DfCurrentServiceService {
   constructor() {
     // Initialize with stored value or -1
     const storedId = localStorage.getItem(CURRENT_SERVICE_ID_KEY);
-    this.currentServiceId = new BehaviorSubject<number>(storedId ? parseInt(storedId, 10) : -1);
+    this.currentServiceId = new BehaviorSubject<number>(
+      storedId ? parseInt(storedId, 10) : -1
+    );
   }
 
   setCurrentServiceId(id: number) {
@@ -28,4 +30,4 @@ export class DfCurrentServiceService {
     localStorage.removeItem(CURRENT_SERVICE_ID_KEY);
     this.currentServiceId.next(-1);
   }
-} 
+}

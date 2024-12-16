@@ -6,4 +6,4 @@ export interface ApiKeyInfo {
 export interface ServiceApiKeys {
   serviceId: number;
   keys: ApiKeyInfo[];
-} 
+}

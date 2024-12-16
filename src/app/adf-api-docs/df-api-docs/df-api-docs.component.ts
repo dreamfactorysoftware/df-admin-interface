@@ -63,7 +63,7 @@ interface ServiceResponse {
     NgIf,
     NgFor,
     SlicePipe,
-    FontAwesomeModule
+    FontAwesomeModule,
   ],
 })
 export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
@@ -91,18 +91,23 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   ngOnInit(): void {
     // Get the service name from the route
     const serviceName = this.activatedRoute.snapshot.params['name'];
-    
+
     // First fetch the service ID by name
     if (serviceName) {
       this.subscriptions.push(
-        this.http.get<ServiceResponse>(`${BASE_URL}/system/service?filter=name=${serviceName}`).pipe(
-          map((response) => response?.resource?.[0]?.id || -1),
-          tap(id => {
-            if (id !== -1) {
-              this.currentServiceService.setCurrentServiceId(id);
-            }
-          })
-        ).subscribe()
+        this.http
+          .get<ServiceResponse>(
+            `${BASE_URL}/system/service?filter=name=${serviceName}`
+          )
+          .pipe(
+            map(response => response?.resource?.[0]?.id || -1),
+            tap(id => {
+              if (id !== -1) {
+                this.currentServiceService.setCurrentServiceId(id);
+              }
+            })
+          )
+          .subscribe()
       );
     }
 
@@ -125,12 +130,17 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
     // Subscribe to the current service ID once
     this.subscriptions.push(
-      this.currentServiceService.getCurrentServiceId().pipe(
-        distinctUntilChanged(),
-        switchMap(serviceId => this.apiKeysService.getApiKeysForService(serviceId))
-      ).subscribe(keys => {
-        this.apiKeys = keys;
-      })
+      this.currentServiceService
+        .getCurrentServiceId()
+        .pipe(
+          distinctUntilChanged(),
+          switchMap(serviceId =>
+            this.apiKeysService.getApiKeysForService(serviceId)
+          )
+        )
+        .subscribe(keys => {
+          this.apiKeys = keys;
+        })
     );
   }
 
@@ -179,7 +189,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   copyApiKey(key: string) {
     this.clipboard.copy(key);
     this.snackBar.open('API Key copied to clipboard', 'Close', {
-      duration: 3000
+      duration: 3000,
     });
   }
 }

@@ -5,7 +5,7 @@ import { DfCurrentServiceService } from 'src/app/shared/services/df-current-serv
 @Component({
   selector: 'df-api-docs-list',
   templateUrl: './df-api-docs-list.component.html',
-  styleUrls: ['./df-api-docs-list.component.scss']
+  styleUrls: ['./df-api-docs-list.component.scss'],
 })
 export class DfApiDocsListComponent implements OnInit {
   services: any[] = [];
@@ -30,4 +30,4 @@ export class DfApiDocsListComponent implements OnInit {
     this.currentServiceService.setCurrentServiceId(service.id);
     this.router.navigate([`/api-connections/api-docs/${service.name}`]);
   }
-} 
+}

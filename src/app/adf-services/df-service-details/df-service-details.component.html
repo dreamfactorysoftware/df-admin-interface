@@ -257,17 +257,167 @@
             (click)="goBack()">
             {{ 'cancel' | transloco }}
           </button>
-          <button class="save-btn" mat-flat-button color="primary">
-            {{ 'save' | transloco }}
-          </button>
+          <div class="button-group">
+            <button
+              mat-flat-button
+              class="save-btn secondary-btn"
+              type="button"
+              [disabled]="!serviceForm.valid"
+              (click)="goToSecurityConfig()">
+              {{ 'services.controls.securityConfig' | transloco }}
+            </button>
+            <button class="save-btn" mat-flat-button color="primary">
+              {{ 'services.controls.createAndTest' | transloco }}
+            </button>
+          </div>
         </div>
       </mat-step>
-      <!-- change default 'edit' & 'done' icon -->
+      <mat-step>
+        <ng-template matStepLabel>Security Configuration</ng-template>
+        <div class="details-section" *ngIf="showSecurityConfig">
+          <h3>Security Configuration</h3>
+          
+          <div class="security-config-container">
+            <div class="hint-widget top-hint">
+              <p>For more granular security options over your API check out the 
+                <a (click)="navigateToRoles($event)" class="role-link">Role Based Access</a> tab
+              </p>
+            </div>
+
+            <!-- Main security cards layout -->
+            <div class="security-cards-grid">
+              <!-- All Access Card -->
+              <mat-card 
+                class="security-option-card" 
+                [class.selected]="selectedAccessType === 'all'"
+                (click)="selectAccessType('all')">
+                <mat-card-content>
+                  <h4>Full Access</h4>
+                  <p>Grant complete access to all database components</p>
+                </mat-card-content>
+                <div class="selection-indicator"></div>
+              </mat-card>
+
+              <!-- Schema Access Card -->
+              <mat-card 
+                class="security-option-card" 
+                [class.selected]="selectedAccessType === 'schema'"
+                (click)="selectAccessType('schema')">
+                <mat-card-content>
+                  <h4>Schema Access</h4>
+                  <p>Configure access to specific database schemas</p>
+                </mat-card-content>
+                <div class="selection-indicator"></div>
+              </mat-card>
+
+              <!-- Tables Access Card -->
+              <mat-card 
+                class="security-option-card" 
+                [class.selected]="selectedAccessType === 'tables'"
+                (click)="selectAccessType('tables')">
+                <mat-card-content>
+                  <h4>Tables Access</h4>
+                  <p>Manage access to individual database tables</p>
+                </mat-card-content>
+                <div class="selection-indicator"></div>
+              </mat-card>
+
+              <!-- Procedures Access Card -->
+              <mat-card 
+                class="security-option-card" 
+                [class.selected]="selectedAccessType === 'procedures'"
+                (click)="selectAccessType('procedures')">
+                <mat-card-content>
+                  <h4>Stored Procedures</h4>
+                  <p>Control access to stored procedures</p>
+                </mat-card-content>
+                <div class="selection-indicator"></div>
+              </mat-card>
+
+              <!-- Functions Access Card -->
+              <mat-card 
+                class="security-option-card" 
+                [class.selected]="selectedAccessType === 'functions'"
+                (click)="selectAccessType('functions')">
+                <mat-card-content>
+                  <h4>Functions</h4>
+                  <p>Set access levels for database functions</p>
+                </mat-card-content>
+                <div class="selection-indicator"></div>
+              </mat-card>
+            </div>
+
+            <!-- Component Selection (shows only when a specific access type is selected) -->
+            <div class="component-selection" *ngIf="selectedAccessType && selectedAccessType !== 'all'">
+              <h3>Security Configuration</h3>
+              <div class="access-level-section">
+                <div class="access-level-controls">
+                  <mat-button-toggle-group 
+                    #accessLevelGroup="matButtonToggleGroup"
+                    [value]="selectedAccessLevel"
+                    (change)="onAccessLevelSelect($event.value)">
+                    <mat-button-toggle value="read">
+                      <div class="toggle-content">
+                        <div class="toggle-text">
+                          <h4>Read Only</h4>
+                          <p>View access to data</p>
+                        </div>
+                      </div>
+                    </mat-button-toggle>
+                    <mat-button-toggle value="write">
+                      <div class="toggle-content">
+                        <div class="toggle-text">
+                          <h4>Read & Write</h4>
+                          <p>View and modify data</p>
+                        </div>
+                      </div>
+                    </mat-button-toggle>
+                    <mat-button-toggle value="full">
+                      <div class="toggle-content">
+                        <div class="toggle-text">
+                          <h4>Full Access</h4>
+                          <p>Complete control over data</p>
+                        </div>
+                      </div>
+                    </mat-button-toggle>
+                  </mat-button-toggle-group>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="action-container">
+            <button mat-button matStepperPrevious class="cancel-btn" type="button">
+              Back
+            </button>
+            <button 
+              mat-flat-button 
+              color="primary" 
+              type="button" 
+              [disabled]="!isSecurityConfigValid()"
+              (click)="saveSecurityConfig()">
+              Apply Security Configuration
+            </button>
+          </div>
+        </div>
+        <div class="details-section" *ngIf="!showSecurityConfig">
+          <p>Please complete the previous steps and click "Security Config" to configure security settings.</p>
+          <div class="action-container">
+            <div>
+              <button mat-button matStepperPrevious class="cancel-btn" type="button">
+                Back
+              </button>
+            </div>
+          </div>
+        </div>
+      </mat-step>
       <ng-template matStepperIcon="edit" let-index="index">
         <ng-container [ngSwitch]="index">
           <mat-icon *ngSwitchCase="0">1</mat-icon>
           <mat-icon *ngSwitchCase="1">2</mat-icon>
           <mat-icon *ngSwitchCase="2">3</mat-icon>
+          <mat-icon *ngSwitchCase="3">4</mat-icon>
         </ng-container>
       </ng-template>
       <ng-template matStepperIcon="done" let-index="index">
@@ -275,6 +425,7 @@
           <mat-icon *ngSwitchCase="0">1</mat-icon>
           <mat-icon *ngSwitchCase="1">2</mat-icon>
           <mat-icon *ngSwitchCase="2">3</mat-icon>
+          <mat-icon *ngSwitchCase="3">4</mat-icon>
         </ng-container>
       </ng-template>
     </mat-stepper>

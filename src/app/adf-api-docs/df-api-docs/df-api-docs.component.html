@@ -4,7 +4,7 @@
   <button class="cancel-btn" mat-raised-button (click)="goBackToList()">
     {{ 'goBack' | transloco }}
   </button>
-  
+
   <button class="save-btn" mat-raised-button (click)="downloadApiDoc()">
     {{ 'apiDocs.downloadApiDoc' | transloco }}
   </button>
@@ -19,9 +19,11 @@
         <div class="api-key-option">
           <div class="key-info">
             <span class="key-name">{{ key.name }}</span>
-            <span class="key-preview">{{ key.apiKey | slice:0:8 }}...</span>
+            <span class="key-preview">{{ key.apiKey | slice: 0 : 8 }}...</span>
           </div>
-          <button mat-icon-button (click)="$event.stopPropagation(); copyApiKey(key.apiKey)">
+          <button
+            mat-icon-button
+            (click)="$event.stopPropagation(); copyApiKey(key.apiKey)">
             <fa-icon [icon]="faCopy"></fa-icon>
           </button>
         </div>
