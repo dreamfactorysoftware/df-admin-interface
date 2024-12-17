@@ -148,18 +148,18 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
           this.serviceTypes[0].name === 'api_type';
 
         if (!isApiTypesOnly) {
-          this.serviceService
-            .getEventScripts<GenericListResponse<Service>>()
-            .subscribe(scriptsData => {
-              const scripts = scriptsData.resource;
-              mappedData.forEach(service => {
-                const match = scripts.find(script =>
-                  script.name.includes(service.name)
-                );
-                service.scripting = match ? match.name : 'not';
-              });
+          // this.serviceService
+          //   .getEventScripts<GenericListResponse<Service>>()
+          //   .subscribe(scriptsData => {
+          //     const scripts = scriptsData.resource;
+          //     mappedData.forEach(service => {
+          //       const match = scripts.find(script =>
+          //         script.name.includes(service.name)
+          //       );
+          //       service.scripting = match ? match.name : 'not';
+          //     });
               this.dataSource.data = mappedData;
-            });
+          //   });
         } else {
           this.dataSource.data = mappedData;
         }
