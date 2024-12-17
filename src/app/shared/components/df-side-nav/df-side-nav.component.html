@@ -149,11 +149,12 @@
 <ng-template #navList let-items>
   <ng-container *ngFor="let item of items">
     <div mat-list-item *ngIf="!item.subRoutes; else subRoutes">
-      <button
+      <a
         mat-flat-button
         class="nav-item"
         [class.active]="isActive(item)"
         [class.commercial-feature]="isCommercialFeature(item.path)"
+        [routerLink]="['/', item.path]"
         (click)="handleNavClick(item)">
         <span class="nav-item">
           <ng-container *ngIf="item?.icon">
@@ -161,7 +162,7 @@
           </ng-container>
           {{ navLabel(item.path) | transloco }}
         </span>
-      </button>
+      </a>
     </div>
     <ng-template #subRoutes>
       <mat-expansion-panel
