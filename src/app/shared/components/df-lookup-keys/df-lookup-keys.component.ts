@@ -52,6 +52,7 @@ export class DfLookupKeysComponent implements OnInit {
   faTrashCan = faTrashCan;
   faPlus = faPlus;
   @Input() showAccordion = true;
+  @Input() deletedIds: number[] = [];
 
   constructor(
     private rootFormGroup: FormGroupDirective,
@@ -79,6 +80,7 @@ export class DfLookupKeysComponent implements OnInit {
   add() {
     this.lookupKeys.push(
       new FormGroup({
+        isDelete: new FormControl(0),
         name: new FormControl('', Validators.required),
         value: new FormControl(''),
         private: new FormControl(false),
@@ -88,7 +90,12 @@ export class DfLookupKeysComponent implements OnInit {
   }
 
   remove(index: number) {
-    this.lookupKeys.removeAt(index);
+    const controlToRemove = this.lookupKeys.at(index);
+    const idToRemove = controlToRemove.get('id')?.value;
+    if (idToRemove) {
+      this.deletedIds.push(idToRemove);
+      this.lookupKeys.removeAt(index);
+    }
     this.updateDataSource();
   }
 }

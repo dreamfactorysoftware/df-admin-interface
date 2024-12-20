@@ -42,6 +42,7 @@ export class DfGlobalLookupKeysComponent implements OnInit {
       lookupKeys: this.fb.array([], [uniqueNameValidator]),
     });
   }
+  deletedIds: number[] = [];
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data }) => {
@@ -62,7 +63,7 @@ export class DfGlobalLookupKeysComponent implements OnInit {
 
   save() {
     if (this.lookupKeysForm.invalid || this.lookupKeysForm.pristine) {
-      return;
+      // return;
     }
 
     const createKeys: LookupKeyType[] = [];
@@ -95,6 +96,18 @@ export class DfGlobalLookupKeysComponent implements OnInit {
           this.crudService
             .update(item.id, item, {
               snackbarSuccess: 'lookupKeys.alerts.updateSuccess',
+            })
+            .subscribe();
+        }
+      });
+    }
+
+    if (this.deletedIds.length > 0) {
+      this.deletedIds.forEach((id: number) => {
+        if (id) {
+          this.crudService
+            .delete(id, {
+              snackbarSuccess: 'lookupKeys.alerts.deletesSuccess',
             })
             .subscribe();
         }

@@ -1,9 +1,6 @@
 <p>{{ 'lookupKeys.fullDesc' | transloco }}</p>
 <form [formGroup]="lookupKeysForm" (ngSubmit)="save()">
-  <df-lookup-keys
-    [showAccordion]="false"
-    formArrayName="lookupKeys"></df-lookup-keys>
-
+  <df-lookup-keys [showAccordion]="false" formArrayName="lookupKeys" [deletedIds]="deletedIds"></df-lookup-keys>
   <button mat-flat-button class="save-btn" type="submit">
     {{ 'save' | transloco }}
   </button>
