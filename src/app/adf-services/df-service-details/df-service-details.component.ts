@@ -876,10 +876,8 @@ export class DfServiceDetailsComponent implements OnInit {
       // Store the newly created service ID for role creation
       this.currentServiceId = createdService.id;
       
-      // Show success message
-      this.snackBar.open('Service successfully created', 'Close', {
-        duration: 3000,
-      });
+      // Show success message using DfSnackbarService
+      this.snackbarService.openSnackBar('Service successfully created', 'success');
       
       // Show security config section
       this.showSecurityConfig = true;
@@ -890,9 +888,8 @@ export class DfServiceDetailsComponent implements OnInit {
       });
       
     } catch (error) {
-      this.snackBar.open('Error creating service', 'Close', {
-        duration: 3000,
-      });
+      // Show error message using DfSnackbarService
+      this.snackbarService.openSnackBar('Error creating service', 'error');
     }
   }
 
@@ -995,22 +992,18 @@ export class DfServiceDetailsComponent implements OnInit {
       })
     ).subscribe({
       next: (result) => {
-        // Show success message with API key
-        this.snackBar.open(
-          `Security configuration saved successfully. Your API Key: ${result.apiKey}`, 
-          'Copy', 
-          { duration: 10000 }
-        ).onAction().subscribe(() => {
-          navigator.clipboard.writeText(result.apiKey);
-        });
+        // Copy API key to clipboard
+        navigator.clipboard.writeText(result.apiKey);
+        
+        // Show success message using DfSnackbarService
+        this.snackbarService.openSnackBar('API Created and API Key copied to clipboard', 'success');
 
-        // Navigate using Router directly
+        // Navigate to API docs
         this.router.navigateByUrl(`/api-connections/api-docs/${result.formattedName}`, {
           replaceUrl: true
         }).then(
           success => {
             if (!success) {
-              // Try alternative navigation
               this.router.navigate(['api-connections', 'api-docs', result.formattedName], {
                 replaceUrl: true
               });
@@ -1019,9 +1012,8 @@ export class DfServiceDetailsComponent implements OnInit {
         );
       },
       error: (error) => {
-        this.snackBar.open('Error saving security configuration', 'Close', {
-          duration: 3000,
-        });
+        // Show error message using DfSnackbarService
+        this.snackbarService.openSnackBar('Error saving security configuration', 'error');
       }
     });
   }
