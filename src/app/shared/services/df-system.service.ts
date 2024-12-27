@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { BASE_URL } from '../constants/urls';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class DfSystemService {
   constructor(private http: HttpClient) {}
@@ -15,4 +15,4 @@ export class DfSystemService {
   get(endpoint: string) {
     return this.http.get(`${BASE_URL}/system/${endpoint}`);
   }
-} 
+}

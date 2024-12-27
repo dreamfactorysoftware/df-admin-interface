@@ -47,7 +47,15 @@ import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
 import { DfFileGithubComponent } from 'src/app/shared/components/df-file-github/df-file-github.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
-import { map, switchMap, catchError, mergeMap, of, throwError, tap } from 'rxjs';
+import {
+  map,
+  switchMap,
+  catchError,
+  mergeMap,
+  of,
+  throwError,
+  tap,
+} from 'rxjs';
 import {
   GOLD_SERVICES,
   SILVER_SERVICES,
@@ -58,13 +66,20 @@ import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
-import { MatButtonToggleModule, MatButtonToggleGroup } from '@angular/material/button-toggle';
+import {
+  MatButtonToggleModule,
+  MatButtonToggleGroup,
+} from '@angular/material/button-toggle';
 import { readAsText } from '../../shared/utilities/file';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DfCurrentServiceService } from 'src/app/shared/services/df-current-service.service';
-import { MatStep, MatStepper, MatStepperModule } from '@angular/material/stepper';
+import {
+  MatStep,
+  MatStepper,
+  MatStepperModule,
+} from '@angular/material/stepper';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatCardModule } from '@angular/material/card';
 import { TitleCasePipe } from '@angular/common';
@@ -178,7 +193,7 @@ export class DfServiceDetailsComponent implements OnInit {
     private snackbarService: DfSnackbarService,
     private currentServiceService: DfCurrentServiceService,
     private snackBar: MatSnackBar,
-    private systemService: DfSystemService,
+    private systemService: DfSystemService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -728,12 +743,14 @@ export class DfServiceDetailsComponent implements OnInit {
     // If component is a string (from dropdown/select)
     if (typeof component === 'string') {
       this.selectedComponent = component;
-      this.componentList.forEach(c => c.selected = (c.value === component));
-    } 
+      this.componentList.forEach(c => (c.selected = c.value === component));
+    }
     // If component is an object (from card selection)
     else {
       this.selectedComponent = component.value;
-      this.componentList.forEach(c => c.selected = (c.value === component.value));
+      this.componentList.forEach(
+        c => (c.selected = c.value === component.value)
+      );
     }
   }
 
@@ -741,24 +758,28 @@ export class DfServiceDetailsComponent implements OnInit {
     const state = {
       accessType: this.selectedAccessType,
       accessLevel: this.selectedAccessLevel,
-      component: this.selectedComponent
+      component: this.selectedComponent,
     };
-    
+
     if (this.selectedAccessType === 'all') {
-      return Boolean(this.selectedAccessLevel) && this.selectedComponent === '*';
+      return (
+        Boolean(this.selectedAccessLevel) && this.selectedComponent === '*'
+      );
     }
-    
-    return Boolean(this.selectedAccessType) && 
-           Boolean(this.selectedComponent) && 
-           Boolean(this.selectedAccessLevel) &&
-           this.selectedComponent.includes('/*'); // Ensure wildcard is present
+
+    return (
+      Boolean(this.selectedAccessType) &&
+      Boolean(this.selectedComponent) &&
+      Boolean(this.selectedAccessLevel) &&
+      this.selectedComponent.includes('/*')
+    ); // Ensure wildcard is present
   }
 
   selectAccessType(type: string) {
     this.selectedAccessType = type;
     this.selectedComponent = '';
     this.showComponentSelection = type !== 'all';
-    
+
     if (type === 'all') {
       this.componentList = [];
       this.selectedComponent = '*'; // Set a default component for 'all' access
@@ -773,7 +794,7 @@ export class DfServiceDetailsComponent implements OnInit {
         this.componentList = ['_table'].map(suffix => ({
           label: `${serviceName}${suffix}`,
           value: `${suffix}/*`,
-          selected: true
+          selected: true,
         }));
         break;
       case 'procedures':
@@ -781,7 +802,7 @@ export class DfServiceDetailsComponent implements OnInit {
         this.componentList = ['_proc'].map(suffix => ({
           label: `${serviceName}${suffix}`,
           value: `${suffix}/*`,
-          selected: true
+          selected: true,
         }));
         break;
       case 'functions':
@@ -789,7 +810,7 @@ export class DfServiceDetailsComponent implements OnInit {
         this.componentList = ['_func'].map(suffix => ({
           label: `${serviceName}${suffix}`,
           value: `${suffix}/*`,
-          selected: true
+          selected: true,
         }));
         break;
       default:
@@ -802,7 +823,7 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   get filteredComponents() {
-    return this.componentList.filter(comp => 
+    return this.componentList.filter(comp =>
       comp.label.toLowerCase().includes(this.componentSearch.toLowerCase())
     );
   }
@@ -815,17 +836,19 @@ export class DfServiceDetailsComponent implements OnInit {
     if (component.selected) {
       this.selectedComponents.push(component);
     } else {
-      this.selectedComponents = this.selectedComponents.filter(c => c.value !== component.value);
+      this.selectedComponents = this.selectedComponents.filter(
+        c => c.value !== component.value
+      );
     }
   }
 
   navigateToRoles(event: Event) {
     event.preventDefault();
     // Navigate to roles tab
-    this.router.navigate(['/roles'], { 
-      queryParams: { 
-        tab: 'access' // This assumes you have a tab parameter in your roles component
-      } 
+    this.router.navigate(['/roles'], {
+      queryParams: {
+        tab: 'access', // This assumes you have a tab parameter in your roles component
+      },
     });
   }
 
@@ -841,52 +864,61 @@ export class DfServiceDetailsComponent implements OnInit {
         ...data,
         config: {
           ...(data.config || {}),
-        }
+        },
       };
 
       // Only add service_doc_by_service_id if it's a network or script service and has content
       if (this.isNetworkService && data.config?.content) {
         payload.service_doc_by_service_id = {
           content: data.config.content,
-          format: Number(this.serviceDefinitionType)
+          format: Number(this.serviceDefinitionType),
         };
       } else if (this.isScriptService && data.config?.serviceDefinition) {
         payload.service_doc_by_service_id = {
           content: data.config.serviceDefinition,
-          format: this.serviceDefinitionType ? Number(this.serviceDefinitionType) : 0
+          format: this.serviceDefinitionType
+            ? Number(this.serviceDefinitionType)
+            : 0,
         };
       } else {
         payload.service_doc_by_service_id = null;
       }
 
-      const serviceResponse = await this.servicesService.create<ServiceResponse>({
-        resource: [payload]
-      }, {
-        snackbarError: 'server',
-        snackbarSuccess: 'services.createSuccessMsg',
-      }).toPromise();
-      
+      const serviceResponse = await this.servicesService
+        .create<ServiceResponse>(
+          {
+            resource: [payload],
+          },
+          {
+            snackbarError: 'server',
+            snackbarSuccess: 'services.createSuccessMsg',
+          }
+        )
+        .toPromise();
+
       if (!serviceResponse) {
         throw new Error('No response received from service creation');
       }
-      
+
       // The response comes back with resource array containing the created service
       const createdService = (serviceResponse as ServiceResponse).resource[0];
-      
+
       // Store the newly created service ID for role creation
       this.currentServiceId = createdService.id;
-      
+
       // Show success message using DfSnackbarService
-      this.snackbarService.openSnackBar('Service successfully created', 'success');
-      
+      this.snackbarService.openSnackBar(
+        'Service successfully created',
+        'success'
+      );
+
       // Show security config section
       this.showSecurityConfig = true;
-      
+
       // Move to security config step
       setTimeout(() => {
         this.stepper.selectedIndex = this.stepper.steps.length - 1;
       });
-      
     } catch (error) {
       // Show error message using DfSnackbarService
       this.snackbarService.openSnackBar('Error creating service', 'error');
@@ -908,114 +940,139 @@ export class DfServiceDetailsComponent implements OnInit {
     const serviceName = this.serviceForm.get('name')?.value;
     const formattedName = this.formatServiceName(serviceName);
     const roleName = `${serviceName}_auto_role`;
-    
+
     const rolePayload = {
-      resource: [{
-        name: roleName,
-        description: `Auto-generated role for service ${serviceName}`,
-        is_active: true,
-        role_service_access_by_role_id: [{
-          service_id: this.currentServiceId,
-          component: this.selectedComponent,
-          verb_mask: this.getAccessLevel(this.selectedAccessLevel),
-          requestor_mask: 3,
-          filters: [],
-          filter_op: "AND"
-        }],
-        user_to_app_to_role_by_role_id: []
-      }]
+      resource: [
+        {
+          name: roleName,
+          description: `Auto-generated role for service ${serviceName}`,
+          is_active: true,
+          role_service_access_by_role_id: [
+            {
+              service_id: this.currentServiceId,
+              component: this.selectedComponent,
+              verb_mask: this.getAccessLevel(this.selectedAccessLevel),
+              requestor_mask: 3,
+              filters: [],
+              filter_op: 'AND',
+            },
+          ],
+          user_to_app_to_role_by_role_id: [],
+        },
+      ],
     };
 
     // Create role and chain with app creation using proper RxJS operators
-    this.systemService.post('role', rolePayload).pipe(
-      catchError(error => {
-        return throwError(() => error);
-      }),
-      switchMap((roleResponse: any) => {
-        if (!roleResponse?.resource?.[0]?.id) {
-          return throwError(() => new Error('Invalid role response'));
-        }
-        const createdRoleId = roleResponse.resource[0].id;
-
-        const appPayload = {
-          resource: [{
-            name: `${serviceName}_app`,
-            description: `Auto-generated app for service ${serviceName}`,
-            type: "0",
-            role_id: createdRoleId,
-            is_active: true,
-            url: null,
-            storage_service_id: null,
-            storage_container: null,
-            path: null
-          }]
-        };
-
-        return this.systemService.post('app?fields=*&related=role_by_role_id', appPayload).pipe(
-          catchError(error => {
-            this.snackBar.open(
-              `Error creating app: ${error.error?.message || error.message || 'Unknown error'}`, 
-              'Close', 
-              { duration: 5000 }
-            );
-            return throwError(() => error);
-          }),
-          map((appResponse: any) => {
-            if (!appResponse?.resource?.[0]) {
-              throw new Error('App response missing resource array');
-            }
-            
-            const app = appResponse.resource[0];
-            
-            if (!app.apiKey) {
-              throw new Error('App response missing apiKey');
-            }
-            
-            return {
-              apiKey: app.apiKey,
-              formattedName: formattedName
-            };
-          }),
-          catchError(error => {
-            return throwError(() => error);
-          })
-        );
-      }),
-      map((appResponse: any) => {
-        if (!appResponse?.apiKey) {
-          throw new Error('Invalid app response');
-        }
-        return {
-          apiKey: appResponse.apiKey,
-          formattedName: formattedName
-        };
-      })
-    ).subscribe({
-      next: (result) => {
-        // Copy API key to clipboard
-        navigator.clipboard.writeText(result.apiKey);
-        
-        // Show success message using DfSnackbarService
-        this.snackbarService.openSnackBar('API Created and API Key copied to clipboard', 'success');
-
-        // Navigate to API docs
-        this.router.navigateByUrl(`/api-connections/api-docs/${result.formattedName}`, {
-          replaceUrl: true
-        }).then(
-          success => {
-            if (!success) {
-              this.router.navigate(['api-connections', 'api-docs', result.formattedName], {
-                replaceUrl: true
-              });
-            }
+    this.systemService
+      .post('role', rolePayload)
+      .pipe(
+        catchError(error => {
+          return throwError(() => error);
+        }),
+        switchMap((roleResponse: any) => {
+          if (!roleResponse?.resource?.[0]?.id) {
+            return throwError(() => new Error('Invalid role response'));
           }
-        );
-      },
-      error: (error) => {
-        // Show error message using DfSnackbarService
-        this.snackbarService.openSnackBar('Error saving security configuration', 'error');
-      }
-    });
+          const createdRoleId = roleResponse.resource[0].id;
+
+          const appPayload = {
+            resource: [
+              {
+                name: `${serviceName}_app`,
+                description: `Auto-generated app for service ${serviceName}`,
+                type: '0',
+                role_id: createdRoleId,
+                is_active: true,
+                url: null,
+                storage_service_id: null,
+                storage_container: null,
+                path: null,
+              },
+            ],
+          };
+
+          return this.systemService
+            .post('app?fields=*&related=role_by_role_id', appPayload)
+            .pipe(
+              catchError(error => {
+                this.snackBar.open(
+                  `Error creating app: ${
+                    error.error?.message || error.message || 'Unknown error'
+                  }`,
+                  'Close',
+                  { duration: 5000 }
+                );
+                return throwError(() => error);
+              }),
+              map((appResponse: any) => {
+                if (!appResponse?.resource?.[0]) {
+                  throw new Error('App response missing resource array');
+                }
+
+                const app = appResponse.resource[0];
+
+                if (!app.apiKey) {
+                  throw new Error('App response missing apiKey');
+                }
+
+                return {
+                  apiKey: app.apiKey,
+                  formattedName: formattedName,
+                };
+              }),
+              catchError(error => {
+                return throwError(() => error);
+              })
+            );
+        }),
+        map((appResponse: any) => {
+          if (!appResponse?.apiKey) {
+            throw new Error('Invalid app response');
+          }
+          return {
+            apiKey: appResponse.apiKey,
+            formattedName: formattedName,
+          };
+        })
+      )
+      .subscribe({
+        next: result => {
+          // Copy API key to clipboard
+          navigator.clipboard.writeText(result.apiKey);
+
+          // Show success message using DfSnackbarService
+          this.snackbarService.openSnackBar(
+            'API Created and API Key copied to clipboard',
+            'success'
+          );
+
+          // Navigate to API docs
+          this.router
+            .navigateByUrl(
+              `/api-connections/api-docs/${result.formattedName}`,
+              {
+                replaceUrl: true,
+              }
+            )
+            .then(success => {
+              if (!success) {
+                this.router.navigate(
+                  ['api-connections', 'api-docs', result.formattedName],
+                  {
+                    replaceUrl: true,
+                  }
+                );
+              }
+            });
+        },
+        error: error => {
+          // Show error message using DfSnackbarService
+          this.snackbarService.openSnackBar(
+            'Error saving security configuration',
+            'error'
+          );
+        },
+      });
   }
 
   private getAccessLevel(level: string): number {

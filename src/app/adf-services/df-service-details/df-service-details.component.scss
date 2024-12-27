@@ -208,7 +208,7 @@ mat-icon {
     grid-template-columns: repeat(2, 1fr);
     gap: 24px;
     margin-bottom: 40px;
-    
+
     @media (max-width: 768px) {
       grid-template-columns: 1fr;
     }
@@ -259,7 +259,10 @@ mat-icon {
 
     &.selected {
       border-color: mat.get-color-from-palette($df-purple-palette, 400);
-      background-color: rgba(mat.get-color-from-palette($df-purple-palette, 50), 0.1);
+      background-color: rgba(
+        mat.get-color-from-palette($df-purple-palette, 50),
+        0.1
+      );
     }
   }
 
@@ -308,7 +311,10 @@ mat-icon {
 
       &.selected {
         border-color: mat.get-color-from-palette($df-purple-palette, 400);
-        background-color: rgba(mat.get-color-from-palette($df-purple-palette, 50), 0.05);
+        background-color: rgba(
+          mat.get-color-from-palette($df-purple-palette, 50),
+          0.05
+        );
       }
     }
 
@@ -322,7 +328,10 @@ mat-icon {
       .hint-widget {
         margin: 0 0 32px 0;
         padding: 16px;
-        background: rgba(mat.get-color-from-palette($df-purple-palette, 50), 0.1);
+        background: rgba(
+          mat.get-color-from-palette($df-purple-palette, 50),
+          0.1
+        );
         border-radius: 8px;
         display: flex;
         align-items: center;
@@ -407,7 +416,10 @@ mat-icon {
           }
 
           &.mat-button-toggle-checked {
-            background: rgba(mat.get-color-from-palette($df-purple-palette, 50), 0.1);
+            background: rgba(
+              mat.get-color-from-palette($df-purple-palette, 50),
+              0.1
+            );
             border-color: mat.get-color-from-palette($df-purple-palette, 400);
 
             .toggle-text {
@@ -450,7 +462,10 @@ mat-icon {
     }
 
     &.selected {
-      background-color: rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+      background-color: rgba(
+        mat.get-color-from-palette($df-purple-palette, 400),
+        0.15
+      );
     }
   }
 
@@ -459,7 +474,10 @@ mat-icon {
     border-color: rgba(255, 255, 255, 0.12);
 
     &.selected {
-      background-color: rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+      background-color: rgba(
+        mat.get-color-from-palette($df-purple-palette, 400),
+        0.15
+      );
     }
   }
 
@@ -486,15 +504,21 @@ mat-icon {
       }
 
       &.mat-button-toggle-checked {
-        background: rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+        background: rgba(
+          mat.get-color-from-palette($df-purple-palette, 400),
+          0.15
+        );
       }
     }
   }
 
   .security-config-container {
     .top-hint {
-      background: rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.1);
-      
+      background: rgba(
+        mat.get-color-from-palette($df-purple-palette, 400),
+        0.1
+      );
+
       p {
         color: rgba(255, 255, 255, 0.87);
       }
@@ -543,8 +567,11 @@ mat-icon {
     }
 
     .hint-widget {
-      background: rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.1);
-      
+      background: rgba(
+        mat.get-color-from-palette($df-purple-palette, 400),
+        0.1
+      );
+
       p {
         color: rgba(255, 255, 255, 0.87);
       }

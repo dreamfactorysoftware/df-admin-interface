@@ -276,19 +276,23 @@
         <ng-template matStepLabel>Security Configuration</ng-template>
         <div class="details-section" *ngIf="showSecurityConfig">
           <h3>Security Configuration</h3>
-          
+
           <div class="security-config-container">
             <div class="hint-widget top-hint">
-              <p>For more granular security options over your API check out the 
-                <a (click)="navigateToRoles($event)" class="role-link">Role Based Access</a> tab
+              <p>
+                For more granular security options over your API check out the
+                <a (click)="navigateToRoles($event)" class="role-link"
+                  >Role Based Access</a
+                >
+                tab
               </p>
             </div>
 
             <!-- Main security cards layout -->
             <div class="security-cards-grid">
               <!-- All Access Card -->
-              <mat-card 
-                class="security-option-card" 
+              <mat-card
+                class="security-option-card"
                 [class.selected]="selectedAccessType === 'all'"
                 (click)="selectAccessType('all')">
                 <mat-card-content>
@@ -299,8 +303,8 @@
               </mat-card>
 
               <!-- Schema Access Card -->
-              <mat-card 
-                class="security-option-card" 
+              <mat-card
+                class="security-option-card"
                 [class.selected]="selectedAccessType === 'schema'"
                 (click)="selectAccessType('schema')">
                 <mat-card-content>
@@ -311,8 +315,8 @@
               </mat-card>
 
               <!-- Tables Access Card -->
-              <mat-card 
-                class="security-option-card" 
+              <mat-card
+                class="security-option-card"
                 [class.selected]="selectedAccessType === 'tables'"
                 (click)="selectAccessType('tables')">
                 <mat-card-content>
@@ -323,8 +327,8 @@
               </mat-card>
 
               <!-- Procedures Access Card -->
-              <mat-card 
-                class="security-option-card" 
+              <mat-card
+                class="security-option-card"
                 [class.selected]="selectedAccessType === 'procedures'"
                 (click)="selectAccessType('procedures')">
                 <mat-card-content>
@@ -335,8 +339,8 @@
               </mat-card>
 
               <!-- Functions Access Card -->
-              <mat-card 
-                class="security-option-card" 
+              <mat-card
+                class="security-option-card"
                 [class.selected]="selectedAccessType === 'functions'"
                 (click)="selectAccessType('functions')">
                 <mat-card-content>
@@ -348,11 +352,13 @@
             </div>
 
             <!-- Component Selection (shows only when a specific access type is selected) -->
-            <div class="component-selection" *ngIf="selectedAccessType && selectedAccessType !== 'all'">
+            <div
+              class="component-selection"
+              *ngIf="selectedAccessType && selectedAccessType !== 'all'">
               <h3>Security Configuration</h3>
               <div class="access-level-section">
                 <div class="access-level-controls">
-                  <mat-button-toggle-group 
+                  <mat-button-toggle-group
                     #accessLevelGroup="matButtonToggleGroup"
                     [value]="selectedAccessLevel"
                     (change)="onAccessLevelSelect($event.value)">
@@ -388,13 +394,17 @@
 
           <!-- Action Buttons -->
           <div class="action-container">
-            <button mat-button matStepperPrevious class="cancel-btn" type="button">
+            <button
+              mat-button
+              matStepperPrevious
+              class="cancel-btn"
+              type="button">
               Back
             </button>
-            <button 
-              mat-flat-button 
-              color="primary" 
-              type="button" 
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
               [disabled]="!isSecurityConfigValid()"
               (click)="saveSecurityConfig()">
               Apply Security Configuration
@@ -402,10 +412,17 @@
           </div>
         </div>
         <div class="details-section" *ngIf="!showSecurityConfig">
-          <p>Please complete the previous steps and click "Security Config" to configure security settings.</p>
+          <p>
+            Please complete the previous steps and click "Security Config" to
+            configure security settings.
+          </p>
           <div class="action-container">
             <div>
-              <button mat-button matStepperPrevious class="cancel-btn" type="button">
+              <button
+                mat-button
+                matStepperPrevious
+                class="cancel-btn"
+                type="button">
                 Back
               </button>
             </div>
