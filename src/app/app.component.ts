@@ -68,7 +68,6 @@ export class AppComponent implements OnInit {
         this.loggingService.log(
           'User not logged in, redirecting to login page'
         );
-        window.location.href = '/#/auth/login';
       } else {
         this.loggingService.log('User is already logged in');
         window.location.href = '/#/home';
