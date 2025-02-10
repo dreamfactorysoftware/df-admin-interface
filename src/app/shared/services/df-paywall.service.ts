@@ -7,15 +7,23 @@ import { DfErrorService } from './df-error.service';
   providedIn: 'root',
 })
 export class DfPaywallService {
-  private commercialFeatures = [
+  private openSourceLockedFeatures = [
     'event-scripts',
     'rate-limiting',
     'scheduler',
     'reporting',
   ];
 
-  isCommercialFeature(route: string): boolean {
-    return this.commercialFeatures.some(feature => route.includes(feature));
+  private silverLockedFeatures = [
+    'rate-limiting',
+    'scheduler',
+    'reporting',
+  ]
+
+  isFeatureLocked(route: string, licenseType: string): boolean {
+    if (licenseType == 'GOLD') return false;
+    if (licenseType == 'SILVER') return this.silverLockedFeatures.some(feature => route.includes(feature));
+    return this.openSourceLockedFeatures.some(feature => route.includes(feature));
   }
 
   constructor(

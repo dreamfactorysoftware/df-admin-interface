@@ -153,7 +153,7 @@
         mat-flat-button
         class="nav-item"
         [class.active]="isActive(item)"
-        [class.commercial-feature]="isCommercialFeature(item.path)"
+        [class.commercial-feature]="isFeatureLocked(item.path, licenseType)"
         (click)="handleNavClick(item)">
         <span class="nav-item">
           <ng-container *ngIf="item?.icon">
