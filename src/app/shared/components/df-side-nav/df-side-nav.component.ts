@@ -32,7 +32,7 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
 import { DfLicenseCheckService } from '../../services/df-license-check.service';
-import { debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
+import { debounceTime, distinctUntilChanged, map, of, switchMap } from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
 import { UntilDestroy } from '@ngneat/until-destroy';
@@ -44,6 +44,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { DfPaywallService } from '../../services/df-paywall.service';
+import { DfSystemConfigDataService } from '../../services/df-system-config-data.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
@@ -89,6 +90,7 @@ export class DfSideNavComponent implements OnInit {
   smallScreen$ = this.breakpointService.isSmallScreen;
   faPlus = faPlus;
   faRefresh = faRefresh;
+  licenseType: string = 'OPEN SOURCE';
   constructor(
     private breakpointService: DfBreakpointService,
     private userDataService: DfUserDataService,
@@ -101,7 +103,8 @@ export class DfSideNavComponent implements OnInit {
     private themeService: DfThemeService,
     private searchService: DfSearchService,
     private snackbarService: DfSnackbarService,
-    private paywallService: DfPaywallService
+    private paywallService: DfPaywallService,
+    private systemConfigDataService: DfSystemConfigDataService,
   ) {}
 
   ngOnInit(): void {
@@ -158,6 +161,9 @@ export class DfSideNavComponent implements OnInit {
           position: { top: '60px' },
         });
       });
+    this.systemConfigDataService.environment$
+      .pipe(map(env => env.platform?.license ?? 'OPEN SOURCE'))
+      .subscribe(license => this.licenseType = license);
   }
   isDarkMode = this.themeService.darkMode$;
   logout() {
@@ -221,7 +227,7 @@ export class DfSideNavComponent implements OnInit {
     return this.transloco.getAvailableLangs() as string[];
   }
 
-  isCommercialFeature(route: string): boolean {
-    return this.paywallService.isCommercialFeature(route);
+  isFeatureLocked(route: string, licenseType: string): boolean {
+    return this.paywallService.isFeatureLocked(route, licenseType);
   }
 }

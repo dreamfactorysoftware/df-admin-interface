@@ -180,7 +180,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
 
         &::after {
           content: '';
-          background-image: url('/assets/img/lock-icon.svg');
+          background-image: url('~src/assets/img/lock-icon.svg');
           background-size: contain;
           width: 14px;
           height: 14px;
