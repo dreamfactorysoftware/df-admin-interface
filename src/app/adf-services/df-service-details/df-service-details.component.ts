@@ -871,7 +871,9 @@ export class DfServiceDetailsComponent implements OnInit {
       if (this.isNetworkService && data.config?.content) {
         payload.service_doc_by_service_id = {
           content: data.config.content,
-          format: Number(this.serviceDefinitionType),
+          format: this.serviceDefinitionType
+            ? Number(this.serviceDefinitionType)
+            : 0,
         };
       } else if (this.isScriptService && data.config?.serviceDefinition) {
         payload.service_doc_by_service_id = {
