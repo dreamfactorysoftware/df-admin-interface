@@ -104,7 +104,7 @@ export class DfSideNavComponent implements OnInit {
     private searchService: DfSearchService,
     private snackbarService: DfSnackbarService,
     private paywallService: DfPaywallService,
-    private systemConfigDataService: DfSystemConfigDataService,
+    private systemConfigDataService: DfSystemConfigDataService
   ) {}
 
   ngOnInit(): void {
@@ -163,7 +163,7 @@ export class DfSideNavComponent implements OnInit {
       });
     this.systemConfigDataService.environment$
       .pipe(map(env => env.platform?.license ?? 'OPEN SOURCE'))
-      .subscribe(license => this.licenseType = license);
+      .subscribe(license => (this.licenseType = license));
   }
   isDarkMode = this.themeService.darkMode$;
   logout() {

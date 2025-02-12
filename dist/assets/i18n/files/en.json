@@ -1,0 +1,18 @@
+{
+  "createFolder": "Create Folder",
+  "folderName": "Folder Name",
+  "importList": "Upload File",
+  "size": "Size",
+  "deleteFile": "Delete File",
+  "downloadFile": "Download File",
+  "editFile": "Edit File",
+  "deleteFolder": "Delete Folder",
+  "openFolder": "Open {{name}} folder",
+  "download": "Download",
+  "alerts": {
+    "uploadSuccess": "File uploaded successfully",
+    "createFolderSuccess": "Folder created successfully",
+    "deleteFolderSuccess": "Folder deleted successfully",
+    "downloadSuccess": "File downloaded successfully"
+  }
+}

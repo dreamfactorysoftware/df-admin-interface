@@ -1,0 +1,70 @@
+{
+  "resourceLinks": {
+    "gettingStartedGuide": "Getting Started Guide",
+    "writtenTutorials": "Written Tutorials",
+    "videoTutorials": "Video Tutorials",
+    "fullDocumentation": "Full Documentation",
+    "communityForum": "Community Forum",
+    "bugFeatureRequests": "Bugs and Feature Requests",
+    "twitter": "DreamFactory on Twitter",
+    "blog": "DreamFactory blog",
+    "contactSupport": "Contact Support"
+  },
+  "welcomePage": {
+    "watchVideoCta": "Watch our video!",
+    "welcomeHeading": "Welcome to DreamFactory!",
+    "welcomeSubHeading": "DreamFactory provides all of the backend services that you need to build great mobile, web, and IoT applications. Follow the links below to get started:",
+    "ossUsersHeading": "Attention OSS users",
+    "ossUsersText": "Did you know DreamFactory’s commercial solutions include connectors for Microsoft SQL Server, Oracle, SOAP-to-REST, API limiting, ELK stack integration, and much more? Contact Us at <a href=\"mailto:sales@dreamfactory.com\">sales@dreamfactory.com</a> to arrange a demo with our engineering team!",
+    "hearFromYouHeading": "We want to hear from you!",
+    "hearFromYouText": "Has DreamFactory made a difference in your organization? Are you doing something novel and interesting with our software? We’d love to add your story to the Dreamfactory.com user showcase! E-mail us at <a href=\"mailto:info@dreamfactory.com\">info@dreamfactory.com</a> with your project details and we’ll add your organization name, URL, and story to our site!",
+    "clientPlatformHeading": "Click on a client platform below to download a sample application and learn how to make API calls:",
+    "nativeExamplesHeading": "Native Examples",
+    "javaScriptExamplesHeading": "JavaScript Examples"
+  },
+  "quickstartPage": {
+    "quickstartHeading": "Quickstart",
+    "quickstartSubHeading": "An example application is a great way to learn how to make basic API calls to DreamFactory.",
+    "quickstartSteps": {
+      "stepOne": "Click on your favorite client platform below. This will take you to a GitHub repo with an example application.",
+      "stepTwo": "Follow the instructions in the README file to get the application running in your new DreamFactory instance.",
+      "stepThree": "If you have any problems, click on the \"Resources\" button at left for links to documentation, product tutorials, and technical support."
+    },
+    "clientPlatformHeading": "Click on a client platform below to download a sample application and learn how to make API calls:",
+    "nativeExamplesHeading": "Native Examples",
+    "javaScriptExamplesHeading": "JavaScript Examples"
+  },
+  "resourcesPage": {
+    "resourcesHeading": "Resources",
+    "resourcesSubHeading": "DreamFactory provides all of the backend services that you need to build great mobile, web, and IoT applications. Follow the links below to get started:"
+  },
+  "downloadPage": {
+    "downloadHeading": "DreamFactory Downloads",
+    "downloadText": "DreamFactory is an open source software package available under the Apache License. The source code is free to download, use, and share. You can install DreamFactory in a number of ways: using a cloud service, a local install, or on any Linux or Windows server. The links below provide access to downloads for your preferred platform.",
+    "cloudInstallersHeading": "Cloud Installers",
+    "localInstallersHeading": "Local Installers"
+  },
+  "brandNames": {
+    "oracleCloud": "Oracle Cloud",
+    "bitnami": "Bitnami",
+    "docker": "Docker",
+    "amazon": "Amazon",
+    "azure": "Azure",
+    "google": "Google",
+    "vmWare": "VMware",
+    "linux": "Linux",
+    "osx": "OS X",
+    "windows": "Windows",
+    "gitHubSource": "GitHub Source",
+    "objectiveC": "Objective-C",
+    "appleSwift": "Apple Swift",
+    "androidJava": "Android Java",
+    "microsoftNet": "Microsoft .NET",
+    "javaScript": "JavaScript",
+    "ionic": "Ionic",
+    "titanium": "Titanium",
+    "angularJs": "Angular JS",
+    "angular2": "Angular 2",
+    "react": "React"
+  }
+}

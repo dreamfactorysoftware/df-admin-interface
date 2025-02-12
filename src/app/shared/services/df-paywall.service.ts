@@ -14,16 +14,15 @@ export class DfPaywallService {
     'reporting',
   ];
 
-  private silverLockedFeatures = [
-    'rate-limiting',
-    'scheduler',
-    'reporting',
-  ]
+  private silverLockedFeatures = ['rate-limiting', 'scheduler', 'reporting'];
 
   isFeatureLocked(route: string, licenseType: string): boolean {
     if (licenseType == 'GOLD') return false;
-    if (licenseType == 'SILVER') return this.silverLockedFeatures.some(feature => route.includes(feature));
-    return this.openSourceLockedFeatures.some(feature => route.includes(feature));
+    if (licenseType == 'SILVER')
+      return this.silverLockedFeatures.some(feature => route.includes(feature));
+    return this.openSourceLockedFeatures.some(feature =>
+      route.includes(feature)
+    );
   }
 
   constructor(
