@@ -1,0 +1,27 @@
+{
+  "accessByTabs": "Access by Tabs",
+  "alerts": {
+    "new": "For new Admins you can send an email invite so they can set their own password, or set a password for them now.",
+    "restrictedAdmin": "Restricted admin",
+    "autoRole": "An auto-generated role will be created for this admin.",
+    "roleId": "Role id: {{roleId}}",
+    "createdSuccess": "Admin created successfully",
+    "updateSuccess": "Admin updated successfully",
+    "deleteSuccess": "Admin deleted successfully",
+    "importSuccess": "Admin imported successfully",
+    "exportSuccess": "Admin exported successfully"
+  },
+  "tabs": {
+    "apps": "Apps",
+    "users": "{{nav.admin-settings.users.nav}}",
+    "services": "Services",
+    "api-docs": "{{nav.api-connections.api-docs.nav}}",
+    "schema": "{{nav.admin-settings.schema.nav}}",
+    "files": "{{files}}",
+    "scripts": "{{nav.api-connections.event-scripts.nav}}",
+    "config": "{{nav.system-settings.config.nav}}",
+    "package-manager": "Packages",
+    "limits": "{{nav.api-security.rate-limiting.nav}}",
+    "scheduler": "{{nav.system-settings.scheduler.nav}}"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "pageTitle": "CORS Overview",
+  "pageSubtitle": "Enter allowed hosts and HTTP verbs. You can enter * for all hosts. Use the * option for development to enable application code running locally on your computer to communicate directly with your DreamFactory instance.",
+  "formControls": {
+    "path": "Path",
+    "description": "Description",
+    "origins": "Origins",
+    "headers": "Headers",
+    "exposedHeaders": "Exposed Headers",
+    "maxAge": "Max Age",
+    "methods": "Methods",
+    "supportsCredentials": "Supports Credentials",
+    "enabled": "Enabled"
+  },
+  "alerts": {
+    "createSuccess": "CORS entry created successfully.",
+    "updateSuccess": "CORS entry updated successfully."
+  }
+}

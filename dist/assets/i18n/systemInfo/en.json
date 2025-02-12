@@ -1,0 +1,33 @@
+{
+  "subheading": "Displays current system information.",
+  "instance": {
+    "instance": "Instance",
+    "licenseLevel": "License Level",
+    "licenseKey": "License Key",
+    "subscriptionStatus": "Subscription Status",
+    "subscriptionExpirationDate": "Subscription Expiration Date",
+    "systemDatabase": "System Database",
+    "installPath": "Install Path",
+    "logPath": "Log Path",
+    "logMode": "Log Mode",
+    "logLevel": "Log Level",
+    "cacheDriver": "Cache Driver",
+    "demo": "Demo",
+    "instanceId": "Instance ID"
+  },
+  "packages": "Installed Packages",
+  "server": {
+    "heading": "Server",
+    "os": "Operating System",
+    "release": "Release",
+    "host": "Host",
+    "machine": "Machine",
+    "serverApi": "Server API"
+  },
+  "client": {
+    "heading": "Client",
+    "userAgent": "User Agent",
+    "ipAddress": "IP Address",
+    "Locale": "Locale"
+  }
+}
