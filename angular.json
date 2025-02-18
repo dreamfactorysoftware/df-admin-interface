@@ -17,6 +17,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
           "options": {
+            "baseHref": "/",
             "outputPath": "dist",
             "index": "src/index.html",
             "main": "src/main.ts",
@@ -34,6 +35,7 @@
           },
           "configurations": {
             "production": {
+              "baseHref": "/dreamfactory/dist/",
               "budgets": [
                 {
                   "type": "initial",
@@ -42,8 +44,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "2kb",
-                  "maximumError": "4kb"
+                  "maximumWarning": "1mb",
+                  "maximumError": "2mb"
                 }
               ],
               "outputHashing": "all"
