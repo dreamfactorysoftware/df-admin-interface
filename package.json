@@ -12,9 +12,7 @@
     "lint": "ng lint",
     "lint:fix": "ng lint --fix",
     "prettier": "npx prettier --write .",
-    "prepare": "husky install",
-    "i18n:extract": "transloco-keys-manager extract",
-    "i18n:find": "transloco-keys-manager find"
+    "prepare": "husky install"
   },
   "private": true,
   "dependencies": {

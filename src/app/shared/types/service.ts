@@ -88,6 +88,7 @@ export interface ServiceRow {
   label: string;
   description: string;
   type: string;
+  scripting: string;
   active: boolean;
   deletable: boolean;
 }

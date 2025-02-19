@@ -18,7 +18,7 @@ export const sessionTokenInterceptor: HttpInterceptorFn = (
   if (req.url.startsWith('/api')) {
     req = req.clone({
       setHeaders: {
-        [API_KEY_HEADER]: environment.dfApiKey,
+        [API_KEY_HEADER]: environment.dfAdminApiKey,
       },
     });
     const userDataService = inject(DfUserDataService);

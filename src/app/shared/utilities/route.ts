@@ -75,7 +75,7 @@ export function accessibleRoutes(
         allowed.push(
           ROUTES.DATABASE,
           ROUTES.SCRIPTING,
-          ROUTES.NETWROK,
+          ROUTES.NETWORK,
           ROUTES.FILE,
           ROUTES.UTILITY,
           ROUTES.AUTHENTICATION,

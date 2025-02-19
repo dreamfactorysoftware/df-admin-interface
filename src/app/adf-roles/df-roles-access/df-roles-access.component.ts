@@ -5,6 +5,8 @@ import {
   FormGroup,
   ReactiveFormsModule,
   Validators,
+  FormBuilder,
+  FormsModule,
 } from '@angular/forms';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
@@ -19,6 +21,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { BehaviorSubject } from 'rxjs';
 import { AsyncPipe } from '@angular/common';
@@ -49,6 +52,8 @@ import { CommonModule } from '@angular/common';
     MatButtonModule,
     AsyncPipe,
     CommonModule,
+    MatButtonToggleModule,
+    FormsModule,
   ],
   animations: [
     trigger('detailExpand', [
@@ -64,6 +69,7 @@ import { CommonModule } from '@angular/common';
 export class DfRolesAccessComponent implements OnInit {
   @Input() formArray: FormArray;
   @Input() roleForm: FormGroup;
+  @Input() visible: boolean[];
   rootForm: FormGroup;
   serviceAccess: FormArray;
   dataSource: MatTableDataSource<any>;
@@ -112,13 +118,24 @@ export class DfRolesAccessComponent implements OnInit {
     { value: 'is null', label: 'is null' },
     { value: 'is not null', label: 'is not null' },
   ];
-
+  form: FormGroup;
   constructor(
     private activatedRoute: ActivatedRoute,
     @Inject(BASE_SERVICE_TOKEN)
-    private baseService: DfBaseCrudService
-  ) {}
-
+    private baseService: DfBaseCrudService,
+    private fb: FormBuilder
+  ) {
+    this.form = this.fb.group({
+      cFormArray: this.fb.array([this.createItem()]),
+    });
+  }
+  createItem(): FormGroup {
+    return this.fb.group({
+      service: [''],
+      component: [''],
+    });
+  }
+  filteredComponentArray: Array<Array<string>> = [];
   ngOnInit() {
     // get services options
     this.activatedRoute.data.subscribe((data: any) => {
@@ -165,8 +182,37 @@ export class DfRolesAccessComponent implements OnInit {
         });
       }
     });
+    this.initializeFilteredComponents();
 
     this.updateDataSource();
+    // this.add();
+  }
+  get cFormArray(): FormArray {
+    return this.form.get('formArray') as FormArray;
+  }
+
+  initializeFilteredComponents() {
+    this.filteredComponentArray = this.formArray.controls.map((_, i) =>
+      this.getComponentArray(i)
+    );
+  }
+  getComponentArray(index: number): Array<string> {
+    const serviceId = this.formArray.at(index).get('service')?.value;
+    const components = this.componentOptions.find(
+      option => option.serviceId === serviceId
+    )?.components;
+    return components || [];
+  }
+
+  filterOptions(event: Event, index: number) {
+    const input = (event.target as HTMLInputElement).value.toLowerCase();
+    const serviceId = this.formArray.at(index).get('service')?.value;
+    const components =
+      this.componentOptions.find(option => option.serviceId === serviceId)
+        ?.components || [];
+    this.filteredComponentArray[index] = components.filter(option =>
+      option.includes(input)
+    );
   }
 
   async getComponents(index: number) {
@@ -198,14 +244,6 @@ export class DfRolesAccessComponent implements OnInit {
     }
   }
 
-  getComponentArray(index: number) {
-    const serviceId = this.formArray.at(index).get('service')?.value;
-    const components = this.componentOptions.find(
-      option => option.serviceId === serviceId
-    )?.components;
-    return components || [];
-  }
-
   getExtendOperator(index: number) {
     const serviceId = this.serviceAccess.at(index).get('extend-operator')
       ?.value;
@@ -231,8 +269,10 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   updateDataSource() {
-    if (!this.formArray) return;
-    this.dataSource = new MatTableDataSource(this.formArray.controls);
+    const visibleControls = this.formArray.controls.filter(
+      (control, index) => this.visible[index]
+    );
+    this.dataSource = new MatTableDataSource(visibleControls);
   }
 
   get hasServiceAccess() {
@@ -250,9 +290,10 @@ export class DfRolesAccessComponent implements OnInit {
         requester: new FormControl([1], Validators.required),
         advancedFilters: advancedFilters,
         id: new FormControl(null),
+        serviceAccess: new FormControl(''),
       })
     );
-
+    this.visible.push(true);
     this.updateDataSource();
   }
 
@@ -267,6 +308,7 @@ export class DfRolesAccessComponent implements OnInit {
         expandField: new FormControl('', Validators.required),
         expandOperator: new FormControl('', Validators.required),
         expandValue: new FormControl('', Validators.required),
+        filterOp: new FormControl(''),
       })
     );
     this.updateDataSource();
@@ -281,7 +323,9 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   remove(index: number) {
-    this.formArray.removeAt(index);
+    if (index >= 0 && index < this.formArray.length) {
+      this.visible[index] = false;
+    }
     this.updateDataSource();
   }
 
@@ -295,6 +339,7 @@ export class DfRolesAccessComponent implements OnInit {
           expandField: new FormControl('', Validators.required),
           expandOperator: new FormControl('', Validators.required),
           expandValue: new FormControl('', Validators.required),
+          filterOp: new FormControl(''),
         })
       );
     } else {
@@ -307,6 +352,12 @@ export class DfRolesAccessComponent implements OnInit {
       .at(serviceIndex)
       .get('advancedFilters') as FormArray;
     filters.removeAt(filterIndex);
+  }
+
+  filterOpChange(event: any, i: number) {
+    this.getAdvancedFilters(i).controls.forEach(filters => {
+      filters.get('filterOp')?.setValue(event.value);
+    });
   }
 }
 

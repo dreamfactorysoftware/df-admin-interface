@@ -79,22 +79,32 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
       header: 'type',
     },
     {
+      columnDef: 'scripting',
+      cell: (row: ServiceRow) => row.scripting,
+      header: 'Scripting',
+    },
+    {
       columnDef: 'actions',
     },
   ];
 
   override mapDataToTable(data: any[]): ServiceRow[] {
-    return data.map(service => {
-      return {
-        id: service.id,
-        name: service.name,
-        label: service.label,
-        description: service.description,
-        active: service.isActive,
-        deletable: service.deletable,
-        type: service.type,
-      };
-    });
+    // Skip event scripts request if we're only looking at API Types
+    const isApiTypesOnly =
+      this.serviceTypes.length === 1 &&
+      this.serviceTypes[0].name === 'api_type';
+
+    // Map the data without checking event scripts for API Types
+    return data.map(service => ({
+      id: service.id,
+      name: service.name,
+      label: service.label,
+      description: service.description,
+      scripting: 'not', // Always set a default value
+      active: service.isActive,
+      deletable: service.deletable,
+      type: service.type,
+    }));
   }
 
   filterQuery = getFilterQuery('services');
@@ -121,6 +131,7 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
     filter = `${filter ? `${filter} and ` : ''}(created_by_id is${
       !this.system ? ' not ' : ' '
     }null)`;
+
     this.serviceService
       .getAll<GenericListResponse<Service>>({
         limit,
@@ -129,7 +140,29 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
         refresh,
       })
       .subscribe(data => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
+        const mappedData = this.mapDataToTable(data.resource);
+
+        // Only make event scripts request if not viewing API Types
+        const isApiTypesOnly =
+          this.serviceTypes.length === 1 &&
+          this.serviceTypes[0].name === 'api_type';
+
+        if (!isApiTypesOnly) {
+          this.serviceService
+            .getEventScripts<GenericListResponse<Service>>()
+            .subscribe(scriptsData => {
+              const scripts = scriptsData.resource;
+              mappedData.forEach(service => {
+                const match = scripts.find(script =>
+                  script.name.includes(service.name)
+                );
+                service.scripting = match ? match.name : 'not';
+              });
+              this.dataSource.data = mappedData;
+            });
+        } else {
+          this.dataSource.data = mappedData;
+        }
         this.tableLength = data.meta.count;
       });
   }

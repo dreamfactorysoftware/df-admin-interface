@@ -27,6 +27,7 @@ import {
 } from 'src/app/shared/components/df-alert/df-alert.component';
 import { catchError, throwError } from 'rxjs';
 import { DfThemeService } from '../../shared/services/df-theme.service';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -62,7 +63,8 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
     private router: Router,
     public breakpointService: DfBreakpointService,
     private activatedRoute: ActivatedRoute,
-    private themeService: DfThemeService
+    private themeService: DfThemeService,
+    private snackbarService: DfSnackbarService
   ) {
     this.emailTemplateForm = this.fb.group({
       name: ['', Validators.required],
@@ -85,7 +87,7 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
     this.activatedRoute.data.subscribe(({ data }) => {
       this.editApp = data;
     });
-
+    this.snackbarService.setSnackbarLastEle(this.editApp.name, true);
     if (this.editApp) {
       this.emailTemplateForm.patchValue({
         name: this.editApp.name,

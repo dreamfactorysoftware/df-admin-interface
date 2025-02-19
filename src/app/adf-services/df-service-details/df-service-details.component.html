@@ -1,9 +1,9 @@
 <form
   [formGroup]="serviceForm"
   class="details-section"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
-  (ngSubmit)="save()">
-  <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabase">
+  (ngSubmit)="save(false, false)"
+  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabaseEdit">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
         <ng-template matStepLabel>
@@ -28,6 +28,7 @@
                 mat-button
                 matStepperNext
                 type="button"
+                class="cancel-btn"
                 [disabled]="serviceForm.get('type')?.value === ''">
                 Next
               </button>
@@ -41,16 +42,6 @@
               placeholder="SQL, AWS, MongoDB, etc."
               [ngModelOptions]="{ standalone: true }" />
           </mat-form-field>
-          <!-- <mat-form-field class="dynamic-width" appearance="outline">
-            <mat-label>{{
-              'services.controls.serviceType.label' | transloco
-            }}</mat-label>
-            <mat-select formControlName="type">
-              <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
-                {{ type.label }}
-              </mat-option>
-            </mat-select>
-          </mat-form-field> -->
           <div class="full-width">
             <div class="grid-wrapper grid-col-auto">
               <label
@@ -108,6 +99,7 @@
               mat-button
               matStepperNext
               type="button"
+              class="cancel-btn"
               [disabled]="serviceForm.get('type')?.value === ''">
               Next
             </button>
@@ -178,11 +170,18 @@
               >{{ 'active' | transloco }}</mat-slide-toggle
             >
             <div>
-              <button mat-button matStepperPrevious type="button">Back</button>
+              <button
+                mat-button
+                matStepperPrevious
+                class="cancel-btn"
+                type="button">
+                Back
+              </button>
               <button
                 mat-button
                 matStepperNext
                 type="button"
+                class="cancel-btn"
                 [disabled]="
                   serviceForm.get('type')?.value === '' &&
                   serviceForm.get('description')?.value === ''
@@ -207,13 +206,17 @@
                       item.type === 'text' && item.name === 'content';
                       else dynamic
                     ">
-                    <df-script-editor
-                      [type]="getControl('type')"
-                      [storageServiceId]="getConfigControl('storageServiceId')"
-                      [storagePath]="getConfigControl('storagePath')"
-                      [content]="getConfigControl('content')"
-                      [cache]="serviceData ? serviceData.name : ''"
-                      class="full-width"></df-script-editor>
+                    <ng-container *ngIf="getConfigControl('storageServiceId')">
+                      <df-script-editor
+                        [type]="getControl('type')"
+                        [storageServiceId]="
+                          getConfigControl('storageServiceId')
+                        "
+                        [storagePath]="getConfigControl('storagePath')"
+                        [content]="getConfigControl('content')"
+                        [cache]="serviceData ? serviceData.name : ''"
+                        class="full-width"></df-script-editor>
+                    </ng-container>
                   </ng-container>
                   <ng-template #dynamic>
                     <df-dynamic-field
@@ -254,17 +257,184 @@
             (click)="goBack()">
             {{ 'cancel' | transloco }}
           </button>
-          <button class="save-btn" mat-flat-button color="primary">
-            {{ 'save' | transloco }}
-          </button>
+          <div class="button-group">
+            <button
+              mat-flat-button
+              class="save-btn secondary-btn"
+              type="button"
+              [disabled]="!serviceForm.valid"
+              (click)="goToSecurityConfig()">
+              {{ 'services.controls.securityConfig' | transloco }}
+            </button>
+            <button class="save-btn" mat-flat-button color="primary">
+              {{ 'services.controls.createAndTest' | transloco }}
+            </button>
+          </div>
         </div>
       </mat-step>
-      <!-- change default 'edit' & 'done' icon -->
+      <mat-step>
+        <ng-template matStepLabel>Security Configuration</ng-template>
+        <div class="details-section" *ngIf="showSecurityConfig">
+          <h3>Security Configuration</h3>
+
+          <div class="security-config-container">
+            <div class="hint-widget top-hint">
+              <p>
+                For more granular security options over your API check out the
+                <a (click)="navigateToRoles($event)" class="role-link"
+                  >Role Based Access</a
+                >
+                tab
+              </p>
+            </div>
+
+            <!-- Main security cards layout -->
+            <div class="security-cards-grid">
+              <!-- All Access Card -->
+              <mat-card
+                class="security-option-card"
+                [class.selected]="selectedAccessType === 'all'"
+                (click)="selectAccessType('all')">
+                <mat-card-content>
+                  <h4>Full Access</h4>
+                  <p>Grant complete access to all database components</p>
+                </mat-card-content>
+                <div class="selection-indicator"></div>
+              </mat-card>
+
+              <!-- Schema Access Card -->
+              <mat-card
+                class="security-option-card"
+                [class.selected]="selectedAccessType === 'schema'"
+                (click)="selectAccessType('schema')">
+                <mat-card-content>
+                  <h4>Schema Access</h4>
+                  <p>Configure access to specific database schemas</p>
+                </mat-card-content>
+                <div class="selection-indicator"></div>
+              </mat-card>
+
+              <!-- Tables Access Card -->
+              <mat-card
+                class="security-option-card"
+                [class.selected]="selectedAccessType === 'tables'"
+                (click)="selectAccessType('tables')">
+                <mat-card-content>
+                  <h4>Tables Access</h4>
+                  <p>Manage access to individual database tables</p>
+                </mat-card-content>
+                <div class="selection-indicator"></div>
+              </mat-card>
+
+              <!-- Procedures Access Card -->
+              <mat-card
+                class="security-option-card"
+                [class.selected]="selectedAccessType === 'procedures'"
+                (click)="selectAccessType('procedures')">
+                <mat-card-content>
+                  <h4>Stored Procedures</h4>
+                  <p>Control access to stored procedures</p>
+                </mat-card-content>
+                <div class="selection-indicator"></div>
+              </mat-card>
+
+              <!-- Functions Access Card -->
+              <mat-card
+                class="security-option-card"
+                [class.selected]="selectedAccessType === 'functions'"
+                (click)="selectAccessType('functions')">
+                <mat-card-content>
+                  <h4>Functions</h4>
+                  <p>Set access levels for database functions</p>
+                </mat-card-content>
+                <div class="selection-indicator"></div>
+              </mat-card>
+            </div>
+
+            <!-- Component Selection (shows only when a specific access type is selected) -->
+            <div
+              class="component-selection"
+              *ngIf="selectedAccessType && selectedAccessType !== 'all'">
+              <h3>Security Configuration</h3>
+              <div class="access-level-section">
+                <div class="access-level-controls">
+                  <mat-button-toggle-group
+                    #accessLevelGroup="matButtonToggleGroup"
+                    [value]="selectedAccessLevel"
+                    (change)="onAccessLevelSelect($event.value)">
+                    <mat-button-toggle value="read">
+                      <div class="toggle-content">
+                        <div class="toggle-text">
+                          <h4>Read Only</h4>
+                          <p>View access to data</p>
+                        </div>
+                      </div>
+                    </mat-button-toggle>
+                    <mat-button-toggle value="write">
+                      <div class="toggle-content">
+                        <div class="toggle-text">
+                          <h4>Read & Write</h4>
+                          <p>View and modify data</p>
+                        </div>
+                      </div>
+                    </mat-button-toggle>
+                    <mat-button-toggle value="full">
+                      <div class="toggle-content">
+                        <div class="toggle-text">
+                          <h4>Full Access</h4>
+                          <p>Complete control over data</p>
+                        </div>
+                      </div>
+                    </mat-button-toggle>
+                  </mat-button-toggle-group>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="action-container">
+            <button
+              mat-button
+              matStepperPrevious
+              class="cancel-btn"
+              type="button">
+              Back
+            </button>
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              [disabled]="!isSecurityConfigValid()"
+              (click)="saveSecurityConfig()">
+              Apply Security Configuration
+            </button>
+          </div>
+        </div>
+        <div class="details-section" *ngIf="!showSecurityConfig">
+          <p>
+            Please complete the previous steps and click "Security Config" to
+            configure security settings.
+          </p>
+          <div class="action-container">
+            <div>
+              <button
+                mat-button
+                matStepperPrevious
+                class="cancel-btn"
+                type="button">
+                Back
+              </button>
+            </div>
+          </div>
+        </div>
+      </mat-step>
       <ng-template matStepperIcon="edit" let-index="index">
         <ng-container [ngSwitch]="index">
           <mat-icon *ngSwitchCase="0">1</mat-icon>
           <mat-icon *ngSwitchCase="1">2</mat-icon>
           <mat-icon *ngSwitchCase="2">3</mat-icon>
+          <mat-icon *ngSwitchCase="3">4</mat-icon>
         </ng-container>
       </ng-template>
       <ng-template matStepperIcon="done" let-index="index">
@@ -272,11 +442,12 @@
           <mat-icon *ngSwitchCase="0">1</mat-icon>
           <mat-icon *ngSwitchCase="1">2</mat-icon>
           <mat-icon *ngSwitchCase="2">3</mat-icon>
+          <mat-icon *ngSwitchCase="3">4</mat-icon>
         </ng-container>
       </ng-template>
     </mat-stepper>
   </ng-container>
-  <ng-template #notDatabase>
+  <ng-template #notDatabaseEdit>
     <mat-form-field
       subscriptSizing="dynamic"
       class="dynamic-width"
@@ -344,8 +515,42 @@
       *ngIf="!subscriptionRequired"
       ><span>{{ 'active' | transloco }}</span></mat-slide-toggle
     >
+    <div class="full-width">
+      <ng-container *ngIf="this.edit">
+        <ng-container *ngIf="this.isDatabase; else notDatabase">
+          <button
+            type="button"
+            mat-flat-button
+            class="save-btn"
+            (click)="gotoSchema()">
+            {{ 'schema' | transloco }}
+          </button>
+        </ng-container>
+        <ng-template #notDatabase>
+          <button
+            type="button"
+            mat-flat-button
+            class="save-btn"
+            (click)="gotoAPIDocs()">
+            {{ 'apiDocs' | transloco }}
+          </button>
+        </ng-template>
+      </ng-container>
+    </div>
     <ng-container *ngIf="viewSchema && !subscriptionRequired">
       <ng-container formGroupName="config">
+        <ng-container *ngIf="this.isNetworkService || this.isScriptService">
+          <ng-container *ngIf="getConfigControl('storageServiceId')">
+            <df-script-editor
+              [isScript]="this.isScriptService"
+              [type]="getControl('type')"
+              [storageServiceId]="getConfigControl('storageServiceId')"
+              [storagePath]="getConfigControl('storagePath')"
+              [content]="getConfigControl('serviceDefinition')"
+              [cache]="serviceData ? serviceData.name : ''"
+              class="full-width"></df-script-editor>
+          </ng-container>
+        </ng-container>
         <mat-accordion class="full-width">
           <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
             <mat-expansion-panel-header
@@ -354,58 +559,68 @@
             <div class="details-section">
               <ng-container
                 *ngIf="this.isNetworkService || this.isScriptService">
-                <mat-button-toggle-group
-                  aria-label="Service Definition Type"
-                  [(ngModel)]="serviceDefinitionType"
-                  [ngModelOptions]="{ standalone: true }"
-                  (change)="
-                    onServiceDefinitionTypeChange(serviceDefinitionType)
-                  ">
-                  <mat-button-toggle value="0">JSON</mat-button-toggle>
-                  <mat-button-toggle value="1">YAML</mat-button-toggle>
-                </mat-button-toggle-group>
+                <ng-container *ngIf="serviceForm.getRawValue().type !== 'soap'">
+                  <mat-button-toggle-group
+                    aria-label="Service Definition Type"
+                    [(ngModel)]="serviceDefinitionType"
+                    [ngModelOptions]="{ standalone: true }"
+                    (change)="
+                      onServiceDefinitionTypeChange(serviceDefinitionType)
+                    ">
+                    <mat-button-toggle value="0">JSON</mat-button-toggle>
+                    <mat-button-toggle value="1">YAML</mat-button-toggle>
+                  </mat-button-toggle-group>
+                </ng-container>
                 <mat-label class="full-width">Service Definition</mat-label>
-                <df-script-editor
-                  [type]="getControl('type')"
-                  [storageServiceId]="getConfigControl('storageServiceId')"
-                  [storagePath]="getConfigControl('storagePath')"
-                  [content]="getConfigControl('serviceDefinition')"
-                  [cache]="serviceData ? serviceData.name : ''"
-                  class="full-width"></df-script-editor>
-                <!-- <mat-form-field class="full-width" appearance="outline">
-                  <mat-label>Service Definition</mat-label>
-                  <textarea
-                    matInput
-                    rows="10"
-                    [(ngModel)]="serviceDefinition"
-                    [ngModelOptions]="{ standalone: true }"></textarea>
-                </mat-form-field> -->
+
+                <ng-container *ngIf="serviceForm.getRawValue().type === 'rws'">
+                  <df-file-github
+                    [type]="getControl('type')"
+                    [content]="getConfigControl('content')"
+                    [contentText]="content"
+                    class="full-width">
+                  </df-file-github>
+                </ng-container>
               </ng-container>
-
-              <!-- <ng-container *ngIf="this.isNetworkService">
-                <df-script-editor
-                  [type]="getControl('type')"
-                  formControlName="content"
-                  [storageServiceId]="getConfigControl('storageServiceId')"
-                  [storagePath]="getConfigControl('storagePath')"
-                  [content]="getConfigControl('content')"
-                  [cache]="serviceData ? serviceData.name : ''"
-                  class="full-width"></df-script-editor
-              ></ng-container> -->
-
+              <ng-container
+                *ngIf="
+                  this.isFile && serviceForm.getRawValue().type === 'local_file'
+                ">
+                <div class="actions full-width">
+                  <input
+                    type="file"
+                    [accept]=""
+                    #fileInput
+                    (change)="excelUpload($event)"
+                    style="display: none" />
+                  <button
+                    type="button"
+                    mat-flat-button
+                    class="save-btn"
+                    (click)="fileInput.click()">
+                    Upload Excel
+                  </button>
+                </div>
+                <df-ace-editor
+                  class="full-width"
+                  [formControl]="getConfigControl('excelContent')"
+                  [mode]="serviceForm.getRawValue().type"></df-ace-editor>
+              </ng-container>
               <ng-container *ngFor="let item of viewSchema">
                 <ng-container
                   *ngIf="
                     item.type === 'text' && item.name === 'content';
                     else dynamic
                   ">
-                  <df-script-editor
-                    [type]="getControl('type')"
-                    [storageServiceId]="getConfigControl('storageServiceId')"
-                    [storagePath]="getConfigControl('storagePath')"
-                    [content]="getConfigControl('content')"
-                    [cache]="serviceData ? serviceData.name : ''"
-                    class="full-width"></df-script-editor>
+                  <ng-container *ngIf="getConfigControl('storageServiceId')">
+                    <df-script-editor
+                      [type]="getControl('type')"
+                      [storageServiceId]="getConfigControl('storageServiceId')"
+                      [storagePath]="getConfigControl('storagePath')"
+                      [content]="getServiceDocByServiceIdControl('content')"
+                      [cache]="serviceData ? serviceData.name : ''"
+                      class="full-width"></df-script-editor>
+                  </ng-container>
                 </ng-container>
                 <ng-template #dynamic>
                   <df-dynamic-field
@@ -448,6 +663,37 @@
         (click)="goBack()">
         {{ 'cancel' | transloco }}
       </button>
+      <ng-container *ngIf="this.edit">
+        <!-- <mat-button-toggle-group
+          [(ngModel)]="clearCache"
+          [ngModelOptions]="{ standalone: true }"
+          appearance="legacy">
+          <mat-button-toggle
+            [value]="true"
+            mat-flat-button
+            class="save-btn"
+            color="primary"
+            (click)="save()">
+            {{ 'saveAndClear' | transloco }}</mat-button-toggle
+          >
+        </mat-button-toggle-group> -->
+        <button
+          [value]="true"
+          mat-flat-button
+          class="save-btn"
+          color="primary"
+          (click)="save(true, false)">
+          {{ 'saveAndClear' | transloco }}
+        </button>
+        <button
+          [value]="true"
+          mat-flat-button
+          class="save-btn"
+          color="primary"
+          (click)="save(true, true)">
+          {{ 'saveAndContinue' | transloco }}
+        </button>
+      </ng-container>
       <button mat-flat-button class="save-btn" color="primary">
         {{ 'save' | transloco }}
       </button>

@@ -30,8 +30,9 @@
     <textarea rows="1" matInput formControlName="description"></textarea>
   </mat-form-field>
 
-  <div formArrayName="serviceAccess">
+  <div formArrayName="serviceAccess" class="full-width">
     <df-roles-access
+      [visible]="visibilityArray"
       [formArray]="serviceAccess"
       [roleForm]="roleForm"
       class="full-width"></df-roles-access>

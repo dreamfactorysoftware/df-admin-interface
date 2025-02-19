@@ -22,6 +22,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfPaywallService } from '../../services/df-paywall.service';
 import { of, switchMap } from 'rxjs';
 import { DfThemeService } from '../../services/df-theme.service';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -65,7 +66,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
   ) {
     this.userForm = this.fb.group({
       profileDetailsGroup: this.fb.group({
-        username: ['', Validators.minLength(6)],
+        username: ['', Validators.minLength(16)],
         email: ['', Validators.email],
         firstName: [''],
         lastName: [''],
@@ -79,6 +80,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
     });
   }
   themeService = inject(DfThemeService);
+  snackbarService = inject(DfSnackbarService);
   isDarkMode = this.themeService.darkMode$;
 
   get cancelRoute() {
@@ -112,6 +114,9 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
         }
       });
     this.activatedRoute.data.subscribe(({ type, data, apps, roles }) => {
+      if (data) {
+        this.snackbarService.setSnackbarLastEle(data.name, true);
+      }
       this.type = type;
       if (this.userType === 'users') {
         this.apps = apps.resource;
@@ -185,6 +190,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
           });
         }
       } else {
+        this.currentProfile = { id: 0 } as T;
         this.userForm.addControl(
           'pass-invite',
           new FormControl('', [Validators.required])
@@ -215,7 +221,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
   addPasswordControls() {
     this.userForm.addControl(
       'password',
-      new FormControl('', [Validators.required, Validators.minLength(6)])
+      new FormControl('', [Validators.required, Validators.minLength(16)])
     );
     this.userForm.addControl(
       'confirmPassword',

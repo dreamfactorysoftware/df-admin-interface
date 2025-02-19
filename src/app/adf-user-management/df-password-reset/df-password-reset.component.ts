@@ -68,7 +68,7 @@ export class DfPasswordResetComponent implements OnInit {
       username: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
       code: ['', [Validators.required]],
-      newPassword: ['', [Validators.required, Validators.minLength(6)]],
+      newPassword: ['', [Validators.required, Validators.minLength(16)]],
       confirmPassword: [
         '',
         [Validators.required, matchValidator('newPassword')],

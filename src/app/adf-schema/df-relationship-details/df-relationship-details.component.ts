@@ -119,7 +119,11 @@ export class DfRelationshipDetailsComponent implements OnInit {
       });
 
       this.serviceOptions = data['services'].resource.map((item: Service) => {
-        return { label: item.label, value: item.id, name: item.name };
+        return {
+          label: this.type === 'edit' ? item.type : item.label,
+          value: item.id,
+          name: item.name,
+        };
       });
 
       if (this.type === 'edit') {

@@ -48,6 +48,8 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 })
 export class DfTableDetailsComponent implements OnInit {
   tableDetailsForm: FormGroup;
+  access: number;
+  primaryKey: string[];
   type: string;
   dbName: string;
   tableFields: [];
@@ -92,6 +94,9 @@ export class DfTableDetailsComponent implements OnInit {
         this.tableDetailsForm.get('name')?.disable();
         this.tableFields = data['data'].field;
         this.tableRelated = data['data'].related;
+        this.access = data['data'].access;
+        this.primaryKey = data['data'].primaryKey;
+        console.log(data['data']);
       }
     });
   }
@@ -108,7 +113,6 @@ export class DfTableDetailsComponent implements OnInit {
       try {
         data = JSON.parse(value);
       } catch (e) {
-        console.log(e);
         return;
       }
     } else {
@@ -170,14 +174,16 @@ export class DfTableDetailsComponent implements OnInit {
         });
     } else if (this.type === 'edit') {
       const tableName = this.tableDetailsForm.get('name')?.value;
+      const formValues = this.tableDetailsForm.getRawValue();
+      const data = {
+        ...formValues,
+        access: this.access,
+        primary_key: this.primaryKey,
+      };
       this.crudService
-        .patch(
-          `${this.dbName}/_schema/${tableName}`,
-          { resource: [this.tableDetailsForm.getRawValue()] },
-          {
-            snackbarSuccess: 'schema.alerts.updateSuccess',
-          }
-        )
+        .patch(`${this.dbName}/_schema/${tableName}`, data, {
+          snackbarSuccess: 'schema.alerts.updateSuccess',
+        })
         .subscribe(() => {
           this.goBack();
         });

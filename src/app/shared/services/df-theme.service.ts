@@ -6,6 +6,7 @@ import { BehaviorSubject } from 'rxjs';
 })
 export class DfThemeService {
   darkMode$ = new BehaviorSubject<boolean>(false);
+  currentTableRowNum$ = new BehaviorSubject<number>(10);
 
   constructor() {
     this.loadInitialTheme();
@@ -14,6 +15,10 @@ export class DfThemeService {
   setThemeMode(isDarkMode: boolean): void {
     this.darkMode$.next(isDarkMode);
     localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
+  }
+
+  setCurrentTableRowNum(num: number): void {
+    this.currentTableRowNum$.next(num);
   }
 
   loadInitialTheme(): void {

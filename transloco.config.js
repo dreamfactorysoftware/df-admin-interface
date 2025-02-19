@@ -1,5 +1,5 @@
 module.exports = {
-  rootTranslationsPath: 'assets/i18n/',
+  rootTranslationsPath: 'src/assets/i18n/',
   langs: ['en'],
   keysManager: {},
 };

@@ -1,65 +1,105 @@
-<div [class]="(isDarkMode | async) ? 'dark-theme' : ''">
-  <section
-    class="two-column-flex-container"
-    [class.mobile]="breakpointService.isSmallScreen | async">
-    <article class="flex-column">
-      <article>
-        <h2>
-          {{ 'home.welcomePage.welcomeHeading' | transloco }}
-        </h2>
-        <p id="get-started-links">
-          {{ 'home.welcomePage.welcomeSubHeading' | transloco }}
-        </p>
-        <ul aria-labelledby="get-started-links">
-          <li *ngFor="let resource of welcomePageResources">
-            <df-icon-link [linkItem]="resource"></df-icon-link>
-          </li>
-        </ul>
+<ng-container
+  *ngIf="{
+    isFirstTimeUser: isFirstTimeUser$ | async
+  } as data">
+  <div [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+    <section
+      class="two-column-flex-container"
+      [class.mobile]="breakpointService.isSmallScreen | async">
+      <article class="flex-column">
+        <article>
+          <h2>
+            {{ 'home.welcomePage.welcomeHeading' | transloco }}
+          </h2>
+          <p id="get-started-links">
+            {{ 'home.welcomePage.welcomeSubHeading' | transloco }}
+          </p>
+          <ul aria-labelledby="get-started-links">
+            <li *ngFor="let resource of welcomePageResources">
+              <ng-container *ngIf="data.isFirstTimeUser; else notFirst">
+                <df-icon-link [linkItem]="resource"></df-icon-link>
+              </ng-container>
+              <ng-template #notFirst>
+                <ng-container
+                  *ngIf="
+                    resource.name === 'home.resourceLinks.fullDocumentation' ||
+                    resource.name === 'home.resourceLinks.blog' ||
+                    resource.name === 'home.resourceLinks.contactSupport'
+                  "
+                  ><df-icon-link [linkItem]="resource"></df-icon-link
+                ></ng-container>
+              </ng-template>
+            </li>
+          </ul>
+        </article>
       </article>
-      <div class="video-link">
-        <a
-          href="https://youtu.be/FOSOm88RxPw"
-          target="_blank"
-          aria-labelledby="video-link-description">
-          <img
-            class="video-image"
-            src="assets/img/macbook-hp-df-1.png"
-            alt="" />
-          <div class="video-overlay">
-            <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
-            <span id="video-link-description">{{
-              'home.welcomePage.watchVideoCta' | transloco
-            }}</span>
+      <aside class="flex-column">
+        <div class="video-link">
+          <a
+            href="https://youtu.be/FOSOm88RxPw"
+            target="_blank"
+            aria-labelledby="video-link-description">
+            <img
+              class="video-image"
+              src="assets/img/macbook-hp-df-1.png"
+              alt="" />
+            <div class="video-overlay">
+              <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
+              <span id="video-link-description">{{
+                'home.welcomePage.watchVideoCta' | transloco
+              }}</span>
+            </div>
+          </a>
+        </div>
+        <!-- <mat-card class="notice-card">
+          <h3>
+            <fa-icon
+              [icon]="faHeart"
+              class="pre-heading-icon"
+              aria-hidden="true"></fa-icon
+            >{{ 'home.welcomePage.ossUsersHeading' | transloco }}
+          </h3>
+          <p [innerHtml]="'home.welcomePage.ossUsersText' | transloco"></p>
+        </mat-card>
+
+        <mat-card class="notice-card">
+          <h3>
+            <fa-icon
+              [icon]="faComment"
+              class="pre-heading-icon"
+              aria-hidden="true"></fa-icon
+            >{{ 'home.welcomePage.hearFromYouHeading' | transloco }}
+          </h3>
+          <p [innerHtml]="'home.welcomePage.hearFromYouText' | transloco"></p>
+        </mat-card> -->
+      </aside>
+    </section>
+    <section class="platforms-section">
+      <div>
+        <h2>GitHub Releases</h2>
+        <div class="release-container">
+          <div *ngFor="let release of releases">
+            <mat-card
+              class="full-width release-card"
+              [style]="{ 'word-break': 'break-all' }">
+              <mat-card-header>
+                <mat-card-subtitle>{{ release.name }}</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <p>Tag: {{ release.tag_name }}</p>
+                <p>Published at: {{ convertDateType(release.published_at) }}</p>
+              </mat-card-content>
+              <mat-card-actions>
+                <a [href]="release.html_url" target="_blank" class="release-btn"
+                  >View Release</a
+                >
+              </mat-card-actions>
+            </mat-card>
           </div>
-        </a>
+        </div>
       </div>
-    </article>
-    <aside class="flex-column">
-      <mat-card class="notice-card">
-        <h3>
-          <fa-icon
-            [icon]="faHeart"
-            class="pre-heading-icon"
-            aria-hidden="true"></fa-icon
-          >{{ 'home.welcomePage.ossUsersHeading' | transloco }}
-        </h3>
-        <p [innerHtml]="'home.welcomePage.ossUsersText' | transloco"></p>
-      </mat-card>
-
-      <mat-card class="notice-card">
-        <h3>
-          <fa-icon
-            [icon]="faComment"
-            class="pre-heading-icon"
-            aria-hidden="true"></fa-icon
-          >{{ 'home.welcomePage.hearFromYouHeading' | transloco }}
-        </h3>
-        <p [innerHtml]="'home.welcomePage.hearFromYouText' | transloco"></p>
-      </mat-card>
-    </aside>
-  </section>
-
-  <!-- <mat-divider></mat-divider>
+    </section>
+    <!-- <mat-divider></mat-divider>
 
   <section class="platforms-section">
     <h3>
@@ -88,4 +128,5 @@
   </section>
   <mat-divider></mat-divider>
   <df-download-page></df-download-page> -->
-</div>
+  </div>
+</ng-container>

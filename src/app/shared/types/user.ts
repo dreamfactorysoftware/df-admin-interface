@@ -79,4 +79,5 @@ export interface UserSession {
   sessionToken: string;
   tokenExpiryDate: Date;
   roleId: number;
+  role_id?: number;
 }

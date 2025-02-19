@@ -1,11 +1,17 @@
 import { NgFor, NgIf } from '@angular/common';
 import { Component, Inject, Input, OnInit } from '@angular/core';
-import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormControl,
+  ReactiveFormsModule,
+  Validators,
+  FormsModule,
+} from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { TranslocoPipe } from '@ngneat/transloco';
 import {
   BASE_SERVICE_TOKEN,
@@ -33,7 +39,9 @@ import { DfThemeService } from '../../services/df-theme.service';
     NgIf,
     MatFormFieldModule,
     MatSelectModule,
+    MatCheckboxModule,
     NgFor,
+    FormsModule,
     MatDialogModule,
     MatInputModule,
     DfAceEditorComponent,
@@ -42,6 +50,7 @@ import { DfThemeService } from '../../services/df-theme.service';
   ],
 })
 export class DfScriptEditorComponent implements OnInit {
+  @Input() isScript: boolean;
   @Input() cache: string;
   @Input({ required: true }) type: FormControl;
   @Input({ required: true }) storageServiceId: FormControl;
@@ -49,6 +58,7 @@ export class DfScriptEditorComponent implements OnInit {
   @Input({ required: true }) content: FormControl;
 
   storageServices: Array<Service> = [];
+  checked = false;
 
   constructor(
     private dialog: MatDialog,
@@ -93,7 +103,6 @@ export class DfScriptEditorComponent implements OnInit {
       this.storagePath.updateValueAndValidity();
     });
   }
-
   fileUpload(event: Event) {
     const input = event.target as HTMLInputElement;
     if (input.files) {

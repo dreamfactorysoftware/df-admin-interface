@@ -4,8 +4,32 @@
   <button class="cancel-btn" mat-raised-button (click)="goBackToList()">
     {{ 'goBack' | transloco }}
   </button>
+
   <button class="save-btn" mat-raised-button (click)="downloadApiDoc()">
     {{ 'apiDocs.downloadApiDoc' | transloco }}
   </button>
 </div>
+
+<!-- Moved API Keys Dropdown -->
+<div class="api-keys-container" *ngIf="apiKeys.length">
+  <mat-form-field appearance="outline" class="api-keys-select">
+    <mat-label>{{ 'apiDocs.apiKeys.label' | transloco }}</mat-label>
+    <mat-select>
+      <mat-option *ngFor="let key of apiKeys" [value]="key.apiKey">
+        <div class="api-key-option">
+          <div class="key-info">
+            <span class="key-name">{{ key.name }}</span>
+            <span class="key-preview">{{ key.apiKey | slice: 0 : 8 }}...</span>
+          </div>
+          <button
+            mat-icon-button
+            (click)="$event.stopPropagation(); copyApiKey(key.apiKey)">
+            <fa-icon [icon]="faCopy"></fa-icon>
+          </button>
+        </div>
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+</div>
+
 <div #apiDocumentation class="swagger-ui"></div>

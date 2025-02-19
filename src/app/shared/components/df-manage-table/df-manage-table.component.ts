@@ -12,10 +12,10 @@ import {
   MatPaginatorModule,
   PageEvent,
 } from '@angular/material/paginator';
-import { MatSort } from '@angular/material/sort';
+import { MatSort, Sort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
-import { debounceTime, distinctUntilChanged } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, map } from 'rxjs';
 import { ROUTES } from 'src/app/shared/types/routes';
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
 import {
@@ -41,6 +41,7 @@ import { MatInputModule } from '@angular/material/input';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { Actions, AdditonalAction, Column } from 'src/app/shared/types/table';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 
 export const DfManageTableModules = [
   NgIf,
@@ -56,6 +57,7 @@ export const DfManageTableModules = [
   MatPaginatorModule,
   MatFormFieldModule,
   MatInputModule,
+  MatSortModule,
 ];
 
 @UntilDestroy({ checkProperties: true })
@@ -70,7 +72,6 @@ export abstract class DfManageTableComponent<T>
   dataSource = new MatTableDataSource<T>();
   tableLength = 0;
   pageSizes = [10, 50, 100];
-  currentPageSize = this.defaultPageSize;
   faTrashCan = faTrashCan;
   faPenToSquare = faPenToSquare;
   faPlus = faPlus;
@@ -120,8 +121,10 @@ export abstract class DfManageTableComponent<T>
     public dialog: MatDialog
   ) {}
   themeService = inject(DfThemeService);
-
+  systemConfigDataService = inject(DfSystemConfigDataService);
   isDarkMode = this.themeService.darkMode$;
+  isDatabase = false;
+  currentPageSize$ = this.themeService.currentTableRowNum$;
   ngOnInit(): void {
     if (!this.tableData) {
       this.activatedRoute.data.subscribe(({ data }) => {
@@ -138,12 +141,26 @@ export abstract class DfManageTableComponent<T>
       this.allowFilter = false;
       this.dataSource.data = this.mapDataToTable(this.tableData);
     }
-    this.currentFilter.valueChanges
-      .pipe(debounceTime(1000), distinctUntilChanged())
-      .subscribe(filter => {
-        filter
-          ? this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter))
-          : this.refreshTable();
+    this.currentPageSize$.subscribe(currentPageSize => {
+      this.currentFilter.valueChanges
+        .pipe(debounceTime(1000), distinctUntilChanged())
+        .subscribe(filter => {
+          filter
+            ? this.refreshTable(currentPageSize, 0, this.filterQuery(filter))
+            : this.refreshTable();
+        });
+    });
+
+    this.systemConfigDataService.environment$
+      .pipe(
+        switchMap(env =>
+          this.activatedRoute.data.pipe(map(route => ({ env, route })))
+        )
+      )
+      .subscribe(({ env, route }) => {
+        if (route['groups'] && route['groups'][0] === 'Database') {
+          this.isDatabase = true;
+        }
       });
   }
 
@@ -156,12 +173,37 @@ export abstract class DfManageTableComponent<T>
     return active ? faCheckCircle : faXmarkCircle;
   }
 
+  isCellActive(
+    cellValue: string | number | boolean | null | undefined
+  ): boolean {
+    if (typeof cellValue === 'boolean') {
+      return cellValue;
+    }
+    if (typeof cellValue === 'string') {
+      return cellValue.toLowerCase() === 'true';
+    }
+    return !!cellValue;
+  }
+
   get displayedColumns() {
     return this.columns.map(c => c.columnDef);
   }
 
-  get defaultPageSize() {
-    return this.pageSizes[0];
+  // get defaultPageSize() {
+  //   let currentPageSize = 10;
+  //   this.storageService.setCurrentPage$.subscribe(num => {
+  //     currentPageSize = num;
+  //   });
+  //   return currentPageSize;
+  //   // return this.pageSizes[0];
+  // }
+
+  goEventScriptsPage(url: string) {
+    if (url !== 'not') {
+      this.router.navigate([
+        ROUTES.API_CONNECTIONS + '/' + ROUTES.EVENT_SCRIPTS + '/' + url,
+      ]);
+    }
   }
 
   isActionDisabled(action: AdditonalAction<T>, row: T): boolean {
@@ -219,11 +261,10 @@ export abstract class DfManageTableComponent<T>
   }
 
   changePage(event: PageEvent): void {
+    this.themeService.setCurrentTableRowNum(event.pageSize);
     // if (event.previousPageIndex !== event.pageIndex) {
-    //   console.log(event);
     //   this.refreshTable(undefined, event.pageIndex * event.pageSize);
     // } else {
-    //   console.log(event);
     //   this.currentPageSize = event.pageSize;
     //   this.refreshTable(event.pageSize);
     // }

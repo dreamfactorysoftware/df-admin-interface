@@ -1,0 +1,8 @@
+<div class="services-list">
+  <div
+    *ngFor="let service of services"
+    class="service-item"
+    (click)="onServiceSelect(service)">
+    <span>{{ service.label || service.name }}</span>
+  </div>
+</div>

@@ -116,9 +116,8 @@ export class DfScriptsGithubDialogComponent implements OnInit {
     }
   }
 
-  onFileUrlChange(value: string) {
-    console.log('file url changed', value);
-  }
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  onFileUrlChange(value: string) {}
 
   onUpload() {
     if (this.formGroup.invalid) return;

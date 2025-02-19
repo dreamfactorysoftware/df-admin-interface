@@ -61,12 +61,17 @@
       </mat-option>
     </mat-autocomplete> -->
     </mat-form-field>
-    <ng-container *ngIf="this.tableOptions">
+    <ng-container *ngIf="tableOptions">
       <mat-form-field
         appearance="outline"
         class="full-width"
         subscriptSizing="dynamic">
-        <mat-label>{{ 'scripts.tableName' | transloco }}</mat-label>
+        <mat-label
+          ><ng-container *ngIf="tableProcedureFlag === 'table'; else procedure"
+            >Table Name</ng-container
+          >
+          <ng-template #procedure>Name</ng-template>
+        </mat-label>
         <mat-select [(value)]="selectTable" (selectionChange)="selectedTable()">
           <mat-option *ngFor="let item of tableOptions" [value]="item">
             {{ item }}
@@ -104,8 +109,13 @@
   <mat-slide-toggle
     formControlName="allow_event_modification"
     class="dynamic-width"
-    >{{ 'Allow Event Modification' | transloco }}</mat-slide-toggle
+    >{{ 'eventModification' | transloco }}</mat-slide-toggle
   >
+  <df-link-service
+    [cache]="scriptForm.getRawValue().name"
+    [storageServiceId]="selectedServiceItem"
+    [storagePath]="getControl('storagePath')"
+    [content]="getControl('content')"></df-link-service>
   <df-script-editor
     class="full-width"
     [cache]="scriptForm.getRawValue().name"

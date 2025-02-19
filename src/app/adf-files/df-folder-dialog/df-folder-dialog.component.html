@@ -14,7 +14,7 @@
   <button class="cancel-btn" mat-flat-button type="button" mat-dialog-close>
     {{ 'cancel' | transloco }}
   </button>
-  <button class="save-btn" mat-flat-button>
+  <button class="save-btn" mat-flat-button (click)="save()">
     {{ 'save' | transloco }}
   </button>
 </div>
