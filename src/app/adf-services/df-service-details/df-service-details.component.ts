@@ -1039,14 +1039,18 @@ export class DfServiceDetailsComponent implements OnInit {
       )
       .subscribe({
         next: result => {
-          // Copy API key to clipboard
-          navigator.clipboard.writeText(result.apiKey);
-
-          // Show success message using DfSnackbarService
-          this.snackbarService.openSnackBar(
-            'API Created and API Key copied to clipboard',
-            'success'
-          );
+          // Attempt to copy API key to clipboard
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(result.apiKey)
+              .then(() => {
+                this.snackbarService.openSnackBar('API Created and API Key copied to clipboard', 'success');
+              })
+              .catch(() => {
+                this.snackbarService.openSnackBar('API Created, but failed to copy API Key', 'success');
+              });
+          } else {
+            this.snackbarService.openSnackBar('API Created, but failed to copy API Key', 'success');
+          }
 
           // Navigate to API docs
           this.router
