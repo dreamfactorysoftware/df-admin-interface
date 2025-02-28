@@ -123,13 +123,6 @@ export const SILVER_SERVICES: Array<ServiceType> = [
     configSchema: [],
   },
   {
-    name: 'mqtt',
-    label: 'MQTT Client',
-    description: 'MQTT Client based on Mosquitto.',
-    group: 'IoT',
-    configSchema: [],
-  },
-  {
     name: 'mysql',
     label: 'MySQL',
     description: 'Database service supporting MySLQ connections.',
@@ -211,6 +204,22 @@ export const GOLD_SERVICES: Array<ServiceType> = [
     label: 'Apache Hive',
     description:
       'The Apache Hive data warehouse software facilitates reading, writing, and managing large datasets residing in distributed storage using SQL',
+    group: 'Big Data',
+    configSchema: [],
+  },
+  {
+    name: 'databricks',
+    label: 'Databricks',
+    description:
+      'The Databricks data intelligence platform simplifies data engineering, analytics, and AI workloads by providing scalable compute and SQL-based access to large datasets in a unified environment.',
+    group: 'Big Data',
+    configSchema: [],
+  },
+  {
+    name: 'dremio',
+    label: 'Dremio',
+    description:
+      'The Dremio data lakehouse platform enables fast querying, data exploration, and analytics on large datasets across various storage systems using SQL.',
     group: 'Big Data',
     configSchema: [],
   },
