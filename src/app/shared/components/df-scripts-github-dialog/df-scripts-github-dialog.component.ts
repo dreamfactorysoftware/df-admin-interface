@@ -125,7 +125,11 @@ export class DfScriptsGithubDialogComponent implements OnInit {
     const githubApiEndpoint = `${this.repoOwner}/${this.repoName}/contents/${this.fileName}`;
 
     this.githubService
-      .getFileContent(githubApiEndpoint, this.formGroup.value.username, this.formGroup.value.password)
+      .getFileContent(
+        githubApiEndpoint,
+        this.formGroup.value.username,
+        this.formGroup.value.password
+      )
       .subscribe((data: any) => {
         this.dialogRef.close({ data: data });
       });

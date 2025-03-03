@@ -97,8 +97,8 @@ export class DfBaseCrudService {
     const url = Array.isArray(id)
       ? `${this.url}?ids=${id.join(',')}`
       : id
-        ? `${this.url}/${id}`
-        : `${this.url}`;
+      ? `${this.url}/${id}`
+      : `${this.url}`;
     return this.http.delete(
       url,
       this.getOptions({ snackbarError: 'server', ...options })
