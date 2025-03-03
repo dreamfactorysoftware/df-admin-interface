@@ -124,26 +124,9 @@ export class DfScriptsGithubDialogComponent implements OnInit {
 
     const githubApiEndpoint = `${this.repoOwner}/${this.repoName}/contents/${this.fileName}`;
 
-    const authData = window.btoa(
-      this.formGroup.value.username + ':' + this.formGroup.value.password
-    );
-
-    const headers: KeyValuePair[] = this.isGitRepoPrivate
-      ? [
-          {
-            key: 'Authorization',
-            value: `Basic ${authData}`,
-          },
-        ]
-      : [];
-
     this.githubService
-      .get(githubApiEndpoint, {
-        additionalParams: [{ key: 'ref', value: 'main' }],
-        additionalHeaders: [...headers],
-      })
-
-      .subscribe(data => {
+      .getFileContent(githubApiEndpoint, this.formGroup.value.username, this.formGroup.value.password)
+      .subscribe((data: any) => {
         this.dialogRef.close({ data: data });
       });
   }
