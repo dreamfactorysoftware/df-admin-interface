@@ -113,5 +113,15 @@
       "src": "assets/img/bigquery.png",
       "alt": "bigquery",
       "label": "bigquery"
+    },
+    {
+      "src": "assets/img/databricks.png",
+      "alt": "databricks",
+      "label": "databricks"
+    },
+    {
+      "src": "assets/img/dremio.svg",
+      "alt": "dremio",
+      "label": "dremio"
     }
   ]
