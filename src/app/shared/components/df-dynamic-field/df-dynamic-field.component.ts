@@ -5,6 +5,8 @@ import {
   OnInit,
   Optional,
   Self,
+  ViewChild,
+  AfterViewInit,
 } from '@angular/core';
 import {
   FormControl,
@@ -30,6 +32,8 @@ import { Observable, map, startWith } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 import { addGroupEntries } from '../../utilities/eventScripts';
 import { DfThemeService } from '../../services/df-theme.service';
+import { DfFileSelectorComponent, SelectedFile } from '../df-file-selector/df-file-selector.component';
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-dynamic-field',
@@ -50,13 +54,16 @@ import { DfThemeService } from '../../services/df-theme.service';
     MatTooltipModule,
     MatAutocompleteModule,
     AsyncPipe,
+    DfFileSelectorComponent
   ],
 })
-export class DfDynamicFieldComponent implements OnInit, DoCheck {
+export class DfDynamicFieldComponent implements OnInit, DoCheck, AfterViewInit {
   @Input() schema: ConfigSchema;
   @Input() showLabel = true;
+  @ViewChild('fileSelector') fileSelector: DfFileSelectorComponent;
   faCircleInfo = faCircleInfo;
   control = new FormControl();
+  private pendingFilePath: string | null = null;
 
   onChange: (value: any) => void;
   onTouched: () => void;
@@ -69,18 +76,21 @@ export class DfDynamicFieldComponent implements OnInit, DoCheck {
     controlDir.valueAccessor = this;
   }
 
-  eventList: string[];
+  eventList: string[] = [];
   filteredEventList: Observable<string[]>;
   isDarkMode = this.themeService.darkMode$;
 
   ngOnInit(): void {
     if (this.schema.type === 'event_picklist') {
-      this.activedRoute.data.subscribe(({ systemEvents }) => {
-        this.eventList = addGroupEntries(systemEvents.resource);
+      this.activedRoute.data.subscribe((data: any) => {
+        if (data.systemEvents && data.systemEvents.resource) {
+          this.eventList = addGroupEntries(data.systemEvents.resource);
+        }
       });
       this.filteredEventList = this.control.valueChanges.pipe(
         startWith(''),
-        map(value => {
+        map((value: string) => {
+          if (!value || !this.eventList) return [];
           return this.eventList.filter(event =>
             event.toLowerCase().includes(value.toLowerCase())
           );
@@ -98,6 +108,19 @@ export class DfDynamicFieldComponent implements OnInit, DoCheck {
     }
   }
 
+  ngAfterViewInit(): void {
+    if (this.schema?.type === 'file_certificate_api' && this.fileSelector) {
+      if (this.pendingFilePath) {
+        console.log('Applying pending file path after view init:', this.pendingFilePath);
+        this.fileSelector.setPath(this.pendingFilePath);
+        this.pendingFilePath = null;
+      } else if (this.control.value && typeof this.control.value === 'string') {
+        console.log('Setting file selector path after view init:', this.control.value);
+        this.fileSelector.setPath(this.control.value);
+      }
+    }
+  }
+
   handleFileInput(event: Event) {
     const input = event.target as HTMLInputElement;
     if (input.files) {
@@ -105,7 +128,35 @@ export class DfDynamicFieldComponent implements OnInit, DoCheck {
     }
   }
 
+  onFileSelected(file: SelectedFile | undefined) {
+    if (file) {
+      this.control.setValue(file.path);
+      
+      console.log('File selected in dynamic field:', file);
+    } else {
+      this.control.setValue(null);
+    }
+  }
+
   writeValue(value: any): void {
+    console.log('Dynamic field writeValue:', value, 'Schema type:', this.schema?.type);
+    
+    if (this.schema?.type === 'file_certificate_api' && typeof value === 'string' && value) {
+      console.log('Setting file path value:', value);
+      
+      this.control.setValue(value, { emitEvent: false });
+      
+      if (this.fileSelector) {
+        console.log('Setting path on file selector:', value);
+        this.fileSelector.setPath(value);
+      } else {
+        console.log('File selector not yet available, storing pending path:', value);
+        this.pendingFilePath = value;
+      }
+      
+      return;
+    }
+    
     this.control.setValue(value, { emitEvent: false });
   }
 

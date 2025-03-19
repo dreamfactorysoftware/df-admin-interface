@@ -1,0 +1,160 @@
+<h2 mat-dialog-title>
+  <ng-container *ngIf="data.uploadMode">
+    <span>Upload Private Key File</span>
+  </ng-container>
+  <ng-container *ngIf="!data.uploadMode">
+    <span>Select Private Key File</span>
+  </ng-container>
+  <small *ngIf="data.allowedExtensions.length > 0">
+    Allowed file types: {{ data.allowedExtensions.join(', ') }}
+  </small>
+</h2>
+
+<mat-dialog-content>
+  <!-- File API Selection -->
+  <div *ngIf="!selectedFileApi" class="file-api-selection">
+    <h3>Select a File Service</h3>
+    <div class="file-api-grid">
+      <div 
+        *ngFor="let fileApi of data.fileApis" 
+        class="file-api-card"
+        (click)="selectFileApi(fileApi)">
+        <div class="file-api-icon">
+          <fa-icon [icon]="faFolderOpen" size="2x"></fa-icon>
+        </div>
+        <div class="file-api-details">
+          <div class="file-api-name">{{ fileApi.label || fileApi.name }}</div>
+          <div class="file-api-type">{{ fileApi.type }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Browser -->
+  <div *ngIf="selectedFileApi" class="file-browser">
+    <!-- Navigation bar -->
+    <div class="navigation-bar">
+      <button mat-icon-button (click)="navigateBack()" matTooltip="Go back">
+        <fa-icon [icon]="faArrowLeft"></fa-icon>
+      </button>
+      <div class="current-location">
+        <span class="service-name">{{ selectedFileApi.name }}</span>
+        <span *ngIf="currentPath">{{ currentPath }}</span>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="action-row">
+      <button 
+        class="action-button create-folder-btn" 
+        (click)="showCreateFolderDialog()">
+        <span class="button-content">cr</span> Create Folder
+      </button>
+      
+      <button 
+        class="action-button upload-file-btn" 
+        (click)="triggerFileUpload()">
+        <span class="button-content">up</span> Upload File
+      </button>
+      <input 
+        type="file" 
+        style="display: none" 
+        #fileUploadInput
+        [accept]="data.allowedExtensions.join(',')"
+        (change)="handleFileUpload($event)">
+    </div>
+
+    <div *ngIf="isLoading" class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <div>Loading files...</div>
+    </div>
+
+    <div *ngIf="!isLoading" class="file-list">
+      <table mat-table [dataSource]="files" class="file-table">
+        <!-- Name Column -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let file" (click)="file.type === 'folder' ? openFolder(file) : selectFile(file)">
+            <div class="file-name-cell">
+              <fa-icon [icon]="file.type === 'folder' ? faFolderOpen : faFile"></fa-icon>
+              <span>{{ file.name }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Type Column -->
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>Type</th>
+          <td mat-cell *matCellDef="let file">
+            {{ file.type === 'folder' ? 'Folder' : (file.contentType || 'File') }}
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let file">
+            <button 
+              *ngIf="file.type === 'folder'"
+              mat-icon-button 
+              color="primary"
+              (click)="openFolder(file)"
+              matTooltip="Open folder">
+              <mat-icon>folder_open</mat-icon>
+            </button>
+            <button 
+              *ngIf="file.type === 'file'"
+              mat-icon-button 
+              color="primary"
+              (click)="selectFile(file)"
+              [disabled]="data.uploadMode"
+              matTooltip="Select file">
+              <mat-icon>check_circle</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr 
+          mat-row 
+          *matRowDef="let file; columns: displayedColumns;"
+          [class.selected-row]="selectedFile?.name === file.name"
+          (click)="file.type === 'folder' ? openFolder(file) : null"></tr>
+      </table>
+
+      <div *ngIf="files.length === 0" class="empty-directory">
+        <p>This directory is empty.</p>
+        <button 
+          mat-stroked-button 
+          color="primary" 
+          (click)="triggerFileUpload()">
+          <mat-icon>upload_file</mat-icon>
+          Upload Private Key File Here
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="data.uploadMode" class="upload-section">
+      <h3>Upload "{{ data.fileToUpload?.name }}" to this location?</h3>
+      <button 
+        mat-raised-button 
+        color="primary" 
+        (click)="uploadFile()" 
+        [disabled]="uploadInProgress">
+        <fa-icon [icon]="faUpload"></fa-icon>
+        Upload Here
+      </button>
+    </div>
+  </div>
+</mat-dialog-content>
+
+<div mat-dialog-actions align="end">
+  <button mat-button (click)="cancel()">Cancel</button>
+  <button 
+    mat-raised-button 
+    color="primary" 
+    [disabled]="!selectedFile || selectedFile.type === 'folder'" 
+    (click)="confirmSelection()">
+    Choose
+  </button>
+</div> 

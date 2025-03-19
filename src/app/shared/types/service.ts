@@ -21,6 +21,7 @@ export interface ConfigSchema {
     | 'picklist'
     | 'multi_picklist'
     | 'file_certificate'
+    | 'file_certificate_api'
     | 'verb_mask'
     | 'event_picklist';
   description?: string;

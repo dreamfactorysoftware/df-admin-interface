@@ -229,14 +229,15 @@
                           'picklist',
                           'multi_picklist',
                           'boolean',
-                          'file_certificate'
+                          'file_certificate',
+                          'file_certificate_api'
                         ].includes(item.type)
                       "
                       [schema]="item"
                       [formControl]="getConfigControl(item.name)"
-                      [class.dynamic-width]="item.type !== 'file_certificate'"
+                      [class.dynamic-width]="['file_certificate', 'file_certificate_api'].indexOf(item.type) === -1"
                       [class.full-width]="
-                        item.type === 'file_certificate'
+                        ['file_certificate', 'file_certificate_api'].indexOf(item.type) !== -1
                       "></df-dynamic-field>
                     <df-array-field
                       *ngIf="item.type === 'array' || item.type === 'object'"
@@ -633,15 +634,16 @@
                         'picklist',
                         'multi_picklist',
                         'boolean',
-                        'file_certificate'
+                        'file_certificate',
+                        'file_certificate_api'
                       ].includes(item.type)
                     "
                     color="primary"
                     [schema]="item"
                     [formControl]="getConfigControl(item.name)"
-                    [class.dynamic-width]="item.type !== 'file_certificate'"
+                    [class.dynamic-width]="['file_certificate', 'file_certificate_api'].indexOf(item.type) === -1"
                     [class.full-width]="
-                      item.type === 'file_certificate'
+                      ['file_certificate', 'file_certificate_api'].indexOf(item.type) !== -1
                     "></df-dynamic-field>
                   <df-array-field
                     *ngIf="item.type === 'array' || item.type === 'object'"
