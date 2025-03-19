@@ -31,7 +31,7 @@
               "src/styles.scss",
               "./node_modules/swagger-ui/dist/swagger-ui.css"
             ],
-            "allowedCommonJsDependencies": ["ace-builds", "flat", "minim"]
+            "allowedCommonJsDependencies": ["ace-builds", "flat", "minim", "prop-types", "swagger-ui"]
           },
           "configurations": {
             "production": {

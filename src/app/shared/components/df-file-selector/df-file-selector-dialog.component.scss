@@ -1,0 +1,241 @@
+mat-dialog-content {
+  min-height: 400px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+h2 {
+  margin-bottom: 0;
+  
+  small {
+    display: block;
+    font-size: 12px;
+    font-weight: normal;
+    color: rgba(0, 0, 0, 0.54);
+    margin-top: 4px;
+  }
+}
+
+/* File API Selection */
+.file-api-selection {
+  padding: 16px 0;
+  
+  h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+  }
+}
+
+.file-api-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.file-api-card {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+  }
+}
+
+.file-api-icon {
+  margin-right: 16px;
+  color: #3f51b5;
+}
+
+.file-api-details {
+  .file-api-name {
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  
+  .file-api-type {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.54);
+  }
+}
+
+/* File Browser */
+.file-browser {
+  .navigation-bar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+    
+    .current-location {
+      margin-left: 8px;
+      
+      .service-name {
+        font-weight: 500;
+        margin-right: 8px;
+      }
+    }
+  }
+  
+  .action-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    
+    .action-button {
+      display: flex;
+      align-items: center;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      
+      .button-content {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        margin-right: 8px;
+        font-weight: bold;
+        font-size: 12px;
+      }
+      
+      &:hover {
+        opacity: 0.9;
+      }
+      
+      &:active {
+        transform: translateY(1px);
+      }
+    }
+    
+    .create-folder-btn {
+      background-color: #3f51b5;
+      color: white;
+      
+      .button-content {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+    }
+    
+    .upload-file-btn {
+      background-color: #ff5722;
+      color: white;
+      
+      .button-content {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+    }
+  }
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  
+  div {
+    margin-top: 16px;
+    color: rgba(0, 0, 0, 0.54);
+  }
+}
+
+.file-table {
+  width: 100%;
+  
+  .mat-column-name {
+    width: 60%;
+  }
+  
+  .mat-column-type {
+    width: 20%;
+  }
+  
+  .mat-column-actions {
+    width: 20%;
+    text-align: right;
+  }
+  
+  .file-name-cell {
+    display: flex;
+    align-items: center;
+    
+    fa-icon {
+      margin-right: 8px;
+      color: #3f51b5;
+    }
+  }
+  
+  .selected-row {
+    background-color: rgba(63, 81, 181, 0.08);
+  }
+}
+
+.empty-directory {
+  padding: 24px 16px;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.54);
+  
+  p {
+    margin-bottom: 16px;
+    font-style: italic;
+  }
+  
+  button {
+    margin-top: 8px;
+  }
+}
+
+.upload-section {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.04);
+  text-align: center;
+  
+  h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+  }
+}
+
+:host-context(.dark-theme) {
+  small {
+    color: rgba(255, 255, 255, 0.6);
+  }
+  
+  .file-api-card {
+    border-color: rgba(255, 255, 255, 0.12);
+    
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.04);
+    }
+  }
+  
+  .file-api-type {
+    color: rgba(255, 255, 255, 0.6);
+  }
+  
+  .loading-container div,
+  .empty-directory {
+    color: rgba(255, 255, 255, 0.6);
+  }
+  
+  .selected-row {
+    background-color: rgba(103, 121, 221, 0.15);
+  }
+  
+  .upload-section {
+    background-color: rgba(255, 255, 255, 0.04);
+  }
+} 
