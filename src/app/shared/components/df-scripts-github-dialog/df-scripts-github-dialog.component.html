@@ -20,12 +20,12 @@
         type="text" />
     </mat-form-field>
     <mat-form-field *ngIf="this.formGroup.contains('password')">
-      <mat-label>GitHub Password</mat-label>
+      <mat-label>GitHub Token</mat-label>
       <input
         matInput
         formControlName="password"
-        placeholder="Password"
-        type="password" />
+        placeholder="Personal Access Token"
+        type="text" />
     </mat-form-field>
   </form>
 </div>

@@ -1,0 +1,60 @@
+<div class="file-selector-container">
+  <div class="file-selector-header" *ngIf="label || description">
+    <span *ngIf="label" class="file-selector-label">{{ label }}</span>
+    <div *ngIf="description" class="file-selector-description" [innerHTML]="description"></div>
+  </div>
+  
+  <div class="file-selector-content">
+    <div *ngIf="!selectedFile" class="file-selector-empty">
+      <div class="file-selector-actions">
+        <button mat-raised-button color="primary" class="select-file-button" (click)="openFileSelector()">
+          <fa-icon [icon]="faFolderOpen"></fa-icon>
+          Select File
+        </button>
+      </div>
+      
+      <div *ngIf="fileApis.length === 0" class="no-apis-message">
+        No file services configured. Contact your administrator.
+      </div>
+    </div>
+    
+    <div *ngIf="selectedFile" class="file-selector-selected">
+      <div class="selected-file-info">
+        <fa-icon [icon]="faFile" class="file-icon"></fa-icon>
+        
+        <div class="file-details">
+          <div class="file-name">{{ selectedFile.fileName || selectedFile.name }}</div>
+          
+          <!-- Service info -->
+          <div class="file-service" *ngIf="selectedFile.serviceName !== 'Unknown'">
+            <strong>Service:</strong> {{ selectedFile.serviceName }}
+          </div>
+          
+          <!-- Enhanced path section - made much more prominent -->
+          <div class="file-path-container">
+            <div class="file-path-header">Full Absolute Path:</div>
+            <div class="file-path-section">
+              <div class="file-path-value">{{ selectedFile.path }}</div>
+            </div>
+            
+            <!-- Relative path section (smaller, secondary) -->
+            <div *ngIf="selectedFile.relativePath" class="relative-path-section">
+              <span class="relative-path-label">Service Relative Path:</span>
+              <span class="relative-path-value">{{ selectedFile.relativePath }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="file-actions">
+        <button class="clear-button" (click)="clearSelection()">
+          Clear selection
+        </button>
+        
+        <button mat-raised-button color="primary" class="select-file-button" (click)="openFileSelector()">
+          Choose Different
+        </button>
+      </div>
+    </div>
+  </div>
+</div> 

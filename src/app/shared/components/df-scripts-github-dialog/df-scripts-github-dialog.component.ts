@@ -15,7 +15,6 @@ import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { GITHUB_REPO_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { KeyValuePair } from 'src/app/shared/types/generic-http';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { isValidHttpUrl } from '../../utilities/url';
 @UntilDestroy({ checkProperties: true })
@@ -68,7 +67,7 @@ export class DfScriptsGithubDialogComponent implements OnInit {
 
           this.repoOwner = urlArray[0];
           this.repoName = urlArray[1];
-          this.fileName = urlArray[4];
+          this.fileName = urlArray.slice(4).join('/');
           const githubApiEndpoint = `${this.repoOwner}/${this.repoName}`;
           this.githubService
             .get(githubApiEndpoint, {
@@ -124,26 +123,13 @@ export class DfScriptsGithubDialogComponent implements OnInit {
 
     const githubApiEndpoint = `${this.repoOwner}/${this.repoName}/contents/${this.fileName}`;
 
-    const authData = window.btoa(
-      this.formGroup.value.username + ':' + this.formGroup.value.password
-    );
-
-    const headers: KeyValuePair[] = this.isGitRepoPrivate
-      ? [
-          {
-            key: 'Authorization',
-            value: `Basic ${authData}`,
-          },
-        ]
-      : [];
-
     this.githubService
-      .get(githubApiEndpoint, {
-        additionalParams: [{ key: 'ref', value: 'main' }],
-        additionalHeaders: [...headers],
-      })
-
-      .subscribe(data => {
+      .getFileContent(
+        githubApiEndpoint,
+        this.formGroup.value.username,
+        this.formGroup.value.password
+      )
+      .subscribe((data: any) => {
         this.dialogRef.close({ data: data });
       });
   }

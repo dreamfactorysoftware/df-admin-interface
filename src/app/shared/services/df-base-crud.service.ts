@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { RequestOptions } from 'src/app/shared/types/generic-http';
 import { readAsText } from 'src/app/shared/utilities/file';
 import { map, switchMap } from 'rxjs';
@@ -29,6 +29,17 @@ export class DfBaseCrudService {
       `${this.url}/${id}`,
       this.getOptions({ snackbarError: 'server', ...options })
     );
+  }
+
+  getFileContent(id: string, username?: string, token?: string) {
+    let headers = new HttpHeaders();
+    if (username && token) {
+      headers = headers.set(
+        'Authorization',
+        'Basic ' + btoa(`${username}:${token}`)
+      );
+    }
+    return this.http.get(`${this.url}/${id}`, { headers });
   }
 
   getEventScripts<T>() {
