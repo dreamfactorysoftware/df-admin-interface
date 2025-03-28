@@ -72,7 +72,10 @@ export class DfAuthService {
   loginWithToken(jwt?: string) {
     return this.http
       .get<UserSession>(URLS.USER_SESSION, {
-        headers: SHOW_LOADING_HEADER,
+        headers: {
+          ...SHOW_LOADING_HEADER,
+          Authorization: jwt ? `Bearer ${jwt}` : '',
+        },
       })
       .pipe(
         map(userData => {
