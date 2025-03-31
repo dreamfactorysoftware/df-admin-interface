@@ -324,9 +324,25 @@ export class DfRolesAccessComponent implements OnInit {
 
   remove(index: number) {
     if (index >= 0 && index < this.formArray.length) {
-      this.visible[index] = false;
+      this.visible = this.updateNthTrueToFalse(this.visible, index);
     }
     this.updateDataSource();
+  }
+
+  updateNthTrueToFalse(arr: boolean[], index: number) {
+    let trueCount = 0;
+
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i]) {
+        if (trueCount === index) {
+          arr[i] = false;
+          break;
+        }
+        trueCount++;
+      }
+    }
+
+    return arr;
   }
 
   addFilter(index: number) {
