@@ -332,10 +332,24 @@ export class FileApiService {
    * @param file The file to upload as binary
    */
   private uploadBinaryFile(url: string, file: File): Observable<any> {
+    console.log(`⭐⭐⭐ UPLOADING BINARY FILE ${file.name} - USING METHOD WITH ${new Date().toISOString()} ⭐⭐⭐`);
+    console.log(`Full upload URL: ${url}`);
     console.log(`Uploading binary file: ${file.name}, size: ${file.size} bytes`);
     
     // Get authentication headers
     const headers = this.getHeaders();
+    console.log('Authentication headers:', headers);
+    
+    // Check if we're using absolute URL
+    if (!url.startsWith('/')) {
+      console.warn('⚠️ WARNING: URL does not start with a leading slash, this may cause issues with baseHref');
+      url = '/' + url;
+      console.log('Fixed URL to: ' + url);
+    }
+    
+    // Log the current document baseURI for debugging
+    console.log('Current document baseURI:', document.baseURI);
+    console.log('Current window location:', window.location.href);
     
     return new Observable(observer => {
       // First read the file
@@ -405,11 +419,18 @@ export class FileApiService {
           xhr.setRequestHeader(key, headers[key]);
         });
         
-        // Add content type header for binary data
-        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        // IMPORTANT CHANGE: Use FormData instead of binary content
+        console.log('Using FormData for binary file upload instead of raw binary content');
+        const formData = new FormData();
         
-        // Send the binary data directly
-        xhr.send(content);
+        // Create a new File from the ArrayBuffer to ensure proper transmission
+        const binaryFile = new File([content], file.name, { type: 'application/octet-stream' });
+        formData.append('file', binaryFile);
+        
+        console.log(`Sending file with FormData, size: ${binaryFile.size} bytes`);
+        
+        // Send FormData which will handle the content-type header automatically
+        xhr.send(formData);
         
         // Return an unsubscribe function
         return () => {

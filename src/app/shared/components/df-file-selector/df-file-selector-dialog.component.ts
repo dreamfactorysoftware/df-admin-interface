@@ -306,6 +306,7 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
     console.log(`Starting upload of ${file.name} (${file.size} bytes)`);
     
+    // Make sure we use the correct service name with an absolute path
     this.fileApiService.uploadFile(
       fileApi.name, 
       file,
@@ -399,7 +400,11 @@ export class DfFileSelectorDialogComponent implements OnInit {
     // Store reference to avoid null checks later
     const fileApi = this.selectedFileApi;
     
-    console.log(`Starting upload of ${file.name} (${file.size} bytes)`);
+    console.log(`Starting upload of ${file.name} (${file.size} bytes) with absolute path`);
+    console.log(`Using file API: ${fileApi.name}, path: ${path}`);
+    
+    // Log the URL that will be constructed for debugging
+    console.log(`⭐⭐⭐ Uploading using file API service, service name: ${fileApi.name} ⭐⭐⭐`);
     
     this.fileApiService.uploadFile(
       fileApi.name, 
