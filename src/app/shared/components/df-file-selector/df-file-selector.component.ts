@@ -10,13 +10,14 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faFile, faFolderOpen, faCheck, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faFile, faFolderOpen, faCheck, faUpload, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { DfFileSelectorDialogComponent } from './df-file-selector-dialog.component';
 import { FileApiService } from '../../services/df-file-api.service';
 import { BASE_SERVICE_TOKEN, URL_TOKEN } from '../../constants/tokens';
 import { DfBaseCrudService } from '../../services/df-base-crud.service';
 import { GenericListResponse } from '../../types/generic-http';
 import { MatIconModule } from '@angular/material/icon';
+import { Router } from '@angular/router';
 
 export interface FileApiInfo {
   id: number;
@@ -72,6 +73,7 @@ export class DfFileSelectorComponent implements OnInit {
   faFolderOpen = faFolderOpen;
   faCheck = faCheck;
   faUpload = faUpload;
+  faExternalLinkAlt = faExternalLinkAlt;
 
   selectedFile: SelectedFile | undefined = undefined;
   fileApis: FileApiInfo[] = [];
@@ -79,9 +81,9 @@ export class DfFileSelectorComponent implements OnInit {
 
   constructor(
     private dialog: MatDialog,
-    // Use both services for now during transition
     private fileApiService: FileApiService,
-    private crudService: DfBaseCrudService
+    private crudService: DfBaseCrudService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -95,6 +97,11 @@ export class DfFileSelectorComponent implements OnInit {
     // Create a fallback service entry immediately, in case the API call takes too long
     // or fails completely
     this.ensureFallbackService();
+  }
+
+  // Navigate to the Files management section
+  goToFilesManager(): void {
+    this.router.navigate(['/adf/files']);
   }
 
   // Ensure there's always at least one file service available
@@ -147,7 +154,8 @@ export class DfFileSelectorComponent implements OnInit {
       width: '800px',
       data: {
         fileApis: this.fileApis,
-        allowedExtensions: this.allowedExtensions
+        allowedExtensions: this.allowedExtensions,
+        selectorOnly: true // Only allow selection, no upload
       }
     });
 

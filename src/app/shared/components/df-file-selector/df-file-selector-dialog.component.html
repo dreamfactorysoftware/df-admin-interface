@@ -3,7 +3,7 @@
     <span>Upload Private Key File</span>
   </ng-container>
   <ng-container *ngIf="!data.uploadMode">
-    <span>Select Private Key File</span>
+    <span>Select File</span>
   </ng-container>
   <small *ngIf="data.allowedExtensions.length > 0">
     Allowed file types: {{ data.allowedExtensions.join(', ') }}
@@ -43,8 +43,8 @@
       </div>
     </div>
 
-    <!-- Action buttons -->
-    <div class="action-row">
+    <!-- Action buttons - only show when not in selector-only mode -->
+    <div class="action-row" *ngIf="!isSelectorOnly">
       <button 
         class="action-button create-folder-btn" 
         (click)="showCreateFolderDialog()">
@@ -62,6 +62,11 @@
         #fileUploadInput
         [accept]="data.allowedExtensions.join(',')"
         (change)="handleFileUpload($event)">
+    </div>
+    
+    <!-- Selector-only mode info message -->
+    <div class="selector-info" *ngIf="isSelectorOnly">
+      <p>Select a file from the list below. To upload new files, please use the File Manager.</p>
     </div>
 
     <div *ngIf="isLoading" class="loading-container">
@@ -124,12 +129,14 @@
 
       <div *ngIf="files.length === 0" class="empty-directory">
         <p>This directory is empty.</p>
+        <!-- Only show upload button when not in selector-only mode -->
         <button 
+          *ngIf="!isSelectorOnly"
           mat-stroked-button 
           color="primary" 
           (click)="triggerFileUpload()">
           <mat-icon>upload_file</mat-icon>
-          Upload Private Key File Here
+          Upload File Here
         </button>
       </div>
     </div>

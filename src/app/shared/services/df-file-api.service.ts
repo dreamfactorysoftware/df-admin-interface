@@ -193,9 +193,14 @@ export class FileApiService {
     
     // Construct the path
     const apiPath = path ? `api/v2/${serviceName}/${path}` : `api/v2/${serviceName}`;
-    // Use absolute URL to bypass any baseHref issues
-    const url = this.getAbsoluteApiUrl(apiPath);
-    console.log(`Listing files from ${url}`);
+    
+    // Log the operation
+    console.log(`Listing files from path: ${apiPath}`);
+    
+    // Use DfBaseCrudService style approach to ensure consistency with admin interface
+    // Just use the HTTP client directly with exact URL
+    const url = `${window.location.origin}/${apiPath}`;
+    console.log(`Using absolute URL: ${url}`);
     
     // Set specific parameters for file listing
     const params: Record<string, string> = {};
@@ -204,9 +209,16 @@ export class FileApiService {
     // Add standard fields
     params['fields'] = 'name,path,type,content_type,last_modified,size';
     
+    // Add the session token to headers
+    const headers: Record<string, string> = {};
+    const token = this.userDataService.token;
+    if (token) {
+      headers[SESSION_TOKEN_HEADER] = token;
+    }
+    
     return this.http.get(url, { 
-      headers: this.getHeaders(),
-      params: params 
+      headers,
+      params
     }).pipe(
       tap(response => console.log('Files response:', response)),
       catchError(error => {

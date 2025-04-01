@@ -80,6 +80,7 @@ interface DialogData {
   allowedExtensions: string[];
   uploadMode?: boolean;
   fileToUpload?: File;
+  selectorOnly?: boolean;
 }
 
 @UntilDestroy({ checkProperties: true })
@@ -135,6 +136,11 @@ export class DfFileSelectorDialogComponent implements OnInit {
   displayedColumns: string[] = ['name', 'type', 'actions'];
   
   selectedFile: FileItem | null = null;
+  
+  // Flag to determine if we're in selector-only mode
+  get isSelectorOnly(): boolean {
+    return !!this.data.selectorOnly;
+  }
 
   constructor(
     private dialogRef: MatDialogRef<DfFileSelectorDialogComponent>,
@@ -475,6 +481,11 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
   // Show dialog to create a new folder
   showCreateFolderDialog(): void {
+    // Don't allow folder creation in selector-only mode
+    if (this.isSelectorOnly) {
+      return;
+    }
+    
     const dialogRef = this.dialog.open(CreateFolderDialogComponent, {
       width: '350px'
     });
@@ -529,6 +540,11 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
   // Trigger the file input click programmatically
   triggerFileUpload(): void {
+    // Don't allow file upload in selector-only mode
+    if (this.isSelectorOnly) {
+      return;
+    }
+    
     if (this.fileUploadInput) {
       this.fileUploadInput.nativeElement.click();
     }
