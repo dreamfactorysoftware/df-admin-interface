@@ -308,7 +308,7 @@ export class DfRolesAccessComponent implements OnInit {
         expandField: new FormControl('', Validators.required),
         expandOperator: new FormControl('', Validators.required),
         expandValue: new FormControl('', Validators.required),
-        filterOp: new FormControl(''),
+        filterOp: new FormControl('AND'),
       })
     );
     this.updateDataSource();
