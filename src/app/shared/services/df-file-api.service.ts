@@ -108,7 +108,8 @@ export class FileApiService {
       // Then try to get the actual services from the API
       // Using direct URL format that matches the server expectation
       // Notice the format change from filter[type] to filter=type=
-      this.http.get<GenericListResponse<FileService>>('/api/v2/system/service', {
+      // Use relative URL (without leading slash) to work with baseHref
+      this.http.get<GenericListResponse<FileService>>('api/v2/system/service', {
         params: {
           'filter': 'type=local_file',
           'fields': 'id,name,label,type'
@@ -173,7 +174,8 @@ export class FileApiService {
       });
     }
     
-    const url = path ? `/api/v2/${serviceName}/${path}` : `/api/v2/${serviceName}`;
+    // Use relative URL (without leading slash) to work with baseHref
+    const url = path ? `api/v2/${serviceName}/${path}` : `api/v2/${serviceName}`;
     console.log(`Listing files from ${url}`);
     
     // Set specific parameters for file listing
@@ -231,9 +233,11 @@ export class FileApiService {
     if (path) {
       // Ensure path doesn't end with slash and append filename
       const cleanPath = path.replace(/\/$/, '');
-      url = `/api/v2/${serviceName}/${cleanPath}/${file.name}`;
+      // Use relative URL (without leading slash) to work with baseHref
+      url = `api/v2/${serviceName}/${cleanPath}/${file.name}`;
     } else {
-      url = `/api/v2/${serviceName}/${file.name}`;
+      // Use relative URL (without leading slash) to work with baseHref
+      url = `api/v2/${serviceName}/${file.name}`;
     }
     
     console.log(`⭐⭐⭐ UPLOADING FILE ${file.name} (${file.size} bytes), type: ${file.type} ⭐⭐⭐`);
@@ -273,7 +277,8 @@ export class FileApiService {
    * @param path The path to the file
    */
   getFileContent(serviceName: string, path: string): Observable<any> {
-    const url = `/api/v2/${serviceName}/${path}`;
+    // Use relative URL (without leading slash) to work with baseHref
+    const url = `api/v2/${serviceName}/${path}`;
     console.log(`Getting file content from ${url}`);
     
     return this.http.get(url, {
@@ -293,7 +298,8 @@ export class FileApiService {
    * @param path The path to the file
    */
   deleteFile(serviceName: string, path: string): Observable<any> {
-    const url = `/api/v2/${serviceName}/${path}`;
+    // Use relative URL (without leading slash) to work with baseHref
+    const url = `api/v2/${serviceName}/${path}`;
     console.log(`Deleting file at ${url}`);
     
     return this.http.delete(url, { headers: this.getHeaders() }).pipe(
@@ -321,7 +327,8 @@ export class FileApiService {
       ]
     };
     
-    const url = path ? `/api/v2/${serviceName}/${path}` : `/api/v2/${serviceName}`;
+    // Use relative URL (without leading slash) to work with baseHref
+    const url = path ? `api/v2/${serviceName}/${path}` : `api/v2/${serviceName}`;
     console.log(`Creating directory at ${url}`, payload);
     
     return this.http.post(url, payload, { headers: this.getHeaders() }).pipe(
