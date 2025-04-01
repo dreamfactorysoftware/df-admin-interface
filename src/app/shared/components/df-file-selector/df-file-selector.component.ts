@@ -13,7 +13,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faFile, faFolderOpen, faCheck, faUpload } from '@fortawesome/free-solid-svg-icons';
 import { DfFileSelectorDialogComponent } from './df-file-selector-dialog.component';
 import { FileApiService } from '../../services/df-file-api.service';
-import { BASE_SERVICE_TOKEN } from '../../constants/tokens';
+import { BASE_SERVICE_TOKEN, URL_TOKEN } from '../../constants/tokens';
 import { DfBaseCrudService } from '../../services/df-base-crud.service';
 import { GenericListResponse } from '../../types/generic-http';
 import { MatIconModule } from '@angular/material/icon';
@@ -53,6 +53,12 @@ export interface SelectedFile {
     MatTooltipModule,
     FontAwesomeModule,
     MatIconModule
+  ],
+  providers: [
+    // Provide the URL_TOKEN for the DfBaseCrudService
+    { provide: URL_TOKEN, useValue: 'api/v2/system/service' },
+    // Provide the DfBaseCrudService
+    DfBaseCrudService
   ]
 })
 export class DfFileSelectorComponent implements OnInit {
@@ -73,7 +79,9 @@ export class DfFileSelectorComponent implements OnInit {
 
   constructor(
     private dialog: MatDialog,
-    private fileApiService: FileApiService
+    // Use both services for now during transition
+    private fileApiService: FileApiService,
+    private crudService: DfBaseCrudService
   ) {}
 
   ngOnInit(): void {

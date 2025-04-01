@@ -18,6 +18,8 @@ import { faFolderOpen, faFile, faArrowLeft, faUpload } from '@fortawesome/free-s
 import { FileApiInfo, SelectedFile } from './df-file-selector.component';
 import { HttpClient } from '@angular/common/http';
 import { FileApiService } from '../../services/df-file-api.service';
+import { DfBaseCrudService } from '../../services/df-base-crud.service';
+import { URL_TOKEN } from '../../constants/tokens';
 
 // Simple dialog for creating a new folder
 @Component({
@@ -102,6 +104,16 @@ interface DialogData {
     ReactiveFormsModule,
     TranslocoPipe,
     FontAwesomeModule
+  ],
+  providers: [
+    // Create a factory provider for the DfBaseCrudService that sets the URL dynamically
+    {
+      provide: DfBaseCrudService,
+      useFactory: (http: HttpClient) => {
+        return new DfBaseCrudService('api/v2', http);
+      },
+      deps: [HttpClient]
+    }
   ]
 })
 export class DfFileSelectorDialogComponent implements OnInit {
@@ -129,7 +141,8 @@ export class DfFileSelectorDialogComponent implements OnInit {
     @Inject(MAT_DIALOG_DATA) public data: DialogData,
     private dialog: MatDialog,
     private http: HttpClient,
-    private fileApiService: FileApiService
+    private fileApiService: FileApiService,
+    private crudService: DfBaseCrudService
   ) { }
 
   ngOnInit(): void {
@@ -303,15 +316,16 @@ export class DfFileSelectorDialogComponent implements OnInit {
     
     // Store reference to avoid null checks later
     const fileApi = this.selectedFileApi;
+    const location = path ? `${fileApi.name}/${path}` : fileApi.name;
 
-    console.log(`Starting upload of ${file.name} (${file.size} bytes)`);
+    console.log(`Starting upload of ${file.name} (${file.size} bytes) to ${location}`);
     
-    // Make sure we use the correct service name with an absolute path
-    this.fileApiService.uploadFile(
-      fileApi.name, 
-      file,
-      path
-    )
+    // Create a file list
+    const fileList = new DataTransfer();
+    fileList.items.add(file);
+    
+    // Use the same approach as the admin interface
+    this.crudService.uploadFile(location, fileList.files)
     .pipe(untilDestroyed(this))
     .subscribe({
       next: (response) => {
@@ -399,18 +413,16 @@ export class DfFileSelectorDialogComponent implements OnInit {
     
     // Store reference to avoid null checks later
     const fileApi = this.selectedFileApi;
+    const location = path ? `${fileApi.name}/${path}` : fileApi.name;
     
-    console.log(`Starting upload of ${file.name} (${file.size} bytes) with absolute path`);
-    console.log(`Using file API: ${fileApi.name}, path: ${path}`);
+    console.log(`Starting upload of ${file.name} (${file.size} bytes) to ${location}`);
     
-    // Log the URL that will be constructed for debugging
-    console.log(`⭐⭐⭐ Uploading using file API service, service name: ${fileApi.name} ⭐⭐⭐`);
+    // Create a file list
+    const fileList = new DataTransfer();
+    fileList.items.add(file);
     
-    this.fileApiService.uploadFile(
-      fileApi.name, 
-      file,
-      path
-    )
+    // Use the same approach as the admin interface
+    this.crudService.uploadFile(location, fileList.files)
     .pipe(untilDestroyed(this))
     .subscribe({
       next: (response) => {
@@ -480,12 +492,22 @@ export class DfFileSelectorDialogComponent implements OnInit {
     
     this.isLoading = true;
     
-    // Use the POST method with X-Http-Method header which is more compatible with the API
-    this.fileApiService.createDirectoryWithPost(
-      this.selectedFileApi.name,
-      this.currentPath,
-      folderName
-    )
+    // Use the legacyDelete method which adds the X-Http-Method header
+    // but in this case for POST with folder creation payload
+    const path = this.currentPath ? `${this.selectedFileApi.name}/${this.currentPath}` : this.selectedFileApi.name;
+    const payload = {
+      resource: [
+        {
+          name: folderName,
+          type: 'folder'
+        }
+      ]
+    };
+    
+    // Using HTTP directly with the required headers
+    this.http.post(`api/v2/${path}`, payload, {
+      headers: { 'X-Http-Method': 'POST' }
+    })
     .pipe(untilDestroyed(this))
     .subscribe({
       next: () => {
