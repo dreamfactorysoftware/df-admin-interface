@@ -42,6 +42,24 @@ export class FileApiService {
   ) { }
 
   /**
+   * Get the absolute API URL by determining the base URL from the current window location
+   * This bypasses the Angular baseHref and router completely
+   */
+  private getAbsoluteApiUrl(path: string): string {
+    // Get the current origin (protocol + hostname + port)
+    const origin = window.location.origin;
+    
+    // Ensure the path starts with a slash but doesn't have multiple slashes
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    
+    // Combine to get the absolute URL without /dreamfactory/dist/
+    const absoluteUrl = `${origin}${cleanPath}`;
+    
+    console.log(`🔍 Constructed absolute URL: ${absoluteUrl} for path: ${path}`);
+    return absoluteUrl;
+  }
+
+  /**
    * Check if a file service should be included in the selector
    * @param service The file service to check
    * @returns True if the service should be included, false otherwise
@@ -106,10 +124,9 @@ export class FileApiService {
       observer.next(defaultServices);
       
       // Then try to get the actual services from the API
-      // Using direct URL format that matches the server expectation
-      // Notice the format change from filter[type] to filter=type=
-      // Use relative URL (without leading slash) to work with baseHref
-      this.http.get<GenericListResponse<FileService>>('api/v2/system/service', {
+      // Using absolute URL to bypass any baseHref issues
+      const url = this.getAbsoluteApiUrl('api/v2/system/service');
+      this.http.get<GenericListResponse<FileService>>(url, {
         params: {
           'filter': 'type=local_file',
           'fields': 'id,name,label,type'
@@ -174,8 +191,10 @@ export class FileApiService {
       });
     }
     
-    // Use relative URL (without leading slash) to work with baseHref
-    const url = path ? `api/v2/${serviceName}/${path}` : `api/v2/${serviceName}`;
+    // Construct the path
+    const apiPath = path ? `api/v2/${serviceName}/${path}` : `api/v2/${serviceName}`;
+    // Use absolute URL to bypass any baseHref issues
+    const url = this.getAbsoluteApiUrl(apiPath);
     console.log(`Listing files from ${url}`);
     
     // Set specific parameters for file listing
@@ -228,20 +247,21 @@ export class FileApiService {
    * @param path The path to upload to (optional)
    */
   uploadFile(serviceName: string, file: File, path: string = ''): Observable<any> {
-    // Build the URL properly including the filename
-    let url: string;
+    // Construct the path
+    let apiPath: string;
     if (path) {
       // Ensure path doesn't end with slash and append filename
       const cleanPath = path.replace(/\/$/, '');
-      // Use relative URL (without leading slash) to work with baseHref
-      url = `api/v2/${serviceName}/${cleanPath}/${file.name}`;
+      apiPath = `api/v2/${serviceName}/${cleanPath}/${file.name}`;
     } else {
-      // Use relative URL (without leading slash) to work with baseHref
-      url = `api/v2/${serviceName}/${file.name}`;
+      apiPath = `api/v2/${serviceName}/${file.name}`;
     }
     
+    // Use absolute URL to bypass any baseHref issues
+    const url = this.getAbsoluteApiUrl(apiPath);
+    
     console.log(`⭐⭐⭐ UPLOADING FILE ${file.name} (${file.size} bytes), type: ${file.type} ⭐⭐⭐`);
-    console.log(`To URL: ${url}`);
+    console.log(`To absolute URL: ${url}`);
     console.log(`Current document baseURI: ${document.baseURI}`);
     console.log(`Current window location: ${window.location.href}`);
     
@@ -288,9 +308,11 @@ export class FileApiService {
       ]
     };
     
-    // Use relative URL (without leading slash) to work with baseHref
-    const url = path ? `api/v2/${serviceName}/${path}` : `api/v2/${serviceName}`;
-    console.log(`Creating directory using POST at ${url}`, payload);
+    // Construct the path
+    const apiPath = path ? `api/v2/${serviceName}/${path}` : `api/v2/${serviceName}`;
+    // Use absolute URL to bypass any baseHref issues
+    const url = this.getAbsoluteApiUrl(apiPath);
+    console.log(`Creating directory using POST at absolute URL: ${url}`, payload);
     
     // Get headers and add X-Http-Method header
     const headers = this.getHeaders();
@@ -311,9 +333,10 @@ export class FileApiService {
    * @param path The path to the file
    */
   getFileContent(serviceName: string, path: string): Observable<any> {
-    // Use relative URL (without leading slash) to work with baseHref
-    const url = `api/v2/${serviceName}/${path}`;
-    console.log(`Getting file content from ${url}`);
+    // Construct the path and use absolute URL
+    const apiPath = `api/v2/${serviceName}/${path}`;
+    const url = this.getAbsoluteApiUrl(apiPath);
+    console.log(`Getting file content from absolute URL: ${url}`);
     
     return this.http.get(url, {
       responseType: 'blob',
@@ -332,9 +355,10 @@ export class FileApiService {
    * @param path The path to the file
    */
   deleteFile(serviceName: string, path: string): Observable<any> {
-    // Use relative URL (without leading slash) to work with baseHref
-    const url = `api/v2/${serviceName}/${path}`;
-    console.log(`Deleting file at ${url}`);
+    // Construct the path and use absolute URL
+    const apiPath = `api/v2/${serviceName}/${path}`;
+    const url = this.getAbsoluteApiUrl(apiPath);
+    console.log(`Deleting file at absolute URL: ${url}`);
     
     return this.http.delete(url, { headers: this.getHeaders() }).pipe(
       tap(response => console.log('Delete response:', response)),
@@ -361,9 +385,11 @@ export class FileApiService {
       ]
     };
     
-    // Use relative URL (without leading slash) to work with baseHref
-    const url = path ? `api/v2/${serviceName}/${path}` : `api/v2/${serviceName}`;
-    console.log(`Creating directory at ${url}`, payload);
+    // Construct the path
+    const apiPath = path ? `api/v2/${serviceName}/${path}` : `api/v2/${serviceName}`;
+    // Use absolute URL to bypass any baseHref issues
+    const url = this.getAbsoluteApiUrl(apiPath);
+    console.log(`Creating directory at absolute URL: ${url}`, payload);
     
     return this.http.post(url, payload, { headers: this.getHeaders() }).pipe(
       tap(response => console.log('Create directory response:', response)),
