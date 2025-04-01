@@ -253,7 +253,8 @@ export class FileApiService {
     
     // Create FormData for the file - this works for ALL file types
     const formData = new FormData();
-    formData.append('file', file);
+    // IMPORTANT: Use 'files' instead of 'file' to match the admin implementation
+    formData.append('files', file);
     
     // Get authentication headers
     const headers = this.getHeaders();
@@ -267,6 +268,39 @@ export class FileApiService {
           status: error.status, 
           error: error.error || { message: 'File upload failed' } 
         }));
+      })
+    );
+  }
+
+  /**
+   * Create a directory using POST with X-Http-Method header
+   * @param serviceName The name of the file service
+   * @param path The path where to create the directory
+   * @param name The name of the directory
+   */
+  createDirectoryWithPost(serviceName: string, path: string, name: string): Observable<any> {
+    const payload = {
+      resource: [
+        {
+          name: name,
+          type: 'folder'
+        }
+      ]
+    };
+    
+    // Use relative URL (without leading slash) to work with baseHref
+    const url = path ? `api/v2/${serviceName}/${path}` : `api/v2/${serviceName}`;
+    console.log(`Creating directory using POST at ${url}`, payload);
+    
+    // Get headers and add X-Http-Method header
+    const headers = this.getHeaders();
+    headers['X-Http-Method'] = 'POST';
+    
+    return this.http.post(url, payload, { headers }).pipe(
+      tap(response => console.log('Create directory response:', response)),
+      catchError(error => {
+        console.error(`Error creating directory at ${url}:`, error);
+        throw error;
       })
     );
   }

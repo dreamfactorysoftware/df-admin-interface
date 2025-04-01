@@ -480,7 +480,8 @@ export class DfFileSelectorDialogComponent implements OnInit {
     
     this.isLoading = true;
     
-    this.fileApiService.createDirectory(
+    // Use the POST method with X-Http-Method header which is more compatible with the API
+    this.fileApiService.createDirectoryWithPost(
       this.selectedFileApi.name,
       this.currentPath,
       folderName
