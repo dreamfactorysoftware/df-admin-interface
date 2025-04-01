@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpEventType } from '@angular/common/http';
-import { Observable, catchError, map, tap, filter } from 'rxjs';
+import { Observable, catchError, map, tap, filter, throwError } from 'rxjs';
 import { DfUserDataService } from './df-user-data.service';
 import { SESSION_TOKEN_HEADER } from '../constants/http-headers';
 
@@ -236,218 +236,35 @@ export class FileApiService {
       url = `/api/v2/${serviceName}/${file.name}`;
     }
     
-    console.log(`Uploading file: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
+    console.log(`⭐⭐⭐ UPLOADING FILE ${file.name} (${file.size} bytes), type: ${file.type} ⭐⭐⭐`);
     console.log(`To URL: ${url}`);
+    console.log(`Current document baseURI: ${document.baseURI}`);
+    console.log(`Current window location: ${window.location.href}`);
     
-    // Check if this is a private key file that needs special handling
+    // Check if this is a private key file (just for logging purposes)
     const isPEMFile = file.name.endsWith('.pem') || file.name.endsWith('.p8') || file.name.endsWith('.key');
-    
     if (isPEMFile) {
-      console.log('Detected private key file - using binary upload method for proper content preservation');
-      return this.uploadBinaryFile(url, file);
+      console.log('Detected private key file - using standard FormData upload method');
     }
+    
+    // Create FormData for the file - this works for ALL file types
+    const formData = new FormData();
+    formData.append('file', file);
     
     // Get authentication headers
     const headers = this.getHeaders();
     
-    // Use a more direct XMLHttpRequest approach with explicit binary handling
-    return new Observable(observer => {
-      // Create a new XMLHttpRequest
-      const xhr = new XMLHttpRequest();
-      
-      // Set up progress tracking
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percentDone = Math.round(100 * event.loaded / event.total);
-          console.log(`Upload progress: ${percentDone}%`);
-          observer.next({ type: 'progress', progress: percentDone });
-        }
-      };
-      
-      // Handle various events
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          let response;
-          try {
-            response = JSON.parse(xhr.responseText);
-          } catch (e) {
-            response = xhr.responseText;
-          }
-          console.log('Upload complete with response:', response);
-          observer.next(response);
-          observer.complete();
-        } else {
-          let errorResponse;
-          try {
-            errorResponse = JSON.parse(xhr.responseText);
-          } catch (e) {
-            errorResponse = { error: xhr.statusText };
-          }
-          console.error(`Error uploading file: ${xhr.status} ${xhr.statusText}`, errorResponse);
-          observer.error({ status: xhr.status, error: errorResponse });
-        }
-      };
-      
-      xhr.onerror = () => {
-        console.error('Network error during file upload');
-        observer.error({ status: 0, error: 'Network error during file upload' });
-      };
-      
-      xhr.ontimeout = () => {
-        console.error('Timeout during file upload');
-        observer.error({ status: 408, error: 'Request timeout' });
-      };
-      
-      // Open the request (POST for file upload)
-      xhr.open('POST', url, true);
-      
-      // Add authentication and other needed headers
-      Object.keys(headers).forEach(key => {
-        xhr.setRequestHeader(key, headers[key]);
-      });
-      
-      // Create FormData for the file
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      // Log the file size again right before sending
-      console.log(`Sending file with size: ${file.size} bytes`);
-      
-      // Send the request with the file data
-      xhr.send(formData);
-      
-      // Return an unsubscribe function
-      return () => {
-        if (xhr && xhr.readyState !== 4) {
-          xhr.abort();
-        }
-      };
-    });
-  }
-
-  /**
-   * Upload a binary file (like PEM, P8, or private key files) using binary transmission
-   * to ensure content is preserved properly
-   * @param url The URL to upload to
-   * @param file The file to upload as binary
-   */
-  private uploadBinaryFile(url: string, file: File): Observable<any> {
-    console.log(`⭐⭐⭐ UPLOADING BINARY FILE ${file.name} - USING METHOD WITH ${new Date().toISOString()} ⭐⭐⭐`);
-    console.log(`Full upload URL: ${url}`);
-    console.log(`Uploading binary file: ${file.name}, size: ${file.size} bytes`);
-    
-    // Get authentication headers
-    const headers = this.getHeaders();
-    console.log('Authentication headers:', headers);
-    
-    // Check if we're using absolute URL
-    if (!url.startsWith('/')) {
-      console.warn('⚠️ WARNING: URL does not start with a leading slash, this may cause issues with baseHref');
-      url = '/' + url;
-      console.log('Fixed URL to: ' + url);
-    }
-    
-    // Log the current document baseURI for debugging
-    console.log('Current document baseURI:', document.baseURI);
-    console.log('Current window location:', window.location.href);
-    
-    return new Observable(observer => {
-      // First read the file
-      const reader = new FileReader();
-      
-      reader.onload = (event) => {
-        const content = event.target?.result;
-        
-        if (!content) {
-          observer.error({ status: 500, error: 'Failed to read file content' });
-          return;
-        }
-        
-        console.log(`File content read successfully, content length: ${(content as ArrayBuffer).byteLength} bytes`);
-        
-        // Create a new XMLHttpRequest for binary upload
-        const xhr = new XMLHttpRequest();
-        
-        // Set up progress tracking
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const percentDone = Math.round(100 * event.loaded / event.total);
-            console.log(`Upload progress: ${percentDone}%`);
-            observer.next({ type: 'progress', progress: percentDone });
-          }
-        };
-        
-        // Handle various events
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            let response;
-            try {
-              response = JSON.parse(xhr.responseText);
-            } catch (e) {
-              response = xhr.responseText;
-            }
-            console.log('Binary upload complete with response:', response);
-            observer.next(response);
-            observer.complete();
-          } else {
-            let errorResponse;
-            try {
-              errorResponse = JSON.parse(xhr.responseText);
-            } catch (e) {
-              errorResponse = { error: xhr.statusText };
-            }
-            console.error(`Error uploading binary file: ${xhr.status} ${xhr.statusText}`, errorResponse);
-            observer.error({ status: xhr.status, error: errorResponse });
-          }
-        };
-        
-        xhr.onerror = () => {
-          console.error('Network error during binary file upload');
-          observer.error({ status: 0, error: 'Network error during binary file upload' });
-        };
-        
-        xhr.ontimeout = () => {
-          console.error('Timeout during binary file upload');
-          observer.error({ status: 408, error: 'Request timeout' });
-        };
-        
-        // Open the request (POST for file upload)
-        xhr.open('POST', url, true);
-        
-        // Add authentication headers
-        Object.keys(headers).forEach(key => {
-          xhr.setRequestHeader(key, headers[key]);
-        });
-        
-        // IMPORTANT CHANGE: Use FormData instead of binary content
-        console.log('Using FormData for binary file upload instead of raw binary content');
-        const formData = new FormData();
-        
-        // Create a new File from the ArrayBuffer to ensure proper transmission
-        const binaryFile = new File([content], file.name, { type: 'application/octet-stream' });
-        formData.append('file', binaryFile);
-        
-        console.log(`Sending file with FormData, size: ${binaryFile.size} bytes`);
-        
-        // Send FormData which will handle the content-type header automatically
-        xhr.send(formData);
-        
-        // Return an unsubscribe function
-        return () => {
-          if (xhr && xhr.readyState !== 4) {
-            xhr.abort();
-          }
-        };
-      };
-      
-      reader.onerror = (error) => {
-        console.error('Error reading file:', error);
-        observer.error({ status: 500, error: 'Failed to read file: ' + (error.target?.error?.message || 'Unknown error') });
-      };
-      
-      // Read the file as an ArrayBuffer (binary content)
-      reader.readAsArrayBuffer(file);
-    });
+    // Use Angular's HttpClient for the upload - this handles baseHref correctly
+    return this.http.post(url, formData, { headers }).pipe(
+      tap(response => console.log('Upload complete with response:', response)),
+      catchError(error => {
+        console.error(`Error uploading file: ${error.status} ${error.statusText}`, error);
+        return throwError(() => ({ 
+          status: error.status, 
+          error: error.error || { message: 'File upload failed' } 
+        }));
+      })
+    );
   }
 
   /**
