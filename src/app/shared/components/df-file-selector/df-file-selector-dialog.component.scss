@@ -84,6 +84,9 @@ h2 {
     display: flex;
     gap: 16px;
     margin-bottom: 20px;
+    padding: 10px;
+    border: 1px dashed #3f51b5;
+    background-color: rgba(63, 81, 181, 0.05);
 
     .action-button {
       display: flex;

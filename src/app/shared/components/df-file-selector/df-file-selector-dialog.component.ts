@@ -166,6 +166,7 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
   // Flag to determine if we're in selector-only mode
   get isSelectorOnly(): boolean {
+    console.log('isSelectorOnly getter called, data.selectorOnly =', this.data.selectorOnly);
     return !!this.data.selectorOnly;
   }
 
@@ -183,6 +184,14 @@ export class DfFileSelectorDialogComponent implements OnInit {
     if (this.data.uploadMode && this.data.fileApis.length > 0) {
       this.selectFileApi(this.data.fileApis[0]);
     }
+    
+    // Print debug information about the dialog data
+    console.log('Dialog initialized with data:', { 
+      uploadMode: this.data.uploadMode,
+      selectorOnly: this.data.selectorOnly,
+      allowedExtensions: this.data.allowedExtensions,
+      fileApis: this.data.fileApis?.length || 0
+    });
   }
 
   selectFileApi(fileApi: FileApiInfo): void {
@@ -198,7 +207,8 @@ export class DfFileSelectorDialogComponent implements OnInit {
     this.isLoading = true;
 
     // Use fileApiService to handle authentication and headers properly
-    this.fileApiService.listFiles(this.selectedFileApi.name, this.currentPath)
+    this.fileApiService
+      .listFiles(this.selectedFileApi.name, this.currentPath)
       .pipe(untilDestroyed(this))
       .subscribe({
         next: (response: any) => {
@@ -362,7 +372,8 @@ export class DfFileSelectorDialogComponent implements OnInit {
     );
 
     // Use fileApiService to handle authentication and proper URL construction
-    this.fileApiService.uploadFile(fileApi.name, file, path)
+    this.fileApiService
+      .uploadFile(fileApi.name, file, path)
       .pipe(untilDestroyed(this))
       .subscribe({
         next: response => {
@@ -458,7 +469,8 @@ export class DfFileSelectorDialogComponent implements OnInit {
     );
 
     // Use fileApiService to handle authentication and proper URL construction
-    this.fileApiService.uploadFile(fileApi.name, file, path)
+    this.fileApiService
+      .uploadFile(fileApi.name, file, path)
       .pipe(untilDestroyed(this))
       .subscribe({
         next: response => {
@@ -514,10 +526,31 @@ export class DfFileSelectorDialogComponent implements OnInit {
       });
   }
 
+  // Trigger the file input click programmatically
+  triggerFileUpload(): void {
+    console.log('triggerFileUpload called, isSelectorOnly =', this.isSelectorOnly);
+    
+    // Don't allow file upload in selector-only mode
+    if (this.isSelectorOnly) {
+      console.log('Blocked file upload due to selector-only mode');
+      return;
+    }
+
+    if (this.fileUploadInput) {
+      console.log('Clicking file upload input element');
+      this.fileUploadInput.nativeElement.click();
+    } else {
+      console.log('File upload input element not found');
+    }
+  }
+
   // Show dialog to create a new folder
   showCreateFolderDialog(): void {
+    console.log('showCreateFolderDialog called, isSelectorOnly =', this.isSelectorOnly);
+    
     // Don't allow folder creation in selector-only mode
     if (this.isSelectorOnly) {
+      console.log('Blocked folder creation due to selector-only mode');
       return;
     }
 
@@ -539,7 +572,8 @@ export class DfFileSelectorDialogComponent implements OnInit {
     this.isLoading = true;
 
     // Use fileApiService to handle authentication and proper URL construction
-    this.fileApiService.createDirectory(this.selectedFileApi.name, this.currentPath, folderName)
+    this.fileApiService
+      .createDirectory(this.selectedFileApi.name, this.currentPath, folderName)
       .pipe(untilDestroyed(this))
       .subscribe({
         next: () => {
@@ -557,18 +591,6 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
   cancel(): void {
     this.dialogRef.close();
-  }
-
-  // Trigger the file input click programmatically
-  triggerFileUpload(): void {
-    // Don't allow file upload in selector-only mode
-    if (this.isSelectorOnly) {
-      return;
-    }
-
-    if (this.fileUploadInput) {
-      this.fileUploadInput.nativeElement.click();
-    }
   }
 
   // Handle file selection from the input element

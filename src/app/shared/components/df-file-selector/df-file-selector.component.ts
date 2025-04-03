@@ -166,12 +166,14 @@ export class DfFileSelectorComponent implements OnInit {
     // Ensure fallback before opening dialog
     this.ensureFallbackService();
 
+    console.log('Opening file selector dialog with selectorOnly = false');
+    
     const dialogRef = this.dialog.open(DfFileSelectorDialogComponent, {
       width: '800px',
       data: {
         fileApis: this.fileApis,
         allowedExtensions: this.allowedExtensions,
-        selectorOnly: true, // Only allow selection, no upload
+        selectorOnly: false, // Allow folder creation and file upload
       },
     });
 
