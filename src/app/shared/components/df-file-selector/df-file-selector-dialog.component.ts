@@ -170,11 +170,27 @@ export class DfFileSelectorDialogComponent implements OnInit {
     
     this.isLoading = true;
     
-    // Use the FileApiService instead of direct HTTP calls
-    this.fileApiService.listFiles(this.selectedFileApi.name, this.currentPath)
+    // Construct the API path
+    const apiPath = this.currentPath ? 
+      `${this.selectedFileApi.name}/${this.currentPath}` : 
+      `${this.selectedFileApi.name}`;
+    
+    // Use absolute URL construction to bypass Angular baseHref
+    const url = `${window.location.origin}/api/v2/${apiPath}`;
+    console.log(`Loading files using absolute URL: ${url}`);
+    
+    // Set specific parameters for file listing
+    const params: Record<string, string> = {};
+    // Ask for content-type to help identify file types
+    params['include_properties'] = 'content_type';
+    // Add standard fields
+    params['fields'] = 'name,path,type,content_type,last_modified,size';
+    
+    // Direct HTTP request to avoid /dreamfactory/dist/ prefix
+    this.http.get(url, { params })
       .pipe(untilDestroyed(this))
       .subscribe({
-        next: (response) => {
+        next: (response: any) => {
           this.isLoading = false;
           
           // Check if response contains an error message from our error handling
@@ -326,12 +342,17 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
     console.log(`Starting upload of ${file.name} (${file.size} bytes) to ${location}`);
     
-    // Create a file list
-    const fileList = new DataTransfer();
-    fileList.items.add(file);
+    // Create FormData for the file
+    const formData = new FormData();
+    // Use 'files' field name to match admin implementation
+    formData.append('files', file);
     
-    // Use the same approach as the admin interface
-    this.crudService.uploadFile(location, fileList.files)
+    // Use absolute URL construction to bypass Angular baseHref
+    const url = `${window.location.origin}/api/v2/${location}`;
+    console.log(`Uploading file using absolute URL: ${url}`);
+    
+    // Direct HTTP request to avoid /dreamfactory/dist/ prefix
+    this.http.post(url, formData)
     .pipe(untilDestroyed(this))
     .subscribe({
       next: (response) => {
@@ -423,12 +444,17 @@ export class DfFileSelectorDialogComponent implements OnInit {
     
     console.log(`Starting upload of ${file.name} (${file.size} bytes) to ${location}`);
     
-    // Create a file list
-    const fileList = new DataTransfer();
-    fileList.items.add(file);
+    // Create FormData for the file
+    const formData = new FormData();
+    // Use 'files' field name to match admin implementation
+    formData.append('files', file);
     
-    // Use the same approach as the admin interface
-    this.crudService.uploadFile(location, fileList.files)
+    // Use absolute URL construction to bypass Angular baseHref
+    const url = `${window.location.origin}/api/v2/${location}`;
+    console.log(`Uploading file using absolute URL: ${url}`);
+    
+    // Direct HTTP request to avoid /dreamfactory/dist/ prefix
+    this.http.post(url, formData)
     .pipe(untilDestroyed(this))
     .subscribe({
       next: (response) => {
@@ -503,9 +529,10 @@ export class DfFileSelectorDialogComponent implements OnInit {
     
     this.isLoading = true;
     
-    // Use the legacyDelete method which adds the X-Http-Method header
-    // but in this case for POST with folder creation payload
+    // Construct the path without dreamfactory/dist prefix
     const path = this.currentPath ? `${this.selectedFileApi.name}/${this.currentPath}` : this.selectedFileApi.name;
+    
+    // Create the payload for folder creation
     const payload = {
       resource: [
         {
@@ -515,10 +542,15 @@ export class DfFileSelectorDialogComponent implements OnInit {
       ]
     };
     
-    // Using HTTP directly with the required headers
-    this.http.post(`api/v2/${path}`, payload, {
-      headers: { 'X-Http-Method': 'POST' }
-    })
+    // Use absolute URL construction to bypass Angular baseHref
+    const url = `${window.location.origin}/api/v2/${path}`;
+    console.log(`Creating folder using absolute URL: ${url}`);
+    
+    // Use the same headers approach as the admin interface
+    const headers = { 'X-Http-Method': 'POST' };
+    
+    // Send request directly to /api/v2 path without dreamfactory/dist prefix
+    this.http.post(url, payload, { headers })
     .pipe(untilDestroyed(this))
     .subscribe({
       next: () => {
