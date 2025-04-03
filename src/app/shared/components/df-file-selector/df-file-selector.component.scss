@@ -19,11 +19,11 @@
 .file-selector-description {
   font-size: 14px;
   color: rgba(0, 0, 0, 0.6);
-  
+
   a {
     color: #3f51b5;
     text-decoration: none;
-    
+
     &:hover {
       text-decoration: underline;
     }
@@ -50,7 +50,7 @@
 .select-file-button {
   padding: 8px 24px;
   font-size: 14px;
-  
+
   fa-icon {
     margin-right: 8px;
   }
@@ -148,7 +148,7 @@
   font-size: 14px;
   padding: 0;
   font-weight: 500;
-  
+
   &:hover {
     text-decoration: underline;
   }
@@ -184,7 +184,7 @@
   .file-selector-description,
   .no-apis-message {
     color: rgba(255, 255, 255, 0.6);
-    
+
     a {
       color: #9fa8da;
     }
@@ -194,7 +194,7 @@
   .file-service {
     color: rgba(255, 255, 255, 0.87);
   }
-  
+
   .file-path-header {
     color: rgba(255, 255, 255, 0.9);
   }
@@ -202,21 +202,21 @@
   .file-selector-selected {
     background-color: rgba(255, 255, 255, 0.04);
   }
-  
+
   .clear-button {
     color: #ef9a9a;
   }
-  
+
   .file-path-section {
     background-color: rgba(255, 255, 255, 0.07);
     border-color: rgba(255, 255, 255, 0.15);
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
   }
-  
+
   .file-path-label {
     color: rgba(255, 255, 255, 0.9);
   }
-  
+
   .file-path-value {
     color: rgba(255, 255, 255, 0.9);
     background-color: rgba(0, 0, 0, 0.2);
@@ -226,4 +226,4 @@
   .relative-path-section {
     color: rgba(255, 255, 255, 0.6);
   }
-} 
+}

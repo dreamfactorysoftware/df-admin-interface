@@ -1,6 +1,17 @@
-import { Component, Inject, OnInit, ViewChild, ElementRef } from '@angular/core';
+import {
+  Component,
+  Inject,
+  OnInit,
+  ViewChild,
+  ElementRef,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA, MatDialog } from '@angular/material/dialog';
+import {
+  MatDialogModule,
+  MatDialogRef,
+  MAT_DIALOG_DATA,
+  MatDialog,
+} from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,7 +25,12 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faFolderOpen, faFile, faArrowLeft, faUpload } from '@fortawesome/free-solid-svg-icons';
+import {
+  faFolderOpen,
+  faFile,
+  faArrowLeft,
+  faUpload,
+} from '@fortawesome/free-solid-svg-icons';
 import { FileApiInfo, SelectedFile } from './df-file-selector.component';
 import { HttpClient } from '@angular/common/http';
 import { FileApiService } from '../../services/df-file-api.service';
@@ -29,17 +45,30 @@ import { URL_TOKEN } from '../../constants/tokens';
     <mat-dialog-content>
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Folder Name</mat-label>
-        <input matInput [(ngModel)]="folderName" placeholder="Enter folder name">
+        <input
+          matInput
+          [(ngModel)]="folderName"
+          placeholder="Enter folder name" />
       </mat-form-field>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button (click)="onCancel()">Cancel</button>
-      <button mat-raised-button color="primary" [disabled]="!folderName" (click)="onConfirm()">Create</button>
+      <button
+        mat-raised-button
+        color="primary"
+        [disabled]="!folderName"
+        (click)="onConfirm()">
+        Create
+      </button>
     </mat-dialog-actions>
   `,
-  styles: [`
-    .full-width { width: 100%; }
-  `],
+  styles: [
+    `
+      .full-width {
+        width: 100%;
+      }
+    `,
+  ],
   standalone: true,
   imports: [
     MatDialogModule,
@@ -47,15 +76,13 @@ import { URL_TOKEN } from '../../constants/tokens';
     MatFormFieldModule,
     MatInputModule,
     FormsModule,
-    CommonModule
-  ]
+    CommonModule,
+  ],
 })
 export class CreateFolderDialogComponent {
   folderName: string = '';
 
-  constructor(
-    public dialogRef: MatDialogRef<CreateFolderDialogComponent>
-  ) {}
+  constructor(public dialogRef: MatDialogRef<CreateFolderDialogComponent>) {}
 
   onCancel(): void {
     this.dialogRef.close();
@@ -104,7 +131,7 @@ interface DialogData {
     FormsModule,
     ReactiveFormsModule,
     TranslocoPipe,
-    FontAwesomeModule
+    FontAwesomeModule,
   ],
   providers: [
     // Create a factory provider for the DfBaseCrudService that sets the URL dynamically
@@ -113,14 +140,14 @@ interface DialogData {
       useFactory: (http: HttpClient) => {
         return new DfBaseCrudService('api/v2', http);
       },
-      deps: [HttpClient]
-    }
-  ]
+      deps: [HttpClient],
+    },
+  ],
 })
 export class DfFileSelectorDialogComponent implements OnInit {
   // Reference to the file input element
   @ViewChild('fileUploadInput') fileUploadInput!: ElementRef<HTMLInputElement>;
-  
+
   faFolderOpen = faFolderOpen;
   faFile = faFile;
   faArrowLeft = faArrowLeft;
@@ -132,11 +159,11 @@ export class DfFileSelectorDialogComponent implements OnInit {
   navigationStack: string[] = [];
   isLoading = false;
   uploadInProgress = false;
-  
+
   displayedColumns: string[] = ['name', 'type', 'actions'];
-  
+
   selectedFile: FileItem | null = null;
-  
+
   // Flag to determine if we're in selector-only mode
   get isSelectorOnly(): boolean {
     return !!this.data.selectorOnly;
@@ -149,7 +176,7 @@ export class DfFileSelectorDialogComponent implements OnInit {
     private http: HttpClient,
     private fileApiService: FileApiService,
     private crudService: DfBaseCrudService
-  ) { }
+  ) {}
 
   ngOnInit(): void {
     // If we're in upload mode, start by showing the file APIs
@@ -167,32 +194,33 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
   loadFiles(): void {
     if (!this.selectedFileApi) return;
-    
+
     this.isLoading = true;
-    
+
     // Construct the API path
-    const apiPath = this.currentPath ? 
-      `${this.selectedFileApi.name}/${this.currentPath}` : 
-      `${this.selectedFileApi.name}`;
-    
+    const apiPath = this.currentPath
+      ? `${this.selectedFileApi.name}/${this.currentPath}`
+      : `${this.selectedFileApi.name}`;
+
     // Use absolute URL construction to bypass Angular baseHref
     const url = `${window.location.origin}/api/v2/${apiPath}`;
     console.log(`Loading files using absolute URL: ${url}`);
-    
+
     // Set specific parameters for file listing
     const params: Record<string, string> = {};
     // Ask for content-type to help identify file types
     params['include_properties'] = 'content_type';
     // Add standard fields
     params['fields'] = 'name,path,type,content_type,last_modified,size';
-    
+
     // Direct HTTP request to avoid /dreamfactory/dist/ prefix
-    this.http.get(url, { params })
+    this.http
+      .get(url, { params })
       .pipe(untilDestroyed(this))
       .subscribe({
         next: (response: any) => {
           this.isLoading = false;
-          
+
           // Check if response contains an error message from our error handling
           if (response.error) {
             console.warn('File listing contained error:', response.error);
@@ -203,37 +231,42 @@ export class DfFileSelectorDialogComponent implements OnInit {
               return;
             }
           }
-          
+
           // Format depends on file service type
           // Typically, the response is either an array of files or has a resource property
           let fileList: any[] = [];
-          
+
           if (Array.isArray(response)) {
             fileList = response;
           } else if (response.resource && Array.isArray(response.resource)) {
             fileList = response.resource;
           }
-          
+
           this.files = fileList.map(file => ({
             name: file.name || (file.path ? file.path.split('/').pop() : ''),
-            path: file.path || ((this.currentPath ? this.currentPath + '/' : '') + file.name).replace('//', '/'),
+            path:
+              file.path ||
+              (
+                (this.currentPath ? this.currentPath + '/' : '') + file.name
+              ).replace('//', '/'),
             type: file.type === 'folder' ? 'folder' : 'file',
             contentType: file.content_type || file.contentType,
             lastModified: file.last_modified || file.lastModified,
-            size: file.size
+            size: file.size,
           }));
-          
+
           console.log('Processed files:', this.files);
         },
         error: (err: any) => {
           console.error('Error loading files:', err);
           this.files = []; // Empty array instead of undefined
-          
+
           // Provide a more specific error message based on the error
           let errorMsg = 'Failed to load files. ';
-          
+
           if (err.status === 500) {
-            errorMsg += 'The server encountered an internal error. Using empty directory view.';
+            errorMsg +=
+              'The server encountered an internal error. Using empty directory view.';
             // We just show an empty directory without alert for 500 errors
             console.warn(errorMsg);
           } else if (err.status === 404) {
@@ -246,9 +279,9 @@ export class DfFileSelectorDialogComponent implements OnInit {
             errorMsg += 'Please check your connection and try again.';
             alert(errorMsg);
           }
-          
+
           this.isLoading = false;
-        }
+        },
       });
   }
 
@@ -273,24 +306,26 @@ export class DfFileSelectorDialogComponent implements OnInit {
     // Check if file extension is allowed
     const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!this.data.allowedExtensions.includes(fileExt)) {
-      alert(`Only ${this.data.allowedExtensions.join(', ')} files are allowed.`);
+      alert(
+        `Only ${this.data.allowedExtensions.join(', ')} files are allowed.`
+      );
       return;
     }
-    
+
     this.selectedFile = file;
   }
 
   confirmSelection(): void {
     if (!this.selectedFile || !this.selectedFileApi) return;
-    
+
     // Store reference to avoid null checks later
     const fileApi = this.selectedFileApi;
     const sourcePath = this.selectedFile.path;
-    
+
     // Get the base storage path for the file service
     // For local file service, the base path should be '/opt/dreamfactory/storage/app/'
     const baseStoragePath = '/opt/dreamfactory/storage/app/';
-    
+
     // Create result with proper path based on the current selection
     const result: SelectedFile = {
       // Provide both the relative path and the absolute path with storage root
@@ -299,210 +334,223 @@ export class DfFileSelectorDialogComponent implements OnInit {
       fileName: this.selectedFile.name,
       name: this.selectedFile.name,
       serviceId: fileApi.id,
-      serviceName: fileApi.name
+      serviceName: fileApi.name,
     };
-    
+
     console.log('Selected file with absolute path:', result);
-    
+
     // Return the selected file directly
     this.dialogRef.close(result);
   }
-  
+
   // Upload a file in the current path
   uploadFileDirectly(file: File): void {
     if (!this.selectedFileApi) {
       alert('Please select a file service first.');
       return;
     }
-    
+
     this.uploadInProgress = true;
-    
+
     // Store reference to avoid null checks later
     const fileApi = this.selectedFileApi;
-    
+
     // Use the current path for upload
     const uploadPath = this.currentPath;
-    
+
     // Upload to the current path
     this.performUpload(file, uploadPath);
   }
-  
+
   // Helper method to perform the actual upload
   private performUpload(file: File, path: string): void {
     if (!this.selectedFileApi) {
       this.uploadInProgress = false;
       return;
     }
-    
+
     this.uploadInProgress = true;
-    
+
     // Store reference to avoid null checks later
     const fileApi = this.selectedFileApi;
     const location = path ? `${fileApi.name}/${path}` : fileApi.name;
 
-    console.log(`Starting upload of ${file.name} (${file.size} bytes) to ${location}`);
-    
+    console.log(
+      `Starting upload of ${file.name} (${file.size} bytes) to ${location}`
+    );
+
     // Create FormData for the file
     const formData = new FormData();
     // Use 'files' field name to match admin implementation
     formData.append('files', file);
-    
+
     // Use absolute URL construction to bypass Angular baseHref
     const url = `${window.location.origin}/api/v2/${location}`;
     console.log(`Uploading file using absolute URL: ${url}`);
-    
+
     // Direct HTTP request to avoid /dreamfactory/dist/ prefix
-    this.http.post(url, formData)
-    .pipe(untilDestroyed(this))
-    .subscribe({
-      next: (response) => {
-        this.uploadInProgress = false;
-        console.log('Upload successful:', response);
-        
-        // Determine the relative path to the uploaded file
-        const relativePath = path ? `${path}/${file.name}` : file.name;
-        
-        // Get the base storage path for the file service
-        const baseStoragePath = '/opt/dreamfactory/storage/app/';
-        
-        // Create result with uploaded file info
-        const result: SelectedFile = {
-          path: baseStoragePath + relativePath,
-          relativePath: relativePath,
-          fileName: file.name,
-          name: file.name,
-          serviceId: fileApi.id,
-          serviceName: fileApi.name
-        };
-        
-        console.log('File uploaded successfully, returning:', result);
-        
-        // Reload files to show the newly uploaded file
-        this.loadFiles();
-        
-        // Automatically select the uploaded file
-        setTimeout(() => {
-          const uploadedFile = this.files.find(f => f.name === file.name);
-          if (uploadedFile) {
-            this.selectedFile = uploadedFile;
+    this.http
+      .post(url, formData)
+      .pipe(untilDestroyed(this))
+      .subscribe({
+        next: response => {
+          this.uploadInProgress = false;
+          console.log('Upload successful:', response);
+
+          // Determine the relative path to the uploaded file
+          const relativePath = path ? `${path}/${file.name}` : file.name;
+
+          // Get the base storage path for the file service
+          const baseStoragePath = '/opt/dreamfactory/storage/app/';
+
+          // Create result with uploaded file info
+          const result: SelectedFile = {
+            path: baseStoragePath + relativePath,
+            relativePath: relativePath,
+            fileName: file.name,
+            name: file.name,
+            serviceId: fileApi.id,
+            serviceName: fileApi.name,
+          };
+
+          console.log('File uploaded successfully, returning:', result);
+
+          // Reload files to show the newly uploaded file
+          this.loadFiles();
+
+          // Automatically select the uploaded file
+          setTimeout(() => {
+            const uploadedFile = this.files.find(f => f.name === file.name);
+            if (uploadedFile) {
+              this.selectedFile = uploadedFile;
+            }
+          }, 500);
+        },
+        error: (err: any) => {
+          console.error('Error uploading file:', err);
+          this.uploadInProgress = false;
+
+          let errorMsg = 'Failed to upload file. ';
+
+          if (err.status === 400) {
+            errorMsg +=
+              'Bad request - check if the file type is allowed or if the file is too large.';
+          } else if (err.status === 401 || err.status === 403) {
+            errorMsg +=
+              'Permission denied - you may not have access to upload to this location.';
+          } else if (err.status === 404) {
+            errorMsg += 'The specified folder does not exist.';
+          } else if (err.status === 413) {
+            errorMsg += 'The file is too large.';
+          } else if (err.status === 500) {
+            errorMsg += err.error?.error?.message || 'Server error occurred.';
+          } else {
+            errorMsg += 'Please try again.';
           }
-        }, 500);
-      },
-      error: (err: any) => {
-        console.error('Error uploading file:', err);
-        this.uploadInProgress = false;
-        
-        let errorMsg = 'Failed to upload file. ';
-        
-        if (err.status === 400) {
-          errorMsg += 'Bad request - check if the file type is allowed or if the file is too large.';
-        } else if (err.status === 401 || err.status === 403) {
-          errorMsg += 'Permission denied - you may not have access to upload to this location.';
-        } else if (err.status === 404) {
-          errorMsg += 'The specified folder does not exist.';
-        } else if (err.status === 413) {
-          errorMsg += 'The file is too large.';
-        } else if (err.status === 500) {
-          errorMsg += err.error?.error?.message || 'Server error occurred.';
-        } else {
-          errorMsg += 'Please try again.';
-        }
-        
-        alert(errorMsg);
-      }
-    });
+
+          alert(errorMsg);
+        },
+      });
   }
 
   // For files selected via the upload button in the main component
   uploadFile(): void {
     if (!this.data.fileToUpload || !this.selectedFileApi) return;
-    
+
     this.uploadInProgress = true;
-    
+
     // Store reference to avoid null checks later
     const fileApi = this.selectedFileApi;
-    
+
     // Use the current path for upload
     const uploadPath = this.currentPath;
-    
+
     // Upload to the current path
     this.performUploadAndClose(this.data.fileToUpload, uploadPath);
   }
-  
+
   // Helper method to perform the upload and close the dialog
   private performUploadAndClose(file: File, path: string): void {
     if (!this.selectedFileApi) {
       this.uploadInProgress = false;
       return;
     }
-    
+
     this.uploadInProgress = true;
-    
+
     // Store reference to avoid null checks later
     const fileApi = this.selectedFileApi;
     const location = path ? `${fileApi.name}/${path}` : fileApi.name;
-    
-    console.log(`Starting upload of ${file.name} (${file.size} bytes) to ${location}`);
-    
+
+    console.log(
+      `Starting upload of ${file.name} (${file.size} bytes) to ${location}`
+    );
+
     // Create FormData for the file
     const formData = new FormData();
     // Use 'files' field name to match admin implementation
     formData.append('files', file);
-    
+
     // Use absolute URL construction to bypass Angular baseHref
     const url = `${window.location.origin}/api/v2/${location}`;
     console.log(`Uploading file using absolute URL: ${url}`);
-    
+
     // Direct HTTP request to avoid /dreamfactory/dist/ prefix
-    this.http.post(url, formData)
-    .pipe(untilDestroyed(this))
-    .subscribe({
-      next: (response) => {
-        this.uploadInProgress = false;
-        console.log('Upload successful:', response);
-        
-        // Determine the relative path to the uploaded file
-        const relativePath = path ? `${path}/${file.name}` : file.name;
-        
-        // Get the base storage path for the file service
-        const baseStoragePath = '/opt/dreamfactory/storage/app/';
-        
-        // Create result with uploaded file info including absolute path
-        const result: SelectedFile = {
-          path: baseStoragePath + relativePath,
-          relativePath: relativePath,
-          fileName: file.name,
-          name: file.name,
-          serviceId: fileApi.id,
-          serviceName: fileApi.name
-        };
-        
-        console.log('File uploaded successfully, returning with absolute path:', result);
-        this.dialogRef.close(result);
-      },
-      error: (err: any) => {
-        console.error('Error uploading file:', err);
-        this.uploadInProgress = false;
-        
-        let errorMsg = 'Failed to upload file. ';
-        
-        if (err.status === 400) {
-          errorMsg += 'Bad request - check if the file type is allowed or if the file is too large.';
-        } else if (err.status === 401 || err.status === 403) {
-          errorMsg += 'Permission denied - you may not have access to upload to this location.';
-        } else if (err.status === 404) {
-          errorMsg += 'The specified folder does not exist.';
-        } else if (err.status === 413) {
-          errorMsg += 'The file is too large.';
-        } else if (err.status === 500) {
-          errorMsg += err.error?.error?.message || 'Server error occurred.';
-        } else {
-          errorMsg += 'Please try again.';
-        }
-        
-        alert(errorMsg);
-      }
-    });
+    this.http
+      .post(url, formData)
+      .pipe(untilDestroyed(this))
+      .subscribe({
+        next: response => {
+          this.uploadInProgress = false;
+          console.log('Upload successful:', response);
+
+          // Determine the relative path to the uploaded file
+          const relativePath = path ? `${path}/${file.name}` : file.name;
+
+          // Get the base storage path for the file service
+          const baseStoragePath = '/opt/dreamfactory/storage/app/';
+
+          // Create result with uploaded file info including absolute path
+          const result: SelectedFile = {
+            path: baseStoragePath + relativePath,
+            relativePath: relativePath,
+            fileName: file.name,
+            name: file.name,
+            serviceId: fileApi.id,
+            serviceName: fileApi.name,
+          };
+
+          console.log(
+            'File uploaded successfully, returning with absolute path:',
+            result
+          );
+          this.dialogRef.close(result);
+        },
+        error: (err: any) => {
+          console.error('Error uploading file:', err);
+          this.uploadInProgress = false;
+
+          let errorMsg = 'Failed to upload file. ';
+
+          if (err.status === 400) {
+            errorMsg +=
+              'Bad request - check if the file type is allowed or if the file is too large.';
+          } else if (err.status === 401 || err.status === 403) {
+            errorMsg +=
+              'Permission denied - you may not have access to upload to this location.';
+          } else if (err.status === 404) {
+            errorMsg += 'The specified folder does not exist.';
+          } else if (err.status === 413) {
+            errorMsg += 'The file is too large.';
+          } else if (err.status === 500) {
+            errorMsg += err.error?.error?.message || 'Server error occurred.';
+          } else {
+            errorMsg += 'Please try again.';
+          }
+
+          alert(errorMsg);
+        },
+      });
   }
 
   // Show dialog to create a new folder
@@ -511,9 +559,9 @@ export class DfFileSelectorDialogComponent implements OnInit {
     if (this.isSelectorOnly) {
       return;
     }
-    
+
     const dialogRef = this.dialog.open(CreateFolderDialogComponent, {
-      width: '350px'
+      width: '350px',
     });
 
     dialogRef.afterClosed().subscribe(folderName => {
@@ -526,44 +574,47 @@ export class DfFileSelectorDialogComponent implements OnInit {
   // Create a new folder in the current path
   createFolder(folderName: string): void {
     if (!this.selectedFileApi) return;
-    
+
     this.isLoading = true;
-    
+
     // Construct the path without dreamfactory/dist prefix
-    const path = this.currentPath ? `${this.selectedFileApi.name}/${this.currentPath}` : this.selectedFileApi.name;
-    
+    const path = this.currentPath
+      ? `${this.selectedFileApi.name}/${this.currentPath}`
+      : this.selectedFileApi.name;
+
     // Create the payload for folder creation
     const payload = {
       resource: [
         {
           name: folderName,
-          type: 'folder'
-        }
-      ]
+          type: 'folder',
+        },
+      ],
     };
-    
+
     // Use absolute URL construction to bypass Angular baseHref
     const url = `${window.location.origin}/api/v2/${path}`;
     console.log(`Creating folder using absolute URL: ${url}`);
-    
+
     // Use the same headers approach as the admin interface
     const headers = { 'X-Http-Method': 'POST' };
-    
+
     // Send request directly to /api/v2 path without dreamfactory/dist prefix
-    this.http.post(url, payload, { headers })
-    .pipe(untilDestroyed(this))
-    .subscribe({
-      next: () => {
-        console.log('Folder created successfully');
-        // Reload files to show the new folder
-        this.loadFiles();
-      },
-      error: (err: any) => {
-        console.error('Error creating folder:', err);
-        alert('Failed to create folder. Please try again.');
-        this.isLoading = false;
-      }
-    });
+    this.http
+      .post(url, payload, { headers })
+      .pipe(untilDestroyed(this))
+      .subscribe({
+        next: () => {
+          console.log('Folder created successfully');
+          // Reload files to show the new folder
+          this.loadFiles();
+        },
+        error: (err: any) => {
+          console.error('Error creating folder:', err);
+          alert('Failed to create folder. Please try again.');
+          this.isLoading = false;
+        },
+      });
   }
 
   cancel(): void {
@@ -576,55 +627,68 @@ export class DfFileSelectorDialogComponent implements OnInit {
     if (this.isSelectorOnly) {
       return;
     }
-    
+
     if (this.fileUploadInput) {
       this.fileUploadInput.nativeElement.click();
     }
   }
-  
+
   // Handle file selection from the input element
   handleFileUpload(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
       const file = input.files[0];
-      
+
       // Log detailed information about the file
       console.log(`File selected: ${file.name}`);
       console.log(`File size: ${file.size} bytes`);
       console.log(`File type: ${file.type}`);
-      
+
       // Check file extension to identify sensitive key files
-      const isPEMFile = file.name.endsWith('.pem') || file.name.endsWith('.p8') || file.name.endsWith('.key');
-      
+      const isPEMFile =
+        file.name.endsWith('.pem') ||
+        file.name.endsWith('.p8') ||
+        file.name.endsWith('.key');
+
       if (isPEMFile) {
-        console.log('Handling private key file with special care for Snowflake authentication');
+        console.log(
+          'Handling private key file with special care for Snowflake authentication'
+        );
       }
-      
+
       // Read the file content to verify it's not empty
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = e => {
         const content = e.target?.result;
-        console.log(`File content read successfully, content length: ${content ? (content as ArrayBuffer).byteLength : 0} bytes`);
-        
+        console.log(
+          `File content read successfully, content length: ${
+            content ? (content as ArrayBuffer).byteLength : 0
+          } bytes`
+        );
+
         // Continue with file validation
         // Validate file extension
         const extension = '.' + file.name.split('.').pop()?.toLowerCase();
         if (!this.data.allowedExtensions.includes(extension)) {
-          alert(`Only ${this.data.allowedExtensions.join(', ')} files are allowed`);
+          alert(
+            `Only ${this.data.allowedExtensions.join(', ')} files are allowed`
+          );
           return;
         }
-        
+
         // Upload the file directly with verified content
         this.uploadFileDirectly(file);
       };
-      
-      reader.onerror = (e) => {
+
+      reader.onerror = e => {
         console.error('Error reading file:', e);
-        alert('Error reading file content. Please try again with another file.');
+        alert(
+          'Error reading file content. Please try again with another file.'
+        );
       };
-      
+
       // Start reading the file as an array buffer
       reader.readAsArrayBuffer(file);
     }
   }
-} 
+}

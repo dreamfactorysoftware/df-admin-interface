@@ -235,9 +235,15 @@
                       "
                       [schema]="item"
                       [formControl]="getConfigControl(item.name)"
-                      [class.dynamic-width]="['file_certificate', 'file_certificate_api'].indexOf(item.type) === -1"
+                      [class.dynamic-width]="
+                        ['file_certificate', 'file_certificate_api'].indexOf(
+                          item.type
+                        ) === -1
+                      "
                       [class.full-width]="
-                        ['file_certificate', 'file_certificate_api'].indexOf(item.type) !== -1
+                        ['file_certificate', 'file_certificate_api'].indexOf(
+                          item.type
+                        ) !== -1
                       "></df-dynamic-field>
                     <df-array-field
                       *ngIf="item.type === 'array' || item.type === 'object'"
@@ -641,9 +647,15 @@
                     color="primary"
                     [schema]="item"
                     [formControl]="getConfigControl(item.name)"
-                    [class.dynamic-width]="['file_certificate', 'file_certificate_api'].indexOf(item.type) === -1"
+                    [class.dynamic-width]="
+                      ['file_certificate', 'file_certificate_api'].indexOf(
+                        item.type
+                      ) === -1
+                    "
                     [class.full-width]="
-                      ['file_certificate', 'file_certificate_api'].indexOf(item.type) !== -1
+                      ['file_certificate', 'file_certificate_api'].indexOf(
+                        item.type
+                      ) !== -1
                     "></df-dynamic-field>
                   <df-array-field
                     *ngIf="item.type === 'array' || item.type === 'object'"

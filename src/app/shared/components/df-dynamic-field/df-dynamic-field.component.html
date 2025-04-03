@@ -25,7 +25,9 @@
           ? 'password'
           : 'text'
       "
-      [attr.autocomplete]="schema.type === 'password' ? 'current-password' : 'off'"
+      [attr.autocomplete]="
+        schema.type === 'password' ? 'current-password' : 'off'
+      "
       [attr.aria-label]="schema.label" />
     <mat-select
       *ngIf="['picklist', 'multi_picklist'].includes(schema.type)"
@@ -42,7 +44,7 @@
       [icon]="faCircleInfo"
       [matTooltip]="schema.description" />
   </mat-form-field>
-  
+
   <!-- Use new file selector for file_certificate_api type -->
   <ng-container *ngIf="schema.type === 'file_certificate_api'">
     <df-file-selector
@@ -54,7 +56,7 @@
       (fileSelected)="onFileSelected($event)">
     </df-file-selector>
   </ng-container>
-  
+
   <!-- Standard file upload for file_certificate type -->
   <ng-container *ngIf="schema.type === 'file_certificate'"
     ><input
