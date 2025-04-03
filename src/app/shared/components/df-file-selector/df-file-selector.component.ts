@@ -31,6 +31,7 @@ import { DfBaseCrudService } from '../../services/df-base-crud.service';
 import { GenericListResponse } from '../../types/generic-http';
 import { MatIconModule } from '@angular/material/icon';
 import { Router } from '@angular/router';
+import { ROUTES } from '../../types/routes';
 
 export interface FileApiInfo {
   id: number;
@@ -114,7 +115,7 @@ export class DfFileSelectorComponent implements OnInit {
 
   // Navigate to the Files management section
   goToFilesManager(): void {
-    this.router.navigate(['/adf/files']);
+    this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.FILES]);
   }
 
   // Ensure there's always at least one file service available
@@ -167,7 +168,7 @@ export class DfFileSelectorComponent implements OnInit {
     this.ensureFallbackService();
 
     console.log('Opening file selector dialog with selectorOnly = false');
-    
+
     const dialogRef = this.dialog.open(DfFileSelectorDialogComponent, {
       width: '800px',
       data: {
