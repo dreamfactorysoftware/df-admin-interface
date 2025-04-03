@@ -49,13 +49,16 @@ export class FileApiService {
     // Get the current origin (protocol + hostname + port)
     const origin = window.location.origin;
     
-    // Ensure the path starts with a slash but doesn't have multiple slashes
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    // Remove leading slash if present
+    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
     
-    // Combine to get the absolute URL without /dreamfactory/dist/
-    const absoluteUrl = `${origin}${cleanPath}`;
+    // First ensure we remove any /dreamfactory/dist/ prefix if it exists in the path
+    const pathWithoutPrefix = cleanPath.replace(/^(dreamfactory\/dist\/)?/, '');
     
-    console.log(`🔍 Constructed absolute URL: ${absoluteUrl} for path: ${path}`);
+    // Combine to get the absolute URL that goes directly to /api/v2 without any prefix
+    const absoluteUrl = `${origin}/${pathWithoutPrefix}`;
+    
+    console.log(`🔍 Constructed absolute URL for API request: ${absoluteUrl}`);
     return absoluteUrl;
   }
 
@@ -123,16 +126,22 @@ export class FileApiService {
       // First emit the default services to ensure the UI is responsive
       observer.next(defaultServices);
       
-      // Then try to get the actual services from the API
-      // Using absolute URL to bypass any baseHref issues
-      const url = this.getAbsoluteApiUrl('api/v2/system/service');
-      this.http.get<GenericListResponse<FileService>>(url, {
-        params: {
-          'filter': 'type=local_file',
-          'fields': 'id,name,label,type'
-        },
-        headers: this.getHeaders()
-      }).pipe(
+      // Direct URL construction to bypass Angular baseHref and router
+      const url = `${window.location.origin}/api/v2/system/service`;
+      console.log(`Loading file services from absolute URL: ${url}`);
+      
+      // Set parameters for file service filtering
+      const params = {
+        'filter': 'type=local_file',
+        'fields': 'id,name,label,type'
+      };
+      
+      // Get authentication headers
+      const headers = this.getHeaders();
+      
+      // Then try to get the actual services from the API using direct HTTP
+      this.http.get<GenericListResponse<FileService>>(url, { params, headers })
+      .pipe(
         map(response => {
           if (!response || !response.resource || !Array.isArray(response.resource)) {
             console.warn('Invalid response format from API, using default services');
