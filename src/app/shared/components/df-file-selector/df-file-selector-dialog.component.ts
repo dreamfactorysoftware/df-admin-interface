@@ -166,7 +166,10 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
   // Flag to determine if we're in selector-only mode
   get isSelectorOnly(): boolean {
-    console.log('isSelectorOnly getter called, data.selectorOnly =', this.data.selectorOnly);
+    console.log(
+      'isSelectorOnly getter called, data.selectorOnly =',
+      this.data.selectorOnly
+    );
     return !!this.data.selectorOnly;
   }
 
@@ -184,13 +187,13 @@ export class DfFileSelectorDialogComponent implements OnInit {
     if (this.data.uploadMode && this.data.fileApis.length > 0) {
       this.selectFileApi(this.data.fileApis[0]);
     }
-    
+
     // Print debug information about the dialog data
-    console.log('Dialog initialized with data:', { 
+    console.log('Dialog initialized with data:', {
       uploadMode: this.data.uploadMode,
       selectorOnly: this.data.selectorOnly,
       allowedExtensions: this.data.allowedExtensions,
-      fileApis: this.data.fileApis?.length || 0
+      fileApis: this.data.fileApis?.length || 0,
     });
   }
 
@@ -528,8 +531,11 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
   // Trigger the file input click programmatically
   triggerFileUpload(): void {
-    console.log('triggerFileUpload called, isSelectorOnly =', this.isSelectorOnly);
-    
+    console.log(
+      'triggerFileUpload called, isSelectorOnly =',
+      this.isSelectorOnly
+    );
+
     // Don't allow file upload in selector-only mode
     if (this.isSelectorOnly) {
       console.log('Blocked file upload due to selector-only mode');
@@ -546,8 +552,11 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
   // Show dialog to create a new folder
   showCreateFolderDialog(): void {
-    console.log('showCreateFolderDialog called, isSelectorOnly =', this.isSelectorOnly);
-    
+    console.log(
+      'showCreateFolderDialog called, isSelectorOnly =',
+      this.isSelectorOnly
+    );
+
     // Don't allow folder creation in selector-only mode
     if (this.isSelectorOnly) {
       console.log('Blocked folder creation due to selector-only mode');
