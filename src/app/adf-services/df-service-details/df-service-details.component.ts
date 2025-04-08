@@ -385,8 +385,11 @@ export class DfServiceDetailsComponent implements OnInit {
     if (type === 'nodejs') {
       return AceEditorMode.NODEJS;
     }
-    if (type === 'python' || type === 'python3') {
+    if (type === 'python') {
       return AceEditorMode.PYTHON;
+    }
+    if (type === 'python3') {
+      return AceEditorMode.PYTHON3;
     }
     if (type === 'php') {
       return AceEditorMode.PHP;

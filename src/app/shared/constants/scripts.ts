@@ -17,4 +17,9 @@ export const SCRIPT_TYPES = [
     value: AceEditorMode.PYTHON,
     extension: 'py',
   },
+  {
+    label: translate('scriptTypes.python3'),
+    value: AceEditorMode.PYTHON3,
+    extension: 'py',
+  },
 ];
