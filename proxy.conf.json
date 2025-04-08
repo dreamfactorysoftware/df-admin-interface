@@ -1,7 +1,1 @@
-{
-  "/api": {
-    "target": "http://web:80",
-    "secure": false,
-    "changeOrigin": true
-  }
-}
+{ "/api": { "target": "http://web:80", "secure": false, "changeOrigin": true } }
