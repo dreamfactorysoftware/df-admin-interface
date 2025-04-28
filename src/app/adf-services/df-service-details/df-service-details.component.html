@@ -202,11 +202,18 @@
               <mat-accordion class="full-width">
                 <div class="details-section">
                   <ng-container *ngFor="let item of viewSchema">
-                    <ng-container *ngIf="item.type === 'text' && item.name === 'content'; else dynamic">
-                      <ng-container *ngIf="getConfigControl('storageServiceId')">
+                    <ng-container
+                      *ngIf="
+                        item.type === 'text' && item.name === 'content';
+                        else dynamic
+                      ">
+                      <ng-container
+                        *ngIf="getConfigControl('storageServiceId')">
                         <df-script-editor
                           [type]="getControl('type')"
-                          [storageServiceId]="getConfigControl('storageServiceId')"
+                          [storageServiceId]="
+                            getConfigControl('storageServiceId')
+                          "
                           [storagePath]="getConfigControl('storagePath')"
                           [content]="getServiceDocByServiceIdControl('content')"
                           [cache]="serviceData ? serviceData.name : ''"
@@ -216,7 +223,18 @@
                     </ng-container>
                     <ng-template #dynamic>
                       <df-dynamic-field
-                        *ngIf="['integer', 'password', 'string', 'text', 'picklist', 'multi_picklist', 'boolean', 'file_certificate'].includes(item.type)"
+                        *ngIf="
+                          [
+                            'integer',
+                            'password',
+                            'string',
+                            'text',
+                            'picklist',
+                            'multi_picklist',
+                            'boolean',
+                            'file_certificate'
+                          ].includes(item.type)
+                        "
                         [schema]="item"
                         [formControl]="getConfigControl(item.name)"
                         [class.dynamic-width]="item.type !== 'file_certificate'"
@@ -238,7 +256,18 @@
               <div class="details-section basic-fields-section">
                 <ng-container *ngFor="let item of basicFields">
                   <df-dynamic-field
-                    *ngIf="['integer', 'password', 'string', 'text', 'picklist', 'multi_picklist', 'boolean', 'file_certificate'].includes(item.type)"
+                    *ngIf="
+                      [
+                        'integer',
+                        'password',
+                        'string',
+                        'text',
+                        'picklist',
+                        'multi_picklist',
+                        'boolean',
+                        'file_certificate'
+                      ].includes(item.type)
+                    "
                     [schema]="item"
                     [formControl]="getConfigControl(item.name)"
                     [class.dynamic-width]="item.type !== 'file_certificate'"
@@ -261,13 +290,22 @@
                     </mat-expansion-panel-header>
                     <div class="details-section">
                       <ng-container *ngFor="let item of advancedFields">
-                        <ng-container *ngIf="item.type === 'text' && item.name === 'content'; else dynamic">
-                          <ng-container *ngIf="getConfigControl('storageServiceId')">
+                        <ng-container
+                          *ngIf="
+                            item.type === 'text' && item.name === 'content';
+                            else dynamic
+                          ">
+                          <ng-container
+                            *ngIf="getConfigControl('storageServiceId')">
                             <df-script-editor
                               [type]="getControl('type')"
-                              [storageServiceId]="getConfigControl('storageServiceId')"
+                              [storageServiceId]="
+                                getConfigControl('storageServiceId')
+                              "
                               [storagePath]="getConfigControl('storagePath')"
-                              [content]="getServiceDocByServiceIdControl('content')"
+                              [content]="
+                                getServiceDocByServiceIdControl('content')
+                              "
                               [cache]="serviceData ? serviceData.name : ''"
                               class="full-width">
                             </df-script-editor>
@@ -275,14 +313,31 @@
                         </ng-container>
                         <ng-template #dynamic>
                           <df-dynamic-field
-                            *ngIf="['integer', 'password', 'string', 'text', 'picklist', 'multi_picklist', 'boolean', 'file_certificate'].includes(item.type)"
+                            *ngIf="
+                              [
+                                'integer',
+                                'password',
+                                'string',
+                                'text',
+                                'picklist',
+                                'multi_picklist',
+                                'boolean',
+                                'file_certificate'
+                              ].includes(item.type)
+                            "
                             [schema]="item"
                             [formControl]="getConfigControl(item.name)"
-                            [class.dynamic-width]="item.type !== 'file_certificate'"
-                            [class.full-width]="item.type === 'file_certificate'">
+                            [class.dynamic-width]="
+                              item.type !== 'file_certificate'
+                            "
+                            [class.full-width]="
+                              item.type === 'file_certificate'
+                            ">
                           </df-dynamic-field>
                           <df-array-field
-                            *ngIf="item.type === 'array' || item.type === 'object'"
+                            *ngIf="
+                              item.type === 'array' || item.type === 'object'
+                            "
                             [schema]="item"
                             [formControl]="getConfigControl(item.name)"
                             class="full-width">
