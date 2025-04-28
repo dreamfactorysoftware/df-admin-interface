@@ -666,7 +666,7 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   validateServiceName(name: string): boolean {
-    const regex = /^[a-zA-Z0-9_-]+$/; // Updated regex to include hyphen
+    const regex = /^[a-zA-Z0-9_-]+$/;
     if (!regex.test(name)) {
       this.warnings.push(
         'Service name can only contain letters, numbers, underscores, and hyphens.'
@@ -1042,15 +1042,25 @@ export class DfServiceDetailsComponent implements OnInit {
         next: result => {
           // Attempt to copy API key to clipboard
           if (navigator.clipboard) {
-            navigator.clipboard.writeText(result.apiKey)
+            navigator.clipboard
+              .writeText(result.apiKey)
               .then(() => {
-                this.snackbarService.openSnackBar('API Created and API Key copied to clipboard', 'success');
+                this.snackbarService.openSnackBar(
+                  'API Created and API Key copied to clipboard',
+                  'success'
+                );
               })
               .catch(() => {
-                this.snackbarService.openSnackBar('API Created, but failed to copy API Key', 'success');
+                this.snackbarService.openSnackBar(
+                  'API Created, but failed to copy API Key',
+                  'success'
+                );
               });
           } else {
-            this.snackbarService.openSnackBar('API Created, but failed to copy API Key', 'success');
+            this.snackbarService.openSnackBar(
+              'API Created, but failed to copy API Key',
+              'success'
+            );
           }
 
           // Navigate to API docs
