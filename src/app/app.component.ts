@@ -2,7 +2,6 @@ import { Component, OnInit } from '@angular/core';
 import { DfLoadingSpinnerService } from './shared/services/df-loading-spinner.service';
 import { NgIf, AsyncPipe } from '@angular/common';
 import { RouterOutlet, Router, ActivatedRoute } from '@angular/router';
-import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.component';
 import { DfLicenseCheckService } from './shared/services/df-license-check.service';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { AuthService } from './shared/services/auth.service';
@@ -15,7 +14,7 @@ import { LoginResponse } from './shared/types/auth.types';
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
   standalone: true,
-  imports: [DfSideNavComponent, RouterOutlet, NgIf, AsyncPipe],
+  imports: [RouterOutlet, NgIf, AsyncPipe],
 })
 export class AppComponent implements OnInit {
   title = 'df-admin-interface';
