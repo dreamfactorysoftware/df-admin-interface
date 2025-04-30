@@ -8,6 +8,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { AuthService } from './shared/services/auth.service';
 import { LoggingService } from './shared/services/logging.service';
 import { LoginResponse } from './shared/types/auth.types';
+import { PopupComponent } from './shared/components/df-popup/df-popup.component';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -15,7 +16,7 @@ import { LoginResponse } from './shared/types/auth.types';
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
   standalone: true,
-  imports: [DfSideNavComponent, RouterOutlet, NgIf, AsyncPipe],
+  imports: [DfSideNavComponent, RouterOutlet, NgIf, AsyncPipe, PopupComponent],
 })
 export class AppComponent implements OnInit {
   title = 'df-admin-interface';

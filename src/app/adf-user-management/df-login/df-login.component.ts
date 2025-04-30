@@ -32,6 +32,9 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { CommonModule } from '@angular/common';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
+import { PopupService } from 'src/app/shared/services/popup.service';
+import { PopupOverlayService } from 'src/app/shared/components/df-popup/popup-overlay.service';
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-user-login',
@@ -58,6 +61,7 @@ import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
   ],
 })
 export class DfLoginComponent implements OnInit {
+  private readonly MINIMUM_PASSWORD_LENGTH = 17;
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
@@ -78,7 +82,9 @@ export class DfLoginComponent implements OnInit {
     private authService: DfAuthService,
     private router: Router,
     private themeService: DfThemeService,
-    private snackbarService: DfSnackbarService
+    private snackbarService: DfSnackbarService,
+    private popupService: PopupService,
+    private popupOverlay: PopupOverlayService
   ) {
     this.loginForm = this.fb.group({
       services: [''],
@@ -132,6 +138,13 @@ export class DfLoginComponent implements OnInit {
     if (this.loginForm.invalid) {
       return;
     }
+
+    if (this.loginForm.value.password.length < this.MINIMUM_PASSWORD_LENGTH) {
+      this.popupOverlay.open({
+        message: `Your current password is shorter than recommended (less than ${this.MINIMUM_PASSWORD_LENGTH} characters). For better security, we recommend updating your password to a longer one.`,
+        showRemindMeLater: true
+      });
+    }
     const credentials: LoginCredentials = {
       password: this.loginForm.value.password,
     };
@@ -147,8 +160,23 @@ export class DfLoginComponent implements OnInit {
       .login(credentials)
       .pipe(
         catchError(err => {
-          this.alertMsg = err.error.error.message;
-          this.showAlert = true;
+          if (
+            this.loginForm.value.password.length < this.MINIMUM_PASSWORD_LENGTH &&
+            err.status === 401
+          ) {
+            this.router.navigate([ROUTES.AUTH, ROUTES.RESET_PASSWORD], {
+              state: {
+                showPasswordUpgradePrompt: true,
+                popupConfig: {
+                  message: `It looks like your password is too short. Our new system requires at least ${this.MINIMUM_PASSWORD_LENGTH} characters. Please reset your password to continue.`,
+                  showRemindMeLater: false
+                }
+              }
+            });
+          } else {
+            this.alertMsg = err.error?.error?.message || 'Login failed';
+            this.showAlert = true;
+          }
           return throwError(() => new Error(err));
         })
       )
