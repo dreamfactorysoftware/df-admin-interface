@@ -62,7 +62,8 @@ export class DfPasswordResetComponent implements OnInit {
     private systemConfigDataService: DfSystemConfigDataService,
     private authService: DfAuthService,
     private router: Router,
-    private route: ActivatedRoute  ) {
+    private route: ActivatedRoute
+  ) {
     this.passwordResetForm = this.fb.group({
       username: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
