@@ -5,4 +5,4 @@ export interface PopupConfig {
   showRemindMeLater: boolean;
 }
 
-export const POPUP_CONFIG = new InjectionToken<PopupConfig>('POPUP_CONFIG'); 
+export const POPUP_CONFIG = new InjectionToken<PopupConfig>('POPUP_CONFIG');

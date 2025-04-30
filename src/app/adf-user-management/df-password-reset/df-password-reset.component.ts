@@ -20,7 +20,6 @@ import {
 } from '../../shared/components/df-alert/df-alert.component';
 import { DfAuthService } from '../services/df-auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
-import { PopupOverlayService } from 'src/app/shared/components/df-popup/popup-overlay.service';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
@@ -63,9 +62,7 @@ export class DfPasswordResetComponent implements OnInit {
     private systemConfigDataService: DfSystemConfigDataService,
     private authService: DfAuthService,
     private router: Router,
-    private route: ActivatedRoute,
-    private popupOverlay: PopupOverlayService
-  ) {
+    private route: ActivatedRoute  ) {
     this.passwordResetForm = this.fb.group({
       username: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
@@ -104,15 +101,6 @@ export class DfPasswordResetComponent implements OnInit {
         this.type = data['type'];
       }
     });
-
-    if (history.state && history.state.popupConfig) {
-      this.popupOverlay.open(history.state.popupConfig);
-    } else if (history.state && history.state.showPasswordUpgradePrompt) {
-      this.popupOverlay.open({
-        message: 'It looks like your password is too short. Our new system requires at least 17 characters. Please reset your password to continue.',
-        showRemindMeLater: false
-      });
-    }
   }
 
   get isAdmin() {

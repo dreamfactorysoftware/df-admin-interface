@@ -8,20 +8,25 @@ import { POPUP_CONFIG, PopupConfig } from './popup-config';
 export class PopupOverlayService {
   private overlayRef: OverlayRef | null = null;
 
-  constructor(private overlay: Overlay, private injector: Injector) {}
+  constructor(
+    private overlay: Overlay,
+    private injector: Injector
+  ) {}
 
   open(config?: PopupConfig) {
-    if (this.overlayRef) return; // Prevent multiple overlays
+    if (this.overlayRef) return;
     const injector = Injector.create({
-      providers: [
-        { provide: POPUP_CONFIG, useValue: config }
-      ],
-      parent: this.injector
+      providers: [{ provide: POPUP_CONFIG, useValue: config }],
+      parent: this.injector,
     });
     this.overlayRef = this.overlay.create({
       hasBackdrop: true,
       backdropClass: 'popup-backdrop',
-      positionStrategy: this.overlay.position().global().centerHorizontally().centerVertically(),
+      positionStrategy: this.overlay
+        .position()
+        .global()
+        .centerHorizontally()
+        .centerVertically(),
       scrollStrategy: this.overlay.scrollStrategies.block(),
     });
     const portal = new ComponentPortal(PopupComponent, null, injector);
@@ -33,4 +38,4 @@ export class PopupOverlayService {
     this.overlayRef?.dispose();
     this.overlayRef = null;
   }
-} 
+}
