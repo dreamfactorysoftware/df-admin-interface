@@ -223,25 +223,31 @@
                     </ng-container>
                     <ng-template #dynamic>
                       <df-dynamic-field
-                      *ngIf="
-                        [
-                          'integer',
-                          'password',
-                          'string',
-                          'text',
-                          'picklist',
-                          'multi_picklist',
-                          'boolean',
-                          'file_certificate',
-                          'file_certificate_api'
-                        ].includes(item.type)
-                      "
-                      [schema]="item"
-                      [formControl]="getConfigControl(item.name)"
-                      [class.dynamic-width]="['file_certificate', 'file_certificate_api'].indexOf(item.type) === -1"
-                      [class.full-width]="
-                        ['file_certificate', 'file_certificate_api'].indexOf(item.type) !== -1
-                      "></df-dynamic-field>
+                        *ngIf="
+                          [
+                            'integer',
+                            'password',
+                            'string',
+                            'text',
+                            'picklist',
+                            'multi_picklist',
+                            'boolean',
+                            'file_certificate',
+                            'file_certificate_api'
+                          ].includes(item.type)
+                        "
+                        [schema]="item"
+                        [formControl]="getConfigControl(item.name)"
+                        [class.dynamic-width]="
+                          ['file_certificate', 'file_certificate_api'].indexOf(
+                            item.type
+                          ) === -1
+                        "
+                        [class.full-width]="
+                          ['file_certificate', 'file_certificate_api'].indexOf(
+                            item.type
+                          ) !== -1
+                        "></df-dynamic-field>
                       <df-array-field
                         *ngIf="item.type === 'array' || item.type === 'object'"
                         [schema]="item"
@@ -744,9 +750,15 @@
                     color="primary"
                     [schema]="item"
                     [formControl]="getConfigControl(item.name)"
-                    [class.dynamic-width]="['file_certificate', 'file_certificate_api'].indexOf(item.type) === -1"
+                    [class.dynamic-width]="
+                      ['file_certificate', 'file_certificate_api'].indexOf(
+                        item.type
+                      ) === -1
+                    "
                     [class.full-width]="
-                      ['file_certificate', 'file_certificate_api'].indexOf(item.type) !== -1
+                      ['file_certificate', 'file_certificate_api'].indexOf(
+                        item.type
+                      ) !== -1
                     "></df-dynamic-field>
                   <df-array-field
                     *ngIf="item.type === 'array' || item.type === 'object'"

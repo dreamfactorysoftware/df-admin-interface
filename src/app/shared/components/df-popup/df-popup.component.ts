@@ -25,8 +25,10 @@ export class PopupComponent {
   ) {}
 
   get message() {
-    return this.config?.message ||
-      'Your current password is shorter than recommended (less than 17 characters). For better security, we recommend updating your password to a longer one.';
+    return (
+      this.config?.message ||
+      'Your current password is shorter than recommended (less than 17 characters). For better security, we recommend updating your password to a longer one.'
+    );
   }
   get showRemindMeLater() {
     return this.config?.showRemindMeLater !== false;

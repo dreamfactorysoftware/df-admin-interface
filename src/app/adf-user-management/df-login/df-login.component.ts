@@ -137,7 +137,8 @@ export class DfLoginComponent implements OnInit {
       return;
     }
 
-    const isPasswordTooShort = this.loginForm.value.password.length < this.MINIMUM_PASSWORD_LENGTH;
+    const isPasswordTooShort =
+      this.loginForm.value.password.length < this.MINIMUM_PASSWORD_LENGTH;
     const credentials: LoginCredentials = {
       password: this.loginForm.value.password,
     };
