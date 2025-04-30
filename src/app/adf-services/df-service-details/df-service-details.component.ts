@@ -666,10 +666,10 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   validateServiceName(name: string): boolean {
-    const regex = /^[a-zA-Z0-9_]+$/; // Example regex for valid characters
+    const regex = /^[a-zA-Z0-9_-]+$/;
     if (!regex.test(name)) {
       this.warnings.push(
-        'Service name can only contain letters, numbers, and underscores.'
+        'Service name can only contain letters, numbers, underscores, and hyphens.'
       );
       return false;
     }
@@ -680,7 +680,7 @@ export class DfServiceDetailsComponent implements OnInit {
     return name
       .toLowerCase()
       .replace(/\s+/g, '')
-      .replace(/[^a-z0-9_]/g, '');
+      .replace(/[^a-z0-9_-]/g, '');
   }
 
   gotoSchema() {
@@ -691,7 +691,8 @@ export class DfServiceDetailsComponent implements OnInit {
   gotoAPIDocs() {
     const data = this.serviceForm.getRawValue();
     this.currentServiceService.setCurrentServiceId(this.serviceData.id);
-    this.router.navigate([`/api-connections/api-docs/${data.name}`]);
+    const formattedName = this.formatServiceName(data.name);
+    this.router.navigate([`/api-connections/api-docs/${formattedName}`]);
   }
 
   goBack() {
@@ -1041,15 +1042,25 @@ export class DfServiceDetailsComponent implements OnInit {
         next: result => {
           // Attempt to copy API key to clipboard
           if (navigator.clipboard) {
-            navigator.clipboard.writeText(result.apiKey)
+            navigator.clipboard
+              .writeText(result.apiKey)
               .then(() => {
-                this.snackbarService.openSnackBar('API Created and API Key copied to clipboard', 'success');
+                this.snackbarService.openSnackBar(
+                  'API Created and API Key copied to clipboard',
+                  'success'
+                );
               })
               .catch(() => {
-                this.snackbarService.openSnackBar('API Created, but failed to copy API Key', 'success');
+                this.snackbarService.openSnackBar(
+                  'API Created, but failed to copy API Key',
+                  'success'
+                );
               });
           } else {
-            this.snackbarService.openSnackBar('API Created, but failed to copy API Key', 'success');
+            this.snackbarService.openSnackBar(
+              'API Created, but failed to copy API Key',
+              'success'
+            );
           }
 
           // Navigate to API docs
