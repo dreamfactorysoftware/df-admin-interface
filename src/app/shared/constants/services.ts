@@ -196,7 +196,7 @@ export const GOLD_SERVICES: Array<ServiceType> = [
     name: 'snowflake',
     label: 'Snowflake',
     description: 'Database service supporting Snowflake connections.',
-    group: 'Big Data',
+    group: 'Database',
     configSchema: [],
   },
   {
@@ -228,6 +228,13 @@ export const GOLD_SERVICES: Array<ServiceType> = [
     label: 'Hadoop HDFS',
     description: 'Hadoop Distributed File System',
     group: 'File',
+    configSchema: [],
+  },
+  {
+    name: 'hana',
+    label: 'SAP HANA',
+    description: 'SAP HANA service.',
+    group: 'Big Data',
     configSchema: [],
   },
 ];
