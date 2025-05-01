@@ -37,8 +37,7 @@ export class PopupComponent {
   closePopup(shouldRedirect = false) {
     this.popupOverlay.close();
     if (shouldRedirect) {
-      this.authService.logout();
-      this.router.navigate([ROUTES.AUTH, ROUTES.RESET_PASSWORD]);
+      this.authService.logout([ROUTES.AUTH, ROUTES.RESET_PASSWORD]);
     }
   }
 }
