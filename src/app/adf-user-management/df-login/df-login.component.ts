@@ -60,7 +60,7 @@ import { PopupOverlayService } from 'src/app/shared/components/df-popup/popup-ov
   ],
 })
 export class DfLoginComponent implements OnInit {
-  private readonly MINIMUM_PASSWORD_LENGTH = 17;
+  private readonly MINIMUM_PASSWORD_LENGTH = 16;
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
