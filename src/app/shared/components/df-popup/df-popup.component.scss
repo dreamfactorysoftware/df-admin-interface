@@ -1,0 +1,110 @@
+// Popup Container
+.popup-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10000;
+}
+
+.popup {
+  position: relative;
+  width: 90%;
+  max-width: 500px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  padding: 24px;
+  z-index: 10001;
+  animation: popupFadeIn 0.3s ease-out;
+
+  .popup-header {
+    margin-bottom: 20px;
+    text-align: center;
+
+    h2 {
+      margin: 0;
+      color: #333333;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+  }
+
+  .popup-content {
+    margin-bottom: 24px;
+    text-align: center;
+
+    p {
+      margin: 8px 0;
+      color: #666666;
+      line-height: 1.5;
+    }
+  }
+
+  .popup-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+
+    button {
+      min-width: 120px;
+      padding: 8px 16px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+
+      &:hover {
+        transform: translateY(-1px);
+      }
+    }
+  }
+}
+
+@keyframes popupFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.actions {
+  display: flex;
+  flex-direction: row;
+}
+
+// Popup Header
+.popup-header {
+  font-size: 18px;
+  font-weight: bold;
+  color: #6d4ec9; // Matches sidebar color
+  margin-bottom: 10px;
+}
+
+// Popup Content
+.popup-content {
+  font-size: 14px;
+  margin-bottom: 15px;
+}
+
+// Close Button
+.popup-close {
+  background: #6d4ec9; // Match theme
+  color: #fff;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s ease;
+
+  &:hover {
+    background: #5a3bb3; // Darker on hover
+  }
+}

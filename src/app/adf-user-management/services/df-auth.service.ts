@@ -104,7 +104,7 @@ export class DfAuthService {
       );
   }
 
-  logout() {
+  logout(redirectTo: any[] = [ROUTES.AUTH, ROUTES.LOGIN]) {
     this.http
       .delete(
         this.userDataService.userData?.isSysAdmin
@@ -114,7 +114,7 @@ export class DfAuthService {
       .subscribe(() => {
         this.userDataService.clearToken();
         this.userDataService.userData = null;
-        this.router.navigate([ROUTES.AUTH, ROUTES.LOGIN]);
+        this.router.navigate(redirectTo);
       });
   }
 }

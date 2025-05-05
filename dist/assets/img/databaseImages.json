@@ -123,5 +123,10 @@
       "src": "assets/img/dremio.svg",
       "alt": "dremio",
       "label": "dremio"
+    },
+    {
+      "src": "assets/img/sap.svg",
+      "alt": "hana",
+      "label": "hana"
     }
   ]

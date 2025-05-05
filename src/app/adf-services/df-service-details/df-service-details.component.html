@@ -198,56 +198,165 @@
         <br />
         <ng-container *ngIf="viewSchema && !subscriptionRequired">
           <ng-container formGroupName="config">
-            <mat-accordion class="full-width">
-              <div class="details-section">
-                <ng-container *ngFor="let item of viewSchema">
-                  <ng-container
-                    *ngIf="
-                      item.type === 'text' && item.name === 'content';
-                      else dynamic
-                    ">
-                    <ng-container *ngIf="getConfigControl('storageServiceId')">
-                      <df-script-editor
-                        [type]="getControl('type')"
-                        [storageServiceId]="
-                          getConfigControl('storageServiceId')
-                        "
-                        [storagePath]="getConfigControl('storagePath')"
-                        [content]="getConfigControl('content')"
-                        [cache]="serviceData ? serviceData.name : ''"
-                        class="full-width"></df-script-editor>
-                    </ng-container>
-                  </ng-container>
-                  <ng-template #dynamic>
-                    <df-dynamic-field
+            <ng-container *ngIf="!isDatabase || !hasStandardFields">
+              <mat-accordion class="full-width">
+                <div class="details-section">
+                  <ng-container *ngFor="let item of viewSchema">
+                    <ng-container
                       *ngIf="
-                        [
-                          'integer',
-                          'password',
-                          'string',
-                          'text',
-                          'picklist',
-                          'multi_picklist',
-                          'boolean',
-                          'file_certificate',
-                          'file_certificate_api'
-                        ].includes(item.type)
-                      "
-                      [schema]="item"
-                      [formControl]="getConfigControl(item.name)"
-                      [class.dynamic-width]="['file_certificate', 'file_certificate_api'].indexOf(item.type) === -1"
-                      [class.full-width]="
-                        ['file_certificate', 'file_certificate_api'].indexOf(item.type) !== -1
-                      "></df-dynamic-field>
-                    <df-array-field
-                      *ngIf="item.type === 'array' || item.type === 'object'"
-                      [schema]="item"
-                      [formControl]="getConfigControl(item.name)"
-                      class="full-width"></df-array-field>
-                  </ng-template>
+                        item.type === 'text' && item.name === 'content';
+                        else dynamic
+                      ">
+                      <ng-container
+                        *ngIf="getConfigControl('storageServiceId')">
+                        <df-script-editor
+                          [type]="getControl('type')"
+                          [storageServiceId]="
+                            getConfigControl('storageServiceId')
+                          "
+                          [storagePath]="getConfigControl('storagePath')"
+                          [content]="getServiceDocByServiceIdControl('content')"
+                          [cache]="serviceData ? serviceData.name : ''"
+                          class="full-width">
+                        </df-script-editor>
+                      </ng-container>
+                    </ng-container>
+                    <ng-template #dynamic>
+                      <df-dynamic-field
+                        *ngIf="
+                          [
+                            'integer',
+                            'password',
+                            'string',
+                            'text',
+                            'picklist',
+                            'multi_picklist',
+                            'boolean',
+                            'file_certificate',
+                            'file_certificate_api'
+                          ].includes(item.type)
+                        "
+                        [schema]="item"
+                        [formControl]="getConfigControl(item.name)"
+                        [class.dynamic-width]="
+                          ['file_certificate', 'file_certificate_api'].indexOf(
+                            item.type
+                          ) === -1
+                        "
+                        [class.full-width]="
+                          ['file_certificate', 'file_certificate_api'].indexOf(
+                            item.type
+                          ) !== -1
+                        "></df-dynamic-field>
+                      <df-array-field
+                        *ngIf="item.type === 'array' || item.type === 'object'"
+                        [schema]="item"
+                        [formControl]="getConfigControl(item.name)"
+                        class="full-width">
+                      </df-array-field>
+                    </ng-template>
+                  </ng-container>
+                </div>
+              </mat-accordion>
+            </ng-container>
+
+            <ng-container *ngIf="isDatabase && hasStandardFields">
+              <div class="details-section basic-fields-section">
+                <ng-container *ngFor="let item of basicFields">
+                  <df-dynamic-field
+                    *ngIf="
+                      [
+                        'integer',
+                        'password',
+                        'string',
+                        'text',
+                        'picklist',
+                        'multi_picklist',
+                        'boolean',
+                        'file_certificate'
+                      ].includes(item.type)
+                    "
+                    [schema]="item"
+                    [formControl]="getConfigControl(item.name)"
+                    [class.dynamic-width]="item.type !== 'file_certificate'"
+                    [class.full-width]="item.type === 'file_certificate'">
+                  </df-dynamic-field>
+                  <df-array-field
+                    *ngIf="item.type === 'array' || item.type === 'object'"
+                    [schema]="item"
+                    [formControl]="getConfigControl(item.name)"
+                    class="full-width">
+                  </df-array-field>
                 </ng-container>
               </div>
-            </mat-accordion>
+
+              <div class="advanced-section" *ngIf="showAdvancedOptions">
+                <mat-accordion class="full-width">
+                  <mat-expansion-panel [expanded]="false">
+                    <mat-expansion-panel-header>
+                      {{ 'services.options' | transloco }}
+                    </mat-expansion-panel-header>
+                    <div class="details-section">
+                      <ng-container *ngFor="let item of advancedFields">
+                        <ng-container
+                          *ngIf="
+                            item.type === 'text' && item.name === 'content';
+                            else dynamic
+                          ">
+                          <ng-container
+                            *ngIf="getConfigControl('storageServiceId')">
+                            <df-script-editor
+                              [type]="getControl('type')"
+                              [storageServiceId]="
+                                getConfigControl('storageServiceId')
+                              "
+                              [storagePath]="getConfigControl('storagePath')"
+                              [content]="
+                                getServiceDocByServiceIdControl('content')
+                              "
+                              [cache]="serviceData ? serviceData.name : ''"
+                              class="full-width">
+                            </df-script-editor>
+                          </ng-container>
+                        </ng-container>
+                        <ng-template #dynamic>
+                          <df-dynamic-field
+                            *ngIf="
+                              [
+                                'integer',
+                                'password',
+                                'string',
+                                'text',
+                                'picklist',
+                                'multi_picklist',
+                                'boolean',
+                                'file_certificate'
+                              ].includes(item.type)
+                            "
+                            [schema]="item"
+                            [formControl]="getConfigControl(item.name)"
+                            [class.dynamic-width]="
+                              item.type !== 'file_certificate'
+                            "
+                            [class.full-width]="
+                              item.type === 'file_certificate'
+                            ">
+                          </df-dynamic-field>
+                          <df-array-field
+                            *ngIf="
+                              item.type === 'array' || item.type === 'object'
+                            "
+                            [schema]="item"
+                            [formControl]="getConfigControl(item.name)"
+                            class="full-width">
+                          </df-array-field>
+                        </ng-template>
+                      </ng-container>
+                    </div>
+                  </mat-expansion-panel>
+                </mat-accordion>
+              </div>
+            </ng-container>
           </ng-container>
         </ng-container>
         <div class="full-width action-bar" *ngIf="!subscriptionRequired">
@@ -641,9 +750,15 @@
                     color="primary"
                     [schema]="item"
                     [formControl]="getConfigControl(item.name)"
-                    [class.dynamic-width]="['file_certificate', 'file_certificate_api'].indexOf(item.type) === -1"
+                    [class.dynamic-width]="
+                      ['file_certificate', 'file_certificate_api'].indexOf(
+                        item.type
+                      ) === -1
+                    "
                     [class.full-width]="
-                      ['file_certificate', 'file_certificate_api'].indexOf(item.type) !== -1
+                      ['file_certificate', 'file_certificate_api'].indexOf(
+                        item.type
+                      ) !== -1
                     "></df-dynamic-field>
                   <df-array-field
                     *ngIf="item.type === 'array' || item.type === 'object'"
