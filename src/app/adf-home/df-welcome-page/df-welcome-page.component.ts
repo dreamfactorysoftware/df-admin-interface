@@ -1,5 +1,9 @@
 import { Component, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common'; // Add this import
+import { RouterModule } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { faDatabase, faCode, faNetworkWired, faFile, faTools } from '@fortawesome/free-solid-svg-icons';
 
 import {
   javaScriptExampleLinks,
@@ -45,6 +49,9 @@ import { DFStorageService } from 'src/app/shared/services/df-storage.service';
     DfQuickstartPageComponent,
     DfResourcesPageComponent,
     DfDownloadPageComponent,
+    RouterModule,
+    MatButtonModule,
+    MatIconModule
   ],
   providers: [DfBaseCrudService],
 })
@@ -52,6 +59,11 @@ export class DfWelcomePageComponent {
   faCirclePlay = faCirclePlay;
   faHeart = faHeart;
   faComment = faComment;
+  faDatabase = faDatabase;
+  faCode = faCode;
+  faNetworkWired = faNetworkWired;
+  faFile = faFile;
+  faTools = faTools;
 
   welcomePageResources = welcomePageResources;
   nativeExampleLinks = nativeExampleLinks;

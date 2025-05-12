@@ -103,3 +103,12 @@ mat-card.notice-card {
 .release-btn {
   margin-left: 10px;
 }
+
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
