@@ -34,6 +34,8 @@ import {
 import { FileApiInfo, SelectedFile } from './df-file-selector.component';
 import { HttpClient } from '@angular/common/http';
 import { FileApiService } from '../../services/df-file-api.service';
+import { DfBaseCrudService } from '../../services/df-base-crud.service';
+import { URL_TOKEN } from '../../constants/tokens';
 
 // Simple dialog for creating a new folder
 @Component({
@@ -105,6 +107,7 @@ interface DialogData {
   allowedExtensions: string[];
   uploadMode?: boolean;
   fileToUpload?: File;
+  selectorOnly?: boolean;
 }
 
 @UntilDestroy({ checkProperties: true })
@@ -130,6 +133,16 @@ interface DialogData {
     TranslocoPipe,
     FontAwesomeModule,
   ],
+  providers: [
+    // Create a factory provider for the DfBaseCrudService that sets the URL dynamically
+    {
+      provide: DfBaseCrudService,
+      useFactory: (http: HttpClient) => {
+        return new DfBaseCrudService('api/v2', http);
+      },
+      deps: [HttpClient],
+    },
+  ],
 })
 export class DfFileSelectorDialogComponent implements OnInit {
   // Reference to the file input element
@@ -151,12 +164,22 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
   selectedFile: FileItem | null = null;
 
+  // Flag to determine if we're in selector-only mode
+  get isSelectorOnly(): boolean {
+    console.log(
+      'isSelectorOnly getter called, data.selectorOnly =',
+      this.data.selectorOnly
+    );
+    return !!this.data.selectorOnly;
+  }
+
   constructor(
     private dialogRef: MatDialogRef<DfFileSelectorDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: DialogData,
     private dialog: MatDialog,
     private http: HttpClient,
-    private fileApiService: FileApiService
+    private fileApiService: FileApiService,
+    private crudService: DfBaseCrudService
   ) {}
 
   ngOnInit(): void {
@@ -164,6 +187,14 @@ export class DfFileSelectorDialogComponent implements OnInit {
     if (this.data.uploadMode && this.data.fileApis.length > 0) {
       this.selectFileApi(this.data.fileApis[0]);
     }
+
+    // Print debug information about the dialog data
+    console.log('Dialog initialized with data:', {
+      uploadMode: this.data.uploadMode,
+      selectorOnly: this.data.selectorOnly,
+      allowedExtensions: this.data.allowedExtensions,
+      fileApis: this.data.fileApis?.length || 0,
+    });
   }
 
   selectFileApi(fileApi: FileApiInfo): void {
@@ -178,12 +209,12 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
     this.isLoading = true;
 
-    // Use the FileApiService instead of direct HTTP calls
+    // Use fileApiService to handle authentication and headers properly
     this.fileApiService
       .listFiles(this.selectedFileApi.name, this.currentPath)
       .pipe(untilDestroyed(this))
       .subscribe({
-        next: response => {
+        next: (response: any) => {
           this.isLoading = false;
 
           // Check if response contains an error message from our error handling
@@ -339,8 +370,11 @@ export class DfFileSelectorDialogComponent implements OnInit {
     // Store reference to avoid null checks later
     const fileApi = this.selectedFileApi;
 
-    console.log(`Starting upload of ${file.name} (${file.size} bytes)`);
+    console.log(
+      `Starting upload of ${file.name} (${file.size} bytes) to ${fileApi.name}/${path}`
+    );
 
+    // Use fileApiService to handle authentication and proper URL construction
     this.fileApiService
       .uploadFile(fileApi.name, file, path)
       .pipe(untilDestroyed(this))
@@ -433,8 +467,11 @@ export class DfFileSelectorDialogComponent implements OnInit {
     // Store reference to avoid null checks later
     const fileApi = this.selectedFileApi;
 
-    console.log(`Starting upload of ${file.name} (${file.size} bytes)`);
+    console.log(
+      `Starting upload of ${file.name} (${file.size} bytes) to ${fileApi.name}/${path}`
+    );
 
+    // Use fileApiService to handle authentication and proper URL construction
     this.fileApiService
       .uploadFile(fileApi.name, file, path)
       .pipe(untilDestroyed(this))
@@ -492,8 +529,40 @@ export class DfFileSelectorDialogComponent implements OnInit {
       });
   }
 
+  // Trigger the file input click programmatically
+  triggerFileUpload(): void {
+    console.log(
+      'triggerFileUpload called, isSelectorOnly =',
+      this.isSelectorOnly
+    );
+
+    // Don't allow file upload in selector-only mode
+    if (this.isSelectorOnly) {
+      console.log('Blocked file upload due to selector-only mode');
+      return;
+    }
+
+    if (this.fileUploadInput) {
+      console.log('Clicking file upload input element');
+      this.fileUploadInput.nativeElement.click();
+    } else {
+      console.log('File upload input element not found');
+    }
+  }
+
   // Show dialog to create a new folder
   showCreateFolderDialog(): void {
+    console.log(
+      'showCreateFolderDialog called, isSelectorOnly =',
+      this.isSelectorOnly
+    );
+
+    // Don't allow folder creation in selector-only mode
+    if (this.isSelectorOnly) {
+      console.log('Blocked folder creation due to selector-only mode');
+      return;
+    }
+
     const dialogRef = this.dialog.open(CreateFolderDialogComponent, {
       width: '350px',
     });
@@ -511,6 +580,7 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
     this.isLoading = true;
 
+    // Use fileApiService to handle authentication and proper URL construction
     this.fileApiService
       .createDirectory(this.selectedFileApi.name, this.currentPath, folderName)
       .pipe(untilDestroyed(this))
@@ -530,13 +600,6 @@ export class DfFileSelectorDialogComponent implements OnInit {
 
   cancel(): void {
     this.dialogRef.close();
-  }
-
-  // Trigger the file input click programmatically
-  triggerFileUpload(): void {
-    if (this.fileUploadInput) {
-      this.fileUploadInput.nativeElement.click();
-    }
   }
 
   // Handle file selection from the input element

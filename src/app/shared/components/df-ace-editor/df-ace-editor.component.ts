@@ -128,9 +128,7 @@ export class DfAceEditorComponent
     if (mode === 'nodejs') {
       return AceEditorMode.JAVASCRIPT;
     }
-    if (mode === 'python3') {
-      return AceEditorMode.PYTHON;
-    }
+    // Python3 now has its own mode, so we don't need to map it to Python anymore
     return mode;
   }
 }
