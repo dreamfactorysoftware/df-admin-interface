@@ -273,7 +273,8 @@
                         'picklist',
                         'multi_picklist',
                         'boolean',
-                        'file_certificate'
+                        'file_certificate',
+                        'file_certificate_api'
                       ].includes(item.type)
                     "
                     [schema]="item"
@@ -330,16 +331,17 @@
                                 'picklist',
                                 'multi_picklist',
                                 'boolean',
-                                'file_certificate'
+                                'file_certificate',
+                                'file_certificate_api'
                               ].includes(item.type)
                             "
                             [schema]="item"
                             [formControl]="getConfigControl(item.name)"
                             [class.dynamic-width]="
-                              item.type !== 'file_certificate'
+                              item.type !== 'file_certificate' && item.type !== 'file_certificate_api'
                             "
                             [class.full-width]="
-                              item.type === 'file_certificate'
+                              item.type === 'file_certificate' || item.type === 'file_certificate_api'
                             ">
                           </df-dynamic-field>
                           <df-array-field
