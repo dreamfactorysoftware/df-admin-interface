@@ -51,6 +51,24 @@
               {{ 'home.welcomePage.utilityServicesButton' | transloco }}
             </button>
           </div>
+          <h3 id="learn-more-heading" class="margin-top-24">{{ 'home.welcomePage.learnMoreHeading' | transloco }}</h3>
+          <ul aria-labelledby="learn-more-heading">
+            <li *ngFor="let resource of welcomePageResources">
+              <ng-container *ngIf="data.isFirstTimeUser; else notFirst">
+                <df-icon-link [linkItem]="resource"></df-icon-link>
+              </ng-container>
+              <ng-template #notFirst>
+                <ng-container
+                  *ngIf="
+                    resource.name === 'home.resourceLinks.fullDocumentation' ||
+                    resource.name === 'home.resourceLinks.blog' ||
+                    resource.name === 'home.resourceLinks.contactSupport'
+                  "
+                  ><df-icon-link [linkItem]="resource"></df-icon-link
+                ></ng-container>
+              </ng-template>
+            </li>
+          </ul>
         </article>
       </article>
       <aside class="flex-column">

@@ -19,6 +19,7 @@
     "networkServicesButton": "Network Services",
     "fileServicesButton": "File Services",
     "utilityServicesButton": "Utility Services",
+    "learnMoreHeading": "Learn More & Get Support",
     "ossUsersHeading": "Attention OSS users",
     "ossUsersText": "Did you know DreamFactory's commercial solutions include connectors for Microsoft SQL Server, Oracle, SOAP-to-REST, API limiting, ELK stack integration, and much more? Contact Us at <a href=\"mailto:sales@dreamfactory.com\">sales@dreamfactory.com</a> to arrange a demo with our engineering team!",
     "hearFromYouHeading": "We want to hear from you!",
