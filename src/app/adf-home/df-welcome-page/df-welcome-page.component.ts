@@ -3,7 +3,13 @@ import { CommonModule } from '@angular/common'; // Add this import
 import { RouterModule } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { faDatabase, faCode, faNetworkWired, faFile, faTools } from '@fortawesome/free-solid-svg-icons';
+import {
+  faDatabase,
+  faCode,
+  faNetworkWired,
+  faFile,
+  faTools,
+} from '@fortawesome/free-solid-svg-icons';
 
 import {
   javaScriptExampleLinks,
@@ -51,7 +57,7 @@ import { DFStorageService } from 'src/app/shared/services/df-storage.service';
     DfDownloadPageComponent,
     RouterModule,
     MatButtonModule,
-    MatIconModule
+    MatIconModule,
   ],
   providers: [DfBaseCrudService],
 })

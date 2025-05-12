@@ -1,8 +1,11 @@
-<ng-container *ngIf="{
+<ng-container
+  *ngIf="{
     isFirstTimeUser: isFirstTimeUser$ | async
   } as data">
   <div [class]="(isDarkMode | async) ? 'dark-theme' : ''">
-    <section class="two-column-flex-container" [class.mobile]="breakpointService.isSmallScreen | async">
+    <section
+      class="two-column-flex-container"
+      [class.mobile]="breakpointService.isSmallScreen | async">
       <article class="flex-column">
         <article>
           <h2>
@@ -12,23 +15,38 @@
             {{ 'home.welcomePage.welcomeSubHeading' | transloco }}
           </p>
           <div class="button-group" aria-labelledby="welcome-heading">
-            <button mat-raised-button color="primary" [routerLink]="['/api-connections/api-types/database/create']">
+            <button
+              mat-raised-button
+              color="primary"
+              [routerLink]="['/api-connections/api-types/database/create']">
               <fa-icon [icon]="faDatabase" size="lg"></fa-icon>
               {{ 'home.welcomePage.createDatabaseButton' | transloco }}
             </button>
-            <button mat-raised-button color="primary" [routerLink]="['/api-connections/api-types/scripting']">
+            <button
+              mat-raised-button
+              color="primary"
+              [routerLink]="['/api-connections/api-types/scripting']">
               <fa-icon [icon]="faCode" size="lg"></fa-icon>
               {{ 'home.welcomePage.scriptingServicesButton' | transloco }}
             </button>
-            <button mat-raised-button color="primary" [routerLink]="['/api-connections/api-types/network']">
+            <button
+              mat-raised-button
+              color="primary"
+              [routerLink]="['/api-connections/api-types/network']">
               <fa-icon [icon]="faNetworkWired" size="lg"></fa-icon>
               {{ 'home.welcomePage.networkServicesButton' | transloco }}
             </button>
-            <button mat-raised-button color="primary" [routerLink]="['/api-connections/api-types/file']">
+            <button
+              mat-raised-button
+              color="primary"
+              [routerLink]="['/api-connections/api-types/file']">
               <fa-icon [icon]="faFile" size="lg"></fa-icon>
               {{ 'home.welcomePage.fileServicesButton' | transloco }}
             </button>
-            <button mat-raised-button color="primary" [routerLink]="['/api-connections/api-types/utility']">
+            <button
+              mat-raised-button
+              color="primary"
+              [routerLink]="['/api-connections/api-types/utility']">
               <fa-icon [icon]="faTools" size="lg"></fa-icon>
               {{ 'home.welcomePage.utilityServicesButton' | transloco }}
             </button>
@@ -37,13 +55,19 @@
       </article>
       <aside class="flex-column">
         <div class="video-link">
-          <a href="https://youtu.be/FOSOm88RxPw" target="_blank" aria-labelledby="video-link-description">
-            <img class="video-image" src="assets/img/macbook-hp-df-1.png" alt="" />
+          <a
+            href="https://youtu.be/FOSOm88RxPw"
+            target="_blank"
+            aria-labelledby="video-link-description">
+            <img
+              class="video-image"
+              src="assets/img/macbook-hp-df-1.png"
+              alt="" />
             <div class="video-overlay">
               <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
               <span id="video-link-description">{{
                 'home.welcomePage.watchVideoCta' | transloco
-                }}</span>
+              }}</span>
             </div>
           </a>
         </div>
@@ -75,7 +99,9 @@
         <h2>GitHub Releases</h2>
         <div class="release-container">
           <div *ngFor="let release of releases">
-            <mat-card class="full-width release-card" [style]="{ 'word-break': 'break-all' }">
+            <mat-card
+              class="full-width release-card"
+              [style]="{ 'word-break': 'break-all' }">
               <mat-card-header>
                 <mat-card-subtitle>{{ release.name }}</mat-card-subtitle>
               </mat-card-header>
@@ -84,7 +110,9 @@
                 <p>Published at: {{ convertDateType(release.published_at) }}</p>
               </mat-card-content>
               <mat-card-actions>
-                <a [href]="release.html_url" target="_blank" class="release-btn">View Release</a>
+                <a [href]="release.html_url" target="_blank" class="release-btn"
+                  >View Release</a
+                >
               </mat-card-actions>
             </mat-card>
           </div>
