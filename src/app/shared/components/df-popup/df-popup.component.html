@@ -1,0 +1,26 @@
+<div class="popup-container">
+  <div class="popup">
+    <div class="popup-header">
+      <h2>{{ 'Password Security Notice' | transloco }}</h2>
+    </div>
+    <div class="popup-content">
+      <p>{{ message | transloco }}</p>
+    </div>
+    <div class="popup-actions">
+      <button
+        *ngIf="showRemindMeLater"
+        mat-stroked-button
+        (click)="closePopup(false)"
+        type="button">
+        {{ 'Remind me later' | transloco }}
+      </button>
+      <button
+        mat-flat-button
+        color="primary"
+        (click)="closePopup(true)"
+        type="button">
+        {{ 'Update Password Now' | transloco }}
+      </button>
+    </div>
+  </div>
+</div>

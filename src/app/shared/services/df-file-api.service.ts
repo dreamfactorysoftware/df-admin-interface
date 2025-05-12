@@ -69,13 +69,9 @@ export class FileApiService {
    */
   private isSelectableFileService(service: FileService): boolean {
     // Exclude services with names containing 'log'
-    if (
-      this.excludedServices.some(
-        exclude =>
-          service.name.toLowerCase().includes(exclude) ||
-          service.label.toLowerCase().includes(exclude)
-      )
-    ) {
+    if (this.excludedServices.some(exclude =>
+        service.name.toLowerCase().includes(exclude) ||
+        service.label.toLowerCase().includes(exclude))) {
       return false;
     }
 

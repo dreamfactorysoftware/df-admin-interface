@@ -578,3 +578,27 @@ mat-icon {
     }
   }
 }
+
+.basic-fields-section {
+  margin-bottom: 2rem;
+
+  .section-title {
+    margin-bottom: 1.5rem;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.87);
+  }
+}
+
+.advanced-section {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+.dark-theme {
+  .basic-fields-section {
+    .section-title {
+      color: rgba(255, 255, 255, 0.87);
+    }
+  }
+}

@@ -111,6 +111,11 @@ interface AppResponse {
   }>;
 }
 
+interface CategorizedField {
+  basic: ConfigSchema[];
+  advanced: ConfigSchema[];
+}
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-service-details',
@@ -438,7 +443,80 @@ export class DfServiceDetailsComponent implements OnInit {
     const result = this.configSchema?.filter(
       control => !['storageServiceId', 'storagePath'].includes(control.name)
     );
-    return result;
+
+    return result || [];
+  }
+
+  get hasStandardFields(): boolean {
+    if (!this.isDatabase || !this.viewSchema) {
+      return false;
+    }
+
+    const standardFieldNames = [
+      'host',
+      'port',
+      'database',
+      'username',
+      'password',
+    ];
+    const fieldNames = this.viewSchema.map(field => field.name.toLowerCase());
+
+    // Check if at least 3 of the standard fields exist
+    const matchingFields = standardFieldNames.filter(name =>
+      fieldNames.includes(name)
+    );
+    return matchingFields.length >= 3;
+  }
+
+  get basicFields() {
+    if (!this.isDatabase || !this.viewSchema) {
+      return [];
+    }
+
+    if (!this.hasStandardFields) {
+      // If not standard fields, return all fields as basic
+      return this.viewSchema;
+    }
+
+    const basicFieldNames = [
+      'host',
+      'port',
+      'database',
+      'username',
+      'password',
+    ];
+    return this.viewSchema.filter(field =>
+      basicFieldNames.includes(field.name.toLowerCase())
+    );
+  }
+
+  get advancedFields() {
+    if (!this.isDatabase || !this.viewSchema) {
+      return [];
+    }
+
+    if (!this.hasStandardFields) {
+      return [];
+    }
+
+    const basicFieldNames = [
+      'host',
+      'port',
+      'database',
+      'username',
+      'password',
+    ];
+    return this.viewSchema.filter(
+      field => !basicFieldNames.includes(field.name.toLowerCase())
+    );
+  }
+
+  get showAdvancedOptions(): boolean {
+    return (
+      this.isDatabase &&
+      this.hasStandardFields &&
+      this.advancedFields.length > 0
+    );
   }
 
   getConfigControl(name: string) {
@@ -669,10 +747,10 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   validateServiceName(name: string): boolean {
-    const regex = /^[a-zA-Z0-9_]+$/; // Example regex for valid characters
+    const regex = /^[a-zA-Z0-9_-]+$/;
     if (!regex.test(name)) {
       this.warnings.push(
-        'Service name can only contain letters, numbers, and underscores.'
+        'Service name can only contain letters, numbers, underscores, and hyphens.'
       );
       return false;
     }
@@ -683,7 +761,7 @@ export class DfServiceDetailsComponent implements OnInit {
     return name
       .toLowerCase()
       .replace(/\s+/g, '')
-      .replace(/[^a-z0-9_]/g, '');
+      .replace(/[^a-z0-9_-]/g, '');
   }
 
   gotoSchema() {
@@ -694,7 +772,8 @@ export class DfServiceDetailsComponent implements OnInit {
   gotoAPIDocs() {
     const data = this.serviceForm.getRawValue();
     this.currentServiceService.setCurrentServiceId(this.serviceData.id);
-    this.router.navigate([`/api-connections/api-docs/${data.name}`]);
+    const formattedName = this.formatServiceName(data.name);
+    this.router.navigate([`/api-connections/api-docs/${formattedName}`]);
   }
 
   goBack() {
