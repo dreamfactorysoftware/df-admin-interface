@@ -338,10 +338,12 @@
                             [schema]="item"
                             [formControl]="getConfigControl(item.name)"
                             [class.dynamic-width]="
-                              item.type !== 'file_certificate' && item.type !== 'file_certificate_api'
+                              item.type !== 'file_certificate' &&
+                              item.type !== 'file_certificate_api'
                             "
                             [class.full-width]="
-                              item.type === 'file_certificate' || item.type === 'file_certificate_api'
+                              item.type === 'file_certificate' ||
+                              item.type === 'file_certificate_api'
                             ">
                           </df-dynamic-field>
                           <df-array-field
