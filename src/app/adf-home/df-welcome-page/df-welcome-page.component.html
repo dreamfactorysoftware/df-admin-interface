@@ -15,38 +15,35 @@
             {{ 'home.welcomePage.welcomeSubHeading' | transloco }}
           </p>
           <div class="button-group" aria-labelledby="welcome-heading">
-            <button
-              mat-raised-button
-              color="primary"
-              [routerLink]="['/api-connections/api-types/database/create']">
+            <button mat-raised-button color="primary" [routerLink]="fpDBRoute">
               <fa-icon [icon]="faDatabase" size="lg"></fa-icon>
               {{ 'home.welcomePage.createDatabaseButton' | transloco }}
             </button>
             <button
               mat-raised-button
               color="primary"
-              [routerLink]="['/api-connections/api-types/scripting']">
+              [routerLink]="fpScriptingRoute">
               <fa-icon [icon]="faCode" size="lg"></fa-icon>
               {{ 'home.welcomePage.scriptingServicesButton' | transloco }}
             </button>
             <button
               mat-raised-button
               color="primary"
-              [routerLink]="['/api-connections/api-types/network']">
+              [routerLink]="fpNetworkRoute">
               <fa-icon [icon]="faNetworkWired" size="lg"></fa-icon>
               {{ 'home.welcomePage.networkServicesButton' | transloco }}
             </button>
             <button
               mat-raised-button
               color="primary"
-              [routerLink]="['/api-connections/api-types/file']">
+              [routerLink]="fpFileRoute">
               <fa-icon [icon]="faFile" size="lg"></fa-icon>
               {{ 'home.welcomePage.fileServicesButton' | transloco }}
             </button>
             <button
               mat-raised-button
               color="primary"
-              [routerLink]="['/api-connections/api-types/utility']">
+              [routerLink]="fpUtilityRoute">
               <fa-icon [icon]="faTools" size="lg"></fa-icon>
               {{ 'home.welcomePage.utilityServicesButton' | transloco }}
             </button>

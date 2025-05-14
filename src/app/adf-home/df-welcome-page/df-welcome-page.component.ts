@@ -37,6 +37,7 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DFStorageService } from 'src/app/shared/services/df-storage.service';
+import { ROUTES } from '../../shared/types/routes';
 @Component({
   selector: 'df-welcome-page',
   templateUrl: './df-welcome-page.component.html',
@@ -70,6 +71,12 @@ export class DfWelcomePageComponent {
   faNetworkWired = faNetworkWired;
   faFile = faFile;
   faTools = faTools;
+
+  fpDBRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.DATABASE}/${ROUTES.CREATE}`;
+  fpScriptingRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.SCRIPTING}/${ROUTES.CREATE}`;
+  fpNetworkRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.NETWORK}/${ROUTES.CREATE}`;
+  fpFileRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.FILES}/${ROUTES.CREATE}`;
+  fpUtilityRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.UTILITY}/${ROUTES.CREATE}`;
 
   welcomePageResources = welcomePageResources;
   nativeExampleLinks = nativeExampleLinks;
