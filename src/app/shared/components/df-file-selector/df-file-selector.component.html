@@ -18,6 +18,21 @@
           <fa-icon [icon]="faFolderOpen"></fa-icon>
           Select File
         </button>
+
+        <button
+          mat-button
+          color="accent"
+          class="manage-files-button"
+          (click)="goToFilesManager()"
+          matTooltip="Upload and manage files in the file manager">
+          <fa-icon [icon]="faExternalLinkAlt"></fa-icon>
+          File Manager
+        </button>
+      </div>
+
+      <div class="help-text">
+        You can upload and select files directly with "Select File" or manage
+        files via the "File Manager".
       </div>
 
       <div *ngIf="fileApis.length === 0" class="no-apis-message">
@@ -72,6 +87,16 @@
           class="select-file-button"
           (click)="openFileSelector()">
           Choose Different
+        </button>
+
+        <button
+          mat-button
+          color="accent"
+          class="manage-files-button"
+          (click)="goToFilesManager()"
+          matTooltip="Upload and manage files in the file manager">
+          <fa-icon [icon]="faExternalLinkAlt"></fa-icon>
+          File Manager
         </button>
       </div>
     </div>

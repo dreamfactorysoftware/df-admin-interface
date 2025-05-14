@@ -22,6 +22,13 @@
   "getScriptSuccessMsg": "Script file successfully fetched",
   "fetchCacheSuccessMsg": "Successfully pulled the latest script from source.",
   "deleteCacheSuccessMsg": "Successfully cleared script from cache.",
+  "scriptTypes": {
+    "javascript": "JavaScript",
+    "php": "PHP",
+    "python": "Python",
+    "python3": "Python3",
+    "nodejs": "Node.js"
+  },
   "errors": {
     "githubImport": "Error: Invalid file format. Only js, php, py, txt file format(s) allowed"
   }

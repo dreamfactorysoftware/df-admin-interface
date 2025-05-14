@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpEventType } from '@angular/common/http';
-import { Observable, catchError, map, tap, filter } from 'rxjs';
+import { Observable, catchError, map, tap, filter, throwError } from 'rxjs';
 import { DfUserDataService } from './df-user-data.service';
 import { SESSION_TOKEN_HEADER } from '../constants/http-headers';
 
@@ -40,6 +40,27 @@ export class FileApiService {
     private http: HttpClient,
     private userDataService: DfUserDataService
   ) {}
+
+  /**
+   * Get the absolute API URL by determining the base URL from the current window location
+   * This bypasses the Angular baseHref and router completely
+   */
+  private getAbsoluteApiUrl(path: string): string {
+    // Get the current origin (protocol + hostname + port)
+    const origin = window.location.origin;
+
+    // Remove leading slash if present
+    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+
+    // First ensure we remove any /dreamfactory/dist/ prefix if it exists in the path
+    const pathWithoutPrefix = cleanPath.replace(/^(dreamfactory\/dist\/)?/, '');
+
+    // Combine to get the absolute URL that goes directly to /api/v2 without any prefix
+    const absoluteUrl = `${origin}/${pathWithoutPrefix}`;
+
+    console.log(`🔍 Constructed absolute URL for API request: ${absoluteUrl}`);
+    return absoluteUrl;
+  }
 
   /**
    * Check if a file service should be included in the selector
@@ -112,17 +133,22 @@ export class FileApiService {
       // First emit the default services to ensure the UI is responsive
       observer.next(defaultServices);
 
-      // Then try to get the actual services from the API
-      // Using direct URL format that matches the server expectation
-      // Notice the format change from filter[type] to filter=type=
+      // Direct URL construction to bypass Angular baseHref and router
+      const url = `${window.location.origin}/api/v2/system/service`;
+      console.log(`Loading file services from absolute URL: ${url}`);
+
+      // Set parameters for file service filtering
+      const params = {
+        filter: 'type=local_file',
+        fields: 'id,name,label,type',
+      };
+
+      // Get authentication headers
+      const headers = this.getHeaders();
+
+      // Then try to get the actual services from the API using direct HTTP
       this.http
-        .get<GenericListResponse<FileService>>('api/v2/system/service', {
-          params: {
-            filter: 'type=local_file',
-            fields: 'id,name,label,type',
-          },
-          headers: this.getHeaders(),
-        })
+        .get<GenericListResponse<FileService>>(url, { params, headers })
         .pipe(
           map(response => {
             if (
@@ -197,10 +223,18 @@ export class FileApiService {
       });
     }
 
-    const url = path
+    // Construct the path
+    const apiPath = path
       ? `api/v2/${serviceName}/${path}`
       : `api/v2/${serviceName}`;
-    console.log(`Listing files from ${url}`);
+
+    // Log the operation
+    console.log(`Listing files from path: ${apiPath}`);
+
+    // Use DfBaseCrudService style approach to ensure consistency with admin interface
+    // Just use the HTTP client directly with exact URL
+    const url = `${window.location.origin}/${apiPath}`;
+    console.log(`Using absolute URL: ${url}`);
 
     // Set specific parameters for file listing
     const params: Record<string, string> = {};
@@ -209,10 +243,17 @@ export class FileApiService {
     // Add standard fields
     params['fields'] = 'name,path,type,content_type,last_modified,size';
 
+    // Add the session token to headers
+    const headers: Record<string, string> = {};
+    const token = this.userDataService.token;
+    if (token) {
+      headers[SESSION_TOKEN_HEADER] = token;
+    }
+
     return this.http
       .get(url, {
-        headers: this.getHeaders(),
-        params: params,
+        headers,
+        params,
       })
       .pipe(
         tap(response => console.log('Files response:', response)),
@@ -260,237 +301,103 @@ export class FileApiService {
     file: File,
     path: string = ''
   ): Observable<any> {
-    // Build the URL properly including the filename
-    let url: string;
+    // Construct the path
+    let apiPath: string;
     if (path) {
       // Ensure path doesn't end with slash and append filename
       const cleanPath = path.replace(/\/$/, '');
-      url = `api/v2/${serviceName}/${cleanPath}/${file.name}`;
+      apiPath = `api/v2/${serviceName}/${cleanPath}/${file.name}`;
     } else {
-      url = `api/v2/${serviceName}/${file.name}`;
+      apiPath = `api/v2/${serviceName}/${file.name}`;
     }
 
-    console.log(
-      `Uploading file: ${file.name}, size: ${file.size} bytes, type: ${file.type}`
-    );
-    console.log(`To URL: ${url}`);
+    // Use absolute URL to bypass any baseHref issues
+    const url = this.getAbsoluteApiUrl(apiPath);
 
-    // Check if this is a private key file that needs special handling
+    console.log(
+      `⭐⭐⭐ UPLOADING FILE ${file.name} (${file.size} bytes), type: ${file.type} ⭐⭐⭐`
+    );
+    console.log(`To absolute URL: ${url}`);
+    console.log(`Current document baseURI: ${document.baseURI}`);
+    console.log(`Current window location: ${window.location.href}`);
+
+    // Check if this is a private key file (just for logging purposes)
     const isPEMFile =
       file.name.endsWith('.pem') ||
       file.name.endsWith('.p8') ||
       file.name.endsWith('.key');
-
     if (isPEMFile) {
       console.log(
-        'Detected private key file - using binary upload method for proper content preservation'
+        'Detected private key file - using standard FormData upload method'
       );
-      return this.uploadBinaryFile(url, file);
     }
+
+    // Create FormData for the file - this works for ALL file types
+    const formData = new FormData();
+    // IMPORTANT: Use 'files' instead of 'file' to match the admin implementation
+    formData.append('files', file);
 
     // Get authentication headers
     const headers = this.getHeaders();
 
-    // Use a more direct XMLHttpRequest approach with explicit binary handling
-    return new Observable(observer => {
-      // Create a new XMLHttpRequest
-      const xhr = new XMLHttpRequest();
-
-      // Set up progress tracking
-      xhr.upload.onprogress = event => {
-        if (event.lengthComputable) {
-          const percentDone = Math.round((100 * event.loaded) / event.total);
-          console.log(`Upload progress: ${percentDone}%`);
-          observer.next({ type: 'progress', progress: percentDone });
-        }
-      };
-
-      // Handle various events
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          let response;
-          try {
-            response = JSON.parse(xhr.responseText);
-          } catch (e) {
-            response = xhr.responseText;
-          }
-          console.log('Upload complete with response:', response);
-          observer.next(response);
-          observer.complete();
-        } else {
-          let errorResponse;
-          try {
-            errorResponse = JSON.parse(xhr.responseText);
-          } catch (e) {
-            errorResponse = { error: xhr.statusText };
-          }
-          console.error(
-            `Error uploading file: ${xhr.status} ${xhr.statusText}`,
-            errorResponse
-          );
-          observer.error({ status: xhr.status, error: errorResponse });
-        }
-      };
-
-      xhr.onerror = () => {
-        console.error('Network error during file upload');
-        observer.error({
-          status: 0,
-          error: 'Network error during file upload',
-        });
-      };
-
-      xhr.ontimeout = () => {
-        console.error('Timeout during file upload');
-        observer.error({ status: 408, error: 'Request timeout' });
-      };
-
-      // Open the request (POST for file upload)
-      xhr.open('POST', url, true);
-
-      // Add authentication and other needed headers
-      Object.keys(headers).forEach(key => {
-        xhr.setRequestHeader(key, headers[key]);
-      });
-
-      // Create FormData for the file
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // Log the file size again right before sending
-      console.log(`Sending file with size: ${file.size} bytes`);
-
-      // Send the request with the file data
-      xhr.send(formData);
-
-      // Return an unsubscribe function
-      return () => {
-        if (xhr && xhr.readyState !== 4) {
-          xhr.abort();
-        }
-      };
-    });
+    // Use Angular's HttpClient for the upload - this handles baseHref correctly
+    return this.http.post(url, formData, { headers }).pipe(
+      tap(response => console.log('Upload complete with response:', response)),
+      catchError(error => {
+        console.error(
+          `Error uploading file: ${error.status} ${error.statusText}`,
+          error
+        );
+        return throwError(() => ({
+          status: error.status,
+          error: error.error || { message: 'File upload failed' },
+        }));
+      })
+    );
   }
 
   /**
-   * Upload a binary file (like PEM, P8, or private key files) using binary transmission
-   * to ensure content is preserved properly
-   * @param url The URL to upload to
-   * @param file The file to upload as binary
+   * Create a directory using POST with X-Http-Method header
+   * @param serviceName The name of the file service
+   * @param path The path where to create the directory
+   * @param name The name of the directory
    */
-  private uploadBinaryFile(url: string, file: File): Observable<any> {
+  createDirectoryWithPost(
+    serviceName: string,
+    path: string,
+    name: string
+  ): Observable<any> {
+    const payload = {
+      resource: [
+        {
+          name: name,
+          type: 'folder',
+        },
+      ],
+    };
+
+    // Construct the path
+    const apiPath = path
+      ? `api/v2/${serviceName}/${path}`
+      : `api/v2/${serviceName}`;
+    // Use absolute URL to bypass any baseHref issues
+    const url = this.getAbsoluteApiUrl(apiPath);
     console.log(
-      `Uploading binary file: ${file.name}, size: ${file.size} bytes`
+      `Creating directory using POST at absolute URL: ${url}`,
+      payload
     );
 
-    // Get authentication headers
+    // Get headers and add X-Http-Method header
     const headers = this.getHeaders();
+    headers['X-Http-Method'] = 'POST';
 
-    return new Observable(observer => {
-      // First read the file
-      const reader = new FileReader();
-
-      reader.onload = event => {
-        const content = event.target?.result;
-
-        if (!content) {
-          observer.error({ status: 500, error: 'Failed to read file content' });
-          return;
-        }
-
-        console.log(
-          `File content read successfully, content length: ${
-            (content as ArrayBuffer).byteLength
-          } bytes`
-        );
-
-        // Create a new XMLHttpRequest for binary upload
-        const xhr = new XMLHttpRequest();
-
-        // Set up progress tracking
-        xhr.upload.onprogress = event => {
-          if (event.lengthComputable) {
-            const percentDone = Math.round((100 * event.loaded) / event.total);
-            console.log(`Upload progress: ${percentDone}%`);
-            observer.next({ type: 'progress', progress: percentDone });
-          }
-        };
-
-        // Handle various events
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            let response;
-            try {
-              response = JSON.parse(xhr.responseText);
-            } catch (e) {
-              response = xhr.responseText;
-            }
-            console.log('Binary upload complete with response:', response);
-            observer.next(response);
-            observer.complete();
-          } else {
-            let errorResponse;
-            try {
-              errorResponse = JSON.parse(xhr.responseText);
-            } catch (e) {
-              errorResponse = { error: xhr.statusText };
-            }
-            console.error(
-              `Error uploading binary file: ${xhr.status} ${xhr.statusText}`,
-              errorResponse
-            );
-            observer.error({ status: xhr.status, error: errorResponse });
-          }
-        };
-
-        xhr.onerror = () => {
-          console.error('Network error during binary file upload');
-          observer.error({
-            status: 0,
-            error: 'Network error during binary file upload',
-          });
-        };
-
-        xhr.ontimeout = () => {
-          console.error('Timeout during binary file upload');
-          observer.error({ status: 408, error: 'Request timeout' });
-        };
-
-        // Open the request (POST for file upload)
-        xhr.open('POST', url, true);
-
-        // Add authentication headers
-        Object.keys(headers).forEach(key => {
-          xhr.setRequestHeader(key, headers[key]);
-        });
-
-        // Add content type header for binary data
-        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-
-        // Send the binary data directly
-        xhr.send(content);
-
-        // Return an unsubscribe function
-        return () => {
-          if (xhr && xhr.readyState !== 4) {
-            xhr.abort();
-          }
-        };
-      };
-
-      reader.onerror = error => {
-        console.error('Error reading file:', error);
-        observer.error({
-          status: 500,
-          error:
-            'Failed to read file: ' +
-            (error.target?.error?.message || 'Unknown error'),
-        });
-      };
-
-      // Read the file as an ArrayBuffer (binary content)
-      reader.readAsArrayBuffer(file);
-    });
+    return this.http.post(url, payload, { headers }).pipe(
+      tap(response => console.log('Create directory response:', response)),
+      catchError(error => {
+        console.error(`Error creating directory at ${url}:`, error);
+        throw error;
+      })
+    );
   }
 
   /**
@@ -499,8 +406,10 @@ export class FileApiService {
    * @param path The path to the file
    */
   getFileContent(serviceName: string, path: string): Observable<any> {
-    const url = `api/v2/${serviceName}/${path}`;
-    console.log(`Getting file content from ${url}`);
+    // Construct the path and use absolute URL
+    const apiPath = `api/v2/${serviceName}/${path}`;
+    const url = this.getAbsoluteApiUrl(apiPath);
+    console.log(`Getting file content from absolute URL: ${url}`);
 
     return this.http
       .get(url, {
@@ -521,8 +430,10 @@ export class FileApiService {
    * @param path The path to the file
    */
   deleteFile(serviceName: string, path: string): Observable<any> {
-    const url = `api/v2/${serviceName}/${path}`;
-    console.log(`Deleting file at ${url}`);
+    // Construct the path and use absolute URL
+    const apiPath = `api/v2/${serviceName}/${path}`;
+    const url = this.getAbsoluteApiUrl(apiPath);
+    console.log(`Deleting file at absolute URL: ${url}`);
 
     return this.http.delete(url, { headers: this.getHeaders() }).pipe(
       tap(response => console.log('Delete response:', response)),
@@ -553,10 +464,13 @@ export class FileApiService {
       ],
     };
 
-    const url = path
+    // Construct the path
+    const apiPath = path
       ? `api/v2/${serviceName}/${path}`
       : `api/v2/${serviceName}`;
-    console.log(`Creating directory at ${url}`, payload);
+    // Use absolute URL to bypass any baseHref issues
+    const url = this.getAbsoluteApiUrl(apiPath);
+    console.log(`Creating directory at absolute URL: ${url}`, payload);
 
     return this.http.post(url, payload, { headers: this.getHeaders() }).pipe(
       tap(response => console.log('Create directory response:', response)),

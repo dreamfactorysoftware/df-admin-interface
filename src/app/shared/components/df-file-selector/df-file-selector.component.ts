@@ -22,13 +22,16 @@ import {
   faFolderOpen,
   faCheck,
   faUpload,
+  faExternalLinkAlt,
 } from '@fortawesome/free-solid-svg-icons';
 import { DfFileSelectorDialogComponent } from './df-file-selector-dialog.component';
 import { FileApiService } from '../../services/df-file-api.service';
-import { BASE_SERVICE_TOKEN } from '../../constants/tokens';
+import { BASE_SERVICE_TOKEN, URL_TOKEN } from '../../constants/tokens';
 import { DfBaseCrudService } from '../../services/df-base-crud.service';
 import { GenericListResponse } from '../../types/generic-http';
 import { MatIconModule } from '@angular/material/icon';
+import { Router } from '@angular/router';
+import { ROUTES } from '../../types/routes';
 
 export interface FileApiInfo {
   id: number;
@@ -66,6 +69,12 @@ export interface SelectedFile {
     FontAwesomeModule,
     MatIconModule,
   ],
+  providers: [
+    // Provide the URL_TOKEN for the DfBaseCrudService
+    { provide: URL_TOKEN, useValue: 'api/v2/system/service' },
+    // Provide the DfBaseCrudService
+    DfBaseCrudService,
+  ],
 })
 export class DfFileSelectorComponent implements OnInit {
   @Input() label: string = 'Private Key File';
@@ -78,6 +87,7 @@ export class DfFileSelectorComponent implements OnInit {
   faFolderOpen = faFolderOpen;
   faCheck = faCheck;
   faUpload = faUpload;
+  faExternalLinkAlt = faExternalLinkAlt;
 
   selectedFile: SelectedFile | undefined = undefined;
   fileApis: FileApiInfo[] = [];
@@ -85,7 +95,9 @@ export class DfFileSelectorComponent implements OnInit {
 
   constructor(
     private dialog: MatDialog,
-    private fileApiService: FileApiService
+    private fileApiService: FileApiService,
+    private crudService: DfBaseCrudService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -99,6 +111,11 @@ export class DfFileSelectorComponent implements OnInit {
     // Create a fallback service entry immediately, in case the API call takes too long
     // or fails completely
     this.ensureFallbackService();
+  }
+
+  // Navigate to the Files management section
+  goToFilesManager(): void {
+    this.router.navigate([ROUTES.ADMIN_SETTINGS, ROUTES.FILES]);
   }
 
   // Ensure there's always at least one file service available
@@ -150,11 +167,14 @@ export class DfFileSelectorComponent implements OnInit {
     // Ensure fallback before opening dialog
     this.ensureFallbackService();
 
+    console.log('Opening file selector dialog with selectorOnly = false');
+
     const dialogRef = this.dialog.open(DfFileSelectorDialogComponent, {
       width: '800px',
       data: {
         fileApis: this.fileApis,
         allowedExtensions: this.allowedExtensions,
+        selectorOnly: false, // Allow folder creation and file upload
       },
     });
 
