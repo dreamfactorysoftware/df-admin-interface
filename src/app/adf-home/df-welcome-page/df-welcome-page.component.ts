@@ -9,6 +9,7 @@ import {
   faNetworkWired,
   faFile,
   faTools,
+  faBook,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -74,12 +75,14 @@ export class DfWelcomePageComponent {
   faNetworkWired = faNetworkWired;
   faFile = faFile;
   faTools = faTools;
+  faBook = faBook;
 
   fpDBRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.DATABASE}/${ROUTES.CREATE}`;
   fpScriptingRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.SCRIPTING}/${ROUTES.CREATE}`;
   fpNetworkRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.NETWORK}/${ROUTES.CREATE}`;
   fpFileRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.FILE}/${ROUTES.CREATE}`;
   fpUtilityRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.UTILITY}/${ROUTES.CREATE}`;
+  fpApiDocsRoute = `/${ROUTES.API_DOCS}`;
 
   public generateApiCardsData: any[];
 
@@ -135,12 +138,12 @@ export class DfWelcomePageComponent {
         headerColor: 'rgb(80,105,137)',
       },
       {
-        icon: this.faTools,
-        headerTextKey: 'home.welcomePage.utilityServicesCard.header',
-        textKey: 'home.welcomePage.utilityServicesCard.description',
-        route: this.fpUtilityRoute,
-        bgColor: 'rgba(80,105,137, 0.1)',
-        headerColor: 'rgb(80,105,137)',
+        icon: this.faBook,
+        headerTextKey: 'home.welcomePage.apiDocsCard.header',
+        textKey: 'home.welcomePage.apiDocsCard.description',
+        route: this.fpApiDocsRoute,
+        bgColor: 'rgba(217, 54, 138, 0.1)',
+        headerColor: 'rgb(217, 54, 138)',
       },
     ];
   }

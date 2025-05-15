@@ -33,6 +33,10 @@
       "header": "Utility API Services",
       "description": "Logging, caching, and more"
     },
+    "apiDocsCard": {
+      "header": "Explore API Docs",
+      "description": "Access detailed documentation for all your APIs."
+    },
     "needHelpChoosing": "need help choosing?",
     "learnMoreHeading": "Learn More & Get Support",
     "ossUsersHeading": "Attention OSS users",
