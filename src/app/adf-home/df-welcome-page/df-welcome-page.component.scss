@@ -143,3 +143,10 @@ mat-card.notice-card {
 #need-help-choosing-note {
   font-size: 12px;
 }
+
+.learn-more-links-list {
+  display: flex;
+  justify-content: space-evenly;
+  flex-wrap: wrap;
+  gap: 10px;
+}

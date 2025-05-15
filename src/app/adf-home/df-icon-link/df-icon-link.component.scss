@@ -5,7 +5,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 .plain-icon-link {
   color: mat.get-color-from-palette($df-purple-palette, 600);
   display: flex;
-  justify-content: center;
+  justify-content: left;
   align-items: center;
   text-decoration: none;
   padding: 5px 0px;
