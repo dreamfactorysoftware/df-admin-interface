@@ -1,0 +1,38 @@
+.df-generate-api-card {
+  cursor: pointer;
+  width: 100%;
+  min-height: 115px;
+  display: flex;
+  flex-direction: column;
+}
+
+.df-generate-api-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: left;
+  padding: 12px;
+  flex-grow: 1;
+  overflow: hidden;
+
+  fa-icon {
+    margin-bottom: 8px;
+    flex-shrink: 0;
+  }
+
+  .df-card-header {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 0px;
+    line-height: 1.2;
+  }
+  .df-card-description {
+    font-size: 12px;
+    line-height: 1.4;
+    display: -webkit-box;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
