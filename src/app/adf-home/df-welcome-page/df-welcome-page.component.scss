@@ -29,6 +29,7 @@ $df-coral-palette: mat.define-palette(theme.$df-coral-palette);
   &:first-child {
     padding-right: 25px;
   }
+
   &:last-child {
     padding-left: 25px;
   }
@@ -69,6 +70,7 @@ $df-coral-palette: mat.define-palette(theme.$df-coral-palette);
 mat-card.notice-card {
   padding: 30px;
   margin-bottom: 40px;
+
   p {
     a {
       color: mat.get-color-from-palette($df-purple-palette, 600);
@@ -86,6 +88,7 @@ mat-card.notice-card {
   p {
     color: white;
   }
+
   .notice-card {
     background-color: mat.get-color-from-palette(
       $df-purple-palette,
@@ -93,13 +96,16 @@ mat-card.notice-card {
     ) !important;
   }
 }
+
 .release-container {
   display: flex;
   gap: 15px;
 }
+
 .release-card {
   background-color: mat.get-color-from-palette($df-purple-palette, 100);
 }
+
 .release-btn {
   margin-left: 10px;
 }
@@ -107,7 +113,33 @@ mat-card.notice-card {
 .button-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 24px;
-  margin-bottom: 24px;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+
+  df-generate-api-card {
+    width: 32%;
+
+    @media (min-width: 960px) and (max-width: 1480px) {
+      width: 48%;
+    }
+
+    @media (max-width: 600px) {
+      width: 48%;
+    }
+
+    @media (max-width: 350px) {
+      width: 98%;
+    }
+  }
+}
+
+#need-help-choosing-note,
+#learn-more-heading {
+  text-align: center;
+  margin: 0;
+}
+
+#need-help-choosing-note {
+  font-size: 12px;
 }

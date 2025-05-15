@@ -9,45 +9,22 @@
       <article class="flex-column">
         <article>
           <h2>
-            {{ 'home.welcomePage.welcomeHeading' | transloco }}
+            {{ 'home.welcomePage.generateYourApis' | transloco }}
           </h2>
-          <p id="get-started-links">
-            {{ 'home.welcomePage.welcomeSubHeading' | transloco }}
-          </p>
           <div class="button-group" aria-labelledby="welcome-heading">
-            <button mat-raised-button color="primary" [routerLink]="fpDBRoute">
-              <fa-icon [icon]="faDatabase" size="lg"></fa-icon>
-              {{ 'home.welcomePage.createDatabaseButton' | transloco }}
-            </button>
-            <button
-              mat-raised-button
-              color="primary"
-              [routerLink]="fpScriptingRoute">
-              <fa-icon [icon]="faCode" size="lg"></fa-icon>
-              {{ 'home.welcomePage.scriptingServicesButton' | transloco }}
-            </button>
-            <button
-              mat-raised-button
-              color="primary"
-              [routerLink]="fpNetworkRoute">
-              <fa-icon [icon]="faNetworkWired" size="lg"></fa-icon>
-              {{ 'home.welcomePage.networkServicesButton' | transloco }}
-            </button>
-            <button
-              mat-raised-button
-              color="primary"
-              [routerLink]="fpFileRoute">
-              <fa-icon [icon]="faFile" size="lg"></fa-icon>
-              {{ 'home.welcomePage.fileServicesButton' | transloco }}
-            </button>
-            <button
-              mat-raised-button
-              color="primary"
-              [routerLink]="fpUtilityRoute">
-              <fa-icon [icon]="faTools" size="lg"></fa-icon>
-              {{ 'home.welcomePage.utilityServicesButton' | transloco }}
-            </button>
+            <df-generate-api-card
+              *ngFor="let card of generateApiCardsData"
+              [icon]="card.icon"
+              [headerText]="card.headerTextKey"
+              [text]="card.textKey"
+              [routerLink]="card.route"
+              [cardFinalBackgroundColor]="card.bgColor"
+              [cardFinalHeaderColor]="card.headerColor">
+            </df-generate-api-card>
           </div>
+          <p id="need-help-choosing-note">
+            {{ 'home.welcomePage.needHelpChoosing' | transloco }}
+          </p>
           <h3 id="learn-more-heading">
             {{ 'home.welcomePage.learnMoreHeading' | transloco }}
           </h3>

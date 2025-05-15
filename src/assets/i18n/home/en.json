@@ -12,13 +12,28 @@
   },
   "welcomePage": {
     "watchVideoCta": "Watch our video!",
-    "welcomeHeading": "Welcome to DreamFactory!",
-    "welcomeSubHeading": "DreamFactory provides all of the backend services that you need to build great mobile, web, and IoT applications. Follow the links below to create:",
-    "createDatabaseButton": "Database Connection",
-    "scriptingServicesButton": "Scripting Services",
-    "networkServicesButton": "Network Services",
-    "fileServicesButton": "File Services",
-    "utilityServicesButton": "Utility Services",
+    "generateYourApis": "Generate Your APIs!",
+    "connectToDatabaseCard": {
+      "header": "Connect to Database",
+      "description": "SQL Server, Postgres, MySQL, Snowflake and more"
+    },
+    "useScriptingServicesCard": {
+      "header": "Use Scripting Services",
+      "description": "Automate business logic with PHP, NodeJs or Python"
+    },
+    "proxyWebServicesCard": {
+      "header": "Proxy a Web Services",
+      "description": "REST, SOAP, or remote Swagger API"
+    },
+    "exposeFileStorageCard": {
+      "header": "Expose a File Storage",
+      "description": "AWS S3, Azure Blob, or local FS"
+    },
+    "utilityServicesCard": {
+      "header": "Utility API Services",
+      "description": "Logging, caching, and more"
+    },
+    "needHelpChoosing": "need help choosing?",
     "learnMoreHeading": "Learn More & Get Support",
     "ossUsersHeading": "Attention OSS users",
     "ossUsersText": "Did you know DreamFactory's commercial solutions include connectors for Microsoft SQL Server, Oracle, SOAP-to-REST, API limiting, ELK stack integration, and much more? Contact Us at <a href=\"mailto:sales@dreamfactory.com\">sales@dreamfactory.com</a> to arrange a demo with our engineering team!",
