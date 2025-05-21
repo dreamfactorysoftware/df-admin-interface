@@ -124,13 +124,10 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
     refresh?: true
   ): void {
     if (this.serviceTypes && this.serviceTypes.length !== 0) {
-      filter = `${filter ? `${filter} and ` : ''}(type in ("${this.serviceTypes
+      filter = `${filter ? `(${filter}) and ` : ''}(type in ("${this.serviceTypes
         .map(src => src.name)
         .join('","')}"))`;
     }
-    filter = `${filter ? `${filter} and ` : ''}(created_by_id is${
-      !this.system ? ' not ' : ' '
-    }null)`;
 
     this.serviceService
       .getAll<GenericListResponse<Service>>({
