@@ -117,6 +117,12 @@
     "python3": "Python3",
     "nodejs": "Node.js"
   },
+  "apiHealthBanner": {
+    "loading": "Checking API status...",
+    "healthy": "API status: Healthy",
+    "unhealthy": "API status: Unhealthy. {{healthError}}",
+    "error": "Error checking API status. {{healthError}}"
+  },
   "nav": {
     "error": {
       "header": "Error"

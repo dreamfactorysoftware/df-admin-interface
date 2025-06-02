@@ -32,4 +32,26 @@
   </mat-form-field>
 </div>
 
+<div #healthBannerElement class="api-health-banner" 
+     *ngIf="healthStatus" 
+     [ngClass]="{
+       'status-loading': healthStatus === 'loading',
+       'status-healthy': healthStatus === 'healthy',
+       'status-unhealthy': healthStatus === 'unhealthy',
+       'status-error': healthStatus === 'error'
+     }">
+  <div *ngIf="healthStatus === 'loading'">
+    <p>{{ 'apiHealthBanner.loading' | transloco }}</p>
+  </div>
+  <div *ngIf="healthStatus === 'healthy'">
+    <p>{{ 'apiHealthBanner.healthy' | transloco }}</p>
+  </div>
+  <div *ngIf="healthStatus === 'unhealthy'">
+    <p>{{ 'apiHealthBanner.unhealthy' | transloco:{ healthError: healthError } }}</p>
+  </div>
+  <div *ngIf="healthStatus === 'error'">
+    <p>{{ 'apiHealthBanner.error' | transloco:{ healthError: healthError } }}</p>
+  </div>
+</div>
+
 <div #apiDocumentation class="swagger-ui"></div>

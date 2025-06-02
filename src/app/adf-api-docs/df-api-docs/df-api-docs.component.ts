@@ -25,7 +25,7 @@ import {
   mapSnakeToCamel,
 } from 'src/app/shared/utilities/case';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
-import { AsyncPipe, NgIf, NgFor, SlicePipe } from '@angular/common';
+import { AsyncPipe, NgIf, NgFor, SlicePipe, NgClass } from '@angular/common';
 import { environment } from '../../../../environments/environment';
 import { ApiKeysService } from '../services/api-keys.service';
 import { ApiKeyInfo } from 'src/app/shared/types/api-keys';
@@ -34,10 +34,10 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
 import { DfCurrentServiceService } from 'src/app/shared/services/df-current-service.service';
-import { tap, switchMap, map, distinctUntilChanged } from 'rxjs/operators';
-import { HttpClient } from '@angular/common/http';
+import { tap, switchMap, map, distinctUntilChanged, catchError } from 'rxjs/operators';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { BASE_URL } from 'src/app/shared/constants/urls';
-import { Subscription } from 'rxjs';
+import { Subscription, of } from 'rxjs';
 
 interface ServiceResponse {
   resource: Array<{
@@ -63,6 +63,7 @@ interface ServiceResponse {
     NgIf,
     NgFor,
     SlicePipe,
+    NgClass,
     FontAwesomeModule,
   ],
 })
@@ -70,11 +71,15 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   @ViewChild('apiDocumentation', { static: true }) apiDocElement:
     | ElementRef
     | undefined;
+  @ViewChild('healthBannerElement') healthBannerElementRef: ElementRef | undefined;
 
   apiDocJson: object;
   apiKeys: ApiKeyInfo[] = [];
   faCopy = faCopy;
   private subscriptions: Subscription[] = [];
+  healthStatus: 'loading' | 'healthy' | 'unhealthy' | 'error' = 'loading';
+  healthError: string | null = null;
+  serviceName: string | null = null;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -90,14 +95,14 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
     // Get the service name from the route
-    const serviceName = this.activatedRoute.snapshot.params['name'];
+    this.serviceName = this.activatedRoute.snapshot.params['name'];
 
     // First fetch the service ID by name
-    if (serviceName) {
+    if (this.serviceName) {
       this.subscriptions.push(
         this.http
           .get<ServiceResponse>(
-            `${BASE_URL}/system/service?filter=name=${serviceName}`
+            `${BASE_URL}/system/service?filter=name=${this.serviceName}`
           )
           .pipe(
             map(response => response?.resource?.[0]?.id || -1),
@@ -108,6 +113,28 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
             })
           )
           .subscribe()
+      );
+
+      // Perform health check
+      this.healthStatus = 'loading';
+      this.subscriptions.push(
+        this.http.get(`${BASE_URL}/${this.serviceName}/_schema`).pipe(
+          tap(() => {
+            this.healthStatus = 'healthy';
+            this.healthError = null;
+          }),
+          catchError((error: HttpErrorResponse) => {
+            if (error.status >= 200 && error.status < 300) {
+               // Even if there's an error in parsing, if it's 2xx, consider it healthy for schema check
+              this.healthStatus = 'healthy'; 
+              this.healthError = null;
+            } else {
+              this.healthStatus = 'unhealthy';
+              this.healthError = error.message || 'Unknown error';
+            }
+            return of(null); // Continue the stream
+          })
+        ).subscribe()
       );
     }
 
@@ -165,6 +192,31 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
         return req;
       },
       showMutatedRequest: true,
+      onComplete: () => {
+        if (this.healthBannerElementRef && this.healthBannerElementRef.nativeElement && this.apiDocElement && this.apiDocElement.nativeElement) {
+          const swaggerContainer = this.apiDocElement.nativeElement;
+          const bannerNode = this.healthBannerElementRef.nativeElement;
+
+          // Try to find the information container within Swagger UI
+          const infoContainer = swaggerContainer.querySelector('.information-container .main');
+
+          if (infoContainer) {
+            // Prepend banner to the information container (which typically holds the title)
+            if (infoContainer.firstChild) {
+              infoContainer.insertBefore(bannerNode, infoContainer.firstChild);
+            } else {
+              infoContainer.appendChild(bannerNode);
+            }
+          } else {
+            // Fallback: Prepend to the main swagger container if .information-container is not found
+            if (swaggerContainer.firstChild) {
+              swaggerContainer.insertBefore(bannerNode, swaggerContainer.firstChild);
+            } else {
+              swaggerContainer.appendChild(bannerNode);
+            }
+          }
+        }
+      }
     });
   }
 
