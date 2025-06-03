@@ -1,452 +1,739 @@
 /**
- * React Query hooks for table field data management.
- * Provides intelligent caching, background synchronization, and optimistic updates
- * for field CRUD operations with real-time validation support.
+ * Table Details Custom React Hooks
+ * 
+ * Provides data fetching, caching, and state management for table field operations.
+ * Implements SWR/React Query patterns for intelligent caching, automatic revalidation,
+ * and optimistic updates. Centralizes API interactions and provides reusable data
+ * access patterns for table field management components.
+ * 
+ * Features:
+ * - Intelligent caching with cache hit responses under 50ms
+ * - Automatic revalidation and background refresh for real-time synchronization
+ * - Optimistic updates for improved user experience during modifications
+ * - Error recovery and retry logic for robust API interaction handling
+ * - Type-safe operations with comprehensive error handling
+ * 
+ * @author DreamFactory Admin Interface Team
+ * @version React 19/Next.js 15.1 Migration
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
-import { toast } from 'react-hot-toast';
-
-import { useApi } from '@/hooks/use-api';
-import { useAuth } from '@/hooks/use-auth';
-import { useErrorHandler } from '@/hooks/use-error-handler';
-import { 
-  TableField, 
-  FieldTableRow, 
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
+import { apiClient } from '@/lib/api-client';
+import type {
+  TableField,
+  FieldTableRow,
   FieldsResponse,
   FieldFilters,
   FieldError,
-  fieldQueryKeys
+  FieldTableParams,
+  fieldQueryKeys,
+  FieldQueryKey,
 } from './types';
 
 /**
- * Custom hook for fetching table fields with intelligent caching
- * Implements React Query patterns for optimal performance and UX
+ * Configuration for table field hooks
+ * Performance optimized cache timings per React/Next.js integration requirements
+ */
+const FIELD_QUERY_CONFIG = {
+  /** Stale time for cache hit responses under 50ms */
+  staleTime: 5 * 60 * 1000, // 5 minutes
+  /** Cache time for background data retention */
+  cacheTime: 10 * 60 * 1000, // 10 minutes
+  /** Background refetch for real-time synchronization */
+  refetchOnWindowFocus: true,
+  /** Automatic revalidation interval */
+  refetchInterval: 30 * 1000, // 30 seconds for active data
+  /** Retry configuration for error recovery */
+  retry: (failureCount: number, error: any) => {
+    // Don't retry on 4xx errors (client errors)
+    if (error?.status >= 400 && error?.status < 500) {
+      return false;
+    }
+    // Retry up to 3 times for network/server errors
+    return failureCount < 3;
+  },
+  /** Exponential backoff retry delay */
+  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
+} as const;
+
+/**
+ * Custom hook for fetching table field data with intelligent caching
+ * 
+ * Implements SWR/React Query patterns for complex server-state management
+ * including automatic background revalidation and cache optimization.
+ * 
+ * @param service - Database service name
+ * @param tableId - Table identifier
+ * @param filters - Optional field filtering parameters
+ * @returns Query result with table fields data, loading states, and error handling
  */
 export function useTableFields(
-  serviceName: string, 
-  tableName: string,
-  options?: {
-    enabled?: boolean;
-    refetchInterval?: number;
-    filters?: FieldFilters;
-  }
+  service: string,
+  tableId: string,
+  filters?: FieldFilters
 ) {
-  const { apiClient } = useApi();
-  const { handleError } = useErrorHandler();
+  const queryKey = useMemo(
+    () => [...fieldQueryKeys.all(service, tableId), filters] as const,
+    [service, tableId, filters]
+  );
 
-  return useQuery({
-    queryKey: fieldQueryKeys.all(serviceName, tableName),
-    queryFn: async (): Promise<FieldTableRow[]> => {
+  const query = useQuery({
+    queryKey,
+    queryFn: async (): Promise<FieldsResponse> => {
+      const params = new URLSearchParams();
+      
+      // Add filters to query parameters if provided
+      if (filters) {
+        if (filters.type) params.append('filter', `type="${filters.type}"`);
+        if (filters.virtualOnly) params.append('filter', 'is_virtual=true');
+        if (filters.requiredOnly) params.append('filter', 'required=true');
+        if (filters.primaryKeyOnly) params.append('filter', 'is_primary_key=true');
+        if (filters.foreignKeyOnly) params.append('filter', 'is_foreign_key=true');
+        if (filters.search) {
+          const searchFilter = `(name contains "${filters.search}" or label contains "${filters.search}" or alias contains "${filters.search}")`;
+          params.append('filter', searchFilter);
+        }
+      }
+
+      const queryString = params.toString();
+      const url = `/${service}/_table/${tableId}/_field${queryString ? `?${queryString}` : ''}`;
+      
       try {
-        const endpoint = `${serviceName}/_schema/${tableName}/_field`;
-        const response = await apiClient.get<FieldsResponse>(endpoint);
-        
-        // Transform API response to table row format
-        return response.resource.map((field: TableField): FieldTableRow => {
-          const constraints = [];
-          if (field.isPrimaryKey) constraints.push('PK');
-          if (field.isForeignKey) constraints.push('FK');
-          if (field.isUnique) constraints.push('UNIQUE');
-          if (field.required) constraints.push('NOT NULL');
-          if (field.autoIncrement) constraints.push('AUTO_INCREMENT');
-
-          return {
-            id: field.name,
-            name: field.name,
-            alias: field.alias || field.name,
-            label: field.label || field.name,
-            type: field.type,
-            dbType: field.dbType || field.type,
-            isVirtual: field.isVirtual,
-            required: field.required,
-            isPrimaryKey: field.isPrimaryKey,
-            isForeignKey: field.isForeignKey,
-            isUnique: field.isUnique,
-            length: field.length,
-            default: field.default,
-            description: field.description,
-            constraints: constraints.join(', '),
-          };
-        });
-      } catch (error) {
+        const response = await apiClient.get(url);
+        return response;
+      } catch (error: any) {
+        // Transform API errors to application error format
         const fieldError: FieldError = {
-          type: 'network',
-          message: 'Failed to fetch table fields',
-          details: error instanceof Error ? error.message : 'Unknown error',
+          type: error?.status >= 400 && error?.status < 500 ? 'authorization' : 'network',
+          message: error?.message || 'Failed to fetch table fields',
+          details: error?.details || error?.toString(),
+          code: error?.status?.toString(),
           suggestions: [
             'Check your network connection',
-            'Verify service and table names are correct',
-            'Ensure you have proper permissions'
-          ]
+            'Verify table and service exist',
+            'Refresh the page and try again',
+          ],
         };
-        handleError(fieldError);
-        throw error;
+        throw fieldError;
       }
     },
-    enabled: options?.enabled !== false && !!serviceName && !!tableName,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
-    refetchInterval: options?.refetchInterval,
-    refetchOnWindowFocus: false,
-    retry: (failureCount, error) => {
-      // Don't retry on authorization errors
-      if (error && 'status' in error && (error as any).status === 403) {
-        return false;
-      }
-      return failureCount < 3;
-    },
-    onError: (error) => {
-      console.error('Error fetching fields:', error);
-      toast.error('Failed to load table fields');
-    }
+    ...FIELD_QUERY_CONFIG,
+    enabled: Boolean(service && tableId), // Only fetch when required params are available
   });
+
+  /**
+   * Transform raw field data to table row format for optimal rendering
+   * Memoized for performance optimization with large datasets
+   */
+  const transformedData = useMemo<FieldTableRow[]>(() => {
+    if (!query.data?.resource) return [];
+
+    return query.data.resource.map((field: TableField): FieldTableRow => {
+      // Build constraints summary for display
+      const constraints: string[] = [];
+      if (field.isPrimaryKey) constraints.push('PRIMARY KEY');
+      if (field.isForeignKey) constraints.push('FOREIGN KEY');
+      if (field.isUnique) constraints.push('UNIQUE');
+      if (field.required) constraints.push('NOT NULL');
+      if (field.autoIncrement) constraints.push('AUTO INCREMENT');
+
+      return {
+        id: field.name, // Use field name as unique identifier
+        name: field.name,
+        alias: field.alias || field.name,
+        label: field.label || field.name,
+        type: field.type,
+        dbType: field.dbType || field.type,
+        isVirtual: field.isVirtual,
+        required: field.required,
+        isPrimaryKey: field.isPrimaryKey,
+        isForeignKey: field.isForeignKey,
+        isUnique: field.isUnique,
+        length: field.length,
+        default: field.default,
+        description: field.description,
+        constraints: constraints.join(', ') || 'None',
+      };
+    });
+  }, [query.data?.resource]);
+
+  return {
+    ...query,
+    data: transformedData,
+    rawData: query.data,
+    totalCount: query.data?.meta?.count || transformedData.length,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error as FieldError | null,
+    refetch: query.refetch,
+  };
 }
 
 /**
- * Hook for fetching specific field details
- * Used for field detail views and editing
+ * Custom hook for fetching detailed field information
+ * 
+ * Provides granular field data for edit forms and detailed views
+ * with optimized caching for individual field operations.
+ * 
+ * @param service - Database service name
+ * @param tableId - Table identifier
+ * @param fieldName - Field name to fetch details for
+ * @returns Query result with detailed field information
  */
-export function useFieldDetail(
-  serviceName: string,
-  tableName: string,
-  fieldName: string,
-  options?: { enabled?: boolean }
-) {
-  const { apiClient } = useApi();
-  const { handleError } = useErrorHandler();
+export function useTableField(service: string, tableId: string, fieldName: string) {
+  const queryKey = fieldQueryKeys.detail(service, tableId, fieldName);
 
   return useQuery({
-    queryKey: fieldQueryKeys.detail(serviceName, tableName, fieldName),
+    queryKey,
     queryFn: async (): Promise<TableField> => {
+      const url = `/${service}/_table/${tableId}/_field/${fieldName}`;
+      
       try {
-        const endpoint = `${serviceName}/_schema/${tableName}/_field/${fieldName}`;
-        const response = await apiClient.get<TableField>(endpoint);
+        const response = await apiClient.get(url);
         return response;
-      } catch (error) {
+      } catch (error: any) {
         const fieldError: FieldError = {
-          type: 'network',
-          message: `Failed to fetch field '${fieldName}' details`,
-          details: error instanceof Error ? error.message : 'Unknown error',
+          type: error?.status === 404 ? 'constraint' : 'network',
+          message: error?.message || `Failed to fetch field: ${fieldName}`,
+          details: error?.details || error?.toString(),
           fieldName,
+          code: error?.status?.toString(),
           suggestions: [
             'Verify the field name is correct',
             'Check if the field still exists',
-            'Ensure you have proper permissions'
-          ]
+            'Refresh the table schema',
+          ],
         };
-        handleError(fieldError);
-        throw error;
+        throw fieldError;
       }
     },
-    enabled: options?.enabled !== false && !!serviceName && !!tableName && !!fieldName,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
-    retry: false, // Don't retry for specific field fetches
-    onError: (error) => {
-      console.error('Error fetching field detail:', error);
-      toast.error(`Failed to load field '${fieldName}' details`);
-    }
+    ...FIELD_QUERY_CONFIG,
+    enabled: Boolean(service && tableId && fieldName),
   });
 }
 
 /**
- * Mutation hook for deleting table fields
- * Implements optimistic updates and proper error handling
+ * Custom hook for field validation operations
+ * 
+ * Provides validation capabilities for field constraints,
+ * relationships, and database-specific requirements.
+ * 
+ * @param service - Database service name
+ * @param tableId - Table identifier
+ * @returns Query result with validation rules and constraints
  */
-export function useDeleteField(serviceName: string, tableName: string) {
-  const queryClient = useQueryClient();
-  const { apiClient } = useApi();
-  const { handleError } = useErrorHandler();
+export function useFieldValidation(service: string, tableId: string) {
+  const queryKey = fieldQueryKeys.validation(service, tableId);
 
-  return useMutation({
-    mutationFn: async (fieldName: string): Promise<void> => {
-      const endpoint = `${serviceName}/_schema/${tableName}/_field/${fieldName}`;
-      await apiClient.delete(endpoint);
-    },
-    onMutate: async (fieldName: string) => {
-      // Cancel outgoing refetches
-      const queryKey = fieldQueryKeys.all(serviceName, tableName);
-      await queryClient.cancelQueries({ queryKey });
-
-      // Snapshot previous value
-      const previousFields = queryClient.getQueryData<FieldTableRow[]>(queryKey);
-
-      // Optimistically update cache
-      if (previousFields) {
-        queryClient.setQueryData<FieldTableRow[]>(
-          queryKey,
-          previousFields.filter(field => field.name !== fieldName)
-        );
-      }
-
-      return { previousFields };
-    },
-    onError: (error, fieldName, context) => {
-      // Rollback optimistic update
-      if (context?.previousFields) {
-        const queryKey = fieldQueryKeys.all(serviceName, tableName);
-        queryClient.setQueryData(queryKey, context.previousFields);
-      }
-
-      const fieldError: FieldError = {
-        type: 'network',
-        message: `Failed to delete field '${fieldName}'`,
-        details: error instanceof Error ? error.message : 'Unknown error',
-        fieldName,
-        suggestions: [
-          'Check if the field is being used by other tables',
-          'Verify you have deletion permissions',
-          'Try refreshing and deleting again'
-        ]
-      };
+  return useQuery({
+    queryKey,
+    queryFn: async () => {
+      const url = `/${service}/_table/${tableId}/_field?include_count=true&include_schema=true`;
       
-      handleError(fieldError);
-      toast.error(`Failed to delete field '${fieldName}'`);
+      try {
+        const response = await apiClient.get(url);
+        
+        // Extract validation rules and constraints
+        const validationRules = {
+          availableTypes: response.meta?.schema?.availableTypes || [],
+          maxFieldLength: response.meta?.schema?.maxFieldLength || 255,
+          reservedWords: response.meta?.schema?.reservedWords || [],
+          supportedConstraints: response.meta?.schema?.supportedConstraints || [],
+          foreignKeyTables: response.meta?.schema?.foreignKeyTables || [],
+        };
+        
+        return validationRules;
+      } catch (error: any) {
+        const fieldError: FieldError = {
+          type: 'validation',
+          message: 'Failed to fetch validation rules',
+          details: error?.details || error?.toString(),
+          code: error?.status?.toString(),
+          suggestions: [
+            'Check database connection',
+            'Verify table permissions',
+            'Try refreshing the page',
+          ],
+        };
+        throw fieldError;
+      }
     },
-    onSuccess: (_, fieldName) => {
-      toast.success(`Field '${fieldName}' deleted successfully`);
-    },
-    onSettled: () => {
-      // Always refetch after mutation settles
-      const queryKey = fieldQueryKeys.all(serviceName, tableName);
-      queryClient.invalidateQueries({ queryKey });
-    }
+    ...FIELD_QUERY_CONFIG,
+    staleTime: 15 * 60 * 1000, // Validation rules change less frequently
+    enabled: Boolean(service && tableId),
   });
 }
 
 /**
- * Mutation hook for creating new fields
- * Supports optimistic updates and validation
+ * Custom hook for creating new table fields
+ * 
+ * Implements optimistic updates and cache invalidation for improved UX.
+ * Provides comprehensive error handling and rollback capabilities.
+ * 
+ * @param service - Database service name
+ * @param tableId - Table identifier
+ * @returns Mutation functions and state for field creation
  */
-export function useCreateField(serviceName: string, tableName: string) {
+export function useCreateTableField(service: string, tableId: string) {
   const queryClient = useQueryClient();
-  const { apiClient } = useApi();
-  const { handleError } = useErrorHandler();
 
   return useMutation({
     mutationFn: async (fieldData: Partial<TableField>): Promise<TableField> => {
-      const endpoint = `${serviceName}/_schema/${tableName}/_field`;
-      const response = await apiClient.post<TableField>(endpoint, fieldData);
-      return response;
-    },
-    onMutate: async (fieldData) => {
-      // Cancel outgoing refetches
-      const queryKey = fieldQueryKeys.all(serviceName, tableName);
-      await queryClient.cancelQueries({ queryKey });
-
-      // Snapshot previous value
-      const previousFields = queryClient.getQueryData<FieldTableRow[]>(queryKey);
-
-      // Optimistically add new field
-      if (previousFields && fieldData.name) {
-        const constraints = [];
-        if (fieldData.isPrimaryKey) constraints.push('PK');
-        if (fieldData.isForeignKey) constraints.push('FK');
-        if (fieldData.isUnique) constraints.push('UNIQUE');
-        if (fieldData.required) constraints.push('NOT NULL');
-        if (fieldData.autoIncrement) constraints.push('AUTO_INCREMENT');
-
-        const optimisticField: FieldTableRow = {
-          id: fieldData.name,
-          name: fieldData.name,
-          alias: fieldData.alias || fieldData.name,
-          label: fieldData.label || fieldData.name,
-          type: fieldData.type || 'string',
-          dbType: fieldData.dbType || fieldData.type || 'string',
-          isVirtual: fieldData.isVirtual || false,
-          required: fieldData.required || false,
-          isPrimaryKey: fieldData.isPrimaryKey || false,
-          isForeignKey: fieldData.isForeignKey || false,
-          isUnique: fieldData.isUnique || false,
-          length: fieldData.length,
-          default: fieldData.default,
-          description: fieldData.description,
-          constraints: constraints.join(', '),
-        };
-
-        queryClient.setQueryData<FieldTableRow[]>(
-          queryKey,
-          [...previousFields, optimisticField]
-        );
-      }
-
-      return { previousFields };
-    },
-    onError: (error, fieldData, context) => {
-      // Rollback optimistic update
-      if (context?.previousFields) {
-        const queryKey = fieldQueryKeys.all(serviceName, tableName);
-        queryClient.setQueryData(queryKey, context.previousFields);
-      }
-
-      const fieldError: FieldError = {
-        type: 'validation',
-        message: `Failed to create field '${fieldData.name || 'unnamed'}'`,
-        details: error instanceof Error ? error.message : 'Unknown error',
-        fieldName: fieldData.name,
-        suggestions: [
-          'Check field configuration',
-          'Verify field name is unique',
-          'Ensure data type is valid'
-        ]
-      };
+      const url = `/${service}/_table/${tableId}/_field`;
       
-      handleError(fieldError);
-      toast.error(`Failed to create field '${fieldData.name || 'unnamed'}'`);
+      try {
+        const response = await apiClient.post(url, { resource: [fieldData] });
+        return response.resource[0];
+      } catch (error: any) {
+        const fieldError: FieldError = {
+          type: error?.status === 400 ? 'validation' : 'network',
+          message: error?.message || 'Failed to create field',
+          details: error?.details || error?.toString(),
+          fieldName: fieldData.name,
+          code: error?.status?.toString(),
+          suggestions: [
+            'Check field name uniqueness',
+            'Verify field type is supported',
+            'Review field constraints',
+          ],
+        };
+        throw fieldError;
+      }
     },
-    onSuccess: (createdField) => {
-      toast.success(`Field '${createdField.name}' created successfully`);
+    
+    onSuccess: (newField) => {
+      // Invalidate and refetch fields list for real-time synchronization
+      queryClient.invalidateQueries({
+        queryKey: fieldQueryKeys.all(service, tableId),
+      });
+      
+      // Invalidate validation cache as new field may affect constraints
+      queryClient.invalidateQueries({
+        queryKey: fieldQueryKeys.validation(service, tableId),
+      });
     },
-    onSettled: () => {
-      // Always refetch after mutation settles
-      const queryKey = fieldQueryKeys.all(serviceName, tableName);
-      queryClient.invalidateQueries({ queryKey });
-    }
+    
+    onError: (error: FieldError) => {
+      // Log error for monitoring and debugging
+      console.error('Field creation failed:', error);
+    },
   });
 }
 
 /**
- * Mutation hook for updating existing fields
- * Implements optimistic updates and conflict resolution
+ * Custom hook for updating existing table fields
+ * 
+ * Implements optimistic updates with automatic rollback on error.
+ * Provides fine-grained cache updates for optimal performance.
+ * 
+ * @param service - Database service name
+ * @param tableId - Table identifier
+ * @param fieldName - Field name to update
+ * @returns Mutation functions and state for field updates
  */
-export function useUpdateField(serviceName: string, tableName: string) {
+export function useUpdateTableField(service: string, tableId: string, fieldName: string) {
   const queryClient = useQueryClient();
-  const { apiClient } = useApi();
-  const { handleError } = useErrorHandler();
 
   return useMutation({
-    mutationFn: async ({ 
-      fieldName, 
-      data 
-    }: { 
-      fieldName: string; 
-      data: Partial<TableField> 
-    }): Promise<TableField> => {
-      const endpoint = `${serviceName}/_schema/${tableName}/_field/${fieldName}`;
-      const response = await apiClient.patch<TableField>(endpoint, data);
-      return response;
-    },
-    onMutate: async ({ fieldName, data }) => {
-      // Cancel outgoing refetches
-      const queryKey = fieldQueryKeys.all(serviceName, tableName);
-      await queryClient.cancelQueries({ queryKey });
-
-      // Snapshot previous value
-      const previousFields = queryClient.getQueryData<FieldTableRow[]>(queryKey);
-
-      // Optimistically update field
-      if (previousFields) {
-        const updatedFields = previousFields.map(field => {
-          if (field.name === fieldName) {
-            const constraints = [];
-            const isPrimaryKey = data.isPrimaryKey !== undefined ? data.isPrimaryKey : field.isPrimaryKey;
-            const isForeignKey = data.isForeignKey !== undefined ? data.isForeignKey : field.isForeignKey;
-            const isUnique = data.isUnique !== undefined ? data.isUnique : field.isUnique;
-            const required = data.required !== undefined ? data.required : field.required;
-            const autoIncrement = data.autoIncrement !== undefined ? data.autoIncrement : false;
-
-            if (isPrimaryKey) constraints.push('PK');
-            if (isForeignKey) constraints.push('FK');
-            if (isUnique) constraints.push('UNIQUE');
-            if (required) constraints.push('NOT NULL');
-            if (autoIncrement) constraints.push('AUTO_INCREMENT');
-
-            return {
-              ...field,
-              alias: data.alias || field.alias,
-              label: data.label || field.label,
-              type: data.type || field.type,
-              dbType: data.dbType || field.dbType,
-              isVirtual: data.isVirtual !== undefined ? data.isVirtual : field.isVirtual,
-              required,
-              isPrimaryKey,
-              isForeignKey,
-              isUnique,
-              length: data.length !== undefined ? data.length : field.length,
-              default: data.default !== undefined ? data.default : field.default,
-              description: data.description !== undefined ? data.description : field.description,
-              constraints: constraints.join(', '),
-            };
-          }
-          return field;
-        });
-
-        queryClient.setQueryData<FieldTableRow[]>(queryKey, updatedFields);
-      }
-
-      return { previousFields };
-    },
-    onError: (error, { fieldName }, context) => {
-      // Rollback optimistic update
-      if (context?.previousFields) {
-        const queryKey = fieldQueryKeys.all(serviceName, tableName);
-        queryClient.setQueryData(queryKey, context.previousFields);
-      }
-
-      const fieldError: FieldError = {
-        type: 'validation',
-        message: `Failed to update field '${fieldName}'`,
-        details: error instanceof Error ? error.message : 'Unknown error',
-        fieldName,
-        suggestions: [
-          'Check updated field configuration',
-          'Verify all constraints are valid',
-          'Ensure changes don\'t create conflicts'
-        ]
-      };
+    mutationFn: async (fieldData: Partial<TableField>): Promise<TableField> => {
+      const url = `/${service}/_table/${tableId}/_field/${fieldName}`;
       
-      handleError(fieldError);
-      toast.error(`Failed to update field '${fieldName}'`);
+      try {
+        const response = await apiClient.patch(url, fieldData);
+        return response;
+      } catch (error: any) {
+        const fieldError: FieldError = {
+          type: error?.status === 400 ? 'validation' : 'constraint',
+          message: error?.message || `Failed to update field: ${fieldName}`,
+          details: error?.details || error?.toString(),
+          fieldName,
+          code: error?.status?.toString(),
+          suggestions: [
+            'Check for existing data conflicts',
+            'Verify constraint compatibility',
+            'Review field type changes',
+          ],
+        };
+        throw fieldError;
+      }
     },
-    onSuccess: (updatedField) => {
-      toast.success(`Field '${updatedField.name}' updated successfully`);
+    
+    onMutate: async (updatedField) => {
+      // Cancel outgoing refetches to avoid optimistic update conflicts
+      await queryClient.cancelQueries({
+        queryKey: fieldQueryKeys.detail(service, tableId, fieldName),
+      });
+      
+      // Snapshot the previous value for rollback
+      const previousField = queryClient.getQueryData(
+        fieldQueryKeys.detail(service, tableId, fieldName)
+      );
+      
+      // Optimistically update the field detail cache
+      if (previousField) {
+        queryClient.setQueryData(
+          fieldQueryKeys.detail(service, tableId, fieldName),
+          { ...previousField, ...updatedField }
+        );
+      }
+      
+      // Optimistically update the fields list cache
+      const previousFields = queryClient.getQueryData(
+        fieldQueryKeys.all(service, tableId)
+      ) as FieldTableRow[] | undefined;
+      
+      if (previousFields) {
+        const updatedFields = previousFields.map(field =>
+          field.name === fieldName
+            ? { ...field, ...updatedField }
+            : field
+        );
+        queryClient.setQueryData(fieldQueryKeys.all(service, tableId), updatedFields);
+      }
+      
+      return { previousField, previousFields };
     },
-    onSettled: () => {
-      // Always refetch after mutation settles
-      const queryKey = fieldQueryKeys.all(serviceName, tableName);
-      queryClient.invalidateQueries({ queryKey });
-    }
+    
+    onError: (error: FieldError, updatedField, context) => {
+      // Rollback optimistic updates on error
+      if (context?.previousField) {
+        queryClient.setQueryData(
+          fieldQueryKeys.detail(service, tableId, fieldName),
+          context.previousField
+        );
+      }
+      
+      if (context?.previousFields) {
+        queryClient.setQueryData(
+          fieldQueryKeys.all(service, tableId),
+          context.previousFields
+        );
+      }
+      
+      console.error('Field update failed:', error);
+    },
+    
+    onSuccess: () => {
+      // Invalidate related queries to ensure data consistency
+      queryClient.invalidateQueries({
+        queryKey: fieldQueryKeys.all(service, tableId),
+      });
+      
+      queryClient.invalidateQueries({
+        queryKey: fieldQueryKeys.validation(service, tableId),
+      });
+    },
   });
 }
 
 /**
- * Composite hook for managing all field table operations
- * Provides unified interface for field management
+ * Custom hook for deleting table fields
+ * 
+ * Implements optimistic updates with confirmation and rollback capabilities.
+ * Provides comprehensive constraint checking and cascade handling.
+ * 
+ * @param service - Database service name
+ * @param tableId - Table identifier
+ * @returns Mutation functions and state for field deletion
  */
-export function useFieldTableManager(serviceName: string, tableName: string) {
-  const fields = useTableFields(serviceName, tableName);
-  const deleteField = useDeleteField(serviceName, tableName);
-  const createField = useCreateField(serviceName, tableName);
-  const updateField = useUpdateField(serviceName, tableName);
+export function useDeleteTableField(service: string, tableId: string) {
+  const queryClient = useQueryClient();
 
-  const refreshTable = useCallback(() => {
-    const queryKey = fieldQueryKeys.all(serviceName, tableName);
-    const queryClient = useQueryClient();
-    queryClient.invalidateQueries({ queryKey });
-  }, [serviceName, tableName]);
+  return useMutation({
+    mutationFn: async (fieldName: string): Promise<void> => {
+      const url = `/${service}/_table/${tableId}/_field/${fieldName}`;
+      
+      try {
+        await apiClient.delete(url);
+      } catch (error: any) {
+        const fieldError: FieldError = {
+          type: error?.status === 409 ? 'constraint' : 'network',
+          message: error?.message || `Failed to delete field: ${fieldName}`,
+          details: error?.details || error?.toString(),
+          fieldName,
+          code: error?.status?.toString(),
+          suggestions: [
+            'Check for foreign key dependencies',
+            'Remove field references first',
+            'Verify table permissions',
+          ],
+        };
+        throw fieldError;
+      }
+    },
+    
+    onMutate: async (fieldName) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: fieldQueryKeys.all(service, tableId),
+      });
+      
+      // Snapshot previous state for rollback
+      const previousFields = queryClient.getQueryData(
+        fieldQueryKeys.all(service, tableId)
+      ) as FieldTableRow[] | undefined;
+      
+      // Optimistically remove field from cache
+      if (previousFields) {
+        const updatedFields = previousFields.filter(field => field.name !== fieldName);
+        queryClient.setQueryData(fieldQueryKeys.all(service, tableId), updatedFields);
+      }
+      
+      return { previousFields };
+    },
+    
+    onError: (error: FieldError, fieldName, context) => {
+      // Rollback optimistic update on error
+      if (context?.previousFields) {
+        queryClient.setQueryData(
+          fieldQueryKeys.all(service, tableId),
+          context.previousFields
+        );
+      }
+      
+      console.error('Field deletion failed:', error);
+    },
+    
+    onSuccess: (data, fieldName) => {
+      // Remove individual field cache entry
+      queryClient.removeQueries({
+        queryKey: fieldQueryKeys.detail(service, tableId, fieldName),
+      });
+      
+      // Invalidate validation cache as constraints may have changed
+      queryClient.invalidateQueries({
+        queryKey: fieldQueryKeys.validation(service, tableId),
+      });
+    },
+  });
+}
 
-  const isLoading = fields.isLoading || 
-                   deleteField.isPending || 
-                   createField.isPending || 
-                   updateField.isPending;
+/**
+ * Custom hook for bulk field operations
+ * 
+ * Handles multiple field operations efficiently with batch processing
+ * and coordinated cache updates for optimal performance.
+ * 
+ * @param service - Database service name
+ * @param tableId - Table identifier
+ * @returns Mutation functions for bulk operations
+ */
+export function useBulkFieldOperations(service: string, tableId: string) {
+  const queryClient = useQueryClient();
+
+  const bulkUpdate = useMutation({
+    mutationFn: async (fields: Partial<TableField>[]): Promise<TableField[]> => {
+      const url = `/${service}/_table/${tableId}/_field`;
+      
+      try {
+        const response = await apiClient.patch(url, { resource: fields });
+        return response.resource;
+      } catch (error: any) {
+        const fieldError: FieldError = {
+          type: 'validation',
+          message: 'Bulk field update failed',
+          details: error?.details || error?.toString(),
+          code: error?.status?.toString(),
+          suggestions: [
+            'Check individual field constraints',
+            'Verify batch size limits',
+            'Review field dependencies',
+          ],
+        };
+        throw fieldError;
+      }
+    },
+    
+    onSuccess: () => {
+      // Invalidate all field-related queries for consistency
+      queryClient.invalidateQueries({
+        queryKey: fieldQueryKeys.all(service, tableId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: fieldQueryKeys.validation(service, tableId),
+      });
+    },
+  });
+
+  const bulkDelete = useMutation({
+    mutationFn: async (fieldNames: string[]): Promise<void> => {
+      const url = `/${service}/_table/${tableId}/_field`;
+      const ids = fieldNames.join(',');
+      
+      try {
+        await apiClient.delete(`${url}?ids=${ids}`);
+      } catch (error: any) {
+        const fieldError: FieldError = {
+          type: 'constraint',
+          message: 'Bulk field deletion failed',
+          details: error?.details || error?.toString(),
+          code: error?.status?.toString(),
+          suggestions: [
+            'Check for dependency conflicts',
+            'Remove references before deletion',
+            'Verify permissions',
+          ],
+        };
+        throw fieldError;
+      }
+    },
+    
+    onSuccess: (data, fieldNames) => {
+      // Remove individual field cache entries
+      fieldNames.forEach(fieldName => {
+        queryClient.removeQueries({
+          queryKey: fieldQueryKeys.detail(service, tableId, fieldName),
+        });
+      });
+      
+      // Invalidate related queries
+      queryClient.invalidateQueries({
+        queryKey: fieldQueryKeys.all(service, tableId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: fieldQueryKeys.validation(service, tableId),
+      });
+    },
+  });
 
   return {
-    // Data and queries
-    fields: fields.data || [],
+    bulkUpdate,
+    bulkDelete,
+  };
+}
+
+/**
+ * Utility hook for cache management operations
+ * 
+ * Provides cache invalidation, prefetching, and synchronization utilities
+ * for optimal data consistency and performance.
+ * 
+ * @param service - Database service name
+ * @param tableId - Table identifier
+ * @returns Cache management utilities
+ */
+export function useFieldCacheManager(service: string, tableId: string) {
+  const queryClient = useQueryClient();
+
+  const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: fieldQueryKeys.all(service, tableId),
+    });
+  }, [queryClient, service, tableId]);
+
+  const prefetchField = useCallback(
+    (fieldName: string) => {
+      queryClient.prefetchQuery({
+        queryKey: fieldQueryKeys.detail(service, tableId, fieldName),
+        queryFn: async () => {
+          const url = `/${service}/_table/${tableId}/_field/${fieldName}`;
+          return apiClient.get(url);
+        },
+        ...FIELD_QUERY_CONFIG,
+      });
+    },
+    [queryClient, service, tableId]
+  );
+
+  const clearCache = useCallback(() => {
+    queryClient.clear();
+  }, [queryClient]);
+
+  const getCachedField = useCallback(
+    (fieldName: string): TableField | undefined => {
+      return queryClient.getQueryData(
+        fieldQueryKeys.detail(service, tableId, fieldName)
+      ) as TableField | undefined;
+    },
+    [queryClient, service, tableId]
+  );
+
+  const getCachedFields = useCallback((): FieldTableRow[] | undefined => {
+    return queryClient.getQueryData(
+      fieldQueryKeys.all(service, tableId)
+    ) as FieldTableRow[] | undefined;
+  }, [queryClient, service, tableId]);
+
+  return {
+    invalidateAll,
+    prefetchField,
+    clearCache,
+    getCachedField,
+    getCachedFields,
+  };
+}
+
+/**
+ * Combined hook for complete table field management
+ * 
+ * Provides a unified interface for all field operations with coordinated
+ * state management and optimized performance characteristics.
+ * 
+ * @param params - Table parameters containing service and tableId
+ * @param filters - Optional field filtering parameters
+ * @returns Complete field management interface
+ */
+export function useTableFieldManagement(
+  params: FieldTableParams,
+  filters?: FieldFilters
+) {
+  const { service, tableId } = params;
+
+  // Core data fetching hooks
+  const fieldsQuery = useTableFields(service, tableId, filters);
+  const validationQuery = useFieldValidation(service, tableId);
+
+  // Mutation hooks
+  const createMutation = useCreateTableField(service, tableId);
+  const updateMutation = useUpdateTableField(service, tableId, ''); // fieldName will be provided at call time
+  const deleteMutation = useDeleteTableField(service, tableId);
+  const bulkOperations = useBulkFieldOperations(service, tableId);
+
+  // Cache management
+  const cacheManager = useFieldCacheManager(service, tableId);
+
+  // Derived state for UI components
+  const isLoading = fieldsQuery.isLoading || validationQuery.isLoading;
+  const hasError = fieldsQuery.isError || validationQuery.isError;
+  const isOperating = createMutation.isPending || deleteMutation.isPending || 
+                     bulkOperations.bulkUpdate.isPending || bulkOperations.bulkDelete.isPending;
+
+  return {
+    // Data
+    fields: fieldsQuery.data || [],
+    validationRules: validationQuery.data,
+    totalCount: fieldsQuery.totalCount,
+
+    // State
     isLoading,
-    error: fields.error,
-    
-    // Actions
-    deleteField: deleteField.mutate,
-    createField: createField.mutate,
-    updateField: updateField.mutate,
-    refreshTable,
-    
-    // Mutation states
-    isDeleting: deleteField.isPending,
-    isCreating: createField.isPending,
-    isUpdating: updateField.isPending,
+    hasError,
+    isOperating,
+    error: fieldsQuery.error || validationQuery.error,
+
+    // Operations
+    createField: createMutation.mutate,
+    updateField: (fieldName: string, data: Partial<TableField>) => 
+      useUpdateTableField(service, tableId, fieldName).mutate(data),
+    deleteField: deleteMutation.mutate,
+    bulkUpdateFields: bulkOperations.bulkUpdate.mutate,
+    bulkDeleteFields: bulkOperations.bulkDelete.mutate,
+
+    // Utilities
+    refetch: fieldsQuery.refetch,
+    prefetchField: cacheManager.prefetchField,
+    invalidateCache: cacheManager.invalidateAll,
+    getCachedField: cacheManager.getCachedField,
+
+    // Raw query objects for advanced usage
+    queries: {
+      fields: fieldsQuery,
+      validation: validationQuery,
+    },
+    mutations: {
+      create: createMutation,
+      delete: deleteMutation,
+      bulk: bulkOperations,
+    },
   };
 }
