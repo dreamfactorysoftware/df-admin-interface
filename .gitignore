@@ -1,14 +1,59 @@
 # See http://help.github.com/ignore-files/ for more about ignoring files.
 
-# Compiled output
-/tmp
-/out-tsc
-/bazel-out
+# Next.js build output
+/.next/
+/dist/
+/out/
+
+# Next.js cache and optimization
+.next/cache/
+/.next/types/
+/.next/trace
+/.next/standalone/
+/.next/static/
+
+# Turbopack cache and build artifacts
+.turbo/
+/.turbopack/
+turbo.json
+.turbopack-cache/
 
 # Node
 /node_modules
 npm-debug.log
 yarn-error.log
+pnpm-debug.log*
+
+# Testing
+/coverage/
+/.nyc_output
+/test-results/
+/playwright-report/
+/test-artifacts/
+
+# Vitest
+/coverage/
+coverage.xml
+.vitest/
+vitest.config.ts.timestamp-*
+
+# Mock Service Worker
+/public/mockServiceWorker.js
+/src/test/mocks/handlers/
+msw.log
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# Tailwind CSS build artifacts
+/dist/
+/.postcssrc
+/postcss.config.js.map
 
 # IDEs and editors
 .idea/
@@ -28,10 +73,9 @@ yarn-error.log
 .history/*
 
 # Miscellaneous
-/.angular/cache
+/tmp
 .sass-cache/
 /connect.lock
-/coverage
 /libpeerconnection.log
 testem.log
 /typings
