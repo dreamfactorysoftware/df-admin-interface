@@ -1,259 +1,336 @@
-/* You can add global styles to this file, and also import other style files */
-@use '@angular/material' as mat;
-@use 'src/theme' as theme;
+/* DreamFactory Admin Interface - Dark Mode Styles using Tailwind CSS */
+/* Migrated from Angular Material theming to Tailwind CSS dark mode utilities */
 
-$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-.dark-theme {
-  // Font
-  .breadcrumb-link > span {
-    color: mat.get-color-from-palette($df-purple-palette, 500) !important;
-  }
-
-  // Divider
-  .mat-divider {
-    border-color: white !important;
-  }
-  .system-info-container
-    .system-info-instance
-    .system-info-packages
-    .package-header {
-    border-bottom-color: white !important;
-  }
-  .system-info-container .system-info-instance .system-info-packages {
-    border-left-color: white !important;
-  }
-
-  // Step
-  .mat-stepper-horizontal {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    border: 1px solid white !important;
-  }
-  .mat-step-icon {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      300
-    ) !important;
-  }
-  .mat-step-icon-selected {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      700
-    ) !important;
-  }
-  .mat-step-icon-state-edit {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      700
-    ) !important;
-  }
-  .mat-stepper-horizontal-line {
-    border-top-color: white !important;
+/* 
+ * Custom CSS layer for DreamFactory-specific dark mode styling
+ * Integrates with Next.js dark mode detection and Tailwind's dark: variant
+ */
+@layer components {
+  
+  /* DreamFactory Purple Color Palette - Tailwind CSS Custom Colors */
+  :root {
+    /* Purple palette for brand consistency */
+    --df-purple-50: #f1f0f6;
+    --df-purple-100: #e2e1ed;
+    --df-purple-200: #c6c4db;
+    --df-purple-300: #aaa8ca;
+    --df-purple-400: #908cba;
+    --df-purple-500: #7571a9;
+    --df-purple-600: #5c5699;
+    --df-purple-700: #423c89;
+    --df-purple-800: #29227a;
+    --df-purple-900: #0f0761;
+    
+    /* Dark theme specific colors for backgrounds */
+    --df-dark-bg-primary: #0f0e13;    /* 1002 */
+    --df-dark-bg-secondary: #1c1b20;  /* 1003 */
+    --df-dark-bg-elevated: #1c1b21;   /* 1001 */
+    --df-dark-bg-accent: #2a292f;     /* 1004 */
   }
 
-  .mat-step-label {
-    color: white !important;
-  }
-  .parent-route,
-  .mat-expansion-panel-body {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1003
-    ) !important;
-  }
-  .nav-item .active > .mdc-button__label > .mat-mdc-button-touch-target {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      700
-    ) !important;
-  }
-  // Radio Button
-  .mat-mdc-radio-button
-    .mdc-radio
-    .mdc-radio__native-control
-    + .mdc-radio__background
-    .mdc-radio__outer-circle {
-    border-color: white !important;
-  }
-  // Checkbox
-  .mat-mdc-checkbox .mdc-checkbox__background,
-  .mdc-checkbox__ripple {
-    border-color: white !important;
-  }
+  /* Dark mode theme styles - WCAG 2.1 AA compliant contrast ratios */
+  .dark {
+    
+    /* Typography and breadcrumb navigation */
+    .breadcrumb-link > span {
+      @apply text-purple-500 dark:text-purple-400;
+    }
 
-  // Form Element
-  .mdc-notched-outline > * {
-    border-color: white !important;
-  }
+    /* Dividers and borders */
+    .divider-border,
+    .mat-divider,
+    .system-info-container .system-info-instance .system-info-packages .package-header {
+      @apply border-white dark:border-gray-300;
+    }
+    
+    .system-info-container .system-info-instance .system-info-packages {
+      @apply border-l-white dark:border-l-gray-300;
+    }
 
-  mat-label,
-  mat-select,
-  mat-option,
-  input,
-  textarea,
-  button,
-  span {
-    color: white !important;
-  }
-  .mat-mdc-form-field-required-marker {
-    color: white !important;
-  }
-  .mdc-form-field > label {
-    color: white !important;
-  }
-  .mat-mdc-select-disabled {
-    color: #a3a1a1 !important;
-  }
-  // Button
-  .save-btn {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      600
-    ) !important;
-    color: mat.get-color-from-palette($df-purple-palette, 700) !important;
-  }
-  .cancel-btn {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    color: mat.get-color-from-palette($df-purple-palette, 200) !important;
-    border: 1px solid mat.get-color-from-palette($df-purple-palette, 200) !important;
-  }
-  .copy-btn {
-    color: white !important;
-  }
-  .refresh-btn {
-    color: #a3a1a1 !important;
-  }
-  .close-btn {
-    color: mat.get-color-from-palette($df-purple-palette, 200) !important;
-    border: 1px solid mat.get-color-from-palette($df-purple-palette, 200) !important;
-  }
+    /* Stepper components */
+    .stepper-container,
+    .mat-stepper-horizontal {
+      @apply bg-slate-900 dark:bg-gray-900 border border-white dark:border-gray-300;
+    }
+    
+    .step-icon,
+    .mat-step-icon {
+      @apply bg-purple-300 dark:bg-purple-400;
+    }
+    
+    .step-icon-selected,
+    .mat-step-icon-selected,
+    .mat-step-icon-state-edit {
+      @apply bg-purple-700 dark:bg-purple-600;
+    }
+    
+    .stepper-line,
+    .mat-stepper-horizontal-line {
+      @apply border-t-white dark:border-t-gray-300;
+    }
 
-  // Card
-  .mat-mdc-card {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    color: white !important;
-    border: 1px solid white !important;
-  }
-  .mat-mdc-card-header {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    color: white !important;
-  }
-  .mat-mdc-card-subtitle {
-    color: #a3a1a1 !important;
-  }
+    .step-label,
+    .mat-step-label {
+      @apply text-white dark:text-gray-100;
+    }
+    
+    /* Expansion panels and route containers */
+    .expansion-panel,
+    .parent-route,
+    .mat-expansion-panel,
+    .mat-expansion-panel-body {
+      @apply bg-slate-900 dark:bg-gray-900 text-white dark:text-gray-100;
+    }
+    
+    .mat-expansion-panel {
+      @apply border border-white dark:border-gray-300;
+    }
+    
+    .mat-expansion-panel-header {
+      @apply text-white dark:text-gray-100;
+    }
+    
+    .mat-accordion .mat-expansion-panel {
+      @apply border border-white dark:border-gray-300;
+    }
+    
+    .mat-expansion-panel-header-title,
+    .mat-expansion-indicator::after {
+      @apply text-white dark:text-gray-100;
+    }
+    
+    .mat-expansion-panel-header-description {
+      @apply text-gray-400 dark:text-gray-500;
+    }
 
-  .mat-expansion-panel {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    border: 1px soild white !important;
-    color: white !important;
-  }
-  .mat-expansion-panel-header {
-    color: white !important;
-  }
+    /* Navigation active states */
+    .nav-item .active > .mdc-button__label > .mat-mdc-button-touch-target {
+      @apply bg-purple-700 dark:bg-purple-600;
+    }
 
-  .mat-accordion .mat-expansion-panel {
-    border: 1px solid white !important;
-  }
-  .mat-expansion-panel-header-title,
-  .mat-expansion-indicator::after {
-    color: white;
-  }
-  .mat-expansion-panel-header-description {
-    color: #a3a1a1;
-  }
+    /* Form controls - Radio buttons and checkboxes */
+    .radio-button,
+    .mat-mdc-radio-button .mdc-radio .mdc-radio__native-control + .mdc-radio__background .mdc-radio__outer-circle {
+      @apply border-white dark:border-gray-300;
+    }
+    
+    .checkbox,
+    .mat-mdc-checkbox .mdc-checkbox__background,
+    .mdc-checkbox__ripple {
+      @apply border-white dark:border-gray-300;
+    }
 
-  // Table
-  table,
-  .mat-mdc-table {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    .mat-mdc-header-row {
-      .mat-mdc-header-cell {
-        background-color: mat.get-color-from-palette(
-          $df-purple-palette,
-          1002
-        ) !important;
-        color: white !important;
-        border-color: white !important;
+    /* Form field inputs and labels */
+    .form-field-outline,
+    .mdc-notched-outline > * {
+      @apply border-white dark:border-gray-300;
+    }
+
+    /* Text elements and form controls */
+    .form-text,
+    mat-label,
+    mat-select,
+    mat-option,
+    input,
+    textarea,
+    button,
+    span {
+      @apply text-white dark:text-gray-100;
+    }
+    
+    .form-required,
+    .mat-mdc-form-field-required-marker {
+      @apply text-white dark:text-gray-100;
+    }
+    
+    .form-label,
+    .mdc-form-field > label {
+      @apply text-white dark:text-gray-100;
+    }
+    
+    .select-disabled,
+    .mat-mdc-select-disabled {
+      @apply text-gray-400 dark:text-gray-500;
+    }
+
+    /* Button variations */
+    .save-btn {
+      @apply bg-purple-600 text-purple-100 dark:bg-purple-500 dark:text-purple-50;
+    }
+    
+    .cancel-btn {
+      @apply bg-slate-900 text-purple-200 border border-purple-200 dark:bg-gray-900 dark:text-purple-300 dark:border-purple-300;
+    }
+    
+    .copy-btn {
+      @apply text-white dark:text-gray-100;
+    }
+    
+    .refresh-btn {
+      @apply text-gray-400 dark:text-gray-500;
+    }
+    
+    .close-btn {
+      @apply text-purple-200 border border-purple-200 dark:text-purple-300 dark:border-purple-300;
+    }
+
+    /* Card components */
+    .card,
+    .mat-mdc-card {
+      @apply bg-slate-900 text-white border border-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-300;
+    }
+    
+    .card-header,
+    .mat-mdc-card-header {
+      @apply bg-slate-900 text-white dark:bg-gray-900 dark:text-gray-100;
+    }
+    
+    .card-subtitle,
+    .mat-mdc-card-subtitle {
+      @apply text-gray-400 dark:text-gray-500;
+    }
+
+    /* Tables and data display */
+    .data-table,
+    table,
+    .mat-mdc-table {
+      @apply bg-slate-900 dark:bg-gray-900;
+      
+      .table-header,
+      .mat-mdc-header-row .mat-mdc-header-cell {
+        @apply bg-slate-900 text-white border-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-300;
+      }
+      
+      .table-row,
+      .mat-mdc-row .mat-mdc-cell {
+        @apply text-white border-white dark:text-gray-100 dark:border-gray-300;
+      }
+      
+      .action-btn {
+        @apply text-purple-700 dark:text-purple-600;
       }
     }
-    .mat-mdc-row {
-      .mat-mdc-cell {
-        color: white !important;
-        border-color: white !important;
+    
+    .no-data-row td {
+      @apply text-white dark:text-gray-100;
+    }
+
+    /* Interactive table rows */
+    .clickable {
+      &.mat-mdc-row:focus,
+      &.mat-mdc-row:focus-within {
+        .mat-mdc-cell:first-child {
+          @apply border-l-2 border-l-purple-800 dark:border-l-purple-600;
+        }
+      }
+
+      &.mat-mdc-row:focus,
+      &.mat-mdc-row:focus-within,
+      &.mat-mdc-row:hover {
+        .mat-mdc-cell {
+          @apply bg-purple-600 dark:bg-purple-700;
+        }
       }
     }
-    .action-btn {
-      color: mat.get-color-from-palette($df-purple-palette, 700) !important;
-    }
-  }
-  .no-data-row td {
-    color: white !important;
-  }
 
-  .clickable {
-    &.mat-mdc-row:focus,
-    &.mat-mdc-row:focus-within {
-      .mat-mdc-cell:first-child {
-        border-left: 2px solid
-          mat.get-color-from-palette($df-purple-palette, 800) !important;
-      }
+    /* Swagger UI dark mode styling */
+    .swagger-ui .info .title,
+    .swagger-ui .renderedMarkdown p {
+      @apply text-white dark:text-gray-100;
     }
 
-    &.mat-mdc-row:focus,
-    &.mat-mdc-row:focus-within,
-    &.mat-mdc-row:hover {
-      .mat-mdc-cell {
-        background-color: mat.get-color-from-palette(
-          $df-purple-palette,
-          600
-        ) !important;
-      }
+    .swagger-ui .scheme-container {
+      @apply bg-slate-900 border border-white text-white dark:bg-gray-900 dark:border-gray-300 dark:text-gray-100;
+    }
+    
+    .swagger-ui .model-toggle::after {
+      @apply bg-white dark:bg-gray-300;
+    }
+
+    /* Code editor styling */
+    .editor {
+      @apply text-inherit bg-slate-900 border border-white dark:bg-gray-900 dark:border-gray-300;
     }
   }
+}
 
-  // Swagger
-  .swagger-ui .info .title,
-  .swagger-ui .renderedMarkdown p {
-    color: white !important;
+/* 
+ * Next.js dark mode integration utilities
+ * Supports system preference detection and manual toggle
+ */
+@layer utilities {
+  
+  /* Theme transition animations for smooth mode switching */
+  .theme-transition {
+    @apply transition-colors duration-300 ease-in-out;
   }
+  
+  /* Utility classes for theme-aware components */
+  .df-bg-primary {
+    @apply bg-white dark:bg-slate-900;
+  }
+  
+  .df-bg-secondary {
+    @apply bg-gray-50 dark:bg-gray-800;
+  }
+  
+  .df-bg-elevated {
+    @apply bg-white dark:bg-gray-900 shadow-lg dark:shadow-xl;
+  }
+  
+  .df-text-primary {
+    @apply text-gray-900 dark:text-gray-100;
+  }
+  
+  .df-text-secondary {
+    @apply text-gray-600 dark:text-gray-400;
+  }
+  
+  .df-border-default {
+    @apply border-gray-200 dark:border-gray-700;
+  }
+  
+  /* Purple theme colors with proper contrast ratios */
+  .df-purple-primary {
+    @apply text-purple-600 dark:text-purple-400;
+  }
+  
+  .df-purple-bg {
+    @apply bg-purple-50 dark:bg-purple-900;
+  }
+  
+  .df-purple-border {
+    @apply border-purple-200 dark:border-purple-700;
+  }
+  
+  /* Focus states with proper contrast */
+  .df-focus-ring {
+    @apply focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-purple-400 dark:focus:ring-offset-gray-900;
+  }
+  
+  /* WCAG 2.1 AA compliant button variants */
+  .df-btn-primary {
+    @apply bg-purple-600 text-white hover:bg-purple-700 focus:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 dark:focus:bg-purple-600;
+  }
+  
+  .df-btn-secondary {
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 focus:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 dark:focus:bg-gray-600;
+  }
+}
 
-  .swagger-ui .scheme-container {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    border: 1px solid white !important;
-    color: white !important;
+/* 
+ * Print styles - ensure proper contrast in print mode
+ */
+@media print {
+  .dark * {
+    @apply !text-black !bg-white;
   }
-  .swagger-ui .model-toggle::after {
-    background-color: white !important;
-  }
-
-  // Editor
-  .editor {
-    color: unset !important;
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    border: 1px solid white;
+  
+  .dark .df-purple-primary {
+    @apply !text-purple-800;
   }
 }
