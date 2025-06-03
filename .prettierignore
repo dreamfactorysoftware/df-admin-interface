@@ -1,15 +1,26 @@
 # See http://help.github.com/ignore-files/ for more about ignoring files.
 
+# Next.js build output
+/.next/
+/dist/
+/out/
+/.swc/
+
 # Compiled output
-/dist
 /tmp
-/out-tsc
-/bazel-out
 
 # Node
 /node_modules
 npm-debug.log
 yarn-error.log
+pnpm-debug.log
+
+# Package manager cache and locks
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
 
 # IDEs and editors
 .idea/
@@ -28,18 +39,41 @@ yarn-error.log
 !.vscode/extensions.json
 .history/*
 
+# Testing
+/coverage/
+/test-results/
+/playwright-report/
+/test-output/
+vitest-coverage/
+.vitest/
+
+# Environment files
+.env.local
+.env.production
+.env.staging
+.env.development
+
+# Tailwind CSS
+/src/styles/tailwind.css.map
+/.tailwindcss-cache/
+
+# Turbopack and PostCSS generated files
+.turbo/
+.postcssrc.cache
+
+# Next.js generated files
+.next/
+.vercel/
+.netlify/
+
 # Miscellaneous
-/.angular/cache
-.sass-cache/
 /connect.lock
-/coverage
 /libpeerconnection.log
-testem.log
-/typings
 
 # System files
 .DS_Store
 Thumbs.db
 
-# assets
+# Assets that shouldn't be formatted
 /src/assets/*
+/public/assets/*
