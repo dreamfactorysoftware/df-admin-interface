@@ -1,7 +1,7 @@
 /**
- * React Query hooks for table relationship data management.
+ * React Query hooks for table field data management.
  * Provides intelligent caching, background synchronization, and optimistic updates
- * for relationship CRUD operations with real-time validation support.
+ * for field CRUD operations with real-time validation support.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,49 +12,68 @@ import { useApi } from '@/hooks/use-api';
 import { useAuth } from '@/hooks/use-auth';
 import { useErrorHandler } from '@/hooks/use-error-handler';
 import { 
-  TableRelated, 
-  RelationshipsRow, 
-  RelationshipsResponse,
-  RelationshipConstraintValidation,
-  RelationshipFilters,
-  RelationshipError,
-  relationshipQueryKeys
+  TableField, 
+  FieldTableRow, 
+  FieldsResponse,
+  FieldFilters,
+  FieldError,
+  fieldQueryKeys
 } from './types';
 
 /**
- * Custom hook for fetching table relationships with intelligent caching
+ * Custom hook for fetching table fields with intelligent caching
  * Implements React Query patterns for optimal performance and UX
  */
-export function useTableRelationships(
+export function useTableFields(
   serviceName: string, 
   tableName: string,
   options?: {
     enabled?: boolean;
     refetchInterval?: number;
-    filters?: RelationshipFilters;
+    filters?: FieldFilters;
   }
 ) {
   const { apiClient } = useApi();
   const { handleError } = useErrorHandler();
 
   return useQuery({
-    queryKey: relationshipQueryKeys.all(serviceName, tableName),
-    queryFn: async (): Promise<RelationshipsRow[]> => {
+    queryKey: fieldQueryKeys.all(serviceName, tableName),
+    queryFn: async (): Promise<FieldTableRow[]> => {
       try {
-        const endpoint = `${serviceName}/_schema/${tableName}/_related`;
-        const response = await apiClient.get<RelationshipsResponse>(endpoint);
+        const endpoint = `${serviceName}/_schema/${tableName}/_field`;
+        const response = await apiClient.get<FieldsResponse>(endpoint);
         
         // Transform API response to table row format
-        return response.resource.map((relationship: TableRelated): RelationshipsRow => ({
-          name: relationship.name,
-          alias: relationship.alias || relationship.name,
-          type: relationship.type,
-          isVirtual: relationship.isVirtual,
-        }));
+        return response.resource.map((field: TableField): FieldTableRow => {
+          const constraints = [];
+          if (field.isPrimaryKey) constraints.push('PK');
+          if (field.isForeignKey) constraints.push('FK');
+          if (field.isUnique) constraints.push('UNIQUE');
+          if (field.required) constraints.push('NOT NULL');
+          if (field.autoIncrement) constraints.push('AUTO_INCREMENT');
+
+          return {
+            id: field.name,
+            name: field.name,
+            alias: field.alias || field.name,
+            label: field.label || field.name,
+            type: field.type,
+            dbType: field.dbType || field.type,
+            isVirtual: field.isVirtual,
+            required: field.required,
+            isPrimaryKey: field.isPrimaryKey,
+            isForeignKey: field.isForeignKey,
+            isUnique: field.isUnique,
+            length: field.length,
+            default: field.default,
+            description: field.description,
+            constraints: constraints.join(', '),
+          };
+        });
       } catch (error) {
-        const relationshipError: RelationshipError = {
+        const fieldError: FieldError = {
           type: 'network',
-          message: 'Failed to fetch table relationships',
+          message: 'Failed to fetch table fields',
           details: error instanceof Error ? error.message : 'Unknown error',
           suggestions: [
             'Check your network connection',
@@ -62,7 +81,7 @@ export function useTableRelationships(
             'Ensure you have proper permissions'
           ]
         };
-        handleError(relationshipError);
+        handleError(fieldError);
         throw error;
       }
     },
@@ -79,356 +98,355 @@ export function useTableRelationships(
       return failureCount < 3;
     },
     onError: (error) => {
-      console.error('Error fetching relationships:', error);
-      toast.error('Failed to load table relationships');
+      console.error('Error fetching fields:', error);
+      toast.error('Failed to load table fields');
     }
   });
 }
 
 /**
- * Hook for fetching specific relationship details
- * Used for relationship detail views and editing
+ * Hook for fetching specific field details
+ * Used for field detail views and editing
  */
-export function useRelationshipDetail(
+export function useFieldDetail(
   serviceName: string,
   tableName: string,
-  relationshipName: string,
+  fieldName: string,
   options?: { enabled?: boolean }
 ) {
   const { apiClient } = useApi();
   const { handleError } = useErrorHandler();
 
   return useQuery({
-    queryKey: relationshipQueryKeys.detail(serviceName, tableName, relationshipName),
-    queryFn: async (): Promise<TableRelated> => {
+    queryKey: fieldQueryKeys.detail(serviceName, tableName, fieldName),
+    queryFn: async (): Promise<TableField> => {
       try {
-        const endpoint = `${serviceName}/_schema/${tableName}/_related/${relationshipName}`;
-        const response = await apiClient.get<TableRelated>(endpoint);
+        const endpoint = `${serviceName}/_schema/${tableName}/_field/${fieldName}`;
+        const response = await apiClient.get<TableField>(endpoint);
         return response;
       } catch (error) {
-        const relationshipError: RelationshipError = {
+        const fieldError: FieldError = {
           type: 'network',
-          message: `Failed to fetch relationship '${relationshipName}' details`,
+          message: `Failed to fetch field '${fieldName}' details`,
           details: error instanceof Error ? error.message : 'Unknown error',
-          relationshipName,
+          fieldName,
           suggestions: [
-            'Verify the relationship name is correct',
-            'Check if the relationship still exists',
+            'Verify the field name is correct',
+            'Check if the field still exists',
             'Ensure you have proper permissions'
           ]
         };
-        handleError(relationshipError);
+        handleError(fieldError);
         throw error;
       }
     },
-    enabled: options?.enabled !== false && !!serviceName && !!tableName && !!relationshipName,
+    enabled: options?.enabled !== false && !!serviceName && !!tableName && !!fieldName,
     staleTime: 5 * 60 * 1000, // 5 minutes
     cacheTime: 10 * 60 * 1000, // 10 minutes
-    retry: false, // Don't retry for specific relationship fetches
+    retry: false, // Don't retry for specific field fetches
     onError: (error) => {
-      console.error('Error fetching relationship detail:', error);
-      toast.error(`Failed to load relationship '${relationshipName}' details`);
+      console.error('Error fetching field detail:', error);
+      toast.error(`Failed to load field '${fieldName}' details`);
     }
   });
 }
 
 /**
- * Hook for real-time relationship constraint validation
- * Provides validation feedback for relationship configuration
- */
-export function useRelationshipValidation(
-  serviceName: string,
-  tableName: string,
-  relationshipData?: Partial<TableRelated>
-) {
-  const { apiClient } = useApi();
-  const { handleError } = useErrorHandler();
-
-  return useQuery({
-    queryKey: [...relationshipQueryKeys.validation(serviceName, tableName), relationshipData],
-    queryFn: async (): Promise<RelationshipConstraintValidation> => {
-      try {
-        // Simulate validation endpoint - replace with actual API when available
-        const endpoint = `${serviceName}/_schema/${tableName}/_related/_validate`;
-        const response = await apiClient.post<RelationshipConstraintValidation>(
-          endpoint, 
-          relationshipData
-        );
-        return response;
-      } catch (error) {
-        // Fallback validation logic
-        return {
-          isValid: true,
-          warnings: relationshipData ? ['Validation endpoint not available - basic checks passed'] : []
-        };
-      }
-    },
-    enabled: !!serviceName && !!tableName && !!relationshipData,
-    staleTime: 30 * 1000, // 30 seconds for validation
-    cacheTime: 2 * 60 * 1000, // 2 minutes
-    refetchOnWindowFocus: false,
-    retry: false,
-    onError: (error) => {
-      console.warn('Relationship validation error:', error);
-      // Don't show error toast for validation failures
-    }
-  });
-}
-
-/**
- * Mutation hook for deleting table relationships
+ * Mutation hook for deleting table fields
  * Implements optimistic updates and proper error handling
  */
-export function useDeleteRelationship(serviceName: string, tableName: string) {
+export function useDeleteField(serviceName: string, tableName: string) {
   const queryClient = useQueryClient();
   const { apiClient } = useApi();
   const { handleError } = useErrorHandler();
 
   return useMutation({
-    mutationFn: async (relationshipName: string): Promise<void> => {
-      const endpoint = `${serviceName}/_schema/${tableName}/_related/${relationshipName}`;
+    mutationFn: async (fieldName: string): Promise<void> => {
+      const endpoint = `${serviceName}/_schema/${tableName}/_field/${fieldName}`;
       await apiClient.delete(endpoint);
     },
-    onMutate: async (relationshipName: string) => {
+    onMutate: async (fieldName: string) => {
       // Cancel outgoing refetches
-      const queryKey = relationshipQueryKeys.all(serviceName, tableName);
+      const queryKey = fieldQueryKeys.all(serviceName, tableName);
       await queryClient.cancelQueries({ queryKey });
 
       // Snapshot previous value
-      const previousRelationships = queryClient.getQueryData<RelationshipsRow[]>(queryKey);
+      const previousFields = queryClient.getQueryData<FieldTableRow[]>(queryKey);
 
       // Optimistically update cache
-      if (previousRelationships) {
-        queryClient.setQueryData<RelationshipsRow[]>(
+      if (previousFields) {
+        queryClient.setQueryData<FieldTableRow[]>(
           queryKey,
-          previousRelationships.filter(rel => rel.name !== relationshipName)
+          previousFields.filter(field => field.name !== fieldName)
         );
       }
 
-      return { previousRelationships };
+      return { previousFields };
     },
-    onError: (error, relationshipName, context) => {
+    onError: (error, fieldName, context) => {
       // Rollback optimistic update
-      if (context?.previousRelationships) {
-        const queryKey = relationshipQueryKeys.all(serviceName, tableName);
-        queryClient.setQueryData(queryKey, context.previousRelationships);
+      if (context?.previousFields) {
+        const queryKey = fieldQueryKeys.all(serviceName, tableName);
+        queryClient.setQueryData(queryKey, context.previousFields);
       }
 
-      const relationshipError: RelationshipError = {
+      const fieldError: FieldError = {
         type: 'network',
-        message: `Failed to delete relationship '${relationshipName}'`,
+        message: `Failed to delete field '${fieldName}'`,
         details: error instanceof Error ? error.message : 'Unknown error',
-        relationshipName,
+        fieldName,
         suggestions: [
-          'Check if the relationship is being used by other tables',
+          'Check if the field is being used by other tables',
           'Verify you have deletion permissions',
           'Try refreshing and deleting again'
         ]
       };
       
-      handleError(relationshipError);
-      toast.error(`Failed to delete relationship '${relationshipName}'`);
+      handleError(fieldError);
+      toast.error(`Failed to delete field '${fieldName}'`);
     },
-    onSuccess: (_, relationshipName) => {
-      toast.success(`Relationship '${relationshipName}' deleted successfully`);
+    onSuccess: (_, fieldName) => {
+      toast.success(`Field '${fieldName}' deleted successfully`);
     },
     onSettled: () => {
       // Always refetch after mutation settles
-      const queryKey = relationshipQueryKeys.all(serviceName, tableName);
+      const queryKey = fieldQueryKeys.all(serviceName, tableName);
       queryClient.invalidateQueries({ queryKey });
     }
   });
 }
 
 /**
- * Mutation hook for creating new relationships
+ * Mutation hook for creating new fields
  * Supports optimistic updates and validation
  */
-export function useCreateRelationship(serviceName: string, tableName: string) {
+export function useCreateField(serviceName: string, tableName: string) {
   const queryClient = useQueryClient();
   const { apiClient } = useApi();
   const { handleError } = useErrorHandler();
 
   return useMutation({
-    mutationFn: async (relationshipData: Partial<TableRelated>): Promise<TableRelated> => {
-      const endpoint = `${serviceName}/_schema/${tableName}/_related`;
-      const response = await apiClient.post<TableRelated>(endpoint, relationshipData);
+    mutationFn: async (fieldData: Partial<TableField>): Promise<TableField> => {
+      const endpoint = `${serviceName}/_schema/${tableName}/_field`;
+      const response = await apiClient.post<TableField>(endpoint, fieldData);
       return response;
     },
-    onMutate: async (relationshipData) => {
+    onMutate: async (fieldData) => {
       // Cancel outgoing refetches
-      const queryKey = relationshipQueryKeys.all(serviceName, tableName);
+      const queryKey = fieldQueryKeys.all(serviceName, tableName);
       await queryClient.cancelQueries({ queryKey });
 
       // Snapshot previous value
-      const previousRelationships = queryClient.getQueryData<RelationshipsRow[]>(queryKey);
+      const previousFields = queryClient.getQueryData<FieldTableRow[]>(queryKey);
 
-      // Optimistically add new relationship
-      if (previousRelationships && relationshipData.name) {
-        const optimisticRelationship: RelationshipsRow = {
-          name: relationshipData.name,
-          alias: relationshipData.alias || relationshipData.name,
-          type: relationshipData.type || 'unknown',
-          isVirtual: relationshipData.isVirtual || false,
+      // Optimistically add new field
+      if (previousFields && fieldData.name) {
+        const constraints = [];
+        if (fieldData.isPrimaryKey) constraints.push('PK');
+        if (fieldData.isForeignKey) constraints.push('FK');
+        if (fieldData.isUnique) constraints.push('UNIQUE');
+        if (fieldData.required) constraints.push('NOT NULL');
+        if (fieldData.autoIncrement) constraints.push('AUTO_INCREMENT');
+
+        const optimisticField: FieldTableRow = {
+          id: fieldData.name,
+          name: fieldData.name,
+          alias: fieldData.alias || fieldData.name,
+          label: fieldData.label || fieldData.name,
+          type: fieldData.type || 'string',
+          dbType: fieldData.dbType || fieldData.type || 'string',
+          isVirtual: fieldData.isVirtual || false,
+          required: fieldData.required || false,
+          isPrimaryKey: fieldData.isPrimaryKey || false,
+          isForeignKey: fieldData.isForeignKey || false,
+          isUnique: fieldData.isUnique || false,
+          length: fieldData.length,
+          default: fieldData.default,
+          description: fieldData.description,
+          constraints: constraints.join(', '),
         };
 
-        queryClient.setQueryData<RelationshipsRow[]>(
+        queryClient.setQueryData<FieldTableRow[]>(
           queryKey,
-          [...previousRelationships, optimisticRelationship]
+          [...previousFields, optimisticField]
         );
       }
 
-      return { previousRelationships };
+      return { previousFields };
     },
-    onError: (error, relationshipData, context) => {
+    onError: (error, fieldData, context) => {
       // Rollback optimistic update
-      if (context?.previousRelationships) {
-        const queryKey = relationshipQueryKeys.all(serviceName, tableName);
-        queryClient.setQueryData(queryKey, context.previousRelationships);
+      if (context?.previousFields) {
+        const queryKey = fieldQueryKeys.all(serviceName, tableName);
+        queryClient.setQueryData(queryKey, context.previousFields);
       }
 
-      const relationshipError: RelationshipError = {
+      const fieldError: FieldError = {
         type: 'validation',
-        message: `Failed to create relationship '${relationshipData.name || 'unnamed'}'`,
+        message: `Failed to create field '${fieldData.name || 'unnamed'}'`,
         details: error instanceof Error ? error.message : 'Unknown error',
-        relationshipName: relationshipData.name,
+        fieldName: fieldData.name,
         suggestions: [
-          'Check relationship configuration',
-          'Verify referenced table and fields exist',
-          'Ensure relationship name is unique'
+          'Check field configuration',
+          'Verify field name is unique',
+          'Ensure data type is valid'
         ]
       };
       
-      handleError(relationshipError);
-      toast.error(`Failed to create relationship '${relationshipData.name || 'unnamed'}'`);
+      handleError(fieldError);
+      toast.error(`Failed to create field '${fieldData.name || 'unnamed'}'`);
     },
-    onSuccess: (createdRelationship) => {
-      toast.success(`Relationship '${createdRelationship.name}' created successfully`);
+    onSuccess: (createdField) => {
+      toast.success(`Field '${createdField.name}' created successfully`);
     },
     onSettled: () => {
       // Always refetch after mutation settles
-      const queryKey = relationshipQueryKeys.all(serviceName, tableName);
+      const queryKey = fieldQueryKeys.all(serviceName, tableName);
       queryClient.invalidateQueries({ queryKey });
     }
   });
 }
 
 /**
- * Mutation hook for updating existing relationships
+ * Mutation hook for updating existing fields
  * Implements optimistic updates and conflict resolution
  */
-export function useUpdateRelationship(serviceName: string, tableName: string) {
+export function useUpdateField(serviceName: string, tableName: string) {
   const queryClient = useQueryClient();
   const { apiClient } = useApi();
   const { handleError } = useErrorHandler();
 
   return useMutation({
     mutationFn: async ({ 
-      relationshipName, 
+      fieldName, 
       data 
     }: { 
-      relationshipName: string; 
-      data: Partial<TableRelated> 
-    }): Promise<TableRelated> => {
-      const endpoint = `${serviceName}/_schema/${tableName}/_related/${relationshipName}`;
-      const response = await apiClient.patch<TableRelated>(endpoint, data);
+      fieldName: string; 
+      data: Partial<TableField> 
+    }): Promise<TableField> => {
+      const endpoint = `${serviceName}/_schema/${tableName}/_field/${fieldName}`;
+      const response = await apiClient.patch<TableField>(endpoint, data);
       return response;
     },
-    onMutate: async ({ relationshipName, data }) => {
+    onMutate: async ({ fieldName, data }) => {
       // Cancel outgoing refetches
-      const queryKey = relationshipQueryKeys.all(serviceName, tableName);
+      const queryKey = fieldQueryKeys.all(serviceName, tableName);
       await queryClient.cancelQueries({ queryKey });
 
       // Snapshot previous value
-      const previousRelationships = queryClient.getQueryData<RelationshipsRow[]>(queryKey);
+      const previousFields = queryClient.getQueryData<FieldTableRow[]>(queryKey);
 
-      // Optimistically update relationship
-      if (previousRelationships) {
-        const updatedRelationships = previousRelationships.map(rel => 
-          rel.name === relationshipName 
-            ? {
-                ...rel,
-                alias: data.alias || rel.alias,
-                type: data.type || rel.type,
-                isVirtual: data.isVirtual !== undefined ? data.isVirtual : rel.isVirtual,
-              }
-            : rel
-        );
+      // Optimistically update field
+      if (previousFields) {
+        const updatedFields = previousFields.map(field => {
+          if (field.name === fieldName) {
+            const constraints = [];
+            const isPrimaryKey = data.isPrimaryKey !== undefined ? data.isPrimaryKey : field.isPrimaryKey;
+            const isForeignKey = data.isForeignKey !== undefined ? data.isForeignKey : field.isForeignKey;
+            const isUnique = data.isUnique !== undefined ? data.isUnique : field.isUnique;
+            const required = data.required !== undefined ? data.required : field.required;
+            const autoIncrement = data.autoIncrement !== undefined ? data.autoIncrement : false;
 
-        queryClient.setQueryData<RelationshipsRow[]>(queryKey, updatedRelationships);
+            if (isPrimaryKey) constraints.push('PK');
+            if (isForeignKey) constraints.push('FK');
+            if (isUnique) constraints.push('UNIQUE');
+            if (required) constraints.push('NOT NULL');
+            if (autoIncrement) constraints.push('AUTO_INCREMENT');
+
+            return {
+              ...field,
+              alias: data.alias || field.alias,
+              label: data.label || field.label,
+              type: data.type || field.type,
+              dbType: data.dbType || field.dbType,
+              isVirtual: data.isVirtual !== undefined ? data.isVirtual : field.isVirtual,
+              required,
+              isPrimaryKey,
+              isForeignKey,
+              isUnique,
+              length: data.length !== undefined ? data.length : field.length,
+              default: data.default !== undefined ? data.default : field.default,
+              description: data.description !== undefined ? data.description : field.description,
+              constraints: constraints.join(', '),
+            };
+          }
+          return field;
+        });
+
+        queryClient.setQueryData<FieldTableRow[]>(queryKey, updatedFields);
       }
 
-      return { previousRelationships };
+      return { previousFields };
     },
-    onError: (error, { relationshipName }, context) => {
+    onError: (error, { fieldName }, context) => {
       // Rollback optimistic update
-      if (context?.previousRelationships) {
-        const queryKey = relationshipQueryKeys.all(serviceName, tableName);
-        queryClient.setQueryData(queryKey, context.previousRelationships);
+      if (context?.previousFields) {
+        const queryKey = fieldQueryKeys.all(serviceName, tableName);
+        queryClient.setQueryData(queryKey, context.previousFields);
       }
 
-      const relationshipError: RelationshipError = {
+      const fieldError: FieldError = {
         type: 'validation',
-        message: `Failed to update relationship '${relationshipName}'`,
+        message: `Failed to update field '${fieldName}'`,
         details: error instanceof Error ? error.message : 'Unknown error',
-        relationshipName,
+        fieldName,
         suggestions: [
-          'Check updated relationship configuration',
-          'Verify all referenced objects still exist',
+          'Check updated field configuration',
+          'Verify all constraints are valid',
           'Ensure changes don\'t create conflicts'
         ]
       };
       
-      handleError(relationshipError);
-      toast.error(`Failed to update relationship '${relationshipName}'`);
+      handleError(fieldError);
+      toast.error(`Failed to update field '${fieldName}'`);
     },
-    onSuccess: (updatedRelationship) => {
-      toast.success(`Relationship '${updatedRelationship.name}' updated successfully`);
+    onSuccess: (updatedField) => {
+      toast.success(`Field '${updatedField.name}' updated successfully`);
     },
     onSettled: () => {
       // Always refetch after mutation settles
-      const queryKey = relationshipQueryKeys.all(serviceName, tableName);
+      const queryKey = fieldQueryKeys.all(serviceName, tableName);
       queryClient.invalidateQueries({ queryKey });
     }
   });
 }
 
 /**
- * Composite hook for managing all relationship table operations
- * Provides unified interface for relationship management
+ * Composite hook for managing all field table operations
+ * Provides unified interface for field management
  */
-export function useRelationshipTableManager(serviceName: string, tableName: string) {
-  const relationships = useTableRelationships(serviceName, tableName);
-  const deleteRelationship = useDeleteRelationship(serviceName, tableName);
-  const createRelationship = useCreateRelationship(serviceName, tableName);
-  const updateRelationship = useUpdateRelationship(serviceName, tableName);
+export function useFieldTableManager(serviceName: string, tableName: string) {
+  const fields = useTableFields(serviceName, tableName);
+  const deleteField = useDeleteField(serviceName, tableName);
+  const createField = useCreateField(serviceName, tableName);
+  const updateField = useUpdateField(serviceName, tableName);
 
   const refreshTable = useCallback(() => {
-    const queryKey = relationshipQueryKeys.all(serviceName, tableName);
+    const queryKey = fieldQueryKeys.all(serviceName, tableName);
     const queryClient = useQueryClient();
     queryClient.invalidateQueries({ queryKey });
   }, [serviceName, tableName]);
 
-  const isLoading = relationships.isLoading || 
-                   deleteRelationship.isPending || 
-                   createRelationship.isPending || 
-                   updateRelationship.isPending;
+  const isLoading = fields.isLoading || 
+                   deleteField.isPending || 
+                   createField.isPending || 
+                   updateField.isPending;
 
   return {
     // Data and queries
-    relationships: relationships.data || [],
+    fields: fields.data || [],
     isLoading,
-    error: relationships.error,
+    error: fields.error,
     
     // Actions
-    deleteRelationship: deleteRelationship.mutate,
-    createRelationship: createRelationship.mutate,
-    updateRelationship: updateRelationship.mutate,
+    deleteField: deleteField.mutate,
+    createField: createField.mutate,
+    updateField: updateField.mutate,
     refreshTable,
     
     // Mutation states
-    isDeleting: deleteRelationship.isPending,
-    isCreating: createRelationship.isPending,
-    isUpdating: updateRelationship.isPending,
+    isDeleting: deleteField.isPending,
+    isCreating: createField.isPending,
+    isUpdating: updateField.isPending,
   };
 }
