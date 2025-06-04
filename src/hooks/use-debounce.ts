@@ -1,67 +1,142 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+'use client';
+
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 /**
- * Configuration options for debouncing behavior
+ * Custom hook for debouncing values with configurable delay and cleanup
+ * Optimizes performance by reducing the frequency of expensive operations
+ * like API calls, search queries, and form validation
  */
-export interface DebounceOptions {
-  /** Delay in milliseconds before executing the debounced action */
-  delay?: number;
-  /** Execute immediately on the first call (leading edge) */
-  leading?: boolean;
-  /** Execute on the trailing edge (default: true) */
-  trailing?: boolean;
-  /** Maximum time to wait before forcing execution */
-  maxWait?: number;
-}
-
-/**
- * Return type for debounced callback functionality
- */
-export interface DebouncedFunction<T extends (...args: any[]) => any> {
-  /** The debounced function */
-  (...args: Parameters<T>): void;
-  /** Cancel any pending execution */
-  cancel: () => void;
-  /** Immediately execute the function and cancel any pending execution */
-  flush: () => void;
-  /** Check if there's a pending execution */
-  isPending: () => boolean;
-}
-
-/**
- * Debounced value hook that delays state updates for performance optimization.
- * Essential for search inputs, form validation, and preventing excessive API calls.
- * 
- * @param value - The value to debounce
- * @param delay - Delay in milliseconds (default: 300ms)
- * @returns The debounced value
- * 
- * @example
- * ```tsx
- * function SearchInput() {
- *   const [searchTerm, setSearchTerm] = useState('');
- *   const debouncedSearchTerm = useDebounceValue(searchTerm, 500);
- *   
- *   useEffect(() => {
- *     if (debouncedSearchTerm) {
- *       // Perform search API call
- *       searchAPI(debouncedSearchTerm);
- *     }
- *   }, [debouncedSearchTerm]);
- *   
- *   return (
- *     <input 
- *       value={searchTerm}
- *       onChange={(e) => setSearchTerm(e.target.value)}
- *       placeholder="Search..."
- *     />
- *   );
- * }
- * ```
- */
-export function useDebounceValue<T>(value: T, delay: number = 300): T {
+export function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    // Set up the timeout to update the debounced value after the delay
+    const timeoutId = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    // Clean up the timeout if value changes before delay completes
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+/**
+ * Enhanced debounce hook with callback function support
+ * Useful for triggering side effects like API calls after debounce delay
+ */
+export function useDebouncedCallback<TArgs extends any[]>(
+  callback: (...args: TArgs) => void,
+  delay: number,
+  dependencies: React.DependencyList = []
+): {
+  /** The debounced callback function */
+  debouncedCallback: (...args: TArgs) => void;
+  /** Cancel any pending debounced callback */
+  cancel: () => void;
+  /** Execute the callback immediately, canceling any pending calls */
+  flush: (...args: TArgs) => void;
+  /** Whether there is a pending debounced callback */
+  isPending: () => boolean;
+} {
+  const timeoutRef = useRef<NodeJS.Timeout>();
+  const callbackRef = useRef(callback);
+  const argsRef = useRef<TArgs>();
+
+  // Update the callback ref when dependencies change
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback, ...dependencies]);
+
+  // Cancel pending callback on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  const cancel = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = undefined;
+    }
+  }, []);
+
+  const flush = useCallback((...args: TArgs) => {
+    cancel();
+    callbackRef.current(...args);
+  }, [cancel]);
+
+  const isPending = useCallback(() => {
+    return timeoutRef.current !== undefined;
+  }, []);
+
+  const debouncedCallback = useCallback((...args: TArgs) => {
+    argsRef.current = args;
+    
+    // Cancel any existing timeout
+    cancel();
+    
+    // Set up new timeout
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = undefined;
+      callbackRef.current(...args);
+    }, delay);
+  }, [cancel, delay]);
+
+  return {
+    debouncedCallback,
+    cancel,
+    flush,
+    isPending
+  };
+}
+
+/**
+ * Debounced state hook that combines useState with debouncing
+ * Returns both immediate and debounced values for flexible usage
+ */
+export function useDebouncedState<T>(
+  initialValue: T,
+  delay: number
+): {
+  /** Current immediate value */
+  value: T;
+  /** Debounced value */
+  debouncedValue: T;
+  /** Set the immediate value */
+  setValue: React.Dispatch<React.SetStateAction<T>>;
+  /** Whether the debounced value is pending update */
+  isPending: boolean;
+} {
+  const [value, setValue] = useState<T>(initialValue);
+  const debouncedValue = useDebounce(value, delay);
+  const isPending = value !== debouncedValue;
+
+  return {
+    value,
+    debouncedValue,
+    setValue,
+    isPending
+  };
+}
+
+/**
+ * Debounced effect hook that delays effect execution until value stabilizes
+ * Useful for expensive operations that should only run after user stops interacting
+ */
+export function useDebouncedEffect(
+  effect: React.EffectCallback,
+  dependencies: React.DependencyList,
+  delay: number
+): void {
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     // Clear existing timeout
@@ -69,9 +144,14 @@ export function useDebounceValue<T>(value: T, delay: number = 300): T {
       clearTimeout(timeoutRef.current);
     }
 
-    // Set new timeout
+    // Set up new timeout
     timeoutRef.current = setTimeout(() => {
-      setDebouncedValue(value);
+      const cleanup = effect();
+      
+      // Store cleanup function for later execution
+      if (cleanup) {
+        timeoutRef.current = setTimeout(cleanup, 0) as any;
+      }
     }, delay);
 
     // Cleanup function
@@ -80,380 +160,186 @@ export function useDebounceValue<T>(value: T, delay: number = 300): T {
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [value, delay]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  return debouncedValue;
+  }, [...dependencies, delay]);
 }
 
 /**
- * Advanced debounced callback hook with comprehensive control options.
- * Provides delayed function execution with cancellation, immediate execution,
- * and advanced timing controls for complex use cases.
- * 
- * @param callback - The function to debounce
- * @param options - Debouncing configuration options
- * @returns Debounced function with control methods
- * 
- * @example
- * ```tsx
- * function AutoSaveForm() {
- *   const [formData, setFormData] = useState({});
- *   
- *   const debouncedSave = useDebounceCallback(
- *     (data) => saveFormAPI(data),
- *     { delay: 1000, maxWait: 5000 }
- *   );
- *   
- *   const handleInputChange = (field, value) => {
- *     const newData = { ...formData, [field]: value };
- *     setFormData(newData);
- *     debouncedSave(newData);
- *   };
- *   
- *   return (
- *     <form>
- *       <input 
- *         onChange={(e) => handleInputChange('name', e.target.value)}
- *       />
- *       <button type="button" onClick={debouncedSave.flush}>
- *         Save Now
- *       </button>
- *       <button type="button" onClick={debouncedSave.cancel}>
- *         Cancel Save
- *       </button>
- *     </form>
- *   );
- * }
- * ```
+ * Advanced debounce hook with leading and trailing edge options
+ * Provides fine-grained control over when the debounced function executes
  */
-export function useDebounceCallback<T extends (...args: any[]) => any>(
-  callback: T,
-  options: DebounceOptions = {}
-): DebouncedFunction<T> {
-  const {
-    delay = 300,
-    leading = false,
-    trailing = true,
-    maxWait
-  } = options;
-
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const maxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastCallTimeRef = useRef<number>(0);
-  const lastInvokeTimeRef = useRef<number>(0);
-  const argsRef = useRef<Parameters<T>>();
-  const resultRef = useRef<ReturnType<T>>();
-
-  // Store the latest callback to avoid stale closure issues
+export function useAdvancedDebounce<TArgs extends any[]>(
+  callback: (...args: TArgs) => void,
+  delay: number,
+  options: {
+    /** Execute on the leading edge of the timeout */
+    leading?: boolean;
+    /** Execute on the trailing edge of the timeout (default: true) */
+    trailing?: boolean;
+    /** Maximum time callback is allowed to be delayed */
+    maxWait?: number;
+  } = {}
+): {
+  /** The debounced callback function */
+  debouncedCallback: (...args: TArgs) => void;
+  /** Cancel any pending debounced callback */
+  cancel: () => void;
+  /** Execute the callback immediately */
+  flush: (...args: TArgs) => void;
+} {
+  const { leading = false, trailing = true, maxWait } = options;
+  
+  const timeoutRef = useRef<NodeJS.Timeout>();
+  const maxTimeoutRef = useRef<NodeJS.Timeout>();
   const callbackRef = useRef(callback);
+  const lastCallTimeRef = useRef<number>();
+  const lastInvokeTimeRef = useRef<number>(0);
+  const argsRef = useRef<TArgs>();
+
+  // Update callback ref
   useEffect(() => {
     callbackRef.current = callback;
   }, [callback]);
 
-  const clearTimeouts = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    if (maxTimeoutRef.current) {
-      clearTimeout(maxTimeoutRef.current);
-      maxTimeoutRef.current = null;
-    }
-  }, []);
-
-  const invokeFunc = useCallback(() => {
-    const args = argsRef.current as Parameters<T>;
-    const func = callbackRef.current;
-    
-    lastInvokeTimeRef.current = Date.now();
-    resultRef.current = func(...args);
-    return resultRef.current;
-  }, []);
-
-  const shouldInvoke = useCallback((time: number) => {
-    const timeSinceLastCall = time - lastCallTimeRef.current;
-    const timeSinceLastInvoke = time - lastInvokeTimeRef.current;
-
-    // Either this is the first call, activity has stopped, or maxWait has elapsed
-    return (
-      lastCallTimeRef.current === 0 ||
-      timeSinceLastCall >= delay ||
-      (maxWait !== undefined && timeSinceLastInvoke >= maxWait)
-    );
-  }, [delay, maxWait]);
-
-  const trailingEdge = useCallback(() => {
-    timeoutRef.current = null;
-    
-    // Only invoke if we have arguments (means trailing edge is enabled)
-    if (trailing && argsRef.current) {
-      return invokeFunc();
-    }
-    
-    argsRef.current = undefined;
-    return resultRef.current;
-  }, [trailing, invokeFunc]);
-
-  const timerExpired = useCallback(() => {
-    const time = Date.now();
-    if (shouldInvoke(time)) {
-      return trailingEdge();
-    }
-    
-    // Restart the timer with remaining time
-    const timeSinceLastCall = time - lastCallTimeRef.current;
-    const timeRemaining = delay - timeSinceLastCall;
-    timeoutRef.current = setTimeout(timerExpired, timeRemaining);
-  }, [shouldInvoke, trailingEdge, delay]);
-
-  const leadingEdge = useCallback((time: number) => {
-    // Reset any `maxWait` timer
-    lastInvokeTimeRef.current = time;
-    
-    // Start the timer for the trailing edge
-    timeoutRef.current = setTimeout(timerExpired, delay);
-    
-    // Invoke the leading edge
-    return leading ? invokeFunc() : resultRef.current;
-  }, [leading, invokeFunc, timerExpired, delay]);
-
-  const debouncedFunction = useCallback((...args: Parameters<T>) => {
-    const time = Date.now();
-    const isInvoking = shouldInvoke(time);
-    
-    lastCallTimeRef.current = time;
-    argsRef.current = args;
-
-    if (isInvoking) {
-      if (timeoutRef.current === null) {
-        return leadingEdge(lastCallTimeRef.current);
-      }
-      
-      if (maxWait !== undefined) {
-        // Handle maxWait
-        timeoutRef.current = setTimeout(timerExpired, delay);
-        return leading ? invokeFunc() : resultRef.current;
-      }
-    }
-    
-    if (timeoutRef.current === null) {
-      timeoutRef.current = setTimeout(timerExpired, delay);
-    }
-    
-    return resultRef.current;
-  }, [shouldInvoke, leadingEdge, timerExpired, delay, maxWait, leading, invokeFunc]);
-
-  const cancel = useCallback(() => {
-    clearTimeouts();
-    lastInvokeTimeRef.current = 0;
-    lastCallTimeRef.current = 0;
-    argsRef.current = undefined;
-  }, [clearTimeouts]);
-
-  const flush = useCallback(() => {
-    if (timeoutRef.current === null) {
-      return resultRef.current;
-    }
-    
-    clearTimeouts();
-    return trailingEdge();
-  }, [clearTimeouts, trailingEdge]);
-
-  const isPending = useCallback(() => {
-    return timeoutRef.current !== null;
-  }, []);
-
-  // Setup maxWait timer if specified
-  useEffect(() => {
-    if (maxWait !== undefined && argsRef.current && !maxTimeoutRef.current) {
-      maxTimeoutRef.current = setTimeout(() => {
-        if (timeoutRef.current) {
-          trailingEdge();
-        }
-      }, maxWait);
-    }
-  }, [maxWait, trailingEdge]);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      clearTimeouts();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (maxTimeoutRef.current) clearTimeout(maxTimeoutRef.current);
     };
-  }, [clearTimeouts]);
+  }, []);
 
-  // Attach control methods to the debounced function
-  const debouncedWithControls = debouncedFunction as DebouncedFunction<T>;
-  debouncedWithControls.cancel = cancel;
-  debouncedWithControls.flush = flush;
-  debouncedWithControls.isPending = isPending;
-
-  return debouncedWithControls;
-}
-
-/**
- * Simple debouncing hook that combines value debouncing with callback execution.
- * Ideal for form validation and search scenarios where you need both debounced
- * state and debounced action execution.
- * 
- * @param value - The value to debounce
- * @param callback - Function to call with the debounced value
- * @param delay - Delay in milliseconds (default: 300ms)
- * @returns Object with debounced value and control methods
- * 
- * @example
- * ```tsx
- * function ValidatedInput() {
- *   const [inputValue, setInputValue] = useState('');
- *   const [errors, setErrors] = useState([]);
- *   
- *   const { debouncedValue, cancel, flush } = useDebounce(
- *     inputValue,
- *     (value) => validateInput(value).then(setErrors),
- *     500
- *   );
- *   
- *   return (
- *     <div>
- *       <input 
- *         value={inputValue}
- *         onChange={(e) => setInputValue(e.target.value)}
- *       />
- *       {errors.map(error => <span key={error}>{error}</span>)}
- *       <button onClick={flush}>Validate Now</button>
- *     </div>
- *   );
- * }
- * ```
- */
-export function useDebounce<T>(
-  value: T,
-  callback?: (value: T) => void,
-  delay: number = 300
-) {
-  const debouncedValue = useDebounceValue(value, delay);
-  
-  const debouncedCallback = useDebounceCallback(
-    (val: T) => callback?.(val),
-    { delay }
-  );
-
-  // Execute callback when debounced value changes
-  useEffect(() => {
-    if (callback) {
-      callback(debouncedValue);
+  const invokeCallback = useCallback(() => {
+    const args = argsRef.current;
+    if (args) {
+      lastInvokeTimeRef.current = Date.now();
+      callbackRef.current(...args);
     }
-  }, [debouncedValue, callback]);
+  }, []);
+
+  const cancel = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = undefined;
+    }
+    if (maxTimeoutRef.current) {
+      clearTimeout(maxTimeoutRef.current);
+      maxTimeoutRef.current = undefined;
+    }
+    lastCallTimeRef.current = undefined;
+  }, []);
+
+  const flush = useCallback((...args: TArgs) => {
+    argsRef.current = args;
+    cancel();
+    invokeCallback();
+  }, [cancel, invokeCallback]);
+
+  const debouncedCallback = useCallback((...args: TArgs) => {
+    const now = Date.now();
+    const isInvoking = lastCallTimeRef.current === undefined;
+    
+    argsRef.current = args;
+    lastCallTimeRef.current = now;
+
+    // Leading edge execution
+    if (isInvoking && leading) {
+      invokeCallback();
+    }
+
+    // Cancel existing timeouts
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Set up trailing execution
+    if (trailing) {
+      timeoutRef.current = setTimeout(() => {
+        timeoutRef.current = undefined;
+        if (lastCallTimeRef.current) {
+          invokeCallback();
+        }
+      }, delay);
+    }
+
+    // Handle maxWait
+    if (maxWait !== undefined && !maxTimeoutRef.current && !isInvoking) {
+      maxTimeoutRef.current = setTimeout(() => {
+        maxTimeoutRef.current = undefined;
+        if (lastCallTimeRef.current) {
+          invokeCallback();
+        }
+      }, maxWait);
+    }
+  }, [delay, leading, trailing, maxWait, invokeCallback]);
 
   return {
-    debouncedValue,
-    cancel: debouncedCallback.cancel,
-    flush: debouncedCallback.flush,
-    isPending: debouncedCallback.isPending
+    debouncedCallback,
+    cancel,
+    flush
   };
 }
 
 /**
- * Debouncing hook specifically optimized for search functionality.
- * Includes additional features like minimum query length and empty query handling.
- * 
- * @param searchTerm - The search term to debounce
- * @param onSearch - Function to call with the debounced search term
- * @param options - Search-specific debouncing options
- * @returns Object with debounced search term and control methods
- * 
- * @example
- * ```tsx
- * function SearchComponent() {
- *   const [query, setQuery] = useState('');
- *   const [results, setResults] = useState([]);
- *   const [isSearching, setIsSearching] = useState(false);
- *   
- *   const { debouncedValue: debouncedQuery, isPending } = useSearchDebounce(
- *     query,
- *     async (searchTerm) => {
- *       if (searchTerm.trim()) {
- *         setIsSearching(true);
- *         try {
- *           const searchResults = await searchAPI(searchTerm);
- *           setResults(searchResults);
- *         } finally {
- *           setIsSearching(false);
- *         }
- *       } else {
- *         setResults([]);
- *       }
- *     },
- *     { delay: 400, minLength: 2 }
- *   );
- *   
- *   return (
- *     <div>
- *       <input 
- *         value={query}
- *         onChange={(e) => setQuery(e.target.value)}
- *         placeholder="Search..."
- *       />
- *       {(isSearching || isPending()) && <span>Searching...</span>}
- *       {results.map(result => <div key={result.id}>{result.name}</div>)}
- *     </div>
- *   );
- * }
- * ```
+ * Hook for debouncing search functionality specifically
+ * Optimized for search use cases with sensible defaults
  */
 export function useSearchDebounce(
-  searchTerm: string,
-  onSearch: (term: string) => void,
-  options: {
-    delay?: number;
-    minLength?: number;
-    trimWhitespace?: boolean;
-  } = {}
-) {
-  const { delay = 400, minLength = 1, trimWhitespace = true } = options;
-  
-  const processedTerm = trimWhitespace ? searchTerm.trim() : searchTerm;
-  const shouldSearch = processedTerm.length >= minLength;
-  
-  const debouncedCallback = useDebounceCallback(
-    (term: string) => {
-      if (shouldSearch) {
-        onSearch(term);
-      }
-    },
-    { delay }
+  searchFunction: (query: string) => void,
+  delay: number = 300
+): {
+  /** Execute search with debouncing */
+  search: (query: string) => void;
+  /** Cancel pending search */
+  cancel: () => void;
+  /** Execute search immediately */
+  searchNow: (query: string) => void;
+  /** Whether a search is pending */
+  isPending: () => boolean;
+} {
+  const { debouncedCallback, cancel, flush, isPending } = useDebouncedCallback(
+    searchFunction,
+    delay
   );
-  
-  const debouncedValue = useDebounceValue(processedTerm, delay);
-  
-  // Execute search when debounced value changes and meets criteria
-  useEffect(() => {
-    if (shouldSearch || processedTerm === '') {
-      debouncedCallback(processedTerm);
-    }
-  }, [debouncedValue, shouldSearch, processedTerm, debouncedCallback]);
-  
+
   return {
-    debouncedValue,
-    cancel: debouncedCallback.cancel,
-    flush: debouncedCallback.flush,
-    isPending: debouncedCallback.isPending,
-    shouldSearch
+    search: debouncedCallback,
+    cancel,
+    searchNow: flush,
+    isPending
   };
 }
 
-// Export default hooks for convenience
+/**
+ * Type definitions for the debounce hooks
+ */
+export interface DebounceOptions {
+  /** Execute on the leading edge */
+  leading?: boolean;
+  /** Execute on the trailing edge */
+  trailing?: boolean;
+  /** Maximum delay time */
+  maxWait?: number;
+}
+
+export interface DebouncedFunction<TArgs extends any[]> {
+  /** The debounced function */
+  (...args: TArgs): void;
+  /** Cancel pending execution */
+  cancel: () => void;
+  /** Execute immediately */
+  flush: (...args: TArgs) => void;
+  /** Check if execution is pending */
+  isPending?: () => boolean;
+}
+
+/**
+ * Default export with all debounce utilities
+ */
 export default {
-  useDebounceValue,
-  useDebounceCallback,
   useDebounce,
+  useDebouncedCallback,
+  useDebouncedState,
+  useDebouncedEffect,
+  useAdvancedDebounce,
   useSearchDebounce
 };
