@@ -1,4 +1,13 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_metadata": {
+    "version": "1.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-01-01T00:00:00.000Z",
+    "framework": "Next.js 15.1 + React 19",
+    "ssrOptimized": true
+  },
   "scriptName": "Script Name",
   "scriptMethod": "Script Method",
   "scriptType": "Script Type",
@@ -16,20 +25,138 @@
   "path": "Path",
   "viewLatest": "View Latest",
   "deleteCache": "Delete Cache",
-  "deleteSuccessMsg": "Script successfully deleted",
-  "createSuccessMsg": "Script successfully created",
-  "updateSuccessMsg": "Script successfully updated",
-  "getScriptSuccessMsg": "Script file successfully fetched",
-  "fetchCacheSuccessMsg": "Successfully pulled the latest script from source.",
-  "deleteCacheSuccessMsg": "Successfully cleared script from cache.",
-  "scriptTypes": {
+  "runtimes": {
     "javascript": "JavaScript",
     "php": "PHP",
     "python": "Python",
     "python3": "Python3",
     "nodejs": "Node.js"
   },
+  "form": {
+    "validation": {
+      "scriptName": {
+        "required": "Script name is required",
+        "minLength": "Script name must be at least 2 characters",
+        "maxLength": "Script name must be less than 50 characters",
+        "pattern": "Script name can only contain letters, numbers, underscores, and hyphens"
+      },
+      "scriptType": {
+        "required": "Please select a script type"
+      },
+      "scriptMethod": {
+        "required": "Script method is required"
+      },
+      "repository": {
+        "required": "Repository URL is required",
+        "url": "Please enter a valid repository URL"
+      },
+      "branch": {
+        "required": "Branch or tag is required"
+      },
+      "path": {
+        "required": "Script path is required"
+      },
+      "file": {
+        "required": "Please select a script file",
+        "fileType": "Only .js, .php, .py, and .txt files are allowed"
+      }
+    },
+    "labels": {
+      "scriptName": "Script Name",
+      "scriptType": "Runtime Type", 
+      "scriptMethod": "Method",
+      "repository": "GitHub Repository",
+      "branch": "Branch/Tag",
+      "path": "File Path",
+      "active": "Active Script"
+    },
+    "placeholders": {
+      "scriptName": "Enter script name",
+      "repository": "https://github.com/username/repository",
+      "branch": "main",
+      "path": "path/to/script.js"
+    }
+  },
+  "notifications": {
+    "success": {
+      "create": "Script successfully created",
+      "update": "Script successfully updated", 
+      "delete": "Script successfully deleted",
+      "fetchScript": "Script file successfully fetched",
+      "fetchCache": "Successfully pulled the latest script from source",
+      "deleteCache": "Successfully cleared script from cache"
+    },
+    "error": {
+      "create": "Failed to create script",
+      "update": "Failed to update script",
+      "delete": "Failed to delete script",
+      "fetchScript": "Failed to fetch script file",
+      "fetchCache": "Failed to pull latest script from source",
+      "deleteCache": "Failed to clear script cache",
+      "networkError": "Network error occurred while processing script",
+      "serverError": "Server error occurred while processing script"
+    }
+  },
   "errors": {
-    "githubImport": "Error: Invalid file format. Only js, php, py, txt file format(s) allowed"
+    "githubImport": "Error: Invalid file format. Only js, php, py, txt file format(s) allowed",
+    "fileUpload": "Error uploading file. Please try again.",
+    "connectionFailed": "Failed to connect to GitHub repository",
+    "invalidRepository": "Invalid repository URL or access denied",
+    "fileNotFound": "Script file not found in repository",
+    "unsupportedRuntime": "Unsupported script runtime type"
+  },
+  "errorBoundary": {
+    "title": "Script Management Error",
+    "description": "An error occurred in the script management component. Please refresh the page or contact support if the problem persists.",
+    "action": "Reload Component",
+    "fallback": "Unable to load script management interface"
+  },
+  "toast": {
+    "success": {
+      "title": "Success",
+      "createMessage": "Script has been created successfully",
+      "updateMessage": "Script has been updated successfully",
+      "deleteMessage": "Script has been deleted successfully",
+      "cacheRefreshMessage": "Script cache has been refreshed",
+      "cacheClearMessage": "Script cache has been cleared"
+    },
+    "error": {
+      "title": "Error",
+      "genericMessage": "An error occurred while processing the script",
+      "validationMessage": "Please correct the form errors and try again",
+      "networkMessage": "Network error - please check your connection",
+      "serverMessage": "Server error - please try again later"
+    },
+    "loading": {
+      "title": "Processing",
+      "createMessage": "Creating script...",
+      "updateMessage": "Updating script...",
+      "deleteMessage": "Deleting script...",
+      "fetchMessage": "Fetching script..."
+    }
+  },
+  "actions": {
+    "create": "Create Script",
+    "update": "Update Script", 
+    "delete": "Delete Script",
+    "save": "Save Script",
+    "cancel": "Cancel",
+    "viewLatest": "View Latest",
+    "refreshCache": "Refresh Cache",
+    "clearCache": "Clear Cache",
+    "uploadFile": "Upload File",
+    "selectFromGitHub": "Select from GitHub"
+  },
+  "states": {
+    "loading": "Loading scripts...",
+    "empty": "No scripts found",
+    "error": "Failed to load scripts"
+  },
+  "accessibility": {
+    "scriptNameInput": "Enter the name for your script",
+    "scriptTypeSelect": "Select the runtime type for your script",
+    "repositoryInput": "Enter GitHub repository URL",
+    "fileUploadButton": "Click to upload script file from your device",
+    "deleteScriptButton": "Delete this script permanently"
   }
 }
