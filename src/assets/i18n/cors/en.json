@@ -1,4 +1,17 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_metadata": {
+    "version": "1.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-12-19T00:00:00.000Z",
+    "framework": "next.js",
+    "ssrOptimized": true,
+    "namespace": "cors",
+    "preloadPriority": "low",
+    "cacheStrategy": "memory-first",
+    "reactHookFormCompatible": true
+  },
   "pageTitle": "CORS Overview",
   "pageSubtitle": "Enter allowed hosts and HTTP verbs. You can enter * for all hosts. Use the * option for development to enable application code running locally on your computer to communicate directly with your DreamFactory instance.",
   "formControls": {
@@ -15,5 +28,91 @@
   "alerts": {
     "createSuccess": "CORS entry created successfully.",
     "updateSuccess": "CORS entry updated successfully."
+  },
+  "validation": {
+    "path": {
+      "required": "Path is required",
+      "pattern": "Please enter a valid path format",
+      "minLength": "Path must be at least 1 character long"
+    },
+    "description": {
+      "maxLength": "Description cannot exceed 255 characters"
+    },
+    "origins": {
+      "required": "At least one origin must be specified",
+      "pattern": "Please enter valid origin format (URL or *)"
+    },
+    "headers": {
+      "pattern": "Please enter valid header names separated by commas"
+    },
+    "exposedHeaders": {
+      "pattern": "Please enter valid header names separated by commas"
+    },
+    "maxAge": {
+      "min": "Max age must be at least 0",
+      "max": "Max age cannot exceed 86400 seconds (24 hours)",
+      "pattern": "Please enter a valid number"
+    },
+    "methods": {
+      "required": "At least one HTTP method must be selected"
+    }
+  },
+  "placeholders": {
+    "path": "Enter API path (e.g., /api/v2/*)",
+    "description": "Enter optional description for this CORS rule",
+    "origins": "Enter allowed origins (e.g., https://example.com or *)",
+    "headers": "Enter allowed headers (e.g., Content-Type, Authorization)",
+    "exposedHeaders": "Enter headers to expose to client",
+    "maxAge": "Enter cache duration in seconds"
+  },
+  "tooltips": {
+    "path": "Specify the API path pattern this CORS rule applies to. Use wildcards (*) for broader matching.",
+    "description": "Optional description to help identify this CORS configuration rule.",
+    "origins": "List of allowed origins. Use * to allow all origins (not recommended for production).",
+    "headers": "HTTP headers that are allowed in preflight requests.",
+    "exposedHeaders": "Headers that browsers are allowed to access in the response.",
+    "maxAge": "How long browsers can cache preflight response (in seconds).",
+    "methods": "HTTP methods allowed for cross-origin requests.",
+    "supportsCredentials": "Whether credentials (cookies, authorization headers) are allowed.",
+    "enabled": "Enable or disable this CORS rule."
+  },
+  "labels": {
+    "basic": "Basic Configuration",
+    "advanced": "Advanced Options",
+    "security": "Security Settings"
+  },
+  "actions": {
+    "save": "Save CORS Rule",
+    "cancel": "Cancel",
+    "test": "Test Configuration",
+    "reset": "Reset to Defaults"
+  },
+  "httpMethods": {
+    "GET": "GET",
+    "POST": "POST", 
+    "PUT": "PUT",
+    "PATCH": "PATCH",
+    "DELETE": "DELETE",
+    "OPTIONS": "OPTIONS",
+    "HEAD": "HEAD"
+  },
+  "presets": {
+    "development": {
+      "name": "Development (Allow All)",
+      "description": "Permissive settings for local development"
+    },
+    "production": {
+      "name": "Production (Secure)",
+      "description": "Secure settings for production deployment"
+    },
+    "api": {
+      "name": "API Gateway",
+      "description": "Common settings for API gateway integration"
+    }
+  },
+  "help": {
+    "whatIsCors": "CORS (Cross-Origin Resource Sharing) allows web applications from different domains to access your API.",
+    "securityNote": "Be careful with wildcard (*) origins in production environments as they can pose security risks.",
+    "testingTip": "Use the test configuration feature to verify your CORS settings work with your client applications."
   }
 }
