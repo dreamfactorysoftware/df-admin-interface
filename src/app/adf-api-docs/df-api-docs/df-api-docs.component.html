@@ -51,8 +51,17 @@
   <div *ngIf="healthStatus === 'unhealthy'">
     <p>
       {{ 'apiHealthBanner.unhealthyBase' | transloco }}
-      <button mat-button color="accent" class="view-details-button" (click)="toggleUnhealthyErrorDetails()">
-        {{ (showUnhealthyErrorDetails ? 'apiHealthBanner.hideDetails' : 'apiHealthBanner.viewDetails') | transloco }}
+      <button
+        mat-button
+        color="accent"
+        class="view-details-button"
+        (click)="toggleUnhealthyErrorDetails()">
+        {{
+          (showUnhealthyErrorDetails
+            ? 'apiHealthBanner.hideDetails'
+            : 'apiHealthBanner.viewDetails'
+          ) | transloco
+        }}
       </button>
     </p>
     <div *ngIf="showUnhealthyErrorDetails" class="unhealthy-error-details">

@@ -135,9 +135,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     this.subscriptions.push(
       this.activatedRoute.data.subscribe(({ data }) => {
         if (data) {
-          if (
-            data.paths['/']?.get?.operationId === 'getSoapResources'
-          ) {
+          if (data.paths['/']?.get?.operationId === 'getSoapResources') {
             this.apiDocJson = { ...data, paths: mapSnakeToCamel(data.paths) };
           } else {
             this.apiDocJson = { ...data, paths: mapCamelToSnake(data.paths) };
@@ -232,13 +230,19 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   private checkApiHealth(): void {
     if (this.serviceName && this.apiDocJson?.paths['/_schema']?.get) {
       // Perform health check
-      this.performHealthCheck(this.serviceName, `${BASE_URL}/${this.serviceName}/_schema`);
+      this.performHealthCheck(
+        this.serviceName,
+        `${BASE_URL}/${this.serviceName}/_schema`
+      );
     } else {
       this.setHealthState('warning');
     }
   }
 
-  private setHealthState(status: 'healthy' | 'unhealthy' | 'warning', error: string | null = null): void {
+  private setHealthState(
+    status: 'healthy' | 'unhealthy' | 'warning',
+    error: string | null = null
+  ): void {
     this.healthStatus = status;
     this.healthError = error;
   }
@@ -248,18 +252,21 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     this.healthError = null;
 
     this.subscriptions.push(
-      this.http.get(url).pipe(
-        tap(() => this.setHealthState('healthy')),
-        catchError((error: HttpErrorResponse) => {
-          if (error.status >= 200 && error.status < 300) {
-            this.setHealthState('healthy');
-            return of(null);
-          }
+      this.http
+        .get(url)
+        .pipe(
+          tap(() => this.setHealthState('healthy')),
+          catchError((error: HttpErrorResponse) => {
+            if (error.status >= 200 && error.status < 300) {
+              this.setHealthState('healthy');
+              return of(null);
+            }
 
-          this.setHealthState('unhealthy', error.message || 'Unknown error');
-          return of(null);
-        })
-      ).subscribe()
+            this.setHealthState('unhealthy', error.message || 'Unknown error');
+            return of(null);
+          })
+        )
+        .subscribe()
     );
   }
 
