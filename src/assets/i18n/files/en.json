@@ -1,4 +1,14 @@
 {
+  "$schema": "../schema.json",
+  "_metadata": {
+    "version": "1.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-12-19T10:30:00.000Z",
+    "framework": "next.js",
+    "ssrOptimized": true,
+    "namespace": "files"
+  },
   "createFolder": "Create Folder",
   "folderName": "Folder Name",
   "importList": "Upload File",
@@ -7,7 +17,7 @@
   "downloadFile": "Download File",
   "editFile": "Edit File",
   "deleteFolder": "Delete Folder",
-  "openFolder": "Open {{name}} folder",
+  "openFolder": "Open {name} folder",
   "download": "Download",
   "alerts": {
     "uploadSuccess": "File uploaded successfully",
