@@ -1,8 +1,17 @@
 {
+  "$schema": "../schema/translation.schema.json",
+  "_metadata": {
+    "version": "1.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-01-01T00:00:00.000Z",
+    "framework": "Next.js",
+    "ssrOptimized": true
+  },
   "alerts": {
     "new": "For new Users you can send an email invite so they can set their own password, or set a password for them now.",
     "createdSuccess": "User created successfully",
-    "updateSuccess": "User updated successfully",
+    "updateSuccess": "User updated successfully", 
     "deleteSuccess": "User deleted successfully",
     "importSuccess": "User imported successfully",
     "exportSuccess": "User exported successfully"
