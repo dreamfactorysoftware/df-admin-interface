@@ -53,6 +53,12 @@ interface ServiceResponse {
   }>;
 }
 
+interface ApiDocJson {
+  paths: {
+    [key: string]: any;
+  };
+}
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-api-docs',
@@ -81,13 +87,14 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     | ElementRef
     | undefined;
 
-  apiDocJson: object;
+  apiDocJson: ApiDocJson;
   apiKeys: ApiKeyInfo[] = [];
   faCopy = faCopy;
   private subscriptions: Subscription[] = [];
-  healthStatus: 'loading' | 'healthy' | 'unhealthy' | 'error' = 'loading';
+  healthStatus: 'loading' | 'healthy' | 'unhealthy' | 'warning' = 'loading';
   healthError: string | null = null;
   serviceName: string | null = null;
+  showUnhealthyErrorDetails = false;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -122,31 +129,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
           )
           .subscribe()
       );
-
-      // Perform health check
-      this.healthStatus = 'loading';
-      this.subscriptions.push(
-        this.http
-          .get(`${BASE_URL}/${this.serviceName}/_schema`)
-          .pipe(
-            tap(() => {
-              this.healthStatus = 'healthy';
-              this.healthError = null;
-            }),
-            catchError((error: HttpErrorResponse) => {
-              if (error.status >= 200 && error.status < 300) {
-                // Even if there's an error in parsing, if it's 2xx, consider it healthy for schema check
-                this.healthStatus = 'healthy';
-                this.healthError = null;
-              } else {
-                this.healthStatus = 'unhealthy';
-                this.healthError = error.message || 'Unknown error';
-              }
-              return of(null); // Continue the stream
-            })
-          )
-          .subscribe()
-      );
     }
 
     // Handle the API documentation
@@ -154,9 +136,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       this.activatedRoute.data.subscribe(({ data }) => {
         if (data) {
           if (
-            data.paths['/']?.get &&
-            data.paths['/']?.get.operationId &&
-            data.paths['/']?.get.operationId === 'getSoapResources'
+            data.paths['/']?.get?.operationId === 'getSoapResources'
           ) {
             this.apiDocJson = { ...data, paths: mapSnakeToCamel(data.paths) };
           } else {
@@ -184,6 +164,9 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   ngAfterContentInit(): void {
     const apiDocumentation = this.apiDocJson;
+
+    this.checkApiHealth();
+
     SwaggerUI({
       spec: apiDocumentation,
       domNode: this.apiDocElement?.nativeElement,
@@ -246,6 +229,40 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
 
+  private checkApiHealth(): void {
+    if (this.serviceName && this.apiDocJson?.paths['/_schema']?.get) {
+      // Perform health check
+      this.performHealthCheck(this.serviceName, `${BASE_URL}/${this.serviceName}/_schema`);
+    } else {
+      this.setHealthState('warning');
+    }
+  }
+
+  private setHealthState(status: 'healthy' | 'unhealthy' | 'warning', error: string | null = null): void {
+    this.healthStatus = status;
+    this.healthError = error;
+  }
+
+  private performHealthCheck(serviceName: string | null, url: string): void {
+    this.healthStatus = 'loading';
+    this.healthError = null;
+
+    this.subscriptions.push(
+      this.http.get(url).pipe(
+        tap(() => this.setHealthState('healthy')),
+        catchError((error: HttpErrorResponse) => {
+          if (error.status >= 200 && error.status < 300) {
+            this.setHealthState('healthy');
+            return of(null);
+          }
+
+          this.setHealthState('unhealthy', error.message || 'Unknown error');
+          return of(null);
+        })
+      ).subscribe()
+    );
+  }
+
   goBackToList(): void {
     this.currentServiceService.clearCurrentServiceId();
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
@@ -264,5 +281,9 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     this.snackBar.open('API Key copied to clipboard', 'Close', {
       duration: 3000,
     });
+  }
+
+  toggleUnhealthyErrorDetails(): void {
+    this.showUnhealthyErrorDetails = !this.showUnhealthyErrorDetails;
   }
 }

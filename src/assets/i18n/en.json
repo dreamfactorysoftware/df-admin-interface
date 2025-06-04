@@ -120,8 +120,10 @@
   "apiHealthBanner": {
     "loading": "Checking API status...",
     "healthy": "API status: Healthy",
-    "unhealthy": "API status: Unhealthy. {{healthError}}",
-    "error": "Error checking API status. {{healthError}}"
+    "unhealthyBase": "API status: Unhealthy.",
+    "viewDetails": "View Details",
+    "hideDetails": "Hide Details",
+    "warningDefault": "Warning: This type of API currently does not support automatic health checks."
   },
   "nav": {
     "error": {

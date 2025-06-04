@@ -40,7 +40,7 @@
     'status-loading': healthStatus === 'loading',
     'status-healthy': healthStatus === 'healthy',
     'status-unhealthy': healthStatus === 'unhealthy',
-    'status-error': healthStatus === 'error'
+    'status-warning': healthStatus === 'warning'
   }">
   <div *ngIf="healthStatus === 'loading'">
     <p>{{ 'apiHealthBanner.loading' | transloco }}</p>
@@ -50,14 +50,18 @@
   </div>
   <div *ngIf="healthStatus === 'unhealthy'">
     <p>
-      {{
-        'apiHealthBanner.unhealthy' | transloco: { healthError: healthError }
-      }}
+      {{ 'apiHealthBanner.unhealthyBase' | transloco }}
+      <button mat-button color="accent" class="view-details-button" (click)="toggleUnhealthyErrorDetails()">
+        {{ (showUnhealthyErrorDetails ? 'apiHealthBanner.hideDetails' : 'apiHealthBanner.viewDetails') | transloco }}
+      </button>
     </p>
+    <div *ngIf="showUnhealthyErrorDetails" class="unhealthy-error-details">
+      <pre>{{ healthError }}</pre>
+    </div>
   </div>
-  <div *ngIf="healthStatus === 'error'">
+  <div *ngIf="healthStatus === 'warning'">
     <p>
-      {{ 'apiHealthBanner.error' | transloco: { healthError: healthError } }}
+      {{ 'apiHealthBanner.warningDefault' | transloco }}
     </p>
   </div>
 </div>

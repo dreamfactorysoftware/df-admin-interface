@@ -43,6 +43,8 @@
 }
 
 .api-health-banner {
+  display: flex;
+  align-items: center;
   padding: 8px 12px;
   border-radius: 4px;
   border-left-width: 4px;
@@ -54,22 +56,73 @@
   }
 
   &.status-healthy {
-    border-left-color: #28a745; // Green
-    background-color: #e9f5ec; // Light green
-    color: #155724; // Darker green text
+    border-left-color: #28a745;
+    background-color: #e9f5ec;
+    color: #155724;
   }
 
   &.status-unhealthy,
   &.status-error {
-    border-left-color: #dc3545; // Red
-    background-color: #f8d7da; // Light red
-    color: #721c24; // Darker red text
+    border-left-color: #dc3545;
+    background-color: #f8d7da;
+    color: #721c24;
+  }
+
+  &.status-unhealthy {
+    & > div {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      width: 100%;
+
+      & > p {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+
+        .view-details-button {
+          margin-left: 12px;
+          flex-shrink: 0;
+          padding: 2px 8px;
+          line-height: normal;
+          font-size: 0.9em;
+          min-width: auto;
+        }
+      }
+
+      .unhealthy-error-details {
+        margin-top: 0;
+        padding: 8px 12px;
+        background-color: rgba(0, 0, 0, 0.03);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 4px;
+        width: 100%;
+        box-sizing: border-box;
+        max-height: 150px;
+        overflow-y: auto;
+
+        pre {
+          margin: 0;
+          white-space: pre-wrap;
+          word-break: break-word;
+          font-size: 0.85em;
+          color: inherit;
+        }
+      }
+    }
   }
 
   &.status-loading {
-    border-left-color: #007bff; // Blue
-    background-color: #e7f3ff; // Light blue
-    color: #004085; // Darker blue text
+    border-left-color: #007bff;
+    background-color: #e7f3ff;
+    color: #004085;
+  }
+
+  &.status-warning {
+    border-left-color: #ffc107;
+    background-color: #fff3cd;
+    color: #856404;
   }
 }
 
@@ -82,6 +135,7 @@
         display: flex;
         justify-content: space-between;
         flex-direction: row-reverse;
+        gap: 8px;
       }
     }
   }
