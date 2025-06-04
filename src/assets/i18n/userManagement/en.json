@@ -1,4 +1,13 @@
 {
+  "$schema": "https://json.schemastore.org/i18n-next.json",
+  "_metadata": {
+    "version": "1.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-12-19T00:00:00.000Z",
+    "framework": "next.js",
+    "ssrOptimized": true
+  },
   "requiredForLogin": "Required for login",
   "resetPassword": "Reset Password",
   "passwordReset": "Password Reset",
@@ -21,66 +30,147 @@
       "label": "Choose Username",
       "altLabel": "Enter Username",
       "optional": "(Optional, defaults to email address)",
+      "placeholder": "Enter your username",
       "errors": {
         "required": "Username is required",
-        "minLength": "Username must be at least 6 characters long"
+        "minLength": "Username must be at least 6 characters long",
+        "pattern": "Username must contain only letters, numbers, and underscores",
+        "maxLength": "Username cannot exceed 50 characters",
+        "unique": "This username is already taken",
+        "invalid": "Invalid username format"
+      },
+      "validation": {
+        "min": 6,
+        "max": 50,
+        "pattern": "^[a-zA-Z0-9_]+$"
       }
     },
     "email": {
       "label": "Enter Email",
+      "placeholder": "Enter your email address",
       "errors": {
         "required": "Email is required",
-        "invalid": "Invalid email format"
+        "invalid": "Invalid email format",
+        "unique": "This email address is already registered",
+        "domain": "Email domain is not allowed",
+        "disposable": "Disposable email addresses are not permitted"
+      },
+      "validation": {
+        "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
       }
     },
     "firstName": {
       "label": "Enter First Name",
+      "placeholder": "Enter your first name",
       "errors": {
-        "required": "First name is required"
+        "required": "First name is required",
+        "minLength": "First name must be at least 1 character",
+        "maxLength": "First name cannot exceed 50 characters",
+        "pattern": "First name can only contain letters, spaces, and hyphens"
+      },
+      "validation": {
+        "min": 1,
+        "max": 50,
+        "pattern": "^[a-zA-Z\\s-]+$"
       }
     },
     "lastName": {
       "label": "Enter Last Name",
+      "placeholder": "Enter your last name",
       "errors": {
-        "required": "Last name is required"
+        "required": "Last name is required",
+        "minLength": "Last name must be at least 1 character",
+        "maxLength": "Last name cannot exceed 50 characters",
+        "pattern": "Last name can only contain letters, spaces, and hyphens"
+      },
+      "validation": {
+        "min": 1,
+        "max": 50,
+        "pattern": "^[a-zA-Z\\s-]+$"
       }
     },
     "displayName": {
       "label": "Enter Display Name",
+      "placeholder": "Enter your display name",
       "errors": {
-        "required": "Display name is required"
+        "required": "Display name is required",
+        "minLength": "Display name must be at least 1 character",
+        "maxLength": "Display name cannot exceed 100 characters"
+      },
+      "validation": {
+        "min": 1,
+        "max": 100
       }
     },
     "oldPassword": {
       "label": "Enter Old Password",
+      "placeholder": "Enter your current password",
       "errors": {
-        "required": "Old password is required"
+        "required": "Old password is required",
+        "incorrect": "Current password is incorrect"
       }
     },
     "password": {
       "label": "Enter Password",
       "altLabel": "Confirm new password",
+      "placeholder": "Enter your password",
       "errors": {
         "required": "Password is required",
-        "length": "Password must be at least 16 characters long"
+        "length": "Password must be at least 16 characters long",
+        "minLength": "Password must be at least 16 characters long",
+        "maxLength": "Password cannot exceed 256 characters",
+        "uppercase": "Password must contain at least one uppercase letter",
+        "lowercase": "Password must contain at least one lowercase letter",
+        "number": "Password must contain at least one number",
+        "symbol": "Password must contain at least one special character",
+        "weak": "Password is too weak",
+        "common": "This password is commonly used and not secure"
+      },
+      "validation": {
+        "min": 16,
+        "max": 256,
+        "requirements": {
+          "uppercase": true,
+          "lowercase": true,
+          "number": true,
+          "symbol": true
+        }
+      },
+      "strength": {
+        "weak": "Weak",
+        "fair": "Fair",
+        "good": "Good",
+        "strong": "Strong"
       }
     },
     "verifyPassword": {
       "label": "Verify Password",
-      "altLabel": "Verify new password"
+      "altLabel": "Verify new password",
+      "placeholder": "Verify your password"
     },
     "confirmationCode": {
       "label": "Enter confirmation code",
+      "placeholder": "Enter the 6-digit code",
       "errors": {
-        "required": "Confirmation code is required"
+        "required": "Confirmation code is required",
+        "invalid": "Invalid confirmation code format",
+        "length": "Confirmation code must be 6 digits",
+        "expired": "Confirmation code has expired",
+        "incorrect": "Incorrect confirmation code"
+      },
+      "validation": {
+        "length": 6,
+        "pattern": "^[0-9]{6}$"
       }
     },
     "confirmPassword": {
       "label": "Confirm Password",
       "altLabel": "Confirm new password",
+      "placeholder": "Confirm your password",
       "errors": {
         "required": "Confirm password is required",
-        "match": "Passwords do not match"
+        "match": "Passwords do not match",
+        "mismatch": "Password confirmation does not match"
       }
     },
     "services": {
@@ -93,29 +183,108 @@
       "label": "Set Password"
     },
     "securityQuestion": {
-      "label": "Security Question"
+      "label": "Security Question",
+      "placeholder": "Select a security question",
+      "errors": {
+        "required": "Security question is required"
+      }
     },
     "securityAnswer": {
       "label": "Enter security answer",
+      "placeholder": "Enter your answer",
       "errors": {
-        "required": "Security answer is required"
+        "required": "Security answer is required",
+        "minLength": "Security answer must be at least 3 characters",
+        "maxLength": "Security answer cannot exceed 100 characters"
+      },
+      "validation": {
+        "min": 3,
+        "max": 100
       }
     },
     "phone": {
-      "label": "Enter telephone number"
+      "label": "Enter telephone number",
+      "placeholder": "Enter your phone number",
+      "errors": {
+        "invalid": "Invalid phone number format",
+        "required": "Phone number is required"
+      },
+      "validation": {
+        "pattern": "^[+]?[1-9]\\d{1,14}$"
+      }
     },
     "currentPassword": {
       "label": "Enter current password",
+      "placeholder": "Enter your current password",
       "errors": {
-        "required": "Required if Changing Email"
+        "required": "Required if Changing Email",
+        "incorrect": "Current password is incorrect"
       }
     },
     "sendInvite": {
       "label": "Send Email Invite"
     }
   },
+  "formValidation": {
+    "realTimeValidation": {
+      "enabled": true,
+      "debounceMs": 100
+    },
+    "submitValidation": {
+      "preventInvalidSubmit": true,
+      "showSummary": true
+    },
+    "fieldValidation": {
+      "validateOnBlur": true,
+      "validateOnChange": true,
+      "showErrorsImmediately": false
+    }
+  },
+  "dynamicValidation": {
+    "loginMethod": {
+      "email": {
+        "identifier": "email",
+        "label": "Email Address",
+        "required": true,
+        "validation": "email"
+      },
+      "username": {
+        "identifier": "username", 
+        "label": "Username",
+        "required": true,
+        "validation": "username"
+      },
+      "both": {
+        "identifier": "email_or_username",
+        "label": "Email or Username",
+        "required": true,
+        "validation": "email_or_username"
+      }
+    },
+    "passwordPolicy": {
+      "configurable": true,
+      "minimumLength": 16,
+      "requireUppercase": true,
+      "requireLowercase": true,
+      "requireNumbers": true,
+      "requireSymbols": true
+    }
+  },
   "alerts": {
-    "resetEmailSent": "A password reset email has been sent to the user's email address."
+    "resetEmailSent": "A password reset email has been sent to the user's email address.",
+    "registrationSuccess": "Registration completed successfully. Please check your email for confirmation.",
+    "loginSuccess": "Welcome back! You have been successfully logged in.",
+    "logoutSuccess": "You have been successfully logged out.",
+    "passwordChangeSuccess": "Your password has been changed successfully.",
+    "profileUpdateSuccess": "Your profile has been updated successfully.",
+    "confirmationSuccess": "Your account has been confirmed successfully.",
+    "invitationSent": "Invitation has been sent successfully.",
+    "validationError": "Please correct the errors below and try again.",
+    "sessionExpired": "Your session has expired. Please log in again.",
+    "accountLocked": "Your account has been temporarily locked. Please try again later.",
+    "invalidCredentials": "Invalid email/username or password.",
+    "networkError": "Network error. Please check your connection and try again.",
+    "serverError": "Server error. Please try again later."
   },
   "profile": {
     "tabs": {
@@ -128,5 +297,29 @@
       "securtyQuestionUpdated": "Security question updated successfully",
       "passwordUpdated": "Password updated successfully"
     }
+  },
+  "accessibility": {
+    "formValidation": {
+      "errorAnnouncement": "Form contains {{count}} error(s). Please review and correct.",
+      "successAnnouncement": "Form submitted successfully.",
+      "fieldError": "Error in {{fieldName}}: {{errorMessage}}",
+      "requiredField": "Required field",
+      "optionalField": "Optional field"
+    },
+    "passwordStrength": {
+      "announcement": "Password strength: {{strength}}",
+      "requirements": "Password must meet the following requirements:",
+      "satisfied": "✓ {{requirement}} satisfied",
+      "unsatisfied": "✗ {{requirement}} required"
+    }
+  },
+  "serverState": {
+    "loading": "Loading...",
+    "submitting": "Submitting...",
+    "validating": "Validating...",
+    "saving": "Saving...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "success": "Success"
   }
 }
