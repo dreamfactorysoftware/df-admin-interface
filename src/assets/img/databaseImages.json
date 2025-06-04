@@ -1,132 +1,306 @@
-[
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "database-images-config",
+  "description": "Database service images configuration optimized for Next.js Image component with responsive sizing and CDN compatibility",
+  "version": "2.0.0",
+  "nextImageConfig": {
+    "deviceSizes": [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    "imageSizes": [16, 32, 48, 64, 96, 128, 256, 384],
+    "formats": ["image/webp", "image/avif", "image/png"],
+    "domains": [
+      "assets-global.website-files.com",
+      "cdn.prod.website-files.com"
+    ],
+    "unoptimized": false,
+    "quality": 75,
+    "minimumCacheTTL": 60
+  },
+  "images": [
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc69_alloy-p-500.png",
       "alt": "AlloyDB",
-      "label": "alloydb"
+      "label": "alloydb",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/663d4b60d4c482cefa684e84_dynamodb%20logo.png",
       "alt": "aws_dynamodb",
-      "label": "aws_dynamodb"
+      "label": "aws_dynamodb",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/663d4aeec92f326a1b4d7aba_redshift.png",
       "alt": "aws_redshift_db",
-      "label": "aws_redshift_db"
+      "label": "aws_redshift_db",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6c_azure-p-500.png",
       "alt": "azure_documentdb",
-      "label": "azure_documentdb"
+      "label": "azure_documentdb",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6e_API%2520Logo%2520Container-p-500.png",
       "alt": "azure_table",
-      "label": "azure_table"
+      "label": "azure_table",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf3_API%2520Logo%2520Container-p-500.webp",
       "alt": "cassandra",
-      "label": "cassandra"
+      "label": "cassandra",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf2_API%2520Logo%2520Container-8-p-500.webp",
       "alt": "couchdb",
-      "label": "couchdb"
+      "label": "couchdb",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf7_API%2520Logo%2520Container-14-p-500.webp",
       "alt": "firebird",
-      "label": "firebird"
+      "label": "firebird",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc63_API%2520Logo%2520Container-p-500.webp",
       "alt": "ibmdb2",
-      "label": "ibmdb2"
+      "label": "ibmdb2",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6d_ibm-p-500.png",
       "alt": "informix",
-      "label": "informix"
+      "label": "informix",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6a_mariaDB-p-500.png",
       "alt": "mariadb",
-      "label": "mariadb"
+      "label": "mariadb",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/663d4c15c6896a7cbc6606d4_singlestore.png",
       "alt": "memsql",
-      "label": "memsql"
+      "label": "memsql",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf1_API%2520Logo%2520Container-21-p-500.webp",
       "alt": "mongodb",
-      "label": "mongodb"
+      "label": "mongodb",
+      "optimization": {
+        "priority": true,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb7e_API%2520Logo%2520Container-3-p-500.webp",
       "alt": "mysql",
-      "label": "mysql"
+      "label": "mysql",
+      "optimization": {
+        "priority": true,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb01_API%2520Logo%2520Container-5-p-500.webp",
       "alt": "oracle",
-      "label": "oracle"
+      "label": "oracle",
+      "optimization": {
+        "priority": true,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb1a_API%2520Logo%2520Container-7-p-500.webp",
       "alt": "pgsql",
-      "label": "pgsql"
+      "label": "pgsql",
+      "optimization": {
+        "priority": true,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc68_Salesforce-p-500.png",
       "alt": "salesforce_db",
-      "label": "salesforce_db"
+      "label": "salesforce_db",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc66_Sap%2520SQL-p-500.png",
       "alt": "sqlanywhere",
-      "label": "sqlanywhere"
+      "label": "sqlanywhere",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbab_API%2520Logo%2520Container-11-p-500.webp",
       "alt": "sqlite",
-      "label": "sqlite"
+      "label": "sqlite",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbd8_API%2520Logo%2520Container-27-p-500.webp",
       "alt": "sqlsrv",
-      "label": "sqlsrv"
+      "label": "sqlsrv",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
       "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc67_API%2520Logo%2520Container-p-500.png",
       "alt": "apache_hive",
-      "label": "apache_hive"
+      "label": "apache_hive",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
       "src": "https://cdn.prod.website-files.com/64ed8da8a866be7a702fbafb/663179140e764316a084735b_connector%20logo%20updated.png",
       "alt": "snowflake",
-      "label": "snowflake"
+      "label": "snowflake",
+      "optimization": {
+        "priority": true,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      }
     },
     {
-      "src": "assets/img/bigquery.png",
+      "src": "/bigquery.png",
       "alt": "bigquery",
-      "label": "bigquery"
+      "label": "bigquery",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
-      "src": "assets/img/databricks.png",
+      "src": "/databricks.png",
       "alt": "databricks",
-      "label": "databricks"
+      "label": "databricks",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/webp", "image/avif"]
+      }
     },
     {
-      "src": "assets/img/dremio.svg",
+      "src": "/dremio.svg",
       "alt": "dremio",
-      "label": "dremio"
+      "label": "dremio",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/svg+xml", "image/webp", "image/avif"]
+      }
     },
     {
-      "src": "assets/img/sap.svg",
+      "src": "/sap.svg",
       "alt": "hana",
-      "label": "hana"
+      "label": "hana",
+      "optimization": {
+        "priority": false,
+        "placeholder": "blur",
+        "sizes": "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
+        "formats": ["image/svg+xml", "image/webp", "image/avif"]
+      }
     }
-  ]
+  ],
+  "usage": {
+    "dynamic_import": "import('@/assets/img/databaseImages.json')",
+    "nextjs_integration": "Compatible with Next.js Image component and automatic optimization",
+    "migration_notes": [
+      "Local asset paths updated from 'assets/img/' to '/' for Next.js public directory serving",
+      "External CDN URLs preserved for assets-global.website-files.com and cdn.prod.website-files.com",
+      "WebP/AVIF format optimization metadata added for supported images",
+      "Responsive sizing configuration aligned with Next.js Image component deviceSizes and imageSizes",
+      "Priority loading enabled for high-usage database types (MySQL, PostgreSQL, Oracle, MongoDB, Snowflake)",
+      "Placeholder blur effect configured for improved perceived performance"
+    ]
+  }
+}
