@@ -1,139 +1,404 @@
 {
-  "fieldDetailsForm": {
-    "updateSuccess": "Database field successfully updated",
-    "createSuccess": "Database field successfully created",
-    "controls": {
-      "name": { "label": "Name", "tooltip": "The field name used by the API." },
-      "alias": {
-        "label": "Alias",
-        "tooltip": "If set, the alias is used in table access instead of the name."
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_metadata": {
+    "version": "1.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-12-19T00:00:00Z",
+    "framework": "next.js",
+    "ssrOptimized": true,
+    "reactHookFormIntegration": true,
+    "namespace": "schema"
+  },
+  "fieldDetails": {
+    "form": {
+      "messages": {
+        "updateSuccess": "Database field successfully updated",
+        "createSuccess": "Database field successfully created"
       },
-      "label": {
-        "label": "Label",
-        "tooltip": "A displayable name used by clients."
+      "controls": {
+        "name": {
+          "label": "Name",
+          "tooltip": "The field name used by the API.",
+          "validation": {
+            "required": "Name is a required field",
+            "pattern": "Field name must contain only alphanumeric characters and underscores",
+            "minLength": "Field name must be at least 1 character long",
+            "maxLength": "Field name cannot exceed 64 characters"
+          }
+        },
+        "alias": {
+          "label": "Alias",
+          "tooltip": "If set, the alias is used in table access instead of the name.",
+          "validation": {
+            "pattern": "Alias must contain only alphanumeric characters and underscores",
+            "maxLength": "Alias cannot exceed 64 characters"
+          }
+        },
+        "label": {
+          "label": "Label",
+          "tooltip": "A displayable name used by clients.",
+          "validation": {
+            "maxLength": "Label cannot exceed 128 characters"
+          }
+        },
+        "isVirtual": {
+          "label": "Is Virtual?",
+          "tooltip": "Indicates if this field is a virtual field"
+        },
+        "isAggregate": {
+          "label": "Is Aggregate?",
+          "tooltip": "Indicates if this field is an aggregate field"
+        },
+        "type": {
+          "label": "Type",
+          "tooltip": "This is a simplified DreamFactory type.",
+          "validation": {
+            "required": "Field type is required"
+          }
+        },
+        "databaseType": {
+          "label": "Database Type",
+          "tooltip": "If necessary, enter a type acceptable to the underlying database.",
+          "validation": {
+            "maxLength": "Database type cannot exceed 64 characters"
+          }
+        },
+        "length": {
+          "label": "Length",
+          "tooltip": "Maximum length for the field",
+          "validation": {
+            "min": "Length must be greater than 0",
+            "max": "Length cannot exceed database limits"
+          }
+        },
+        "precision": {
+          "label": "Precision",
+          "tooltip": "Precision for numeric fields",
+          "validation": {
+            "min": "Precision must be greater than 0",
+            "max": "Precision cannot exceed 65"
+          }
+        },
+        "scale": {
+          "label": "Scale",
+          "tooltip": "Scale for decimal fields",
+          "validation": {
+            "min": "Scale must be 0 or greater",
+            "max": "Scale cannot exceed precision value"
+          }
+        },
+        "fixedLength": {
+          "label": "Fixed Length",
+          "tooltip": "Indicates if the field has a fixed length"
+        },
+        "supportsMultibyte": {
+          "label": "Supports Multibyte",
+          "tooltip": "Indicates if the field supports multibyte characters"
+        },
+        "allowNull": {
+          "label": "Allow Null",
+          "tooltip": "Indicates if the field allows null values"
+        },
+        "autoIncrement": {
+          "label": "Auto Increment",
+          "tooltip": "Indicates if the field auto-increments"
+        },
+        "defaultValue": {
+          "label": "Default Value",
+          "tooltip": "The default value for the field",
+          "validation": {
+            "maxLength": "Default value cannot exceed 255 characters"
+          }
+        },
+        "isIndex": {
+          "label": "Indexed",
+          "tooltip": "Indicates if the field is indexed"
+        },
+        "isUnique": {
+          "label": "Unique",
+          "tooltip": "Indicates if the field has a unique constraint"
+        },
+        "isPrimaryKey": {
+          "label": "Primary Key",
+          "tooltip": "Indicates if the field is a primary key"
+        },
+        "isForeignKey": {
+          "label": "Foreign Key",
+          "tooltip": "Indicates if the field is a foreign key"
+        },
+        "refTable": {
+          "label": "Reference Table",
+          "tooltip": "The table this foreign key references"
+        },
+        "refField": {
+          "label": "Reference Field",
+          "tooltip": "The field this foreign key references"
+        },
+        "validation": {
+          "label": "Validation",
+          "tooltip": "A JSON object detailing required validations, if any. See here for more info.",
+          "validation": {
+            "custom": "Enter valid JSON here"
+          }
+        },
+        "picklist": {
+          "label": "Picklist",
+          "tooltip": "Comma-separated list of allowed values",
+          "validation": {
+            "custom": "Enter valid CSV here"
+          }
+        }
       },
-      "isVirtual": "Is Virtual?",
-      "isAggregate": "Is Aggregate?",
-      "type": {
-        "label": "Type",
-        "tooltip": "This is a simplified DreamFactory type."
-      },
-      "databaseType": {
-        "label": "Database Type",
-        "tooltip": "If necessary, enter a type acceptable to the underlying database."
-      },
-      "length": "Length",
-      "precision": "Precision",
-      "scale": "Scale",
-      "fixedLength": "Fixed Length",
-      "supportsMultibyte": "Supports Multibyte",
-      "allowNull": "Allow Null",
-      "autoIncrement": "Auto Increment",
-      "defaultValue": "Default Value",
-      "isIndex": "Indexed",
-      "isUnique": "Unique",
-      "isPrimaryKey": "Primary Key",
-      "isForeignKey": "Foreign Key",
-      "refTable": "Reference Table",
-      "refField": "Reference Field",
-      "validation": {
-        "label": "Validation",
-        "tooltip": "A JSON object detailing required validations, if any. See here for more info."
-      },
-      "picklist": "Picklist",
-      "dbFunctionTitle": "DB Function Use",
-      "dfFunctionTooltip": "Enter valid syntax for a database function supported by this database vendor, like upper(fieldname), max(fieldname) or concat(field1, '.', field2), to apply to this field for various operations. See here for more info.",
-      "dbFunctionUseDescription": "Assign Database Function To Uses Of This Field",
-      "noDbFunctions": "No DB Function Uses"
-    },
-    "errors": {
-      "name": "Name is a required field",
-      "json": "Enter valid JSON here",
-      "csv": "Enter valid CSV here"
+      "dbFunction": {
+        "title": "DB Function Use",
+        "tooltip": "Enter valid syntax for a database function supported by this database vendor, like upper(fieldname), max(fieldname) or concat(field1, '.', field2), to apply to this field for various operations. See here for more info.",
+        "description": "Assign Database Function To Uses Of This Field",
+        "noFunctions": "No DB Function Uses"
+      }
     }
   },
-  "name": "Name",
-  "alias": "Alias",
-  "type": "Type",
-  "virtual": "Virtual",
-  "aggregate": "Aggregate",
-  "required": "Required",
-  "constraints": "Constraints",
-  "tableName": "Table Name",
-  "label": "Label",
-  "plural": "Plural Label",
-  "description": "Description",
-  "enter": {
-    "tableName": "Enter {tableName}",
-    "alias": "Enter {alias} label",
-    "label": "Enter table label",
-    "plural": "Enter table plural label",
-    "description": "Enter table description"
+  "table": {
+    "properties": {
+      "name": "Name",
+      "alias": "Alias", 
+      "type": "Type",
+      "virtual": "Virtual",
+      "aggregate": "Aggregate",
+      "required": "Required",
+      "constraints": "Constraints",
+      "tableName": "Table Name",
+      "label": "Label",
+      "plural": "Plural Label",
+      "description": "Description"
+    },
+    "placeholders": {
+      "enter": {
+        "tableName": "Enter {tableName}",
+        "alias": "Enter {alias} label",
+        "label": "Enter table label",
+        "plural": "Enter table plural label",
+        "description": "Enter table description"
+      }
+    },
+    "actions": {
+      "addField": "Add Field",
+      "addRelationship": "Add Virtual Relationship"
+    },
+    "labels": {
+      "fields": "Fields",
+      "primaryKey": "Primary Key",
+      "foreignKey": "Foreign Key",
+      "table": "Table"
+    },
+    "messages": {
+      "validation": {
+        "tableNameError": "Table name is required"
+      },
+      "success": {
+        "createSuccess": "Table created",
+        "updateSuccess": "Table updated",
+        "deleteSuccess": "Table deleted"
+      }
+    }
   },
-  "fields": "Fields",
-  "addField": "Add Field",
-  "addRelationship": "Add Virtual Relationship",
-  "alerts": {
-    "tableNameError": "Table name is required",
-    "createSuccecss": "Table created",
-    "updateSuccess": "Table updated",
-    "deleteSuccess": "Table deleted"
-  },
-  "primaryKey": "Primary Key",
-  "foreignKey": "Foreign Key",
-  "table": "Table",
   "relationships": {
     "heading": "Relationships",
-    "name": {
-      "tooltip": "The auto-generated relation name used by the API."
+    "form": {
+      "controls": {
+        "name": {
+          "label": "Name",
+          "tooltip": "The auto-generated relation name used by the API.",
+          "validation": {
+            "required": "Relationship name is required",
+            "pattern": "Relationship name must contain only alphanumeric characters and underscores"
+          }
+        },
+        "alias": {
+          "label": "Alias",
+          "tooltip": "If set, the alias is used in relation access instead of the name.",
+          "validation": {
+            "pattern": "Alias must contain only alphanumeric characters and underscores",
+            "maxLength": "Alias cannot exceed 64 characters"
+          }
+        },
+        "label": {
+          "label": "Label",
+          "tooltip": "A displayable name used by clients.",
+          "validation": {
+            "maxLength": "Label cannot exceed 128 characters"
+          }
+        },
+        "description": {
+          "label": "Description",
+          "tooltip": "A displayable description used by clients.",
+          "validation": {
+            "maxLength": "Description cannot exceed 255 characters"
+          }
+        },
+        "fetch": {
+          "label": "Always Fetch",
+          "tooltip": "Indicates if this relationship should always be fetched"
+        },
+        "type": {
+          "label": "Type",
+          "tooltip": "The type of relationship"
+        },
+        "virtualRelationship": {
+          "label": "Virtual Relationship",
+          "tooltip": "Indicates if this is a virtual relationship"
+        }
+      },
+      "selectors": {
+        "field": {
+          "label": "Field",
+          "default": "Select Field",
+          "validation": {
+            "required": "Field selection is required"
+          }
+        },
+        "referenceService": {
+          "label": "Reference Service", 
+          "default": "Select Reference Service",
+          "validation": {
+            "required": "Reference service is required"
+          }
+        },
+        "referenceTable": {
+          "label": "Reference Table",
+          "default": "Select Reference Table",
+          "validation": {
+            "required": "Reference table is required"
+          }
+        },
+        "referenceField": {
+          "label": "Reference Field",
+          "default": "Select Reference Field",
+          "validation": {
+            "required": "Reference field is required"
+          }
+        },
+        "junctionService": {
+          "label": "Junction Service",
+          "default": "Select Junction Service",
+          "validation": {
+            "required": "Junction service is required for many-to-many relationships"
+          }
+        },
+        "junctionTable": {
+          "label": "Junction Table",
+          "default": "Select Junction Table",
+          "validation": {
+            "required": "Junction table is required for many-to-many relationships"
+          }
+        },
+        "junctionField": {
+          "label": "Junction Field",
+          "default": "Select Junction Field",
+          "validation": {
+            "required": "Junction field is required for many-to-many relationships"
+          }
+        },
+        "junctionReferenceField": {
+          "label": "Junction Reference Field",
+          "default": "Select Junction Reference Field",
+          "validation": {
+            "required": "Junction reference field is required for many-to-many relationships"
+          }
+        }
+      },
+      "messages": {
+        "success": {
+          "createSuccess": "Relationship created",
+          "updateSuccess": "Relationship updated"
+        }
+      }
+    }
+  },
+  "navigation": {
+    "breadcrumbs": {
+      "schema": "Schema",
+      "databases": "Databases",
+      "tables": "Tables",
+      "fields": "Fields",
+      "relationships": "Relationships"
+    }
+  },
+  "discovery": {
+    "loading": {
+      "schemas": "Loading database schemas...",
+      "tables": "Loading tables...",
+      "fields": "Loading fields...",
+      "relationships": "Loading relationships..."
     },
-    "alias": {
-      "tooltip": "If set, the alias is used in relation access instead of the name."
+    "empty": {
+      "schemas": "No schemas found",
+      "tables": "No tables found in this schema",
+      "fields": "No fields found in this table",
+      "relationships": "No relationships defined for this table"
     },
-    "label": {
-      "tooltip": "A displayable name used by clients."
+    "filters": {
+      "searchPlaceholder": "Search tables, fields, or relationships...",
+      "showVirtual": "Show Virtual Fields",
+      "showIndexed": "Show Indexed Fields Only",
+      "showRequired": "Show Required Fields Only"
     },
-    "description": {
-      "tooltip": "A displayable description used by clients."
+    "tree": {
+      "expand": "Expand all",
+      "collapse": "Collapse all",
+      "refresh": "Refresh schema"
+    }
+  },
+  "performance": {
+    "optimization": {
+      "largeDatasets": "Optimized for schemas with 1000+ tables",
+      "virtualScrolling": "Virtual scrolling enabled for large lists",
+      "lazyLoading": "Relationships loaded on demand"
+    }
+  },
+  "accessibility": {
+    "fieldEditor": {
+      "openEditor": "Open field editor for {fieldName}",
+      "closeEditor": "Close field editor",
+      "editField": "Edit field {fieldName}",
+      "deleteField": "Delete field {fieldName}"
     },
-    "fetch": "Always Fetch",
-    "type": "Type",
-    "virtualRelationship": "Virtual Relationship",
-    "field": {
-      "label": "Field",
-      "default": "Select Field"
+    "tableEditor": {
+      "openEditor": "Open table editor for {tableName}",
+      "closeEditor": "Close table editor",
+      "editTable": "Edit table {tableName}",
+      "deleteTable": "Delete table {tableName}"
     },
-    "referenceService": {
-      "label": "Reference Service",
-      "default": "Select Reference Service"
+    "relationshipEditor": {
+      "openEditor": "Open relationship editor for {relationshipName}",
+      "closeEditor": "Close relationship editor",
+      "editRelationship": "Edit relationship {relationshipName}",
+      "deleteRelationship": "Delete relationship {relationshipName}"
+    }
+  },
+  "error": {
+    "fieldValidation": {
+      "invalidType": "Invalid field type selected",
+      "invalidLength": "Field length must be a positive number",
+      "invalidPrecision": "Precision must be between 1 and 65",
+      "invalidScale": "Scale cannot be greater than precision",
+      "duplicateName": "Field name already exists in this table"
     },
-    "referenceTable": {
-      "label": "Reference Table",
-      "default": "Select Reference Table"
+    "tableValidation": {
+      "invalidName": "Table name contains invalid characters",
+      "duplicateName": "Table name already exists in this schema",
+      "noPrimaryKey": "Table must have at least one primary key field"
     },
-    "referenceField": {
-      "label": "Reference Field",
-      "default": "Select Reference Field"
+    "relationshipValidation": {
+      "invalidConfiguration": "Invalid relationship configuration",
+      "circularReference": "Circular relationship detected",
+      "missingReferences": "Missing required reference table or field"
     },
-    "junctionService": {
-      "label": "Junction Service",
-      "default": "Select Junction Service"
-    },
-    "junctionTable": {
-      "label": "Junction Table",
-      "default": "Select Junction Table"
-    },
-    "junctionField": {
-      "label": "Junction Field",
-      "default": "Select Junction Field"
-    },
-    "junctionReferenceField": {
-      "label": "Junction Reference Field",
-      "default": "Select Junction Reference Field"
-    },
-    "alerts": {
-      "createSuccecss": "Relationship created",
-      "updateSuccess": "Relationship updated"
+    "network": {
+      "connectionTimeout": "Database connection timeout",
+      "unauthorized": "Authentication failed - please check credentials",
+      "schemaLoadFailed": "Failed to load database schema",
+      "updateFailed": "Failed to save changes - please try again"
     }
   }
 }
