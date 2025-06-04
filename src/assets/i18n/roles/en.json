@@ -1,23 +1,31 @@
 {
-  "label": "Roles",
+  "$schema": "../schema/translation.schema.json",
+  "_metadata": {
+    "version": "2.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-01-15T10:30:00.000Z",
+    "framework": "nextjs",
+    "ssrOptimized": true
+  },
+  "roles": "Roles",
   "role": "Role",
   "app": "App",
-  "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
-  "noRoles": "No roles assigned.",
-
+  "noRolesAssigned": "No roles assigned.",
+  "appRolesSummary": "{assigned}/{total} app roles assigned",
   "rolesOverview": {
     "heading": "Roles Overview",
     "description": "Roles provide a way to grant or deny API access to specific services or apps.",
-    "error": {
-      "name": "The name field is required."
-    }
+    "validationError": "The name field is required."
   },
   "accessOverview": {
     "heading": "Access Overview",
     "description": "This section allows you set up rules for a role restricting what services and components users assigned to the role will have access to. Advanced Filters are for implementing additional server side filter logic on database transactions.",
-    "tableLabel": "Service Access",
-    "tableDescription": "Access rules for DreamFactory services. Use caution when allowing system access.",
-    "tableHeadings": {
+    "tableLabels": {
+      "serviceAccess": "Service Access",
+      "accessRules": "Access rules for DreamFactory services. Use caution when allowing system access."
+    },
+    "columnHeadings": {
       "service": "Service",
       "component": "Component",
       "access": "Access",
@@ -28,6 +36,76 @@
   },
   "lookupKeys": {
     "heading": "Lookup Keys Overview",
-    "description": "The DreamFactory administrator can create any number of 'key, value' pairs attached to a role. The key values are automatically substituted on the server. For example, key names can be used in the username and password fields required to hook up a SQL or NoSQL database. They can also be used in Email Templates or as parameters for external REST services. Any Lookup Key can be marked as private, and in this case the key value is securely ncrypted on the server and is no longer accessible through the platform interface. Lookup keys for service configuration and credentials must be made private."
+    "description": "The DreamFactory administrator can create any number of 'key, value' pairs attached to a role. The key values are automatically substituted on the server. For example, key names can be used in the username and password fields required to hook up a SQL or NoSQL database. They can also be used in Email Templates or as parameters for external REST services. Any Lookup Key can be marked as private, and in this case the key value is securely encrypted on the server and is no longer accessible through the platform interface. Lookup keys for service configuration and credentials must be made private."
+  },
+  "_componentMapping": {
+    "RoleOverview": {
+      "props": [
+        "rolesOverview.heading",
+        "rolesOverview.description",
+        "rolesOverview.validationError"
+      ],
+      "interpolationSupport": false
+    },
+    "AccessRulesTable": {
+      "props": [
+        "accessOverview.heading",
+        "accessOverview.description",
+        "accessOverview.tableLabels.*",
+        "accessOverview.columnHeadings.*",
+        "accessOverview.noAccessRules"
+      ],
+      "interpolationSupport": false
+    },
+    "AppRolesSummary": {
+      "props": [
+        "appRolesSummary"
+      ],
+      "interpolationSupport": true,
+      "interpolationVars": ["assigned", "total"]
+    },
+    "LookupKeysSection": {
+      "props": [
+        "lookupKeys.heading",
+        "lookupKeys.description"
+      ],
+      "interpolationSupport": false
+    }
+  },
+  "_ssrConfig": {
+    "preloadOnServer": true,
+    "criticalTranslations": [
+      "roles",
+      "role",
+      "app",
+      "rolesOverview.heading",
+      "accessOverview.heading"
+    ],
+    "lazyTranslations": [
+      "lookupKeys.description"
+    ]
+  },
+  "_accessibilityLabels": {
+    "roleTableLabel": "Roles management table",
+    "accessRulesTableLabel": "Service access rules configuration table",
+    "roleFormLabel": "Role configuration form",
+    "lookupKeysLabel": "Role lookup keys configuration"
+  },
+  "_validationMessages": {
+    "name": {
+      "required": "Role name is required",
+      "minLength": "Role name must be at least 2 characters",
+      "pattern": "Role name can only contain letters, numbers, and underscores"
+    },
+    "description": {
+      "maxLength": "Description cannot exceed 500 characters"
+    },
+    "lookupKey": {
+      "required": "Lookup key name is required",
+      "pattern": "Lookup key must be a valid identifier"
+    },
+    "lookupValue": {
+      "required": "Lookup value is required"
+    }
   }
 }
