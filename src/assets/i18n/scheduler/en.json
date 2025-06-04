@@ -1,4 +1,13 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_metadata": {
+    "version": "1.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-01-01T00:00:00.000Z",
+    "framework": "next.js",
+    "ssrOptimized": true
+  },
   "form": {
     "label": {
       "name": "Name",
