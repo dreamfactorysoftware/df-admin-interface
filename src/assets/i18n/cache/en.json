@@ -1,7 +1,16 @@
 {
+  "$schema": "../../schemas/translation-schema.json",
+  "_metadata": {
+    "version": "1.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-12-19T00:00:00.000Z",
+    "framework": "next.js",
+    "ssrOptimized": true
+  },
   "cache": "Cache",
   "overview": "Cache Overview",
-  "flushService": "Flush {{serviceName}} Cache",
+  "flushService": "Flush {serviceName} Cache",
   "flushCache": "Flush Cache",
   "description": "Flush system-wide cache or per-service caches. Use the cache clearing buttons below to refresh any changes made to your system configuration values.",
   "flushSystemCache": "Flush System-Wide Cache",
