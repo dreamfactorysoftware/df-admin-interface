@@ -1,4 +1,13 @@
 {
+  "$schema": "https://raw.githubusercontent.com/dreamfactorysoftware/df-admin-interface/main/src/assets/i18n/schema.json",
+  "_metadata": {
+    "version": "1.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-01-01T00:00:00.000Z",
+    "framework": "next.js",
+    "ssrOptimized": true
+  },
   "subheading": "Displays current system information.",
   "instance": {
     "instance": "Instance",
@@ -28,6 +37,6 @@
     "heading": "Client",
     "userAgent": "User Agent",
     "ipAddress": "IP Address",
-    "Locale": "Locale"
+    "locale": "Locale"
   }
 }
