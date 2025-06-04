@@ -1,8 +1,26 @@
 {
+  "$schema": "https://json.schemastore.org/web-manifest",
+  "_metadata": {
+    "version": "1.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-12-19T12:00:00.000Z",
+    "framework": "Next.js",
+    "ssrOptimized": true,
+    "namespace": "apiDocs",
+    "loadPriority": "low",
+    "cacheStrategy": "memory-first",
+    "preloadEnabled": false,
+    "testingCompatible": {
+      "vitest": true,
+      "msw": true,
+      "playwright": true
+    }
+  },
   "table": {
     "header": {
-      "name": "Service Name",
-      "label": "Label",
+      "serviceName": "Service Name",
+      "label": "Label", 
       "description": "Description",
       "group": "Group",
       "type": "Type"
