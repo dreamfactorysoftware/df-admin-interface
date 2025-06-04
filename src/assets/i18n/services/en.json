@@ -1,4 +1,17 @@
 {
+  "$schema": "../../types.ts#ServicesTranslations",
+  "_metadata": {
+    "version": "1.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2025-01-15T10:00:00Z",
+    "framework": "Next.js",
+    "ssrOptimized": true,
+    "namespace": "services",
+    "description": "Service management translations for database service configuration, creation, and administration UI components",
+    "reactHookFormCompatible": true,
+    "typeScriptSupport": true
+  },
   "details": "Details",
   "definition": "Service Definition",
   "config": "Configuration",
@@ -6,24 +19,161 @@
   "controls": {
     "serviceType": {
       "label": "Service Type",
-      "tooltip": "Select the type of service you're adding."
+      "tooltip": "Select the type of service you're adding.",
+      "placeholder": "Choose service type...",
+      "validation": {
+        "required": "Service type is required",
+        "invalid": "Please select a valid service type"
+      }
     },
     "namespace": {
       "label": "Namespace",
-      "tooltip": "Select a namespace used for the API’s URI structure, such as /api/v2/{type}/{namespace}. It should be lowercase and alphanumeric."
+      "tooltip": "Select a namespace used for the API's URI structure, such as /api/v2/{type}/{namespace}. It should be lowercase and alphanumeric.",
+      "placeholder": "Enter namespace (lowercase, alphanumeric)",
+      "validation": {
+        "required": "Namespace is required",
+        "pattern": "Namespace must be lowercase and alphanumeric only",
+        "minLength": "Namespace must be at least 2 characters",
+        "maxLength": "Namespace cannot exceed 50 characters",
+        "reserved": "This namespace is reserved and cannot be used"
+      }
     },
     "label": {
       "label": "Label",
-      "tooltip": "The display name or label for the service."
+      "tooltip": "The display name or label for the service.",
+      "placeholder": "Enter service label",
+      "validation": {
+        "required": "Service label is required",
+        "minLength": "Label must be at least 2 characters",
+        "maxLength": "Label cannot exceed 100 characters"
+      }
     },
     "description": {
       "label": "Description",
-      "tooltip": "Write a brief description of the API (optional)."
+      "tooltip": "Write a brief description of the API (optional).",
+      "placeholder": "Enter service description (optional)",
+      "validation": {
+        "maxLength": "Description cannot exceed 500 characters"
+      }
     },
     "createAndTest": "Create & Test",
     "securityConfig": "Security Config"
   },
-  "deleteSuccessMsg": "Service successfully deleted",
-  "createSuccessMsg": "Service successfully created",
-  "updateSuccessMsg": "Service successfully updated"
+  "actions": {
+    "create": "Create Service",
+    "update": "Update Service",
+    "delete": "Delete Service",
+    "test": "Test Connection",
+    "save": "Save",
+    "cancel": "Cancel",
+    "reset": "Reset",
+    "configure": "Configure",
+    "clone": "Clone Service",
+    "export": "Export Configuration",
+    "import": "Import Configuration"
+  },
+  "states": {
+    "loading": "Loading services...",
+    "creating": "Creating service...",
+    "updating": "Updating service...",
+    "testing": "Testing connection...",
+    "deleting": "Deleting service...",
+    "saving": "Saving configuration...",
+    "empty": "No services configured",
+    "error": "Error loading services"
+  },
+  "tabs": {
+    "basic": "Basic Information",
+    "configuration": "Configuration",
+    "security": "Security Settings",
+    "advanced": "Advanced Options",
+    "testing": "Connection Testing"
+  },
+  "validation": {
+    "form": {
+      "invalid": "Please correct the errors below",
+      "required": "This field is required",
+      "saving": "Please wait while saving...",
+      "testing": "Please wait while testing connection..."
+    },
+    "connection": {
+      "success": "Connection test successful",
+      "failed": "Connection test failed",
+      "timeout": "Connection test timed out",
+      "invalidCredentials": "Invalid credentials provided",
+      "networkError": "Network error occurred",
+      "permissionDenied": "Permission denied"
+    }
+  },
+  "messages": {
+    "success": {
+      "created": "Service successfully created",
+      "updated": "Service successfully updated", 
+      "deleted": "Service successfully deleted",
+      "tested": "Connection test completed successfully",
+      "configured": "Service configuration saved",
+      "cloned": "Service successfully cloned",
+      "exported": "Service configuration exported",
+      "imported": "Service configuration imported"
+    },
+    "error": {
+      "createFailed": "Failed to create service",
+      "updateFailed": "Failed to update service",
+      "deleteFailed": "Failed to delete service",
+      "testFailed": "Connection test failed",
+      "loadFailed": "Failed to load service configuration",
+      "saveFailed": "Failed to save configuration",
+      "cloneFailed": "Failed to clone service",
+      "exportFailed": "Failed to export configuration",
+      "importFailed": "Failed to import configuration"
+    },
+    "confirmation": {
+      "delete": "Are you sure you want to delete this service? This action cannot be undone.",
+      "reset": "Are you sure you want to reset the configuration? Unsaved changes will be lost.",
+      "overwrite": "A service with this name already exists. Do you want to overwrite it?"
+    }
+  },
+  "accessibility": {
+    "serviceTypeSelect": "Select database service type from dropdown",
+    "namespaceInput": "Enter unique namespace identifier for service",
+    "labelInput": "Enter display label for service",
+    "descriptionInput": "Enter optional description for service",
+    "createButton": "Create new database service",
+    "testButton": "Test database connection",
+    "configButton": "Configure service security settings",
+    "deleteButton": "Delete selected service",
+    "editButton": "Edit service configuration"
+  },
+  "help": {
+    "serviceTypes": "DreamFactory supports various database types including MySQL, PostgreSQL, MongoDB, Oracle, and more.",
+    "namespacing": "Namespaces help organize your APIs and create clean URL structures for database access.",
+    "security": "Configure role-based access control and API key authentication for your database services.",
+    "testing": "Test your database connection to ensure proper configuration before deploying to production."
+  },
+  "placeholders": {
+    "searchServices": "Search services...",
+    "noServices": "No services match your search criteria",
+    "selectServiceType": "Select a service type",
+    "enterNamespace": "my-database",
+    "enterLabel": "My Database Service",
+    "enterDescription": "Database service for application data"
+  },
+  "tooltips": {
+    "namespaceHelp": "Used in API URLs like /api/v2/{{namespace}}/table_name",
+    "securityHelp": "Configure which users and roles can access this service",
+    "testHelp": "Verify connection settings work correctly",
+    "deleteHelp": "Permanently remove this service and all its configurations"
+  },
+  "shortcuts": {
+    "createNew": "Ctrl+N",
+    "save": "Ctrl+S",
+    "test": "Ctrl+T",
+    "delete": "Delete",
+    "escape": "Esc"
+  },
+  "legacy": {
+    "deleteSuccessMsg": "Service successfully deleted",
+    "createSuccessMsg": "Service successfully created",
+    "updateSuccessMsg": "Service successfully updated"
+  }
 }
