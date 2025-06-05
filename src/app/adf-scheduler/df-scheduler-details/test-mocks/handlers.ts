@@ -1,773 +1,1048 @@
 /**
- * Mock Service Worker (MSW) Request Handlers for Scheduler Operations
+ * @fileoverview Mock Service Worker (MSW) request handlers for scheduler CRUD operations
+ * @description Provides realistic API mocking during development and testing for scheduler functionality
  * 
- * This module provides comprehensive MSW handlers for scheduler task CRUD operations,
- * service component discovery, and task log management. These handlers intercept and mock
- * all scheduler-related API calls, providing realistic API responses for development and testing.
+ * This file exports HTTP request handlers that intercept and mock all scheduler-related API calls
+ * including task creation, reading, updating, deletion, and task log retrieval. The handlers simulate
+ * the DreamFactory Core API endpoints for scheduler functionality with proper response formats,
+ * error conditions, and realistic latency.
  * 
  * Features:
- * - Complete scheduler task CRUD operations
- * - Service component access list endpoints
- * - Task log retrieval and management
- * - Error scenario simulation for robust testing
- * - Realistic network latency simulation
- * - DreamFactory Core API v2 response format compliance
+ * - MSW handlers intercept scheduler API calls for isolated frontend testing per Section 7.1.1
+ * - Response formats match existing DreamFactory Core API v2 specifications
+ * - Error scenarios cover all edge cases for robust error handling testing
+ * - Handlers support both development environment and Vitest test execution contexts
+ * - Includes delay simulation for realistic network latency during development testing
+ * - Integrates with scheduler task log endpoints for comprehensive workflow testing coverage
  * 
- * Endpoints Covered:
- * - GET /api/v2/system/task (list scheduler tasks)
- * - GET /api/v2/system/task/{id} (get single task)
- * - POST /api/v2/system/task (create task)
- * - PUT /api/v2/system/task/{id} (update task)
- * - DELETE /api/v2/system/task/{id} (delete task)
- * - GET /api/v2/{serviceName}?as_access_list=true (service components)
- * - GET /api/v2/system/service (services list for dropdowns)
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
+ * @author DreamFactory Team
+ * @license MIT
  */
 
-import { http, HttpResponse, delay } from 'msw';
+import { rest } from 'msw';
 import type {
-  SchedulerTask,
-  SchedulerTaskData,
-  CreateSchedulePayload,
-  UpdateSchedulePayload,
-  TaskLog,
-  TaskListResponse,
-  ServiceAccessList,
-  SchedulerAPIResponse,
-  SchedulerTestScenario,
-  MockSchedulerTask
-} from '../../../../types/scheduler';
+  ApiListResponse,
+  ApiResourceResponse,
+  ApiErrorResponse,
+  ApiSuccessResponse,
+} from '../../../../types/api';
 import type { Service } from '../../../../types/service';
 
 // ============================================================================
-// MOCK DATA GENERATORS
+// TYPE DEFINITIONS
 // ============================================================================
 
 /**
- * Generate mock task log data
+ * Scheduler task data structure based on DreamFactory Core API v2 specification
+ * Maintains compatibility with existing Angular component data patterns
  */
-const generateMockTaskLog = (taskId: number, statusCode: number = 200): TaskLog => ({
-  taskId,
-  statusCode,
-  lastModifiedDate: new Date().toISOString(),
-  createdDate: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-  content: statusCode === 200 
-    ? `Task executed successfully at ${new Date().toLocaleString()}.\n\nResponse data:\n${JSON.stringify({
-        success: true,
-        message: 'Operation completed',
-        timestamp: new Date().toISOString(),
-        executionTime: Math.floor(Math.random() * 1000) + 100
-      }, null, 2)}`
-    : `Task execution failed at ${new Date().toLocaleString()}.\n\nError details:\n${JSON.stringify({
-        error: 'Task execution failed',
-        statusCode,
-        message: statusCode === 404 ? 'Resource not found' : 'Internal server error',
-        timestamp: new Date().toISOString()
-      }, null, 2)}`
-});
+export interface SchedulerTaskData {
+  /** Task ID (auto-generated) */
+  id: number;
+  /** Task name (required, unique) */
+  name: string;
+  /** Task description (optional) */
+  description: string | null;
+  /** Whether the task is active */
+  isActive: boolean;
+  /** Associated service ID */
+  serviceId: number;
+  /** Component/resource path */
+  component: string;
+  /** HTTP verb for the task */
+  verb: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  /** Bitmask representation of HTTP verb */
+  verbMask: number;
+  /** Execution frequency in seconds */
+  frequency: number;
+  /** JSON payload for non-GET requests */
+  payload: string | null;
+  /** Task creation timestamp */
+  createdDate: string;
+  /** Last modification timestamp */
+  lastModifiedDate: string;
+  /** Creator user ID */
+  createdById: number;
+  /** Last modifier user ID */
+  lastModifiedById: number | null;
+  /** Associated service details */
+  serviceByServiceId: Service;
+  /** Task execution log (if available) */
+  taskLogByTaskId: SchedulerTaskLog | null;
+}
 
 /**
- * Generate mock service data for scheduler tasks
+ * Scheduler task log structure for execution history
  */
-const generateMockService = (id: number, name: string, type: string = 'mysql'): Service => ({
-  id,
-  name,
-  label: name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' '),
-  description: `${type.toUpperCase()} database service for ${name}`,
-  isActive: true,
-  type,
-  mutable: true,
-  deletable: true,
-  createdDate: new Date(Date.now() - 7 * 86400000).toISOString(), // 7 days ago
-  lastModifiedDate: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-  createdById: 1,
-  lastModifiedById: 1,
-  config: {
-    host: 'localhost',
-    port: type === 'mysql' ? 3306 : type === 'pgsql' ? 5432 : 27017,
-    database: `${name}_db`,
-    username: 'admin',
-    connectionTimeout: 30
-  },
-  serviceDocByServiceId: null,
-  refresh: false
-});
+export interface SchedulerTaskLog {
+  /** Associated task ID */
+  taskId: number;
+  /** HTTP status code from last execution */
+  statusCode: number;
+  /** Execution log content/output */
+  content: string;
+  /** Log creation timestamp */
+  createdDate: string;
+  /** Log modification timestamp */
+  lastModifiedDate: string;
+}
 
 /**
- * Generate mock scheduler task data
+ * Create scheduler task payload structure
  */
-const generateMockSchedulerTask = (
-  id: number, 
-  overrides: Partial<SchedulerTask> = {},
-  includeLog: boolean = Math.random() > 0.5
-): SchedulerTask => {
-  const serviceId = overrides.serviceId || (id % 3) + 1; // Cycle through services 1-3
-  const serviceNames = ['users_db', 'products_db', 'analytics_db'];
-  const serviceName = serviceNames[(serviceId - 1) % serviceNames.length];
-  const service = generateMockService(serviceId, serviceName);
-  
-  const components = ['users', 'profiles', 'sessions', 'logs', 'analytics', 'reports'];
-  const verbs = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
-  
-  const verb = overrides.verb || verbs[id % verbs.length];
-  const component = overrides.component || components[id % components.length];
-  
-  return {
-    id,
-    name: overrides.name || `Scheduled ${verb} ${component} Task ${id}`,
-    description: overrides.description || `Automated ${verb.toLowerCase()} operation for ${component} endpoint every ${300 + (id * 60)} seconds`,
-    isActive: overrides.isActive !== undefined ? overrides.isActive : Math.random() > 0.3,
-    serviceId,
-    component,
-    frequency: overrides.frequency || 300 + (id * 60), // 5 minutes plus incremental
-    payload: overrides.payload || (verb !== 'GET' ? JSON.stringify({
-      automated: true,
-      taskId: id,
-      timestamp: new Date().toISOString()
-    }) : null),
-    createdDate: new Date(Date.now() - (id * 86400000)).toISOString(), // Staggered creation dates
-    lastModifiedDate: new Date(Date.now() - Math.floor(Math.random() * 86400000)).toISOString(),
-    createdById: 1,
-    lastModifiedById: Math.random() > 0.5 ? 1 : null,
-    verb,
-    verbMask: getVerbMask(verb),
-    taskLogByTaskId: includeLog ? generateMockTaskLog(id, Math.random() > 0.8 ? 500 : 200) : null,
-    serviceByServiceId: service,
-    ...overrides
+export interface CreateSchedulerTaskPayload {
+  /** Task name */
+  name: string;
+  /** Task description */
+  description?: string | null;
+  /** Active status */
+  isActive: boolean;
+  /** Service ID */
+  serviceId: number;
+  /** Component path */
+  component: string;
+  /** HTTP verb */
+  verb: string;
+  /** Execution frequency */
+  frequency: number;
+  /** JSON payload */
+  payload?: string | null;
+  /** Service details */
+  service?: {
+    id: number;
+    name: string;
+    label: string;
+    description: string;
+    type: string;
+    components: string[];
   };
+  /** Service name */
+  serviceName?: string;
+  /** Verb mask */
+  verbMask?: number;
+}
+
+/**
+ * Update scheduler task payload structure
+ */
+export interface UpdateSchedulerTaskPayload extends CreateSchedulerTaskPayload {
+  /** Task ID */
+  id: number;
+  /** Creation timestamp */
+  createdDate: string;
+  /** Creator ID */
+  createdById: number;
+  /** Modification timestamp */
+  lastModifiedDate: string;
+  /** Modifier ID */
+  lastModifiedById: number | null;
+  /** Whether task has execution log */
+  hasLog: boolean;
+}
+
+// ============================================================================
+// MOCK DATA REPOSITORY
+// ============================================================================
+
+/**
+ * Mock services available for scheduler task assignment
+ * Represents realistic service configurations
+ */
+const mockServices: Service[] = [
+  {
+    id: 2,
+    name: 'api_docs',
+    label: 'Live API Docs',
+    description: 'API documenting and testing service.',
+    active: true,
+    type: 'swagger',
+    config: {},
+    created_date: '2023-08-04T21:10:07.000000Z',
+    last_modified_date: '2023-08-04T21:10:07.000000Z',
+    created_by_id: null,
+    last_modified_by_id: null,
+  },
+  {
+    id: 5,
+    name: 'db',
+    label: 'Local SQL Database',
+    description: 'Service for accessing local SQLite database.',
+    active: true,
+    type: 'sqlite',
+    config: {
+      service_id: 5,
+      database: 'db.sqlite',
+      allow_upsert: false,
+      max_records: 1000,
+      cache_enabled: false,
+      cache_ttl: 0,
+    },
+    created_date: '2023-08-04T21:10:07.000000Z',
+    last_modified_date: '2023-08-21T13:46:25.000000Z',
+    created_by_id: null,
+    last_modified_by_id: 1,
+  },
+  {
+    id: 6,
+    name: 'email',
+    label: 'Local Email Service',
+    description: 'Email service used for sending user invites and/or password reset confirmation.',
+    active: true,
+    type: 'local_email',
+    config: {
+      parameters: [],
+    },
+    created_date: '2023-08-04T21:10:07.000000Z',
+    last_modified_date: '2023-08-04T21:10:07.000000Z',
+    created_by_id: null,
+    last_modified_by_id: null,
+  },
+  {
+    id: 7,
+    name: 'file',
+    label: 'Local File Storage',
+    description: 'Service for managing local file storage operations.',
+    active: true,
+    type: 'file',
+    config: {
+      container: 'app',
+      public_path: '/storage/app',
+    },
+    created_date: '2023-08-04T21:10:07.000000Z',
+    last_modified_date: '2023-08-04T21:10:07.000000Z',
+    created_by_id: null,
+    last_modified_by_id: null,
+  },
+];
+
+/**
+ * Mock scheduler tasks repository
+ * Provides realistic task configurations for testing
+ */
+let mockSchedulerTasks: SchedulerTaskData[] = [
+  {
+    id: 1,
+    name: 'daily_cleanup',
+    description: 'Daily database cleanup task',
+    isActive: true,
+    serviceId: 5,
+    component: '_proc/cleanup',
+    verb: 'POST',
+    verbMask: 2,
+    frequency: 86400, // 24 hours
+    payload: JSON.stringify({ action: 'cleanup', tables: ['logs', 'temp'] }),
+    createdDate: '2023-08-30T10:00:00.000000Z',
+    lastModifiedDate: '2023-08-30T10:00:00.000000Z',
+    createdById: 1,
+    lastModifiedById: 1,
+    serviceByServiceId: mockServices[1],
+    taskLogByTaskId: {
+      taskId: 1,
+      statusCode: 200,
+      content: 'Task executed successfully. Cleanup completed for 150 records.',
+      createdDate: '2023-08-30T10:01:00.000000Z',
+      lastModifiedDate: '2023-08-30T10:01:00.000000Z',
+    },
+  },
+  {
+    id: 2,
+    name: 'api_health_check',
+    description: 'Periodic API health monitoring',
+    isActive: true,
+    serviceId: 2,
+    component: 'health',
+    verb: 'GET',
+    verbMask: 1,
+    frequency: 300, // 5 minutes
+    payload: null,
+    createdDate: '2023-08-30T11:00:00.000000Z',
+    lastModifiedDate: '2023-08-30T14:30:00.000000Z',
+    createdById: 1,
+    lastModifiedById: 1,
+    serviceByServiceId: mockServices[0],
+    taskLogByTaskId: {
+      taskId: 2,
+      statusCode: 200,
+      content: 'Health check passed. All endpoints responding normally.',
+      createdDate: '2023-08-30T14:35:00.000000Z',
+      lastModifiedDate: '2023-08-30T14:35:00.000000Z',
+    },
+  },
+  {
+    id: 3,
+    name: 'failed_email_retry',
+    description: 'Retry failed email deliveries',
+    isActive: false,
+    serviceId: 6,
+    component: 'retry_failed',
+    verb: 'POST',
+    verbMask: 2,
+    frequency: 1800, // 30 minutes
+    payload: JSON.stringify({ retry_attempts: 3, max_age_hours: 24 }),
+    createdDate: '2023-08-30T12:00:00.000000Z',
+    lastModifiedDate: '2023-08-30T15:45:00.000000Z',
+    createdById: 1,
+    lastModifiedById: 1,
+    serviceByServiceId: mockServices[2],
+    taskLogByTaskId: {
+      taskId: 3,
+      statusCode: 500,
+      content: 'Error: SMTP connection failed. Unable to retry emails at this time.',
+      createdDate: '2023-08-30T15:50:00.000000Z',
+      lastModifiedDate: '2023-08-30T15:50:00.000000Z',
+    },
+  },
+];
+
+/**
+ * Mock service access components for different service types
+ * Simulates the access_list endpoint responses
+ */
+const mockServiceComponents: Record<string, string[]> = {
+  db: ['_table', '_schema', '_proc', 'users', 'contacts', 'orders', 'products'],
+  api_docs: ['health', 'swagger', 'openapi', 'docs'],
+  email: ['send', 'template', 'queue', 'retry_failed'],
+  file: ['container', 'folder', 'upload', 'download', 'delete'],
+};
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Generate realistic delay for API responses
+ * Simulates network latency for development testing
+ */
+const generateDelay = (): number => {
+  return Math.random() * 500 + 100; // 100-600ms delay
 };
 
 /**
- * Get verb mask for HTTP method
+ * Generate DreamFactory Core API v2 compatible timestamp
+ */
+const generateTimestamp = (): string => {
+  return new Date().toISOString().replace('T', 'T').replace(/\.\d{3}Z$/, '.000000Z');
+};
+
+/**
+ * Convert HTTP verb to bitmask value
  */
 const getVerbMask = (verb: string): number => {
-  const masks = { 'GET': 1, 'POST': 2, 'PUT': 4, 'PATCH': 8, 'DELETE': 16 };
-  return masks[verb as keyof typeof masks] || 1;
+  const verbMasks: Record<string, number> = {
+    GET: 1,
+    POST: 2,
+    PUT: 4,
+    PATCH: 8,
+    DELETE: 16,
+  };
+  return verbMasks[verb.toUpperCase()] || 1;
 };
 
 /**
- * Generate mock service components list
+ * Generate unique task ID
  */
-const generateServiceComponents = (serviceName: string): string[] => {
-  const baseComponents = ['_table', '_proc', '_func', '_schema'];
-  const tableComponents = [
-    'users', 'profiles', 'sessions', 'logs', 'analytics', 'reports',
-    'orders', 'products', 'categories', 'customers', 'inventory',
-    'transactions', 'payments', 'notifications', 'settings'
-  ];
-  
-  // Generate components based on service name for consistency
-  const serviceSpecificComponents = serviceName.includes('users') 
-    ? ['users', 'profiles', 'sessions', 'permissions']
-    : serviceName.includes('products')
-    ? ['products', 'categories', 'inventory', 'orders']
-    : serviceName.includes('analytics')
-    ? ['analytics', 'reports', 'metrics', 'logs']
-    : tableComponents.slice(0, 6 + Math.floor(Math.random() * 4));
-
-  return [...baseComponents, ...serviceSpecificComponents].sort();
+let nextTaskId = 100;
+const generateTaskId = (): number => {
+  return ++nextTaskId;
 };
 
-// ============================================================================
-// MOCK DATA STORAGE
-// ============================================================================
-
 /**
- * In-memory storage for scheduler tasks during testing
+ * Validate scheduler task payload
  */
-let mockSchedulerTasks: Map<number, SchedulerTask> = new Map();
-let nextTaskId = 1;
+const validateTaskPayload = (payload: CreateSchedulerTaskPayload): string[] => {
+  const errors: string[] = [];
 
-/**
- * Initialize mock data
- */
-const initializeMockData = (): void => {
-  if (mockSchedulerTasks.size === 0) {
-    // Generate initial set of tasks
-    for (let i = 1; i <= 12; i++) {
-      const task = generateMockSchedulerTask(i);
-      mockSchedulerTasks.set(i, task);
-      nextTaskId = Math.max(nextTaskId, i + 1);
+  if (!payload.name || payload.name.trim().length === 0) {
+    errors.push('Task name is required');
+  }
+
+  if (payload.name && payload.name.length > 255) {
+    errors.push('Task name cannot exceed 255 characters');
+  }
+
+  if (!payload.serviceId) {
+    errors.push('Service ID is required');
+  }
+
+  if (!payload.component || payload.component.trim().length === 0) {
+    errors.push('Component is required');
+  }
+
+  if (!payload.verb) {
+    errors.push('HTTP verb is required');
+  }
+
+  if (payload.frequency && (payload.frequency < 60 || payload.frequency > 2592000)) {
+    errors.push('Frequency must be between 60 seconds and 30 days');
+  }
+
+  if (payload.payload && payload.verb === 'GET') {
+    errors.push('Payload is not allowed for GET requests');
+  }
+
+  if (payload.payload && !payload.payload.trim().startsWith('{')) {
+    try {
+      JSON.parse(payload.payload);
+    } catch {
+      errors.push('Payload must be valid JSON');
     }
   }
+
+  // Check for duplicate names
+  const existingTask = mockSchedulerTasks.find(
+    task => task.name.toLowerCase() === payload.name.toLowerCase()
+  );
+  if (existingTask) {
+    errors.push('Task name must be unique');
+  }
+
+  return errors;
 };
 
 /**
- * Get all tasks with optional filtering
+ * Validate update task payload
  */
-const getAllTasks = (params: URLSearchParams): SchedulerTask[] => {
-  initializeMockData();
-  
-  let tasks = Array.from(mockSchedulerTasks.values());
-  
-  // Apply filters
-  const isActive = params.get('filter');
-  if (isActive) {
-    // Parse filter query like "isActive=true"
-    if (isActive.includes('isActive=true')) {
-      tasks = tasks.filter(task => task.isActive);
-    } else if (isActive.includes('isActive=false')) {
-      tasks = tasks.filter(task => !task.isActive);
+const validateUpdateTaskPayload = (
+  taskId: number,
+  payload: UpdateSchedulerTaskPayload
+): string[] => {
+  const errors: string[] = [];
+
+  if (!payload.name || payload.name.trim().length === 0) {
+    errors.push('Task name is required');
+  }
+
+  if (payload.name && payload.name.length > 255) {
+    errors.push('Task name cannot exceed 255 characters');
+  }
+
+  if (!payload.serviceId) {
+    errors.push('Service ID is required');
+  }
+
+  if (!payload.component || payload.component.trim().length === 0) {
+    errors.push('Component is required');
+  }
+
+  if (!payload.verb) {
+    errors.push('HTTP verb is required');
+  }
+
+  if (payload.frequency && (payload.frequency < 60 || payload.frequency > 2592000)) {
+    errors.push('Frequency must be between 60 seconds and 30 days');
+  }
+
+  if (payload.payload && payload.verb === 'GET') {
+    errors.push('Payload is not allowed for GET requests');
+  }
+
+  if (payload.payload && !payload.payload.trim().startsWith('{')) {
+    try {
+      JSON.parse(payload.payload);
+    } catch {
+      errors.push('Payload must be valid JSON');
     }
   }
-  
-  // Apply search
-  const search = params.get('search');
-  if (search) {
-    const searchLower = search.toLowerCase();
-    tasks = tasks.filter(task => 
-      task.name.toLowerCase().includes(searchLower) ||
-      task.description?.toLowerCase().includes(searchLower) ||
-      task.component.toLowerCase().includes(searchLower)
-    );
+
+  // Check for duplicate names (excluding current task)
+  const existingTask = mockSchedulerTasks.find(
+    task => task.name.toLowerCase() === payload.name.toLowerCase() && task.id !== taskId
+  );
+  if (existingTask) {
+    errors.push('Task name must be unique');
   }
-  
-  // Apply sorting
-  const sortBy = params.get('order') || 'id';
-  const sortDirection = params.get('direction') || 'asc';
-  
-  tasks.sort((a, b) => {
-    let aVal: any = a[sortBy as keyof SchedulerTask];
-    let bVal: any = b[sortBy as keyof SchedulerTask];
-    
-    if (typeof aVal === 'string') aVal = aVal.toLowerCase();
-    if (typeof bVal === 'string') bVal = bVal.toLowerCase();
-    
-    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
-  
-  return tasks;
+
+  return errors;
 };
 
 /**
- * Apply pagination to tasks
+ * Find service by ID
  */
-const paginateTasks = (tasks: SchedulerTask[], params: URLSearchParams): {
-  paginatedTasks: SchedulerTask[];
-  meta: { count: number; limit: number; offset: number };
-} => {
-  const limit = parseInt(params.get('limit') || '25', 10);
-  const offset = parseInt(params.get('offset') || '0', 10);
-  
-  const paginatedTasks = tasks.slice(offset, offset + limit);
-  
+const findServiceById = (serviceId: number): Service | undefined => {
+  return mockServices.find(service => service.id === serviceId);
+};
+
+/**
+ * Create task from payload
+ */
+const createTaskFromPayload = (payload: CreateSchedulerTaskPayload): SchedulerTaskData => {
+  const service = findServiceById(payload.serviceId);
+  if (!service) {
+    throw new Error(`Service with ID ${payload.serviceId} not found`);
+  }
+
+  const now = generateTimestamp();
+  const taskId = generateTaskId();
+
   return {
-    paginatedTasks,
-    meta: {
-      count: tasks.length,
-      limit,
-      offset
-    }
+    id: taskId,
+    name: payload.name,
+    description: payload.description || null,
+    isActive: payload.isActive,
+    serviceId: payload.serviceId,
+    component: payload.component,
+    verb: payload.verb.toUpperCase() as any,
+    verbMask: getVerbMask(payload.verb),
+    frequency: payload.frequency,
+    payload: payload.payload || null,
+    createdDate: now,
+    lastModifiedDate: now,
+    createdById: 1, // Mock user ID
+    lastModifiedById: 1,
+    serviceByServiceId: service,
+    taskLogByTaskId: null,
   };
 };
 
 // ============================================================================
-// MSW HANDLERS
+// MSW REQUEST HANDLERS
 // ============================================================================
 
 /**
- * GET /api/v2/system/task - List scheduler tasks
- */
-const getSchedulerTasks = http.get('/api/v2/system/task', async ({ request }) => {
-  // Simulate network latency
-  await delay(150 + Math.random() * 100);
-  
-  const url = new URL(request.url);
-  const params = url.searchParams;
-  
-  // Check for test scenarios
-  const scenario = params.get('test_scenario') as SchedulerTestScenario;
-  
-  if (scenario === 'network_error') {
-    return new HttpResponse(null, { status: 0 }); // Network error
-  }
-  
-  if (scenario === 'server_error') {
-    await delay(2000); // Simulate timeout
-    return HttpResponse.json({
-      error: {
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Internal server error occurred',
-        status_code: 500
-      }
-    }, { status: 500 });
-  }
-  
-  if (scenario === 'task_list_empty') {
-    return HttpResponse.json({
-      resource: [],
-      meta: { count: 0, limit: 25, offset: 0 }
-    });
-  }
-  
-  try {
-    const allTasks = getAllTasks(params);
-    const { paginatedTasks, meta } = paginateTasks(allTasks, params);
-    
-    // Check if related fields are requested
-    const fields = params.get('fields');
-    const related = params.get('related');
-    const includeCount = params.get('include_count') === 'true';
-    
-    // Transform tasks to match DreamFactory response format
-    const transformedTasks = paginatedTasks.map(task => ({
-      ...task,
-      // Include related data based on related parameter
-      ...(related?.includes('task_log_by_task_id') && task.taskLogByTaskId && {
-        taskLogByTaskId: task.taskLogByTaskId
-      }),
-      ...(related?.includes('service_by_service_id') && {
-        serviceByServiceId: task.serviceByServiceId
-      })
-    }));
-    
-    const response: TaskListResponse = {
-      resource: transformedTasks,
-      meta: includeCount ? meta : { count: meta.count, limit: meta.limit, offset: meta.offset }
-    };
-    
-    return HttpResponse.json(response);
-    
-  } catch (error) {
-    return HttpResponse.json({
-      error: {
-        code: 'BAD_REQUEST',
-        message: 'Invalid request parameters',
-        status_code: 400
-      }
-    }, { status: 400 });
-  }
-});
-
-/**
- * GET /api/v2/system/task/{id} - Get single scheduler task
- */
-const getSchedulerTask = http.get('/api/v2/system/task/:id', async ({ params, request }) => {
-  await delay(100 + Math.random() * 50);
-  
-  const taskId = parseInt(params.id as string, 10);
-  const url = new URL(request.url);
-  const urlParams = url.searchParams;
-  
-  // Check for test scenarios
-  const scenario = urlParams.get('test_scenario') as SchedulerTestScenario;
-  
-  if (scenario === 'task_update_not_found' || !mockSchedulerTasks.has(taskId)) {
-    return HttpResponse.json({
-      error: {
-        code: 'NOT_FOUND',
-        message: `Scheduler task with ID ${taskId} not found`,
-        status_code: 404
-      }
-    }, { status: 404 });
-  }
-  
-  const task = mockSchedulerTasks.get(taskId)!;
-  const related = urlParams.get('related');
-  
-  // Include related data based on related parameter
-  const responseTask = {
-    ...task,
-    ...(related?.includes('task_log_by_task_id') && task.taskLogByTaskId && {
-      taskLogByTaskId: task.taskLogByTaskId
-    }),
-    ...(related?.includes('service_by_service_id') && {
-      serviceByServiceId: task.serviceByServiceId
-    })
-  };
-  
-  return HttpResponse.json(responseTask);
-});
-
-/**
- * POST /api/v2/system/task - Create scheduler task
- */
-const createSchedulerTask = http.post('/api/v2/system/task', async ({ request }) => {
-  await delay(200 + Math.random() * 150);
-  
-  const url = new URL(request.url);
-  const params = url.searchParams;
-  const scenario = params.get('test_scenario') as SchedulerTestScenario;
-  
-  if (scenario === 'task_creation_validation_error') {
-    return HttpResponse.json({
-      error: {
-        code: 'VALIDATION_ERROR',
-        message: 'Validation failed',
-        status_code: 422,
-        context: {
-          resource: [{
-            message: 'Task name is required and must be unique'
-          }]
-        }
-      }
-    }, { status: 422 });
-  }
-  
-  try {
-    const body = await request.json() as { resource: CreateSchedulePayload[] };
-    const taskData = body.resource[0];
-    
-    // Validate required fields
-    if (!taskData.name || !taskData.serviceId || !taskData.component || !taskData.verb) {
-      return HttpResponse.json({
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Missing required fields',
-          status_code: 422,
-          context: {
-            resource: [{
-              message: 'Name, service, component, and verb are required'
-            }]
-          }
-        }
-      }, { status: 422 });
-    }
-    
-    // Create new task
-    const newTask: SchedulerTask = {
-      id: nextTaskId++,
-      name: taskData.name,
-      description: taskData.description,
-      isActive: taskData.isActive,
-      serviceId: taskData.serviceId,
-      component: taskData.component,
-      frequency: taskData.frequency,
-      payload: taskData.payload,
-      verb: taskData.verb,
-      verbMask: taskData.verbMask,
-      createdDate: new Date().toISOString(),
-      lastModifiedDate: new Date().toISOString(),
-      createdById: 1, // Mock admin user ID
-      lastModifiedById: null,
-      taskLogByTaskId: null,
-      serviceByServiceId: taskData.service as Service
-    };
-    
-    mockSchedulerTasks.set(newTask.id, newTask);
-    
-    // Check if related fields are requested
-    const related = params.get('related');
-    const responseTask = {
-      ...newTask,
-      ...(related?.includes('task_log_by_task_id') && newTask.taskLogByTaskId && {
-        taskLogByTaskId: newTask.taskLogByTaskId
-      }),
-      ...(related?.includes('service_by_service_id') && {
-        serviceByServiceId: newTask.serviceByServiceId
-      })
-    };
-    
-    return HttpResponse.json({
-      resource: [responseTask]
-    }, { status: 201 });
-    
-  } catch (error) {
-    return HttpResponse.json({
-      error: {
-        code: 'BAD_REQUEST',
-        message: 'Invalid JSON payload',
-        status_code: 400
-      }
-    }, { status: 400 });
-  }
-});
-
-/**
- * PUT /api/v2/system/task/{id} - Update scheduler task
- */
-const updateSchedulerTask = http.put('/api/v2/system/task/:id', async ({ params, request }) => {
-  await delay(200 + Math.random() * 150);
-  
-  const taskId = parseInt(params.id as string, 10);
-  const url = new URL(request.url);
-  const urlParams = url.searchParams;
-  const scenario = urlParams.get('test_scenario') as SchedulerTestScenario;
-  
-  if (scenario === 'task_update_not_found' || !mockSchedulerTasks.has(taskId)) {
-    return HttpResponse.json({
-      error: {
-        code: 'NOT_FOUND',
-        message: `Scheduler task with ID ${taskId} not found`,
-        status_code: 404
-      }
-    }, { status: 404 });
-  }
-  
-  try {
-    const updateData = await request.json() as UpdateSchedulePayload;
-    const existingTask = mockSchedulerTasks.get(taskId)!;
-    
-    // Update task
-    const updatedTask: SchedulerTask = {
-      ...existingTask,
-      name: updateData.name || existingTask.name,
-      description: updateData.description !== undefined ? updateData.description : existingTask.description,
-      isActive: updateData.isActive !== undefined ? updateData.isActive : existingTask.isActive,
-      serviceId: updateData.serviceId || existingTask.serviceId,
-      component: updateData.component || existingTask.component,
-      frequency: updateData.frequency || existingTask.frequency,
-      payload: updateData.payload !== undefined ? updateData.payload : existingTask.payload,
-      verb: updateData.verb || existingTask.verb,
-      verbMask: updateData.verbMask || existingTask.verbMask,
-      lastModifiedDate: new Date().toISOString(),
-      lastModifiedById: 1,
-      serviceByServiceId: updateData.service ? updateData.service as Service : existingTask.serviceByServiceId
-    };
-    
-    mockSchedulerTasks.set(taskId, updatedTask);
-    
-    // Check if related fields are requested
-    const related = urlParams.get('related');
-    const responseTask = {
-      ...updatedTask,
-      ...(related?.includes('task_log_by_task_id') && updatedTask.taskLogByTaskId && {
-        taskLogByTaskId: updatedTask.taskLogByTaskId
-      }),
-      ...(related?.includes('service_by_service_id') && {
-        serviceByServiceId: updatedTask.serviceByServiceId
-      })
-    };
-    
-    return HttpResponse.json(responseTask);
-    
-  } catch (error) {
-    return HttpResponse.json({
-      error: {
-        code: 'BAD_REQUEST',
-        message: 'Invalid JSON payload',
-        status_code: 400
-      }
-    }, { status: 400 });
-  }
-});
-
-/**
- * DELETE /api/v2/system/task/{id} - Delete scheduler task
- */
-const deleteSchedulerTask = http.delete('/api/v2/system/task/:id', async ({ params, request }) => {
-  await delay(150 + Math.random() * 100);
-  
-  const taskId = parseInt(params.id as string, 10);
-  const url = new URL(request.url);
-  const urlParams = url.searchParams;
-  const scenario = urlParams.get('test_scenario') as SchedulerTestScenario;
-  
-  if (scenario === 'task_deletion_not_found' || !mockSchedulerTasks.has(taskId)) {
-    return HttpResponse.json({
-      error: {
-        code: 'NOT_FOUND',
-        message: `Scheduler task with ID ${taskId} not found`,
-        status_code: 404
-      }
-    }, { status: 404 });
-  }
-  
-  const deletedTask = mockSchedulerTasks.get(taskId)!;
-  mockSchedulerTasks.delete(taskId);
-  
-  return HttpResponse.json({
-    id: taskId,
-    name: deletedTask.name
-  }, { status: 200 });
-});
-
-/**
- * GET /api/v2/{serviceName}?as_access_list=true - Get service components
- */
-const getServiceComponents = http.get('/api/v2/:serviceName', async ({ params, request }) => {
-  await delay(100 + Math.random() * 75);
-  
-  const serviceName = params.serviceName as string;
-  const url = new URL(request.url);
-  const urlParams = url.searchParams;
-  
-  // Only handle access list requests
-  if (urlParams.get('as_access_list') !== 'true') {
-    return new HttpResponse(null, { status: 404 });
-  }
-  
-  const scenario = urlParams.get('test_scenario') as SchedulerTestScenario;
-  
-  if (scenario === 'service_components_error') {
-    return HttpResponse.json({
-      error: {
-        code: 'SERVICE_UNAVAILABLE',
-        message: 'Service temporarily unavailable',
-        status_code: 503
-      }
-    }, { status: 503 });
-  }
-  
-  // Skip certain system endpoints
-  if (serviceName === 'system' || serviceName === 'user') {
-    return new HttpResponse(null, { status: 404 });
-  }
-  
-  const components = generateServiceComponents(serviceName);
-  
-  return HttpResponse.json({
-    resource: components
-  });
-});
-
-/**
- * GET /api/v2/system/service - Get services list for dropdown
- */
-const getServicesList = http.get('/api/v2/system/service', async ({ request }) => {
-  await delay(120 + Math.random() * 80);
-  
-  const url = new URL(request.url);
-  const params = url.searchParams;
-  
-  // Generate mock services
-  const services: Service[] = [
-    generateMockService(1, 'users_db', 'mysql'),
-    generateMockService(2, 'products_db', 'pgsql'),
-    generateMockService(3, 'analytics_db', 'mongodb'),
-    generateMockService(4, 'files_service', 'rest'),
-    generateMockService(5, 'email_service', 'smtp')
-  ].filter(service => service.isActive); // Only return active services
-  
-  return HttpResponse.json({
-    resource: services
-  });
-});
-
-/**
- * POST /api/v2/system/task/execute/{id} - Execute scheduler task immediately (optional)
- */
-const executeSchedulerTask = http.post('/api/v2/system/task/execute/:id', async ({ params, request }) => {
-  await delay(500 + Math.random() * 1000); // Simulate execution time
-  
-  const taskId = parseInt(params.id as string, 10);
-  const url = new URL(request.url);
-  const urlParams = url.searchParams;
-  const scenario = urlParams.get('test_scenario') as SchedulerTestScenario;
-  
-  if (!mockSchedulerTasks.has(taskId)) {
-    return HttpResponse.json({
-      error: {
-        code: 'NOT_FOUND',
-        message: `Scheduler task with ID ${taskId} not found`,
-        status_code: 404
-      }
-    }, { status: 404 });
-  }
-  
-  const task = mockSchedulerTasks.get(taskId)!;
-  
-  if (scenario === 'task_execution_failure') {
-    // Create error log entry
-    const errorLog = generateMockTaskLog(taskId, 500);
-    task.taskLogByTaskId = errorLog;
-    mockSchedulerTasks.set(taskId, task);
-    
-    return HttpResponse.json({
-      success: false,
-      message: 'Task execution failed',
-      log: errorLog
-    });
-  }
-  
-  // Create success log entry
-  const successLog = generateMockTaskLog(taskId, 200);
-  task.taskLogByTaskId = successLog;
-  mockSchedulerTasks.set(taskId, task);
-  
-  return HttpResponse.json({
-    success: true,
-    message: 'Task executed successfully',
-    log: successLog
-  });
-});
-
-// ============================================================================
-// EXPORTED HANDLERS
-// ============================================================================
-
-/**
- * All scheduler-related MSW handlers
+ * MSW request handlers for scheduler CRUD operations
+ * Supports all DreamFactory Core API v2 endpoints with realistic responses
  */
 export const schedulerHandlers = [
-  getSchedulerTasks,
-  getSchedulerTask,
-  createSchedulerTask,
-  updateSchedulerTask,
-  deleteSchedulerTask,
-  getServiceComponents,
-  getServicesList,
-  executeSchedulerTask
+  // -------------------------------------------------------------------------
+  // GET /api/v2/system/scheduler - List all scheduler tasks
+  // -------------------------------------------------------------------------
+  rest.get('/api/v2/system/scheduler', async (req, res, ctx) => {
+    const url = new URL(req.url);
+    const limit = parseInt(url.searchParams.get('limit') || '25');
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const filter = url.searchParams.get('filter');
+    const fields = url.searchParams.get('fields');
+    const related = url.searchParams.get('related');
+
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, generateDelay()));
+
+    try {
+      let filteredTasks = [...mockSchedulerTasks];
+
+      // Apply filtering if specified
+      if (filter) {
+        const filterLower = filter.toLowerCase();
+        filteredTasks = filteredTasks.filter(task =>
+          task.name.toLowerCase().includes(filterLower) ||
+          (task.description && task.description.toLowerCase().includes(filterLower))
+        );
+      }
+
+      // Apply pagination
+      const paginatedTasks = filteredTasks.slice(offset, offset + limit);
+
+      // Handle field selection
+      let responseTasks = paginatedTasks;
+      if (fields && fields !== '*') {
+        const selectedFields = fields.split(',');
+        responseTasks = paginatedTasks.map(task => {
+          const filteredTask: any = {};
+          selectedFields.forEach(field => {
+            if (field.trim() in task) {
+              filteredTask[field.trim()] = (task as any)[field.trim()];
+            }
+          });
+          return filteredTask;
+        });
+      }
+
+      // Handle related data inclusion
+      if (related && related.includes('task_log_by_task_id')) {
+        responseTasks = responseTasks.map(task => ({
+          ...task,
+          taskLogByTaskId: task.taskLogByTaskId,
+        }));
+      }
+
+      const response: ApiListResponse<SchedulerTaskData> = {
+        resource: responseTasks,
+        meta: {
+          count: filteredTasks.length,
+          offset,
+          limit,
+          has_next: offset + limit < filteredTasks.length,
+          has_previous: offset > 0,
+          page_count: Math.ceil(filteredTasks.length / limit),
+        },
+        timestamp: generateTimestamp(),
+        request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+      };
+
+      return res(ctx.status(200), ctx.json(response));
+    } catch (error) {
+      const errorResponse: ApiErrorResponse = {
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Internal server error occurred while fetching scheduler tasks',
+          status_code: 500,
+          context: error instanceof Error ? error.message : 'Unknown error',
+        },
+        timestamp: generateTimestamp(),
+        request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+      };
+
+      return res(ctx.status(500), ctx.json(errorResponse));
+    }
+  }),
+
+  // -------------------------------------------------------------------------
+  // GET /api/v2/system/scheduler/{id} - Get specific scheduler task
+  // -------------------------------------------------------------------------
+  rest.get('/api/v2/system/scheduler/:id', async (req, res, ctx) => {
+    const { id } = req.params;
+    const taskId = parseInt(id as string);
+
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, generateDelay()));
+
+    const task = mockSchedulerTasks.find(t => t.id === taskId);
+
+    if (!task) {
+      const errorResponse: ApiErrorResponse = {
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: `Scheduler task with ID ${taskId} not found`,
+          status_code: 404,
+        },
+        timestamp: generateTimestamp(),
+        request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+      };
+
+      return res(ctx.status(404), ctx.json(errorResponse));
+    }
+
+    const response: ApiResourceResponse<SchedulerTaskData> = {
+      resource: task,
+      timestamp: generateTimestamp(),
+      request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+    };
+
+    return res(ctx.status(200), ctx.json(response));
+  }),
+
+  // -------------------------------------------------------------------------
+  // POST /api/v2/system/scheduler - Create new scheduler task
+  // -------------------------------------------------------------------------
+  rest.post('/api/v2/system/scheduler', async (req, res, ctx) => {
+    try {
+      const body = await req.json();
+      
+      // Handle both single resource and bulk resource creation
+      const resource = body.resource || [body];
+      
+      if (!Array.isArray(resource) || resource.length === 0) {
+        const errorResponse: ApiErrorResponse = {
+          success: false,
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'Request must contain resource array or single resource',
+            status_code: 400,
+          },
+          timestamp: generateTimestamp(),
+          request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+        };
+
+        return res(ctx.status(400), ctx.json(errorResponse));
+      }
+
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, generateDelay()));
+
+      // Validate and create tasks
+      const createdTasks: SchedulerTaskData[] = [];
+      const errors: any[] = [];
+
+      for (let i = 0; i < resource.length; i++) {
+        const payload = resource[i] as CreateSchedulerTaskPayload;
+        const validationErrors = validateTaskPayload(payload);
+
+        if (validationErrors.length > 0) {
+          errors.push({
+            index: i,
+            errors: validationErrors,
+          });
+          continue;
+        }
+
+        try {
+          const newTask = createTaskFromPayload(payload);
+          mockSchedulerTasks.push(newTask);
+          createdTasks.push(newTask);
+        } catch (error) {
+          errors.push({
+            index: i,
+            errors: [error instanceof Error ? error.message : 'Unknown error'],
+          });
+        }
+      }
+
+      if (errors.length > 0 && createdTasks.length === 0) {
+        // All tasks failed validation
+        const errorResponse: ApiErrorResponse = {
+          success: false,
+          error: {
+            code: 'VALIDATION_FAILED',
+            message: 'Validation failed for scheduler task creation',
+            status_code: 422,
+            context: {
+              resource: errors,
+            },
+          },
+          timestamp: generateTimestamp(),
+          request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+        };
+
+        return res(ctx.status(422), ctx.json(errorResponse));
+      }
+
+      // Return created tasks
+      const response: ApiListResponse<SchedulerTaskData> = {
+        resource: createdTasks,
+        meta: {
+          count: createdTasks.length,
+          offset: 0,
+          limit: createdTasks.length,
+          success_count: createdTasks.length,
+          error_count: errors.length,
+        },
+        timestamp: generateTimestamp(),
+        request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+      };
+
+      return res(ctx.status(201), ctx.json(response));
+
+    } catch (error) {
+      const errorResponse: ApiErrorResponse = {
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Internal server error occurred during task creation',
+          status_code: 500,
+          context: error instanceof Error ? error.message : 'Unknown error',
+        },
+        timestamp: generateTimestamp(),
+        request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+      };
+
+      return res(ctx.status(500), ctx.json(errorResponse));
+    }
+  }),
+
+  // -------------------------------------------------------------------------
+  // PUT /api/v2/system/scheduler/{id} - Update scheduler task
+  // -------------------------------------------------------------------------
+  rest.put('/api/v2/system/scheduler/:id', async (req, res, ctx) => {
+    const { id } = req.params;
+    const taskId = parseInt(id as string);
+
+    try {
+      const payload = await req.json() as UpdateSchedulerTaskPayload;
+
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, generateDelay()));
+
+      const taskIndex = mockSchedulerTasks.findIndex(t => t.id === taskId);
+
+      if (taskIndex === -1) {
+        const errorResponse: ApiErrorResponse = {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: `Scheduler task with ID ${taskId} not found`,
+            status_code: 404,
+          },
+          timestamp: generateTimestamp(),
+          request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+        };
+
+        return res(ctx.status(404), ctx.json(errorResponse));
+      }
+
+      const validationErrors = validateUpdateTaskPayload(taskId, payload);
+
+      if (validationErrors.length > 0) {
+        const errorResponse: ApiErrorResponse = {
+          success: false,
+          error: {
+            code: 'VALIDATION_FAILED',
+            message: 'Validation failed for scheduler task update',
+            status_code: 422,
+            context: {
+              errors: validationErrors,
+            },
+          },
+          timestamp: generateTimestamp(),
+          request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+        };
+
+        return res(ctx.status(422), ctx.json(errorResponse));
+      }
+
+      const service = findServiceById(payload.serviceId);
+      if (!service) {
+        const errorResponse: ApiErrorResponse = {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: `Service with ID ${payload.serviceId} not found`,
+            status_code: 404,
+          },
+          timestamp: generateTimestamp(),
+          request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+        };
+
+        return res(ctx.status(404), ctx.json(errorResponse));
+      }
+
+      // Update the task
+      const updatedTask: SchedulerTaskData = {
+        ...mockSchedulerTasks[taskIndex],
+        name: payload.name,
+        description: payload.description || null,
+        isActive: payload.isActive,
+        serviceId: payload.serviceId,
+        component: payload.component,
+        verb: payload.verb.toUpperCase() as any,
+        verbMask: getVerbMask(payload.verb),
+        frequency: payload.frequency,
+        payload: payload.payload || null,
+        lastModifiedDate: generateTimestamp(),
+        lastModifiedById: 1,
+        serviceByServiceId: service,
+      };
+
+      mockSchedulerTasks[taskIndex] = updatedTask;
+
+      const response: ApiResourceResponse<SchedulerTaskData> = {
+        resource: updatedTask,
+        timestamp: generateTimestamp(),
+        request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+      };
+
+      return res(ctx.status(200), ctx.json(response));
+
+    } catch (error) {
+      const errorResponse: ApiErrorResponse = {
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Internal server error occurred during task update',
+          status_code: 500,
+          context: error instanceof Error ? error.message : 'Unknown error',
+        },
+        timestamp: generateTimestamp(),
+        request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+      };
+
+      return res(ctx.status(500), ctx.json(errorResponse));
+    }
+  }),
+
+  // -------------------------------------------------------------------------
+  // DELETE /api/v2/system/scheduler/{id} - Delete scheduler task
+  // -------------------------------------------------------------------------
+  rest.delete('/api/v2/system/scheduler/:id', async (req, res, ctx) => {
+    const { id } = req.params;
+    const taskId = parseInt(id as string);
+
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, generateDelay()));
+
+    const taskIndex = mockSchedulerTasks.findIndex(t => t.id === taskId);
+
+    if (taskIndex === -1) {
+      const errorResponse: ApiErrorResponse = {
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: `Scheduler task with ID ${taskId} not found`,
+          status_code: 404,
+        },
+        timestamp: generateTimestamp(),
+        request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+      };
+
+      return res(ctx.status(404), ctx.json(errorResponse));
+    }
+
+    // Remove the task
+    mockSchedulerTasks.splice(taskIndex, 1);
+
+    const response: ApiSuccessResponse = {
+      success: true,
+      message: `Scheduler task with ID ${taskId} has been deleted successfully`,
+      timestamp: generateTimestamp(),
+      request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+    };
+
+    return res(ctx.status(200), ctx.json(response));
+  }),
+
+  // -------------------------------------------------------------------------
+  // GET /api/{serviceName} - Get service access list (for component dropdown)
+  // -------------------------------------------------------------------------
+  rest.get('/api/:serviceName', async (req, res, ctx) => {
+    const { serviceName } = req.params;
+    const url = new URL(req.url);
+    const asAccessList = url.searchParams.get('as_access_list');
+
+    // Only handle access list requests
+    if (asAccessList !== 'true') {
+      return req.passthrough();
+    }
+
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, generateDelay()));
+
+    const components = mockServiceComponents[serviceName as string];
+
+    if (!components) {
+      const errorResponse: ApiErrorResponse = {
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: `Service '${serviceName}' not found or has no accessible components`,
+          status_code: 404,
+        },
+        timestamp: generateTimestamp(),
+        request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+      };
+
+      return res(ctx.status(404), ctx.json(errorResponse));
+    }
+
+    const response: ApiListResponse<string> = {
+      resource: components,
+      meta: {
+        count: components.length,
+        offset: 0,
+        limit: components.length,
+      },
+      timestamp: generateTimestamp(),
+      request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+    };
+
+    return res(ctx.status(200), ctx.json(response));
+  }),
+
+  // -------------------------------------------------------------------------
+  // GET /api/v2/system/service - Get available services (for dropdown)
+  // -------------------------------------------------------------------------
+  rest.get('/api/v2/system/service', async (req, res, ctx) => {
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, generateDelay()));
+
+    const response: ApiListResponse<Service> = {
+      resource: mockServices,
+      meta: {
+        count: mockServices.length,
+        offset: 0,
+        limit: mockServices.length,
+      },
+      timestamp: generateTimestamp(),
+      request_id: `req_${Math.random().toString(36).substr(2, 9)}`,
+    };
+
+    return res(ctx.status(200), ctx.json(response));
+  }),
+
+  // -------------------------------------------------------------------------
+  // Error simulation handlers for testing edge cases
+  // -------------------------------------------------------------------------
+
+  // Simulate connection timeout
+  rest.get('/api/v2/system/scheduler/timeout', async (req, res, ctx) => {
+    await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
+    return res(ctx.status(408), ctx.json({
+      success: false,
+      error: {
+        code: 'REQUEST_TIMEOUT',
+        message: 'Request timeout occurred',
+        status_code: 408,
+      },
+    }));
+  }),
+
+  // Simulate server error
+  rest.get('/api/v2/system/scheduler/server-error', async (req, res, ctx) => {
+    return res(ctx.status(500), ctx.json({
+      success: false,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Internal server error for testing',
+        status_code: 500,
+      },
+    }));
+  }),
+
+  // Simulate authentication error
+  rest.get('/api/v2/system/scheduler/auth-error', async (req, res, ctx) => {
+    return res(ctx.status(401), ctx.json({
+      success: false,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required',
+        status_code: 401,
+      },
+    }));
+  }),
+
+  // Simulate permission denied
+  rest.get('/api/v2/system/scheduler/forbidden', async (req, res, ctx) => {
+    return res(ctx.status(403), ctx.json({
+      success: false,
+      error: {
+        code: 'FORBIDDEN',
+        message: 'Insufficient permissions to access scheduler',
+        status_code: 403,
+      },
+    }));
+  }),
 ];
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
 
 /**
- * Default export for convenience
+ * Default export of all scheduler-related MSW handlers
+ * Can be imported and used in test setup or development server
  */
-export default schedulerHandlers;
+export const handlers = schedulerHandlers;
 
 /**
- * Named exports for specific handler groups
+ * Export individual handler groups for granular usage
  */
-export const schedulerCrudHandlers = [
-  getSchedulerTasks,
-  getSchedulerTask,
-  createSchedulerTask,
-  updateSchedulerTask,
-  deleteSchedulerTask
-];
-
-export const schedulerServiceHandlers = [
-  getServiceComponents,
-  getServicesList
-];
-
-export const schedulerExecutionHandlers = [
-  executeSchedulerTask
-];
-
-/**
- * Test scenario helpers for automated testing
- */
-export const schedulerTestScenarios = {
-  /**
-   * Reset mock data to initial state
-   */
-  resetMockData: (): void => {
-    mockSchedulerTasks.clear();
-    nextTaskId = 1;
-    initializeMockData();
-  },
-  
-  /**
-   * Add custom mock task for testing
-   */
-  addMockTask: (task: Partial<SchedulerTask>): SchedulerTask => {
-    const mockTask = generateMockSchedulerTask(nextTaskId++, task);
-    mockSchedulerTasks.set(mockTask.id, mockTask);
-    return mockTask;
-  },
-  
-  /**
-   * Get current mock task count
-   */
-  getTaskCount: (): number => mockSchedulerTasks.size,
-  
-  /**
-   * Clear all mock tasks
-   */
-  clearAllTasks: (): void => {
-    mockSchedulerTasks.clear();
-  }
+export {
+  schedulerHandlers,
+  mockSchedulerTasks,
+  mockServices,
+  mockServiceComponents,
 };
 
 /**
- * Utility functions for MSW testing
+ * Export mock data for use in component tests
  */
-export const schedulerMockUtils = {
-  generateMockSchedulerTask,
-  generateMockTaskLog,
-  generateMockService,
-  generateServiceComponents,
-  getVerbMask
+export const mockData = {
+  schedulerTasks: mockSchedulerTasks,
+  services: mockServices,
+  serviceComponents: mockServiceComponents,
+};
+
+/**
+ * Export utility functions for testing
+ */
+export const testUtils = {
+  generateDelay,
+  generateTimestamp,
+  getVerbMask,
+  validateTaskPayload,
+  validateUpdateTaskPayload,
+  findServiceById,
+  createTaskFromPayload,
 };
