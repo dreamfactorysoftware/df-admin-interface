@@ -1,440 +1,401 @@
 'use client';
 
-import React, { Component, ReactNode } from 'react';
-import { RefreshCcw, AlertTriangle, Shield, Users, Home, ArrowLeft } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-// Types for error classification and handling
-interface AdminError {
-  type: 'validation' | 'permission' | 'network' | 'server' | 'unknown';
-  code?: string;
-  message: string;
-  field?: string;
-  context?: Record<string, any>;
+// Types for error handling
+interface ErrorInfo {
+  componentStack: string;
+  errorBoundary?: string;
 }
 
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: AdminError | null;
-  errorId: string | null;
-  retryCount: number;
-  isRetrying: boolean;
+interface AdminCreationError extends Error {
+  code?: string;
+  field?: string;
+  context?: {
+    resource?: Array<{ message: string }>;
+  };
+  response?: {
+    status: number;
+    data?: {
+      error?: {
+        message: string;
+        context?: {
+          resource?: Array<{ message: string }>;
+        };
+      };
+    };
+  };
 }
 
 interface ErrorBoundaryProps {
-  children: ReactNode;
-  fallback?: ReactNode;
-  onError?: (error: AdminError, errorInfo: React.ErrorInfo) => void;
+  error: AdminCreationError;
+  reset: () => void;
 }
 
-// Error classification utility matching Angular parseError patterns
-function classifyAdminError(error: Error): AdminError {
-  const message = error.message || 'An unexpected error occurred';
-  
-  // Network errors
-  if (message.includes('fetch') || message.includes('network') || message.includes('connection')) {
-    return {
-      type: 'network',
-      message: 'Network connection failed. Please check your internet connection and try again.',
-      code: 'NETWORK_ERROR'
-    };
+// Error parsing utility equivalent to Angular parseError
+const parseAdminError = (errorString: string | null): string => {
+  if (!errorString) {
+    return 'An unexpected error occurred during admin creation';
   }
-  
-  // Permission errors
-  if (message.includes('403') || message.includes('unauthorized') || message.includes('permission')) {
-    return {
-      type: 'permission',
-      message: 'You do not have permission to create administrator accounts. Please contact your system administrator.',
-      code: 'PERMISSION_DENIED'
-    };
-  }
-  
-  // Validation errors - matching Angular parseError patterns
-  if (message.includes('Duplicate entry') && message.includes('user_email_unique')) {
-    return {
-      type: 'validation',
-      message: 'This email address is already registered. Please use a different email address.',
-      code: 'DUPLICATE_EMAIL',
-      field: 'email'
-    };
-  }
-  
-  if (message.includes('validation') || message.includes('invalid') || message.includes('required')) {
-    return {
-      type: 'validation',
-      message: 'Please check your input and correct any validation errors.',
-      code: 'VALIDATION_ERROR'
-    };
-  }
-  
-  // Server errors
-  if (message.includes('500') || message.includes('server') || message.includes('internal')) {
-    return {
-      type: 'server',
-      message: 'The server encountered an error. Please try again in a few moments.',
-      code: 'SERVER_ERROR'
-    };
-  }
-  
-  // Unknown errors
-  return {
-    type: 'unknown',
-    message: message || 'An unexpected error occurred while creating the administrator account.',
-    code: 'UNKNOWN_ERROR'
-  };
-}
 
-// Error logging utility (interface for future implementation)
-function logError(error: AdminError, errorInfo: React.ErrorInfo, context: Record<string, any> = {}) {
-  const errorLog = {
-    ...error,
-    stack: errorInfo.componentStack,
+  const errorPatterns = [
+    {
+      regex: /Duplicate entry '([^']+)' for key 'user_email_unique'/,
+      message: 'An admin with this email address already exists',
+    },
+    {
+      regex: /Duplicate entry '([^']+)' for key 'user_username_unique'/,
+      message: 'An admin with this username already exists',
+    },
+    {
+      regex: /Password must be at least (\d+) characters/,
+      message: 'Password must be at least 16 characters long',
+    },
+    {
+      regex: /Email format is invalid/,
+      message: 'Please enter a valid email address',
+    },
+    {
+      regex: /Access denied|Permission denied|Unauthorized/i,
+      message: 'You do not have permission to create administrators',
+    },
+    {
+      regex: /Network error|Failed to fetch/i,
+      message: 'Network connection error. Please check your connection and try again',
+    },
+    {
+      regex: /Validation failed/i,
+      message: 'Please check your form inputs and correct any errors',
+    },
+    {
+      regex: /Rate limit exceeded/i,
+      message: 'Too many requests. Please wait a moment before trying again',
+    },
+    {
+      regex: /Server error|Internal server error/i,
+      message: 'Server error occurred. Please try again later',
+    },
+  ];
+
+  const matchedError = errorPatterns.find(pattern => 
+    pattern.regex.test(errorString)
+  );
+
+  return matchedError ? matchedError.message : errorString;
+};
+
+// Error logging utility
+const logError = async (error: AdminCreationError, errorInfo?: ErrorInfo) => {
+  const errorData = {
+    message: error.message,
+    stack: error.stack,
+    componentStack: errorInfo?.componentStack,
+    code: error.code,
+    field: error.field,
+    context: error.context,
+    response: error.response,
     timestamp: new Date().toISOString(),
-    context: {
-      route: '/adf-admins/create',
-      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'unknown',
-      ...context
-    }
+    route: '/adf-admins/create',
+    userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : undefined,
+    url: typeof window !== 'undefined' ? window.location.href : undefined,
   };
-  
-  // Console logging for development
-  console.error('Admin Creation Error:', errorLog);
-  
-  // TODO: Integrate with error-logger.ts when available
-  // errorLogger.logError(errorLog);
-}
 
-// Recovery suggestions based on error type
-function getRecoveryActions(error: AdminError): Array<{ label: string; action: string; primary?: boolean }> {
-  switch (error.type) {
-    case 'network':
-      return [
-        { label: 'Try Again', action: 'retry', primary: true },
-        { label: 'Check Connection', action: 'check-network' },
-        { label: 'Go Back', action: 'back' }
-      ];
-    
-    case 'permission':
-      return [
-        { label: 'Contact Administrator', action: 'contact-admin', primary: true },
-        { label: 'View Admin List', action: 'admin-list' },
-        { label: 'Go Home', action: 'home' }
-      ];
-    
-    case 'validation':
-      return [
-        { label: 'Go Back to Form', action: 'back', primary: true },
-        { label: 'Clear Form', action: 'clear-form' }
-      ];
-    
-    case 'server':
-      return [
-        { label: 'Try Again', action: 'retry', primary: true },
-        { label: 'Wait and Retry', action: 'delayed-retry' },
-        { label: 'Go Back', action: 'back' }
-      ];
-    
-    default:
-      return [
-        { label: 'Try Again', action: 'retry', primary: true },
-        { label: 'Go Back', action: 'back' },
-        { label: 'Go Home', action: 'home' }
-      ];
+  // In production, this would send to monitoring service
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      await fetch('/api/error-reporting', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(errorData),
+      });
+    } catch (reportingError) {
+      console.error('Failed to report error:', reportingError);
+    }
+  } else {
+    console.error('Admin Creation Error:', errorData);
   }
-}
+};
 
-// Error icon component with animation
-function ErrorIcon({ type }: { type: AdminError['type'] }) {
-  const iconClass = "w-16 h-16 mx-auto mb-4 animate-pulse";
-  
-  switch (type) {
-    case 'permission':
-      return <Shield className={`${iconClass} text-red-500`} aria-hidden="true" />;
-    case 'validation':
-      return <Users className={`${iconClass} text-amber-500`} aria-hidden="true" />;
-    case 'network':
-      return <RefreshCcw className={`${iconClass} text-blue-500`} aria-hidden="true" />;
-    default:
-      return <AlertTriangle className={`${iconClass} text-red-500`} aria-hidden="true" />;
+// Error recovery utility
+const getRecoveryActions = (error: AdminCreationError) => {
+  const actions = [];
+
+  // Network errors - retry action
+  if (error.message.includes('Network') || error.message.includes('fetch')) {
+    actions.push({
+      type: 'retry',
+      label: 'Try Again',
+      description: 'Retry the admin creation process',
+    });
   }
-}
 
-// Action button component
-function ActionButton({ 
-  label, 
-  action, 
-  primary = false, 
-  loading = false, 
-  onClick 
-}: { 
-  label: string; 
-  action: string; 
-  primary?: boolean; 
-  loading?: boolean; 
-  onClick: (action: string) => void; 
-}) {
-  const baseClasses = "px-4 py-2 rounded-md font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
-  const primaryClasses = "bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500";
-  const secondaryClasses = "bg-gray-200 hover:bg-gray-300 text-gray-900 focus:ring-gray-500 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100 dark:focus:ring-gray-400";
-  
+  // Validation errors - edit action
+  if (error.message.includes('Validation') || error.message.includes('required')) {
+    actions.push({
+      type: 'edit',
+      label: 'Edit Form',
+      description: 'Go back to review and correct the form',
+    });
+  }
+
+  // Permission errors - contact admin action
+  if (error.message.includes('permission') || error.message.includes('Unauthorized')) {
+    actions.push({
+      type: 'contact',
+      label: 'Contact Administrator',
+      description: 'Request admin creation permissions',
+    });
+  }
+
+  // Duplicate entry errors - suggest alternatives
+  if (error.message.includes('already exists')) {
+    actions.push({
+      type: 'edit',
+      label: 'Use Different Details',
+      description: 'Try with a different email or username',
+    });
+  }
+
+  // Default fallback actions
+  actions.push({
+    type: 'navigate',
+    label: 'Return to Admin List',
+    description: 'Go back to the administrators list',
+  });
+
+  return actions;
+};
+
+// Error message component
+const ErrorMessage = ({ error, onRetry, onEdit, onNavigate }: {
+  error: AdminCreationError;
+  onRetry: () => void;
+  onEdit: () => void;
+  onNavigate: () => void;
+}) => {
+  const parsedMessage = parseAdminError(error.message);
+  const recoveryActions = getRecoveryActions(error);
+
   return (
-    <button
-      className={`${baseClasses} ${primary ? primaryClasses : secondaryClasses}`}
-      onClick={() => onClick(action)}
-      disabled={loading}
-      aria-label={loading ? `${label} - Loading` : label}
+    <div 
+      className="rounded-md bg-red-50 p-4 border border-red-200"
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
     >
-      {loading && (
-        <RefreshCcw className="w-4 h-4 mr-2 animate-spin inline" aria-hidden="true" />
-      )}
-      {label}
-    </button>
+      <div className="flex">
+        <div className="flex-shrink-0">
+          <svg 
+            className="h-5 w-5 text-red-400" 
+            viewBox="0 0 20 20" 
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path 
+              fillRule="evenodd" 
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" 
+              clipRule="evenodd" 
+            />
+          </svg>
+        </div>
+        <div className="ml-3 flex-1">
+          <h3 className="text-sm font-medium text-red-800">
+            Admin Creation Failed
+          </h3>
+          <div className="mt-2 text-sm text-red-700">
+            <p>{parsedMessage}</p>
+          </div>
+          {recoveryActions.length > 0 && (
+            <div className="mt-4">
+              <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
+                {recoveryActions.map((action, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => {
+                      switch (action.type) {
+                        case 'retry':
+                          onRetry();
+                          break;
+                        case 'edit':
+                          onEdit();
+                          break;
+                        case 'navigate':
+                          onNavigate();
+                          break;
+                        case 'contact':
+                          // In a real app, this might open a contact form or email
+                          alert('Please contact your system administrator for assistance.');
+                          break;
+                      }
+                    }}
+                    className={`
+                      inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold shadow-sm
+                      transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2
+                      ${index === 0 
+                        ? 'bg-red-600 text-white hover:bg-red-500 focus:ring-red-500' 
+                        : 'bg-white text-red-600 border border-red-300 hover:bg-red-50 focus:ring-red-500'
+                      }
+                    `}
+                    aria-label={`${action.label}: ${action.description}`}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Loading spinner component for retry operations
+const LoadingSpinner = () => (
+  <div 
+    className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]"
+    role="status"
+    aria-label="Loading"
+  >
+    <span className="sr-only">Loading...</span>
+  </div>
+);
+
+// Main error boundary component
+export default function AdminCreateError({ error, reset }: ErrorBoundaryProps) {
+  const router = useRouter();
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
+
+  // Log error on mount and when error changes
+  useEffect(() => {
+    logError(error);
+  }, [error]);
+
+  // Handle retry with exponential backoff for transient errors
+  const handleRetry = async () => {
+    if (retryCount >= maxRetries) {
+      alert('Maximum retry attempts reached. Please try again later or contact support.');
+      return;
+    }
+
+    setIsRetrying(true);
+    setRetryCount(prev => prev + 1);
+
+    // Exponential backoff: 1s, 2s, 4s
+    const delay = Math.pow(2, retryCount) * 1000;
+    
+    setTimeout(() => {
+      setIsRetrying(false);
+      reset();
+    }, delay);
+  };
+
+  // Handle editing - reload the page to reset form state
+  const handleEdit = () => {
+    window.location.reload();
+  };
+
+  // Handle navigation to admin list
+  const handleNavigate = () => {
+    router.push('/adf-admins');
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-md">
+        <div className="text-center mb-8">
+          <svg 
+            className="mx-auto h-12 w-12 text-red-400" 
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.996-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" 
+            />
+          </svg>
+          <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-900">
+            Something went wrong
+          </h1>
+          <p className="mt-2 text-base text-gray-500">
+            An error occurred while creating the administrator account.
+          </p>
+        </div>
+
+        {isRetrying ? (
+          <div 
+            className="text-center"
+            role="status"
+            aria-live="polite"
+          >
+            <LoadingSpinner />
+            <p className="mt-2 text-sm text-gray-600">
+              Retrying... (Attempt {retryCount + 1} of {maxRetries})
+            </p>
+          </div>
+        ) : (
+          <ErrorMessage
+            error={error}
+            onRetry={handleRetry}
+            onEdit={handleEdit}
+            onNavigate={handleNavigate}
+          />
+        )}
+
+        {/* Error details for development */}
+        {process.env.NODE_ENV === 'development' && (
+          <details className="mt-8 p-4 bg-gray-100 rounded-md">
+            <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
+              Error Details (Development)
+            </summary>
+            <div className="mt-2 text-xs text-gray-600 font-mono">
+              <p><strong>Message:</strong> {error.message}</p>
+              {error.code && <p><strong>Code:</strong> {error.code}</p>}
+              {error.field && <p><strong>Field:</strong> {error.field}</p>}
+              {error.stack && (
+                <div className="mt-2">
+                  <strong>Stack:</strong>
+                  <pre className="whitespace-pre-wrap mt-1">{error.stack}</pre>
+                </div>
+              )}
+            </div>
+          </details>
+        )}
+
+        {/* Accessibility announcements */}
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {error.message && `Error: ${parseAdminError(error.message)}`}
+        </div>
+      </div>
+    </div>
   );
 }
 
-// Main error boundary component
-export default class AdminCreateErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  private maxRetries = 3;
-  private retryTimeouts: NodeJS.Timeout[] = [];
+// Error boundary hook for additional error handling
+export const useAdminErrorHandler = () => {
+  const router = useRouter();
 
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-      errorId: null,
-      retryCount: 0,
-      isRetrying: false
-    };
-  }
+  const handleError = (error: AdminCreationError) => {
+    // Log error
+    logError(error);
 
-  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
-    const classifiedError = classifyAdminError(error);
-    const errorId = `admin-create-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    return {
-      hasError: true,
-      error: classifiedError,
-      errorId,
-      isRetrying: false
-    };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    const classifiedError = classifyAdminError(error);
-    
-    // Log error for monitoring and debugging
-    logError(classifiedError, errorInfo, {
-      retryCount: this.state.retryCount,
-      errorId: this.state.errorId
-    });
-    
-    // Call optional onError callback
-    if (this.props.onError) {
-      this.props.onError(classifiedError, errorInfo);
-    }
-  }
-
-  componentWillUnmount() {
-    // Clear any pending retry timeouts
-    this.retryTimeouts.forEach(timeout => clearTimeout(timeout));
-  }
-
-  handleRetry = () => {
-    if (this.state.retryCount >= this.maxRetries) {
-      return;
-    }
-    
-    this.setState({ isRetrying: true });
-    
-    // Exponential backoff for retries
-    const delay = Math.pow(2, this.state.retryCount) * 1000; // 1s, 2s, 4s
-    
-    const timeout = setTimeout(() => {
-      this.setState(prevState => ({
-        hasError: false,
-        error: null,
-        errorId: null,
-        retryCount: prevState.retryCount + 1,
-        isRetrying: false
-      }));
-    }, delay);
-    
-    this.retryTimeouts.push(timeout);
-  };
-
-  handleAction = (action: string) => {
-    switch (action) {
-      case 'retry':
-        this.handleRetry();
-        break;
-      case 'delayed-retry':
-        // Longer delay for server errors
-        this.setState({ isRetrying: true });
-        const timeout = setTimeout(() => {
-          this.handleRetry();
-        }, 5000);
-        this.retryTimeouts.push(timeout);
-        break;
-      case 'back':
-        if (typeof window !== 'undefined') {
-          window.history.back();
-        }
-        break;
-      case 'admin-list':
-        if (typeof window !== 'undefined') {
-          window.location.href = '/adf-admins';
-        }
-        break;
-      case 'home':
-        if (typeof window !== 'undefined') {
-          window.location.href = '/';
-        }
-        break;
-      case 'check-network':
-        // Open network settings or provide guidance
-        alert('Please check your internet connection and try again.');
-        break;
-      case 'contact-admin':
-        // Could integrate with help system
-        alert('Please contact your system administrator for assistance.');
-        break;
-      case 'clear-form':
-        if (typeof window !== 'undefined') {
-          window.location.reload();
-        }
-        break;
-      default:
-        console.warn(`Unknown action: ${action}`);
+    // Navigate to error page if not in error boundary
+    if (error.response?.status === 403) {
+      router.push('/unauthorized');
+    } else if (error.response?.status === 404) {
+      router.push('/not-found');
     }
   };
 
-  render() {
-    if (this.state.hasError && this.state.error) {
-      const { error } = this.state;
-      const actions = getRecoveryActions(error);
-      const canRetry = this.state.retryCount < this.maxRetries && 
-                      (error.type === 'network' || error.type === 'server');
-
-      return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 sm:px-6 lg:px-8">
-          <div className="max-w-md w-full space-y-8">
-            {/* Error announcement for screen readers */}
-            <div 
-              role="alert" 
-              aria-live="assertive" 
-              className="sr-only"
-              aria-describedby="error-title error-description"
-            >
-              Admin creation error: {error.message}
-            </div>
-            
-            <div className="text-center">
-              {/* Error icon */}
-              <ErrorIcon type={error.type} />
-              
-              {/* Error title */}
-              <h1 
-                id="error-title"
-                className="mt-6 text-3xl font-extrabold text-gray-900 dark:text-gray-100"
-              >
-                {error.type === 'permission' && 'Access Denied'}
-                {error.type === 'validation' && 'Validation Error'}
-                {error.type === 'network' && 'Connection Error'}
-                {error.type === 'server' && 'Server Error'}
-                {error.type === 'unknown' && 'Unexpected Error'}
-              </h1>
-              
-              {/* Error description */}
-              <p 
-                id="error-description"
-                className="mt-2 text-sm text-gray-600 dark:text-gray-400 leading-relaxed"
-              >
-                {error.message}
-              </p>
-              
-              {/* Error details for debugging */}
-              {error.code && (
-                <details className="mt-4 text-xs text-gray-500 dark:text-gray-500">
-                  <summary className="cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
-                    Technical Details
-                  </summary>
-                  <div className="mt-2 text-left bg-gray-100 dark:bg-gray-800 p-2 rounded">
-                    <p><strong>Error Code:</strong> {error.code}</p>
-                    {error.field && <p><strong>Field:</strong> {error.field}</p>}
-                    {this.state.errorId && <p><strong>Error ID:</strong> {this.state.errorId}</p>}
-                    <p><strong>Retry Count:</strong> {this.state.retryCount}/{this.maxRetries}</p>
-                  </div>
-                </details>
-              )}
-            </div>
-            
-            {/* Action buttons */}
-            <div className="mt-8 space-y-4">
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                {actions.map((action, index) => (
-                  <ActionButton
-                    key={`${action.action}-${index}`}
-                    label={action.label}
-                    action={action.action}
-                    primary={action.primary}
-                    loading={this.state.isRetrying && (action.action === 'retry' || action.action === 'delayed-retry')}
-                    onClick={this.handleAction}
-                  />
-                ))}
-              </div>
-              
-              {/* Retry information */}
-              {canRetry && (
-                <div className="text-center">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Retry {this.state.retryCount + 1} of {this.maxRetries} attempts
-                  </p>
-                </div>
-              )}
-              
-              {/* Maximum retries reached */}
-              {this.state.retryCount >= this.maxRetries && error.type !== 'permission' && (
-                <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
-                  <div className="flex items-center">
-                    <AlertTriangle className="w-5 h-5 text-amber-400 mr-2" aria-hidden="true" />
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
-                      Maximum retry attempts reached. Please contact support if the issue persists.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Navigation helpers */}
-            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-center space-x-6 text-sm">
-                <button
-                  onClick={() => this.handleAction('admin-list')}
-                  className="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                  aria-label="Return to administrator list"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-1" aria-hidden="true" />
-                  Admin List
-                </button>
-                <button
-                  onClick={() => this.handleAction('home')}
-                  className="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                  aria-label="Return to home page"
-                >
-                  <Home className="w-4 h-4 mr-1" aria-hidden="true" />
-                  Home
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Render children when no error
-    return this.props.children;
-  }
-}
-
-// Export types for use by other components
-export type { AdminError, ErrorBoundaryState, ErrorBoundaryProps };
+  return { handleError };
+};
