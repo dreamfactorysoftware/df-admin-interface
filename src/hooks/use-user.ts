@@ -1,772 +1,888 @@
-'use client'
-
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import useSWR from 'swr'
-import { useSWRConfig } from 'swr'
-import useLocalStorage from './use-local-storage'
-import {
-  UserProfile,
-  AdminUser,
-  UserPermissions,
-  SessionState,
-  NotificationPreferences,
-  UserProfileUpdateForm,
-  ChangePasswordForm,
-  ApiResponse,
-  AUTH_ERROR_CODES,
-  AuthError,
-  userQueryKeys,
-  isAdminUser,
-  isAuthenticatedUser,
-  UpdateUserPayload,
-  userProfileUpdateSchema
-} from '../types/user'
-
 /**
- * User hook configuration options
- */
-interface UseUserOptions {
-  /** Enable automatic localStorage synchronization */
-  enablePersistence?: boolean
-  /** Enable cross-tab synchronization */
-  syncAcrossTabs?: boolean
-  /** Enable automatic session refresh */
-  enableAutoRefresh?: boolean
-  /** Session refresh interval in milliseconds */
-  refreshInterval?: number
-  /** Enable real-time profile updates */
-  enableRealtimeUpdates?: boolean
-}
-
-/**
- * User hook state interface
- */
-interface UserState {
-  user: UserProfile | null
-  permissions: UserPermissions | null
-  preferences: NotificationPreferences | null
-  isLoading: boolean
-  error: AuthError | null
-  isAuthenticated: boolean
-  isSystemAdmin: boolean
-  lastActivity: number
-  sessionExpiry: number | null
-}
-
-/**
- * User profile mutation options
- */
-interface UserMutationOptions {
-  optimisticUpdate?: boolean
-  invalidateQueries?: boolean
-  showSuccessMessage?: boolean
-  onSuccess?: (user: UserProfile) => void
-  onError?: (error: AuthError) => void
-}
-
-/**
- * User data management hook error class
- */
-export class UserHookError extends Error {
-  constructor(
-    message: string,
-    public readonly code: keyof typeof AUTH_ERROR_CODES,
-    public readonly details?: any
-  ) {
-    super(message)
-    this.name = 'UserHookError'
-  }
-}
-
-/**
- * User data management hook that handles current user state, profile information, 
- * and user-related operations. Replaces Angular UserService and DfUserDataService 
- * with React patterns for reactive user data management, localStorage persistence, 
- * and session coordination.
+ * User Data Management Hook
  * 
- * Features:
+ * Comprehensive user data management hook that handles current user state, profile
+ * information, and user-related operations. Replaces Angular UserService and 
+ * DfUserDataService with React patterns for reactive user data management,
+ * localStorage persistence, and session coordination.
+ * 
+ * Key Features:
+ * - User profile state management with React Query integration
+ * - LocalStorage synchronization for user preferences and profile data
  * - Reactive user data updates coordinated with authentication state changes
- * - LocalStorage synchronization for user data across browser sessions with JSON serialization
- * - User profile mutation capabilities using SWR/React Query for update operations
- * - Session token integration with user data for authenticated API requests
- * - Role-based user data filtering and access control integration
- * - Automatic session refresh and activity tracking
- * - Cross-tab synchronization support
- * - Comprehensive error handling and recovery
+ * - User profile mutation capabilities with optimistic updates
+ * - Session token integration for authenticated API requests
+ * - Role-based access control integration with permission checking
+ * - Cross-tab synchronization for user data consistency
  * 
- * @param options - Configuration options for the user hook
- * @returns User state and management functions
+ * @fileoverview User management hook for the DreamFactory Admin Interface
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
+ */
+
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { 
+  UserProfile, 
+  AdminProfile, 
+  UserSession,
+  UserParams,
+  UpdatePasswordRequest,
+  UpdatePasswordResponse,
+  UserProfileFormData,
+  UserProfileSchema,
+  type UserAction,
+  type SessionValidationResult,
+  type SessionError
+} from '@/types/user';
+import { useLocalStorage } from './use-local-storage';
+import { 
+  AuthClient,
+  CrudClient,
+  createCrudClient,
+  generateAuthHeaders,
+  type RequestConfig
+} from '@/lib/api-client';
+import { 
+  getSessionManager,
+  getCurrentUserSession,
+  isAuthenticated,
+  userHasPermission,
+  userHasRole,
+  onSessionStateChange,
+  type UserSession as SessionUserSession,
+  type SessionStateChangeListener
+} from '@/lib/auth/session';
+
+// =============================================================================
+// TYPES AND INTERFACES
+// =============================================================================
+
+/**
+ * User preferences interface for localStorage persistence
+ */
+export interface UserPreferences {
+  theme?: 'light' | 'dark' | 'system';
+  language?: string;
+  timezone?: string;
+  dateFormat?: string;
+  timeFormat?: '12h' | '24h';
+  tablePageSize?: number;
+  notifications?: {
+    email?: boolean;
+    browser?: boolean;
+    sound?: boolean;
+  };
+  layout?: {
+    sidebarCollapsed?: boolean;
+    density?: 'comfortable' | 'compact' | 'spacious';
+  };
+  dashboard?: {
+    widgets?: string[];
+    layout?: 'grid' | 'list';
+  };
+  [key: string]: any;
+}
+
+/**
+ * User state interface for the hook
+ */
+export interface UserState {
+  // Core user data
+  user: UserProfile | null;
+  session: UserSession | null;
+  preferences: UserPreferences;
+  
+  // Authentication state
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  isRefreshing: boolean;
+  
+  // Error handling
+  error: SessionError | string | null;
+  lastError: Date | null;
+  
+  // Permissions and roles
+  permissions: string[];
+  roles: string[];
+  isAdmin: boolean;
+  isSysAdmin: boolean;
+  
+  // Activity tracking
+  lastActivity: Date | null;
+  sessionExpiresAt: Date | null;
+  timeUntilExpiry: number;
+}
+
+/**
+ * User mutation options
+ */
+export interface UserMutationOptions {
+  optimistic?: boolean;
+  invalidateQueries?: boolean;
+  showNotification?: boolean;
+  onSuccess?: (data: any) => void;
+  onError?: (error: any) => void;
+}
+
+/**
+ * User profile update data
+ */
+export interface UserProfileUpdate extends Partial<UserProfile> {
+  preferences?: Partial<UserPreferences>;
+}
+
+/**
+ * User hook return interface
+ */
+export interface UseUserReturn {
+  // State data
+  user: UserProfile | null;
+  session: UserSession | null;
+  preferences: UserPreferences;
+  state: UserState;
+  
+  // Authentication state
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  isRefreshing: boolean;
+  error: SessionError | string | null;
+  
+  // Permission utilities
+  hasPermission: (permission: string) => boolean;
+  hasRole: (roles: string | string[]) => boolean;
+  hasAnyPermission: (permissions: string[]) => boolean;
+  hasAllPermissions: (permissions: string[]) => boolean;
+  
+  // Profile operations
+  updateProfile: (data: UserProfileUpdate, options?: UserMutationOptions) => Promise<UserProfile>;
+  updatePreferences: (preferences: Partial<UserPreferences>, options?: UserMutationOptions) => Promise<UserPreferences>;
+  updatePassword: (data: UpdatePasswordRequest, options?: UserMutationOptions) => Promise<UpdatePasswordResponse>;
+  
+  // Data refresh
+  refreshUser: () => Promise<UserProfile | null>;
+  refreshSession: () => Promise<UserSession | null>;
+  
+  // Utility functions
+  clearUserData: () => void;
+  resetPreferences: () => void;
+  exportUserData: () => Record<string, any>;
+  getDisplayName: () => string;
+  getInitials: () => string;
+  
+  // Activity tracking
+  updateActivity: () => void;
+  getSessionTimeRemaining: () => number;
+  
+  // Loading states for mutations
+  isUpdatingProfile: boolean;
+  isUpdatingPreferences: boolean;
+  isUpdatingPassword: boolean;
+}
+
+// =============================================================================
+// CONSTANTS AND DEFAULTS
+// =============================================================================
+
+/**
+ * Default user preferences
+ */
+const DEFAULT_PREFERENCES: UserPreferences = {
+  theme: 'system',
+  language: 'en',
+  timezone: 'UTC',
+  dateFormat: 'YYYY-MM-DD',
+  timeFormat: '24h',
+  tablePageSize: 25,
+  notifications: {
+    email: true,
+    browser: true,
+    sound: false,
+  },
+  layout: {
+    sidebarCollapsed: false,
+    density: 'comfortable',
+  },
+  dashboard: {
+    widgets: ['quick-stats', 'recent-activity', 'system-status'],
+    layout: 'grid',
+  },
+};
+
+/**
+ * Query keys for React Query
+ */
+const QUERY_KEYS = {
+  user: ['user'] as const,
+  profile: (userId: number) => ['user', 'profile', userId] as const,
+  preferences: (userId: number) => ['user', 'preferences', userId] as const,
+  session: ['user', 'session'] as const,
+} as const;
+
+/**
+ * Cache configuration
+ */
+const CACHE_CONFIG = {
+  staleTime: 5 * 60 * 1000, // 5 minutes
+  gcTime: 30 * 60 * 1000, // 30 minutes
+  refetchOnWindowFocus: false,
+  retry: (failureCount: number, error: any) => {
+    // Don't retry authentication errors
+    if (error?.status === 401 || error?.status === 403) {
+      return false;
+    }
+    return failureCount < 3;
+  },
+} as const;
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Convert session user data to UserProfile
+ */
+const sessionToUserProfile = (session: SessionUserSession): UserProfile => ({
+  id: session.userId ? Number(session.userId) : 0,
+  username: session.username || session.email,
+  email: session.email,
+  first_name: session.firstName,
+  last_name: session.lastName,
+  display_name: session.displayName || session.email,
+  is_active: true,
+  permissions: session.permissions || [],
+  roles: session.roles?.map(role => ({ 
+    id: 0, 
+    name: role, 
+    is_active: true 
+  })) || [],
+  accessibleRoutes: session.accessibleRoutes || [],
+  preferences: session.preferences || {},
+  created_date: new Date().toISOString(),
+  last_modified_date: new Date().toISOString(),
+});
+
+/**
+ * Convert session user data to UserSession
+ */
+const sessionToUserSession = (session: SessionUserSession): UserSession => ({
+  id: session.userId ? Number(session.userId) : 0,
+  session_token: session.sessionToken || '',
+  sessionToken: session.sessionToken || '',
+  user_id: session.userId ? Number(session.userId) : 0,
+  username: session.username || session.email,
+  email: session.email,
+  display_name: session.displayName || session.email,
+  is_sys_admin: session.isSysAdmin || false,
+  is_active: true,
+  role: session.roles?.[0] ? { 
+    id: 0, 
+    name: session.roles[0], 
+    is_active: true 
+  } : undefined,
+  permissions: session.permissions || [],
+  accessibleRoutes: session.accessibleRoutes || [],
+  created_date: new Date().toISOString(),
+  expires_at: new Date(session.expiresAt).toISOString(),
+  last_activity: new Date(session.lastActivity).toISOString(),
+});
+
+/**
+ * Generate display name from user data
+ */
+const generateDisplayName = (user: UserProfile | null): string => {
+  if (!user) return 'Guest';
+  
+  if (user.display_name) return user.display_name;
+  if (user.first_name && user.last_name) {
+    return `${user.first_name} ${user.last_name}`;
+  }
+  if (user.first_name) return user.first_name;
+  if (user.name) return user.name;
+  if (user.username) return user.username;
+  return user.email || 'User';
+};
+
+/**
+ * Generate initials from user data
+ */
+const generateInitials = (user: UserProfile | null): string => {
+  if (!user) return 'G';
+  
+  const displayName = generateDisplayName(user);
+  const words = displayName.split(' ').filter(Boolean);
+  
+  if (words.length >= 2) {
+    return `${words[0][0]}${words[1][0]}`.toUpperCase();
+  }
+  
+  return displayName.slice(0, 2).toUpperCase();
+};
+
+// =============================================================================
+// MAIN HOOK IMPLEMENTATION
+// =============================================================================
+
+/**
+ * User data management hook with comprehensive functionality
+ * 
+ * @param options Configuration options for the hook
+ * @returns Complete user management interface
  * 
  * @example
  * ```typescript
  * const {
  *   user,
- *   permissions,
- *   updateProfile,
- *   changePassword,
- *   isLoading,
- *   error,
  *   isAuthenticated,
- *   isSystemAdmin,
  *   hasPermission,
- *   refreshUserData,
- *   clearError
- * } = useUser({
- *   enablePersistence: true,
- *   syncAcrossTabs: true,
- *   enableAutoRefresh: true
- * })
+ *   updateProfile,
+ *   updatePreferences,
+ *   preferences
+ * } = useUser();
+ * 
+ * // Check permissions
+ * if (hasPermission('manage_users')) {
+ *   // Show admin UI
+ * }
+ * 
+ * // Update user preferences
+ * await updatePreferences({ theme: 'dark' });
+ * 
+ * // Update profile
+ * await updateProfile({ 
+ *   first_name: 'John',
+ *   last_name: 'Doe'
+ * });
  * ```
  */
-export function useUser(options: UseUserOptions = {}) {
-  const {
-    enablePersistence = true,
-    syncAcrossTabs = true,
-    enableAutoRefresh = true,
-    refreshInterval = 30000, // 30 seconds
-    enableRealtimeUpdates = true
-  } = options
-
-  // SWR configuration
-  const { mutate, cache } = useSWRConfig()
-
+export function useUser(): UseUserReturn {
+  // Initialize query client for React Query operations
+  const queryClient = useQueryClient();
+  
+  // Session manager for authentication coordination
+  const sessionManager = useMemo(() => getSessionManager(), []);
+  
   // Local state management
-  const [userState, setUserState] = useState<UserState>({
-    user: null,
-    permissions: null,
-    preferences: null,
-    isLoading: true,
-    error: null,
-    isAuthenticated: false,
-    isSystemAdmin: false,
-    lastActivity: Date.now(),
-    sessionExpiry: null
-  })
-
-  // Persistent user data storage with cross-tab synchronization
-  const [persistedUser, setPersistedUser, removePersistedUser, storageError] = useLocalStorage<UserProfile>(
-    'dreamfactory_user_profile',
-    {
-      defaultValue: undefined,
-      syncAcrossTabs,
-      validator: (value): value is UserProfile => isAuthenticatedUser(value),
-      enableCleanup: true,
-      expirationTime: 24 * 60 * 60 * 1000, // 24 hours
-      migrator: {
-        version: 1,
-        migrate: (oldData: unknown) => {
-          // Handle any schema migrations if needed
-          return oldData as UserProfile
-        }
-      }
-    }
-  )
-
-  // Persistent user preferences storage
-  const [persistedPreferences, setPersistedPreferences] = useLocalStorage<NotificationPreferences>(
-    'dreamfactory_user_preferences',
-    {
-      defaultValue: {
-        email_notifications: true,
-        system_alerts: true,
-        api_quota_warnings: true,
-        security_notifications: true,
-        maintenance_notifications: true,
-        newsletter_subscription: false
-      },
-      syncAcrossTabs,
-      enableCleanup: true
-    }
-  )
-
-  // Session token from auth store (would be implemented via Zustand)
-  const [sessionToken, setSessionToken] = useState<string | null>(null)
-
-  // SWR fetcher function for user profile data
-  const userProfileFetcher = useCallback(async (url: string): Promise<UserProfile> => {
-    if (!sessionToken) {
-      throw new UserHookError('No session token available', 'TOKEN_INVALID')
-    }
-
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${sessionToken}`,
-          'Content-Type': 'application/json',
-          'X-DreamFactory-API-Key': process.env.NEXT_PUBLIC_DREAMFACTORY_API_KEY || '',
-          'X-DreamFactory-Session-Token': sessionToken
-        },
-        credentials: 'include'
-      })
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new UserHookError('Session expired', 'SESSION_EXPIRED')
-        }
-        if (response.status === 403) {
-          throw new UserHookError('Access denied', 'PERMISSION_DENIED')
-        }
-        throw new UserHookError(`HTTP error: ${response.status}`, 'SERVER_ERROR')
-      }
-
-      const data: ApiResponse<UserProfile> = await response.json()
-      
-      if (!data.success || !data.data) {
-        throw new UserHookError('Invalid response from server', 'SERVER_ERROR')
-      }
-
-      return data.data
-    } catch (error) {
-      if (error instanceof UserHookError) {
-        throw error
-      }
-      
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new UserHookError('Network connection failed', 'NETWORK_ERROR')
-      }
-      
-      throw new UserHookError(
-        `Failed to fetch user profile: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'SERVER_ERROR'
-      )
-    }
-  }, [sessionToken])
-
-  // SWR hook for user profile data with caching and revalidation
+  const [error, setError] = useState<SessionError | string | null>(null);
+  const [lastError, setLastError] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // localStorage for user preferences with cross-tab sync
+  const [preferences, setPreferences, , , preferencesError] = useLocalStorage('userPreferences', {
+    defaultValue: DEFAULT_PREFERENCES,
+    syncAcrossTabs: true,
+    serialize: true,
+    version: 1,
+  });
+  
+  // Refs for avoiding stale closures
+  const sessionListenerRef = useRef<(() => void) | null>(null);
+  
+  // Current session query with automatic updates
   const {
-    data: userData,
+    data: currentSession,
+    isLoading: isLoadingSession,
+    error: sessionError,
+    refetch: refetchSession,
+  } = useQuery({
+    queryKey: QUERY_KEYS.session,
+    queryFn: async (): Promise<UserSession | null> => {
+      const session = getCurrentUserSession();
+      if (!session) return null;
+      return sessionToUserSession(session);
+    },
+    ...CACHE_CONFIG,
+    refetchInterval: 60000, // Refetch every minute to check session status
+  });
+  
+  // User profile query derived from session
+  const {
+    data: user,
+    isLoading: isLoadingUser,
     error: userError,
-    isLoading: userLoading,
-    mutate: mutateUser,
-    isValidating
-  } = useSWR<UserProfile, UserHookError>(
-    sessionToken ? '/api/v2/user/profile' : null,
-    userProfileFetcher,
-    {
-      refreshInterval: enableAutoRefresh ? refreshInterval : 0,
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-      dedupingInterval: 5000,
-      shouldRetryOnError: (error) => {
-        // Don't retry on authentication errors
-        return !['SESSION_EXPIRED', 'TOKEN_INVALID', 'PERMISSION_DENIED'].includes(error.code)
-      },
-      onError: (error: UserHookError) => {
-        console.error('User profile fetch error:', error)
-        setUserState(prev => ({
-          ...prev,
-          error: {
-            code: error.code,
-            message: error.message,
-            details: error.details
-          }
-        }))
-      },
-      onSuccess: (data: UserProfile) => {
-        // Update persisted data
-        if (enablePersistence) {
-          setPersistedUser(data)
-        }
-        
-        // Update activity tracking
-        setUserState(prev => ({
-          ...prev,
-          lastActivity: Date.now(),
-          error: null
-        }))
-      }
-    }
-  )
-
-  // SWR hook for user permissions data
-  const {
-    data: permissionsData,
-    mutate: mutatePermissions
-  } = useSWR<UserPermissions, UserHookError>(
-    sessionToken && userData ? `/api/v2/user/${userData.id}/permissions` : null,
-    userProfileFetcher,
-    {
-      refreshInterval: enableAutoRefresh ? refreshInterval * 2 : 0, // Less frequent refresh for permissions
-      revalidateOnFocus: false,
-      dedupingInterval: 30000 // Cache permissions for 30 seconds
-    }
-  )
-
-  /**
-   * Update user profile with optimistic updates and comprehensive error handling
-   */
-  const updateProfile = useCallback(async (
-    updates: Partial<UserProfileUpdateForm>,
-    options: UserMutationOptions = {}
-  ): Promise<UserProfile | null> => {
-    if (!sessionToken || !userData) {
-      const error = new UserHookError('User not authenticated', 'TOKEN_INVALID')
-      setUserState(prev => ({ ...prev, error: { code: error.code, message: error.message } }))
-      options.onError?.(error)
-      return null
-    }
-
-    try {
-      // Validate input data
-      const validatedData = userProfileUpdateSchema.parse({
-        ...userData,
-        ...updates
-      })
-
-      // Optimistic update if enabled
-      if (options.optimisticUpdate) {
-        const optimisticUser = { ...userData, ...updates }
-        await mutateUser(optimisticUser, false)
-        if (enablePersistence) {
-          setPersistedUser(optimisticUser)
-        }
-      }
-
-      // Send update request
-      const response = await fetch(`/api/v2/user/${userData.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${sessionToken}`,
-          'Content-Type': 'application/json',
-          'X-DreamFactory-API-Key': process.env.NEXT_PUBLIC_DREAMFACTORY_API_KEY || '',
-          'X-DreamFactory-Session-Token': sessionToken
-        },
-        body: JSON.stringify(validatedData),
-        credentials: 'include'
-      })
-
-      if (!response.ok) {
-        // Rollback optimistic update
-        if (options.optimisticUpdate) {
-          await mutateUser(userData, false)
-          if (enablePersistence) {
-            setPersistedUser(userData)
-          }
-        }
-        
-        const errorCode = response.status === 401 ? 'SESSION_EXPIRED' : 
-                         response.status === 403 ? 'PERMISSION_DENIED' : 'SERVER_ERROR'
-        throw new UserHookError(`Failed to update profile: ${response.statusText}`, errorCode)
-      }
-
-      const result: ApiResponse<UserProfile> = await response.json()
-      
-      if (!result.success || !result.data) {
-        throw new UserHookError('Invalid response from server', 'SERVER_ERROR')
-      }
-
-      // Update local cache and persistence
-      await mutateUser(result.data, false)
-      if (enablePersistence) {
-        setPersistedUser(result.data)
-      }
-
-      // Invalidate related queries if requested
-      if (options.invalidateQueries) {
-        await mutate(
-          key => typeof key === 'string' && key.startsWith('/api/v2/user'),
-          undefined,
-          { revalidate: true }
-        )
-      }
-
-      setUserState(prev => ({ ...prev, error: null }))
-      options.onSuccess?.(result.data)
-
-      return result.data
-    } catch (error) {
-      const userError = error instanceof UserHookError ? error : 
-        new UserHookError(
-          `Profile update failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          'SERVER_ERROR'
-        )
-      
-      setUserState(prev => ({ ...prev, error: { code: userError.code, message: userError.message } }))
-      options.onError?.(userError)
-      
-      return null
-    }
-  }, [sessionToken, userData, mutateUser, enablePersistence, setPersistedUser, mutate])
-
-  /**
-   * Change user password with secure handling
-   */
-  const changePassword = useCallback(async (
-    passwordData: ChangePasswordForm,
-    options: UserMutationOptions = {}
-  ): Promise<boolean> => {
-    if (!sessionToken || !userData) {
-      const error = new UserHookError('User not authenticated', 'TOKEN_INVALID')
-      setUserState(prev => ({ ...prev, error: { code: error.code, message: error.message } }))
-      options.onError?.(error)
-      return false
-    }
-
-    try {
-      const response = await fetch('/api/v2/user/password', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${sessionToken}`,
-          'Content-Type': 'application/json',
-          'X-DreamFactory-API-Key': process.env.NEXT_PUBLIC_DREAMFACTORY_API_KEY || '',
-          'X-DreamFactory-Session-Token': sessionToken
-        },
-        body: JSON.stringify(passwordData),
-        credentials: 'include'
-      })
-
-      if (!response.ok) {
-        const errorCode = response.status === 401 ? 'INVALID_CREDENTIALS' : 
-                         response.status === 403 ? 'PERMISSION_DENIED' : 'SERVER_ERROR'
-        throw new UserHookError(`Failed to change password: ${response.statusText}`, errorCode)
-      }
-
-      const result: ApiResponse = await response.json()
-      
-      if (!result.success) {
-        throw new UserHookError('Password change failed', 'SERVER_ERROR')
-      }
-
-      setUserState(prev => ({ ...prev, error: null }))
-      return true
-    } catch (error) {
-      const userError = error instanceof UserHookError ? error : 
-        new UserHookError(
-          `Password change failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          'SERVER_ERROR'
-        )
-      
-      setUserState(prev => ({ ...prev, error: { code: userError.code, message: userError.message } }))
-      options.onError?.(userError)
-      
-      return false
-    }
-  }, [sessionToken, userData])
-
-  /**
-   * Update user preferences with persistence
-   */
-  const updatePreferences = useCallback(async (
-    preferences: Partial<NotificationPreferences>
-  ): Promise<boolean> => {
-    try {
-      const updatedPreferences = {
-        ...userState.preferences,
-        ...preferences
-      }
-
-      // Update local state
-      setUserState(prev => ({
-        ...prev,
-        preferences: updatedPreferences
-      }))
-
-      // Persist preferences
-      if (enablePersistence) {
-        setPersistedPreferences(updatedPreferences)
-      }
-
-      // Update user profile with new preferences if user is authenticated
-      if (userData && sessionToken) {
-        await updateProfile(
-          { notification_preferences: updatedPreferences },
-          { optimisticUpdate: true }
-        )
-      }
-
-      return true
-    } catch (error) {
-      console.error('Failed to update preferences:', error)
-      return false
-    }
-  }, [userState.preferences, enablePersistence, setPersistedPreferences, userData, sessionToken, updateProfile])
-
-  /**
-   * Check if user has specific permission
-   */
+    refetch: refetchUser,
+  } = useQuery({
+    queryKey: QUERY_KEYS.user,
+    queryFn: async (): Promise<UserProfile | null> => {
+      const session = getCurrentUserSession();
+      if (!session) return null;
+      return sessionToUserProfile(session);
+    },
+    enabled: !!currentSession,
+    ...CACHE_CONFIG,
+  });
+  
+  // Derived state
+  const isAuthenticated = useMemo(() => isAuthenticated(), [currentSession]);
+  const isLoading = isLoadingSession || isLoadingUser;
+  
+  const permissions = useMemo(() => 
+    user?.permissions || currentSession?.permissions || [], 
+    [user?.permissions, currentSession?.permissions]
+  );
+  
+  const roles = useMemo(() => 
+    user?.roles?.map(r => r.name) || currentSession?.role ? [currentSession.role.name] : [],
+    [user?.roles, currentSession?.role]
+  );
+  
+  const isAdmin = useMemo(() => 
+    roles.includes('admin') || roles.includes('administrator') || 
+    permissions.includes('admin_access'),
+    [roles, permissions]
+  );
+  
+  const isSysAdmin = useMemo(() => 
+    currentSession?.is_sys_admin || 
+    roles.includes('sys_admin') || 
+    permissions.includes('system_admin'),
+    [currentSession?.is_sys_admin, roles, permissions]
+  );
+  
+  // Session timing
+  const timeUntilExpiry = useMemo(() => 
+    sessionManager.getTimeUntilExpiry(),
+    [sessionManager, currentSession?.expires_at]
+  );
+  
+  // =============================================================================
+  // PERMISSION UTILITIES
+  // =============================================================================
+  
   const hasPermission = useCallback((permission: string): boolean => {
-    if (!userState.permissions) return false
-    
-    // System admin has all permissions
-    if (userState.isSystemAdmin) return true
-    
-    // Check specific permissions based on the permission string
-    switch (permission) {
-      case 'manage_users':
-        return userState.permissions.canManageUsers
-      case 'manage_roles':
-        return userState.permissions.canManageRoles
-      case 'manage_services':
-        return userState.permissions.canManageServices
-      case 'manage_apps':
-        return userState.permissions.canManageApps
-      case 'view_reports':
-        return userState.permissions.canViewReports
-      case 'configure_system':
-        return userState.permissions.canConfigureSystem
-      case 'manage_files':
-        return userState.permissions.canManageFiles
-      case 'manage_scripts':
-        return userState.permissions.canManageScripts
-      case 'manage_scheduler':
-        return userState.permissions.canManageScheduler
-      case 'manage_cache':
-        return userState.permissions.canManageCache
-      case 'manage_cors':
-        return userState.permissions.canManageCors
-      case 'manage_email_templates':
-        return userState.permissions.canManageEmailTemplates
-      default:
-        return false
-    }
-  }, [userState.permissions, userState.isSystemAdmin])
-
-  /**
-   * Check if user can access specific service
-   */
-  const canAccessService = useCallback((serviceId: number, action: 'create' | 'read' | 'update' | 'delete' = 'read'): boolean => {
-    if (!userState.permissions || !userState.permissions.serviceAccess) return false
-    
-    // System admin has access to all services
-    if (userState.isSystemAdmin) return true
-    
-    const servicePermission = userState.permissions.serviceAccess.find(
-      service => service.serviceId === serviceId
-    )
-    
-    if (!servicePermission) return false
-    
-    switch (action) {
-      case 'create':
-        return servicePermission.canCreate
-      case 'read':
-        return servicePermission.canRead
-      case 'update':
-        return servicePermission.canUpdate
-      case 'delete':
-        return servicePermission.canDelete
-      default:
-        return false
-    }
-  }, [userState.permissions, userState.isSystemAdmin])
-
-  /**
-   * Refresh user data and permissions
-   */
-  const refreshUserData = useCallback(async (): Promise<void> => {
-    try {
-      await Promise.all([
-        mutateUser(),
-        mutatePermissions()
-      ])
+    return userHasPermission(permission as any);
+  }, []);
+  
+  const hasRole = useCallback((roleNames: string | string[]): boolean => {
+    return userHasRole(roleNames);
+  }, []);
+  
+  const hasAnyPermission = useCallback((permissionList: string[]): boolean => {
+    return permissionList.some(permission => hasPermission(permission));
+  }, [hasPermission]);
+  
+  const hasAllPermissions = useCallback((permissionList: string[]): boolean => {
+    return permissionList.every(permission => hasPermission(permission));
+  }, [hasPermission]);
+  
+  // =============================================================================
+  // USER PROFILE MUTATIONS
+  // =============================================================================
+  
+  // Create API client for user operations
+  const userApiClient = useMemo(() => {
+    return createCrudClient('system/user');
+  }, []);
+  
+  // Profile update mutation
+  const {
+    mutateAsync: updateProfileMutation,
+    isPending: isUpdatingProfile,
+  } = useMutation({
+    mutationFn: async (data: UserProfileUpdate): Promise<UserProfile> => {
+      if (!user) throw new Error('No user session available');
       
-      setUserState(prev => ({
-        ...prev,
-        lastActivity: Date.now(),
-        error: null
-      }))
-    } catch (error) {
-      console.error('Failed to refresh user data:', error)
-    }
-  }, [mutateUser, mutatePermissions])
-
-  /**
-   * Clear current error state
-   */
-  const clearError = useCallback((): void => {
-    setUserState(prev => ({ ...prev, error: null }))
-  }, [])
-
-  /**
-   * Update activity timestamp
-   */
-  const updateActivity = useCallback((): void => {
-    setUserState(prev => ({
-      ...prev,
-      lastActivity: Date.now()
-    }))
-  }, [])
-
-  /**
-   * Clear user data and reset state
-   */
-  const clearUserData = useCallback((): void => {
-    setUserState({
-      user: null,
-      permissions: null,
-      preferences: null,
-      isLoading: false,
-      error: null,
-      isAuthenticated: false,
-      isSystemAdmin: false,
-      lastActivity: Date.now(),
-      sessionExpiry: null
-    })
-    
-    if (enablePersistence) {
-      removePersistedUser()
-    }
-    
-    // Clear SWR cache for user-related endpoints
-    mutate(
-      key => typeof key === 'string' && key.startsWith('/api/v2/user'),
-      undefined,
-      { revalidate: false }
-    )
-  }, [enablePersistence, removePersistedUser, mutate])
-
-  // Initialize user state from persisted data
-  useEffect(() => {
-    if (enablePersistence && persistedUser && !userData) {
-      setUserState(prev => ({
-        ...prev,
-        user: persistedUser,
-        isAuthenticated: true,
-        isSystemAdmin: isAdminUser(persistedUser),
-        preferences: persistedPreferences
-      }))
-    }
-  }, [enablePersistence, persistedUser, userData, persistedPreferences])
-
-  // Update state when user data changes
-  useEffect(() => {
-    if (userData) {
-      setUserState(prev => ({
-        ...prev,
-        user: userData,
-        isAuthenticated: true,
-        isSystemAdmin: isAdminUser(userData),
-        isLoading: false,
-        error: null
-      }))
-    } else if (!userLoading) {
-      setUserState(prev => ({
-        ...prev,
-        user: null,
-        isAuthenticated: false,
-        isSystemAdmin: false,
-        isLoading: false
-      }))
-    }
-  }, [userData, userLoading])
-
-  // Update permissions state
-  useEffect(() => {
-    if (permissionsData) {
-      setUserState(prev => ({
-        ...prev,
-        permissions: permissionsData
-      }))
-    }
-  }, [permissionsData])
-
-  // Handle loading state
-  useEffect(() => {
-    setUserState(prev => ({
-      ...prev,
-      isLoading: userLoading || isValidating
-    }))
-  }, [userLoading, isValidating])
-
-  // Handle storage errors
-  useEffect(() => {
-    if (storageError) {
-      console.error('User storage error:', storageError)
-      setUserState(prev => ({
-        ...prev,
-        error: {
-          code: 'SERVER_ERROR',
-          message: `Storage error: ${storageError.message}`
+      // Validate the data using Zod schema
+      const validatedData = UserProfileSchema.parse(data);
+      
+      // Update user profile via API
+      const response = await userApiClient.update(user.id, validatedData, {
+        headers: generateAuthHeaders(),
+      });
+      
+      return response.data;
+    },
+    onMutate: async (newData) => {
+      // Optimistic update
+      if (user) {
+        const optimisticUser = { ...user, ...newData };
+        queryClient.setQueryData(QUERY_KEYS.user, optimisticUser);
+      }
+    },
+    onSuccess: (updatedUser) => {
+      // Update all related queries
+      queryClient.setQueryData(QUERY_KEYS.user, updatedUser);
+      queryClient.setQueryData(QUERY_KEYS.profile(updatedUser.id), updatedUser);
+      
+      // Clear any previous errors
+      setError(null);
+      setLastError(null);
+    },
+    onError: (error, variables, context) => {
+      // Revert optimistic update
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user });
+      
+      // Set error state
+      const errorMessage = error instanceof Error ? error.message : 'Profile update failed';
+      setError(errorMessage);
+      setLastError(new Date());
+    },
+  });
+  
+  // Preferences update mutation
+  const {
+    mutateAsync: updatePreferencesMutation,
+    isPending: isUpdatingPreferences,
+  } = useMutation({
+    mutationFn: async (newPreferences: Partial<UserPreferences>): Promise<UserPreferences> => {
+      const updatedPreferences = { ...preferences, ...newPreferences };
+      
+      // Update localStorage immediately
+      const result = setPreferences(updatedPreferences);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save preferences');
+      }
+      
+      // Optionally sync with server if user has profile
+      if (user) {
+        try {
+          await updateProfileMutation({
+            preferences: updatedPreferences,
+          });
+        } catch (error) {
+          // Don't throw if server sync fails, localStorage is primary for preferences
+          console.warn('Failed to sync preferences to server:', error);
         }
-      }))
+      }
+      
+      return updatedPreferences;
+    },
+    onSuccess: (updatedPreferences) => {
+      // Update React Query cache
+      if (user) {
+        queryClient.setQueryData(QUERY_KEYS.preferences(user.id), updatedPreferences);
+      }
+      setError(null);
+    },
+    onError: (error) => {
+      const errorMessage = error instanceof Error ? error.message : 'Preferences update failed';
+      setError(errorMessage);
+      setLastError(new Date());
+    },
+  });
+  
+  // Password update mutation
+  const {
+    mutateAsync: updatePasswordMutation,
+    isPending: isUpdatingPassword,
+  } = useMutation({
+    mutationFn: async (data: UpdatePasswordRequest): Promise<UpdatePasswordResponse> => {
+      if (!user) throw new Error('No user session available');
+      
+      const response = await userApiClient.request<UpdatePasswordResponse>('PUT', 'password', {
+        body: data,
+        headers: generateAuthHeaders(),
+      });
+      
+      return response.data;
+    },
+    onSuccess: (response) => {
+      // If password update requires re-authentication, handle it
+      if (response.requiresReauth) {
+        sessionManager.clearSession('Password updated - re-authentication required');
+      }
+      
+      setError(null);
+    },
+    onError: (error) => {
+      const errorMessage = error instanceof Error ? error.message : 'Password update failed';
+      setError(errorMessage);
+      setLastError(new Date());
+    },
+  });
+  
+  // =============================================================================
+  // PUBLIC API FUNCTIONS
+  // =============================================================================
+  
+  const updateProfile = useCallback(async (
+    data: UserProfileUpdate, 
+    options: UserMutationOptions = {}
+  ): Promise<UserProfile> => {
+    try {
+      const result = await updateProfileMutation(data);
+      options.onSuccess?.(result);
+      return result;
+    } catch (error) {
+      options.onError?.(error);
+      throw error;
     }
-  }, [storageError])
-
-  // Memoized return value for performance optimization
-  const returnValue = useMemo(() => ({
-    // User state
-    user: userState.user,
-    permissions: userState.permissions,
-    preferences: userState.preferences,
-    isLoading: userState.isLoading,
-    error: userState.error,
-    isAuthenticated: userState.isAuthenticated,
-    isSystemAdmin: userState.isSystemAdmin,
-    lastActivity: userState.lastActivity,
-    sessionExpiry: userState.sessionExpiry,
+  }, [updateProfileMutation]);
+  
+  const updatePreferences = useCallback(async (
+    newPreferences: Partial<UserPreferences>,
+    options: UserMutationOptions = {}
+  ): Promise<UserPreferences> => {
+    try {
+      const result = await updatePreferencesMutation(newPreferences);
+      options.onSuccess?.(result);
+      return result;
+    } catch (error) {
+      options.onError?.(error);
+      throw error;
+    }
+  }, [updatePreferencesMutation]);
+  
+  const updatePassword = useCallback(async (
+    data: UpdatePasswordRequest,
+    options: UserMutationOptions = {}
+  ): Promise<UpdatePasswordResponse> => {
+    try {
+      const result = await updatePasswordMutation(data);
+      options.onSuccess?.(result);
+      return result;
+    } catch (error) {
+      options.onError?.(error);
+      throw error;
+    }
+  }, [updatePasswordMutation]);
+  
+  const refreshUser = useCallback(async (): Promise<UserProfile | null> => {
+    setIsRefreshing(true);
+    try {
+      const { data } = await refetchUser();
+      return data || null;
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetchUser]);
+  
+  const refreshSession = useCallback(async (): Promise<UserSession | null> => {
+    setIsRefreshing(true);
+    try {
+      const { data } = await refetchSession();
+      return data || null;
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetchSession]);
+  
+  const clearUserData = useCallback(() => {
+    queryClient.removeQueries({ queryKey: QUERY_KEYS.user });
+    queryClient.removeQueries({ queryKey: QUERY_KEYS.session });
+    if (user) {
+      queryClient.removeQueries({ queryKey: QUERY_KEYS.profile(user.id) });
+      queryClient.removeQueries({ queryKey: QUERY_KEYS.preferences(user.id) });
+    }
+    setError(null);
+    setLastError(null);
+  }, [queryClient, user]);
+  
+  const resetPreferences = useCallback(() => {
+    const result = setPreferences(DEFAULT_PREFERENCES);
+    if (!result.success) {
+      setError(result.error || 'Failed to reset preferences');
+    }
+  }, [setPreferences]);
+  
+  const exportUserData = useCallback((): Record<string, any> => {
+    return {
+      user: user || null,
+      session: currentSession || null,
+      preferences: preferences || DEFAULT_PREFERENCES,
+      permissions,
+      roles,
+      exportedAt: new Date().toISOString(),
+    };
+  }, [user, currentSession, preferences, permissions, roles]);
+  
+  const getDisplayName = useCallback((): string => {
+    return generateDisplayName(user);
+  }, [user]);
+  
+  const getInitials = useCallback((): string => {
+    return generateInitials(user);
+  }, [user]);
+  
+  const updateActivity = useCallback(() => {
+    sessionManager.updateActivity();
+  }, [sessionManager]);
+  
+  const getSessionTimeRemaining = useCallback((): number => {
+    return sessionManager.getTimeUntilExpiry();
+  }, [sessionManager]);
+  
+  // =============================================================================
+  // EFFECTS AND LIFECYCLE
+  // =============================================================================
+  
+  // Set up session state change listener
+  useEffect(() => {
+    const unsubscribe = onSessionStateChange((state, session) => {
+      // Invalidate queries when session changes
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.session });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user });
+      
+      // Clear error state on successful authentication
+      if (state === 'AUTHENTICATED') {
+        setError(null);
+        setLastError(null);
+      }
+    });
     
-    // User mutations
-    updateProfile,
-    changePassword,
-    updatePreferences,
+    sessionListenerRef.current = unsubscribe;
     
-    // Permission checks
-    hasPermission,
-    canAccessService,
-    
-    // Utility functions
-    refreshUserData,
-    clearError,
-    updateActivity,
-    clearUserData,
-    
-    // SWR utilities for advanced usage
-    mutateUser,
-    mutatePermissions,
-    
-    // State flags
-    isValidating,
-    isRefreshing: isValidating
+    return () => {
+      unsubscribe();
+      sessionListenerRef.current = null;
+    };
+  }, [queryClient]);
+  
+  // Handle preference storage errors
+  useEffect(() => {
+    if (preferencesError) {
+      setError(`Preferences storage error: ${preferencesError}`);
+      setLastError(new Date());
+    }
+  }, [preferencesError]);
+  
+  // Handle session and user query errors
+  useEffect(() => {
+    const error = sessionError || userError;
+    if (error) {
+      setError(error instanceof Error ? error.message : 'Unknown error');
+      setLastError(new Date());
+    }
+  }, [sessionError, userError]);
+  
+  // Build comprehensive user state
+  const state: UserState = useMemo(() => ({
+    user,
+    session: currentSession,
+    preferences: preferences || DEFAULT_PREFERENCES,
+    isAuthenticated,
+    isLoading,
+    isRefreshing,
+    error,
+    lastError,
+    permissions,
+    roles,
+    isAdmin,
+    isSysAdmin,
+    lastActivity: currentSession?.last_activity ? new Date(currentSession.last_activity) : null,
+    sessionExpiresAt: currentSession?.expires_at ? new Date(currentSession.expires_at) : null,
+    timeUntilExpiry,
   }), [
-    userState,
-    updateProfile,
-    changePassword,
-    updatePreferences,
-    hasPermission,
-    canAccessService,
-    refreshUserData,
-    clearError,
-    updateActivity,
-    clearUserData,
-    mutateUser,
-    mutatePermissions,
-    isValidating
-  ])
-
-  return returnValue
-}
-
-/**
- * Utility hook for getting user query keys for SWR operations
- */
-export function useUserQueryKeys() {
-  return useMemo(() => userQueryKeys, [])
-}
-
-/**
- * Utility hook for batch user operations
- */
-export function useUserBatch() {
-  const { mutate } = useSWRConfig()
+    user,
+    currentSession,
+    preferences,
+    isAuthenticated,
+    isLoading,
+    isRefreshing,
+    error,
+    lastError,
+    permissions,
+    roles,
+    isAdmin,
+    isSysAdmin,
+    timeUntilExpiry,
+  ]);
   
-  const invalidateAllUserQueries = useCallback(async () => {
-    return mutate(
-      key => typeof key === 'string' && key.startsWith('/api/v2/user'),
-      undefined,
-      { revalidate: true }
-    )
-  }, [mutate])
-  
-  const preloadUserData = useCallback(async (userId: number) => {
-    // Preload user data for improved UX
-    return mutate(`/api/v2/user/${userId}`)
-  }, [mutate])
+  // =============================================================================
+  // RETURN HOOK INTERFACE
+  // =============================================================================
   
   return {
-    invalidateAllUserQueries,
-    preloadUserData
-  }
+    // State data
+    user,
+    session: currentSession,
+    preferences: preferences || DEFAULT_PREFERENCES,
+    state,
+    
+    // Authentication state
+    isAuthenticated,
+    isLoading,
+    isRefreshing,
+    error,
+    
+    // Permission utilities
+    hasPermission,
+    hasRole,
+    hasAnyPermission,
+    hasAllPermissions,
+    
+    // Profile operations
+    updateProfile,
+    updatePreferences,
+    updatePassword,
+    
+    // Data refresh
+    refreshUser,
+    refreshSession,
+    
+    // Utility functions
+    clearUserData,
+    resetPreferences,
+    exportUserData,
+    getDisplayName,
+    getInitials,
+    
+    // Activity tracking
+    updateActivity,
+    getSessionTimeRemaining,
+    
+    // Loading states for mutations
+    isUpdatingProfile,
+    isUpdatingPreferences,
+    isUpdatingPassword,
+  };
 }
 
-export default useUser
+// =============================================================================
+// ADDITIONAL UTILITY HOOKS
+// =============================================================================
+
+/**
+ * Lightweight hook for just checking authentication status
+ */
+export function useAuthStatus() {
+  const { isAuthenticated, isLoading, user } = useUser();
+  
+  return {
+    isAuthenticated,
+    isLoading,
+    user,
+  };
+}
+
+/**
+ * Hook for permission checking without full user data
+ */
+export function usePermissions() {
+  const { hasPermission, hasRole, hasAnyPermission, hasAllPermissions, permissions, roles } = useUser();
+  
+  return {
+    hasPermission,
+    hasRole,
+    hasAnyPermission,
+    hasAllPermissions,
+    permissions,
+    roles,
+  };
+}
+
+/**
+ * Hook for user preferences management
+ */
+export function useUserPreferences() {
+  const { preferences, updatePreferences, resetPreferences, isUpdatingPreferences } = useUser();
+  
+  return {
+    preferences,
+    updatePreferences,
+    resetPreferences,
+    isUpdating: isUpdatingPreferences,
+  };
+}
+
+// =============================================================================
+// TYPE EXPORTS
+// =============================================================================
+
+export type {
+  UserPreferences,
+  UserState,
+  UserMutationOptions,
+  UserProfileUpdate,
+  UseUserReturn,
+};
