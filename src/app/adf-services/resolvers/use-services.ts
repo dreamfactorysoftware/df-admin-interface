@@ -1,319 +1,267 @@
+'use client';
+
+import { useQuery, useQueries, UseQueryResult } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
+import { GenericListResponse, Meta } from '@/types/generic-http';
+import { Service, ServiceType } from '@/types/service';
+import { useServiceTypes } from './use-service-types';
+
 /**
- * Service Management React Query Hooks
- * 
- * Provides React Query-based custom hooks for service data fetching, replacing Angular
- * servicesResolver and serviceResolver patterns with advanced caching, filtering, and
- * parallel query capabilities. Implements complex conditional logic for group-based
- * filtering, system service filtering, and related data fetching with optimistic updates.
+ * Configuration options for useServices hook
+ */
+interface UseServicesOptions {
+  /** Maximum number of services to fetch */
+  limit?: number;
+  /** Additional filter string for query */
+  filter?: string;
+  /** Whether to fetch system services (created_by_id is null) or user services (created_by_id is not null) */
+  system?: boolean;
+  /** Array of service groups to filter by. When provided, will fetch service types for these groups first */
+  groups?: string[];
+  /** Whether to enable the query (default: true) */
+  enabled?: boolean;
+}
+
+/**
+ * Configuration options for useService hook
+ */
+interface UseServiceOptions {
+  /** Related entities to include in the response */
+  related?: string;
+  /** Whether to enable the query (default: true when id is provided) */
+  enabled?: boolean;
+}
+
+/**
+ * Response type for useServices hook combining services and service types
+ */
+interface UseServicesResponse {
+  resource: Service[];
+  meta?: Meta;
+  serviceTypes?: ServiceType[];
+}
+
+/**
+ * React Query configuration constants
+ * TTL configuration per Section 5.2 requirements:
+ * - staleTime: 300 seconds (5 minutes)
+ * - cacheTime: 900 seconds (15 minutes)
+ */
+const QUERY_CONFIG = {
+  staleTime: 5 * 60 * 1000, // 5 minutes
+  cacheTime: 15 * 60 * 1000, // 15 minutes
+} as const;
+
+/**
+ * Custom React Query hook that fetches a list of services with advanced filtering capabilities.
+ * Replaces Angular servicesResolver factory pattern with React Query useServices hook.
  * 
  * Features:
- * - useServices: Configurable service list fetching with intelligent caching
- * - useService: Individual service fetching with related data loading
- * - Supports filtering by groups, system flag, and custom filters
- * - Background synchronization with React Query TTL configuration
- * - Optimistic updates and cache invalidation for service workflows
+ * - Intelligent caching with TTL configuration (staleTime: 300s, cacheTime: 900s)
+ * - Group-based filtering using parallel queries with useQueries
+ * - System vs user service filtering
+ * - Complex filter string building logic
+ * - Background synchronization and automatic revalidation
+ * - Cache hit responses under 50ms per React/Next.js Integration Requirements
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @param options - Configuration options for service fetching
+ * @returns UseQueryResult containing services data, loading state, and error information
  */
+export function useServices(options: UseServicesOptions = {}): UseQueryResult<UseServicesResponse> {
+  const {
+    limit,
+    filter,
+    system,
+    groups,
+    enabled = true,
+  } = options;
 
-import { useQuery, useQueries, UseQueryResult } from '@tanstack/react-query'
-import { apiClient } from '../../../lib/api-client'
+  // Fetch service types for group filtering
+  const {
+    data: serviceTypesData,
+    isLoading: serviceTypesLoading,
+    error: serviceTypesError,
+  } = useServiceTypes({
+    groups,
+    enabled: enabled && !!groups?.length,
+  });
 
-// Type definitions based on Angular implementation patterns
-interface Meta {
-  count: number
-  total?: number
-  offset?: number
-  limit?: number
-}
+  // Determine if we should proceed with services query
+  const shouldFetchServices = enabled && (!groups?.length || (!serviceTypesLoading && !serviceTypesError));
 
-interface GenericListResponse<T> {
-  resource: Array<T>
-  meta?: Meta
-}
-
-interface Service {
-  id: string
-  name: string
-  label?: string
-  description?: string
-  type: string
-  created_by_id?: string | null
-  is_active?: boolean
-  config?: Record<string, any>
-  service_doc_by_service_id?: any
-}
-
-interface ServiceType {
-  id?: string
-  name: string
-  label?: string
-  description?: string
-  group?: string
-  class_name?: string
-  config_schema?: Record<string, any>
-}
-
-// Query key factories for consistent cache management
-export const serviceQueries = {
-  all: ['services'] as const,
-  lists: () => [...serviceQueries.all, 'list'] as const,
-  list: (filters: ServiceListFilters) => [...serviceQueries.lists(), filters] as const,
-  details: () => [...serviceQueries.all, 'detail'] as const,
-  detail: (id: string, related?: string[]) => [...serviceQueries.details(), id, related] as const,
-  serviceTypes: () => ['service-types'] as const,
-  serviceTypesByGroups: (groups: string[]) => [...serviceQueries.serviceTypes(), 'groups', groups] as const,
-}
-
-// Service list filtering configuration
-interface ServiceListFilters {
-  limit?: number
-  offset?: number
-  filter?: string
-  system?: boolean
-  groups?: string[]
-  sort?: string
-}
-
-// Service list response type combining services and optional service types
-interface ServiceListResponse {
-  resource: Service[]
-  meta?: Meta
-  serviceTypes?: ServiceType[]
-}
-
-/**
- * React Query hook for fetching service types, with optional group filtering
- * Replaces Angular serviceTypesResolver with intelligent caching
- */
-export function useServiceTypes(groups?: string[]) {
-  // If groups are specified, use parallel queries for each group
-  const groupQueries = useQueries({
-    queries: groups ? groups.map(group => ({
-      queryKey: serviceQueries.serviceTypesByGroups([group]),
-      queryFn: async () => {
-        const response = await apiClient.get<GenericListResponse<ServiceType>>(
-          `/system/service_type?group=${encodeURIComponent(group)}`
-        )
-        return response
-      },
-      staleTime: 5 * 60 * 1000, // 5 minutes - service types change infrequently
-      cacheTime: 15 * 60 * 1000, // 15 minutes
-      enabled: !!group,
-    })) : [],
-  })
-
-  // Single query for all service types when no groups specified
-  const allTypesQuery = useQuery({
-    queryKey: serviceQueries.serviceTypes(),
-    queryFn: async () => {
-      const response = await apiClient.get<GenericListResponse<ServiceType>>('/system/service_type')
-      return response
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 15 * 60 * 1000, // 15 minutes
-    enabled: !groups || groups.length === 0,
-  })
-
-  if (groups && groups.length > 0) {
-    // Combine results from parallel group queries
-    const isLoading = groupQueries.some(query => query.isLoading)
-    const error = groupQueries.find(query => query.error)?.error
-    const data = groupQueries.every(query => query.data) 
-      ? groupQueries.flatMap(query => query.data?.resource || [])
-      : undefined
-
-    return {
-      data,
-      isLoading,
-      error,
-      isError: !!error,
-    }
-  }
-
-  return {
-    data: allTypesQuery.data?.resource,
-    isLoading: allTypesQuery.isLoading,
-    error: allTypesQuery.error,
-    isError: allTypesQuery.isError,
-  }
-}
-
-/**
- * React Query hook for fetching filtered service lists
- * Replaces Angular servicesResolver with advanced caching and filtering
- * 
- * Features:
- * - Group-based filtering with parallel service type queries
- * - System service filtering (created_by_id conditions)
- * - Complex filter string building with optimized re-rendering
- * - Background synchronization with 300s stale time / 900s cache time
- */
-export function useServices(filters: ServiceListFilters = {}) {
-  const { 
-    limit, 
-    offset = 0, 
-    filter, 
-    system = false, 
-    groups, 
-    sort = 'name' 
-  } = filters
-
-  // First, fetch service types if groups are specified
-  const serviceTypesQuery = useServiceTypes(groups)
-
-  // Main services query with dependent execution
   return useQuery({
-    queryKey: serviceQueries.list(filters),
-    queryFn: async (): Promise<ServiceListResponse> => {
-      let filterString = ''
-      
-      // Build complex filter string based on conditions
-      if (groups && serviceTypesQuery.data) {
-        // Filter by service types from groups
-        const typeNames = serviceTypesQuery.data.map(type => type.name)
-        const typeFilter = `type in ("${typeNames.join('","')}")`
-        
+    queryKey: ['services', { limit, filter, system, groups }],
+    queryFn: async (): Promise<UseServicesResponse> => {
+      // Build the filter string based on system flag and groups
+      let filterString = '';
+
+      if (system !== undefined) {
         if (system) {
-          filterString = `(created_by_id is not null) and (${typeFilter})`
+          // System services: created_by_id is not null
+          filterString = '(created_by_id is not null)';
         } else {
-          filterString = typeFilter
-        }
-      } else {
-        // System-only filtering without groups
-        if (system) {
-          filterString = '(created_by_id is null) and (name != "api_docs")'
+          // User services: created_by_id is null and exclude api_docs
+          filterString = '(created_by_id is null) and (name != "api_docs")';
         }
       }
 
-      // Append custom filter if provided
+      // Add group-based filtering if groups are specified
+      if (groups?.length && serviceTypesData?.length) {
+        const serviceTypeNames = serviceTypesData.map(st => st.name);
+        const typeFilter = `(type in ("${serviceTypeNames.join('","')}"))`;
+        
+        if (filterString) {
+          filterString = `${filterString} and ${typeFilter}`;
+        } else {
+          filterString = typeFilter;
+        }
+      }
+
+      // Add additional filter if provided
       if (filter) {
-        filterString = filterString 
-          ? `${filterString} and ${filter}` 
-          : filter
+        if (filterString) {
+          filterString = `${filterString} and ${filter}`;
+        } else {
+          filterString = filter;
+        }
       }
 
-      // Build query parameters
-      const params = new URLSearchParams()
-      if (limit) params.append('limit', limit.toString())
-      if (offset) params.append('offset', offset.toString())
-      if (sort) params.append('sort', sort)
-      if (filterString) params.append('filter', filterString)
+      // Fetch services with constructed filter
+      const response = await apiClient.get<GenericListResponse<Service>>('/system/service', {
+        params: {
+          limit,
+          sort: 'name',
+          ...(filterString && { filter: filterString }),
+        },
+      });
 
-      const response = await apiClient.get<GenericListResponse<Service>>(
-        `/system/service?${params.toString()}`
-      )
-
-      // Include service types in response if they were fetched
-      const result: ServiceListResponse = {
+      return {
         resource: response.resource,
         meta: response.meta,
-      }
-
-      if (groups && serviceTypesQuery.data) {
-        result.serviceTypes = serviceTypesQuery.data
-      }
-
-      return result
+        serviceTypes: serviceTypesData,
+      };
     },
-    // Enable query only when service types are loaded (if needed) or when no groups specified
-    enabled: !groups || !serviceTypesQuery.isLoading,
-    // React Query TTL configuration per requirements
-    staleTime: 5 * 60 * 1000, // 5 minutes (300s)
-    cacheTime: 15 * 60 * 1000, // 15 minutes (900s)
-    // Optimized re-rendering with select function
+    enabled: shouldFetchServices,
+    ...QUERY_CONFIG,
+    // Select function for optimized re-rendering per React/Next.js Integration Requirements
     select: (data) => ({
       ...data,
-      resource: data.resource.filter(service => {
-        // Additional client-side filtering for performance optimization
-        return true // Placeholder for any client-side optimizations
-      })
+      // Ensure stable references for arrays
+      resource: data.resource || [],
+      serviceTypes: data.serviceTypes || [],
     }),
-    // Background synchronization for cache hit responses under 50ms
-    refetchOnWindowFocus: true,
+    // Background refetch configuration for intelligent synchronization
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
-    refetchInterval: 30 * 1000, // 30 seconds background sync
-  })
+    // Retry configuration for resilient data fetching
+    retry: (failureCount, error: any) => {
+      // Don't retry on 4xx errors (client errors)
+      if (error?.response?.status >= 400 && error?.response?.status < 500) {
+        return false;
+      }
+      // Retry up to 3 times for other errors
+      return failureCount < 3;
+    },
+  });
 }
 
 /**
- * React Query hook for fetching individual service details
- * Replaces Angular serviceResolver with intelligent caching and related data fetching
+ * Custom React Query hook that fetches a single service by ID with related data.
+ * Replaces Angular serviceResolver for individual service fetching.
  * 
  * Features:
- * - Related data loading (service_doc_by_service_id)
- * - Optimistic updates support
- * - Cache invalidation integration
+ * - Intelligent caching with TTL configuration
+ * - Optional related data fetching
+ * - Automatic background revalidation
+ * - Type-safe service data with proper error handling
+ * 
+ * @param id - Service ID to fetch
+ * @param options - Configuration options for service fetching
+ * @returns UseQueryResult containing service data, loading state, and error information
  */
-export function useService(id?: string, related?: string[]) {
+export function useService(
+  id: string | number | null | undefined,
+  options: UseServiceOptions = {}
+): UseQueryResult<Service | undefined> {
+  const {
+    related = 'service_doc_by_service_id',
+    enabled = true,
+  } = options;
+
   return useQuery({
-    queryKey: serviceQueries.detail(id || '', related),
+    queryKey: ['service', id, { related }],
     queryFn: async (): Promise<Service> => {
       if (!id) {
-        throw new Error('Service ID is required')
+        throw new Error('Service ID is required');
       }
 
-      // Build query parameters for related data
-      const params = new URLSearchParams()
-      if (related && related.length > 0) {
-        params.append('related', related.join(','))
-      }
+      const response = await apiClient.get<Service>(`/system/service/${id}`, {
+        params: {
+          related,
+        },
+      });
 
-      const queryString = params.toString()
-      const url = `/system/service/${encodeURIComponent(id)}${queryString ? `?${queryString}` : ''}`
-      
-      const response = await apiClient.get<Service>(url)
-      return response
+      return response;
     },
-    enabled: !!id,
-    // React Query TTL configuration per requirements  
-    staleTime: 5 * 60 * 1000, // 5 minutes (300s)
-    cacheTime: 15 * 60 * 1000, // 15 minutes (900s)
-    // Background synchronization
-    refetchOnWindowFocus: true,
+    enabled: enabled && !!id,
+    ...QUERY_CONFIG,
+    // Background refetch configuration
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
-  })
+    // Retry configuration
+    retry: (failureCount, error: any) => {
+      // Don't retry on 404 (service not found) or other 4xx errors
+      if (error?.response?.status >= 400 && error?.response?.status < 500) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+  });
 }
 
 /**
- * Utility hook for pre-loading service data (optimistic loading)
- * Supports parallel queries and intelligent cache warming
+ * Utility hook for fetching multiple services in parallel using useQueries.
+ * Useful for complex scenarios requiring parallel service fetching with different parameters.
+ * 
+ * @param queries - Array of service query configurations
+ * @returns Array of UseQueryResult objects for each service query
  */
-export function useServiceQueries(serviceIds: string[], related?: string[]) {
+export function useMultipleServices(
+  queries: Array<{ id: string | number; options?: UseServiceOptions }>
+): UseQueryResult<Service | undefined>[] {
   return useQueries({
-    queries: serviceIds.map(id => ({
-      queryKey: serviceQueries.detail(id, related),
-      queryFn: async () => {
-        const params = new URLSearchParams()
-        if (related && related.length > 0) {
-          params.append('related', related.join(','))
-        }
-
-        const queryString = params.toString()
-        const url = `/system/service/${encodeURIComponent(id)}${queryString ? `?${queryString}` : ''}`
-        
-        return await apiClient.get<Service>(url)
+    queries: queries.map(({ id, options = {} }) => ({
+      queryKey: ['service', id, { related: options.related }],
+      queryFn: async (): Promise<Service> => {
+        const response = await apiClient.get<Service>(`/system/service/${id}`, {
+          params: {
+            related: options.related || 'service_doc_by_service_id',
+          },
+        });
+        return response;
       },
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 15 * 60 * 1000, // 15 minutes
-      enabled: !!id,
+      enabled: options.enabled !== false && !!id,
+      ...QUERY_CONFIG,
     })),
-  })
+  });
 }
 
 /**
- * Hook for service management actions with cache invalidation
- * Supports optimistic updates and intelligent cache management
+ * Query key factory for service-related queries.
+ * Provides consistent query key generation for cache invalidation and prefetching.
  */
-export function useServiceActions() {
-  // Placeholder for mutation hooks that will be implemented
-  // when service creation/update/delete functionality is migrated
-  return {
-    // Will include: useCreateService, useUpdateService, useDeleteService
-    // with optimistic updates and cache invalidation
-  }
-}
+export const serviceQueryKeys = {
+  all: ['services'] as const,
+  lists: () => [...serviceQueryKeys.all, 'list'] as const,
+  list: (filters: UseServicesOptions) => [...serviceQueryKeys.lists(), filters] as const,
+  details: () => [...serviceQueryKeys.all, 'detail'] as const,
+  detail: (id: string | number, options?: UseServiceOptions) => 
+    [...serviceQueryKeys.details(), id, options] as const,
+} as const;
 
-// Export query key factories for external cache invalidation
-export { serviceQueries as ServiceQueryKeys }
+/**
+ * Type exports for external usage
+ */
+export type { UseServicesOptions, UseServiceOptions, UseServicesResponse };
