@@ -1,106 +1,160 @@
+"use client";
+
+import React from "react";
+import { cn } from "@/lib/utils";
+
 /**
  * Next.js Loading UI Component for Profile Management Section
  * 
- * Implements skeleton placeholders during profile data fetching operations.
- * Provides accessible loading states with proper ARIA attributes and responsive design
- * using Tailwind CSS animations for profile forms, security questions, and password updates.
+ * Implements accessible loading states with skeleton placeholders during profile data fetching.
+ * Follows Next.js 15.1+ app router conventions with comprehensive WCAG 2.1 AA compliance.
  * 
- * @implements {React Component} Next.js app router loading convention
- * @implements {WCAG 2.1 AA} Accessibility compliance with screen reader support
- * @implements {Tailwind CSS 4.1+} Theme-aware styling with responsive design patterns
+ * Features:
+ * - Skeleton UI placeholders for profile form tabs (Details, Security Question, Password)
+ * - WCAG 2.1 AA accessibility with proper ARIA attributes and announcements
+ * - Responsive design adapting to mobile, tablet, and desktop viewports
+ * - Theme-aware styling matching application design system
+ * - Smooth Tailwind CSS animations providing clear loading feedback
+ * - Screen reader compatible with loading state announcements
+ * 
+ * @see Technical Specification Section 0.2.1 for Next.js app router architecture
+ * @see Technical Specification Section 7.7.1 for WCAG 2.1 AA compliance requirements
  */
-
-import React from 'react';
 
 /**
- * Skeleton component for form field loading states
- * Provides accessible loading placeholder with proper ARIA attributes
+ * Reusable skeleton component for form fields and content areas
+ * Implements consistent loading animations with accessibility features
  */
-function SkeletonField({ 
-  label, 
-  type = 'input',
-  className = '' 
-}: { 
-  label: string; 
-  type?: 'input' | 'textarea' | 'select';
+interface SkeletonProps {
+  /** CSS classes for custom styling */
   className?: string;
-}) {
-  const baseClasses = "animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md";
-  
-  const typeClasses = {
-    input: "h-12",
-    textarea: "h-24", 
-    select: "h-12"
+  /** Width variant for responsive design */
+  width?: "full" | "3/4" | "1/2" | "1/3" | "1/4";
+  /** Height variant for different content types */
+  height?: "sm" | "md" | "lg" | "xl";
+  /** Accessible label for screen readers */
+  ariaLabel?: string;
+}
+
+function Skeleton({ 
+  className, 
+  width = "full", 
+  height = "md",
+  ariaLabel = "Loading content"
+}: SkeletonProps) {
+  const widthClasses = {
+    full: "w-full",
+    "3/4": "w-3/4",
+    "1/2": "w-1/2", 
+    "1/3": "w-1/3",
+    "1/4": "w-1/4"
+  };
+
+  const heightClasses = {
+    sm: "h-4",
+    md: "h-6", 
+    lg: "h-8",
+    xl: "h-12"
   };
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      {/* Field Label Skeleton */}
-      <div 
-        className={`${baseClasses} h-5 w-32`}
-        aria-label={`Loading ${label} field label`}
-        role="status"
-      />
+    <div
+      className={cn(
+        // Base skeleton styling with accessibility-compliant animations
+        "animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md",
+        // Responsive width and height variants
+        widthClasses[width],
+        heightClasses[height],
+        // Custom classes override
+        className
+      )}
+      role="progressbar"
+      aria-label={ariaLabel}
+      aria-busy="true"
+    />
+  );
+}
+
+/**
+ * Form field skeleton component matching profile form structure
+ * Provides consistent loading placeholders for input fields and labels
+ */
+function FormFieldSkeleton({ 
+  label, 
+  required = false,
+  type = "input"
+}: {
+  label: string;
+  required?: boolean;
+  type?: "input" | "textarea" | "select";
+}) {
+  const inputHeight = {
+    input: "h-11", // 44px minimum touch target per WCAG guidelines
+    textarea: "h-24",
+    select: "h-11"
+  };
+
+  return (
+    <div className="space-y-2" role="group" aria-label={`Loading ${label} field`}>
+      {/* Label skeleton */}
+      <div className="flex items-center gap-1">
+        <Skeleton 
+          width="1/4" 
+          height="sm"
+          ariaLabel={`Loading ${label} label`}
+        />
+        {required && (
+          <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
+        )}
+      </div>
       
-      {/* Field Input Skeleton */}
-      <div 
-        className={`${baseClasses} w-full ${typeClasses[type]}`}
-        aria-label={`Loading ${label} field input`}
-        role="status"
+      {/* Input field skeleton */}
+      <Skeleton 
+        className={cn(
+          "rounded-md border border-gray-200 dark:border-gray-600",
+          inputHeight[type]
+        )}
+        ariaLabel={`Loading ${label} input field`}
       />
     </div>
   );
 }
 
 /**
- * Skeleton component for form buttons
- * Provides loading placeholder for action buttons with proper sizing
+ * Tab skeleton component for navigation tabs
+ * Implements accessible tab loading with proper ARIA attributes
  */
-function SkeletonButton({ 
-  variant = 'primary',
-  className = '' 
+function TabSkeleton({ 
+  tabs 
 }: { 
-  variant?: 'primary' | 'secondary';
-  className?: string;
+  tabs: Array<{ label: string; active?: boolean }> 
 }) {
-  const variantClasses = variant === 'primary' 
-    ? "bg-primary-200 dark:bg-primary-800" 
-    : "bg-gray-200 dark:bg-gray-700";
-
   return (
     <div 
-      className={`animate-pulse ${variantClasses} rounded-md h-12 w-32 min-w-[44px] ${className}`}
-      aria-label="Loading action button"
-      role="status"
-    />
-  );
-}
-
-/**
- * Skeleton component for tab navigation
- * Provides loading state for profile form tabs with proper accessibility
- */
-function SkeletonTabs() {
-  const tabs = [
-    { label: 'Profile Details', width: 'w-28' },
-    { label: 'Security Question', width: 'w-36' },
-    { label: 'Password Update', width: 'w-32' }
-  ];
-
-  return (
-    <div 
-      className="border-b border-gray-200 dark:border-gray-700 mb-8"
+      className="border-b border-gray-200 dark:border-gray-700 mb-6"
       role="tablist"
-      aria-label="Loading profile form tabs"
+      aria-label="Loading profile management tabs"
     >
-      <nav className="-mb-px flex space-x-8" aria-label="Profile form sections">
+      <nav className="-mb-px flex space-x-8">
         {tabs.map((tab, index) => (
-          <div 
+          <div
             key={index}
-            className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded-t-md h-10 ${tab.width} mb-[-1px]`}
+            role="tab"
+            aria-selected={tab.active}
             aria-label={`Loading ${tab.label} tab`}
-            role="status"
-          />
+            className={cn(
+              "py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap",
+              tab.active
+                ? "border-primary-500 text-primary-600 dark:text-primary-400"
+                : "border-transparent text-gray-500 dark:text-gray-400"
+            )}
+          >
+            <Skeleton 
+              width="3/4" 
+              height="sm"
+              ariaLabel={`Loading ${tab.label} tab text`}
+            />
+          </div>
         ))}
       </nav>
     </div>
@@ -108,223 +162,219 @@ function SkeletonTabs() {
 }
 
 /**
- * Skeleton component for profile details form
- * Provides loading placeholders matching profile edit form structure
+ * Action button skeleton for form submission buttons
+ * Maintains consistent button sizing per WCAG touch target requirements
  */
-function ProfileDetailsFormSkeleton() {
+function ActionButtonSkeleton({ 
+  variant = "primary",
+  children
+}: {
+  variant?: "primary" | "secondary";
+  children: string;
+}) {
   return (
-    <div className="space-y-6" aria-label="Loading profile details form">
-      {/* Personal Information Section */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md h-6 w-40 mb-6" />
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <SkeletonField label="First Name" />
-          <SkeletonField label="Last Name" />
-          <SkeletonField label="Email Address" className="md:col-span-2" />
-          <SkeletonField label="Display Name" />
-          <SkeletonField label="Phone Number" />
-        </div>
+    <Skeleton
+      className={cn(
+        // WCAG 2.1 AA minimum 44x44px touch targets
+        "min-h-[44px] min-w-[44px] rounded-md",
+        variant === "primary" 
+          ? "bg-primary-200 dark:bg-primary-800" 
+          : "bg-gray-200 dark:bg-gray-700",
+        "px-4 py-2"
+      )}
+      width="1/4"
+      ariaLabel={`Loading ${children} button`}
+    />
+  );
+}
+
+/**
+ * Main Loading Component for Profile Management
+ * 
+ * Displays comprehensive loading states for all profile management sections
+ * with proper accessibility and responsive design implementation
+ */
+export default function ProfileLoading() {
+  const profileTabs = [
+    { label: "Details", active: true },
+    { label: "Security Question", active: false },
+    { label: "Password", active: false }
+  ];
+
+  return (
+    <div 
+      className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8"
+      role="main"
+      aria-label="Loading profile management interface"
+      aria-busy="true"
+    >
+      {/* Screen reader announcement for loading state */}
+      <div 
+        className="sr-only" 
+        aria-live="polite" 
+        aria-atomic="true"
+      >
+        Loading profile management interface. Please wait while we fetch your profile information.
       </div>
 
-      {/* Preferences Section */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md h-6 w-32 mb-6" />
+      {/* Page header skeleton */}
+      <div className="mb-8">
+        <Skeleton 
+          width="1/3" 
+          height="xl"
+          className="mb-2"
+          ariaLabel="Loading page title"
+        />
+        <Skeleton 
+          width="1/2" 
+          height="sm"
+          ariaLabel="Loading page description"
+        />
+      </div>
+
+      {/* Tab navigation skeleton */}
+      <TabSkeleton tabs={profileTabs} />
+
+      {/* Main content area with responsive layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
         
-        <div className="space-y-6">
-          <SkeletonField label="Default Database Type" type="select" />
-          <SkeletonField label="Items per Page" type="select" />
-          
-          {/* Checkbox Options */}
-          <div className="space-y-4">
-            {['Auto-refresh schemas', 'Show advanced options', 'Email notifications'].map((option, index) => (
-              <div key={index} className="flex items-center space-x-3">
-                <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded h-5 w-5" />
-                <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md h-5 w-36" />
+        {/* Profile form content - responsive layout */}
+        <div className="lg:col-span-8">
+          <div 
+            className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
+            role="region"
+            aria-label="Loading profile form"
+          >
+            {/* Profile Details Tab Content */}
+            <div className="space-y-6">
+              {/* Basic Information Section */}
+              <div>
+                <Skeleton 
+                  width="1/4" 
+                  height="lg"
+                  className="mb-4"
+                  ariaLabel="Loading section title"
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormFieldSkeleton label="First Name" required />
+                  <FormFieldSkeleton label="Last Name" required />
+                  <FormFieldSkeleton label="Email Address" required type="input" />
+                  <FormFieldSkeleton label="Phone Number" type="input" />
+                </div>
               </div>
-            ))}
+
+              {/* Additional Details Section */}
+              <div>
+                <Skeleton 
+                  width="1/3" 
+                  height="lg"
+                  className="mb-4"
+                  ariaLabel="Loading additional details section"
+                />
+                <div className="space-y-4">
+                  <FormFieldSkeleton label="Display Name" type="input" />
+                  <FormFieldSkeleton label="Default Role" type="select" />
+                  <FormFieldSkeleton label="About" type="textarea" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Profile sidebar - responsive layout */}
+        <div className="lg:col-span-4">
+          <div 
+            className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
+            role="complementary"
+            aria-label="Loading profile information"
+          >
+            {/* Profile avatar section */}
+            <div className="text-center mb-6">
+              <Skeleton 
+                className="w-24 h-24 rounded-full mx-auto mb-4"
+                ariaLabel="Loading profile avatar"
+              />
+              <Skeleton 
+                width="1/2" 
+                height="md"
+                className="mx-auto mb-2"
+                ariaLabel="Loading user name"
+              />
+              <Skeleton 
+                width="3/4" 
+                height="sm"
+                className="mx-auto"
+                ariaLabel="Loading user role"
+              />
+            </div>
+
+            {/* Quick actions */}
+            <div className="space-y-3">
+              <Skeleton 
+                width="1/3" 
+                height="md"
+                className="mb-3"
+                ariaLabel="Loading quick actions title"
+              />
+              <ActionButtonSkeleton variant="secondary">Change Avatar</ActionButtonSkeleton>
+              <ActionButtonSkeleton variant="secondary">Download Data</ActionButtonSkeleton>
+              <ActionButtonSkeleton variant="secondary">Account Settings</ActionButtonSkeleton>
+            </div>
+          </div>
+
+          {/* Security overview */}
+          <div 
+            className="mt-6 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
+            role="region"
+            aria-label="Loading security overview"
+          >
+            <Skeleton 
+              width="1/2" 
+              height="md"
+              className="mb-4"
+              ariaLabel="Loading security section title"
+            />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Skeleton width="1/2" height="sm" ariaLabel="Loading security item" />
+                <Skeleton width="1/4" height="sm" ariaLabel="Loading security status" />
+              </div>
+              <div className="flex items-center justify-between">
+                <Skeleton width="1/2" height="sm" ariaLabel="Loading security item" />
+                <Skeleton width="1/4" height="sm" ariaLabel="Loading security status" />
+              </div>
+              <div className="flex items-center justify-between">
+                <Skeleton width="1/2" height="sm" ariaLabel="Loading security item" />
+                <Skeleton width="1/4" height="sm" ariaLabel="Loading security status" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-4">
-        <SkeletonButton variant="primary" className="sm:order-2" />
-        <SkeletonButton variant="secondary" className="sm:order-1" />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Skeleton component for security question form
- * Provides loading placeholders for security question management
- */
-function SecurityQuestionFormSkeleton() {
-  return (
-    <div className="space-y-6" aria-label="Loading security question form">
-      {/* Current Security Question Section */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md h-6 w-48 mb-6" />
-        
-        <div className="space-y-4">
-          <SkeletonField label="Current Question" />
-          <SkeletonField label="Current Answer" type="input" />
-        </div>
-      </div>
-
-      {/* New Security Question Section */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md h-6 w-44 mb-6" />
-        
-        <div className="space-y-4">
-          <SkeletonField label="Security Question" type="select" />
-          <SkeletonField label="Your Answer" type="input" />
-          <SkeletonField label="Confirm Answer" type="input" />
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-4">
-        <SkeletonButton variant="primary" className="sm:order-2" />
-        <SkeletonButton variant="secondary" className="sm:order-1" />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Skeleton component for password update form
- * Provides loading placeholders for password change functionality
- */
-function PasswordUpdateFormSkeleton() {
-  return (
-    <div className="space-y-6" aria-label="Loading password update form">
-      {/* Password Change Section */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md h-6 w-36 mb-6" />
-        
-        <div className="space-y-4">
-          <SkeletonField label="Current Password" />
-          <SkeletonField label="New Password" />
-          <SkeletonField label="Confirm New Password" />
-        </div>
-      </div>
-
-      {/* Password Requirements Section */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md h-6 w-44 mb-6" />
-        
-        <div className="space-y-3">
-          {[
-            'At least 8 characters long',
-            'Contains uppercase and lowercase letters',
-            'Contains at least one number',
-            'Contains at least one special character'
-          ].map((requirement, index) => (
-            <div key={index} className="flex items-center space-x-3">
-              <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-full h-4 w-4" />
-              <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md h-4 flex-1 max-w-xs" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-4">
-        <SkeletonButton variant="primary" className="sm:order-2" />
-        <SkeletonButton variant="secondary" className="sm:order-1" />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Main Loading Component for Profile Management Section
- * 
- * Displays skeleton placeholders during profile data fetching operations.
- * Implements Next.js app router loading conventions with accessible design.
- * 
- * Features:
- * - Responsive design for mobile and desktop viewports
- * - Theme-aware styling with dark/light mode support  
- * - WCAG 2.1 AA compliant with proper ARIA attributes
- * - Smooth loading transitions using Tailwind CSS animations
- * - Form field skeletons matching profile edit form structure
- * 
- * @returns {JSX.Element} Loading UI with skeleton placeholders
- */
-export default function ProfileLoading(): JSX.Element {
-  return (
-    <div 
-      className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8"
-      role="status"
-      aria-live="polite"
-      aria-label="Loading profile management interface"
-    >
-      {/* Page Header Skeleton */}
-      <div className="mb-8">
-        <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md h-8 w-48 mb-2" />
-        <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-md h-5 w-96 max-w-full" />
-      </div>
-
-      {/* Tab Navigation Skeleton */}
-      <SkeletonTabs />
-
-      {/* Profile Details Form Skeleton - Default Active Tab */}
-      <div className="transition-opacity duration-300 ease-in-out">
-        <ProfileDetailsFormSkeleton />
-      </div>
-
-      {/* Loading Indicator for Screen Readers */}
-      <div className="sr-only" aria-live="assertive">
-        Loading profile management interface. Please wait while we fetch your profile data.
-      </div>
-
-      {/* Loading Progress Indicator */}
+      {/* Form actions */}
       <div 
-        className="fixed bottom-4 right-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-50"
+        className="mt-8 flex flex-col sm:flex-row gap-3 justify-end"
+        role="group"
+        aria-label="Loading form actions"
+      >
+        <ActionButtonSkeleton variant="secondary">Cancel</ActionButtonSkeleton>
+        <ActionButtonSkeleton variant="primary">Save Changes</ActionButtonSkeleton>
+      </div>
+
+      {/* Loading progress indicator for enhanced feedback */}
+      <div 
+        className="fixed bottom-4 right-4 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4 hidden sm:block"
         role="status"
-        aria-label="Loading progress"
+        aria-live="polite"
       >
         <div className="flex items-center space-x-3">
-          {/* Spinning Loading Icon */}
-          <div className="animate-spin h-5 w-5 border-2 border-primary-500 border-t-transparent rounded-full" />
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Loading profile...
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600 dark:border-primary-400" />
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            Loading profile data...
           </span>
-        </div>
-        
-        {/* Progress Bar */}
-        <div className="mt-2 w-48 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-          <div className="h-full bg-primary-500 rounded-full animate-pulse" style={{ width: '60%' }} />
         </div>
       </div>
     </div>
   );
 }
-
-/**
- * Component Export Documentation
- * 
- * This loading component is automatically used by Next.js app router when
- * navigating to /adf-profile route during data fetching operations.
- * 
- * Design System Integration:
- * - Uses design tokens from Tailwind CSS 4.1+ configuration
- * - Implements WCAG 2.1 AA color contrast requirements (4.5:1 minimum)
- * - Provides theme-aware styling for dark/light mode support
- * - Responsive breakpoints: mobile-first design with sm: md: lg: variants
- * 
- * Accessibility Features:
- * - ARIA live regions for screen reader announcements
- * - Proper role and aria-label attributes on loading elements
- * - Keyboard navigation support with focus management
- * - Screen reader-only loading progress announcements
- * 
- * Performance Considerations:
- * - Lightweight skeleton rendering with minimal DOM nodes
- * - CSS-only animations using Tailwind's animate-pulse utility
- * - Optimized for fast initial render during data fetching
- * - No JavaScript dependencies beyond React for optimal performance
- */
