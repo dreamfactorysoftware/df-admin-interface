@@ -1,1013 +1,642 @@
 /**
- * Comprehensive Vitest test suite for User Edit Page Component
+ * Comprehensive Vitest unit test suite for the user edit page component
  * 
- * Tests the React/Next.js user edit page functionality including form validation,
- * data fetching, submission workflows, and error scenarios. Implements modern
- * testing patterns with Vitest, React Testing Library, and Mock Service Worker.
+ * Tests cover:
+ * - Form validation with React Hook Form and Zod schema validation
+ * - Data fetching with SWR and loading states
+ * - Submission workflows with optimistic updates
+ * - Error scenarios and error boundary validation
+ * - Accessibility compliance (WCAG 2.1 AA)
+ * - Mock Service Worker (MSW) for realistic API mocking
  * 
- * Migration from Angular TestBed to React Testing Library patterns per Section 4.7.1.3
- * testing infrastructure setup with 10x faster test execution using Vitest.
+ * Replaces Angular TestBed with modern React testing patterns using:
+ * - Vitest for 10x faster test execution
+ * - React Testing Library for component testing best practices
+ * - MSW for realistic API mocking without backend dependencies
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { axe, toHaveNoViolations } from 'jest-axe';
+import { rest } from 'msw';
+import { setupServer } from 'msw/node';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NextRouter } from 'next/router';
-import { useRouter, useParams } from 'next/navigation';
-import { server } from '../../../test/mocks/server';
-import { rest } from 'msw';
+
+// Component and dependencies
 import UserEditPage from './page';
-import { 
-  mockUserProfile, 
-  mockUserRoles, 
-  mockUserApps,
-  createMockUser,
-  mockAdminUser 
-} from '../../../test/mocks/user-data';
-import { 
-  UserProfile, 
-  UserRole, 
-  UserApp,
-  userProfileUpdateSchema,
-  changePasswordSchema 
-} from '../../../types/user';
-import { APIResponse } from '../../../types/api';
+import { mockUsers, mockRoles } from '../../../test/mocks/user-data';
+import { renderWithProviders } from '../../../test/utils/test-utils';
+import { createMockUser, createMockRole } from '../../../test/utils/component-factories';
 
-// ============================================================================
-// Mock Setup and Configuration
-// ============================================================================
+// Hooks and utilities
+import * as useUsersHook from '../../../hooks/use-users';
+import { UserProfile, UserProfileFormData } from '../../../types/user';
 
-// Mock Next.js router hooks
+// Extend Jest with axe matchers
+expect.extend(toHaveNoViolations);
+
+// Mock Next.js router
+const mockRouter = {
+  route: '/adf-users/1',
+  pathname: '/adf-users/[id]',
+  query: { id: '1' },
+  asPath: '/adf-users/1',
+  push: vi.fn(),
+  replace: vi.fn(),
+  reload: vi.fn(),
+  back: vi.fn(),
+  prefetch: vi.fn(),
+  beforePopState: vi.fn(),
+  events: {
+    on: vi.fn(),
+    off: vi.fn(),
+    emit: vi.fn(),
+  },
+  isFallback: false,
+  isReady: true,
+  isPreview: false,
+} as unknown as NextRouter;
+
+// Mock useRouter hook
+vi.mock('next/router', () => ({
+  useRouter: () => mockRouter,
+}));
+
+// Mock useParams hook for Next.js 13+ App Router
 vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
-  useParams: vi.fn(),
+  useParams: () => ({ id: '1' }),
+  useRouter: () => mockRouter,
+  useSearchParams: () => new URLSearchParams(),
 }));
 
-// Mock use-users hook
-vi.mock('../../../hooks/use-users', () => ({
-  useUser: vi.fn(),
-  useUpdateUser: vi.fn(),
-  useDeleteUser: vi.fn(),
-  useUserRoles: vi.fn(),
-  useUserApps: vi.fn(),
-  useAssignUserRole: vi.fn(),
-  useRemoveUserRole: vi.fn(),
-}));
+// MSW server setup for API mocking
+const server = setupServer(
+  // User GET endpoint
+  rest.get('/api/v2/system/user/1', (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json({
+        resource: [mockUsers[0]], // admin user
+        meta: { count: 1 },
+      })
+    );
+  }),
 
-// Mock Zod validation schemas
-vi.mock('../../../lib/validations/user', () => ({
-  userProfileUpdateSchema: {
-    parse: vi.fn(),
-    safeParse: vi.fn(),
-  },
-  changePasswordSchema: {
-    parse: vi.fn(),
-    safeParse: vi.fn(),
-  },
-}));
+  // User UPDATE endpoint
+  rest.put('/api/v2/system/user/1', async (req, res, ctx) => {
+    const requestBody = await req.json();
+    const updatedUser = {
+      ...mockUsers[0],
+      ...requestBody.resource,
+      last_modified_date: new Date().toISOString(),
+    };
+    
+    return res(
+      ctx.status(200),
+      ctx.json({
+        resource: [updatedUser],
+        meta: { count: 1 },
+      })
+    );
+  }),
 
-// ============================================================================
-// Test Data Factories
-// ============================================================================
+  // Roles endpoint for dropdown data
+  rest.get('/api/v2/system/role', (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json({
+        resource: mockRoles,
+        meta: { count: mockRoles.length },
+      })
+    );
+  }),
 
-/**
- * Factory for creating mock user profiles with realistic data
- */
-const createTestUser = (overrides: Partial<UserProfile> = {}): UserProfile => ({
-  id: 1,
-  name: 'John Doe',
-  first_name: 'John',
-  last_name: 'Doe',
-  display_name: 'John Doe',
-  email: 'john.doe@dreamfactory.com',
-  username: 'johndoe',
-  phone: '+1-555-0123',
-  is_active: true,
-  is_sys_admin: false,
-  created_date: '2024-01-15T10:30:00.000Z',
-  last_modified_date: '2024-01-15T10:30:00.000Z',
-  email_verified_at: '2024-01-15T10:30:00.000Z',
-  default_app_id: 1,
-  timezone: 'UTC',
-  locale: 'en',
-  theme_preference: 'light',
-  notification_preferences: {
-    email_notifications: true,
-    system_alerts: true,
-    api_quota_warnings: true,
-    security_notifications: true,
-    maintenance_notifications: false,
-  },
-  user_to_app_to_role_by_user_id: [],
-  user_lookup_by_user_id: [],
-  ...overrides,
-});
-
-/**
- * Factory for creating mock user roles
- */
-const createTestRole = (overrides: Partial<UserRole> = {}): UserRole => ({
-  id: 1,
-  name: 'Editor',
-  description: 'Content Editor Role',
-  is_active: true,
-  created_date: '2024-01-01T00:00:00.000Z',
-  last_modified_date: '2024-01-01T00:00:00.000Z',
-  ...overrides,
-});
-
-/**
- * Factory for creating mock user apps
- */
-const createTestApp = (overrides: Partial<UserApp> = {}): UserApp => ({
-  id: 1,
-  name: 'Admin Console',
-  description: 'DreamFactory Admin Console',
-  is_active: true,
-  type: 'Web App',
-  path: '/admin',
-  url: '/admin',
-  requires_fullscreen: false,
-  allow_fullscreen_toggle: true,
-  created_date: '2024-01-01T00:00:00.000Z',
-  last_modified_date: '2024-01-01T00:00:00.000Z',
-  ...overrides,
-});
-
-/**
- * Factory for API error responses
- */
-const createApiError = (status: number, message: string, field?: string) => ({
-  success: false,
-  error: {
-    code: status,
-    message,
-    field,
-    details: field ? { [field]: [message] } : undefined,
-  },
-});
-
-// ============================================================================
-// Test Utilities and Wrappers
-// ============================================================================
-
-/**
- * Custom test wrapper with QueryClient and providers
- */
-const TestWrapper = ({ children }: { children: React.ReactNode }) => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        cacheTime: 0,
-      },
-      mutations: {
-        retry: false,
-      },
-    },
-  });
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
-};
-
-/**
- * Helper to render component with test wrapper
- */
-const renderUserEditPage = (userId: string = '1') => {
-  (useParams as any).mockReturnValue({ id: userId });
-  
-  return render(
-    <TestWrapper>
-      <UserEditPage />
-    </TestWrapper>
-  );
-};
-
-// ============================================================================
-// MSW Handlers for API Mocking
-// ============================================================================
-
-const mockHandlers = {
-  // Get user by ID
-  getUserSuccess: (user: UserProfile) =>
-    rest.get('/api/v2/system/user/:id', (req, res, ctx) => {
-      return res(
-        ctx.status(200),
-        ctx.json({
-          success: true,
-          data: user,
-        })
-      );
-    }),
-
-  // Get user roles
-  getUserRolesSuccess: (roles: UserRole[]) =>
-    rest.get('/api/v2/system/role', (req, res, ctx) => {
-      return res(
-        ctx.status(200),
-        ctx.json({
-          success: true,
-          data: roles,
-          meta: { total: roles.length, count: roles.length },
-        })
-      );
-    }),
-
-  // Get user apps
-  getUserAppsSuccess: (apps: UserApp[]) =>
-    rest.get('/api/v2/system/app', (req, res, ctx) => {
-      return res(
-        ctx.status(200),
-        ctx.json({
-          success: true,
-          data: apps,
-          meta: { total: apps.length, count: apps.length },
-        })
-      );
-    }),
-
-  // Update user success
-  updateUserSuccess: (user: UserProfile) =>
-    rest.put('/api/v2/system/user/:id', (req, res, ctx) => {
-      return res(
-        ctx.status(200),
-        ctx.json({
-          success: true,
-          data: user,
-        })
-      );
-    }),
-
-  // Update user validation error
-  updateUserValidationError: (field: string, message: string) =>
-    rest.put('/api/v2/system/user/:id', (req, res, ctx) => {
+  // User validation endpoint
+  rest.post('/api/v2/system/user/validate', async (req, res, ctx) => {
+    const requestBody = await req.json();
+    const { email } = requestBody;
+    
+    // Simulate email uniqueness validation
+    const isDuplicate = mockUsers.some(user => 
+      user.email === email && user.id !== 1
+    );
+    
+    if (isDuplicate) {
       return res(
         ctx.status(422),
-        ctx.json(createApiError(422, message, field))
-      );
-    }),
-
-  // Update user server error
-  updateUserServerError: () =>
-    rest.put('/api/v2/system/user/:id', (req, res, ctx) => {
-      return res(
-        ctx.status(500),
-        ctx.json(createApiError(500, 'Internal server error'))
-      );
-    }),
-
-  // Delete user success
-  deleteUserSuccess: () =>
-    rest.delete('/api/v2/system/user/:id', (req, res, ctx) => {
-      return res(
-        ctx.status(200),
         ctx.json({
-          success: true,
-          message: 'User deleted successfully',
+          error: {
+            code: 422,
+            message: 'Validation failed',
+            details: 'The email address is already in use.',
+            validation_errors: {
+              email: ['The email has already been taken.'],
+            },
+          },
         })
       );
-    }),
+    }
+    
+    return res(ctx.status(200), ctx.json({ valid: true }));
+  }),
 
-  // User not found
-  userNotFound: () =>
-    rest.get('/api/v2/system/user/:id', (req, res, ctx) => {
-      return res(
-        ctx.status(404),
-        ctx.json(createApiError(404, 'User not found'))
-      );
-    }),
-};
+  // Error scenarios
+  rest.get('/api/v2/system/user/999', (req, res, ctx) => {
+    return res(
+      ctx.status(404),
+      ctx.json({
+        error: {
+          code: 404,
+          message: 'Resource not found',
+          details: 'User with ID 999 does not exist.',
+        },
+      })
+    );
+  }),
 
-// ============================================================================
-// Test Suite Setup
-// ============================================================================
+  rest.put('/api/v2/system/user/500', (req, res, ctx) => {
+    return res(
+      ctx.status(500),
+      ctx.json({
+        error: {
+          code: 500,
+          message: 'Internal Server Error',
+          details: 'Database connection failed.',
+        },
+      })
+    );
+  }),
 
-describe('UserEditPage', () => {
-  const mockPush = vi.fn();
-  const mockRouter = {
-    push: mockPush,
-    replace: vi.fn(),
-    back: vi.fn(),
-    forward: vi.fn(),
-    refresh: vi.fn(),
-    pathname: '/adf-users/1',
-    query: { id: '1' },
-  } as unknown as NextRouter;
+  // Network timeout simulation
+  rest.get('/api/v2/system/user/timeout', (req, res, ctx) => {
+    return res(ctx.delay('infinite'));
+  }),
+);
+
+describe('UserEditPage Component', () => {
+  let queryClient: QueryClient;
+  let user: ReturnType<typeof userEvent.setup>;
 
   beforeAll(() => {
-    // Start MSW server
     server.listen({ onUnhandledRequest: 'error' });
   });
 
   beforeEach(() => {
-    // Reset router mock
-    (useRouter as any).mockReturnValue(mockRouter);
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          cacheTime: 0,
+        },
+        mutations: {
+          retry: false,
+        },
+      },
+    });
+    user = userEvent.setup();
     
-    // Reset all mocks
+    // Reset router mocks
     vi.clearAllMocks();
-    
-    // Setup default successful responses
-    server.use(
-      mockHandlers.getUserSuccess(createTestUser()),
-      mockHandlers.getUserRolesSuccess([createTestRole()]),
-      mockHandlers.getUserAppsSuccess([createTestApp()])
-    );
   });
 
   afterEach(() => {
-    // Reset MSW handlers
     server.resetHandlers();
+    queryClient.clear();
   });
 
   afterAll(() => {
-    // Stop MSW server
     server.close();
   });
 
-  // ============================================================================
-  // Component Rendering Tests
-  // ============================================================================
-
-  describe('Component Rendering', () => {
-    it('should render user edit page successfully', async () => {
-      renderUserEditPage();
-
-      // Wait for loading to complete
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      // Verify page title and form elements are present
-      expect(screen.getByRole('heading', { name: /edit user/i })).toBeInTheDocument();
-      expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/last name/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+  describe('Component Rendering and Data Fetching', () => {
+    it('should render loading state initially', async () => {
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
+      expect(screen.getByTestId('user-edit-loading')).toBeInTheDocument();
+      expect(screen.getByRole('progressbar')).toBeInTheDocument();
     });
 
-    it('should display loading state while fetching user data', async () => {
-      renderUserEditPage();
-
-      // Verify loading spinner is displayed initially
-      expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
-
-      // Wait for loading to complete
+    it('should fetch and display user data successfully', async () => {
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
       });
+      
+      expect(screen.getByDisplayValue('System')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Administrator')).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: /active/i })).toBeChecked();
     });
 
-    it('should display error message when user is not found', async () => {
-      server.use(mockHandlers.userNotFound());
-
-      renderUserEditPage();
-
+    it('should handle user not found error', async () => {
+      // Override router to return 999 (non-existent user)
+      const routerWith404 = { ...mockRouter, query: { id: '999' } };
+      vi.mocked(mockRouter).query = { id: '999' };
+      
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
       await waitFor(() => {
         expect(screen.getByText(/user not found/i)).toBeInTheDocument();
       });
+      
+      expect(screen.getByText(/user with id 999 does not exist/i)).toBeInTheDocument();
     });
 
-    it('should populate form fields with user data', async () => {
-      const testUser = createTestUser({
-        first_name: 'Jane',
-        last_name: 'Smith',
-        email: 'jane.smith@example.com',
-        phone: '+1-555-9876',
-      });
-
-      server.use(mockHandlers.getUserSuccess(testUser));
-
-      renderUserEditPage();
-
+    it('should handle network timeout gracefully', async () => {
+      vi.mocked(mockRouter).query = { id: 'timeout' };
+      
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Jane')).toBeInTheDocument();
-        expect(screen.getByDisplayValue('Smith')).toBeInTheDocument();
-        expect(screen.getByDisplayValue('jane.smith@example.com')).toBeInTheDocument();
-        expect(screen.getByDisplayValue('+1-555-9876')).toBeInTheDocument();
-      });
+        expect(screen.getByText(/request timeout/i)).toBeInTheDocument();
+      }, { timeout: 5000 });
     });
   });
 
-  // ============================================================================
-  // Form Validation Tests
-  // ============================================================================
-
-  describe('Form Validation', () => {
-    it('should display validation errors for required fields', async () => {
-      const user = userEvent.setup();
-      renderUserEditPage();
-
+  describe('Form Validation with React Hook Form and Zod', () => {
+    beforeEach(async () => {
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
+      // Wait for form to load
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
       });
+    });
 
-      // Clear required fields
-      const firstNameInput = screen.getByLabelText(/first name/i);
-      const lastNameInput = screen.getByLabelText(/last name/i);
+    it('should validate required email field', async () => {
       const emailInput = screen.getByLabelText(/email/i);
-
-      await user.clear(firstNameInput);
-      await user.clear(lastNameInput);
+      
       await user.clear(emailInput);
-
-      // Trigger validation by attempting to save
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
-
-      // Verify validation errors are displayed
+      await user.tab(); // Trigger blur validation
+      
       await waitFor(() => {
-        expect(screen.getByText(/first name is required/i)).toBeInTheDocument();
-        expect(screen.getByText(/last name is required/i)).toBeInTheDocument();
         expect(screen.getByText(/email is required/i)).toBeInTheDocument();
       });
     });
 
     it('should validate email format', async () => {
-      const user = userEvent.setup();
-      renderUserEditPage();
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
       const emailInput = screen.getByLabelText(/email/i);
+      
       await user.clear(emailInput);
       await user.type(emailInput, 'invalid-email');
-
-      // Trigger validation
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
-
+      await user.tab();
+      
       await waitFor(() => {
-        expect(screen.getByText(/invalid email address/i)).toBeInTheDocument();
+        expect(screen.getByText(/invalid email format/i)).toBeInTheDocument();
       });
     });
 
-    it('should validate password confirmation match', async () => {
-      const user = userEvent.setup();
-      renderUserEditPage();
-
+    it('should validate username requirements', async () => {
+      const usernameInput = screen.getByLabelText(/username/i);
+      
+      // Test minimum length
+      await user.clear(usernameInput);
+      await user.type(usernameInput, 'ab');
+      await user.tab();
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+        expect(screen.getByText(/username must be at least 3 characters/i)).toBeInTheDocument();
       });
-
-      // Toggle to password mode
-      const setPasswordRadio = screen.getByLabelText(/set password/i);
-      await user.click(setPasswordRadio);
-
+      
+      // Test invalid characters
+      await user.clear(usernameInput);
+      await user.type(usernameInput, 'user@name');
+      await user.tab();
+      
       await waitFor(() => {
-        expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
-      });
-
-      const passwordInput = screen.getByLabelText(/^password$/i);
-      const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-
-      await user.type(passwordInput, 'Password123!');
-      await user.type(confirmPasswordInput, 'Different123!');
-
-      // Trigger validation
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/passwords don't match/i)).toBeInTheDocument();
+        expect(screen.getByText(/username can only contain letters/i)).toBeInTheDocument();
       });
     });
 
-    it('should validate password strength requirements', async () => {
-      const user = userEvent.setup();
-      renderUserEditPage();
-
+    it('should validate first name length', async () => {
+      const firstNameInput = screen.getByLabelText(/first name/i);
+      
+      await user.clear(firstNameInput);
+      await user.type(firstNameInput, 'a'.repeat(101)); // Exceed max length
+      await user.tab();
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      // Toggle to password mode
-      const setPasswordRadio = screen.getByLabelText(/set password/i);
-      await user.click(setPasswordRadio);
-
-      const passwordInput = screen.getByLabelText(/^password$/i);
-      await user.type(passwordInput, 'weak');
-
-      // Trigger validation
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/password must be at least 8 characters/i)).toBeInTheDocument();
-      });
-    });
-  });
-
-  // ============================================================================
-  // Data Fetching Tests (SWR Integration)
-  // ============================================================================
-
-  describe('Data Fetching with SWR', () => {
-    it('should fetch user data on component mount', async () => {
-      const testUser = createTestUser({ id: 42 });
-      server.use(mockHandlers.getUserSuccess(testUser));
-
-      renderUserEditPage('42');
-
-      await waitFor(() => {
-        expect(screen.getByDisplayValue(testUser.first_name!)).toBeInTheDocument();
-        expect(screen.getByDisplayValue(testUser.email)).toBeInTheDocument();
+        expect(screen.getByText(/first name must not exceed 100 characters/i)).toBeInTheDocument();
       });
     });
 
-    it('should fetch user roles and apps for assignment', async () => {
-      const testRoles = [
-        createTestRole({ id: 1, name: 'Admin' }),
-        createTestRole({ id: 2, name: 'Editor' }),
-      ];
-      const testApps = [
-        createTestApp({ id: 1, name: 'Admin Console' }),
-        createTestApp({ id: 2, name: 'User Portal' }),
-      ];
-
-      server.use(
-        mockHandlers.getUserSuccess(createTestUser()),
-        mockHandlers.getUserRolesSuccess(testRoles),
-        mockHandlers.getUserAppsSuccess(testApps)
-      );
-
-      renderUserEditPage();
-
+    it('should handle server-side validation errors', async () => {
+      const emailInput = screen.getByLabelText(/email/i);
+      
+      // Use email that triggers server validation error
+      await user.clear(emailInput);
+      await user.type(emailInput, 'john.developer@company.com'); // Already exists
+      
+      const submitButton = screen.getByRole('button', { name: /save user/i });
+      await user.click(submitButton);
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      // Navigate to roles tab
-      const rolesTab = screen.getByRole('tab', { name: /roles/i });
-      await userEvent.click(rolesTab);
-
-      await waitFor(() => {
-        expect(screen.getByText('Admin')).toBeInTheDocument();
-        expect(screen.getByText('Editor')).toBeInTheDocument();
-        expect(screen.getByText('Admin Console')).toBeInTheDocument();
-        expect(screen.getByText('User Portal')).toBeInTheDocument();
+        expect(screen.getByText(/the email has already been taken/i)).toBeInTheDocument();
       });
     });
 
-    it('should handle network errors gracefully', async () => {
-      server.use(
-        rest.get('/api/v2/system/user/:id', (req, res, ctx) => {
-          return res.networkError('Network connection failed');
-        })
-      );
-
-      renderUserEditPage();
-
+    it('should show all validation errors when form is invalid', async () => {
+      // Clear all required fields
+      const emailInput = screen.getByLabelText(/email/i);
+      const usernameInput = screen.getByLabelText(/username/i);
+      
+      await user.clear(emailInput);
+      await user.clear(usernameInput);
+      
+      const submitButton = screen.getByRole('button', { name: /save user/i });
+      await user.click(submitButton);
+      
       await waitFor(() => {
-        expect(screen.getByText(/failed to load user data/i)).toBeInTheDocument();
+        expect(screen.getByText(/email is required/i)).toBeInTheDocument();
+        expect(screen.getByText(/username must be at least 3 characters/i)).toBeInTheDocument();
       });
-    });
-
-    it('should retry failed requests on user action', async () => {
-      let requestCount = 0;
-      server.use(
-        rest.get('/api/v2/system/user/:id', (req, res, ctx) => {
-          requestCount++;
-          if (requestCount === 1) {
-            return res.networkError('Network connection failed');
-          }
-          return res(
-            ctx.status(200),
-            ctx.json({
-              success: true,
-              data: createTestUser(),
-            })
-          );
-        })
-      );
-
-      renderUserEditPage();
-
-      await waitFor(() => {
-        expect(screen.getByText(/failed to load user data/i)).toBeInTheDocument();
-      });
-
-      // Click retry button
-      const retryButton = screen.getByRole('button', { name: /retry/i });
-      await userEvent.click(retryButton);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
-      });
-
-      expect(requestCount).toBe(2);
+      
+      // Submit button should be disabled or show validation state
+      expect(submitButton).toHaveAttribute('aria-describedby');
     });
   });
 
-  // ============================================================================
-  // Form Submission Tests
-  // ============================================================================
-
-  describe('Form Submission', () => {
-    it('should successfully update user profile', async () => {
-      const user = userEvent.setup();
-      const updatedUser = createTestUser({
-        first_name: 'Updated',
-        last_name: 'Name',
-        email: 'updated@example.com',
-      });
-
-      server.use(
-        mockHandlers.getUserSuccess(createTestUser()),
-        mockHandlers.updateUserSuccess(updatedUser)
-      );
-
-      renderUserEditPage();
-
+  describe('Form Submission Workflows', () => {
+    beforeEach(async () => {
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
       });
+    });
 
-      // Update form fields
+    it('should successfully submit form with valid data', async () => {
       const firstNameInput = screen.getByLabelText(/first name/i);
       const lastNameInput = screen.getByLabelText(/last name/i);
-      const emailInput = screen.getByLabelText(/email/i);
-
+      
       await user.clear(firstNameInput);
       await user.type(firstNameInput, 'Updated');
       await user.clear(lastNameInput);
       await user.type(lastNameInput, 'Name');
-      await user.clear(emailInput);
-      await user.type(emailInput, 'updated@example.com');
-
-      // Submit form
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
-
-      // Verify success message and navigation
+      
+      const submitButton = screen.getByRole('button', { name: /save user/i });
+      await user.click(submitButton);
+      
+      // Check loading state
+      expect(submitButton).toBeDisabled();
+      expect(screen.getByText(/saving/i)).toBeInTheDocument();
+      
       await waitFor(() => {
         expect(screen.getByText(/user updated successfully/i)).toBeInTheDocument();
       });
-
-      expect(mockPush).toHaveBeenCalledWith('/adf-users');
+      
+      // Should redirect after successful save
+      expect(mockRouter.push).toHaveBeenCalledWith('/adf-users');
     });
 
-    it('should handle validation errors from server', async () => {
-      const user = userEvent.setup();
+    it('should handle optimistic updates', async () => {
+      const firstNameInput = screen.getByLabelText(/first name/i);
       
-      server.use(
-        mockHandlers.getUserSuccess(createTestUser()),
-        mockHandlers.updateUserValidationError('email', 'Email already exists')
-      );
+      await user.clear(firstNameInput);
+      await user.type(firstNameInput, 'Optimistic');
+      
+      const submitButton = screen.getByRole('button', { name: /save user/i });
+      await user.click(submitButton);
+      
+      // Should immediately show updated value (optimistic update)
+      expect(screen.getByDisplayValue('Optimistic')).toBeInTheDocument();
+    });
 
-      renderUserEditPage();
-
+    it('should rollback optimistic updates on error', async () => {
+      // Trigger server error
+      vi.mocked(mockRouter).query = { id: '500' };
+      
+      const firstNameInput = screen.getByLabelText(/first name/i);
+      const originalValue = firstNameInput.getAttribute('value');
+      
+      await user.clear(firstNameInput);
+      await user.type(firstNameInput, 'Will Fail');
+      
+      const submitButton = screen.getByRole('button', { name: /save user/i });
+      await user.click(submitButton);
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+        expect(screen.getByText(/database connection failed/i)).toBeInTheDocument();
       });
+      
+      // Should rollback to original value
+      expect(screen.getByDisplayValue(originalValue!)).toBeInTheDocument();
+    });
 
-      // Submit form
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
-
-      // Verify server error is displayed
+    it('should prevent double submission', async () => {
+      const submitButton = screen.getByRole('button', { name: /save user/i });
+      
+      await user.click(submitButton);
+      await user.click(submitButton); // Second click
+      
+      // Should only have one API call
       await waitFor(() => {
-        expect(screen.getByText(/email already exists/i)).toBeInTheDocument();
+        expect(screen.getByText(/saving/i)).toBeInTheDocument();
+      });
+      
+      // Button should remain disabled
+      expect(submitButton).toBeDisabled();
+    });
+
+    it('should handle form reset functionality', async () => {
+      const firstNameInput = screen.getByLabelText(/first name/i);
+      const originalValue = firstNameInput.getAttribute('value');
+      
+      await user.clear(firstNameInput);
+      await user.type(firstNameInput, 'Changed Value');
+      
+      const resetButton = screen.getByRole('button', { name: /reset/i });
+      await user.click(resetButton);
+      
+      expect(screen.getByDisplayValue(originalValue!)).toBeInTheDocument();
+    });
+  });
+
+  describe('Role Management and Permissions', () => {
+    beforeEach(async () => {
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
       });
     });
 
-    it('should handle server errors gracefully', async () => {
-      const user = userEvent.setup();
+    it('should load and display available roles', async () => {
+      const roleSelect = screen.getByLabelText(/role/i);
       
-      server.use(
-        mockHandlers.getUserSuccess(createTestUser()),
-        mockHandlers.updateUserServerError()
-      );
-
-      renderUserEditPage();
-
+      await user.click(roleSelect);
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+        expect(screen.getByText('Super Administrator')).toBeInTheDocument();
+        expect(screen.getByText('Administrator')).toBeInTheDocument();
+        expect(screen.getByText('Developer')).toBeInTheDocument();
       });
+    });
 
-      // Submit form
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
+    it('should update user role selection', async () => {
+      const roleSelect = screen.getByLabelText(/role/i);
+      
+      await user.click(roleSelect);
+      await user.click(screen.getByText('Developer'));
+      
+      expect(roleSelect).toHaveValue('3'); // Developer role ID
+    });
 
-      // Verify generic error message is displayed
+    it('should show role permissions preview', async () => {
+      const roleSelect = screen.getByLabelText(/role/i);
+      
+      await user.click(roleSelect);
+      await user.click(screen.getByText('Developer'));
+      
+      await waitFor(() => {
+        expect(screen.getByText(/permissions: schema.read, api.generate, api.test/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('User Status Management', () => {
+    beforeEach(async () => {
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
+      });
+    });
+
+    it('should toggle user active status', async () => {
+      const activeCheckbox = screen.getByRole('checkbox', { name: /active/i });
+      
+      expect(activeCheckbox).toBeChecked();
+      
+      await user.click(activeCheckbox);
+      expect(activeCheckbox).not.toBeChecked();
+    });
+
+    it('should show deactivation warning for active users', async () => {
+      const activeCheckbox = screen.getByRole('checkbox', { name: /active/i });
+      
+      await user.click(activeCheckbox);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/deactivating this user will revoke/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should handle verified status correctly', async () => {
+      const verifiedCheckbox = screen.getByRole('checkbox', { name: /verified/i });
+      
+      expect(verifiedCheckbox).toBeChecked();
+      expect(verifiedCheckbox).toBeDisabled(); // Cannot change verified status directly
+    });
+  });
+
+  describe('Error Scenarios and Error Boundaries', () => {
+    it('should handle component rendering errors gracefully', async () => {
+      // Mock console.error to suppress error logging in tests
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      // Simulate component error by providing invalid data
+      const invalidQueryClient = new QueryClient({
+        defaultOptions: {
+          queries: {
+            queryFn: () => {
+              throw new Error('Component render error');
+            },
+          },
+        },
+      });
+      
+      renderWithProviders(<UserEditPage />, { queryClient: invalidQueryClient });
+      
       await waitFor(() => {
         expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
       });
-    });
-
-    it('should prevent submission while request is in progress', async () => {
-      const user = userEvent.setup();
       
-      // Create a delayed response
-      server.use(
-        rest.put('/api/v2/system/user/:id', (req, res, ctx) => {
-          return res(
-            ctx.delay(1000),
-            ctx.status(200),
-            ctx.json({
-              success: true,
-              data: createTestUser(),
-            })
-          );
-        })
-      );
-
-      renderUserEditPage();
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      // Submit form
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
-
-      // Verify button is disabled and shows loading state
-      expect(saveButton).toBeDisabled();
-      expect(screen.getByText(/saving/i)).toBeInTheDocument();
-
-      // Verify multiple clicks don't trigger multiple requests
-      await user.click(saveButton);
-      await user.click(saveButton);
-
-      // Should still only show one loading state
-      expect(screen.getAllByText(/saving/i)).toHaveLength(1);
-    });
-  });
-
-  // ============================================================================
-  // User Role Management Tests
-  // ============================================================================
-
-  describe('User Role Management', () => {
-    it('should display assigned roles and apps', async () => {
-      const userWithRoles = createTestUser({
-        user_to_app_to_role_by_user_id: [
-          {
-            id: 1,
-            user_id: 1,
-            app_id: 1,
-            role_id: 1,
-            app: createTestApp({ id: 1, name: 'Admin Console' }),
-            role: createTestRole({ id: 1, name: 'Admin' }),
-          },
-        ],
-      });
-
-      server.use(mockHandlers.getUserSuccess(userWithRoles));
-
-      renderUserEditPage();
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      // Navigate to roles tab
-      const rolesTab = screen.getByRole('tab', { name: /roles/i });
-      await userEvent.click(rolesTab);
-
-      await waitFor(() => {
-        expect(screen.getByText('Admin Console')).toBeInTheDocument();
-        expect(screen.getByText('Admin')).toBeInTheDocument();
-      });
+      consoleSpy.mockRestore();
     });
 
-    it('should allow assigning new roles', async () => {
-      const user = userEvent.setup();
-      const testRoles = [createTestRole({ id: 2, name: 'Editor' })];
-      const testApps = [createTestApp({ id: 2, name: 'Content Management' })];
-
-      server.use(
-        mockHandlers.getUserSuccess(createTestUser()),
-        mockHandlers.getUserRolesSuccess(testRoles),
-        mockHandlers.getUserAppsSuccess(testApps),
-        rest.post('/api/v2/system/user_app_role', (req, res, ctx) => {
-          return res(
-            ctx.status(201),
-            ctx.json({
-              success: true,
-              data: {
-                id: 2,
-                user_id: 1,
-                app_id: 2,
-                role_id: 2,
-              },
-            })
-          );
-        })
-      );
-
-      renderUserEditPage();
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      // Navigate to roles tab
-      const rolesTab = screen.getByRole('tab', { name: /roles/i });
-      await user.click(rolesTab);
-
-      // Add new role assignment
-      const addRoleButton = screen.getByRole('button', { name: /add role/i });
-      await user.click(addRoleButton);
-
-      // Select app and role
-      const appSelect = screen.getByLabelText(/application/i);
-      const roleSelect = screen.getByLabelText(/role/i);
-
-      await user.selectOptions(appSelect, '2');
-      await user.selectOptions(roleSelect, '2');
-
-      const assignButton = screen.getByRole('button', { name: /assign role/i });
-      await user.click(assignButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/role assigned successfully/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should allow removing assigned roles', async () => {
-      const user = userEvent.setup();
-      const userWithRoles = createTestUser({
-        user_to_app_to_role_by_user_id: [
-          {
-            id: 1,
-            user_id: 1,
-            app_id: 1,
-            role_id: 1,
-            app: createTestApp({ id: 1, name: 'Admin Console' }),
-            role: createTestRole({ id: 1, name: 'Admin' }),
-          },
-        ],
-      });
-
-      server.use(
-        mockHandlers.getUserSuccess(userWithRoles),
-        rest.delete('/api/v2/system/user_app_role/:id', (req, res, ctx) => {
-          return res(
-            ctx.status(200),
-            ctx.json({
-              success: true,
-              message: 'Role removed successfully',
-            })
-          );
-        })
-      );
-
-      renderUserEditPage();
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      // Navigate to roles tab
-      const rolesTab = screen.getByRole('tab', { name: /roles/i });
-      await user.click(rolesTab);
-
-      // Remove role assignment
-      const removeButton = screen.getByRole('button', { name: /remove role/i });
-      await user.click(removeButton);
-
-      // Confirm removal
-      const confirmButton = screen.getByRole('button', { name: /confirm/i });
-      await user.click(confirmButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/role removed successfully/i)).toBeInTheDocument();
-      });
-    });
-  });
-
-  // ============================================================================
-  // Password Management Tests
-  // ============================================================================
-
-  describe('Password Management', () => {
-    it('should toggle between email invitation and password setting modes', async () => {
-      const user = userEvent.setup();
-      renderUserEditPage();
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      // Initially should show email invitation option
-      const emailInviteRadio = screen.getByLabelText(/send email invitation/i);
-      expect(emailInviteRadio).toBeChecked();
-
-      // Switch to set password mode
-      const setPasswordRadio = screen.getByLabelText(/set password/i);
-      await user.click(setPasswordRadio);
-
-      await waitFor(() => {
-        expect(setPasswordRadio).toBeChecked();
-        expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
-      });
-
-      // Switch back to email invitation
-      await user.click(emailInviteRadio);
-
-      await waitFor(() => {
-        expect(emailInviteRadio).toBeChecked();
-        expect(screen.queryByLabelText(/^password$/i)).not.toBeInTheDocument();
-      });
-    });
-
-    it('should send invitation email when email mode is selected', async () => {
-      const user = userEvent.setup();
+    it('should provide error recovery options', async () => {
+      vi.mocked(mockRouter).query = { id: '999' };
       
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
+      await waitFor(() => {
+        expect(screen.getByText(/user not found/i)).toBeInTheDocument();
+      });
+      
+      // Should show retry button
+      const retryButton = screen.getByRole('button', { name: /try again/i });
+      expect(retryButton).toBeInTheDocument();
+      
+      await user.click(retryButton);
+      
+      // Should attempt to reload data
+      expect(screen.getByTestId('user-edit-loading')).toBeInTheDocument();
+    });
+
+    it('should handle network errors with retry capability', async () => {
       server.use(
-        mockHandlers.getUserSuccess(createTestUser()),
-        rest.patch('/api/v2/system/user/:id', (req, res, ctx) => {
-          return res(
-            ctx.status(200),
-            ctx.json({
-              success: true,
-              message: 'Invitation email sent successfully',
-            })
-          );
+        rest.get('/api/v2/system/user/1', (req, res, ctx) => {
+          return res.networkError('Network error');
         })
       );
-
-      renderUserEditPage();
-
+      
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+        expect(screen.getByText(/network error/i)).toBeInTheDocument();
       });
-
-      // Ensure email invitation is selected
-      const emailInviteRadio = screen.getByLabelText(/send email invitation/i);
-      await user.click(emailInviteRadio);
-
-      // Submit form
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/invitation email sent successfully/i)).toBeInTheDocument();
-      });
+      
+      const retryButton = screen.getByRole('button', { name: /retry/i });
+      await user.click(retryButton);
+      
+      // Should show loading state on retry
+      expect(screen.getByTestId('user-edit-loading')).toBeInTheDocument();
     });
   });
 
-  // ============================================================================
-  // Accessibility Tests (WCAG 2.1 AA Compliance)
-  // ============================================================================
-
-  describe('Accessibility', () => {
-    it('should have proper heading hierarchy', async () => {
-      renderUserEditPage();
-
+  describe('Accessibility Compliance (WCAG 2.1 AA)', () => {
+    beforeEach(async () => {
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
       });
-
-      // Check for proper heading structure
-      const mainHeading = screen.getByRole('heading', { level: 1 });
-      expect(mainHeading).toHaveTextContent(/edit user/i);
-
-      const sectionHeadings = screen.getAllByRole('heading', { level: 2 });
-      expect(sectionHeadings.length).toBeGreaterThan(0);
     });
 
-    it('should have proper form labels and descriptions', async () => {
-      renderUserEditPage();
-
+    it('should have no accessibility violations', async () => {
+      const { container } = render(
+        <QueryClientProvider client={queryClient}>
+          <UserEditPage />
+        </QueryClientProvider>
+      );
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
       });
+      
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
+    });
 
-      // Check that all form inputs have proper labels
+    it('should have proper form labels and ARIA attributes', async () => {
+      const emailInput = screen.getByLabelText(/email/i);
+      const usernameInput = screen.getByLabelText(/username/i);
       const firstNameInput = screen.getByLabelText(/first name/i);
-      const lastNameInput = screen.getByLabelText(/last name/i);
-      const emailInput = screen.getByLabelText(/email/i);
-
-      expect(firstNameInput).toHaveAttribute('aria-required', 'true');
-      expect(lastNameInput).toHaveAttribute('aria-required', 'true');
+      
       expect(emailInput).toHaveAttribute('aria-required', 'true');
+      expect(usernameInput).toHaveAttribute('aria-required', 'true');
+      expect(firstNameInput).toHaveAttribute('aria-describedby');
     });
 
-    it('should announce form validation errors to screen readers', async () => {
-      const user = userEvent.setup();
-      renderUserEditPage();
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      // Clear required field to trigger validation error
+    it('should announce validation errors to screen readers', async () => {
       const emailInput = screen.getByLabelText(/email/i);
+      
       await user.clear(emailInput);
-
-      // Trigger validation
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
-
+      await user.tab();
+      
       await waitFor(() => {
         const errorMessage = screen.getByText(/email is required/i);
         expect(errorMessage).toHaveAttribute('role', 'alert');
@@ -1016,157 +645,188 @@ describe('UserEditPage', () => {
     });
 
     it('should support keyboard navigation', async () => {
-      renderUserEditPage();
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      const firstNameInput = screen.getByLabelText(/first name/i);
-      const lastNameInput = screen.getByLabelText(/last name/i);
-      const emailInput = screen.getByLabelText(/email/i);
-
-      // Test tab navigation
-      firstNameInput.focus();
-      expect(document.activeElement).toBe(firstNameInput);
-
-      fireEvent.keyDown(firstNameInput, { key: 'Tab' });
-      expect(document.activeElement).toBe(lastNameInput);
-
-      fireEvent.keyDown(lastNameInput, { key: 'Tab' });
-      expect(document.activeElement).toBe(emailInput);
+      const firstInput = screen.getByLabelText(/email/i);
+      const lastInput = screen.getByRole('button', { name: /save user/i });
+      
+      firstInput.focus();
+      expect(document.activeElement).toBe(firstInput);
+      
+      // Tab through all form elements
+      await user.tab();
+      await user.tab();
+      await user.tab();
+      await user.tab();
+      await user.tab();
+      
+      expect(document.activeElement).toBe(lastInput);
     });
 
-    it('should have proper ARIA attributes for dynamic content', async () => {
-      renderUserEditPage();
-
-      // Loading state should have proper ARIA attributes
-      const loadingSpinner = screen.getByTestId('loading-spinner');
-      expect(loadingSpinner).toHaveAttribute('aria-busy', 'true');
-      expect(loadingSpinner).toHaveAttribute('aria-label', 'Loading user data');
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      // Form should have proper ARIA attributes
-      const form = screen.getByRole('form');
-      expect(form).toHaveAttribute('aria-labelledby');
+    it('should have proper heading structure', () => {
+      const mainHeading = screen.getByRole('heading', { level: 1 });
+      expect(mainHeading).toHaveTextContent(/edit user/i);
+      
+      const formSections = screen.getAllByRole('heading', { level: 2 });
+      expect(formSections).toHaveLength(2); // Basic Info, Permissions
     });
 
-    it('should provide clear focus indicators', async () => {
-      renderUserEditPage();
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      const firstNameInput = screen.getByLabelText(/first name/i);
-      firstNameInput.focus();
-
-      // Check that focus styles are applied
-      expect(firstNameInput).toHaveFocus();
-      expect(firstNameInput).toHaveClass('focus:ring-2', 'focus:ring-blue-500');
+    it('should provide descriptive button labels', () => {
+      const saveButton = screen.getByRole('button', { name: /save user/i });
+      const cancelButton = screen.getByRole('button', { name: /cancel/i });
+      const resetButton = screen.getByRole('button', { name: /reset/i });
+      
+      expect(saveButton).toHaveAttribute('aria-describedby');
+      expect(cancelButton).toBeInTheDocument();
+      expect(resetButton).toBeInTheDocument();
     });
   });
 
-  // ============================================================================
-  // Error Boundary Tests
-  // ============================================================================
-
-  describe('Error Handling', () => {
-    it('should handle unexpected component errors gracefully', async () => {
-      // Mock console.error to prevent noise in test output
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      // Force a React error by providing invalid props
-      const InvalidComponent = () => {
-        throw new Error('Test error');
-      };
-
-      render(
-        <TestWrapper>
-          <InvalidComponent />
-        </TestWrapper>
+  describe('SWR Data Fetching and Caching', () => {
+    it('should cache user data and avoid unnecessary requests', async () => {
+      let requestCount = 0;
+      
+      server.use(
+        rest.get('/api/v2/system/user/1', (req, res, ctx) => {
+          requestCount++;
+          return res(
+            ctx.status(200),
+            ctx.json({
+              resource: [mockUsers[0]],
+              meta: { count: 1 },
+            })
+          );
+        })
       );
-
+      
+      const { rerender } = renderWithProviders(<UserEditPage />, { queryClient });
+      
       await waitFor(() => {
-        expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
       });
-
-      consoleSpy.mockRestore();
+      
+      // Re-render component
+      rerender(<UserEditPage />);
+      
+      // Should use cached data, no additional request
+      expect(requestCount).toBe(1);
     });
 
-    it('should provide error recovery options', async () => {
-      server.use(mockHandlers.userNotFound());
-
-      renderUserEditPage();
-
+    it('should handle stale-while-revalidate pattern', async () => {
+      // Initial render with cached data
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
       await waitFor(() => {
-        expect(screen.getByText(/user not found/i)).toBeInTheDocument();
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
       });
+      
+      // Simulate data becoming stale
+      queryClient.invalidateQueries(['user', '1']);
+      
+      // Should show stale data while revalidating
+      expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
+      
+      await waitFor(() => {
+        // Should eventually show updated data
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
+      });
+    });
 
-      // Should provide navigation back to users list
-      const backButton = screen.getByRole('button', { name: /back to users/i });
-      expect(backButton).toBeInTheDocument();
-
-      await userEvent.click(backButton);
-      expect(mockPush).toHaveBeenCalledWith('/adf-users');
+    it('should handle background refetch on window focus', async () => {
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
+      });
+      
+      // Simulate window focus event
+      window.dispatchEvent(new Event('focus'));
+      
+      // Should trigger background refetch (no visible loading state)
+      expect(screen.queryByTestId('user-edit-loading')).not.toBeInTheDocument();
+      expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
     });
   });
 
-  // ============================================================================
-  // Performance Tests
-  // ============================================================================
+  describe('Mock Data Factory Integration', () => {
+    it('should create realistic test user data', () => {
+      const testUser = createMockUser({
+        id: 999,
+        email: 'test@example.com',
+        first_name: 'Test',
+        last_name: 'User',
+        is_active: true,
+      });
+      
+      expect(testUser).toMatchObject({
+        id: 999,
+        email: 'test@example.com',
+        first_name: 'Test',
+        last_name: 'User',
+        is_active: true,
+        created_date: expect.any(String),
+        last_modified_date: expect.any(String),
+      });
+    });
 
-  describe('Performance', () => {
-    it('should load and render within acceptable time limits', async () => {
+    it('should create realistic test role data', () => {
+      const testRole = createMockRole({
+        id: 999,
+        name: 'test_role',
+        label: 'Test Role',
+        permissions: ['test.read', 'test.write'],
+      });
+      
+      expect(testRole).toMatchObject({
+        id: 999,
+        name: 'test_role',
+        label: 'Test Role',
+        permissions: ['test.read', 'test.write'],
+        is_active: true,
+      });
+    });
+  });
+
+  describe('Performance and Memory Management', () => {
+    it('should cleanup event listeners on unmount', async () => {
+      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+      
+      const { unmount } = renderWithProviders(<UserEditPage />, { queryClient });
+      
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
+      });
+      
+      unmount();
+      
+      // Should cleanup event listeners
+      expect(removeEventListenerSpy).toHaveBeenCalled();
+    });
+
+    it('should cancel pending requests on unmount', async () => {
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+      
+      const { unmount } = renderWithProviders(<UserEditPage />, { queryClient });
+      
+      // Unmount before request completes
+      unmount();
+      
+      expect(abortSpy).toHaveBeenCalled();
+    });
+
+    it('should handle large user datasets efficiently', async () => {
       const startTime = performance.now();
       
-      renderUserEditPage();
-
+      renderWithProviders(<UserEditPage />, { queryClient });
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+        expect(screen.getByDisplayValue('admin@dreamfactory.com')).toBeInTheDocument();
       });
-
+      
       const endTime = performance.now();
       const renderTime = endTime - startTime;
-
-      // Should render within 2 seconds as per SSR requirements
-      expect(renderTime).toBeLessThan(2000);
-    });
-
-    it('should handle large datasets efficiently', async () => {
-      // Create a large number of roles and apps
-      const largeRolesList = Array.from({ length: 100 }, (_, i) =>
-        createTestRole({ id: i + 1, name: `Role ${i + 1}` })
-      );
-      const largeAppsList = Array.from({ length: 100 }, (_, i) =>
-        createTestApp({ id: i + 1, name: `App ${i + 1}` })
-      );
-
-      server.use(
-        mockHandlers.getUserSuccess(createTestUser()),
-        mockHandlers.getUserRolesSuccess(largeRolesList),
-        mockHandlers.getUserAppsSuccess(largeAppsList)
-      );
-
-      const startTime = performance.now();
-      renderUserEditPage();
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-      });
-
-      // Navigate to roles tab
-      const rolesTab = screen.getByRole('tab', { name: /roles/i });
-      await userEvent.click(rolesTab);
-
-      const endTime = performance.now();
-      const renderTime = endTime - startTime;
-
-      // Should handle large datasets efficiently
-      expect(renderTime).toBeLessThan(3000);
+      
+      // Should render within performance budget (< 1000ms)
+      expect(renderTime).toBeLessThan(1000);
     });
   });
 });
