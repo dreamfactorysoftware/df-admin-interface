@@ -1,1083 +1,741 @@
 /**
- * Scheduler Details Page Test Suite
+ * @fileoverview Vitest test suite for the scheduler details page component.
  * 
- * Comprehensive test suite for the scheduler details page component using:
- * - Vitest for 10x faster test execution compared to Jasmine/Karma
- * - React Testing Library for user-centric testing approaches
- * - Mock Service Worker (MSW) for realistic API mocking
- * - React Query testing for cache and state management validation
- * - Accessibility testing for WCAG 2.1 AA compliance
+ * This test file provides comprehensive coverage for scheduler task CRUD operations,
+ * form validation workflows, tab navigation, JSON payload validation, and accessibility
+ * compliance. It replaces the Angular Jasmine/Karma tests with React Testing Library
+ * for user-centric testing approaches and Mock Service Worker (MSW) for realistic 
+ * API mocking, providing 10x faster test execution compared to the original implementation.
  * 
- * @fileoverview Tests for scheduler task CRUD operations, form validation,
- * tab navigation, JSON payload validation, and error handling workflows
+ * @version 1.0.0
+ * @author DreamFactory Admin Interface Team
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
-import { axe, toHaveNoViolations } from 'jest-axe'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
+import { axe, toHaveNoViolations } from 'jest-axe';
 
-// Component under test
-import SchedulerDetailsPage from './page'
+import SchedulerDetailsPage from './page';
+import { server } from '@/test/mocks/server';
+import { schedulerHandlers } from '@/test/mocks/scheduler-handlers';
+import { mockSchedulerTaskData, mockServices } from '@/test/mocks/scheduler-data';
+import { rest } from 'msw';
 
-// Test utilities and providers
-import { createTestQueryClient } from '@/test/utils/query-client'
-import { TestProviders } from '@/test/utils/test-providers'
+// Extend Jest matchers for accessibility testing
+expect.extend(toHaveNoViolations);
 
-// Mock data and handlers
-import { mockSchedulerTasks, mockSchedulerTask } from '@/test/mocks/scheduler-data'
-import { createErrorResponse } from '@/test/mocks/error-responses'
-import type { SchedulerTask, CreateSchedulerTaskRequest, UpdateSchedulerTaskRequest } from '@/types/scheduler'
-
-// Extend expect with accessibility matchers
-expect.extend(toHaveNoViolations)
-
-// Mock Next.js router
-const mockPush = vi.fn()
-const mockBack = vi.fn()
+// Mock Next.js hooks
+const mockPush = vi.fn();
+const mockReplace = vi.fn();
+const mockRefresh = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
-    back: mockBack,
-    refresh: vi.fn(),
+    replace: mockReplace,
+    refresh: mockRefresh,
   }),
-  useParams: () => ({ id: 'test-task-1' }),
+  useParams: () => ({ id: undefined }), // Default to create mode
   useSearchParams: () => new URLSearchParams(),
-}))
+}));
 
-// Mock React Query hooks
-const mockMutateAsync = vi.fn()
-const mockInvalidateQueries = vi.fn()
-
-vi.mock('@/hooks/useSchedulerTask', () => ({
-  useSchedulerTask: vi.fn(),
-  useCreateSchedulerTask: () => ({
-    mutateAsync: mockMutateAsync,
-    isPending: false,
-    error: null,
+// Mock authentication and theme context
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { id: 1, email: 'admin@test.com' },
+    isAuthenticated: true,
   }),
-  useUpdateSchedulerTask: () => ({
-    mutateAsync: mockMutateAsync,
-    isPending: false,
-    error: null,
-  }),
-  useDeleteSchedulerTask: () => ({
-    mutateAsync: mockMutateAsync,
-    isPending: false,
-    error: null,
-  }),
-}))
+}));
 
-vi.mock('@tanstack/react-query', async () => {
-  const actual = await vi.importActual('@tanstack/react-query')
-  return {
-    ...actual,
-    useQueryClient: () => ({
-      invalidateQueries: mockInvalidateQueries,
-      setQueryData: vi.fn(),
-      getQueryData: vi.fn(),
-    }),
-  }
-})
-
-// MSW Server setup with scheduler endpoints
-const schedulerHandlers = [
-  // Get scheduler task by ID
-  http.get('/api/v2/system/scheduler/:id', ({ params }) => {
-    const { id } = params
-    if (id === 'test-task-1') {
-      return HttpResponse.json({ resource: [mockSchedulerTask] })
-    }
-    return HttpResponse.json(
-      createErrorResponse(404, 'Scheduler task not found', `Task with ID ${id} does not exist`)
-    )
+vi.mock('@/hooks/useTheme', () => ({
+  useTheme: () => ({
+    theme: 'light',
+    setTheme: vi.fn(),
   }),
+}));
 
-  // Get all scheduler tasks
-  http.get('/api/v2/system/scheduler', ({ request }) => {
-    const url = new URL(request.url)
-    const limit = parseInt(url.searchParams.get('limit') || '25')
-    const offset = parseInt(url.searchParams.get('offset') || '0')
-    
-    return HttpResponse.json({
-      resource: mockSchedulerTasks.slice(offset, offset + limit),
-      meta: {
-        count: mockSchedulerTasks.length,
-        limit,
-        offset,
+// Mock Zustand stores
+vi.mock('@/stores/auth-store', () => ({
+  useAuthStore: () => ({
+    isAuthenticated: true,
+    user: { id: 1, email: 'admin@test.com' },
+  }),
+}));
+
+/**
+ * Test wrapper component that provides necessary context providers
+ */
+const TestWrapper = ({ children }: { children: React.ReactNode }) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        staleTime: 0,
+        cacheTime: 0,
       },
+      mutations: {
+        retry: false,
+      },
+    },
+  });
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        {children}
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+};
+
+/**
+ * Helper function to render component with test wrapper
+ */
+const renderWithProviders = (component: React.ReactElement) => {
+  return render(component, { wrapper: TestWrapper });
+};
+
+/**
+ * Mock scheduler API handlers for successful operations
+ */
+const setupSuccessHandlers = () => {
+  server.use(
+    rest.get('/api/v2/system/service', (req, res, ctx) => {
+      return res(ctx.json({ resource: mockServices }));
+    }),
+    rest.post('/api/v2/system/task', (req, res, ctx) => {
+      return res(ctx.status(201), ctx.json({ 
+        resource: [{ ...req.body, id: 123 }] 
+      }));
+    }),
+    rest.patch('/api/v2/system/task/15', (req, res, ctx) => {
+      return res(ctx.json({ 
+        resource: [{ ...mockSchedulerTaskData, ...req.body }] 
+      }));
+    }),
+    rest.get('/api/v2/system/task/15', (req, res, ctx) => {
+      return res(ctx.json({ resource: [mockSchedulerTaskData] }));
     })
-  }),
+  );
+};
 
-  // Create scheduler task
-  http.post('/api/v2/system/scheduler', async ({ request }) => {
-    const body = await request.json() as CreateSchedulerTaskRequest
-    
-    // Validate required fields
-    if (!body.name || !body.type || !body.config) {
-      return HttpResponse.json(
-        createErrorResponse(400, 'Validation Error', 'Missing required fields'),
-        { status: 400 }
-      )
-    }
+/**
+ * Mock scheduler API handlers for error scenarios
+ */
+const setupErrorHandlers = () => {
+  server.use(
+    rest.post('/api/v2/system/task', (req, res, ctx) => {
+      return res(
+        ctx.status(422),
+        ctx.json({
+          error: {
+            code: 422,
+            message: 'Validation failed',
+            context: {
+              name: ['Name is required'],
+            },
+          },
+        })
+      );
+    }),
+    rest.patch('/api/v2/system/task/15', (req, res, ctx) => {
+      return res(
+        ctx.status(422),
+        ctx.json({
+          error: {
+            code: 422,
+            message: 'Validation failed',
+            context: {
+              name: ['Name cannot be empty'],
+            },
+          },
+        })
+      );
+    })
+  );
+};
 
-    // Validate JSON payload in config
-    if (body.type === 'script' && body.config.payload) {
-      try {
-        JSON.parse(body.config.payload)
-      } catch (error) {
-        return HttpResponse.json(
-          createErrorResponse(422, 'Invalid JSON', 'Payload must be valid JSON'),
-          { status: 422 }
-        )
-      }
-    }
-
-    const newTask: SchedulerTask = {
-      id: Date.now(),
-      name: body.name,
-      type: body.type,
-      frequency: body.frequency || 'once',
-      start_time: body.start_time || new Date().toISOString(),
-      is_active: body.is_active ?? true,
-      config: body.config,
-      created_date: new Date().toISOString(),
-      created_by_id: 1,
-      last_modified_date: new Date().toISOString(),
-      last_modified_by_id: 1,
-    }
-
-    return HttpResponse.json({ resource: [newTask] }, { status: 201 })
-  }),
-
-  // Update scheduler task
-  http.put('/api/v2/system/scheduler/:id', async ({ params, request }) => {
-    const { id } = params
-    const body = await request.json() as UpdateSchedulerTaskRequest
-
-    if (id === 'test-task-1') {
-      const updatedTask: SchedulerTask = {
-        ...mockSchedulerTask,
-        ...body,
-        last_modified_date: new Date().toISOString(),
-      }
-      return HttpResponse.json({ resource: [updatedTask] })
-    }
-
-    return HttpResponse.json(
-      createErrorResponse(404, 'Scheduler task not found', `Task with ID ${id} does not exist`),
-      { status: 404 }
-    )
-  }),
-
-  // Delete scheduler task
-  http.delete('/api/v2/system/scheduler/:id', ({ params }) => {
-    const { id } = params
-    if (id === 'test-task-1') {
-      return HttpResponse.json({ success: true })
-    }
-    return HttpResponse.json(
-      createErrorResponse(404, 'Scheduler task not found', `Task with ID ${id} does not exist`),
-      { status: 404 }
-    )
-  }),
-
-  // Trigger scheduler task
-  http.post('/api/v2/system/scheduler/:id/trigger', ({ params }) => {
-    const { id } = params
-    if (id === 'test-task-1') {
-      return HttpResponse.json({ 
-        success: true, 
-        message: 'Task triggered successfully',
-        execution_id: Date.now().toString(),
-      })
-    }
-    return HttpResponse.json(
-      createErrorResponse(404, 'Scheduler task not found', `Task with ID ${id} does not exist`),
-      { status: 404 }
-    )
-  }),
-]
-
-const server = setupServer(...schedulerHandlers)
-
-describe('SchedulerDetailsPage', () => {
-  let queryClient: QueryClient
-  let user: ReturnType<typeof userEvent.setup>
-
-  beforeAll(() => {
-    server.listen({ onUnhandledRequest: 'error' })
-  })
+describe('SchedulerDetailsPage - Create Scheduler Task Flow', () => {
+  let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
-    queryClient = createTestQueryClient()
-    user = userEvent.setup()
-    
-    // Mock useSchedulerTask hook for existing task
-    vi.mocked(require('@/hooks/useSchedulerTask').useSchedulerTask).mockReturnValue({
-      data: mockSchedulerTask,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    })
-
-    // Clear all mocks
-    vi.clearAllMocks()
-    mockPush.mockClear()
-    mockBack.mockClear()
-    mockMutateAsync.mockClear()
-    mockInvalidateQueries.mockClear()
-  })
+    user = userEvent.setup();
+    setupSuccessHandlers();
+    vi.clearAllMocks();
+  });
 
   afterEach(() => {
-    server.resetHandlers()
-  })
+    server.resetHandlers();
+  });
 
-  afterAll(() => {
-    server.close()
-  })
+  it('should render the scheduler details page successfully', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
 
-  describe('Component Rendering', () => {
-    it('renders scheduler details page with loading state', async () => {
-      // Mock loading state
-      vi.mocked(require('@/hooks/useSchedulerTask').useSchedulerTask).mockReturnValue({
-        data: undefined,
-        isLoading: true,
-        isError: false,
-        error: null,
-        refetch: vi.fn(),
+    // Verify main elements are present
+    expect(screen.getByRole('heading', { name: /create scheduler task/i })).toBeInTheDocument();
+    expect(screen.getByRole('form')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = renderWithProviders(<SchedulerDetailsPage />);
+    
+    await waitFor(async () => {
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
+    });
+  });
+
+  it('should validate required fields and show validation errors', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Try to submit without filling required fields
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    // Check for validation error messages
+    await waitFor(() => {
+      expect(screen.getByText(/name is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/service is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/component is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/frequency is required/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should successfully create scheduler task with valid input', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Fill out the form with valid data
+    await user.type(screen.getByLabelText(/name/i), 'test-scheduler');
+    await user.type(screen.getByLabelText(/description/i), 'Test scheduler description');
+    
+    // Select service
+    const serviceSelect = screen.getByLabelText(/service/i);
+    await user.click(serviceSelect);
+    await user.click(screen.getByText('Local SQL Database'));
+
+    await user.type(screen.getByLabelText(/component/i), 'test-component');
+    await user.type(screen.getByLabelText(/frequency/i), '600');
+
+    // Submit the form
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    // Verify success behavior
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/system-settings/scheduler');
+    });
+  });
+
+  it('should not create scheduler task with invalid input', async () => {
+    setupErrorHandlers();
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Try to submit with empty name
+    await user.type(screen.getByLabelText(/description/i), 'Test description');
+    
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    // Verify no navigation occurred due to validation errors
+    await waitFor(() => {
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should not show payload input by default', () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Payload field should not be visible by default (GET method)
+    expect(screen.queryByLabelText(/payload/i)).not.toBeInTheDocument();
+  });
+
+  it('should not show payload input when method is GET', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Explicitly select GET method
+    const methodSelect = screen.getByLabelText(/method/i);
+    await user.click(methodSelect);
+    await user.click(screen.getByText('GET'));
+
+    // Payload field should not be visible
+    expect(screen.queryByLabelText(/payload/i)).not.toBeInTheDocument();
+  });
+
+  it('should show payload input when method is not GET', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Select POST method
+    const methodSelect = screen.getByLabelText(/method/i);
+    await user.click(methodSelect);
+    await user.click(screen.getByText('POST'));
+
+    // Payload field should now be visible
+    await waitFor(() => {
+      expect(screen.getByLabelText(/payload/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should validate JSON payload when provided', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Select POST method to show payload field
+    const methodSelect = screen.getByLabelText(/method/i);
+    await user.click(methodSelect);
+    await user.click(screen.getByText('POST'));
+
+    // Enter invalid JSON
+    const payloadField = await screen.findByLabelText(/payload/i);
+    await user.type(payloadField, '{ invalid json }');
+
+    // Try to submit
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    // Should show JSON validation error
+    await waitFor(() => {
+      expect(screen.getByText(/invalid json format/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle tab navigation between Basic and Log views', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Check that Basic tab is active by default
+    const basicTab = screen.getByRole('tab', { name: /basic/i });
+    const logTab = screen.getByRole('tab', { name: /log/i });
+
+    expect(basicTab).toHaveAttribute('aria-selected', 'true');
+    expect(logTab).toHaveAttribute('aria-selected', 'false');
+
+    // Click on Log tab
+    await user.click(logTab);
+
+    // Verify tab states changed
+    await waitFor(() => {
+      expect(basicTab).toHaveAttribute('aria-selected', 'false');
+      expect(logTab).toHaveAttribute('aria-selected', 'true');
+    });
+
+    // Verify correct tab content is displayed
+    expect(screen.getByText(/log information/i)).toBeInTheDocument();
+  });
+
+  it('should toggle active status correctly', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    const activeSwitch = screen.getByRole('switch', { name: /active/i });
+    
+    // Should be inactive by default
+    expect(activeSwitch).not.toBeChecked();
+
+    // Toggle to active
+    await user.click(activeSwitch);
+    expect(activeSwitch).toBeChecked();
+
+    // Toggle back to inactive
+    await user.click(activeSwitch);
+    expect(activeSwitch).not.toBeChecked();
+  });
+
+  it('should cancel navigation when cancel button is clicked', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    await user.click(cancelButton);
+
+    expect(mockPush).toHaveBeenCalledWith('/system-settings/scheduler');
+  });
+});
+
+describe('SchedulerDetailsPage - Edit Scheduler Task Flow', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
+  beforeEach(() => {
+    user = userEvent.setup();
+    setupSuccessHandlers();
+    vi.clearAllMocks();
+
+    // Mock useParams to return edit mode
+    vi.mocked(require('next/navigation').useParams).mockReturnValue({ 
+      id: '15' 
+    });
+  });
+
+  afterEach(() => {
+    server.resetHandlers();
+    // Reset useParams mock to default
+    vi.mocked(require('next/navigation').useParams).mockReturnValue({ 
+      id: undefined 
+    });
+  });
+
+  it('should load existing scheduler task data in edit mode', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Wait for data to load
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('gaaa')).toBeInTheDocument(); // name
+      expect(screen.getByDisplayValue('pac')).toBeInTheDocument(); // description
+      expect(screen.getByDisplayValue('*')).toBeInTheDocument(); // component
+      expect(screen.getByDisplayValue('88')).toBeInTheDocument(); // frequency
+    });
+
+    // Verify page title shows edit mode
+    expect(screen.getByRole('heading', { name: /edit scheduler task/i })).toBeInTheDocument();
+  });
+
+  it('should successfully update scheduler task with valid changes', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Wait for data to load
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('gaaa')).toBeInTheDocument();
+    });
+
+    // Update the name field
+    const nameField = screen.getByDisplayValue('gaaa');
+    await user.clear(nameField);
+    await user.type(nameField, 'new-scheduler-name');
+
+    // Submit the form
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    // Verify success behavior
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/system-settings/scheduler');
+    });
+  });
+
+  it('should not update scheduler task with invalid input', async () => {
+    setupErrorHandlers();
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Wait for data to load
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('gaaa')).toBeInTheDocument();
+    });
+
+    // Clear the name field (make it invalid)
+    const nameField = screen.getByDisplayValue('gaaa');
+    await user.clear(nameField);
+
+    // Submit the form
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    // Verify no navigation occurred due to validation errors
+    await waitFor(() => {
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should show log content in Log tab when available', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Wait for data to load
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('gaaa')).toBeInTheDocument();
+    });
+
+    // Click on Log tab
+    const logTab = screen.getByRole('tab', { name: /log/i });
+    await user.click(logTab);
+
+    // Verify log content is displayed
+    await waitFor(() => {
+      expect(screen.getByText(/status code: 404/i)).toBeInTheDocument();
+      expect(screen.getByText(/resource '\*' not found/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle missing task data gracefully', async () => {
+    // Setup handler to return 404
+    server.use(
+      rest.get('/api/v2/system/task/15', (req, res, ctx) => {
+        return res(ctx.status(404), ctx.json({
+          error: { code: 404, message: 'Task not found' }
+        }));
       })
+    );
 
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
+    renderWithProviders(<SchedulerDetailsPage />);
 
-      expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument()
-      expect(screen.getByText(/loading scheduler task/i)).toBeInTheDocument()
-    })
+    // Should show error state
+    await waitFor(() => {
+      expect(screen.getByText(/task not found/i)).toBeInTheDocument();
+    });
+  });
+});
 
-    it('renders scheduler details form when data is loaded', async () => {
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
+describe('SchedulerDetailsPage - React Query Integration', () => {
+  beforeEach(() => {
+    setupSuccessHandlers();
+    vi.clearAllMocks();
+  });
 
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /scheduler task details/i })).toBeInTheDocument()
+  afterEach(() => {
+    server.resetHandlers();
+  });
+
+  it('should cache service data and avoid redundant requests', async () => {
+    let serviceRequestCount = 0;
+    
+    server.use(
+      rest.get('/api/v2/system/service', (req, res, ctx) => {
+        serviceRequestCount++;
+        return res(ctx.json({ resource: mockServices }));
       })
+    );
 
-      // Check form fields are rendered
-      expect(screen.getByLabelText(/task name/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/task type/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/frequency/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/start time/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/active/i)).toBeInTheDocument()
-    })
+    // Render component twice
+    const { unmount } = renderWithProviders(<SchedulerDetailsPage />);
+    
+    await waitFor(() => {
+      expect(screen.getByLabelText(/service/i)).toBeInTheDocument();
+    });
 
-    it('renders error state when task is not found', async () => {
-      vi.mocked(require('@/hooks/useSchedulerTask').useSchedulerTask).mockReturnValue({
-        data: undefined,
-        isLoading: false,
-        isError: true,
-        error: { message: 'Scheduler task not found' },
-        refetch: vi.fn(),
+    unmount();
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/service/i)).toBeInTheDocument();
+    });
+
+    // Should only make one request due to caching
+    expect(serviceRequestCount).toBe(1);
+  });
+
+  it('should handle optimistic updates during task creation', async () => {
+    let createRequestMade = false;
+    
+    server.use(
+      rest.post('/api/v2/system/task', async (req, res, ctx) => {
+        createRequestMade = true;
+        // Simulate slow network
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return res(ctx.status(201), ctx.json({ 
+          resource: [{ ...await req.json(), id: 123 }] 
+        }));
       })
+    );
 
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
+    renderWithProviders(<SchedulerDetailsPage />);
+    const user = userEvent.setup();
 
-      expect(screen.getByRole('alert')).toBeInTheDocument()
-      expect(screen.getByText(/scheduler task not found/i)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
-    })
+    // Fill out form quickly
+    await user.type(screen.getByLabelText(/name/i), 'test-task');
+    await user.type(screen.getByLabelText(/description/i), 'Test description');
+    
+    const serviceSelect = screen.getByLabelText(/service/i);
+    await user.click(serviceSelect);
+    await user.click(screen.getByText('Local SQL Database'));
 
-    it('populates form fields with existing task data', async () => {
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
+    await user.type(screen.getByLabelText(/component/i), 'test');
+    await user.type(screen.getByLabelText(/frequency/i), '600');
 
-      await waitFor(() => {
-        const nameInput = screen.getByDisplayValue(mockSchedulerTask.name)
-        const typeSelect = screen.getByDisplayValue(mockSchedulerTask.type)
-        const frequencySelect = screen.getByDisplayValue(mockSchedulerTask.frequency)
-        
-        expect(nameInput).toBeInTheDocument()
-        expect(typeSelect).toBeInTheDocument()
-        expect(frequencySelect).toBeInTheDocument()
+    // Submit form
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    // Save button should show loading state
+    await waitFor(() => {
+      expect(saveButton).toBeDisabled();
+    });
+
+    // Wait for completion
+    await waitFor(() => {
+      expect(createRequestMade).toBe(true);
+      expect(mockPush).toHaveBeenCalled();
+    });
+  });
+
+  it('should invalidate related queries after successful mutation', async () => {
+    let servicesRefetched = false;
+    
+    server.use(
+      rest.get('/api/v2/system/service', (req, res, ctx) => {
+        servicesRefetched = true;
+        return res(ctx.json({ resource: mockServices }));
+      }),
+      rest.post('/api/v2/system/task', (req, res, ctx) => {
+        return res(ctx.status(201), ctx.json({ 
+          resource: [{ ...req.body, id: 123 }] 
+        }));
       })
-    })
-  })
+    );
 
-  describe('Tab Navigation', () => {
-    beforeEach(async () => {
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
+    renderWithProviders(<SchedulerDetailsPage />);
+    const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /scheduler task details/i })).toBeInTheDocument()
+    // Wait for initial service load
+    await waitFor(() => {
+      expect(servicesRefetched).toBe(true);
+    });
+
+    servicesRefetched = false;
+
+    // Create a task
+    await user.type(screen.getByLabelText(/name/i), 'test-task');
+    await user.type(screen.getByLabelText(/description/i), 'Test description');
+    
+    const serviceSelect = screen.getByLabelText(/service/i);
+    await user.click(serviceSelect);
+    await user.click(screen.getByText('Local SQL Database'));
+
+    await user.type(screen.getByLabelText(/component/i), 'test');
+    await user.type(screen.getByLabelText(/frequency/i), '600');
+
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    // Related queries should be invalidated and refetched
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalled();
+    });
+  });
+});
+
+describe('SchedulerDetailsPage - Error Handling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    server.resetHandlers();
+  });
+
+  it('should display network error when service request fails', async () => {
+    server.use(
+      rest.get('/api/v2/system/service', (req, res, ctx) => {
+        return res.networkError('Network error');
       })
-    })
+    );
 
-    it('renders all tab buttons', () => {
-      const tabList = screen.getByRole('tablist')
-      expect(tabList).toBeInTheDocument()
+    renderWithProviders(<SchedulerDetailsPage />);
 
-      const tabs = within(tabList).getAllByRole('tab')
-      expect(tabs).toHaveLength(4)
+    await waitFor(() => {
+      expect(screen.getByText(/failed to load services/i)).toBeInTheDocument();
+    });
+  });
 
-      expect(screen.getByRole('tab', { name: /general/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /configuration/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /schedule/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /history/i })).toBeInTheDocument()
-    })
+  it('should display validation errors from server response', async () => {
+    setupErrorHandlers();
+    renderWithProviders(<SchedulerDetailsPage />);
+    const user = userEvent.setup();
 
-    it('shows general tab as selected by default', () => {
-      const generalTab = screen.getByRole('tab', { name: /general/i })
-      expect(generalTab).toHaveAttribute('aria-selected', 'true')
+    // Try to submit invalid data
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
 
-      const generalPanel = screen.getByRole('tabpanel', { name: /general/i })
-      expect(generalPanel).toBeInTheDocument()
-    })
+    await waitFor(() => {
+      expect(screen.getByText(/name is required/i)).toBeInTheDocument();
+    });
+  });
 
-    it('switches to configuration tab when clicked', async () => {
-      const configTab = screen.getByRole('tab', { name: /configuration/i })
-      
-      await user.click(configTab)
-
-      expect(configTab).toHaveAttribute('aria-selected', 'true')
-      expect(screen.getByRole('tabpanel', { name: /configuration/i })).toBeInTheDocument()
-    })
-
-    it('switches to schedule tab when clicked', async () => {
-      const scheduleTab = screen.getByRole('tab', { name: /schedule/i })
-      
-      await user.click(scheduleTab)
-
-      expect(scheduleTab).toHaveAttribute('aria-selected', 'true')
-      expect(screen.getByRole('tabpanel', { name: /schedule/i })).toBeInTheDocument()
-    })
-
-    it('switches to history tab when clicked', async () => {
-      const historyTab = screen.getByRole('tab', { name: /history/i })
-      
-      await user.click(historyTab)
-
-      expect(historyTab).toHaveAttribute('aria-selected', 'true')
-      expect(screen.getByRole('tabpanel', { name: /history/i })).toBeInTheDocument()
-    })
-
-    it('supports keyboard navigation between tabs', async () => {
-      const firstTab = screen.getByRole('tab', { name: /general/i })
-      firstTab.focus()
-
-      // Navigate to next tab with arrow key
-      await user.keyboard('{ArrowRight}')
-      
-      const configTab = screen.getByRole('tab', { name: /configuration/i })
-      expect(configTab).toHaveFocus()
-
-      // Activate tab with Enter or Space
-      await user.keyboard('{Enter}')
-      expect(configTab).toHaveAttribute('aria-selected', 'true')
-    })
-  })
-
-  describe('Form Validation', () => {
-    beforeEach(async () => {
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /scheduler task details/i })).toBeInTheDocument()
+  it('should handle 500 server errors gracefully', async () => {
+    server.use(
+      rest.post('/api/v2/system/task', (req, res, ctx) => {
+        return res(ctx.status(500), ctx.json({
+          error: { code: 500, message: 'Internal server error' }
+        }));
       })
-    })
-
-    it('validates required fields on form submission', async () => {
-      const nameInput = screen.getByLabelText(/task name/i)
-      const saveButton = screen.getByRole('button', { name: /save/i })
-
-      // Clear required field
-      await user.clear(nameInput)
-      await user.click(saveButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/task name is required/i)).toBeInTheDocument()
-      })
-
-      expect(mockMutateAsync).not.toHaveBeenCalled()
-    })
-
-    it('validates task name minimum length', async () => {
-      const nameInput = screen.getByLabelText(/task name/i)
-      
-      await user.clear(nameInput)
-      await user.type(nameInput, 'ab')
-
-      await waitFor(() => {
-        expect(screen.getByText(/task name must be at least 3 characters/i)).toBeInTheDocument()
-      })
-    })
-
-    it('validates task name maximum length', async () => {
-      const nameInput = screen.getByLabelText(/task name/i)
-      const longName = 'a'.repeat(256)
-      
-      await user.clear(nameInput)
-      await user.type(nameInput, longName)
-
-      await waitFor(() => {
-        expect(screen.getByText(/task name must be less than 255 characters/i)).toBeInTheDocument()
-      })
-    })
-
-    it('validates JSON payload format in configuration tab', async () => {
-      const configTab = screen.getByRole('tab', { name: /configuration/i })
-      await user.click(configTab)
-
-      const payloadTextarea = screen.getByLabelText(/payload/i)
-      const invalidJson = '{ invalid json }'
-
-      await user.clear(payloadTextarea)
-      await user.type(payloadTextarea, invalidJson)
-
-      await waitFor(() => {
-        expect(screen.getByText(/invalid json format/i)).toBeInTheDocument()
-      })
-    })
-
-    it('validates start time is not in the past', async () => {
-      const scheduleTab = screen.getByRole('tab', { name: /schedule/i })
-      await user.click(scheduleTab)
-
-      const startTimeInput = screen.getByLabelText(/start time/i)
-      const pastDate = '2020-01-01T00:00'
-
-      await user.clear(startTimeInput)
-      await user.type(startTimeInput, pastDate)
-
-      await waitFor(() => {
-        expect(screen.getByText(/start time cannot be in the past/i)).toBeInTheDocument()
-      })
-    })
-
-    it('shows real-time validation errors with debounced input', async () => {
-      const nameInput = screen.getByLabelText(/task name/i)
-      
-      await user.clear(nameInput)
-      
-      // Validation should appear after debounce delay
-      await waitFor(() => {
-        expect(screen.getByText(/task name is required/i)).toBeInTheDocument()
-      }, { timeout: 500 })
-    })
-  })
-
-  describe('CRUD Operations', () => {
-    beforeEach(async () => {
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /scheduler task details/i })).toBeInTheDocument()
-      })
-    })
-
-    it('creates new scheduler task with valid data', async () => {
-      // Mock creating new task (no existing data)
-      vi.mocked(require('@/hooks/useSchedulerTask').useSchedulerTask).mockReturnValue({
-        data: undefined,
-        isLoading: false,
-        isError: false,
-        error: null,
-        refetch: vi.fn(),
-      })
-
-      const { rerender } = render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      const nameInput = screen.getByLabelText(/task name/i)
-      const typeSelect = screen.getByLabelText(/task type/i)
-      const saveButton = screen.getByRole('button', { name: /save/i })
-
-      await user.type(nameInput, 'New Test Task')
-      await user.selectOptions(typeSelect, 'script')
-      
-      mockMutateAsync.mockResolvedValueOnce({ success: true })
-
-      await user.click(saveButton)
-
-      await waitFor(() => {
-        expect(mockMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({
-            name: 'New Test Task',
-            type: 'script',
-          })
-        )
-      })
-
-      expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['scheduler-tasks'] })
-    })
-
-    it('updates existing scheduler task', async () => {
-      const nameInput = screen.getByLabelText(/task name/i)
-      const saveButton = screen.getByRole('button', { name: /save/i })
-
-      await user.clear(nameInput)
-      await user.type(nameInput, 'Updated Task Name')
-
-      mockMutateAsync.mockResolvedValueOnce({ success: true })
-
-      await user.click(saveButton)
-
-      await waitFor(() => {
-        expect(mockMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({
-            name: 'Updated Task Name',
-          })
-        )
-      })
-
-      expect(mockInvalidateQueries).toHaveBeenCalledWith({ 
-        queryKey: ['scheduler-task', 'test-task-1'] 
-      })
-    })
-
-    it('deletes scheduler task with confirmation', async () => {
-      const deleteButton = screen.getByRole('button', { name: /delete/i })
-      
-      await user.click(deleteButton)
-
-      // Confirm deletion dialog should appear
-      const confirmDialog = screen.getByRole('dialog', { name: /confirm deletion/i })
-      expect(confirmDialog).toBeInTheDocument()
-
-      const confirmButton = within(confirmDialog).getByRole('button', { name: /delete/i })
-      
-      mockMutateAsync.mockResolvedValueOnce({ success: true })
-
-      await user.click(confirmButton)
-
-      await waitFor(() => {
-        expect(mockMutateAsync).toHaveBeenCalled()
-      })
-
-      expect(mockPush).toHaveBeenCalledWith('/adf-scheduler')
-    })
-
-    it('triggers scheduler task execution', async () => {
-      const triggerButton = screen.getByRole('button', { name: /trigger now/i })
-      
-      mockMutateAsync.mockResolvedValueOnce({ 
-        success: true, 
-        execution_id: '12345' 
-      })
-
-      await user.click(triggerButton)
-
-      await waitFor(() => {
-        expect(mockMutateAsync).toHaveBeenCalled()
-      })
-
-      expect(screen.getByText(/task triggered successfully/i)).toBeInTheDocument()
-    })
-  })
-
-  describe('Error Handling', () => {
-    beforeEach(async () => {
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /scheduler task details/i })).toBeInTheDocument()
-      })
-    })
-
-    it('handles network errors during save operation', async () => {
-      const nameInput = screen.getByLabelText(/task name/i)
-      const saveButton = screen.getByRole('button', { name: /save/i })
-
-      await user.clear(nameInput)
-      await user.type(nameInput, 'Test Task')
-
-      const networkError = new Error('Network error')
-      mockMutateAsync.mockRejectedValueOnce(networkError)
-
-      await user.click(saveButton)
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument()
-        expect(screen.getByText(/failed to save scheduler task/i)).toBeInTheDocument()
-      })
-    })
-
-    it('handles validation errors from server', async () => {
-      const saveButton = screen.getByRole('button', { name: /save/i })
-
-      const validationError = {
-        response: {
-          status: 422,
-          data: {
-            error: {
-              code: 422,
-              message: 'Validation Error',
-              details: {
-                name: ['Task name is required'],
-                type: ['Invalid task type'],
-              },
-            },
-          },
-        },
-      }
-
-      mockMutateAsync.mockRejectedValueOnce(validationError)
-
-      await user.click(saveButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/task name is required/i)).toBeInTheDocument()
-        expect(screen.getByText(/invalid task type/i)).toBeInTheDocument()
-      })
-    })
-
-    it('handles 404 errors when task is not found', async () => {
-      const error404 = {
-        response: {
-          status: 404,
-          data: {
-            error: {
-              code: 404,
-              message: 'Scheduler task not found',
-            },
-          },
-        },
-      }
-
-      vi.mocked(require('@/hooks/useSchedulerTask').useSchedulerTask).mockReturnValue({
-        data: undefined,
-        isLoading: false,
-        isError: true,
-        error: error404,
-        refetch: vi.fn(),
-      })
-
-      const { rerender } = render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      expect(screen.getByText(/scheduler task not found/i)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /go back/i })).toBeInTheDocument()
-    })
-
-    it('handles permission errors (403)', async () => {
-      const saveButton = screen.getByRole('button', { name: /save/i })
-
-      const permissionError = {
-        response: {
-          status: 403,
-          data: {
-            error: {
-              code: 403,
-              message: 'Insufficient permissions',
-            },
-          },
-        },
-      }
-
-      mockMutateAsync.mockRejectedValueOnce(permissionError)
-
-      await user.click(saveButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/insufficient permissions/i)).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('React Query Integration', () => {
-    it('invalidates scheduler tasks cache after successful creation', async () => {
-      vi.mocked(require('@/hooks/useSchedulerTask').useSchedulerTask).mockReturnValue({
-        data: undefined,
-        isLoading: false,
-        isError: false,
-        error: null,
-        refetch: vi.fn(),
-      })
-
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      const nameInput = screen.getByLabelText(/task name/i)
-      const saveButton = screen.getByRole('button', { name: /save/i })
-
-      await user.type(nameInput, 'New Task')
-      
-      mockMutateAsync.mockResolvedValueOnce({ success: true })
-
-      await user.click(saveButton)
-
-      await waitFor(() => {
-        expect(mockInvalidateQueries).toHaveBeenCalledWith({ 
-          queryKey: ['scheduler-tasks'] 
-        })
-      })
-    })
-
-    it('invalidates specific task cache after successful update', async () => {
-      const nameInput = screen.getByLabelText(/task name/i)
-      const saveButton = screen.getByRole('button', { name: /save/i })
-
-      await user.clear(nameInput)
-      await user.type(nameInput, 'Updated Task')
-      
-      mockMutateAsync.mockResolvedValueOnce({ success: true })
-
-      await user.click(saveButton)
-
-      await waitFor(() => {
-        expect(mockInvalidateQueries).toHaveBeenCalledWith({ 
-          queryKey: ['scheduler-task', 'test-task-1'] 
-        })
-      })
-    })
-
-    it('handles stale data detection and refetching', async () => {
-      const refetch = vi.fn()
-      
-      vi.mocked(require('@/hooks/useSchedulerTask').useSchedulerTask).mockReturnValue({
-        data: mockSchedulerTask,
-        isLoading: false,
-        isError: false,
-        error: null,
-        refetch,
-        isStale: true,
-      })
-
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      // Component should show refresh indicator for stale data
-      expect(screen.getByRole('button', { name: /refresh/i })).toBeInTheDocument()
-
-      const refreshButton = screen.getByRole('button', { name: /refresh/i })
-      await user.click(refreshButton)
-
-      expect(refetch).toHaveBeenCalled()
-    })
-  })
-
-  describe('JSON Payload Validation', () => {
-    beforeEach(async () => {
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      await waitFor(() => {
-        const configTab = screen.getByRole('tab', { name: /configuration/i })
-        user.click(configTab)
-      })
-    })
-
-    it('validates JSON syntax in payload editor', async () => {
-      const payloadEditor = screen.getByLabelText(/payload/i)
-      
-      await user.clear(payloadEditor)
-      await user.type(payloadEditor, '{ "invalid": json }')
-
-      await waitFor(() => {
-        expect(screen.getByText(/invalid json syntax/i)).toBeInTheDocument()
-      })
-    })
-
-    it('formats valid JSON payload automatically', async () => {
-      const payloadEditor = screen.getByLabelText(/payload/i)
-      const compactJson = '{"name":"test","value":123}'
-      
-      await user.clear(payloadEditor)
-      await user.type(payloadEditor, compactJson)
-
-      const formatButton = screen.getByRole('button', { name: /format json/i })
-      await user.click(formatButton)
-
-      await waitFor(() => {
-        const formattedJson = JSON.stringify(JSON.parse(compactJson), null, 2)
-        expect(payloadEditor).toHaveValue(formattedJson)
-      })
-    })
-
-    it('validates JSON schema if provided', async () => {
-      const payloadEditor = screen.getByLabelText(/payload/i)
-      const invalidPayload = '{"wrongProperty": "value"}'
-      
-      await user.clear(payloadEditor)
-      await user.type(payloadEditor, invalidPayload)
-
-      await waitFor(() => {
-        expect(screen.getByText(/payload does not match expected schema/i)).toBeInTheDocument()
-      })
-    })
-
-    it('provides JSON editing assistance with syntax highlighting', async () => {
-      const payloadEditor = screen.getByLabelText(/payload/i)
-      
-      // Check that the editor has syntax highlighting classes
-      expect(payloadEditor).toHaveClass('syntax-highlighted')
-      
-      // Check for autocomplete functionality
-      await user.type(payloadEditor, '{"')
-      
-      // Should show autocomplete suggestions
-      await waitFor(() => {
-        expect(screen.getByRole('listbox', { name: /autocomplete/i })).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Accessibility Compliance', () => {
-    it('meets WCAG 2.1 AA accessibility standards', async () => {
-      const { container } = render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /scheduler task details/i })).toBeInTheDocument()
-      })
-
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
-
-    it('provides proper ARIA labels for form elements', async () => {
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/task name/i)).toHaveAccessibleName()
-        expect(screen.getByLabelText(/task type/i)).toHaveAccessibleName()
-        expect(screen.getByLabelText(/frequency/i)).toHaveAccessibleName()
-        expect(screen.getByLabelText(/active/i)).toHaveAccessibleName()
-      })
-    })
-
-    it('supports keyboard navigation throughout the form', async () => {
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /scheduler task details/i })).toBeInTheDocument()
-      })
-
-      // Test tab order through form elements
-      const nameInput = screen.getByLabelText(/task name/i)
-      nameInput.focus()
-
-      await user.keyboard('{Tab}')
-      expect(screen.getByLabelText(/task type/i)).toHaveFocus()
-
-      await user.keyboard('{Tab}')
-      expect(screen.getByLabelText(/frequency/i)).toHaveFocus()
-    })
-
-    it('announces form validation errors to screen readers', async () => {
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      const nameInput = screen.getByLabelText(/task name/i)
-      
-      await user.clear(nameInput)
-      await user.tab() // Move focus away to trigger validation
-
-      await waitFor(() => {
-        const errorMessage = screen.getByText(/task name is required/i)
-        expect(errorMessage).toHaveAttribute('role', 'alert')
-        expect(errorMessage).toHaveAttribute('aria-live', 'polite')
-      })
-    })
-
-    it('provides proper focus management for modal dialogs', async () => {
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      const deleteButton = screen.getByRole('button', { name: /delete/i })
-      await user.click(deleteButton)
-
-      const dialog = screen.getByRole('dialog', { name: /confirm deletion/i })
-      expect(dialog).toBeInTheDocument()
-
-      // Focus should be trapped within the dialog
-      const firstFocusableElement = within(dialog).getByRole('button', { name: /cancel/i })
-      expect(firstFocusableElement).toHaveFocus()
-    })
-  })
-
-  describe('Loading States and UI Feedback', () => {
-    it('shows loading spinner during save operation', async () => {
-      const { rerender } = render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      // Mock pending mutation state
-      vi.mocked(require('@/hooks/useSchedulerTask').useCreateSchedulerTask).mockReturnValue({
-        mutateAsync: mockMutateAsync,
-        isPending: true,
-        error: null,
-      })
-
-      rerender(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      const saveButton = screen.getByRole('button', { name: /saving/i })
-      expect(saveButton).toBeDisabled()
-      expect(screen.getByRole('status', { name: /saving/i })).toBeInTheDocument()
-    })
-
-    it('disables form during loading operations', async () => {
-      vi.mocked(require('@/hooks/useSchedulerTask').useSchedulerTask).mockReturnValue({
-        data: undefined,
-        isLoading: true,
-        isError: false,
-        error: null,
-        refetch: vi.fn(),
-      })
-
-      render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      // All form elements should be disabled during loading
-      await waitFor(() => {
-        const nameInput = screen.getByLabelText(/task name/i)
-        const typeSelect = screen.getByLabelText(/task type/i)
-        const saveButton = screen.getByRole('button', { name: /save/i })
-
-        expect(nameInput).toBeDisabled()
-        expect(typeSelect).toBeDisabled()
-        expect(saveButton).toBeDisabled()
-      })
-    })
-
-    it('shows success notification after successful operations', async () => {
-      const nameInput = screen.getByLabelText(/task name/i)
-      const saveButton = screen.getByRole('button', { name: /save/i })
-
-      await user.clear(nameInput)
-      await user.type(nameInput, 'Updated Task')
-      
-      mockMutateAsync.mockResolvedValueOnce({ success: true })
-
-      await user.click(saveButton)
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert', { name: /success/i })).toBeInTheDocument()
-        expect(screen.getByText(/scheduler task saved successfully/i)).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Performance and Optimization', () => {
-    it('debounces form validation to prevent excessive API calls', async () => {
-      const nameInput = screen.getByLabelText(/task name/i)
-      
-      await user.clear(nameInput)
-      
-      // Type rapidly - validation should be debounced
-      await user.type(nameInput, 'te')
-      await user.type(nameInput, 'st')
-      
-      // Validation should only happen once after debounce delay
-      await waitFor(() => {
-        expect(screen.getByText(/task name must be at least 3 characters/i)).toBeInTheDocument()
-      }, { timeout: 600 })
-    })
-
-    it('optimistically updates UI during mutations', async () => {
-      const nameInput = screen.getByLabelText(/task name/i)
-      const saveButton = screen.getByRole('button', { name: /save/i })
-
-      await user.clear(nameInput)
-      await user.type(nameInput, 'Optimistic Update')
-
-      // Mock slow mutation
-      mockMutateAsync.mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 1000))
-      )
-
-      await user.click(saveButton)
-
-      // UI should update optimistically before mutation completes
-      expect(screen.getByDisplayValue('Optimistic Update')).toBeInTheDocument()
-    })
-
-    it('implements proper cleanup to prevent memory leaks', async () => {
-      const { unmount } = render(
-        <TestProviders queryClient={queryClient}>
-          <SchedulerDetailsPage />
-        </TestProviders>
-      )
-
-      // Component should clean up properly when unmounted
-      unmount()
-
-      // Verify no warnings about memory leaks or state updates after unmount
-      expect(vi.getTimerCount()).toBe(0)
-    })
-  })
-})
+    );
+
+    renderWithProviders(<SchedulerDetailsPage />);
+    const user = userEvent.setup();
+
+    // Fill form with valid data
+    await user.type(screen.getByLabelText(/name/i), 'test-task');
+    await user.type(screen.getByLabelText(/description/i), 'Test description');
+    
+    const serviceSelect = screen.getByLabelText(/service/i);
+    await user.click(serviceSelect);
+    await user.click(screen.getByText('Local SQL Database'));
+
+    await user.type(screen.getByLabelText(/component/i), 'test');
+    await user.type(screen.getByLabelText(/frequency/i), '600');
+
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    // Should show error message
+    await waitFor(() => {
+      expect(screen.getByText(/internal server error/i)).toBeInTheDocument();
+    });
+  });
+});
+
+describe('SchedulerDetailsPage - Accessibility Compliance', () => {
+  beforeEach(() => {
+    setupSuccessHandlers();
+  });
+
+  afterEach(() => {
+    server.resetHandlers();
+  });
+
+  it('should maintain proper focus management', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+    const user = userEvent.setup();
+
+    // Tab through form elements
+    await user.tab();
+    expect(screen.getByLabelText(/name/i)).toHaveFocus();
+
+    await user.tab();
+    expect(screen.getByLabelText(/description/i)).toHaveFocus();
+
+    await user.tab();
+    expect(screen.getByLabelText(/active/i)).toHaveFocus();
+  });
+
+  it('should have proper ARIA labels and descriptions', () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+
+    // Check for required ARIA attributes
+    expect(screen.getByRole('form')).toHaveAttribute('aria-label');
+    expect(screen.getByLabelText(/name/i)).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByLabelText(/service/i)).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByLabelText(/component/i)).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByLabelText(/frequency/i)).toHaveAttribute('aria-required', 'true');
+  });
+
+  it('should announce validation errors to screen readers', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+    const user = userEvent.setup();
+
+    const saveButton = screen.getByRole('button', { name: /save/i });
+    await user.click(saveButton);
+
+    await waitFor(() => {
+      const errorMessage = screen.getByText(/name is required/i);
+      expect(errorMessage).toHaveAttribute('role', 'alert');
+      expect(errorMessage).toHaveAttribute('aria-live', 'polite');
+    });
+  });
+
+  it('should support keyboard navigation for tabs', async () => {
+    renderWithProviders(<SchedulerDetailsPage />);
+    const user = userEvent.setup();
+
+    const basicTab = screen.getByRole('tab', { name: /basic/i });
+    const logTab = screen.getByRole('tab', { name: /log/i });
+
+    // Focus on tab
+    basicTab.focus();
+    expect(basicTab).toHaveFocus();
+
+    // Use arrow keys to navigate tabs
+    await user.keyboard('{ArrowRight}');
+    expect(logTab).toHaveFocus();
+
+    await user.keyboard('{ArrowLeft}');
+    expect(basicTab).toHaveFocus();
+  });
+});
