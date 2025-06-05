@@ -1,849 +1,611 @@
-/**
- * Tables Table Component for Database Schema Management
- * 
- * React component that displays and manages a table of database table schemas with
- * TanStack Virtual for large dataset handling. Replaces Angular DfManageTablesTableComponent
- * with React Query for data fetching, Headless UI table components with Tailwind CSS styling,
- * and Next.js routing for navigation.
- * 
- * Features:
- * - Database table schema listing with virtual scrolling (1000+ tables)
- * - React Query cached schema metadata with TTL configuration
- * - Table filtering, viewing, and deletion capabilities
- * - Responsive design with Tailwind CSS utility classes
- * - WCAG 2.1 AA compliance for accessibility
- * - Next.js router integration for navigation
- * 
- * Performance optimizations:
- * - TanStack Virtual for efficient rendering of large datasets
- * - React Query intelligent caching (staleTime: 300s, cacheTime: 900s)
- * - Memoized components and callbacks for optimal re-rendering
- * - Progressive loading with configurable page sizes
- */
-
 'use client';
 
-import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useRef } from 'react';
+import { useTableSchemas } from '@/hooks/use-table-schemas';
+import type { SchemaTable } from '@/types/schema';
+import { useAppStore } from '@/stores/app-store';
 import { 
-  ChevronUpDownIcon, 
-  EyeIcon, 
   TrashIcon, 
+  EyeIcon, 
+  PlusIcon, 
+  ArrowPathIcon,
   MagnifyingGlassIcon,
-  ExclamationTriangleIcon,
-  CheckIcon,
-  XMarkIcon
+  ExclamationTriangleIcon 
 } from '@heroicons/react/24/outline';
-import { Menu, Transition, Dialog } from '@headlessui/react';
-import { Fragment } from 'react';
-
-// =============================================================================
-// TYPE DEFINITIONS AND INTERFACES
-// =============================================================================
+import { EyeIcon as EyeIconSolid } from '@heroicons/react/24/solid';
 
 /**
- * Database table schema interface optimized for React Query and virtual scrolling
+ * Props interface for the TablesTable component
  */
-interface TableSchema {
-  name: string;
-  label?: string;
-  description?: string;
-  schema?: string;
+export interface TablesTableProps {
+  /**
+   * Optional service name override (defaults to route parameter)
+   */
+  serviceName?: string;
   
-  // Table metadata
+  /**
+   * Enable table creation functionality
+   */
+  allowCreate?: boolean;
+  
+  /**
+   * Enable search/filter functionality  
+   */
+  allowFilter?: boolean;
+  
+  /**
+   * Enable refresh functionality
+   */
+  allowRefresh?: boolean;
+  
+  /**
+   * Custom page size for pagination
+   */
+  pageSize?: number;
+  
+  /**
+   * Enable virtual scrolling for large datasets
+   */
+  enableVirtualScrolling?: boolean;
+  
+  /**
+   * Custom row height for virtual scrolling optimization
+   */
+  rowHeight?: number;
+  
+  /**
+   * Callback when table is created/edited
+   */
+  onTableAction?: (action: 'create' | 'edit' | 'delete', tableName?: string) => void;
+  
+  /**
+   * Additional CSS classes
+   */
+  className?: string;
+}
+
+/**
+ * Table row data interface matching the Angular DatabaseTableRowData type
+ */
+export interface TableRowData {
+  id: string;
+  name: string;
+  label: string;
+  description?: string;
+  isView?: boolean;
   rowCount?: number;
   estimatedSize?: string;
   lastModified?: string;
-  isView: boolean;
-  
-  // Field information
-  fieldCount: number;
-  primaryKeyFields: string[];
-  foreignKeyCount: number;
-  indexCount: number;
-  
-  // API generation status
-  apiEnabled?: boolean;
-  endpointGenerated?: boolean;
-  access?: number;
-  
-  // React component state
-  expanded?: boolean;
-  selected?: boolean;
-  loading?: boolean;
 }
 
 /**
- * Table filter form schema with Zod validation
- */
-const filterFormSchema = z.object({
-  searchTerm: z.string().optional(),
-  showViews: z.boolean().default(true),
-  showTables: z.boolean().default(true),
-  hasData: z.enum(['all', 'with-data', 'empty']).default('all'),
-  apiStatus: z.enum(['all', 'enabled', 'disabled']).default('all'),
-  sortBy: z.enum(['name', 'rowCount', 'lastModified', 'fieldCount']).default('name'),
-  sortOrder: z.enum(['asc', 'desc']).default('asc')
-});
-
-type FilterFormData = z.infer<typeof filterFormSchema>;
-
-/**
- * Query configuration for React Query integration
- */
-interface TableSchemasQuery {
-  serviceName: string;
-  database: string;
-  filters?: Partial<FilterFormData>;
-  page?: number;
-  pageSize?: number;
-}
-
-/**
- * API response structure for table schemas
- */
-interface TableSchemasResponse {
-  resource: TableSchema[];
-  meta: {
-    count: number;
-    total: number;
-    offset: number;
-    limit: number;
-  };
-}
-
-// =============================================================================
-// REACT QUERY HOOKS AND API FUNCTIONS
-// =============================================================================
-
-/**
- * API client function for fetching table schemas
- */
-const fetchTableSchemas = async ({ 
-  serviceName, 
-  database, 
-  filters, 
-  page = 0, 
-  pageSize = 50 
-}: TableSchemasQuery): Promise<TableSchemasResponse> => {
-  const params = new URLSearchParams({
-    offset: (page * pageSize).toString(),
-    limit: pageSize.toString(),
-    include_schema: 'true',
-    include_count: 'true'
-  });
-
-  // Apply filters
-  if (filters?.searchTerm) {
-    params.append('filter', `name like "${filters.searchTerm}%"`);
-  }
-
-  if (filters?.showViews === false) {
-    params.append('filter', 'is_view = false');
-  }
-
-  if (filters?.showTables === false) {
-    params.append('filter', 'is_view = true');
-  }
-
-  if (filters?.hasData === 'with-data') {
-    params.append('filter', 'row_count > 0');
-  } else if (filters?.hasData === 'empty') {
-    params.append('filter', 'row_count = 0');
-  }
-
-  // Sorting
-  if (filters?.sortBy && filters?.sortOrder) {
-    const sortField = filters.sortBy === 'rowCount' ? 'row_count' : 
-                     filters.sortBy === 'lastModified' ? 'last_modified' :
-                     filters.sortBy === 'fieldCount' ? 'field_count' : 'name';
-    params.append('order', `${sortField} ${filters.sortOrder}`);
-  }
-
-  const response = await fetch(`/api/v2/${serviceName}/_schema?${params}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    credentials: 'include'
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch table schemas: ${response.statusText}`);
-  }
-
-  return response.json();
-};
-
-/**
- * Custom hook for table schemas data fetching with React Query
- */
-const useTableSchemas = (serviceName: string, database: string, filters?: Partial<FilterFormData>) => {
-  return useQuery({
-    queryKey: ['tableSchemas', serviceName, database, filters],
-    queryFn: () => fetchTableSchemas({ serviceName, database, filters }),
-    staleTime: 5 * 60 * 1000, // 5 minutes (300 seconds) per specification
-    gcTime: 15 * 60 * 1000, // 15 minutes (900 seconds) per specification
-    enabled: Boolean(serviceName && database),
-    keepPreviousData: true,
-    refetchOnWindowFocus: false,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && error.message.includes('401')) {
-        return false; // Don't retry on authentication errors
-      }
-      return failureCount < 3;
-    }
-  });
-};
-
-/**
- * Custom hook for table deletion mutation
- */
-const useDeleteTable = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ serviceName, tableName }: { serviceName: string; tableName: string }) => {
-      const response = await fetch(`/api/v2/${serviceName}/_schema/${tableName}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete table: ${response.statusText}`);
-      }
-
-      return response.json();
-    },
-    onSuccess: (_, { serviceName }) => {
-      // Invalidate and refetch table schemas after deletion
-      queryClient.invalidateQueries({ queryKey: ['tableSchemas', serviceName] });
-    }
-  });
-};
-
-// =============================================================================
-// UI COMPONENTS
-// =============================================================================
-
-/**
- * Loading skeleton component for table rows
- */
-const TableRowSkeleton: React.FC = () => (
-  <div className="h-12 border-b border-gray-200 dark:border-gray-700 animate-pulse">
-    <div className="flex items-center px-6 py-3 space-x-4">
-      <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/4"></div>
-      <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/6"></div>
-      <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/6"></div>
-      <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/6"></div>
-      <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/6"></div>
-      <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
-    </div>
-  </div>
-);
-
-/**
- * Error boundary component for graceful error handling
- */
-const ErrorDisplay: React.FC<{ error: Error; retry: () => void }> = ({ error, retry }) => (
-  <div className="flex flex-col items-center justify-center p-8 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-    <ExclamationTriangleIcon className="h-12 w-12 text-red-500 dark:text-red-400 mb-4" />
-    <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
-      Failed to Load Table Schemas
-    </h3>
-    <p className="text-red-700 dark:text-red-300 text-center mb-4 max-w-md">
-      {error.message || 'An unexpected error occurred while fetching table schemas.'}
-    </p>
-    <button
-      onClick={retry}
-      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-    >
-      Try Again
-    </button>
-  </div>
-);
-
-/**
- * Empty state component when no tables are found
- */
-const EmptyState: React.FC<{ hasFilters: boolean; onClearFilters: () => void }> = ({ 
-  hasFilters, 
-  onClearFilters 
-}) => (
-  <div className="flex flex-col items-center justify-center p-12 text-gray-500 dark:text-gray-400">
-    <div className="w-16 h-16 mb-4 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-      <MagnifyingGlassIcon className="h-8 w-8" />
-    </div>
-    <h3 className="text-lg font-medium mb-2">
-      {hasFilters ? 'No tables match your filters' : 'No tables found'}
-    </h3>
-    <p className="text-sm text-center mb-4 max-w-sm">
-      {hasFilters 
-        ? 'Try adjusting your search criteria or filters to find tables.'
-        : 'This database does not contain any tables or views.'
-      }
-    </p>
-    {hasFilters && (
-      <button
-        onClick={onClearFilters}
-        className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-      >
-        Clear Filters
-      </button>
-    )}
-  </div>
-);
-
-/**
- * Confirmation dialog for table deletion
- */
-const DeleteConfirmationDialog: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  tableName: string;
-  isDeleting: boolean;
-}> = ({ isOpen, onClose, onConfirm, tableName, isDeleting }) => (
-  <Transition appear show={isOpen} as={Fragment}>
-    <Dialog as="div" className="relative z-50" onClose={onClose}>
-      <Transition.Child
-        as={Fragment}
-        enter="ease-out duration-300"
-        enterFrom="opacity-0"
-        enterTo="opacity-100"
-        leave="ease-in duration-200"
-        leaveFrom="opacity-100"
-        leaveTo="opacity-0"
-      >
-        <div className="fixed inset-0 bg-black bg-opacity-25" />
-      </Transition.Child>
-
-      <div className="fixed inset-0 overflow-y-auto">
-        <div className="flex min-h-full items-center justify-center p-4 text-center">
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0 scale-95"
-            enterTo="opacity-100 scale-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100 scale-100"
-            leaveTo="opacity-0 scale-95"
-          >
-            <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
-              <Dialog.Title
-                as="h3"
-                className="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100 mb-4"
-              >
-                Delete Table "{tableName}"
-              </Dialog.Title>
-              
-              <div className="mb-6">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Are you sure you want to delete this table? This action cannot be undone and will permanently remove all data and structure.
-                </p>
-              </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                  onClick={onClose}
-                  disabled={isDeleting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                  onClick={onConfirm}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete Table'}
-                </button>
-              </div>
-            </Dialog.Panel>
-          </Transition.Child>
-        </div>
-      </div>
-    </Dialog>
-  </Transition>
-);
-
-// =============================================================================
-// MAIN COMPONENT
-// =============================================================================
-
-/**
- * Tables Table Component
+ * Enhanced database table schema management component optimized for React/Next.js architecture.
  * 
- * Main component for displaying and managing database table schemas with virtual scrolling,
- * filtering, and CRUD operations. Implements React Query for data management and TanStack
- * Virtual for performance optimization with large datasets.
+ * Provides high-performance table display and management capabilities for database schemas
+ * with TanStack Virtual integration for datasets containing 1000+ tables. Features React Query
+ * intelligent caching with 5-minute stale time and 15-minute cache duration for optimal
+ * performance per Section 5.2 Component Details.
+ * 
+ * Key Features:
+ * - TanStack Virtual scrolling for enterprise-scale database schemas
+ * - React Query caching with TTL configuration (staleTime: 300s, cacheTime: 900s)
+ * - Headless UI components with Tailwind CSS styling
+ * - Next.js routing integration for navigation
+ * - Cache hit responses under 50ms per React/Next.js Integration Requirements
+ * - Real-time search filtering with debounced input
+ * - Accessible table interactions with WCAG 2.1 AA compliance
+ * 
+ * Performance Optimizations:
+ * - Virtual scrolling with configurable row height (default: 48px)
+ * - Progressive loading for large datasets
+ * - Intelligent caching and background refresh
+ * - Memory-efficient rendering of visible rows only
+ * 
+ * @param props - Component configuration options
+ * @returns Optimized database table schema management interface
  */
-export const TablesTable: React.FC = () => {
+export function TablesTable({
+  serviceName: propServiceName,
+  allowCreate = true,
+  allowFilter = true,
+  allowRefresh = true,
+  pageSize = 50,
+  enableVirtualScrolling = true,
+  rowHeight = 48,
+  onTableAction,
+  className = '',
+}: TablesTableProps) {
+  // Next.js routing hooks
   const router = useRouter();
   const params = useParams();
-  const searchParams = useSearchParams();
   
-  // Extract service name from URL parameters
-  const serviceName = params?.service as string;
-  const database = searchParams?.get('database') || '';
+  // Extract database name from route parameters
+  const databaseName = propServiceName || (params?.name as string);
   
-  // Component state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [tableToDelete, setTableToDelete] = useState<string | null>(null);
-  const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
+  // Local state management
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  
+  // Global state for preferences and theming
+  const { preferences, theme } = useAppStore();
   
   // Virtual scrolling setup
   const parentRef = useRef<HTMLDivElement>(null);
   
-  // Form setup for filters
+  // React Query hook for table schemas with optimized caching
   const {
-    control,
-    watch,
-    setValue,
-    reset: resetFilters,
-    handleSubmit
-  } = useForm<FilterFormData>({
-    resolver: zodResolver(filterFormSchema),
-    defaultValues: {
-      searchTerm: '',
-      showViews: true,
-      showTables: true,
-      hasData: 'all',
-      apiStatus: 'all',
-      sortBy: 'name',
-      sortOrder: 'asc'
-    }
-  });
-  
-  const filters = watch();
-  
-  // React Query hooks
-  const {
-    data: tableData,
+    tables,
+    filteredTables,
     isLoading,
     isError,
     error,
-    refetch
-  } = useTableSchemas(serviceName, database, filters);
-  
-  const deleteTableMutation = useDeleteTable();
-  
-  // Memoized table data for virtual scrolling
-  const tables = useMemo(() => tableData?.resource || [], [tableData]);
-  
-  // Virtual scrolling configuration
-  const virtualizer = useVirtualizer({
-    count: tables.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: useCallback(() => 48, []), // 48px row height
-    overscan: 10 // Render 10 extra items for smooth scrolling
+    refetch,
+    refresh,
+    totalTables,
+    loadedTables,
+    cacheHitRate,
+    lastFetchTime,
+    setTableFilter,
+    getTableDetails,
+    selectTable,
+  } = useTableSchemas({
+    serviceName: databaseName,
+    enableProgressiveLoading: true,
+    enableVirtualScrolling,
+    pageSize,
+    tableFilter: searchQuery,
+    includeViews: true,
+    prefetchDetails: false,
+    cacheConfig: {
+      staleTime: 5 * 60 * 1000, // 5 minutes (300 seconds) per requirements
+      cacheTime: 15 * 60 * 1000, // 15 minutes (900 seconds) per requirements
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: true,
+      retry: 3,
+      retryDelay: 1000,
+    },
   });
   
-  // Event handlers
-  const handleTableView = useCallback((tableName: string) => {
-    router.push(`/adf-schema/tables/${encodeURIComponent(tableName)}?service=${serviceName}&database=${database}`);
-  }, [router, serviceName, database]);
+  // Map schema tables to table row data format
+  const tableRowData = useMemo((): TableRowData[] => {
+    return filteredTables.map((table: SchemaTable) => ({
+      id: table.name,
+      name: table.name,
+      label: table.label || table.name,
+      description: table.description,
+      isView: table.isView,
+      rowCount: table.rowCount,
+      estimatedSize: table.estimatedSize,
+      lastModified: table.lastModified,
+    }));
+  }, [filteredTables]);
   
-  const handleTableDelete = useCallback((tableName: string) => {
-    setTableToDelete(tableName);
-    setDeleteDialogOpen(true);
-  }, []);
+  // TanStack Virtual configuration for performance optimization
+  const rowVirtualizer = useVirtualizer({
+    count: tableRowData.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => rowHeight,
+    overscan: 10, // Render 10 additional rows outside viewport for smooth scrolling
+    enabled: enableVirtualScrolling && tableRowData.length > 100, // Only enable for large datasets
+  });
   
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!tableToDelete) return;
+  // Virtual items for efficient rendering
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  
+  // Handle search input with debouncing via the hook
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setTableFilter(value);
+  }, [setTableFilter]);
+  
+  // Navigation handlers
+  const handleCreateTable = useCallback(() => {
+    router.push(`/adf-schema/df-table-details/create?service=${databaseName}`);
+    onTableAction?.('create');
+  }, [router, databaseName, onTableAction]);
+  
+  const handleViewTable = useCallback((tableName: string) => {
+    router.push(`/adf-schema/df-table-details/${tableName}?service=${databaseName}`);
+    onTableAction?.('edit', tableName);
+  }, [router, databaseName, onTableAction]);
+  
+  const handleDeleteTable = useCallback(async (tableName: string) => {
+    if (window.confirm(`Are you sure you want to delete table "${tableName}"?`)) {
+      try {
+        // Call the API to delete the table schema
+        const response = await fetch(`/api/v2/db/${databaseName}/_schema/${tableName}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to delete table: ${response.statusText}`);
+        }
+        
+        // Refresh the table data after successful deletion
+        await refresh();
+        onTableAction?.('delete', tableName);
+      } catch (error) {
+        console.error('Error deleting table:', error);
+        // In a real app, you'd show a proper error notification
+        alert(`Failed to delete table: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+  }, [databaseName, refresh, onTableAction]);
+  
+  const handleRefreshSchema = useCallback(() => {
+    refresh();
+  }, [refresh]);
+  
+  // Row selection handlers
+  const handleRowSelect = useCallback((tableName: string, multiSelect = false) => {
+    if (multiSelect) {
+      const newSelection = new Set(selectedRows);
+      if (newSelection.has(tableName)) {
+        newSelection.delete(tableName);
+      } else {
+        newSelection.add(tableName);
+      }
+      setSelectedRows(newSelection);
+    } else {
+      setSelectedRows(new Set([tableName]));
+    }
+    selectTable(tableName, multiSelect);
+  }, [selectedRows, selectTable]);
+  
+  const handleRowClick = useCallback((tableName: string, event: React.MouseEvent) => {
+    const isMetaKey = event.metaKey || event.ctrlKey;
+    const isShiftKey = event.shiftKey;
     
-    try {
-      await deleteTableMutation.mutateAsync({
-        serviceName,
-        tableName: tableToDelete
-      });
-      setDeleteDialogOpen(false);
-      setTableToDelete(null);
-    } catch (error) {
-      console.error('Failed to delete table:', error);
-      // Error handling is managed by the mutation hook
-    }
-  }, [tableToDelete, deleteTableMutation, serviceName]);
-  
-  const handleClearFilters = useCallback(() => {
-    resetFilters();
-  }, [resetFilters]);
-  
-  const handleTableSelect = useCallback((tableName: string, selected: boolean) => {
-    const newSelection = new Set(selectedTables);
-    if (selected) {
-      newSelection.add(tableName);
+    if (isMetaKey || isShiftKey) {
+      handleRowSelect(tableName, true);
     } else {
-      newSelection.delete(tableName);
+      handleViewTable(tableName);
     }
-    setSelectedTables(newSelection);
-  }, [selectedTables]);
+  }, [handleRowSelect, handleViewTable]);
   
-  const handleSelectAll = useCallback((selected: boolean) => {
-    if (selected) {
-      setSelectedTables(new Set(tables.map(table => table.name)));
-    } else {
-      setSelectedTables(new Set());
+  const handleKeyDown = useCallback((event: React.KeyboardEvent, tableName: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleViewTable(tableName);
     }
-  }, [tables]);
+  }, [handleViewTable]);
   
-  // Check for active filters
-  const hasActiveFilters = useMemo(() => {
-    return Boolean(
-      filters.searchTerm ||
-      !filters.showViews ||
-      !filters.showTables ||
-      filters.hasData !== 'all' ||
-      filters.apiStatus !== 'all'
-    );
-  }, [filters]);
-  
-  // Loading state
-  if (isLoading) {
+  // Error state rendering
+  if (isError) {
     return (
-      <div className="space-y-4">
-        <div className="h-16 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
-        <div className="space-y-2">
-          {Array.from({ length: 10 }).map((_, index) => (
-            <TableRowSkeleton key={index} />
-          ))}
+      <div className="flex items-center justify-center p-8 text-red-600 dark:text-red-400">
+        <ExclamationTriangleIcon className="h-8 w-8 mr-3" />
+        <div>
+          <h3 className="text-lg font-semibold">Error loading database tables</h3>
+          <p className="text-sm mt-1">
+            {error?.message || 'Failed to load database schema information'}
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
-  }
-  
-  // Error state
-  if (isError && error) {
-    return <ErrorDisplay error={error as Error} retry={refetch} />;
-  }
-  
-  // Empty state
-  if (!tables.length) {
-    return <EmptyState hasFilters={hasActiveFilters} onClearFilters={handleClearFilters} />;
   }
   
   return (
-    <div className="space-y-6">
-      {/* Header and Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              Database Tables
-            </h2>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {tableData?.meta.total || 0} tables found
-            </div>
+    <div className={`bg-white dark:bg-gray-900 rounded-lg shadow-lg ${className}`}>
+      {/* Top Action Bar */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center space-x-3">
+          {allowCreate && (
+            <button
+              onClick={handleCreateTable}
+              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              aria-label="Create new table"
+            >
+              <PlusIcon className="h-4 w-4 mr-2" />
+              New Table
+            </button>
+          )}
+          
+          {allowRefresh && (
+            <button
+              onClick={handleRefreshSchema}
+              disabled={isLoading}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
+              aria-label="Refresh schema"
+            >
+              <ArrowPathIcon className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          )}
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          {/* Performance metrics display */}
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {totalTables > 0 && (
+              <span>
+                {loadedTables.toLocaleString()} of {totalTables.toLocaleString()} tables
+                {cacheHitRate > 0 && (
+                  <span className="ml-2">
+                    Cache: {(cacheHitRate * 100).toFixed(1)}%
+                  </span>
+                )}
+              </span>
+            )}
           </div>
           
-          {/* Filter Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Search Input */}
+          {allowFilter && (
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Controller
-                name="searchTerm"
-                control={control}
-                render={({ field }) => (
-                  <input
-                    {...field}
-                    type="text"
-                    placeholder="Search tables..."
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                )}
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search tables..."
+                className="block w-64 pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors"
+                aria-label="Search tables"
               />
             </div>
-            
-            {/* Data Filter */}
-            <Controller
-              name="hasData"
-              control={control}
-              render={({ field }) => (
-                <select
-                  {...field}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">All Tables</option>
-                  <option value="with-data">With Data</option>
-                  <option value="empty">Empty Tables</option>
-                </select>
-              )}
-            />
-            
-            {/* Sort Controls */}
-            <Controller
-              name="sortBy"
-              control={control}
-              render={({ field }) => (
-                <select
-                  {...field}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="name">Sort by Name</option>
-                  <option value="rowCount">Sort by Row Count</option>
-                  <option value="lastModified">Sort by Modified</option>
-                  <option value="fieldCount">Sort by Fields</option>
-                </select>
-              )}
-            />
-            
-            {/* Sort Order */}
-            <Controller
-              name="sortOrder"
-              control={control}
-              render={({ field }) => (
-                <div className="flex">
-                  <select
-                    {...field}
-                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="asc">Ascending</option>
-                    <option value="desc">Descending</option>
-                  </select>
-                  {hasActiveFilters && (
-                    <button
-                      onClick={handleClearFilters}
-                      className="px-3 py-2 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      title="Clear filters"
-                    >
-                      <XMarkIcon className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              )}
-            />
-          </div>
-          
-          {/* Table Type Toggles */}
-          <div className="flex items-center space-x-6 mt-4">
-            <Controller
-              name="showTables"
-              control={control}
-              render={({ field: { value, onChange } }) => (
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={value}
-                    onChange={(e) => onChange(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Show Tables</span>
-                </label>
-              )}
-            />
-            <Controller
-              name="showViews"
-              control={control}
-              render={({ field: { value, onChange } }) => (
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={value}
-                    onChange={(e) => onChange(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Show Views</span>
-                </label>
-              )}
-            />
-          </div>
+          )}
         </div>
       </div>
       
-      {/* Table Container with Virtual Scrolling */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        {/* Table Header */}
-        <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-          <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            <div className="col-span-1">
-              <input
-                type="checkbox"
-                checked={selectedTables.size === tables.length && tables.length > 0}
-                onChange={(e) => handleSelectAll(e.target.checked)}
-                className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
-              />
+      {/* Table Container */}
+      <div className="relative">
+        {isLoading && tableRowData.length === 0 ? (
+          <div className="flex items-center justify-center p-12">
+            <div className="text-center">
+              <ArrowPathIcon className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+              <p className="text-gray-600 dark:text-gray-400">Loading database tables...</p>
             </div>
-            <div className="col-span-3">Name</div>
-            <div className="col-span-1">Type</div>
-            <div className="col-span-2">Rows</div>
-            <div className="col-span-2">Fields</div>
-            <div className="col-span-2">Last Modified</div>
-            <div className="col-span-1">Actions</div>
           </div>
-        </div>
-        
-        {/* Virtual Scrolling Container */}
-        <div
-          ref={parentRef}
-          className="h-96 overflow-auto"
-          style={{
-            contain: 'strict'
-          }}
-        >
-          <div
-            style={{
-              height: `${virtualizer.getTotalSize()}px`,
-              width: '100%',
-              position: 'relative'
-            }}
-          >
-            {virtualizer.getVirtualItems().map((virtualItem) => {
-              const table = tables[virtualItem.index];
-              const isSelected = selectedTables.has(table.name);
-              
-              return (
-                <div
-                  key={virtualItem.key}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: `${virtualItem.size}px`,
-                    transform: `translateY(${virtualItem.start}px)`
-                  }}
-                  className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150"
+        ) : tableRowData.length === 0 ? (
+          <div className="flex items-center justify-center p-12">
+            <div className="text-center">
+              <EyeIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                No tables found
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                {searchQuery ? 
+                  `No tables match "${searchQuery}"` : 
+                  'This database contains no tables'
+                }
+              </p>
+              {allowCreate && !searchQuery && (
+                <button
+                  onClick={handleCreateTable}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                 >
-                  <div className="px-6 py-3">
-                    <div className="grid grid-cols-12 gap-4 items-center">
-                      {/* Selection Checkbox */}
-                      <div className="col-span-1">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => handleTableSelect(table.name, e.target.checked)}
-                          className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  Create First Table
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-hidden">
+            {/* Table Header */}
+            <div className="bg-gray-50 dark:bg-gray-800 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-12 gap-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div className="col-span-6">Table Name</div>
+                <div className="col-span-2">Type</div>
+                <div className="col-span-2">Rows</div>
+                <div className="col-span-2">Actions</div>
+              </div>
+            </div>
+            
+            {/* Virtual Scrolling Container */}
+            <div
+              ref={parentRef}
+              className="overflow-auto"
+              style={{
+                height: enableVirtualScrolling && tableRowData.length > 100 ? '600px' : 'auto',
+                maxHeight: '600px',
+              }}
+            >
+              {enableVirtualScrolling && tableRowData.length > 100 ? (
+                <div
+                  style={{
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {virtualItems.map((virtualItem) => {
+                    const row = tableRowData[virtualItem.index];
+                    const isSelected = selectedRows.has(row.name);
+                    
+                    return (
+                      <div
+                        key={virtualItem.key}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: `${virtualItem.size}px`,
+                          transform: `translateY(${virtualItem.start}px)`,
+                        }}
+                      >
+                        <TableRow
+                          row={row}
+                          isSelected={isSelected}
+                          onRowClick={handleRowClick}
+                          onViewTable={handleViewTable}
+                          onDeleteTable={handleDeleteTable}
+                          onKeyDown={handleKeyDown}
                         />
                       </div>
-                      
-                      {/* Table Name */}
-                      <div className="col-span-3">
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {table.name}
-                        </div>
-                        {table.label && table.label !== table.name && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {table.label}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Type */}
-                      <div className="col-span-1">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          table.isView 
-                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300'
-                            : 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
-                        }`}>
-                          {table.isView ? 'View' : 'Table'}
-                        </span>
-                      </div>
-                      
-                      {/* Row Count */}
-                      <div className="col-span-2">
-                        <div className="text-sm text-gray-900 dark:text-gray-100">
-                          {table.rowCount?.toLocaleString() || '—'}
-                        </div>
-                        {table.estimatedSize && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {table.estimatedSize}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Field Count */}
-                      <div className="col-span-2">
-                        <div className="text-sm text-gray-900 dark:text-gray-100">
-                          {table.fieldCount} fields
-                        </div>
-                        {table.primaryKeyFields.length > 0 && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            PK: {table.primaryKeyFields.join(', ')}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Last Modified */}
-                      <div className="col-span-2">
-                        <div className="text-sm text-gray-900 dark:text-gray-100">
-                          {table.lastModified 
-                            ? new Date(table.lastModified).toLocaleDateString()
-                            : '—'
-                          }
-                        </div>
-                      </div>
-                      
-                      {/* Actions */}
-                      <div className="col-span-1">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleTableView(table.name)}
-                            className="p-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
-                            title="View table details"
-                          >
-                            <EyeIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleTableDelete(table.name)}
-                            className="p-1 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200"
-                            title="Delete table"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-        
-        {/* Table Footer with Pagination Info */}
-        {tableData?.meta && (
-          <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-            <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-              <div>
-                Showing {tableData.meta.offset + 1} to {Math.min(tableData.meta.offset + tableData.meta.limit, tableData.meta.total)} of {tableData.meta.total} tables
-              </div>
-              <div>
-                {selectedTables.size > 0 && (
-                  <span>
-                    {selectedTables.size} table{selectedTables.size !== 1 ? 's' : ''} selected
-                  </span>
-                )}
-              </div>
+              ) : (
+                <div>
+                  {tableRowData.map((row) => {
+                    const isSelected = selectedRows.has(row.name);
+                    
+                    return (
+                      <TableRow
+                        key={row.id}
+                        row={row}
+                        isSelected={isSelected}
+                        onRowClick={handleRowClick}
+                        onViewTable={handleViewTable}
+                        onDeleteTable={handleDeleteTable}
+                        onKeyDown={handleKeyDown}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
       
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={deleteDialogOpen}
-        onClose={() => {
-          setDeleteDialogOpen(false);
-          setTableToDelete(null);
-        }}
-        onConfirm={handleDeleteConfirm}
-        tableName={tableToDelete || ''}
-        isDeleting={deleteTableMutation.isPending}
-      />
+      {/* Bottom Info Bar */}
+      {tableRowData.length > 0 && (
+        <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+            <div>
+              Showing {tableRowData.length} of {totalTables} tables
+              {searchQuery && (
+                <span className="ml-2">
+                  (filtered by "{searchQuery}")
+                </span>
+              )}
+            </div>
+            <div>
+              {lastFetchTime > 0 && (
+                <span>
+                  Last updated: {new Date(lastFetchTime).toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
+}
+
+/**
+ * Individual table row component for optimized rendering
+ */
+interface TableRowProps {
+  row: TableRowData;
+  isSelected: boolean;
+  onRowClick: (tableName: string, event: React.MouseEvent) => void;
+  onViewTable: (tableName: string) => void;
+  onDeleteTable: (tableName: string) => void;
+  onKeyDown: (event: React.KeyboardEvent, tableName: string) => void;
+}
+
+function TableRow({
+  row,
+  isSelected,
+  onRowClick,
+  onViewTable,
+  onDeleteTable,
+  onKeyDown,
+}: TableRowProps) {
+  return (
+    <div
+      className={`
+        px-6 py-3 border-b border-gray-200 dark:border-gray-700 cursor-pointer
+        hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors
+        ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : ''}
+        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-blue-50 dark:focus:bg-blue-900/20
+      `}
+      tabIndex={0}
+      onClick={(e) => onRowClick(row.name, e)}
+      onKeyDown={(e) => onKeyDown(e, row.name)}
+      role="button"
+      aria-label={`View table ${row.label}`}
+    >
+      <div className="grid grid-cols-12 gap-4 items-center">
+        {/* Table Name */}
+        <div className="col-span-6">
+          <div className="flex items-center">
+            <div>
+              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {row.label}
+              </div>
+              {row.description && (
+                <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                  {row.description}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Table Type */}
+        <div className="col-span-2">
+          <span className={`
+            inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+            ${row.isView ? 
+              'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400' : 
+              'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+            }
+          `}>
+            {row.isView ? 'View' : 'Table'}
+          </span>
+        </div>
+        
+        {/* Row Count */}
+        <div className="col-span-2">
+          <div className="text-sm text-gray-900 dark:text-gray-100">
+            {row.rowCount !== undefined ? row.rowCount.toLocaleString() : '-'}
+          </div>
+          {row.estimatedSize && (
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {row.estimatedSize}
+            </div>
+          )}
+        </div>
+        
+        {/* Actions */}
+        <div className="col-span-2">
+          <div className="flex items-center justify-end space-x-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewTable(row.name);
+              }}
+              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              aria-label={`View table ${row.label}`}
+            >
+              <EyeIconSolid className="h-4 w-4" />
+            </button>
+            
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteTable(row.name);
+              }}
+              className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+              aria-label={`Delete table ${row.label}`}
+            >
+              <TrashIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default TablesTable;
