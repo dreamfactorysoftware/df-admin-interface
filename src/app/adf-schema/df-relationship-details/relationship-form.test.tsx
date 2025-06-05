@@ -1,1435 +1,888 @@
 /**
- * @fileoverview Comprehensive Vitest unit tests for RelationshipForm component
+ * Vitest unit tests for the RelationshipForm component
  * 
- * Tests React Hook Form integration, Zod schema validation, dynamic field behavior,
- * user interactions, and form submission handling. Validates the migration from
- * Angular reactive forms to React Hook Form with enhanced performance characteristics.
+ * Tests comprehensive form validation, dynamic field behavior, user interactions,
+ * and submission handling with React Hook Form and Zod schema validation.
+ * Validates performance requirements for real-time validation under 100ms.
  * 
- * Key Testing Areas:
- * - Form validation with Zod schema validation per React/Next.js Integration Requirements
- * - Dynamic field enabling/disabling based on relationship type (belongs_to vs many_many)
- * - Real-time validation performance under 100ms per performance requirements
- * - Form state management with React Hook Form uncontrolled components
- * - MSW integration for realistic API testing without backend dependencies
- * - User interaction patterns and accessibility compliance
- * 
- * Performance Targets:
- * - Real-time validation under 100ms per React/Next.js Integration Requirements
- * - Test suite execution under 30 seconds for fast development feedback
- * - 90%+ code coverage for comprehensive validation testing
- * 
- * @version 1.0.0
- * @since 2024-01-15
+ * @fileoverview React Hook Form testing with MSW integration for DreamFactory
+ * relationship configuration workflow validation
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
-import { server } from '../../../test/mocks/server';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { server } from '@/test/mocks/server'
+import { handlers } from '@/test/mocks/handlers'
+import { RelationshipForm } from './relationship-form'
+import { relationshipSchema } from './validation-schemas'
+import { renderWithProviders } from '@/test/utils/test-utils'
+import { createMockRelationship, createMockTableField } from '@/test/utils/component-factories'
+import type { RelationshipFormData, RelationshipType } from '@/types/schema'
 
-// Import the component and its dependencies
-import { RelationshipForm } from './relationship-form';
-import { relationshipValidationSchema } from './validation-schemas';
-import type { RelationshipFormData, RelationshipType } from '../../../types/relationship';
-
-/**
- * Test utilities and mock data setup
- * Replicates Angular TestBed configuration patterns for React testing environment
- */
-
-// Mock data for database services (replaces Angular service mocks)
-const mockDatabaseServices = [
-  {
-    id: 1,
-    name: 'mysql-test',
-    label: 'MySQL Test Database',
-    type: 'mysql',
-    config: {
-      host: 'localhost',
-      port: 3306,
-      database: 'test_db',
-    },
-  },
-  {
-    id: 2,
-    name: 'postgresql-test', 
-    label: 'PostgreSQL Test Database',
-    type: 'postgresql',
-    config: {
-      host: 'localhost',
-      port: 5432,
-      database: 'test_db',
-    },
-  },
-];
-
-// Mock data for table fields (replaces Angular route resolver data)
-const mockTableFields = [
-  { name: 'id', label: 'ID', type: 'integer', isPrimaryKey: true },
-  { name: 'name', label: 'Name', type: 'string', isRequired: true },
-  { name: 'email', label: 'Email', type: 'string', isUnique: true },
-  { name: 'created_at', label: 'Created At', type: 'timestamp' },
-  { name: 'user_id', label: 'User ID', type: 'integer', isForeignKey: true },
-];
-
-// Mock data for reference table fields
-const mockReferenceFields = [
-  { name: 'id', label: 'ID', type: 'integer', isPrimaryKey: true },
-  { name: 'title', label: 'Title', type: 'string', isRequired: true },
-  { name: 'description', label: 'Description', type: 'text' },
-];
-
-// Mock data for junction table fields (many_many relationships)
-const mockJunctionFields = [
-  { name: 'id', label: 'ID', type: 'integer', isPrimaryKey: true },
-  { name: 'user_id', label: 'User ID', type: 'integer', isForeignKey: true },
-  { name: 'role_id', label: 'Role ID', type: 'integer', isForeignKey: true },
-  { name: 'assigned_at', label: 'Assigned At', type: 'timestamp' },
-];
-
-// Valid form data for belongs_to relationship
-const validBelongsToData: Partial<RelationshipFormData> = {
-  alias: 'user_profile',
-  label: 'User Profile',
-  description: 'User profile relationship',
-  type: 'belongs_to' as RelationshipType,
-  field: 'user_id',
-  refServiceId: 1,
-  refTable: 'users',
-  refField: 'id',
-  alwaysFetch: false,
-};
-
-// Valid form data for many_many relationship
-const validManyManyData: Partial<RelationshipFormData> = {
-  alias: 'user_roles',
-  label: 'User Roles',
-  description: 'Many-to-many user roles relationship',
-  type: 'many_many' as RelationshipType,
-  field: 'id',
-  refServiceId: 1,
-  refTable: 'roles',
-  refField: 'id',
-  junctionServiceId: 2,
-  junctionTable: 'user_roles',
-  junctionField: 'user_id',
-  junctionRefField: 'role_id',
-  alwaysFetch: true,
-};
-
-// Existing relationship data for edit mode testing
-const existingRelationshipData: RelationshipFormData = {
-  alias: 'existing_relation',
-  label: 'Existing Relationship',
-  description: 'Pre-existing relationship for testing edit mode',
-  type: 'belongs_to' as RelationshipType,
-  field: 'category_id',
-  refServiceId: 1,
-  refTable: 'categories',
-  refField: 'id',
-  alwaysFetch: false,
-  // Junction fields should be undefined for belongs_to
-  junctionServiceId: undefined,
-  junctionTable: undefined,
-  junctionField: undefined,
-  junctionRefField: undefined,
-};
-
-/**
- * MSW request handlers for API endpoint mocking
- * Replaces Angular HTTP interceptors with realistic API simulation
- */
-const relationshipHandlers = [
-  // Database services endpoint
-  http.get('/api/v2/system/service', () => {
-    return HttpResponse.json({
-      resource: mockDatabaseServices,
-      meta: { count: mockDatabaseServices.length },
-    });
-  }),
-
-  // Table fields endpoint
-  http.get('/api/v2/:service/_schema/:table', ({ params }) => {
-    const { service, table } = params;
-    let fields = mockTableFields;
-    
-    // Return different fields based on table name for realistic testing
-    if (table === 'roles') {
-      fields = mockReferenceFields;
-    } else if (table === 'user_roles') {
-      fields = mockJunctionFields;
-    }
-    
-    return HttpResponse.json({
-      field: fields,
-      meta: { count: fields.length },
-    });
-  }),
-
-  // Table listing endpoint for junction table selection
-  http.get('/api/v2/:service/_schema', ({ params }) => {
-    const tables = [
-      { name: 'users', label: 'Users' },
-      { name: 'roles', label: 'Roles' },
-      { name: 'user_roles', label: 'User Roles Junction' },
-      { name: 'categories', label: 'Categories' },
-    ];
-    
-    return HttpResponse.json({
-      resource: tables,
-      meta: { count: tables.length },
-    });
-  }),
-
-  // Relationship creation endpoint
-  http.post('/api/v2/:service/_schema/:table/_related', async ({ request, params }) => {
-    const body = await request.json() as RelationshipFormData;
-    const { service, table } = params;
-    
-    // Simulate validation errors for testing
-    if (!body.alias) {
-      return HttpResponse.json(
-        {
-          error: {
-            code: 400,
-            message: 'Validation failed',
-            details: {
-              alias: ['Relationship alias is required'],
-            },
-          },
-        },
-        { status: 400 }
-      );
-    }
-    
-    // Simulate successful creation with response timing under 2 seconds
-    await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay for realistic testing
-    
-    return HttpResponse.json({
-      alias: body.alias,
-      label: body.label,
-      description: body.description,
-      type: body.type,
-      field: body.field,
-      ref_service_id: body.refServiceId,
-      ref_table: body.refTable,
-      ref_field: body.refField,
-      junction_service_id: body.junctionServiceId,
-      junction_table: body.junctionTable,
-      junction_field: body.junctionField,
-      junction_ref_field: body.junctionRefField,
-      always_fetch: body.alwaysFetch,
-    });
-  }),
-
-  // Relationship update endpoint
-  http.put('/api/v2/:service/_schema/:table/_related/:alias', async ({ request, params }) => {
-    const body = await request.json() as RelationshipFormData;
-    const { service, table, alias } = params;
-    
-    // Simulate update delay for performance testing
-    await new Promise(resolve => setTimeout(resolve, 150)); // 150ms delay
-    
-    return HttpResponse.json({
-      alias: body.alias,
-      label: body.label,
-      description: body.description,
-      type: body.type,
-      field: body.field,
-      ref_service_id: body.refServiceId,
-      ref_table: body.refTable,
-      ref_field: body.refField,
-      junction_service_id: body.junctionServiceId,
-      junction_table: body.junctionTable,
-      junction_field: body.junctionField,
-      junction_ref_field: body.junctionRefField,
-      always_fetch: body.alwaysFetch,
-    });
-  }),
-
-  // Error response handler for testing error scenarios
-  http.post('/api/v2/error-test/_schema/test/_related', () => {
-    return HttpResponse.json(
-      {
-        error: {
-          code: 500,
-          message: 'Internal server error',
-          details: 'Database connection failed',
-        },
-      },
-      { status: 500 }
-    );
-  }),
-];
-
-/**
- * Test wrapper component with React Query provider
- * Replaces Angular TestBed module configuration
- */
-interface TestWrapperProps {
-  children: React.ReactNode;
-  queryClient?: QueryClient;
+// Performance testing utilities
+const measureValidationPerformance = async (action: () => Promise<void> | void): Promise<number> => {
+  const startTime = performance.now()
+  await action()
+  const endTime = performance.now()
+  return endTime - startTime
 }
 
-const TestWrapper: React.FC<TestWrapperProps> = ({ 
-  children, 
-  queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false, // Disable retry for faster test execution
-        staleTime: 0, // Ensure fresh data for each test
-        gcTime: 0, // Disable garbage collection delay
-      },
-      mutations: {
-        retry: false,
-      },
-    },
-  })
-}) => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-      {process.env.NODE_ENV === 'development' && <ReactQueryDevtools />}
-    </QueryClientProvider>
-  );
-};
+// Mock data factories
+const mockTableFields = [
+  createMockTableField({ id: 1, name: 'id', type: 'integer', is_primary_key: true }),
+  createMockTableField({ id: 2, name: 'user_id', type: 'integer' }),
+  createMockTableField({ id: 3, name: 'email', type: 'string' }),
+  createMockTableField({ id: 4, name: 'created_at', type: 'timestamp' })
+]
 
-/**
- * Custom render function with providers
- * Replaces Angular TestBed.createComponent() pattern
- */
-const renderWithProviders = (
-  ui: React.ReactElement,
-  options: {
-    queryClient?: QueryClient;
-    [key: string]: any;
-  } = {}
-) => {
-  const { queryClient, ...renderOptions } = options;
-  
-  return render(ui, {
-    wrapper: ({ children }) => (
-      <TestWrapper queryClient={queryClient}>
-        {children}
-      </TestWrapper>
-    ),
-    ...renderOptions,
-  });
-};
+const mockRelatedTables = [
+  { id: 1, name: 'users', schema_name: 'public' },
+  { id: 2, name: 'roles', schema_name: 'public' },
+  { id: 3, name: 'permissions', schema_name: 'public' }
+]
 
-/**
- * Performance testing utility for validation timing
- * Ensures real-time validation under 100ms per requirements
- */
-const measureValidationPerformance = async (
-  callback: () => Promise<void> | void
-): Promise<number> => {
-  const startTime = performance.now();
-  await callback();
-  const endTime = performance.now();
-  return endTime - startTime;
-};
+const mockBelongsToRelationship = createMockRelationship({
+  type: 'belongs_to' as RelationshipType,
+  table_id: 1,
+  local_field: 'user_id',
+  foreign_table_id: 2,
+  foreign_field: 'id',
+  alias: 'user',
+  always_fetch: false,
+  native: true
+})
 
-/**
- * Setup and teardown for each test
- * Replicates Angular beforeEach/afterEach patterns
- */
+const mockManyManyRelationship = createMockRelationship({
+  type: 'many_many' as RelationshipType,
+  table_id: 1,
+  local_field: 'id',
+  foreign_table_id: 3,
+  foreign_field: 'id',
+  junction_table_id: 2,
+  junction_local_field: 'user_id',
+  junction_foreign_field: 'role_id',
+  alias: 'user_roles',
+  always_fetch: true,
+  native: false
+})
+
 describe('RelationshipForm Component', () => {
-  let queryClient: QueryClient;
-  let mockOnSubmit: Mock;
-  let mockOnCancel: Mock;
+  let user: ReturnType<typeof userEvent.setup>
+
+  beforeAll(() => {
+    // Setup MSW server for API mocking
+    server.listen({ onUnhandledRequest: 'error' })
+  })
+
+  afterAll(() => {
+    server.close()
+  })
 
   beforeEach(() => {
-    // Setup MSW handlers for this test suite
-    server.use(...relationshipHandlers);
+    user = userEvent.setup()
+    server.resetHandlers(...handlers)
     
-    // Create fresh QueryClient for each test to prevent cache interference
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: 0,
-          gcTime: 0,
-        },
-        mutations: {
-          retry: false,
-        },
-      },
-    });
-
-    // Create mock functions for form callbacks
-    mockOnSubmit = vi.fn();
-    mockOnCancel = vi.fn();
-
-    // Mock console.error to suppress expected validation error messages
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-  });
+    // Mock performance.now for consistent testing
+    vi.spyOn(performance, 'now').mockImplementation(() => Date.now())
+  })
 
   afterEach(() => {
-    // Clear all mocks after each test
-    vi.clearAllMocks();
-    
-    // Clear React Query cache
-    queryClient.clear();
-    
-    // Reset MSW handlers to default state
-    server.resetHandlers();
-    
-    // Restore console.error
-    vi.restoreAllMocks();
-  });
+    server.resetHandlers()
+    vi.restoreAllMocks()
+  })
 
-  /**
-   * Basic component rendering and initialization tests
-   * Validates component mounts correctly with proper form structure
-   */
-  describe('Component Rendering and Initialization', () => {
-    it('should render the relationship form with all required fields', async () => {
-      renderWithProviders(
+  describe('Form Initialization and Rendering', () => {
+    it('should render form with all required fields for new relationship', () => {
+      const { container } = renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
 
-      // Verify form structure is rendered
-      expect(screen.getByRole('form')).toBeInTheDocument();
+      // Verify form structure
+      expect(screen.getByRole('form', { name: /relationship configuration/i })).toBeInTheDocument()
       
-      // Verify all required form fields are present
-      expect(screen.getByLabelText(/relationship alias/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/relationship label/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/relationship type/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/local field/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/reference service/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/reference table/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/reference field/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/always fetch/i)).toBeInTheDocument();
+      // Required fields for all relationships
+      expect(screen.getByLabelText(/relationship type/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/alias/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/local field/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/foreign table/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/foreign field/i)).toBeInTheDocument()
+      
+      // Configuration options
+      expect(screen.getByLabelText(/always fetch/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/native/i)).toBeInTheDocument()
+      
+      // Action buttons
+      expect(screen.getByRole('button', { name: /create relationship/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument()
 
-      // Verify action buttons are present
-      expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
-    });
+      // Form should have proper accessibility attributes
+      expect(container.querySelector('form')).toHaveAttribute('aria-label')
+    })
 
-    it('should initialize with default form values for create mode', () => {
-      renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      // Verify default values
-      const aliasInput = screen.getByLabelText(/relationship alias/i) as HTMLInputElement;
-      const typeSelect = screen.getByLabelText(/relationship type/i) as HTMLSelectElement;
-      const alwaysFetchCheckbox = screen.getByLabelText(/always fetch/i) as HTMLInputElement;
-
-      expect(aliasInput.value).toBe('');
-      expect(typeSelect.value).toBe('belongs_to'); // Default relationship type
-      expect(alwaysFetchCheckbox.checked).toBe(false); // Default always fetch state
-    });
-
-    it('should populate form with existing data in edit mode', async () => {
+    it('should populate form with existing relationship data in edit mode', () => {
       renderWithProviders(
         <RelationshipForm
           mode="edit"
-          serviceId="test-service"
-          tableName="test-table"
-          initialData={existingRelationshipData}
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          initialData={mockBelongsToRelationship}
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
 
-      // Wait for form to populate with existing data
-      await waitFor(() => {
-        const aliasInput = screen.getByLabelText(/relationship alias/i) as HTMLInputElement;
-        expect(aliasInput.value).toBe(existingRelationshipData.alias);
-      });
+      // Verify pre-populated values
+      expect(screen.getByDisplayValue('belongs_to')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('user')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('user_id')).toBeInTheDocument()
+      
+      // Button should show update text
+      expect(screen.getByRole('button', { name: /update relationship/i })).toBeInTheDocument()
+    })
 
-      // Verify all fields are populated correctly
-      const labelInput = screen.getByLabelText(/relationship label/i) as HTMLInputElement;
-      const descriptionInput = screen.getByLabelText(/description/i) as HTMLTextAreaElement;
-      const typeSelect = screen.getByLabelText(/relationship type/i) as HTMLSelectElement;
-
-      expect(labelInput.value).toBe(existingRelationshipData.label);
-      expect(descriptionInput.value).toBe(existingRelationshipData.description);
-      expect(typeSelect.value).toBe(existingRelationshipData.type);
-    });
-
-    it('should render with proper WCAG 2.1 AA accessibility attributes', () => {
+    it('should initialize with loading state when tableFields is empty', () => {
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={[]}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
 
-      // Verify form has proper accessibility attributes
-      const form = screen.getByRole('form');
-      expect(form).toHaveAttribute('aria-label', expect.stringMatching(/relationship/i));
+      expect(screen.getByRole('status', { name: /loading fields/i })).toBeInTheDocument()
+    })
+  })
 
-      // Verify required fields have proper aria-required attribute
-      const aliasInput = screen.getByLabelText(/relationship alias/i);
-      expect(aliasInput).toHaveAttribute('aria-required', 'true');
-
-      // Verify error containers have proper aria-live attributes for screen readers
-      const errorContainers = screen.getAllByRole('alert');
-      errorContainers.forEach(container => {
-        expect(container).toHaveAttribute('aria-live', 'polite');
-      });
-    });
-  });
-
-  /**
-   * Form validation testing with Zod schema integration
-   * Validates comprehensive input validation per React/Next.js Integration Requirements
-   */
-  describe('Form Validation with Zod Schema', () => {
-    it('should show validation errors for required fields when submitted empty', async () => {
-      const user = userEvent.setup();
+  describe('Zod Schema Validation', () => {
+    it('should validate required fields with appropriate error messages', async () => {
+      const onSubmit = vi.fn()
       
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />
+      )
 
-      // Submit empty form
-      const submitButton = screen.getByRole('button', { name: /save/i });
-      await user.click(submitButton);
+      // Attempt to submit empty form
+      const submitButton = screen.getByRole('button', { name: /create relationship/i })
+      await user.click(submitButton)
 
-      // Wait for validation errors to appear
+      // Verify validation errors appear
       await waitFor(() => {
-        expect(screen.getByText(/relationship alias is required/i)).toBeInTheDocument();
-      });
+        expect(screen.getByText(/relationship type is required/i)).toBeInTheDocument()
+        expect(screen.getByText(/alias is required/i)).toBeInTheDocument()
+        expect(screen.getByText(/local field is required/i)).toBeInTheDocument()
+        expect(screen.getByText(/foreign table is required/i)).toBeInTheDocument()
+        expect(screen.getByText(/foreign field is required/i)).toBeInTheDocument()
+      })
 
-      // Verify multiple validation errors are displayed
-      expect(screen.getByText(/relationship label is required/i)).toBeInTheDocument();
-      expect(screen.getByText(/local field is required/i)).toBeInTheDocument();
-      expect(screen.getByText(/reference service is required/i)).toBeInTheDocument();
+      // Form should not submit with validation errors
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
 
-      // Verify onSubmit was not called due to validation errors
-      expect(mockOnSubmit).not.toHaveBeenCalled();
-    });
-
-    it('should validate alias field for proper format and uniqueness', async () => {
-      const user = userEvent.setup();
+    it('should validate alias uniqueness when provided', async () => {
+      const validationSpy = vi.spyOn(relationshipSchema, 'parseAsync')
       
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          existingAliases={['user', 'profile']}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
 
-      const aliasInput = screen.getByLabelText(/relationship alias/i);
+      const aliasInput = screen.getByLabelText(/alias/i)
+      await user.type(aliasInput, 'user')
 
-      // Test invalid characters
-      await user.type(aliasInput, 'invalid-alias!@#');
-      await user.tab(); // Trigger validation
-
-      await waitFor(() => {
-        expect(screen.getByText(/alias can only contain letters, numbers, and underscores/i)).toBeInTheDocument();
-      });
-
-      // Test valid alias format
-      await user.clear(aliasInput);
-      await user.type(aliasInput, 'valid_alias_123');
-      await user.tab();
+      // Trigger validation
+      await user.tab()
 
       await waitFor(() => {
-        expect(screen.queryByText(/alias can only contain letters, numbers, and underscores/i)).not.toBeInTheDocument();
-      });
-    });
+        expect(screen.getByText(/alias must be unique/i)).toBeInTheDocument()
+      })
+
+      expect(validationSpy).toHaveBeenCalled()
+    })
 
     it('should validate field dependencies for belongs_to relationships', async () => {
-      const user = userEvent.setup();
-      
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
 
-      // Fill in basic required fields
-      await user.type(screen.getByLabelText(/relationship alias/i), 'test_relation');
-      await user.type(screen.getByLabelText(/relationship label/i), 'Test Relation');
-      
-      // Select belongs_to type (should be default)
-      const typeSelect = screen.getByLabelText(/relationship type/i);
-      await user.selectOptions(typeSelect, 'belongs_to');
+      // Select belongs_to relationship type
+      const typeSelect = screen.getByLabelText(/relationship type/i)
+      await user.selectOptions(typeSelect, 'belongs_to')
 
-      // Try to submit without reference service
-      const submitButton = screen.getByRole('button', { name: /save/i });
-      await user.click(submitButton);
+      // Try to submit without required fields
+      const submitButton = screen.getByRole('button', { name: /create relationship/i })
+      await user.click(submitButton)
 
       await waitFor(() => {
-        expect(screen.getByText(/reference service is required/i)).toBeInTheDocument();
-        expect(screen.getByText(/reference table is required/i)).toBeInTheDocument();
-        expect(screen.getByText(/reference field is required/i)).toBeInTheDocument();
-      });
-
-      // Verify junction fields are not required for belongs_to
-      expect(screen.queryByText(/junction service is required/i)).not.toBeInTheDocument();
-    });
+        // Should validate that junction fields are not required for belongs_to
+        expect(screen.queryByText(/junction table is required/i)).not.toBeInTheDocument()
+        
+        // But foreign fields are still required
+        expect(screen.getByText(/foreign field is required/i)).toBeInTheDocument()
+      })
+    })
 
     it('should validate junction table requirements for many_many relationships', async () => {
-      const user = userEvent.setup();
+      renderWithProviders(
+        <RelationshipForm
+          mode="create"
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
+
+      // Select many_many relationship type
+      const typeSelect = screen.getByLabelText(/relationship type/i)
+      await user.selectOptions(typeSelect, 'many_many')
+
+      // Fill required basic fields
+      await user.type(screen.getByLabelText(/alias/i), 'test_relationship')
+      await user.selectOptions(screen.getByLabelText(/local field/i), 'id')
+      await user.selectOptions(screen.getByLabelText(/foreign table/i), 'users')
+
+      // Try to submit without junction table fields
+      const submitButton = screen.getByRole('button', { name: /create relationship/i })
+      await user.click(submitButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/junction table is required for many_many relationships/i)).toBeInTheDocument()
+        expect(screen.getByText(/junction local field is required/i)).toBeInTheDocument()
+        expect(screen.getByText(/junction foreign field is required/i)).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('Dynamic Field Behavior', () => {
+    it('should show/hide junction table fields based on relationship type', async () => {
+      renderWithProviders(
+        <RelationshipForm
+          mode="create"
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
+
+      // Initially, junction fields should be hidden (no type selected)
+      expect(screen.queryByLabelText(/junction table/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/junction local field/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/junction foreign field/i)).not.toBeInTheDocument()
+
+      // Select belongs_to - junction fields should remain hidden
+      const typeSelect = screen.getByLabelText(/relationship type/i)
+      await user.selectOptions(typeSelect, 'belongs_to')
+
+      await waitFor(() => {
+        expect(screen.queryByLabelText(/junction table/i)).not.toBeInTheDocument()
+      })
+
+      // Select many_many - junction fields should appear
+      await user.selectOptions(typeSelect, 'many_many')
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/junction table/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/junction local field/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/junction foreign field/i)).toBeInTheDocument()
+      })
+
+      // Switch back to belongs_to - junction fields should disappear
+      await user.selectOptions(typeSelect, 'belongs_to')
+
+      await waitFor(() => {
+        expect(screen.queryByLabelText(/junction table/i)).not.toBeInTheDocument()
+      })
+    })
+
+    it('should update available foreign fields when foreign table changes', async () => {
+      // Mock API call for foreign table fields
+      server.use(
+        rest.get('/api/v2/system/service/:serviceId/table/:tableName/field', (req, res, ctx) => {
+          const tableName = req.params.tableName
+          if (tableName === 'users') {
+            return res(ctx.json({
+              resource: [
+                { name: 'id', type: 'integer' },
+                { name: 'email', type: 'string' },
+                { name: 'username', type: 'string' }
+              ]
+            }))
+          }
+          return res(ctx.json({ resource: [] }))
+        })
+      )
+
+      renderWithProviders(
+        <RelationshipForm
+          mode="create"
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
+
+      // Select relationship type first
+      const typeSelect = screen.getByLabelText(/relationship type/i)
+      await user.selectOptions(typeSelect, 'belongs_to')
+
+      // Select foreign table
+      const foreignTableSelect = screen.getByLabelText(/foreign table/i)
+      await user.selectOptions(foreignTableSelect, 'users')
+
+      // Wait for foreign fields to load
+      await waitFor(() => {
+        const foreignFieldSelect = screen.getByLabelText(/foreign field/i)
+        expect(within(foreignFieldSelect).getByRole('option', { name: /id/i })).toBeInTheDocument()
+        expect(within(foreignFieldSelect).getByRole('option', { name: /email/i })).toBeInTheDocument()
+        expect(within(foreignFieldSelect).getByRole('option', { name: /username/i })).toBeInTheDocument()
+      })
+    })
+
+    it('should clear dependent field values when parent field changes', async () => {
+      renderWithProviders(
+        <RelationshipForm
+          mode="edit"
+          initialData={mockManyManyRelationship}
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
+
+      // Verify initial values are set
+      expect(screen.getByDisplayValue('many_many')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('user_roles')).toBeInTheDocument()
+
+      // Change relationship type - this should clear junction table fields
+      const typeSelect = screen.getByLabelText(/relationship type/i)
+      await user.selectOptions(typeSelect, 'belongs_to')
+
+      await waitFor(() => {
+        // Junction fields should be cleared and hidden
+        expect(screen.queryByLabelText(/junction table/i)).not.toBeInTheDocument()
+      })
+
+      // Switch back to many_many
+      await user.selectOptions(typeSelect, 'many_many')
+
+      await waitFor(() => {
+        // Junction fields should reappear but be empty
+        const junctionTableSelect = screen.getByLabelText(/junction table/i)
+        expect(junctionTableSelect).toBeInTheDocument()
+        expect(junctionTableSelect).toHaveValue('')
+      })
+    })
+  })
+
+  describe('User Interactions and Form State', () => {
+    it('should handle form submission with valid belongs_to relationship data', async () => {
+      const onSubmit = vi.fn()
       
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />
+      )
 
-      // Fill in basic required fields
-      await user.type(screen.getByLabelText(/relationship alias/i), 'many_relation');
-      await user.type(screen.getByLabelText(/relationship label/i), 'Many Relation');
+      // Fill out form with valid belongs_to data
+      await user.selectOptions(screen.getByLabelText(/relationship type/i), 'belongs_to')
+      await user.type(screen.getByLabelText(/alias/i), 'user_profile')
+      await user.selectOptions(screen.getByLabelText(/local field/i), 'user_id')
+      await user.selectOptions(screen.getByLabelText(/foreign table/i), 'users')
       
-      // Select many_many type
-      const typeSelect = screen.getByLabelText(/relationship type/i);
-      await user.selectOptions(typeSelect, 'many_many');
-
-      // Wait for dynamic fields to appear
+      // Mock foreign field loading
       await waitFor(() => {
-        expect(screen.getByLabelText(/junction service/i)).toBeInTheDocument();
-      });
+        const foreignFieldSelect = screen.getByLabelText(/foreign field/i)
+        fireEvent.change(foreignFieldSelect, { target: { value: 'id' } })
+      })
 
-      // Try to submit without junction fields
-      const submitButton = screen.getByRole('button', { name: /save/i });
-      await user.click(submitButton);
+      // Set configuration options
+      const alwaysFetchToggle = screen.getByLabelText(/always fetch/i)
+      await user.click(alwaysFetchToggle)
+
+      // Submit form
+      const submitButton = screen.getByRole('button', { name: /create relationship/i })
+      await user.click(submitButton)
 
       await waitFor(() => {
-        expect(screen.getByText(/junction service is required for many-to-many relationships/i)).toBeInTheDocument();
-      });
-    });
+        expect(onSubmit).toHaveBeenCalledWith({
+          type: 'belongs_to',
+          alias: 'user_profile',
+          local_field: 'user_id',
+          foreign_table: 'users',
+          foreign_field: 'id',
+          always_fetch: true,
+          native: true,
+          // Junction fields should not be present for belongs_to
+          junction_table: undefined,
+          junction_local_field: undefined,
+          junction_foreign_field: undefined
+        })
+      })
+    })
 
-    it('should perform real-time validation under 100ms performance requirement', async () => {
-      const user = userEvent.setup();
+    it('should handle form submission with valid many_many relationship data', async () => {
+      const onSubmit = vi.fn()
       
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />
+      )
 
-      const aliasInput = screen.getByLabelText(/relationship alias/i);
+      // Fill out form with valid many_many data
+      await user.selectOptions(screen.getByLabelText(/relationship type/i), 'many_many')
+      await user.type(screen.getByLabelText(/alias/i), 'user_roles')
+      await user.selectOptions(screen.getByLabelText(/local field/i), 'id')
+      await user.selectOptions(screen.getByLabelText(/foreign table/i), 'roles')
+      await user.selectOptions(screen.getByLabelText(/foreign field/i), 'id')
+      
+      // Fill junction table fields
+      await user.selectOptions(screen.getByLabelText(/junction table/i), 'user_roles_junction')
+      await user.selectOptions(screen.getByLabelText(/junction local field/i), 'user_id')
+      await user.selectOptions(screen.getByLabelText(/junction foreign field/i), 'role_id')
 
-      // Measure validation performance
+      // Submit form
+      const submitButton = screen.getByRole('button', { name: /create relationship/i })
+      await user.click(submitButton)
+
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith({
+          type: 'many_many',
+          alias: 'user_roles',
+          local_field: 'id',
+          foreign_table: 'roles',
+          foreign_field: 'id',
+          junction_table: 'user_roles_junction',
+          junction_local_field: 'user_id',
+          junction_foreign_field: 'role_id',
+          always_fetch: false,
+          native: true
+        })
+      })
+    })
+
+    it('should handle cancel action without submitting', async () => {
+      const onSubmit = vi.fn()
+      const onCancel = vi.fn()
+      
+      renderWithProviders(
+        <RelationshipForm
+          mode="create"
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={onSubmit}
+          onCancel={onCancel}
+        />
+      )
+
+      // Fill some form data
+      await user.type(screen.getByLabelText(/alias/i), 'test_relationship')
+
+      // Click cancel
+      const cancelButton = screen.getByRole('button', { name: /cancel/i })
+      await user.click(cancelButton)
+
+      expect(onCancel).toHaveBeenCalled()
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('should reset form when reset button is clicked', async () => {
+      renderWithProviders(
+        <RelationshipForm
+          mode="create"
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          showReset={true}
+        />
+      )
+
+      // Fill form data
+      await user.selectOptions(screen.getByLabelText(/relationship type/i), 'belongs_to')
+      await user.type(screen.getByLabelText(/alias/i), 'test_relationship')
+
+      // Verify data is filled
+      expect(screen.getByDisplayValue('belongs_to')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('test_relationship')).toBeInTheDocument()
+
+      // Click reset
+      const resetButton = screen.getByRole('button', { name: /reset/i })
+      await user.click(resetButton)
+
+      // Verify form is cleared
+      await waitFor(() => {
+        expect(screen.getByLabelText(/relationship type/i)).toHaveValue('')
+        expect(screen.getByLabelText(/alias/i)).toHaveValue('')
+      })
+    })
+  })
+
+  describe('Real-time Validation Performance', () => {
+    it('should validate fields in under 100ms during typing', async () => {
+      renderWithProviders(
+        <RelationshipForm
+          mode="create"
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
+
+      const aliasInput = screen.getByLabelText(/alias/i)
+
+      // Test validation performance during typing
       const validationTime = await measureValidationPerformance(async () => {
-        await user.type(aliasInput, 'test_alias');
-        await user.tab(); // Trigger validation
-        
+        await user.type(aliasInput, 'test')
         // Wait for validation to complete
-        await waitFor(() => {
-          expect(screen.queryByText(/relationship alias is required/i)).not.toBeInTheDocument();
-        }, { timeout: 100 }); // Ensure validation completes within 100ms
-      });
+        await new Promise(resolve => setTimeout(resolve, 50))
+      })
 
-      // Verify validation performance meets requirements
-      expect(validationTime).toBeLessThan(100); // Real-time validation under 100ms
-    });
-  });
+      // Validation should complete in under 100ms
+      expect(validationTime).toBeLessThan(100)
+    })
 
-  /**
-   * Dynamic field behavior testing
-   * Validates field enabling/disabling based on relationship type per business logic
-   */
-  describe('Dynamic Field Behavior Based on Relationship Type', () => {
-    it('should disable junction fields when relationship type is belongs_to', async () => {
-      const user = userEvent.setup();
+    it('should debounce validation to avoid excessive API calls', async () => {
+      const validationSpy = vi.fn()
       
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          onValidationChange={validationSpy}
+        />
+      )
 
-      // Select belongs_to type (should be default)
-      const typeSelect = screen.getByLabelText(/relationship type/i);
-      await user.selectOptions(typeSelect, 'belongs_to');
+      const aliasInput = screen.getByLabelText(/alias/i)
 
-      // Verify junction fields are not visible or are disabled
+      // Type rapidly to trigger debouncing
+      await user.type(aliasInput, 'rapid_typing_test')
+
+      // Wait for debounced validation
       await waitFor(() => {
-        expect(screen.queryByLabelText(/junction service/i)).not.toBeInTheDocument();
-        expect(screen.queryByLabelText(/junction table/i)).not.toBeInTheDocument();
-        expect(screen.queryByLabelText(/junction field/i)).not.toBeInTheDocument();
-        expect(screen.queryByLabelText(/junction reference field/i)).not.toBeInTheDocument();
-      });
+        // Validation should be called fewer times than characters typed
+        expect(validationSpy).toHaveBeenCalledTimes(1)
+      }, { timeout: 1000 })
+    })
 
-      // Verify core relationship fields are still enabled
-      expect(screen.getByLabelText(/local field/i)).toBeEnabled();
-      expect(screen.getByLabelText(/reference service/i)).toBeEnabled();
-      expect(screen.getByLabelText(/reference table/i)).toBeEnabled();
-      expect(screen.getByLabelText(/reference field/i)).toBeEnabled();
-    });
-
-    it('should enable junction fields when relationship type is many_many', async () => {
-      const user = userEvent.setup();
-      
+    it('should provide immediate visual feedback for field validation', async () => {
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
 
-      // Select many_many type
-      const typeSelect = screen.getByLabelText(/relationship type/i);
-      await user.selectOptions(typeSelect, 'many_many');
+      const aliasInput = screen.getByLabelText(/alias/i)
 
-      // Wait for junction fields to appear and be enabled
+      // Enter invalid data (empty string after typing)
+      await user.type(aliasInput, 'test')
+      await user.clear(aliasInput)
+      await user.tab() // Trigger blur validation
+
+      // Should show validation error quickly
       await waitFor(() => {
-        expect(screen.getByLabelText(/junction service/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/junction service/i)).toBeEnabled();
-      });
+        expect(screen.getByText(/alias is required/i)).toBeInTheDocument()
+        
+        // Input should have error styling
+        expect(aliasInput).toHaveAttribute('aria-invalid', 'true')
+        expect(aliasInput.closest('.form-field')).toHaveClass('error')
+      }, { timeout: 200 })
+    })
+  })
 
-      // Verify all junction fields are present and initially in correct state
-      expect(screen.getByLabelText(/junction table/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/junction field/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/junction reference field/i)).toBeInTheDocument();
-
-      // Junction table should be disabled until junction service is selected
-      expect(screen.getByLabelText(/junction table/i)).toBeDisabled();
-      expect(screen.getByLabelText(/junction field/i)).toBeDisabled();
-      expect(screen.getByLabelText(/junction reference field/i)).toBeDisabled();
-    });
-
-    it('should enable junction table when junction service is selected', async () => {
-      const user = userEvent.setup();
-      
-      renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      // Select many_many type
-      const typeSelect = screen.getByLabelText(/relationship type/i);
-      await user.selectOptions(typeSelect, 'many_many');
-
-      // Wait for junction service to appear
-      await waitFor(() => {
-        expect(screen.getByLabelText(/junction service/i)).toBeInTheDocument();
-      });
-
-      // Select a junction service
-      const junctionServiceSelect = screen.getByLabelText(/junction service/i);
-      await user.selectOptions(junctionServiceSelect, '1');
-
-      // Wait for junction table to be enabled
-      await waitFor(() => {
-        expect(screen.getByLabelText(/junction table/i)).toBeEnabled();
-      });
-
-      // Junction fields should still be disabled until table is selected
-      expect(screen.getByLabelText(/junction field/i)).toBeDisabled();
-      expect(screen.getByLabelText(/junction reference field/i)).toBeDisabled();
-    });
-
-    it('should enable junction fields when junction table is selected', async () => {
-      const user = userEvent.setup();
-      
-      renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      // Select many_many type
-      const typeSelect = screen.getByLabelText(/relationship type/i);
-      await user.selectOptions(typeSelect, 'many_many');
-
-      // Wait for junction service to appear and select it
-      await waitFor(() => {
-        expect(screen.getByLabelText(/junction service/i)).toBeInTheDocument();
-      });
-      
-      const junctionServiceSelect = screen.getByLabelText(/junction service/i);
-      await user.selectOptions(junctionServiceSelect, '1');
-
-      // Wait for junction table to be enabled and select it
-      await waitFor(() => {
-        expect(screen.getByLabelText(/junction table/i)).toBeEnabled();
-      });
-      
-      const junctionTableSelect = screen.getByLabelText(/junction table/i);
-      await user.selectOptions(junctionTableSelect, 'user_roles');
-
-      // Wait for junction fields to be enabled
-      await waitFor(() => {
-        expect(screen.getByLabelText(/junction field/i)).toBeEnabled();
-        expect(screen.getByLabelText(/junction reference field/i)).toBeEnabled();
-      });
-    });
-
-    it('should clear junction field values when switching from many_many to belongs_to', async () => {
-      const user = userEvent.setup();
-      
-      renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      const typeSelect = screen.getByLabelText(/relationship type/i);
-
-      // Start with many_many and fill junction fields
-      await user.selectOptions(typeSelect, 'many_many');
-      
-      await waitFor(() => {
-        expect(screen.getByLabelText(/junction service/i)).toBeInTheDocument();
-      });
-
-      // Fill junction service
-      const junctionServiceSelect = screen.getByLabelText(/junction service/i);
-      await user.selectOptions(junctionServiceSelect, '1');
-
-      // Switch back to belongs_to
-      await user.selectOptions(typeSelect, 'belongs_to');
-
-      // Verify junction fields are hidden/cleared
-      await waitFor(() => {
-        expect(screen.queryByLabelText(/junction service/i)).not.toBeInTheDocument();
-      });
-
-      // Switch back to many_many to verify fields are cleared
-      await user.selectOptions(typeSelect, 'many_many');
-      
-      await waitFor(() => {
-        const junctionServiceAfterSwitch = screen.getByLabelText(/junction service/i) as HTMLSelectElement;
-        expect(junctionServiceAfterSwitch.value).toBe(''); // Should be cleared
-      });
-    });
-  });
-
-  /**
-   * Form submission and API integration testing
-   * Validates MSW integration and proper form submission handling
-   */
-  describe('Form Submission and API Integration', () => {
-    it('should submit valid belongs_to relationship data successfully', async () => {
-      const user = userEvent.setup();
-      
-      renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      // Fill in valid belongs_to relationship data
-      await user.type(screen.getByLabelText(/relationship alias/i), validBelongsToData.alias!);
-      await user.type(screen.getByLabelText(/relationship label/i), validBelongsToData.label!);
-      await user.type(screen.getByLabelText(/description/i), validBelongsToData.description!);
-      
-      const typeSelect = screen.getByLabelText(/relationship type/i);
-      await user.selectOptions(typeSelect, validBelongsToData.type!);
-
-      await user.type(screen.getByLabelText(/local field/i), validBelongsToData.field!);
-      
-      const refServiceSelect = screen.getByLabelText(/reference service/i);
-      await user.selectOptions(refServiceSelect, validBelongsToData.refServiceId!.toString());
-
-      await user.type(screen.getByLabelText(/reference table/i), validBelongsToData.refTable!);
-      await user.type(screen.getByLabelText(/reference field/i), validBelongsToData.refField!);
-
-      // Submit the form
-      const submitButton = screen.getByRole('button', { name: /save/i });
-      await user.click(submitButton);
-
-      // Wait for form submission to complete
-      await waitFor(() => {
-        expect(mockOnSubmit).toHaveBeenCalledWith(
-          expect.objectContaining({
-            alias: validBelongsToData.alias,
-            label: validBelongsToData.label,
-            description: validBelongsToData.description,
-            type: validBelongsToData.type,
-            field: validBelongsToData.field,
-            refServiceId: validBelongsToData.refServiceId,
-            refTable: validBelongsToData.refTable,
-            refField: validBelongsToData.refField,
-            alwaysFetch: validBelongsToData.alwaysFetch,
-          })
-        );
-      });
-    });
-
-    it('should submit valid many_many relationship data successfully', async () => {
-      const user = userEvent.setup();
-      
-      renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      // Fill in valid many_many relationship data
-      await user.type(screen.getByLabelText(/relationship alias/i), validManyManyData.alias!);
-      await user.type(screen.getByLabelText(/relationship label/i), validManyManyData.label!);
-      await user.type(screen.getByLabelText(/description/i), validManyManyData.description!);
-      
-      const typeSelect = screen.getByLabelText(/relationship type/i);
-      await user.selectOptions(typeSelect, validManyManyData.type!);
-
-      // Wait for junction fields to appear
-      await waitFor(() => {
-        expect(screen.getByLabelText(/junction service/i)).toBeInTheDocument();
-      });
-
-      await user.type(screen.getByLabelText(/local field/i), validManyManyData.field!);
-      
-      const refServiceSelect = screen.getByLabelText(/reference service/i);
-      await user.selectOptions(refServiceSelect, validManyManyData.refServiceId!.toString());
-
-      await user.type(screen.getByLabelText(/reference table/i), validManyManyData.refTable!);
-      await user.type(screen.getByLabelText(/reference field/i), validManyManyData.refField!);
-
-      // Fill junction fields
-      const junctionServiceSelect = screen.getByLabelText(/junction service/i);
-      await user.selectOptions(junctionServiceSelect, validManyManyData.junctionServiceId!.toString());
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/junction table/i)).toBeEnabled();
-      });
-
-      await user.type(screen.getByLabelText(/junction table/i), validManyManyData.junctionTable!);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/junction field/i)).toBeEnabled();
-      });
-
-      await user.type(screen.getByLabelText(/junction field/i), validManyManyData.junctionField!);
-      await user.type(screen.getByLabelText(/junction reference field/i), validManyManyData.junctionRefField!);
-
-      // Enable always fetch
-      const alwaysFetchCheckbox = screen.getByLabelText(/always fetch/i);
-      await user.click(alwaysFetchCheckbox);
-
-      // Submit the form
-      const submitButton = screen.getByRole('button', { name: /save/i });
-      await user.click(submitButton);
-
-      // Wait for form submission to complete
-      await waitFor(() => {
-        expect(mockOnSubmit).toHaveBeenCalledWith(
-          expect.objectContaining({
-            alias: validManyManyData.alias,
-            label: validManyManyData.label,
-            type: validManyManyData.type,
-            junctionServiceId: validManyManyData.junctionServiceId,
-            junctionTable: validManyManyData.junctionTable,
-            junctionField: validManyManyData.junctionField,
-            junctionRefField: validManyManyData.junctionRefField,
-            alwaysFetch: true,
-          })
-        );
-      });
-    });
-
-    it('should handle API errors gracefully during form submission', async () => {
-      const user = userEvent.setup();
-      
-      // Set up error handler for testing
+  describe('Error Handling and Loading States', () => {
+    it('should display loading state while submitting form', async () => {
+      // Mock slow API response
       server.use(
-        http.post('/api/v2/test-service/_schema/test-table/_related', () => {
-          return HttpResponse.json(
-            {
+        rest.post('/api/v2/system/service/:serviceId/relationship', (req, res, ctx) => {
+          return res(ctx.delay(1000), ctx.json({ resource: { id: 1 } }))
+        })
+      )
+
+      const onSubmit = vi.fn()
+      
+      renderWithProviders(
+        <RelationshipForm
+          mode="create"
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />
+      )
+
+      // Fill valid form data
+      await user.selectOptions(screen.getByLabelText(/relationship type/i), 'belongs_to')
+      await user.type(screen.getByLabelText(/alias/i), 'test_relationship')
+      await user.selectOptions(screen.getByLabelText(/local field/i), 'user_id')
+      await user.selectOptions(screen.getByLabelText(/foreign table/i), 'users')
+
+      // Submit form
+      const submitButton = screen.getByRole('button', { name: /create relationship/i })
+      await user.click(submitButton)
+
+      // Should show loading state
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /creating/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /creating/i })).toBeDisabled()
+      })
+    })
+
+    it('should handle server validation errors gracefully', async () => {
+      // Mock API error response
+      server.use(
+        rest.post('/api/v2/system/service/:serviceId/relationship', (req, res, ctx) => {
+          return res(
+            ctx.status(422),
+            ctx.json({
               error: {
-                code: 500,
-                message: 'Internal server error',
-                details: 'Database connection failed',
-              },
-            },
-            { status: 500 }
-          );
+                code: 422,
+                message: 'Validation failed',
+                details: {
+                  alias: ['Alias already exists'],
+                  foreign_table: ['Foreign table not found']
+                }
+              }
+            })
+          )
         })
-      );
-      
+      )
+
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
 
-      // Fill in minimal valid data
-      await user.type(screen.getByLabelText(/relationship alias/i), 'test_relation');
-      await user.type(screen.getByLabelText(/relationship label/i), 'Test Relation');
-      await user.type(screen.getByLabelText(/local field/i), 'test_field');
-      
-      const refServiceSelect = screen.getByLabelText(/reference service/i);
-      await user.selectOptions(refServiceSelect, '1');
+      // Fill and submit form
+      await user.selectOptions(screen.getByLabelText(/relationship type/i), 'belongs_to')
+      await user.type(screen.getByLabelText(/alias/i), 'duplicate_alias')
+      await user.selectOptions(screen.getByLabelText(/local field/i), 'user_id')
+      await user.selectOptions(screen.getByLabelText(/foreign table/i), 'invalid_table')
 
-      await user.type(screen.getByLabelText(/reference table/i), 'test_table');
-      await user.type(screen.getByLabelText(/reference field/i), 'id');
+      const submitButton = screen.getByRole('button', { name: /create relationship/i })
+      await user.click(submitButton)
 
-      // Submit the form
-      const submitButton = screen.getByRole('button', { name: /save/i });
-      await user.click(submitButton);
-
-      // Wait for error message to appear
+      // Should display server validation errors
       await waitFor(() => {
-        expect(screen.getByText(/database connection failed/i)).toBeInTheDocument();
-      });
+        expect(screen.getByText(/alias already exists/i)).toBeInTheDocument()
+        expect(screen.getByText(/foreign table not found/i)).toBeInTheDocument()
+      })
 
-      // Verify onSubmit was not called due to API error
-      expect(mockOnSubmit).not.toHaveBeenCalled();
+      // Form should remain enabled for corrections
+      expect(submitButton).not.toBeDisabled()
+    })
+  })
 
-      // Verify form remains editable after error
-      expect(screen.getByLabelText(/relationship alias/i)).toBeEnabled();
-      expect(submitButton).toBeEnabled();
-    });
-
-    it('should show loading state during form submission', async () => {
-      const user = userEvent.setup();
-      
+  describe('Accessibility and User Experience', () => {
+    it('should provide proper ARIA labels and descriptions', () => {
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
 
-      // Fill in minimal valid data
-      await user.type(screen.getByLabelText(/relationship alias/i), 'test_relation');
-      await user.type(screen.getByLabelText(/relationship label/i), 'Test Relation');
-      await user.type(screen.getByLabelText(/local field/i), 'test_field');
-      
-      const refServiceSelect = screen.getByLabelText(/reference service/i);
-      await user.selectOptions(refServiceSelect, '1');
+      // Form should have proper ARIA attributes
+      const form = screen.getByRole('form')
+      expect(form).toHaveAttribute('aria-label', 'Relationship Configuration')
 
-      await user.type(screen.getByLabelText(/reference table/i), 'test_table');
-      await user.type(screen.getByLabelText(/reference field/i), 'id');
+      // Required fields should be marked
+      const aliasInput = screen.getByLabelText(/alias/i)
+      expect(aliasInput).toHaveAttribute('aria-required', 'true')
 
-      // Submit the form
-      const submitButton = screen.getByRole('button', { name: /save/i });
-      await user.click(submitButton);
+      // Error messages should be associated with inputs
+      const typeSelect = screen.getByLabelText(/relationship type/i)
+      expect(typeSelect).toHaveAttribute('aria-describedby')
+    })
 
-      // Verify loading state is shown immediately
-      expect(screen.getByText(/saving/i)).toBeInTheDocument();
-      expect(submitButton).toBeDisabled();
+    it('should support keyboard navigation', async () => {
+      renderWithProviders(
+        <RelationshipForm
+          mode="create"
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
 
-      // Wait for submission to complete
+      // Tab through form fields
+      await user.tab() // Relationship type
+      expect(screen.getByLabelText(/relationship type/i)).toHaveFocus()
+
+      await user.tab() // Alias
+      expect(screen.getByLabelText(/alias/i)).toHaveFocus()
+
+      await user.tab() // Local field
+      expect(screen.getByLabelText(/local field/i)).toHaveFocus()
+
+      // Continue through all fields
+      await user.tab() // Foreign table
+      await user.tab() // Foreign field
+      await user.tab() // Always fetch
+      await user.tab() // Native
+      await user.tab() // Submit button
+      expect(screen.getByRole('button', { name: /create relationship/i })).toHaveFocus()
+    })
+
+    it('should announce form validation errors to screen readers', async () => {
+      renderWithProviders(
+        <RelationshipForm
+          mode="create"
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
+
+      // Submit empty form to trigger validation
+      const submitButton = screen.getByRole('button', { name: /create relationship/i })
+      await user.click(submitButton)
+
       await waitFor(() => {
-        expect(mockOnSubmit).toHaveBeenCalled();
-      });
-    });
+        // Error messages should be announced
+        const errorSummary = screen.getByRole('alert')
+        expect(errorSummary).toBeInTheDocument()
+        expect(errorSummary).toHaveTextContent(/form has validation errors/i)
+      })
+    })
+  })
 
-    it('should handle form cancellation correctly', async () => {
-      const user = userEvent.setup();
-      
-      renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      // Fill in some data
-      await user.type(screen.getByLabelText(/relationship alias/i), 'test_relation');
-      await user.type(screen.getByLabelText(/relationship label/i), 'Test Relation');
-
-      // Click cancel button
-      const cancelButton = screen.getByRole('button', { name: /cancel/i });
-      await user.click(cancelButton);
-
-      // Verify onCancel was called
-      expect(mockOnCancel).toHaveBeenCalled();
-
-      // Verify onSubmit was not called
-      expect(mockOnSubmit).not.toHaveBeenCalled();
-    });
-  });
-
-  /**
-   * User interaction and accessibility testing
-   * Validates proper user experience and WCAG 2.1 AA compliance
-   */
-  describe('User Interactions and Accessibility', () => {
-    it('should support keyboard navigation through form fields', async () => {
-      const user = userEvent.setup();
-      
-      renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      const aliasInput = screen.getByLabelText(/relationship alias/i);
-      
-      // Focus first field
-      aliasInput.focus();
-      expect(document.activeElement).toBe(aliasInput);
-
-      // Tab through fields
-      await user.tab();
-      expect(document.activeElement).toBe(screen.getByLabelText(/relationship label/i));
-
-      await user.tab();
-      expect(document.activeElement).toBe(screen.getByLabelText(/description/i));
-
-      await user.tab();
-      expect(document.activeElement).toBe(screen.getByLabelText(/relationship type/i));
-
-      // Continue tabbing through remaining fields
-      await user.tab();
-      expect(document.activeElement).toBe(screen.getByLabelText(/local field/i));
-
-      await user.tab();
-      expect(document.activeElement).toBe(screen.getByLabelText(/reference service/i));
-    });
-
-    it('should announce validation errors to screen readers', async () => {
-      const user = userEvent.setup();
-      
-      renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      // Submit empty form to trigger validation errors
-      const submitButton = screen.getByRole('button', { name: /save/i });
-      await user.click(submitButton);
-
-      // Wait for validation errors
-      await waitFor(() => {
-        expect(screen.getByText(/relationship alias is required/i)).toBeInTheDocument();
-      });
-
-      // Verify error messages have proper aria-live attributes
-      const errorMessages = screen.getAllByRole('alert');
-      errorMessages.forEach(error => {
-        expect(error).toHaveAttribute('aria-live', 'polite');
-      });
-
-      // Verify form fields are associated with error messages
-      const aliasInput = screen.getByLabelText(/relationship alias/i);
-      const aliasError = screen.getByText(/relationship alias is required/i);
-      
-      expect(aliasInput).toHaveAttribute('aria-describedby', expect.stringContaining(aliasError.id));
-    });
-
-    it('should provide clear focus indicators for all interactive elements', async () => {
-      const user = userEvent.setup();
-      
-      renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      // Test focus indicators on form fields
-      const aliasInput = screen.getByLabelText(/relationship alias/i);
-      await user.click(aliasInput);
-      
-      // Verify focus styles are applied (would be tested with visual regression in full implementation)
-      expect(aliasInput).toHaveFocus();
-      expect(aliasInput).toHaveClass('focus:ring-2'); // Tailwind focus class
-
-      // Test focus indicators on buttons
-      const submitButton = screen.getByRole('button', { name: /save/i });
-      await user.tab(); // Navigate to button
-      // The button should receive focus through keyboard navigation
-      
-      const cancelButton = screen.getByRole('button', { name: /cancel/i });
-      await user.tab(); // Navigate to cancel button
-      // The cancel button should receive focus through keyboard navigation
-    });
-
-    it('should maintain form state during component re-renders', async () => {
-      const user = userEvent.setup();
-      
-      const { rerender } = renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      // Fill in some form data
-      await user.type(screen.getByLabelText(/relationship alias/i), 'persistent_alias');
-      await user.type(screen.getByLabelText(/relationship label/i), 'Persistent Label');
-
-      // Re-render component with same props
-      rerender(
-        <TestWrapper queryClient={queryClient}>
-          <RelationshipForm
-            mode="create"
-            serviceId="test-service"
-            tableName="test-table"
-            onSubmit={mockOnSubmit}
-            onCancel={mockOnCancel}
-          />
-        </TestWrapper>
-      );
-
-      // Verify form state is maintained
-      const aliasInput = screen.getByLabelText(/relationship alias/i) as HTMLInputElement;
-      const labelInput = screen.getByLabelText(/relationship label/i) as HTMLInputElement;
-
-      expect(aliasInput.value).toBe('persistent_alias');
-      expect(labelInput.value).toBe('Persistent Label');
-    });
-  });
-
-  /**
-   * Performance and optimization testing
-   * Validates component performance meets React/Next.js Integration Requirements
-   */
-  describe('Performance and Optimization', () => {
-    it('should render initial component within acceptable time limits', async () => {
-      const renderStartTime = performance.now();
-      
-      renderWithProviders(
-        <RelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      // Wait for component to be fully rendered
-      await waitFor(() => {
-        expect(screen.getByRole('form')).toBeInTheDocument();
-      });
-
-      const renderEndTime = performance.now();
-      const renderTime = renderEndTime - renderStartTime;
-
-      // Verify component renders quickly (under 100ms for good UX)
-      expect(renderTime).toBeLessThan(100);
-    });
-
-    it('should handle large datasets efficiently in select dropdowns', async () => {
-      // Mock large dataset for services
-      const largeServiceDataset = Array.from({ length: 100 }, (_, index) => ({
-        id: index + 1,
-        name: `service-${index + 1}`,
-        label: `Service ${index + 1}`,
-        type: 'mysql',
-      }));
-
+  describe('Integration with MSW and API Testing', () => {
+    it('should integrate with MSW for realistic form submission testing', async () => {
+      // Setup MSW handler for successful creation
       server.use(
-        http.get('/api/v2/system/service', () => {
-          return HttpResponse.json({
-            resource: largeServiceDataset,
-            meta: { count: largeServiceDataset.length },
-          });
+        rest.post('/api/v2/system/service/:serviceId/relationship', (req, res, ctx) => {
+          return res(
+            ctx.status(201),
+            ctx.json({
+              resource: {
+                id: 123,
+                type: 'belongs_to',
+                alias: 'test_relationship',
+                created_at: new Date().toISOString()
+              }
+            })
+          )
         })
-      );
+      )
 
-      const user = userEvent.setup();
+      const onSubmit = vi.fn()
       
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />
+      )
 
-      // Wait for services to load
+      // Complete form submission
+      await user.selectOptions(screen.getByLabelText(/relationship type/i), 'belongs_to')
+      await user.type(screen.getByLabelText(/alias/i), 'test_relationship')
+      await user.selectOptions(screen.getByLabelText(/local field/i), 'user_id')
+      await user.selectOptions(screen.getByLabelText(/foreign table/i), 'users')
+
+      const submitButton = screen.getByRole('button', { name: /create relationship/i })
+      await user.click(submitButton)
+
+      // Verify API integration and success handling
       await waitFor(() => {
-        const refServiceSelect = screen.getByLabelText(/reference service/i);
-        expect(refServiceSelect).toBeEnabled();
-      });
+        expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+          type: 'belongs_to',
+          alias: 'test_relationship'
+        }))
+      })
+    })
 
-      // Measure time to open dropdown with large dataset
-      const dropdownOpenTime = await measureValidationPerformance(async () => {
-        const refServiceSelect = screen.getByLabelText(/reference service/i);
-        await user.click(refServiceSelect);
-      });
+    it('should handle network errors gracefully', async () => {
+      // Mock network error
+      server.use(
+        rest.post('/api/v2/system/service/:serviceId/relationship', (req, res) => {
+          return res.networkError('Network connection failed')
+        })
+      )
 
-      // Verify dropdown opens quickly even with large dataset
-      expect(dropdownOpenTime).toBeLessThan(200); // Should open within 200ms
-    });
-
-    it('should optimize re-renders when form values change', async () => {
-      const user = userEvent.setup();
-      let renderCount = 0;
-
-      // Component with render counter
-      const TestRelationshipForm = (props: any) => {
-        renderCount++;
-        return <RelationshipForm {...props} />;
-      };
-      
-      renderWithProviders(
-        <TestRelationshipForm
-          mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
-
-      const initialRenderCount = renderCount;
-
-      // Type in alias field
-      const aliasInput = screen.getByLabelText(/relationship alias/i);
-      await user.type(aliasInput, 'test');
-
-      // Verify renders are optimized (React Hook Form should minimize re-renders)
-      const finalRenderCount = renderCount;
-      const additionalRenders = finalRenderCount - initialRenderCount;
-
-      // Should not re-render for every keystroke (React Hook Form optimization)
-      expect(additionalRenders).toBeLessThan(10); // Allow some re-renders but not excessive
-    });
-
-    it('should efficiently handle relationship type switching', async () => {
-      const user = userEvent.setup();
-      
       renderWithProviders(
         <RelationshipForm
           mode="create"
-          serviceId="test-service"
-          tableName="test-table"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />,
-        { queryClient }
-      );
+          tableFields={mockTableFields}
+          relatedTables={mockRelatedTables}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
 
-      const typeSelect = screen.getByLabelText(/relationship type/i);
+      // Fill and submit form
+      await user.selectOptions(screen.getByLabelText(/relationship type/i), 'belongs_to')
+      await user.type(screen.getByLabelText(/alias/i), 'test_relationship')
+      await user.selectOptions(screen.getByLabelText(/local field/i), 'user_id')
 
-      // Measure time to switch relationship types
-      const switchTime = await measureValidationPerformance(async () => {
-        // Switch from belongs_to to many_many
-        await user.selectOptions(typeSelect, 'many_many');
-        
-        // Wait for junction fields to appear
-        await waitFor(() => {
-          expect(screen.getByLabelText(/junction service/i)).toBeInTheDocument();
-        });
+      const submitButton = screen.getByRole('button', { name: /create relationship/i })
+      await user.click(submitButton)
 
-        // Switch back to belongs_to
-        await user.selectOptions(typeSelect, 'belongs_to');
-        
-        // Wait for junction fields to disappear
-        await waitFor(() => {
-          expect(screen.queryByLabelText(/junction service/i)).not.toBeInTheDocument();
-        });
-      });
-
-      // Verify type switching is performant
-      expect(switchTime).toBeLessThan(100); // Should complete within 100ms
-    });
-  });
-});
+      // Should display network error message
+      await waitFor(() => {
+        expect(screen.getByText(/network error/i)).toBeInTheDocument()
+      })
+    })
+  })
+})
