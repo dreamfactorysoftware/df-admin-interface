@@ -1,482 +1,678 @@
 /**
- * Comprehensive TypeScript interface definitions for the search dialog component system
- * Migrated from Angular dialog types with enhanced React patterns and accessibility support
+ * Search Dialog Component Type Definitions
+ * 
+ * Comprehensive TypeScript interface definitions for the search dialog component system,
+ * migrated from Angular dialog types to React 19/Next.js 15.1 patterns.
+ * 
+ * Supports global search functionality, result categorization, keyboard navigation,
+ * and WCAG 2.1 AA accessibility compliance per technical specification Section 7.7.1.
+ * 
+ * @fileoverview Search dialog type definitions for React 19 component system
+ * @version 1.0.0
+ * @author DreamFactory Admin Interface Team
  */
 
-import { ReactNode } from 'react';
-import { UseFormReturn } from 'react-hook-form';
+import { type ReactNode, type RefObject, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  type BaseComponentProps,
+  type AccessibilityProps,
+  type ThemeProps,
+  type ResponsiveProps,
+  type AnimationProps,
+  type FocusProps,
+  type ControlledProps,
+  type EventHandlers
+} from '@/types/ui';
 
 /**
- * Search result type enumeration supporting multiple result categories
- * Used for proper categorization and visual differentiation of search results
+ * Search result type enumeration supporting multiple data categories
+ * Matches the system's primary navigation and management entities
  */
 export enum SearchResultType {
-  DATABASE = 'database',
-  TABLE = 'table',
-  FIELD = 'field',
+  /** Database service connections and configurations */
+  DATABASE_SERVICE = 'database_service',
+  /** Database tables within discovered schemas */
+  DATABASE_TABLE = 'database_table',
+  /** Database fields/columns within tables */
+  DATABASE_FIELD = 'database_field',
+  /** System users and account management */
   USER = 'user',
+  /** Administrative users with elevated permissions */
   ADMIN = 'admin',
+  /** User roles and permission groups */
   ROLE = 'role',
-  SERVICE = 'service',
-  SETTING = 'setting',
-  SCRIPT = 'script',
+  /** System configuration settings */
+  SYSTEM_SETTING = 'system_setting',
+  /** API documentation and endpoint information */
+  API_DOCUMENTATION = 'api_documentation',
+  /** Generated API endpoints */
+  API_ENDPOINT = 'api_endpoint',
+  /** Application configurations */
+  APPLICATION = 'application',
+  /** Event scripts and automation */
+  EVENT_SCRIPT = 'event_script',
+  /** Email templates and notifications */
+  EMAIL_TEMPLATE = 'email_template',
+  /** File system navigation */
   FILE = 'file',
-  APP = 'app',
-  DOCUMENTATION = 'documentation'
+  /** System reports and analytics */
+  REPORT = 'report',
+  /** Scheduled tasks and jobs */
+  SCHEDULED_TASK = 'scheduled_task',
+  /** Global lookup keys */
+  LOOKUP_KEY = 'lookup_key',
+  /** Rate limiting and API limits */
+  API_LIMIT = 'api_limit'
 }
 
 /**
  * Individual search result interface with comprehensive metadata
- * Supports navigation, categorization, and accessibility features
+ * Supports hierarchical navigation and contextual information display
  */
 export interface SearchResult {
-  /** Unique identifier for the search result */
+  /** Unique identifier for the result */
   id: string;
-  /** Display title for the search result */
-  title: string;
-  /** Optional description or subtitle */
-  description?: string;
-  /** Result type for categorization and icon selection */
+  /** Result category type */
   type: SearchResultType;
-  /** Navigation URL or route for the result */
-  url: string;
-  /** Optional category for grouping results */
-  category?: string;
-  /** Optional icon name or component for visual representation */
+  /** Display title/name of the result */
+  title: string;
+  /** Optional subtitle or description */
+  subtitle?: string;
+  /** Detailed description for screen readers */
+  description?: string;
+  /** Navigation URL or route */
+  href?: string;
+  /** Icon name or React component for visual representation */
   icon?: string | ReactNode;
-  /** Additional metadata for enhanced search functionality */
-  metadata?: {
-    /** Parent context (e.g., database name for a table) */
-    parent?: string;
-    /** Tags for improved search matching */
-    tags?: string[];
-    /** Last modified date for relevance sorting */
-    lastModified?: Date;
-    /** Usage frequency for popularity sorting */
-    usageCount?: number;
-    /** Permissions level for access control */
-    permissions?: string[];
+  /** Visual badge text (e.g., table count, user status) */
+  badge?: string;
+  /** Badge color variant for categorization */
+  badgeColor?: 'primary' | 'secondary' | 'success' | 'warning' | 'error';
+  /** Parent entity information for hierarchical display */
+  parent?: {
+    id: string;
+    title: string;
+    type: SearchResultType;
   };
-  /** Relevance score for search result ranking */
+  /** Search relevance score (0-1) for result ordering */
   score?: number;
-  /** Highlighted text matches for search term visualization */
-  highlights?: {
-    title?: string;
-    description?: string;
+  /** Last modified timestamp for recency sorting */
+  lastModified?: Date;
+  /** Additional metadata for specific result types */
+  metadata?: {
+    /** Database-specific information */
+    database?: {
+      connectionStatus?: 'connected' | 'disconnected' | 'error';
+      tableCount?: number;
+      fieldCount?: number;
+      engine?: string;
+    };
+    /** User-specific information */
+    user?: {
+      role?: string;
+      status?: 'active' | 'inactive' | 'pending';
+      lastLogin?: Date;
+    };
+    /** API-specific information */
+    api?: {
+      method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+      endpoint?: string;
+      deprecated?: boolean;
+    };
+    /** File-specific information */
+    file?: {
+      size?: number;
+      extension?: string;
+      mimeType?: string;
+    };
   };
+  /** Custom action handlers for result interaction */
+  actions?: Array<{
+    label: string;
+    icon?: string | ReactNode;
+    handler: () => void;
+    hotkey?: string;
+  }>;
 }
 
 /**
- * Search result group interface for organized result presentation
- * Enables categorized display of search results with proper accessibility
+ * Grouped search results interface for categorized display
+ * Enables organized presentation of search results by type
  */
 export interface SearchResultGroup {
-  /** Group identifier for accessibility and navigation */
-  id: string;
-  /** Display label for the result group */
-  label: string;
-  /** Array of search results in this group */
-  results: SearchResult[];
-  /** Optional icon for the group header */
+  /** Group identifier matching SearchResultType */
+  type: SearchResultType;
+  /** Display title for the group */
+  title: string;
+  /** Group description for accessibility */
+  description?: string;
+  /** Icon for the entire group */
   icon?: string | ReactNode;
-  /** Whether the group is expanded by default */
-  expanded?: boolean;
-  /** Maximum number of results to show initially */
-  maxVisible?: number;
+  /** Array of results in this group */
+  results: SearchResult[];
+  /** Total number of available results (may exceed results.length) */
+  totalCount?: number;
+  /** Whether this group supports further filtering */
+  filterable?: boolean;
+  /** Whether this group can be collapsed/expanded */
+  collapsible?: boolean;
+  /** Default collapsed state */
+  defaultCollapsed?: boolean;
 }
 
 /**
- * Search dialog component props interface with comprehensive configuration options
- * Replaces Angular Material dialog configuration with React patterns
- */
-export interface SearchDialogProps {
-  /** Whether the search dialog is currently open */
-  open: boolean;
-  /** Callback function when dialog should be closed */
-  onClose: () => void;
-  /** Callback function when a search result is selected */
-  onSelect?: (result: SearchResult) => void;
-  /** Custom search function override */
-  onSearch?: (query: string) => Promise<SearchResult[]> | SearchResult[];
-  /** Initial search query */
-  initialQuery?: string;
-  /** Placeholder text for the search input */
-  placeholder?: string;
-  /** Whether to show recent searches */
-  showRecentSearches?: boolean;
-  /** Maximum number of recent searches to display */
-  maxRecentSearches?: number;
-  /** Custom CSS classes for styling */
-  className?: string;
-  /** Accessibility configuration */
-  a11y?: SearchA11yConfig;
-  /** Responsive behavior configuration */
-  responsive?: SearchResponsiveConfig;
-  /** Keyboard navigation configuration */
-  keyboard?: SearchKeyboardConfig;
-}
-
-/**
- * Search dialog internal state interface for component state management
- * Tracks search terms, selection, loading states, and user interactions
+ * Search dialog component state interface for comprehensive state management
+ * Tracks search terms, selection state, and UI interaction state
  */
 export interface SearchDialogState {
   /** Current search query string */
   query: string;
-  /** Search results from the current query */
-  results: SearchResult[];
-  /** Grouped search results for organized display */
-  groupedResults: SearchResultGroup[];
-  /** Currently selected result index for keyboard navigation */
+  /** Whether search is currently active/loading */
+  isSearching: boolean;
+  /** Current search results organized by groups */
+  results: SearchResultGroup[];
+  /** Currently selected result index (for keyboard navigation) */
   selectedIndex: number;
-  /** Whether a search is currently in progress */
-  loading: boolean;
-  /** Error message if search fails */
+  /** Currently selected group index */
+  selectedGroupIndex: number;
+  /** Search error state */
   error?: string;
+  /** Whether the dialog is currently open */
+  isOpen: boolean;
   /** Recent search queries for quick access */
   recentSearches: string[];
-  /** Whether to show recent searches section */
-  showRecents: boolean;
-  /** Debounced query for API calls */
-  debouncedQuery: string;
-  /** Total number of results available */
-  totalResults: number;
-  /** Whether more results are available for pagination */
-  hasMoreResults: boolean;
+  /** Whether to show recent searches */
+  showRecentSearches: boolean;
+  /** Loading state for different operations */
+  loadingStates: {
+    initial: boolean;
+    searching: boolean;
+    navigating: boolean;
+  };
+  /** Search filters and options */
+  filters: {
+    /** Filter by result types */
+    types?: SearchResultType[];
+    /** Date range filtering */
+    dateRange?: {
+      start: Date;
+      end: Date;
+    };
+    /** Only show results user has access to */
+    accessibleOnly?: boolean;
+  };
+  /** Pagination for large result sets */
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalResults: number;
+    hasNextPage: boolean;
+  };
 }
 
 /**
- * Keyboard navigation event interface for accessible interactions
- * Defines keyboard actions and their corresponding behaviors
+ * Keyboard navigation event interface for accessible command palette interactions
+ * Extends React's KeyboardEvent with search-specific navigation context
  */
-export interface SearchKeyboardEvent {
-  /** The keyboard key that was pressed */
-  key: string;
-  /** Whether Ctrl was held during the event */
-  ctrlKey: boolean;
-  /** Whether Meta (Cmd) was held during the event */
-  metaKey: boolean;
-  /** Whether Shift was held during the event */
-  shiftKey: boolean;
-  /** Whether Alt was held during the event */
-  altKey: boolean;
-  /** Action to perform based on the key combination */
-  action: SearchKeyboardAction;
-}
-
-/**
- * Keyboard action enumeration for search dialog interactions
- * Defines available keyboard shortcuts and navigation actions
- */
-export enum SearchKeyboardAction {
-  OPEN_SEARCH = 'open_search',
-  CLOSE_SEARCH = 'close_search',
-  CLEAR_QUERY = 'clear_query',
-  NAVIGATE_UP = 'navigate_up',
-  NAVIGATE_DOWN = 'navigate_down',
-  SELECT_RESULT = 'select_result',
-  SHOW_RECENTS = 'show_recents',
-  NEXT_GROUP = 'next_group',
-  PREV_GROUP = 'prev_group'
+export interface SearchKeyboardEvent extends ReactKeyboardEvent<HTMLElement> {
+  /** The navigation action being performed */
+  action: 'navigate' | 'select' | 'close' | 'filter' | 'expand' | 'collapse';
+  /** Target result or group being navigated to */
+  target?: {
+    type: 'result' | 'group';
+    index: number;
+    groupIndex?: number;
+  };
+  /** Whether the event should prevent default browser behavior */
+  shouldPreventDefault: boolean;
+  /** Whether the event should stop propagation */
+  shouldStopPropagation: boolean;
 }
 
 /**
  * Recent searches interface for local storage persistence
- * Manages search history with automatic cleanup and privacy considerations
+ * Manages search history with automatic cleanup and categorization
  */
 export interface RecentSearches {
-  /** Array of recent search queries */
-  queries: string[];
-  /** Maximum number of queries to store */
+  /** Maximum number of recent searches to retain */
   maxCount: number;
-  /** Timestamp of last update for cleanup scheduling */
-  lastUpdated: Date;
-  /** Automatic cleanup configuration */
+  /** Automatic cleanup interval in milliseconds */
+  cleanupInterval: number;
+  /** Array of recent search entries */
+  searches: Array<{
+    /** Search query string */
+    query: string;
+    /** Timestamp when search was performed */
+    timestamp: Date;
+    /** Result count for this search */
+    resultCount?: number;
+    /** Most relevant result type for categorization */
+    primaryResultType?: SearchResultType;
+    /** Whether this search produced useful results */
+    wasSuccessful?: boolean;
+  }>;
+  /** Search frequency tracking for intelligent suggestions */
+  frequencies: Record<string, number>;
+  /** User preference for saving searches */
+  enabled: boolean;
+  /** Storage key for persistence */
+  storageKey: string;
+  /** Cleanup configuration */
   cleanup: {
-    /** Number of days after which to remove old searches */
-    retentionDays: number;
-    /** Whether to clean up on app startup */
-    cleanupOnStartup: boolean;
+    /** Remove searches older than this many days */
+    maxAgeDays: number;
+    /** Remove searches with low success rate */
+    removeUnsuccessful: boolean;
+    /** Minimum frequency to retain search */
+    minFrequency: number;
   };
 }
 
 /**
  * WCAG 2.1 AA accessibility configuration interface
- * Ensures compliance with accessibility standards and screen reader support
+ * Comprehensive accessibility settings for inclusive search experience
  */
 export interface SearchA11yConfig {
-  /** ARIA label for the search dialog */
-  dialogLabel?: string;
-  /** ARIA description for the search functionality */
-  dialogDescription?: string;
-  /** Whether to announce search results to screen readers */
-  announceResults?: boolean;
-  /** Whether to announce loading states */
-  announceLoading?: boolean;
-  /** Custom ARIA live region configuration */
-  liveRegion?: {
-    /** Politeness level for announcements */
-    politeness: 'polite' | 'assertive' | 'off';
-    /** Whether announcements are atomic */
-    atomic: boolean;
+  /** Keyboard navigation configuration */
+  keyboard: {
+    /** Enable arrow key navigation between results */
+    arrowKeyNavigation: boolean;
+    /** Enable Enter key for result selection */
+    enterKeySelection: boolean;
+    /** Enable Escape key for dialog dismissal */
+    escapeKeyClose: boolean;
+    /** Enable Tab key for focus management */
+    tabKeyNavigation: boolean;
+    /** Custom hotkey assignments */
+    customHotkeys: Record<string, () => void>;
+    /** Whether to announce navigation changes */
+    announceNavigation: boolean;
+  };
+  /** Screen reader support configuration */
+  screenReader: {
+    /** Announce search results count */
+    announceResultCount: boolean;
+    /** Announce selected result details */
+    announceSelection: boolean;
+    /** Announce search status changes */
+    announceStatus: boolean;
+    /** Live region politeness level */
+    liveRegionPoliteness: 'polite' | 'assertive' | 'off';
+    /** Include detailed descriptions in announcements */
+    includeDescriptions: boolean;
+    /** Custom ARIA labels for specific elements */
+    customLabels: {
+      searchInput?: string;
+      resultsList?: string;
+      selectedResult?: string;
+      noResults?: string;
+      loading?: string;
+    };
   };
   /** Focus management configuration */
-  focus?: {
-    /** Whether to trap focus within the dialog */
+  focus: {
+    /** Trap focus within dialog when open */
     trapFocus: boolean;
-    /** Element to focus when dialog opens */
-    initialFocus?: 'input' | 'first-result' | 'close-button';
-    /** Element to focus when dialog closes */
-    returnFocus?: 'trigger' | 'body' | 'previous';
+    /** Restore focus to trigger element on close */
+    restoreFocus: boolean;
+    /** Auto-focus search input on open */
+    autoFocusInput: boolean;
+    /** Focus visible indicators */
+    focusVisible: boolean;
+    /** Custom focus ring styling */
+    customFocusRing?: {
+      color: string;
+      width: string;
+      offset: string;
+    };
   };
-  /** High contrast mode support */
-  highContrast?: boolean;
-  /** Reduced motion preferences */
-  reducedMotion?: boolean;
+  /** Color and contrast configuration */
+  visual: {
+    /** High contrast mode support */
+    highContrastMode: boolean;
+    /** Respect user's reduced motion preference */
+    respectReducedMotion: boolean;
+    /** Minimum contrast ratio enforcement (4.5:1 for AA) */
+    enforceContrastRatio: boolean;
+    /** Custom color overrides for accessibility */
+    colorOverrides?: {
+      focus?: string;
+      selection?: string;
+      error?: string;
+      success?: string;
+    };
+  };
+  /** Touch and mobile accessibility */
+  touch: {
+    /** Minimum touch target size (44px per WCAG) */
+    minTouchTargetSize: number;
+    /** Touch gesture support */
+    gestureSupport: boolean;
+    /** Swipe navigation between results */
+    swipeNavigation: boolean;
+    /** Haptic feedback on supported devices */
+    hapticFeedback: boolean;
+  };
 }
 
 /**
  * Responsive design configuration for mobile-first approach
- * Defines behavior across different screen sizes and touch interactions
+ * Defines breakpoint-specific behavior and touch interaction support
  */
 export interface SearchResponsiveConfig {
-  /** Breakpoint definitions for responsive behavior */
-  breakpoints?: {
-    mobile: number;
-    tablet: number;
-    desktop: number;
+  /** Breakpoint definitions matching Tailwind CSS system */
+  breakpoints: {
+    sm: string; // 640px
+    md: string; // 768px
+    lg: string; // 1024px
+    xl: string; // 1280px
   };
   /** Mobile-specific configuration */
-  mobile?: {
-    /** Whether to use fullscreen mode on mobile */
-    fullscreen: boolean;
-    /** Touch interaction enhancements */
-    touchOptimized: boolean;
-    /** Virtual keyboard handling */
-    virtualKeyboard: {
-      /** Whether to adjust layout for virtual keyboard */
-      adjustLayout: boolean;
-      /** Minimum viewport height when keyboard is visible */
-      minHeight: number;
-    };
+  mobile: {
+    /** Use full screen on mobile devices */
+    fullScreen: boolean;
+    /** Show search suggestions */
+    showSuggestions: boolean;
+    /** Enable voice search if supported */
+    voiceSearchSupported: boolean;
+    /** Virtual keyboard optimization */
+    optimizeForVirtualKeyboard: boolean;
+    /** Touch-friendly result spacing */
+    touchFriendlySpacing: boolean;
   };
   /** Tablet-specific configuration */
-  tablet?: {
-    /** Maximum width for tablet layout */
-    maxWidth: number;
-    /** Whether to show side-by-side layout */
-    sideBySide: boolean;
+  tablet: {
+    /** Dialog width as percentage of screen */
+    dialogWidth: string;
+    /** Show sidebar with filters */
+    showFilterSidebar: boolean;
+    /** Grid layout for results */
+    useGridLayout: boolean;
   };
   /** Desktop-specific configuration */
-  desktop?: {
-    /** Maximum width for desktop layout */
-    maxWidth: number;
-    /** Whether to center the dialog */
-    centered: boolean;
+  desktop: {
+    /** Maximum dialog width */
+    maxDialogWidth: string;
+    /** Enable hover previews */
+    hoverPreviews: boolean;
+    /** Show keyboard shortcuts */
+    showKeyboardShortcuts: boolean;
+    /** Multi-column result layout */
+    multiColumnLayout: boolean;
+  };
+  /** Layout adaptation options */
+  layout: {
+    /** Automatically adjust based on content */
+    adaptive: boolean;
+    /** Preferred orientation handling */
+    preferredOrientation: 'portrait' | 'landscape' | 'auto';
+    /** Content density options */
+    density: 'compact' | 'normal' | 'comfortable';
   };
 }
 
 /**
- * Keyboard navigation configuration interface
- * Defines keyboard shortcuts and navigation behavior
+ * Main search dialog component props interface
+ * Replaces Angular Material dialog configuration with React 19 patterns
  */
-export interface SearchKeyboardConfig {
-  /** Global keyboard shortcuts */
-  shortcuts?: {
-    /** Key combination to open search (default: Cmd/Ctrl+K) */
-    open?: string[];
-    /** Key to close search (default: Escape) */
-    close?: string[];
-    /** Key to clear search (default: Escape when input focused) */
-    clear?: string[];
+export interface SearchDialogProps 
+  extends BaseComponentProps<HTMLDivElement>,
+          AccessibilityProps,
+          ThemeProps,
+          ResponsiveProps,
+          AnimationProps,
+          FocusProps,
+          ControlledProps<boolean> {
+  
+  /** Whether the search dialog is currently open */
+  open: boolean;
+  /** Handler for dialog open/close state changes */
+  onOpenChange: (open: boolean) => void;
+  /** Initial search query to populate */
+  initialQuery?: string;
+  /** Placeholder text for search input */
+  placeholder?: string;
+  /** Custom search handler function */
+  onSearch?: (query: string, filters?: SearchDialogState['filters']) => Promise<SearchResultGroup[]>;
+  /** Result selection handler */
+  onSelectResult: (result: SearchResult) => void;
+  /** Dialog close handler */
+  onClose?: () => void;
+  
+  /** Configuration options */
+  config?: {
+    /** Accessibility configuration */
+    accessibility?: Partial<SearchA11yConfig>;
+    /** Responsive behavior configuration */
+    responsive?: Partial<SearchResponsiveConfig>;
+    /** Recent searches configuration */
+    recentSearches?: Partial<RecentSearches>;
+    /** Maximum number of results to show per group */
+    maxResultsPerGroup?: number;
+    /** Enable search suggestions */
+    enableSuggestions?: boolean;
+    /** Debounce delay for search queries in milliseconds */
+    debounceDelay?: number;
+    /** Minimum query length to trigger search */
+    minQueryLength?: number;
   };
-  /** Navigation keys configuration */
-  navigation?: {
-    /** Keys for moving up in results (default: ArrowUp) */
-    up?: string[];
-    /** Keys for moving down in results (default: ArrowDown) */
-    down?: string[];
-    /** Keys for selecting result (default: Enter) */
-    select?: string[];
-    /** Keys for next result group (default: Tab) */
-    nextGroup?: string[];
-    /** Keys for previous result group (default: Shift+Tab) */
-    prevGroup?: string[];
+
+  /** UI customization options */
+  customization?: {
+    /** Custom search input component */
+    SearchInput?: React.ComponentType<any>;
+    /** Custom result item component */
+    ResultItem?: React.ComponentType<{ result: SearchResult; isSelected: boolean }>;
+    /** Custom group header component */
+    GroupHeader?: React.ComponentType<{ group: SearchResultGroup; isExpanded: boolean }>;
+    /** Custom empty state component */
+    EmptyState?: React.ComponentType<{ query: string }>;
+    /** Custom loading component */
+    LoadingComponent?: React.ComponentType;
+    /** Custom error component */
+    ErrorComponent?: React.ComponentType<{ error: string; onRetry: () => void }>;
   };
-  /** Whether to enable vim-style navigation */
-  vimMode?: boolean;
-  /** Whether to prevent default browser shortcuts */
-  preventDefaults?: boolean;
+
+  /** Event handlers for extended functionality */
+  eventHandlers?: {
+    /** Search query change handler */
+    onQueryChange?: (query: string) => void;
+    /** Keyboard navigation handler */
+    onKeyboardNavigation?: (event: SearchKeyboardEvent) => void;
+    /** Result hover handler for previews */
+    onResultHover?: (result: SearchResult | null) => void;
+    /** Filter change handler */
+    onFilterChange?: (filters: SearchDialogState['filters']) => void;
+    /** Analytics tracking handler */
+    onTrackEvent?: (event: string, data: Record<string, any>) => void;
+  };
+
+  /** Advanced features */
+  features?: {
+    /** Enable result grouping */
+    enableGrouping?: boolean;
+    /** Enable result filtering */
+    enableFiltering?: boolean;
+    /** Enable result sorting */
+    enableSorting?: boolean;
+    /** Enable infinite scroll for large result sets */
+    enableInfiniteScroll?: boolean;
+    /** Enable result previews */
+    enablePreviews?: boolean;
+    /** Enable voice search (where supported) */
+    enableVoiceSearch?: boolean;
+    /** Enable search history */
+    enableHistory?: boolean;
+  };
+
+  /** Dialog positioning and styling */
+  positioning?: {
+    /** Dialog position relative to trigger */
+    position?: 'center' | 'top' | 'bottom';
+    /** Custom positioning offset */
+    offset?: { x: number; y: number };
+    /** Whether dialog should adapt to available space */
+    adaptive?: boolean;
+  };
+
+  /** Performance optimization options */
+  performance?: {
+    /** Enable result virtualization for large lists */
+    enableVirtualization?: boolean;
+    /** Result cache duration in milliseconds */
+    cacheResultsDuration?: number;
+    /** Lazy load result details */
+    lazyLoadDetails?: boolean;
+    /** Prefetch related results */
+    prefetchRelated?: boolean;
+  };
+
+  /** Integration options */
+  integration?: {
+    /** Custom API client for search requests */
+    apiClient?: any;
+    /** Custom analytics tracker */
+    analytics?: any;
+    /** Custom logger for debugging */
+    logger?: any;
+    /** URL state synchronization */
+    syncWithURL?: boolean;
+  };
+
+  /** Ref for programmatic access to dialog methods */
+  ref?: RefObject<SearchDialogRef>;
 }
 
 /**
- * Search filter interface for advanced filtering options
- * Enables users to narrow down search results by various criteria
+ * Search dialog ref interface for programmatic control
+ * Provides imperative API for external components
  */
-export interface SearchFilter {
-  /** Filter identifier */
-  id: string;
-  /** Display label for the filter */
-  label: string;
-  /** Filter type for different filtering mechanisms */
-  type: 'select' | 'checkbox' | 'date-range' | 'text';
-  /** Available filter options for select/checkbox types */
-  options?: SearchFilterOption[];
-  /** Current filter value */
-  value?: any;
-  /** Whether the filter is currently active */
-  active: boolean;
-  /** Number of results that match this filter */
-  count?: number;
+export interface SearchDialogRef {
+  /** Programmatically open the dialog */
+  open: () => void;
+  /** Programmatically close the dialog */
+  close: () => void;
+  /** Focus the search input */
+  focusInput: () => void;
+  /** Clear the current search */
+  clearSearch: () => void;
+  /** Set search query programmatically */
+  setQuery: (query: string) => void;
+  /** Trigger search manually */
+  triggerSearch: (query?: string) => Promise<void>;
+  /** Navigate to specific result by index */
+  navigateToResult: (groupIndex: number, resultIndex: number) => void;
+  /** Get current search state */
+  getState: () => SearchDialogState;
+  /** Reset dialog to initial state */
+  reset: () => void;
 }
 
 /**
- * Search filter option interface for individual filter choices
- * Used with select and checkbox filter types
- */
-export interface SearchFilterOption {
-  /** Option value */
-  value: string;
-  /** Display label for the option */
-  label: string;
-  /** Number of results that match this option */
-  count?: number;
-  /** Optional icon for the option */
-  icon?: string | ReactNode;
-  /** Whether the option is currently selected */
-  selected?: boolean;
-}
-
-/**
- * Search context interface for provider pattern
- * Enables sharing search state across multiple components
+ * Search context interface for sharing search state across components
+ * Enables global search state management and coordination
  */
 export interface SearchContextValue {
-  /** Current search state */
+  /** Global search state */
   state: SearchDialogState;
-  /** Actions for updating search state */
-  actions: {
-    /** Update the search query */
-    setQuery: (query: string) => void;
-    /** Set search results */
-    setResults: (results: SearchResult[]) => void;
-    /** Set loading state */
-    setLoading: (loading: boolean) => void;
-    /** Set error state */
-    setError: (error: string | undefined) => void;
-    /** Add to recent searches */
-    addRecentSearch: (query: string) => void;
-    /** Clear recent searches */
-    clearRecentSearches: () => void;
-    /** Select a search result */
-    selectResult: (result: SearchResult) => void;
-    /** Navigate to next result */
-    navigateNext: () => void;
-    /** Navigate to previous result */
-    navigatePrev: () => void;
-  };
-  /** Search configuration */
-  config: {
-    /** Accessibility configuration */
-    a11y: SearchA11yConfig;
-    /** Responsive configuration */
-    responsive: SearchResponsiveConfig;
-    /** Keyboard configuration */
-    keyboard: SearchKeyboardConfig;
-  };
+  /** Search state setter */
+  setState: (state: Partial<SearchDialogState>) => void;
+  /** Global search function */
+  search: (query: string, filters?: SearchDialogState['filters']) => Promise<SearchResultGroup[]>;
+  /** Recent searches management */
+  recentSearches: RecentSearches;
+  /** Add to recent searches */
+  addRecentSearch: (query: string, resultCount?: number, primaryType?: SearchResultType) => void;
+  /** Clear recent searches */
+  clearRecentSearches: () => void;
+  /** Global accessibility configuration */
+  a11yConfig: SearchA11yConfig;
+  /** Update accessibility configuration */
+  updateA11yConfig: (config: Partial<SearchA11yConfig>) => void;
+  /** Global responsive configuration */
+  responsiveConfig: SearchResponsiveConfig;
+  /** Track search analytics event */
+  trackEvent: (event: string, data: Record<string, any>) => void;
 }
 
 /**
- * Search input specific props extending the base search dialog types
- * Provides focused interface for the search input component
+ * Search result action interface for contextual actions
+ * Defines available actions for each result type
  */
-export interface SearchInputFormData {
-  /** Search query field */
-  search: string;
+export interface SearchResultAction {
+  /** Action identifier */
+  id: string;
+  /** Action label for display */
+  label: string;
+  /** Action description for accessibility */
+  description?: string;
+  /** Action icon */
+  icon?: string | ReactNode;
+  /** Keyboard shortcut */
+  hotkey?: string;
+  /** Action handler function */
+  handler: (result: SearchResult) => void | Promise<void>;
+  /** Whether action is disabled */
+  disabled?: boolean;
+  /** Action variant for styling */
+  variant?: 'primary' | 'secondary' | 'destructive';
+  /** Confirmation required before execution */
+  requiresConfirmation?: boolean;
+  /** Custom confirmation message */
+  confirmationMessage?: string;
 }
 
 /**
- * Search input component ref interface for imperative actions
- * Enables parent components to control the search input programmatically
+ * Type guard functions for runtime type checking
  */
-export interface SearchInputRef {
-  /** Focus the search input */
-  focus: () => void;
-  /** Clear the search input */
-  clear: () => void;
-  /** Get current input value */
-  getValue: () => string;
-  /** Set input value programmatically */
-  setValue: (value: string) => void;
-  /** Trigger search immediately */
-  search: () => void;
-}
-
-/**
- * Default values for search configuration objects
- * Provides sensible defaults while allowing customization
- */
-export const DEFAULT_SEARCH_CONFIG = {
-  a11y: {
-    dialogLabel: 'Global search',
-    dialogDescription: 'Search for databases, tables, users, and settings',
-    announceResults: true,
-    announceLoading: true,
-    liveRegion: {
-      politeness: 'polite' as const,
-      atomic: true
-    },
-    focus: {
-      trapFocus: true,
-      initialFocus: 'input' as const,
-      returnFocus: 'trigger' as const
-    },
-    highContrast: false,
-    reducedMotion: false
-  },
-  responsive: {
-    breakpoints: {
-      mobile: 768,
-      tablet: 1024,
-      desktop: 1280
-    },
-    mobile: {
-      fullscreen: true,
-      touchOptimized: true,
-      virtualKeyboard: {
-        adjustLayout: true,
-        minHeight: 300
-      }
-    },
-    tablet: {
-      maxWidth: 600,
-      sideBySide: false
-    },
-    desktop: {
-      maxWidth: 800,
-      centered: true
-    }
-  },
-  keyboard: {
-    shortcuts: {
-      open: ['Cmd+K', 'Ctrl+K'],
-      close: ['Escape'],
-      clear: ['Escape']
-    },
-    navigation: {
-      up: ['ArrowUp'],
-      down: ['ArrowDown'],
-      select: ['Enter'],
-      nextGroup: ['Tab'],
-      prevGroup: ['Shift+Tab']
-    },
-    vimMode: false,
-    preventDefaults: true
-  }
-} as const;
-
-export default {
-  SearchResultType,
-  SearchKeyboardAction,
-  DEFAULT_SEARCH_CONFIG
+export const isSearchResult = (value: any): value is SearchResult => {
+  return value && typeof value.id === 'string' && typeof value.type === 'string' && typeof value.title === 'string';
 };
+
+export const isSearchResultGroup = (value: any): value is SearchResultGroup => {
+  return value && typeof value.type === 'string' && typeof value.title === 'string' && Array.isArray(value.results);
+};
+
+export const isSearchKeyboardEvent = (value: any): value is SearchKeyboardEvent => {
+  return value && typeof value.action === 'string' && typeof value.shouldPreventDefault === 'boolean';
+};
+
+/**
+ * Utility type for extracting result metadata by type
+ */
+export type SearchResultMetadataByType<T extends SearchResultType> = 
+  T extends SearchResultType.DATABASE_SERVICE | SearchResultType.DATABASE_TABLE | SearchResultType.DATABASE_FIELD
+    ? NonNullable<SearchResult['metadata']>['database']
+    : T extends SearchResultType.USER | SearchResultType.ADMIN
+    ? NonNullable<SearchResult['metadata']>['user']
+    : T extends SearchResultType.API_ENDPOINT | SearchResultType.API_DOCUMENTATION
+    ? NonNullable<SearchResult['metadata']>['api']
+    : T extends SearchResultType.FILE
+    ? NonNullable<SearchResult['metadata']>['file']
+    : never;
+
+/**
+ * Utility type for strict result type checking
+ */
+export type TypedSearchResult<T extends SearchResultType> = SearchResult & {
+  type: T;
+  metadata?: {
+    [K in keyof SearchResult['metadata']]: K extends keyof SearchResultMetadataByType<T>
+      ? SearchResultMetadataByType<T>[K]
+      : SearchResult['metadata'][K];
+  };
+};
+
+/**
+ * Export all interfaces and types for external consumption
+ */
+export type {
+  BaseComponentProps,
+  AccessibilityProps,
+  ThemeProps,
+  ResponsiveProps,
+  AnimationProps,
+  FocusProps,
+  ControlledProps,
+  EventHandlers
+} from '@/types/ui';
