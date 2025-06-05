@@ -1,517 +1,506 @@
-/**
- * @fileoverview Application Management Page Component
- * 
- * Next.js page component serving as the main application management interface,
- * replacing Angular routing with Next.js app router structure. Provides comprehensive
- * application CRUD operations including creation, management, API key handling,
- * and deployment configuration using React Server Components for optimal performance.
- * 
- * Key Features:
- * - React Server Component with metadata configuration for SEO optimization
- * - Sub-2 second SSR performance target for initial page loads
- * - Integration with Next.js Link components for client-side navigation
- * - Tailwind CSS styling with dark mode support and consistent theme injection
- * - Server-side data prefetching for enhanced performance
- * - Accessibility compliance with WCAG 2.1 AA standards
- * - Integration with React Query for intelligent caching and synchronization
- * - Support for application lifecycle management workflows
- * 
- * Performance Requirements:
- * - SSR pages under 2 seconds (React/Next.js Integration Requirements)
- * - Cache hit responses under 50ms (React/Next.js Integration Requirements)
- * - Real-time validation under 100ms for form interactions
- * 
- * Migration Notes:
- * - Replaces Angular's adf-apps routing module and component structure
- * - Maintains functional parity with original df-manage-apps table component
- * - Preserves all CRUD operations and API key management features
- * - Converts Angular Material UI to Tailwind CSS with Headless UI components
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- */
-
-import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { Metadata } from 'next';
+import { Plus, Package, Key, ExternalLink, Copy, RefreshCw, Settings } from 'lucide-react';
 import Link from 'next/link';
 
-// Type definitions for application management
-interface AppType {
-  id: number;
-  name: string;
-  description?: string;
-  api_key: string;
-  is_active: boolean;
-  type: number;
-  path?: string;
-  url?: string;
-  storage_service_id?: number;
-  storage_container?: string;
-  role_id?: number;
-  role?: {
-    id: number;
-    name: string;
-    description?: string;
-  };
-  created_date: string;
-  last_modified_date: string;
-  created_by_id?: number;
-  last_modified_by_id?: number;
-}
+// UI Components
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
-// Enhanced metadata for SEO optimization and search visibility
-export const metadata: Metadata = {
-  title: 'Application Management',
-  description: 'Manage DreamFactory applications, API keys, and deployment configurations. Create, configure, and deploy applications with comprehensive security and access control.',
-  keywords: [
-    'application management',
-    'api keys',
-    'app deployment',
-    'dreamfactory apps',
-    'application security',
-    'app configuration',
-    'api application',
-    'rest api management'
-  ],
-  openGraph: {
-    title: 'Application Management | DreamFactory Admin',
-    description: 'Comprehensive application management interface for creating, configuring, and deploying DreamFactory applications with advanced security and API key management.',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary',
-    title: 'Application Management | DreamFactory Admin',
-    description: 'Manage DreamFactory applications, API keys, and deployment configurations with comprehensive security controls.',
-  },
-  robots: {
-    index: false, // Admin interface should not be indexed
-    follow: false,
-  },
-};
+// Dynamic imports for client components that need interactivity
+import dynamic from 'next/dynamic';
 
-/**
- * Page Header Component
- * Provides consistent page header with title, description, and primary actions
- */
-function PageHeader() {
+// Dynamically imported client components for optimal loading
+const AppManagementTable = dynamic(() => import('@/components/app-management/app-table'), {
+  loading: () => (
+    <div className="space-y-4">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="animate-pulse">
+          <div className="h-16 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+        </div>
+      ))}
+    </div>
+  ),
+  ssr: false,
+});
+
+const AppMetrics = dynamic(() => import('@/components/app-management/app-metrics'), {
+  loading: () => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="animate-pulse">
+          <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+        </div>
+      ))}
+    </div>
+  ),
+  ssr: false,
+});
+
+const RecentAppActivity = dynamic(() => import('@/components/app-management/recent-activity'), {
+  loading: () => (
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="animate-pulse flex space-x-3">
+          <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  ),
+  ssr: false,
+});
+
+// Static app overview component for SSR optimization
+function AppOverview() {
   return (
-    <div className="border-b border-gray-200 bg-white px-4 py-5 sm:px-6 dark:border-gray-700 dark:bg-gray-800">
-      <div className="flex flex-wrap items-center justify-between sm:flex-nowrap">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight dark:text-white">
-            Applications
-          </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Manage applications, API keys, and deployment configurations for your DreamFactory instance.
-            Create new applications or configure existing ones with comprehensive security controls.
-          </p>
-        </div>
-        <div className="ml-4 flex flex-shrink-0">
-          <Link
-            href="/adf-apps/create"
-            className="relative inline-flex items-center gap-x-1.5 rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-colors duration-200"
-          >
-            <svg
-              className="-ml-0.5 h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4.5v15m7.5-7.5h-15"
-              />
-            </svg>
-            Create Application
-          </Link>
-        </div>
-      </div>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Applications</CardTitle>
+          <Package className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>}>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">No applications configured</p>
+          </Suspense>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Active Applications</CardTitle>
+          <Settings className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>}>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">All applications inactive</p>
+          </Suspense>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">API Keys</CardTitle>
+          <Key className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>}>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">Ready to generate</p>
+          </Suspense>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-/**
- * Application Management Stats Component
- * Displays key metrics and statistics for application overview
- */
-function ApplicationStats() {
-  return (
-    <div className="bg-white px-4 py-5 sm:px-6 dark:bg-gray-800">
-      <dl className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <div className="overflow-hidden rounded-lg bg-gray-50 px-4 py-5 shadow dark:bg-gray-700">
-          <dt className="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-            Total Applications
-          </dt>
-          <dd className="mt-1 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
-            <Suspense fallback={<div className="h-9 w-16 animate-pulse rounded bg-gray-200 dark:bg-gray-600" />}>
-              {/* This will be populated by client component */}
-              --
-            </Suspense>
-          </dd>
-        </div>
-        <div className="overflow-hidden rounded-lg bg-gray-50 px-4 py-5 shadow dark:bg-gray-700">
-          <dt className="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-            Active Applications
-          </dt>
-          <dd className="mt-1 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
-            <Suspense fallback={<div className="h-9 w-16 animate-pulse rounded bg-gray-200 dark:bg-gray-600" />}>
-              {/* This will be populated by client component */}
-              --
-            </Suspense>
-          </dd>
-        </div>
-        <div className="overflow-hidden rounded-lg bg-gray-50 px-4 py-5 shadow dark:bg-gray-700">
-          <dt className="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-            API Keys Generated
-          </dt>
-          <dd className="mt-1 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
-            <Suspense fallback={<div className="h-9 w-16 animate-pulse rounded bg-gray-200 dark:bg-gray-600" />}>
-              {/* This will be populated by client component */}
-              --
-            </Suspense>
-          </dd>
-        </div>
-      </dl>
-    </div>
-  );
-}
-
-/**
- * Quick Actions Component
- * Provides convenient shortcuts for common application management tasks
- */
-function QuickActions() {
+// Quick actions component for app management
+function AppQuickActions() {
   const actions = [
     {
-      title: 'Create New Application',
-      description: 'Set up a new application with custom configuration and security settings.',
+      title: 'Create New App',
+      description: 'Set up a new application with hosting and configuration',
       href: '/adf-apps/create',
-      icon: (
-        <svg
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 4.5v15m7.5-7.5h-15"
-          />
-        </svg>
-      ),
-      color: 'bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30',
+      icon: Plus,
+      variant: 'default' as const,
     },
     {
-      title: 'Import Applications',
-      description: 'Import application configurations from backup files or other instances.',
-      href: '/adf-apps/import',
-      icon: (
-        <svg
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-          />
-        </svg>
-      ),
-      color: 'bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30',
+      title: 'Manage API Keys',
+      description: 'View and refresh application API keys',
+      href: '/adf-apps/api-keys',
+      icon: Key,
+      variant: 'outline' as const,
     },
     {
-      title: 'Application Templates',
-      description: 'Browse and use pre-configured application templates for rapid deployment.',
-      href: '/adf-apps/templates',
-      icon: (
-        <svg
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-          />
-        </svg>
-      ),
-      color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30',
+      title: 'App Settings',
+      description: 'Configure global application settings',
+      href: '/adf-apps/settings',
+      icon: Settings,
+      variant: 'outline' as const,
     },
   ];
 
   return (
-    <div className="bg-white px-4 py-5 sm:px-6 dark:bg-gray-800">
-      <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-        Quick Actions
-      </h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {actions.map((action) => (
-          <Link
-            key={action.title}
-            href={action.href}
-            className={`relative block w-full rounded-lg p-6 transition-colors duration-200 ${action.color}`}
-          >
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                {action.icon}
-              </div>
-              <div className="ml-4">
-                <h3 className="text-base font-medium">
-                  {action.title}
-                </h3>
-                <p className="mt-1 text-sm opacity-90">
-                  {action.description}
-                </p>
-              </div>
-            </div>
+    <div className="grid gap-4 md:grid-cols-3">
+      {actions.map((action) => (
+        <Card key={action.href} className="hover:shadow-md transition-shadow cursor-pointer group">
+          <Link href={action.href}>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm group-hover:text-primary-600 transition-colors">
+                <action.icon className="h-4 w-4" />
+                {action.title}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {action.description}
+              </CardDescription>
+            </CardHeader>
           </Link>
-        ))}
-      </div>
+        </Card>
+      ))}
     </div>
   );
 }
 
-/**
- * Applications Table Loading Skeleton
- * Provides loading state while application data is being fetched
- */
-function ApplicationsTableSkeleton() {
+// Getting started guide for app management
+function AppGettingStarted() {
   return (
-    <div className="bg-white shadow dark:bg-gray-800">
-      <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-        <div className="h-6 w-48 animate-pulse rounded bg-gray-200 dark:bg-gray-600" />
-      </div>
-      <div className="overflow-hidden">
-        <div className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          {/* Table header skeleton */}
-          <div className="bg-gray-50 dark:bg-gray-700">
-            <div className="px-6 py-3">
-              <div className="flex space-x-4">
-                <div className="h-4 w-20 animate-pulse rounded bg-gray-300 dark:bg-gray-600" />
-                <div className="h-4 w-24 animate-pulse rounded bg-gray-300 dark:bg-gray-600" />
-                <div className="h-4 w-32 animate-pulse rounded bg-gray-300 dark:bg-gray-600" />
-                <div className="h-4 w-20 animate-pulse rounded bg-gray-300 dark:bg-gray-600" />
-                <div className="h-4 w-16 animate-pulse rounded bg-gray-300 dark:bg-gray-600" />
-              </div>
+    <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 dark:border-green-800">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-green-900 dark:text-green-100">
+          <Package className="h-5 w-5" />
+          Application Management
+        </CardTitle>
+        <CardDescription className="text-green-700 dark:text-green-200">
+          Create and manage web applications hosted on DreamFactory
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-green-800 dark:text-green-200">
+          Applications in DreamFactory can be hosted in various ways including file storage, 
+          web server paths, or remote URLs. Each application gets its own API key and role-based access control.
+        </p>
+        <div className="space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-xs font-medium text-green-900 dark:bg-green-900 dark:text-green-100">
+              1
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-green-900 dark:text-green-100">Create Application</p>
+              <p className="text-xs text-green-700 dark:text-green-200">
+                Set up your app with name, description, and hosting location
+              </p>
             </div>
           </div>
-          {/* Table rows skeleton */}
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="bg-white dark:bg-gray-800">
-              <div className="px-6 py-4">
-                <div className="flex space-x-4">
-                  <div className="h-4 w-6 animate-pulse rounded bg-gray-200 dark:bg-gray-600" />
-                  <div className="h-4 w-32 animate-pulse rounded bg-gray-200 dark:bg-gray-600" />
-                  <div className="h-4 w-48 animate-pulse rounded bg-gray-200 dark:bg-gray-600" />
-                  <div className="h-4 w-24 animate-pulse rounded bg-gray-200 dark:bg-gray-600" />
-                  <div className="h-4 w-20 animate-pulse rounded bg-gray-200 dark:bg-gray-600" />
-                </div>
+          <div className="flex items-start gap-3">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-900 dark:bg-gray-800 dark:text-gray-100">
+              2
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Configure Security</p>
+              <p className="text-xs text-muted-foreground">
+                Assign default roles and generate API keys for access control
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-900 dark:bg-gray-800 dark:text-gray-100">
+              3
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Deploy & Launch</p>
+              <p className="text-xs text-muted-foreground">
+                Activate your application and share the launch URL
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" className="bg-green-600 hover:bg-green-700">
+            <Link href="/adf-apps/create">
+              <Plus className="h-4 w-4 mr-2" />
+              Create First App
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-600 dark:text-green-200">
+            <Link href="/adf-home/quickstart">
+              <ExternalLink className="h-4 w-4 mr-2" />
+              View Documentation
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Application features showcase
+function AppFeatures() {
+  const features = [
+    {
+      icon: Package,
+      title: 'Multiple Hosting Options',
+      description: 'Host apps on file storage, web servers, or remote URLs with flexible configuration',
+    },
+    {
+      icon: Key,
+      title: 'API Key Management',
+      description: 'Generate, copy, and refresh API keys with fine-grained access control',
+    },
+    {
+      icon: Settings,
+      title: 'Role-Based Security',
+      description: 'Assign default roles and configure security settings per application',
+    },
+    {
+      icon: ExternalLink,
+      title: 'Launch Integration',
+      description: 'Direct launch URLs for seamless application access and sharing',
+    },
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Application Features</CardTitle>
+        <CardDescription>
+          Comprehensive tools for managing web applications on DreamFactory
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 md:grid-cols-2">
+          {features.map((feature, index) => (
+            <div key={index} className="flex gap-3">
+              <feature.icon className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{feature.title}</p>
+                <p className="text-xs text-muted-foreground">{feature.description}</p>
               </div>
             </div>
           ))}
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
-/**
- * Applications Management Interface
- * Client component that will handle the interactive table and data management
- * Note: This will be implemented as a separate client component file
- */
-function ApplicationsManagementInterface() {
-  return (
-    <div className="bg-white shadow dark:bg-gray-800">
-      <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          Applications
-        </h3>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Manage and configure your DreamFactory applications, API keys, and deployment settings.
-        </p>
-      </div>
-      
-      {/* Search and Filter Controls */}
-      <div className="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-700">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <svg
-                className="h-5 w-5 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </div>
-            <input
-              type="text"
-              placeholder="Search applications..."
-              className="block w-full rounded-md border-gray-300 pl-10 pr-3 py-2 text-sm placeholder-gray-500 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400 dark:focus:border-primary-400 dark:focus:ring-primary-400"
-            />
-          </div>
-          <div className="mt-3 sm:mt-0 sm:ml-4 sm:flex-shrink-0">
-            <div className="flex items-center space-x-2">
-              <select className="block rounded-md border-gray-300 py-2 pl-3 pr-10 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-primary-400 dark:focus:ring-primary-400">
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-              <select className="block rounded-md border-gray-300 py-2 pl-3 pr-10 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-primary-400 dark:focus:ring-primary-400">
-                <option value="">All Types</option>
-                <option value="file">File Storage</option>
-                <option value="web">Web Application</option>
-                <option value="remote">Remote URL</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Placeholder for Applications Table */}
-      <div className="px-4 py-6 text-center">
-        <div className="mx-auto h-48 w-48 text-gray-400">
-          <svg
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1}
-              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-            />
-          </svg>
-        </div>
-        <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-          Application Management Interface
-        </h3>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Interactive application management table will be loaded here.
-          This will include full CRUD operations, API key management, and deployment controls.
-        </p>
-        <div className="mt-6">
-          <Link
-            href="/adf-apps/create"
-            className="inline-flex items-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
-          >
-            <svg
-              className="-ml-0.5 mr-1.5 h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4.5v15m7.5-7.5h-15"
-              />
-            </svg>
-            Create Your First Application
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Main Application Management Page Component
- * 
- * Serves as the primary entry point for application management functionality,
- * implementing Next.js server component architecture for optimal performance.
- * Provides comprehensive interface for creating, managing, and configuring
- * DreamFactory applications with full CRUD operations and security controls.
- * 
- * Architecture:
- * - React Server Component for enhanced SSR performance
- * - Suspense boundaries for progressive loading
- * - Client component integration for interactive features
- * - Tailwind CSS styling with dark mode support
- * - SEO optimization with metadata configuration
- * - Accessibility compliance with WCAG 2.1 AA standards
- * 
- * Navigation Structure:
- * - /adf-apps (this page) - Main application listing and management
- * - /adf-apps/create - Create new application wizard
- * - /adf-apps/[id] - Individual application details and configuration
- * - /adf-apps/import - Import applications from backup
- * - /adf-apps/templates - Application template library
- * 
- * Performance Considerations:
- * - Server-side rendering for initial page load under 2 seconds
- * - Progressive enhancement with client-side interactivity
- * - Optimized images and lazy loading for media assets
- * - Efficient data fetching with React Query caching
- * 
- * @returns JSX element representing the complete application management interface
- */
+// Main application management page component
 export default function ApplicationManagementPage() {
   return (
-    <div className="min-h-full">
-      {/* Page Header with title and primary actions */}
-      <PageHeader />
-      
-      {/* Main content area with statistics and management interface */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="py-6">
-          {/* Application statistics overview */}
-          <div className="mb-6">
-            <ApplicationStats />
+    <div className="space-y-8" data-testid="app-management-page">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Application Management
+          </h1>
+          <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">
+            Create, configure, and manage web applications
+          </p>
+        </div>
+        <Button asChild size="lg">
+          <Link href="/adf-apps/create">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Application
+          </Link>
+        </Button>
+      </div>
+
+      {/* Getting Started Section */}
+      <AppGettingStarted />
+
+      {/* App Overview Stats */}
+      <AppOverview />
+
+      {/* Quick Actions */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+          Quick Actions
+        </h2>
+        <AppQuickActions />
+      </div>
+
+      {/* App Metrics */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+          Application Metrics
+        </h2>
+        <Suspense fallback={
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-24 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse"></div>
+            ))}
           </div>
-          
-          {/* Quick actions for common tasks */}
-          <div className="mb-6">
-            <QuickActions />
-          </div>
-          
-          {/* Main applications management interface */}
-          <div className="space-y-6">
-            <Suspense fallback={<ApplicationsTableSkeleton />}>
-              <ApplicationsManagementInterface />
-            </Suspense>
-          </div>
+        }>
+          <AppMetrics />
+        </Suspense>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-8">
+          {/* Applications Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Applications
+              </CardTitle>
+              <CardDescription>
+                View and manage all configured applications
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Suspense
+                fallback={
+                  <div className="space-y-4">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse"></div>
+                    ))}
+                  </div>
+                }
+              >
+                <AppManagementTable />
+              </Suspense>
+            </CardContent>
+          </Card>
+
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Recent Activity
+              </CardTitle>
+              <CardDescription>
+                Latest application management events and changes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Suspense
+                fallback={
+                  <div className="space-y-3">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="animate-pulse flex space-x-3">
+                        <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                }
+              >
+                <RecentAppActivity />
+              </Suspense>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-8">
+          {/* App Features */}
+          <AppFeatures />
+
+          {/* Application Types Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Application Types</CardTitle>
+              <CardDescription>
+                Different hosting options available
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-900 dark:bg-blue-900 dark:text-blue-100">
+                    0
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">No Storage</p>
+                    <p className="text-xs text-muted-foreground">
+                      Application without file hosting requirements
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-xs font-medium text-green-900 dark:bg-green-900 dark:text-green-100">
+                    1
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">File Storage</p>
+                    <p className="text-xs text-muted-foreground">
+                      Hosted on DreamFactory file storage services
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-xs font-medium text-purple-900 dark:bg-purple-900 dark:text-purple-100">
+                    2
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Remote URL</p>
+                    <p className="text-xs text-muted-foreground">
+                      Application hosted on external servers
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 text-xs font-medium text-orange-900 dark:bg-orange-900 dark:text-orange-100">
+                    3
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Web Server</p>
+                    <p className="text-xs text-muted-foreground">
+                      Hosted on DreamFactory web server paths
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <Button asChild variant="outline" size="sm" className="w-full">
+                <Link href="/adf-apps/create">
+                  Create New App
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* API Key Management Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">API Key Management</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Total Keys</span>
+                <span className="font-medium">0</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Active Keys</span>
+                <span className="font-medium">0</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Last Refresh</span>
+                <span className="font-medium">Never</span>
+              </div>
+              <div className="pt-2 border-t space-y-2">
+                <Button asChild variant="outline" size="sm" className="w-full">
+                  <Link href="/adf-apps/api-keys">
+                    <Key className="h-4 w-4 mr-2" />
+                    Manage Keys
+                  </Link>
+                </Button>
+                <Button variant="outline" size="sm" className="w-full" disabled>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh All Keys
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-      
-      {/* Screen reader announcements for dynamic content */}
-      <div
-        id="applications-announcements"
-        aria-live="polite"
-        aria-atomic="true"
-        className="sr-only"
-      />
     </div>
   );
 }
 
-/**
- * Type exports for use by child components and related pages
- */
-export type { AppType };
+// Metadata for SEO and Next.js optimization
+export const metadata: Metadata = {
+  title: 'Application Management',
+  description: 'Create, configure, and manage web applications hosted on DreamFactory with API key management and role-based security',
+  openGraph: {
+    title: 'Application Management | DreamFactory Admin Console',
+    description: 'Comprehensive application hosting and management tools for DreamFactory platform',
+  },
+};
+
+// Force dynamic rendering for real-time data
+export const dynamic = 'force-dynamic';
+
+// Ensure this page is server-side rendered with streaming
+export const revalidate = 0;
