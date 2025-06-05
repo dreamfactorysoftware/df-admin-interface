@@ -1,989 +1,930 @@
 /**
- * Comprehensive Vitest Test Suite for Function Usage Form Component
+ * Function Use Form Component Test Suite
  * 
- * This test suite validates the function usage form component that enables users to
- * configure database function usage entries within field configurations. The component
- * supports dynamic addition/removal of function entries, real-time validation,
- * accordion/table display modes, and seamless integration with parent forms.
+ * Comprehensive Vitest test suite for the function usage form component using React Testing Library
+ * and Mock Service Worker for API mocking. Tests dynamic function entry management, validation 
+ * workflows, accordion/table display modes, and integration with parent form components.
  * 
  * Key Testing Areas:
- * - Dynamic function entry addition/removal workflows
- * - Real-time validation with Zod schema integration
+ * - Dynamic function entry addition and removal
+ * - React Hook Form validation with Zod schemas
  * - Accordion and table display mode switching
- * - React Hook Form integration and validation
- * - MSW-powered API mocking for function options
+ * - MSW integration for function dropdown options
  * - Accessibility compliance (WCAG 2.1 AA)
- * - Performance validation (sub-100ms interactions)
+ * - Integration with parent form components
+ * - React Query caching patterns for function options
  * 
- * Performance Target: All user interactions complete within 100ms
- * Coverage Target: 95%+ test coverage for component functionality
- * 
- * @version React 19.0.0 + Next.js 15.1 + Vitest 2.1.0
+ * Performance Requirements:
+ * - 10x faster test execution with Vitest 2.1.0
+ * - Real-time validation under 100ms
+ * - Component rendering optimizations
  */
 
-import { describe, test, expect, beforeEach, vi, beforeAll, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi, beforeAll, afterEach } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { QueryClient } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { FormProvider, useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-
-// Component under test
+import { 
+  renderWithProviders, 
+  renderWithForm, 
+  accessibilityUtils, 
+  headlessUIUtils,
+  testUtils
+} from '@/test/utils/test-utils';
 import { FunctionUseForm } from './function-use-form';
-import type { 
-  FunctionUseFormProps, 
-  FunctionUseEntry, 
-  FunctionOption,
-  DisplayMode 
-} from './function-use.types';
+import { functionUseSchema, type FunctionUseFormData } from './function-use.types';
 
-// Mock data and utilities
-const mockFunctionOptions: FunctionOption[] = [
+// ============================================================================
+// MOCK DATA AND FIXTURES
+// ============================================================================
+
+/**
+ * Mock function usage dropdown options matching DreamFactory API responses
+ */
+const mockFunctionUsesDropdownOptions = [
   {
-    id: 'NOW',
-    name: 'NOW',
-    description: 'Returns current timestamp',
-    parameters: [],
-    returnType: 'TIMESTAMP',
-    category: 'date'
+    name: 'SELECT (GET)',
+    value: 'SELECT',
+    description: 'Function for SELECT operations',
   },
   {
-    id: 'UPPER',
-    name: 'UPPER',
-    description: 'Converts string to uppercase',
-    parameters: [{ name: 'str', type: 'VARCHAR', required: true }],
-    returnType: 'VARCHAR',
-    category: 'string'
+    name: 'FILTER (GET)',
+    value: 'FILTER',
+    description: 'Function for FILTER operations',
   },
   {
-    id: 'CONCAT',
-    name: 'CONCAT',
-    description: 'Concatenates multiple strings',
-    parameters: [
-      { name: 'str1', type: 'VARCHAR', required: true },
-      { name: 'str2', type: 'VARCHAR', required: true }
-    ],
-    returnType: 'VARCHAR',
-    category: 'string'
+    name: 'INSERT (POST)',
+    value: 'INSERT',
+    description: 'Function for INSERT operations',
   },
   {
-    id: 'SUM',
-    name: 'SUM',
-    description: 'Calculates sum of numeric values',
-    parameters: [{ name: 'value', type: 'NUMERIC', required: true }],
-    returnType: 'NUMERIC',
-    category: 'aggregate'
-  }
+    name: 'UPDATE (PATCH)',
+    value: 'UPDATE',
+    description: 'Function for UPDATE operations',
+  },
 ];
 
-const mockFunctionEntries: FunctionUseEntry[] = [
-  {
-    id: '1',
-    functionId: 'NOW',
-    functionName: 'NOW',
-    parameters: {},
-    description: 'Current timestamp function',
-    isValid: true
-  },
-  {
-    id: '2',
-    functionId: 'UPPER',
-    functionName: 'UPPER',
-    parameters: { str: 'test_value' },
-    description: 'Uppercase conversion',
-    isValid: true
-  }
-];
-
-// Test form schema
-const testFormSchema = z.object({
-  functionEntries: z.array(z.object({
-    id: z.string(),
-    functionId: z.string().min(1, 'Function selection is required'),
-    functionName: z.string(),
-    parameters: z.record(z.string()),
-    description: z.string().optional(),
-    isValid: z.boolean()
-  }))
-});
-
-type TestFormData = z.infer<typeof testFormSchema>;
-
-// Test wrapper component with form context
-const TestWrapper: React.FC<{ 
-  children: React.ReactNode;
-  defaultValues?: Partial<TestFormData>;
-  onSubmit?: (data: TestFormData) => void;
-}> = ({ children, defaultValues, onSubmit = vi.fn() }) => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false }
-    }
-  });
-
-  const form = useForm<TestFormData>({
-    resolver: zodResolver(testFormSchema),
-    defaultValues: {
-      functionEntries: [],
-      ...defaultValues
-    }
-  });
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} data-testid="test-form">
-          {children}
-          <button type="submit" data-testid="submit-button">Submit</button>
-        </form>
-      </FormProvider>
-    </QueryClientProvider>
-  );
+/**
+ * Mock initial form data for testing
+ */
+const mockInitialFormData: FunctionUseFormData = {
+  dbFunction: [
+    {
+      use: ['SELECT', 'FILTER'],
+      function: 'my_custom_function',
+    },
+    {
+      use: ['INSERT'],
+      function: 'insert_validation_function',
+    },
+  ],
 };
 
-// MSW handlers for function options API
-const functionOptionsHandlers = [
-  http.get('/api/v2/system/database/:serviceId/functions', ({ params }) => {
-    const { serviceId } = params;
-    
-    if (serviceId === 'test-mysql-service') {
-      return HttpResponse.json({
-        resource: mockFunctionOptions,
-        count: mockFunctionOptions.length
-      });
-    }
-    
-    return HttpResponse.json({ resource: [], count: 0 });
+/**
+ * Empty form data for testing new entries
+ */
+const emptyFormData: FunctionUseFormData = {
+  dbFunction: [],
+};
+
+// ============================================================================
+// MSW HANDLERS FOR API MOCKING
+// ============================================================================
+
+/**
+ * MSW handlers for function usage API endpoints
+ */
+const functionUsageHandlers = [
+  // Mock function usage options endpoint
+  http.get('/api/v2/system/database/function-options', () => {
+    return HttpResponse.json({
+      resource: mockFunctionUsesDropdownOptions,
+      success: true,
+    });
   }),
 
-  http.get('/api/v2/system/database/:serviceId/functions/:functionId', ({ params }) => {
-    const { functionId } = params;
-    const func = mockFunctionOptions.find(f => f.id === functionId);
+  // Mock function validation endpoint
+  http.post('/api/v2/system/database/validate-function', async ({ request }) => {
+    const body = await request.json() as { functionName: string };
+    const { functionName } = body;
     
-    if (func) {
-      return HttpResponse.json({ resource: [func] });
+    // Simulate validation logic
+    if (functionName === 'invalid_function') {
+      return HttpResponse.json({
+        error: 'Function does not exist in database',
+        success: false,
+      }, { status: 400 });
     }
     
-    return HttpResponse.json(
-      { error: { message: 'Function not found', code: 404 } },
-      { status: 404 }
-    );
-  })
+    return HttpResponse.json({
+      valid: true,
+      signature: `${functionName}(param1 varchar, param2 int)`,
+      returnType: 'varchar',
+      success: true,
+    });
+  }),
+
+  // Mock error scenario for network failures
+  http.get('/api/v2/system/database/function-options-error', () => {
+    return HttpResponse.json({
+      error: 'Database connection failed',
+      success: false,
+    }, { status: 500 });
+  }),
 ];
 
-describe('FunctionUseForm Component', () => {
-  let user: ReturnType<typeof userEvent.setup>;
+// ============================================================================
+// TEST SETUP AND UTILITIES
+// ============================================================================
 
+/**
+ * Custom render function for Function Use Form with form providers
+ */
+const renderFunctionUseForm = (
+  props: Partial<React.ComponentProps<typeof FunctionUseForm>> = {},
+  formOptions: {
+    defaultValues?: FunctionUseFormData;
+    mode?: 'onChange' | 'onBlur' | 'onSubmit';
+  } = {}
+) => {
+  const { defaultValues = emptyFormData, mode = 'onChange' } = formOptions;
+  
+  const TestWrapper = () => {
+    const methods = useForm<FunctionUseFormData>({
+      resolver: zodResolver(functionUseSchema),
+      defaultValues,
+      mode,
+    });
+
+    return (
+      <form 
+        onSubmit={methods.handleSubmit((data) => console.log('Form submitted:', data))}
+        data-testid="function-use-test-form"
+      >
+        <FunctionUseForm
+          showAccordion={true}
+          name="dbFunction"
+          {...props}
+        />
+        <button type="submit" data-testid="submit-button">
+          Submit
+        </button>
+      </form>
+    );
+  };
+
+  return renderWithForm(<TestWrapper />, {
+    providerOptions: {
+      queryClient: new QueryClient({
+        defaultOptions: {
+          queries: { retry: false, gcTime: 0 },
+          mutations: { retry: false },
+        },
+      }),
+    },
+  });
+};
+
+/**
+ * Helper function to add a new function entry
+ */
+const addFunctionEntry = async (user: ReturnType<typeof userEvent.setup>) => {
+  const addButton = screen.getByRole('button', { name: /add.*function/i });
+  await user.click(addButton);
+};
+
+/**
+ * Helper function to remove a function entry
+ */
+const removeFunctionEntry = async (
+  user: ReturnType<typeof userEvent.setup>, 
+  index: number
+) => {
+  const removeButtons = screen.getAllByRole('button', { name: /delete.*row/i });
+  await user.click(removeButtons[index]);
+};
+
+/**
+ * Helper function to select function uses
+ */
+const selectFunctionUses = async (
+  user: ReturnType<typeof userEvent.setup>,
+  rowIndex: number,
+  uses: string[]
+) => {
+  const table = screen.getByRole('table');
+  const rows = within(table).getAllByRole('row');
+  const targetRow = rows[rowIndex + 1]; // +1 to skip header row
+  
+  const useSelect = within(targetRow).getByRole('combobox', { name: /use/i });
+  await user.click(useSelect);
+  
+  for (const use of uses) {
+    const option = await screen.findByRole('option', { name: new RegExp(use, 'i') });
+    await user.click(option);
+  }
+  
+  // Click outside to close dropdown
+  await user.click(document.body);
+};
+
+/**
+ * Helper function to enter function name
+ */
+const enterFunctionName = async (
+  user: ReturnType<typeof userEvent.setup>,
+  rowIndex: number,
+  functionName: string
+) => {
+  const table = screen.getByRole('table');
+  const rows = within(table).getAllByRole('row');
+  const targetRow = rows[rowIndex + 1]; // +1 to skip header row
+  
+  const functionInput = within(targetRow).getByRole('textbox', { name: /function/i });
+  await user.clear(functionInput);
+  await user.type(functionInput, functionName);
+};
+
+// ============================================================================
+// TEST SUITE SETUP
+// ============================================================================
+
+describe('FunctionUseForm Component', () => {
   beforeAll(() => {
-    // Add MSW handlers for function options
-    server.use(...functionOptionsHandlers);
+    // Start MSW server with function usage handlers
+    server.use(...functionUsageHandlers);
   });
 
   beforeEach(() => {
-    user = userEvent.setup();
+    // Reset any custom handlers and clear all mocks
+    server.resetHandlers();
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    server.resetHandlers();
+    // Clean up after each test
+    vi.clearAllTimers();
   });
+
+  // ============================================================================
+  // BASIC RENDERING AND STRUCTURE TESTS
+  // ============================================================================
 
   describe('Component Rendering', () => {
-    test('renders function use form with empty state', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion',
-        label: 'Function Usage Configuration',
-        description: 'Configure database functions for this field'
-      };
-
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Verify form label and description
-      expect(screen.getByText('Function Usage Configuration')).toBeInTheDocument();
-      expect(screen.getByText('Configure database functions for this field')).toBeInTheDocument();
-
-      // Verify empty state message
-      expect(screen.getByText(/no function entries configured/i)).toBeInTheDocument();
-
-      // Verify add function button is present
-      expect(screen.getByRole('button', { name: /add function/i })).toBeInTheDocument();
+    it('should render function use form with accordion by default', () => {
+      renderFunctionUseForm();
+      
+      expect(screen.getByText(/database function/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument();
     });
 
-    test('renders with existing function entries in accordion mode', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion',
-        label: 'Function Usage Configuration'
-      };
-
-      render(
-        <TestWrapper defaultValues={{ functionEntries: mockFunctionEntries }}>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Wait for function entries to load
-      await waitFor(() => {
-        expect(screen.getByText('NOW')).toBeInTheDocument();
-        expect(screen.getByText('UPPER')).toBeInTheDocument();
-      });
-
-      // Verify accordion structure
-      const accordionItems = screen.getAllByRole('button', { expanded: false });
-      expect(accordionItems).toHaveLength(2);
+    it('should render function use form without accordion when showAccordion is false', () => {
+      renderFunctionUseForm({ showAccordion: false });
+      
+      expect(screen.getByRole('table')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { expanded: false })).not.toBeInTheDocument();
     });
 
-    test('renders with existing function entries in table mode', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'table',
-        label: 'Function Usage Configuration'
-      };
-
-      render(
-        <TestWrapper defaultValues={{ functionEntries: mockFunctionEntries }}>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Wait for table to render
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Verify table headers
-      expect(screen.getByText('Function')).toBeInTheDocument();
-      expect(screen.getByText('Parameters')).toBeInTheDocument();
-      expect(screen.getByText('Description')).toBeInTheDocument();
-      expect(screen.getByText('Actions')).toBeInTheDocument();
-
-      // Verify table rows
-      const rows = screen.getAllByRole('row');
-      expect(rows).toHaveLength(3); // Header + 2 data rows
+    it('should render table with correct columns when accordion is expanded', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      // Expand accordion
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      
+      expect(screen.getByRole('columnheader', { name: /use/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /function/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /add.*function/i })).toBeInTheDocument();
     });
 
-    test('shows loading state while fetching function options', async () => {
-      // Delay the API response
-      server.use(
-        http.get('/api/v2/system/database/:serviceId/functions', async () => {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          return HttpResponse.json({
-            resource: mockFunctionOptions,
-            count: mockFunctionOptions.length
-          });
-        })
-      );
+    it('should display "no functions" message when form array is empty', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      // Expand accordion
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      
+      expect(screen.getByText(/no database functions/i)).toBeInTheDocument();
+    });
 
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Verify loading state
-      expect(screen.getByText(/loading function options/i)).toBeInTheDocument();
-
-      // Wait for loading to complete
-      await waitFor(() => {
-        expect(screen.queryByText(/loading function options/i)).not.toBeInTheDocument();
-      });
+    it('should render existing function entries from form data', () => {
+      renderFunctionUseForm({}, { defaultValues: mockInitialFormData });
+      
+      expect(screen.getByDisplayValue('my_custom_function')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('insert_validation_function')).toBeInTheDocument();
     });
   });
+
+  // ============================================================================
+  // DYNAMIC FUNCTION ENTRY MANAGEMENT TESTS
+  // ============================================================================
 
   describe('Dynamic Function Entry Management', () => {
-    test('adds new function entry when add button is clicked', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Wait for function options to load
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /add function/i })).toBeEnabled();
-      });
-
-      // Click add function button
-      const addButton = screen.getByRole('button', { name: /add function/i });
-      await user.click(addButton);
-
-      // Verify new entry form appears
-      await waitFor(() => {
-        expect(screen.getByText(/select function/i)).toBeInTheDocument();
-      });
-
-      // Verify function dropdown is present
-      expect(screen.getByRole('combobox', { name: /function/i })).toBeInTheDocument();
+    it('should add new function entry when add button is clicked', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      
+      await addFunctionEntry(user);
+      
+      // Check that new row is added
+      const table = screen.getByRole('table');
+      const rows = within(table).getAllByRole('row');
+      expect(rows).toHaveLength(2); // header + 1 data row
+      
+      // Check that form fields are present
+      expect(screen.getByRole('combobox', { name: /use/i })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: /function/i })).toBeInTheDocument();
     });
 
-    test('removes function entry when remove button is clicked', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper defaultValues={{ functionEntries: mockFunctionEntries }}>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Wait for entries to load
-      await waitFor(() => {
-        expect(screen.getByText('NOW')).toBeInTheDocument();
-      });
-
-      // Find and click remove button for first entry
-      const removeButtons = screen.getAllByRole('button', { name: /remove function/i });
-      expect(removeButtons).toHaveLength(2);
-
-      await user.click(removeButtons[0]);
-
-      // Verify entry is removed
-      await waitFor(() => {
-        expect(screen.queryByText('NOW')).not.toBeInTheDocument();
-        expect(screen.getByText('UPPER')).toBeInTheDocument();
-      });
+    it('should add multiple function entries', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      // Expand accordion
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      
+      // Add multiple entries
+      await addFunctionEntry(user);
+      await addFunctionEntry(user);
+      await addFunctionEntry(user);
+      
+      const table = screen.getByRole('table');
+      const rows = within(table).getAllByRole('row');
+      expect(rows).toHaveLength(4); // header + 3 data rows
     });
 
-    test('reorders function entries with drag and drop', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion',
-        allowReorder: true
-      };
+    it('should remove function entry when delete button is clicked', async () => {
+      const { user } = renderFunctionUseForm({}, { defaultValues: mockInitialFormData });
+      
+      // Expand accordion
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      
+      // Initial state should have 2 entries
+      let table = screen.getByRole('table');
+      let rows = within(table).getAllByRole('row');
+      expect(rows).toHaveLength(3); // header + 2 data rows
+      
+      // Remove first entry
+      await removeFunctionEntry(user, 0);
+      
+      // Should have 1 entry remaining
+      table = screen.getByRole('table');
+      rows = within(table).getAllByRole('row');
+      expect(rows).toHaveLength(2); // header + 1 data row
+      
+      // First entry should be removed, second entry should remain
+      expect(screen.queryByDisplayValue('my_custom_function')).not.toBeInTheDocument();
+      expect(screen.getByDisplayValue('insert_validation_function')).toBeInTheDocument();
+    });
 
-      render(
-        <TestWrapper defaultValues={{ functionEntries: mockFunctionEntries }}>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Wait for entries to load
-      await waitFor(() => {
-        expect(screen.getByText('NOW')).toBeInTheDocument();
-        expect(screen.getByText('UPPER')).toBeInTheDocument();
-      });
-
-      // Find drag handles
-      const dragHandles = screen.getAllByRole('button', { name: /reorder/i });
-      expect(dragHandles).toHaveLength(2);
-
-      // Simulate drag and drop (simplified for testing)
-      const firstHandle = dragHandles[0];
-      const secondHandle = dragHandles[1];
-
-      // Focus and keyboard interaction simulation
-      firstHandle.focus();
-      await user.keyboard('{ArrowDown}');
-
-      // Verify order change indication
-      expect(firstHandle).toHaveAttribute('aria-pressed', 'true');
+    it('should remove all entries and show empty message', async () => {
+      const { user } = renderFunctionUseForm({}, { defaultValues: mockInitialFormData });
+      
+      // Expand accordion
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      
+      // Remove all entries
+      await removeFunctionEntry(user, 0);
+      await removeFunctionEntry(user, 0); // Index 0 again because array shrinks
+      
+      // Should show empty message
+      expect(screen.getByText(/no database functions/i)).toBeInTheDocument();
     });
   });
 
-  describe('Function Selection and Configuration', () => {
-    test('selects function from dropdown and configures parameters', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
+  // ============================================================================
+  // FORM VALIDATION TESTS
+  // ============================================================================
 
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Add new function entry
-      await user.click(screen.getByRole('button', { name: /add function/i }));
-
-      // Wait for function dropdown to appear
+  describe('Form Validation', () => {
+    it('should validate that use field is required', async () => {
+      const { user } = renderFunctionUseForm({}, { mode: 'onChange' });
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      await addFunctionEntry(user);
+      
+      // Enter function name but leave use field empty
+      await enterFunctionName(user, 0, 'test_function');
+      
+      // Submit form to trigger validation
+      const submitButton = screen.getByTestId('submit-button');
+      await user.click(submitButton);
+      
       await waitFor(() => {
-        expect(screen.getByRole('combobox', { name: /function/i })).toBeInTheDocument();
-      });
-
-      // Select function from dropdown
-      const functionSelect = screen.getByRole('combobox', { name: /function/i });
-      await user.click(functionSelect);
-
-      // Wait for options to appear
-      await waitFor(() => {
-        expect(screen.getByText('UPPER')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByText('UPPER'));
-
-      // Verify function is selected and parameter fields appear
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('UPPER')).toBeInTheDocument();
-        expect(screen.getByLabelText(/str parameter/i)).toBeInTheDocument();
-      });
-
-      // Configure parameter
-      const parameterInput = screen.getByLabelText(/str parameter/i);
-      await user.clear(parameterInput);
-      await user.type(parameterInput, 'test_value');
-
-      // Verify parameter value
-      expect(parameterInput).toHaveValue('test_value');
-    });
-
-    test('validates required parameters', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Add new function entry
-      await user.click(screen.getByRole('button', { name: /add function/i }));
-
-      // Select function with required parameters
-      const functionSelect = screen.getByRole('combobox', { name: /function/i });
-      await user.click(functionSelect);
-      await user.click(await screen.findByText('CONCAT'));
-
-      // Wait for parameter fields
-      await waitFor(() => {
-        expect(screen.getByLabelText(/str1 parameter/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/str2 parameter/i)).toBeInTheDocument();
-      });
-
-      // Try to submit form without filling required parameters
-      await user.click(screen.getByTestId('submit-button'));
-
-      // Verify validation errors
-      await waitFor(() => {
-        expect(screen.getByText(/str1 is required/i)).toBeInTheDocument();
-        expect(screen.getByText(/str2 is required/i)).toBeInTheDocument();
+        expect(screen.getByText(/use is required/i)).toBeInTheDocument();
       });
     });
 
-    test('shows function description and parameter help', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Add new function entry
-      await user.click(screen.getByRole('button', { name: /add function/i }));
-
-      // Select function
-      const functionSelect = screen.getByRole('combobox', { name: /function/i });
-      await user.click(functionSelect);
-      await user.click(await screen.findByText('UPPER'));
-
-      // Verify function description is shown
+    it('should allow function field to be optional', async () => {
+      const { user } = renderFunctionUseForm({}, { mode: 'onChange' });
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      await addFunctionEntry(user);
+      
+      // Select use but leave function empty
+      await selectFunctionUses(user, 0, ['SELECT']);
+      
+      // Submit form - should not show validation error for function field
+      const submitButton = screen.getByTestId('submit-button');
+      await user.click(submitButton);
+      
       await waitFor(() => {
-        expect(screen.getByText('Converts string to uppercase')).toBeInTheDocument();
+        expect(screen.queryByText(/function is required/i)).not.toBeInTheDocument();
       });
-
-      // Verify parameter help text
-      expect(screen.getByText(/required parameter/i)).toBeInTheDocument();
-    });
-  });
-
-  describe('Display Mode Switching', () => {
-    test('switches from accordion to table mode', async () => {
-      const mockOnDisplayModeChange = vi.fn();
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion',
-        onDisplayModeChange: mockOnDisplayModeChange,
-        allowModeSwitch: true
-      };
-
-      render(
-        <TestWrapper defaultValues={{ functionEntries: mockFunctionEntries }}>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Wait for accordion to render
-      await waitFor(() => {
-        expect(screen.getByText('NOW')).toBeInTheDocument();
-      });
-
-      // Find and click table mode button
-      const tableModeButton = screen.getByRole('button', { name: /table view/i });
-      await user.click(tableModeButton);
-
-      // Verify mode change callback
-      expect(mockOnDisplayModeChange).toHaveBeenCalledWith('table');
     });
 
-    test('switches from table to accordion mode', async () => {
-      const mockOnDisplayModeChange = vi.fn();
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'table',
-        onDisplayModeChange: mockOnDisplayModeChange,
-        allowModeSwitch: true
-      };
-
-      render(
-        <TestWrapper defaultValues={{ functionEntries: mockFunctionEntries }}>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Wait for table to render
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Find and click accordion mode button
-      const accordionModeButton = screen.getByRole('button', { name: /accordion view/i });
-      await user.click(accordionModeButton);
-
-      // Verify mode change callback
-      expect(mockOnDisplayModeChange).toHaveBeenCalledWith('accordion');
+    it('should validate real-time changes under 100ms', async () => {
+      const { user } = renderFunctionUseForm({}, { mode: 'onChange' });
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      await addFunctionEntry(user);
+      
+      const startTime = performance.now();
+      
+      // Make changes that should trigger validation
+      await selectFunctionUses(user, 0, ['SELECT']);
+      await enterFunctionName(user, 0, 'test_function');
+      
+      const endTime = performance.now();
+      const validationTime = endTime - startTime;
+      
+      // Validation should complete under 100ms
+      expect(validationTime).toBeLessThan(100);
     });
 
-    test('maintains form state when switching display modes', async () => {
-      let currentMode: DisplayMode = 'accordion';
-      const mockOnDisplayModeChange = vi.fn((mode: DisplayMode) => {
-        currentMode = mode;
-      });
-
-      const Component = () => (
-        <TestWrapper defaultValues={{ functionEntries: mockFunctionEntries }}>
-          <FunctionUseForm
-            name="functionEntries"
-            serviceId="test-mysql-service"
-            displayMode={currentMode}
-            onDisplayModeChange={mockOnDisplayModeChange}
-            allowModeSwitch={true}
-          />
-        </TestWrapper>
-      );
-
-      const { rerender } = render(<Component />);
-
-      // Wait for initial render
+    it('should validate multiple use selections', async () => {
+      const { user } = renderFunctionUseForm({}, { mode: 'onChange' });
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      await addFunctionEntry(user);
+      
+      // Select multiple uses
+      await selectFunctionUses(user, 0, ['SELECT', 'FILTER', 'UPDATE']);
+      
+      // Verify all selections are maintained
+      const useField = screen.getByRole('combobox', { name: /use/i });
+      expect(useField).toHaveAttribute('aria-expanded', 'false');
+      
+      // Check that values are properly stored (this would be verified by form state)
+      const submitButton = screen.getByTestId('submit-button');
+      await user.click(submitButton);
+      
+      // Should not show validation errors
       await waitFor(() => {
-        expect(screen.getByText('NOW')).toBeInTheDocument();
-      });
-
-      // Switch to table mode
-      await user.click(screen.getByRole('button', { name: /table view/i }));
-      currentMode = 'table';
-      rerender(<Component />);
-
-      // Verify data is preserved
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-        expect(screen.getByText('NOW')).toBeInTheDocument();
-        expect(screen.getByText('UPPER')).toBeInTheDocument();
+        expect(screen.queryByText(/use is required/i)).not.toBeInTheDocument();
       });
     });
   });
 
-  describe('Form Integration and Validation', () => {
-    test('integrates with parent form submission', async () => {
-      const mockOnSubmit = vi.fn();
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
+  // ============================================================================
+  // ACCORDION AND TABLE DISPLAY MODE TESTS
+  // ============================================================================
 
-      render(
-        <TestWrapper 
-          defaultValues={{ functionEntries: mockFunctionEntries }}
-          onSubmit={mockOnSubmit}
-        >
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Submit form
-      await user.click(screen.getByTestId('submit-button'));
-
-      // Verify form submission with function entries
-      await waitFor(() => {
-        expect(mockOnSubmit).toHaveBeenCalledWith({
-          functionEntries: expect.arrayContaining([
-            expect.objectContaining({
-              functionId: 'NOW',
-              functionName: 'NOW'
-            }),
-            expect.objectContaining({
-              functionId: 'UPPER',
-              functionName: 'UPPER'
-            })
-          ])
-        });
-      });
+  describe('Accordion and Table Display Modes', () => {
+    it('should toggle accordion expansion and maintain accessibility', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      const accordionButton = screen.getByRole('button', { expanded: false });
+      
+      // Test initial state
+      expect(accordionButton).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+      
+      // Expand accordion
+      await user.click(accordionButton);
+      
+      expect(screen.getByRole('button', { expanded: true })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('table')).toBeInTheDocument();
+      
+      // Collapse accordion
+      await user.click(screen.getByRole('button', { expanded: true }));
+      
+      expect(screen.getByRole('button', { expanded: false })).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
     });
 
-    test('validates function entries with form validation', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion',
-        required: true
-      };
-
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Try to submit empty form when required
-      await user.click(screen.getByTestId('submit-button'));
-
-      // Verify validation error
-      await waitFor(() => {
-        expect(screen.getByText(/at least one function entry is required/i)).toBeInTheDocument();
-      });
-    });
-
-    test('handles field array operations correctly', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper defaultValues={{ functionEntries: mockFunctionEntries }}>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Initial state: 2 entries
-      await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: /remove function/i })).toHaveLength(2);
-      });
-
-      // Add new entry
-      await user.click(screen.getByRole('button', { name: /add function/i }));
-
-      // Now should have 3 entries (2 existing + 1 new)
-      await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: /remove function/i })).toHaveLength(3);
-      });
-
-      // Remove one entry
-      const removeButtons = screen.getAllByRole('button', { name: /remove function/i });
-      await user.click(removeButtons[0]);
-
-      // Back to 2 entries
-      await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: /remove function/i })).toHaveLength(2);
-      });
-    });
-  });
-
-  describe('Accessibility Compliance', () => {
-    test('provides proper ARIA labels and descriptions', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion',
-        label: 'Function Configuration',
-        description: 'Configure database functions'
-      };
-
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Verify main form has proper labeling
-      const form = screen.getByRole('group', { name: /function configuration/i });
-      expect(form).toHaveAttribute('aria-describedby');
-
-      // Verify add button is properly labeled
-      const addButton = screen.getByRole('button', { name: /add function/i });
-      expect(addButton).toHaveAttribute('aria-label');
-    });
-
-    test('supports keyboard navigation', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper defaultValues={{ functionEntries: mockFunctionEntries }}>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Test keyboard navigation through entries
-      const addButton = screen.getByRole('button', { name: /add function/i });
-      addButton.focus();
-      expect(addButton).toHaveFocus();
-
-      // Navigate to first entry
-      await user.keyboard('{Tab}');
-      const firstEntry = screen.getAllByRole('button', { expanded: false })[0];
-      expect(firstEntry).toHaveFocus();
-
-      // Expand with keyboard
+    it('should support keyboard navigation for accordion toggle', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      const accordionButton = screen.getByRole('button', { expanded: false });
+      accordionButton.focus();
+      
+      // Test Enter key
       await user.keyboard('{Enter}');
-      expect(firstEntry).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('table')).toBeInTheDocument();
+      
+      // Test Space key
+      await user.keyboard(' ');
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
     });
 
-    test('announces changes to screen readers', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
+    it('should maintain proper focus management when switching modes', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      const accordionButton = screen.getByRole('button', { expanded: false });
+      
+      // Expand accordion
+      await user.click(accordionButton);
+      
+      // Focus should remain manageable within the expanded content
+      const addButton = screen.getByRole('button', { name: /add.*function/i });
+      addButton.focus();
+      expect(document.activeElement).toBe(addButton);
+      
+      // Collapse accordion
+      await user.click(screen.getByRole('button', { expanded: true }));
+      
+      // Focus should return to accordion button
+      expect(document.activeElement).toBe(screen.getByRole('button', { expanded: false }));
+    });
 
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
+    it('should display table directly when showAccordion is false', () => {
+      renderFunctionUseForm({ showAccordion: false });
+      
+      // Table should be visible immediately
+      expect(screen.getByRole('table')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { expanded: false })).not.toBeInTheDocument();
+    });
+  });
 
-      // Add function entry
-      await user.click(screen.getByRole('button', { name: /add function/i }));
+  // ============================================================================
+  // MSW INTEGRATION AND API MOCKING TESTS
+  // ============================================================================
 
-      // Verify live region announcement
+  describe('MSW Integration and API Mocking', () => {
+    it('should load function options from API', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      await addFunctionEntry(user);
+      
+      // Open use dropdown
+      const useSelect = screen.getByRole('combobox', { name: /use/i });
+      await user.click(useSelect);
+      
+      // Wait for options to load from API
       await waitFor(() => {
-        const liveRegion = screen.getByRole('status');
-        expect(liveRegion).toHaveTextContent(/function entry added/i);
+        expect(screen.getByRole('option', { name: /SELECT \(GET\)/i })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: /FILTER \(GET\)/i })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: /INSERT \(POST\)/i })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: /UPDATE \(PATCH\)/i })).toBeInTheDocument();
       });
     });
 
-    test('provides proper focus management', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper defaultValues={{ functionEntries: mockFunctionEntries }}>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
+    it('should handle API errors gracefully', async () => {
+      // Mock error response
+      server.use(
+        http.get('/api/v2/system/database/function-options', () => {
+          return HttpResponse.json({
+            error: 'Database connection failed',
+            success: false,
+          }, { status: 500 });
+        })
       );
 
-      // Focus should move to new entry after adding
-      await user.click(screen.getByRole('button', { name: /add function/i }));
-
+      const { user } = renderFunctionUseForm();
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      await addFunctionEntry(user);
+      
+      // Open use dropdown
+      const useSelect = screen.getByRole('combobox', { name: /use/i });
+      await user.click(useSelect);
+      
+      // Should show error state or fallback options
       await waitFor(() => {
-        const functionSelect = screen.getByRole('combobox', { name: /function/i });
-        expect(functionSelect).toHaveFocus();
+        expect(screen.getByText(/error loading options/i) || 
+               screen.getByText(/database connection failed/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should validate function names through API', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      await addFunctionEntry(user);
+      
+      // Enter invalid function name
+      await enterFunctionName(user, 0, 'invalid_function');
+      
+      // Function validation should occur (this would typically be on blur or submit)
+      const functionInput = screen.getByRole('textbox', { name: /function/i });
+      await user.click(document.body); // Trigger blur
+      
+      await waitFor(() => {
+        expect(screen.getByText(/function does not exist/i)).toBeInTheDocument();
       });
     });
   });
 
-  describe('Performance Validation', () => {
-    test('handles large number of function entries efficiently', async () => {
-      const largeFunctionEntries = Array.from({ length: 50 }, (_, i) => ({
-        id: `${i + 1}`,
-        functionId: 'NOW',
-        functionName: 'NOW',
-        parameters: {},
-        description: `Function entry ${i + 1}`,
-        isValid: true
-      }));
+  // ============================================================================
+  // ACCESSIBILITY COMPLIANCE TESTS (WCAG 2.1 AA)
+  // ============================================================================
 
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'table' // Table mode for better performance with many entries
+  describe('Accessibility Compliance (WCAG 2.1 AA)', () => {
+    it('should have proper ARIA labels and descriptions', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      // Expand accordion
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      expect(accessibilityUtils.hasAriaLabel(accordionToggle)).toBe(true);
+      
+      await user.click(accordionToggle);
+      
+      // Check form fields have proper labels
+      const useSelect = screen.getByRole('combobox', { name: /use/i });
+      const functionInput = screen.getByRole('textbox', { name: /function/i });
+      
+      expect(accessibilityUtils.hasAriaLabel(useSelect)).toBe(true);
+      expect(accessibilityUtils.hasAriaLabel(functionInput)).toBe(true);
+    });
+
+    it('should support keyboard navigation through all interactive elements', async () => {
+      const { user } = renderFunctionUseForm({}, { defaultValues: mockInitialFormData });
+      
+      // Expand accordion
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      
+      const container = screen.getByTestId('function-use-test-form');
+      const navigationResult = await accessibilityUtils.testKeyboardNavigation(container, user);
+      
+      expect(navigationResult.success).toBe(true);
+      expect(navigationResult.focusedElements.length).toBeGreaterThan(0);
+    });
+
+    it('should maintain proper focus order and focus indicators', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      await addFunctionEntry(user);
+      
+      // Test tab order
+      await user.keyboard('{Tab}');
+      expect(document.activeElement).toBe(screen.getByRole('combobox', { name: /use/i }));
+      
+      await user.keyboard('{Tab}');
+      expect(document.activeElement).toBe(screen.getByRole('textbox', { name: /function/i }));
+      
+      await user.keyboard('{Tab}');
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: /delete.*row/i }));
+    });
+
+    it('should provide appropriate error announcements for screen readers', async () => {
+      const { user } = renderFunctionUseForm({}, { mode: 'onChange' });
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      await addFunctionEntry(user);
+      
+      // Submit form to trigger validation error
+      const submitButton = screen.getByTestId('submit-button');
+      await user.click(submitButton);
+      
+      await waitFor(() => {
+        const errorMessage = screen.getByText(/use is required/i);
+        expect(errorMessage).toHaveAttribute('aria-live', 'polite');
+      });
+    });
+
+    it('should have adequate color contrast for all text elements', () => {
+      renderFunctionUseForm();
+      
+      const textElements = screen.getAllByText(/./);
+      textElements.forEach(element => {
+        if (element.tagName !== 'SCRIPT' && element.textContent?.trim()) {
+          expect(accessibilityUtils.hasAdequateContrast(element as HTMLElement)).toBe(true);
+        }
+      });
+    });
+  });
+
+  // ============================================================================
+  // INTEGRATION WITH PARENT FORM COMPONENTS TESTS
+  // ============================================================================
+
+  describe('Integration with Parent Form Components', () => {
+    it('should integrate seamlessly with React Hook Form', () => {
+      const TestParentForm = () => {
+        const methods = useForm<{ dbFunction: FunctionUseFormData['dbFunction'] }>({
+          defaultValues: { dbFunction: [] },
+        });
+
+        return (
+          <form onSubmit={methods.handleSubmit(() => {})}>
+            <FunctionUseForm name="dbFunction" showAccordion={false} />
+          </form>
+        );
+      };
+
+      renderWithForm(<TestParentForm />);
+      expect(screen.getByRole('table')).toBeInTheDocument();
+    });
+
+    it('should maintain form state when parent form re-renders', async () => {
+      let renderCount = 0;
+      const TestParentForm = () => {
+        renderCount++;
+        const methods = useForm<FunctionUseFormData>({
+          defaultValues: emptyFormData,
+        });
+
+        return (
+          <form onSubmit={methods.handleSubmit(() => {})}>
+            <div data-testid={`render-count-${renderCount}`}>Render: {renderCount}</div>
+            <FunctionUseForm name="dbFunction" showAccordion={false} />
+          </form>
+        );
+      };
+
+      const { user, rerender } = renderWithForm(<TestParentForm />);
+      
+      // Add entry and fill data
+      await addFunctionEntry(user);
+      await selectFunctionUses(user, 0, ['SELECT']);
+      await enterFunctionName(user, 0, 'test_function');
+      
+      // Force re-render
+      rerender(<TestParentForm />);
+      
+      // Data should be preserved
+      expect(screen.getByDisplayValue('test_function')).toBeInTheDocument();
+    });
+
+    it('should validate form data according to parent form schema', async () => {
+      const parentSchema = functionUseSchema.extend({
+        additionalField: z.string().min(1, 'Additional field is required'),
+      });
+
+      const TestParentForm = () => {
+        const methods = useForm({
+          resolver: zodResolver(parentSchema),
+          defaultValues: { dbFunction: [], additionalField: '' },
+        });
+
+        return (
+          <form onSubmit={methods.handleSubmit(() => {})}>
+            <input 
+              {...methods.register('additionalField')} 
+              placeholder="Additional field"
+              data-testid="additional-field"
+            />
+            <FunctionUseForm name="dbFunction" showAccordion={false} />
+            <button type="submit" data-testid="parent-submit">Submit</button>
+          </form>
+        );
+      };
+
+      const { user } = renderWithForm(<TestParentForm />);
+      
+      // Submit without filling required parent field
+      const submitButton = screen.getByTestId('parent-submit');
+      await user.click(submitButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/additional field is required/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // REACT QUERY CACHING TESTS
+  // ============================================================================
+
+  describe('React Query Caching Patterns', () => {
+    it('should cache function options data effectively', async () => {
+      const { user } = renderFunctionUseForm();
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      await addFunctionEntry(user);
+      
+      // Open dropdown first time - should fetch from API
+      const useSelect = screen.getByRole('combobox', { name: /use/i });
+      await user.click(useSelect);
+      
+      await waitFor(() => {
+        expect(screen.getByRole('option', { name: /SELECT \(GET\)/i })).toBeInTheDocument();
+      });
+      
+      // Close and reopen dropdown - should use cached data
+      await user.click(document.body);
+      await user.click(useSelect);
+      
+      // Options should appear immediately from cache
+      expect(screen.getByRole('option', { name: /SELECT \(GET\)/i })).toBeInTheDocument();
+    });
+
+    it('should handle cache invalidation properly', async () => {
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false, gcTime: 0 },
+          mutations: { retry: false },
+        },
+      });
+
+      const { user } = renderFunctionUseForm({}, { 
+        defaultValues: emptyFormData 
+      });
+      
+      // Invalidate cache
+      queryClient.invalidateQueries({ queryKey: ['function-options'] });
+      
+      // Expand accordion and add entry
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      await addFunctionEntry(user);
+      
+      // Should refetch data after cache invalidation
+      const useSelect = screen.getByRole('combobox', { name: /use/i });
+      await user.click(useSelect);
+      
+      await waitFor(() => {
+        expect(screen.getByRole('option', { name: /SELECT \(GET\)/i })).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // PERFORMANCE TESTS
+  // ============================================================================
+
+  describe('Performance Optimization', () => {
+    it('should render large numbers of function entries efficiently', async () => {
+      const largeMockData: FunctionUseFormData = {
+        dbFunction: Array.from({ length: 50 }, (_, i) => ({
+          use: ['SELECT'],
+          function: `function_${i}`,
+        })),
       };
 
       const startTime = performance.now();
-
-      render(
-        <TestWrapper defaultValues={{ functionEntries: largeFunctionEntries }}>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Wait for rendering to complete
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
+      renderFunctionUseForm({}, { defaultValues: largeMockData });
       const endTime = performance.now();
+      
       const renderTime = endTime - startTime;
-
-      // Verify render time is under performance threshold (100ms)
-      expect(renderTime).toBeLessThan(100);
-
-      // Verify all entries are rendered
-      const rows = screen.getAllByRole('row');
-      expect(rows).toHaveLength(51); // Header + 50 data rows
+      
+      // Should render efficiently even with many entries
+      expect(renderTime).toBeLessThan(500); // 500ms threshold
+      expect(screen.getByDisplayValue('function_0')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('function_49')).toBeInTheDocument();
     });
 
-    test('debounces parameter input changes', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Add function with parameters
-      await user.click(screen.getByRole('button', { name: /add function/i }));
+    it('should handle rapid user interactions without performance degradation', async () => {
+      const { user } = renderFunctionUseForm();
       
-      const functionSelect = screen.getByRole('combobox', { name: /function/i });
-      await user.click(functionSelect);
-      await user.click(await screen.findByText('UPPER'));
-
-      // Type in parameter field rapidly
-      const parameterInput = await screen.findByLabelText(/str parameter/i);
+      // Expand accordion
+      const accordionToggle = screen.getByRole('button', { expanded: false });
+      await user.click(accordionToggle);
+      
       const startTime = performance.now();
       
-      await user.type(parameterInput, 'rapid_typing_test');
+      // Rapidly add and remove entries
+      for (let i = 0; i < 10; i++) {
+        await addFunctionEntry(user);
+      }
+      
+      for (let i = 0; i < 5; i++) {
+        await removeFunctionEntry(user, 0);
+      }
       
       const endTime = performance.now();
-      const inputTime = endTime - startTime;
-
-      // Verify interaction is responsive (under 100ms for each character)
-      expect(inputTime / 'rapid_typing_test'.length).toBeLessThan(10);
-    });
-  });
-
-  describe('Error Handling', () => {
-    test('handles API errors gracefully', async () => {
-      // Mock API error
-      server.use(
-        http.get('/api/v2/system/database/:serviceId/functions', () => {
-          return HttpResponse.json(
-            { error: { message: 'Service not found', code: 404 } },
-            { status: 404 }
-          );
-        })
-      );
-
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'invalid-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Verify error message is displayed
-      await waitFor(() => {
-        expect(screen.getByText(/failed to load function options/i)).toBeInTheDocument();
-      });
-
-      // Verify retry button is available
-      expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
-    });
-
-    test('handles network connectivity issues', async () => {
-      // Mock network error
-      server.use(
-        http.get('/api/v2/system/database/:serviceId/functions', () => {
-          return HttpResponse.error();
-        })
-      );
-
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Verify network error handling
-      await waitFor(() => {
-        expect(screen.getByText(/network error/i)).toBeInTheDocument();
-      });
-    });
-
-    test('validates function parameter types', async () => {
-      const props: FunctionUseFormProps = {
-        name: 'functionEntries',
-        serviceId: 'test-mysql-service',
-        displayMode: 'accordion'
-      };
-
-      render(
-        <TestWrapper>
-          <FunctionUseForm {...props} />
-        </TestWrapper>
-      );
-
-      // Add function with numeric parameter
-      await user.click(screen.getByRole('button', { name: /add function/i }));
+      const interactionTime = endTime - startTime;
       
-      const functionSelect = screen.getByRole('combobox', { name: /function/i });
-      await user.click(functionSelect);
-      await user.click(await screen.findByText('SUM'));
-
-      // Enter invalid value for numeric parameter
-      const parameterInput = await screen.findByLabelText(/value parameter/i);
-      await user.type(parameterInput, 'not_a_number');
-
-      // Trigger validation
-      await user.tab();
-
-      // Verify validation error
-      await waitFor(() => {
-        expect(screen.getByText(/must be a valid number/i)).toBeInTheDocument();
-      });
+      // Should handle rapid interactions efficiently
+      expect(interactionTime).toBeLessThan(2000); // 2 second threshold
+      
+      // Should have 5 entries remaining
+      const table = screen.getByRole('table');
+      const rows = within(table).getAllByRole('row');
+      expect(rows).toHaveLength(6); // header + 5 data rows
     });
   });
 });
