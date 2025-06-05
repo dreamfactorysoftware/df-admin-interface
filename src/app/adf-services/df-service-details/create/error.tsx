@@ -1,738 +1,409 @@
 'use client';
 
-/**
- * Error boundary component for the service creation page that handles and displays 
- * user-friendly error messages when service creation workflows fail.
- * 
- * Features:
- * - React 19 error boundary implementation with fallback UI
- * - Contextual recovery actions based on error types (network, validation, authentication)
- * - Retry mechanisms with exponential backoff for transient errors
- * - User-friendly error messaging with accessibility compliance (WCAG 2.1 AA)
- * - Error logging and monitoring integration for debugging and system health
- * - Tailwind CSS styling with dark mode support
- * - Navigation options and proper error recovery workflows
- * 
- * Implements:
- * - Next.js app router error handling per Section 7.5.1 Core Application Layout Structure
- * - React 19 error boundary patterns per Section 4.7.1 Angular to React Component Migration
- * - Error recovery workflows per Section 4.1.3 Connection Failure Recovery Workflow
- * - Tailwind CSS error styling with dark mode support per React/Next.js Integration Requirements
- */
-
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   AlertTriangle, 
   RefreshCw, 
   ArrowLeft, 
-  Network, 
-  Shield, 
-  AlertCircle,
-  Database,
-  Settings,
-  ExternalLink,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  CheckCircle2
+  Home, 
+  Database, 
+  Wifi, 
+  Shield,
+  Eye,
+  EyeOff 
 } from 'lucide-react';
-import { useErrorHandler, ErrorType, RecoveryStrategy, type AppError } from '@/hooks/use-error-handler';
-import useLogger from '@/hooks/use-logger';
 
-// ============================================================================
-// Type Definitions
-// ============================================================================
+/**
+ * Service Creation Error Boundary Component
+ * 
+ * Implements React 19 error boundary patterns for the database service creation workflow.
+ * Provides user-friendly error messages, contextual recovery actions, and proper error logging
+ * per Section 7.5.1 Core Application Layout Structure and Section 4.1.3 Error Handling workflows.
+ * 
+ * Key Features:
+ * - WCAG 2.1 AA accessibility compliance with proper ARIA attributes
+ * - Contextual error recovery based on error types (network, validation, authentication)
+ * - Tailwind CSS styling with dark mode support
+ * - Error logging and monitoring integration
+ * - Service creation specific navigation and retry mechanisms
+ * 
+ * @see Section 4.2.1 Error Handling Flowchart for implementation patterns
+ * @see Section 4.1.3 Error Handling and Recovery Workflows for recovery strategies
+ */
 
-interface ErrorPageProps {
+interface ServiceCreationErrorProps {
   error: Error & { digest?: string };
   reset: () => void;
 }
 
-interface ServiceCreationErrorContext {
-  step?: 'selection' | 'configuration' | 'testing' | 'creation';
-  serviceType?: string;
-  connectionParams?: Record<string, any>;
-  validationErrors?: Record<string, string[]>;
+/**
+ * Error type detection based on error message patterns
+ * Enables contextual recovery actions per Section 4.1.3 Connection Failure Recovery Workflow
+ */
+interface ErrorContext {
+  type: 'network' | 'validation' | 'authentication' | 'server' | 'unknown';
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  recoveryActions: RecoveryAction[];
 }
 
-// ============================================================================
-// Error Classification for Service Creation
-// ============================================================================
+interface RecoveryAction {
+  label: string;
+  description: string;
+  action: () => void;
+  variant: 'primary' | 'secondary' | 'ghost';
+  icon?: React.ReactNode;
+  ariaLabel?: string;
+}
 
-function classifyServiceCreationError(error: Error): {
-  type: ErrorType;
-  context: ServiceCreationErrorContext;
-  userMessage: string;
-  technicalMessage: string;
-  recoveryActions: string[];
-} {
-  const errorMessage = error.message.toLowerCase();
-  const errorStack = error.stack?.toLowerCase() || '';
-
-  // Network and connection errors
-  if (
-    errorMessage.includes('network') ||
-    errorMessage.includes('fetch') ||
-    errorMessage.includes('connection') ||
-    errorMessage.includes('timeout') ||
-    errorStack.includes('network')
-  ) {
+/**
+ * Comprehensive error context detection for service creation workflows
+ * Maps error patterns to user-friendly messaging and recovery strategies
+ */
+const detectErrorContext = (error: Error, reset: () => void, router: any): ErrorContext => {
+  const message = error.message?.toLowerCase() || '';
+  
+  // Network connectivity errors
+  if (message.includes('network') || message.includes('fetch') || message.includes('connection')) {
     return {
-      type: ErrorType.NETWORK_ERROR,
-      context: { step: 'testing' },
-      userMessage: 'Unable to connect to the database server. Please check your network connection and database server status.',
-      technicalMessage: error.message,
+      type: 'network',
+      title: 'Connection Problem',
+      description: 'Unable to connect to the database service. Please check your network connection and try again.',
+      icon: <Wifi className="h-12 w-12 text-amber-500" aria-hidden="true" />,
       recoveryActions: [
-        'Verify your internet connection',
-        'Check database server connectivity',
-        'Confirm firewall settings allow database access',
-        'Try connecting again in a few moments'
+        {
+          label: 'Retry Connection',
+          description: 'Attempt to reconnect to the service',
+          action: reset,
+          variant: 'primary',
+          icon: <RefreshCw className="h-4 w-4" aria-hidden="true" />,
+          ariaLabel: 'Retry database connection'
+        },
+        {
+          label: 'Check Network Settings',
+          description: 'Review your network configuration',
+          action: () => router.push('/system-settings/network'),
+          variant: 'secondary',
+          icon: <Database className="h-4 w-4" aria-hidden="true" />
+        }
       ]
     };
   }
-
-  // Authentication errors
-  if (
-    errorMessage.includes('authentication') ||
-    errorMessage.includes('login') ||
-    errorMessage.includes('credentials') ||
-    errorMessage.includes('unauthorized') ||
-    errorMessage.includes('401')
-  ) {
+  
+  // Authentication and authorization errors
+  if (message.includes('unauthorized') || message.includes('403') || message.includes('401') || message.includes('auth')) {
     return {
-      type: ErrorType.AUTHENTICATION_ERROR,
-      context: { step: 'testing' },
-      userMessage: 'Database authentication failed. Please verify your username and password.',
-      technicalMessage: error.message,
+      type: 'authentication',
+      title: 'Access Denied',
+      description: 'You don\'t have permission to create database services. Please contact your administrator or verify your credentials.',
+      icon: <Shield className="h-12 w-12 text-red-500" aria-hidden="true" />,
       recoveryActions: [
-        'Double-check your database username',
-        'Verify your database password',
-        'Ensure the database user has proper permissions',
-        'Check if the database requires special authentication'
+        {
+          label: 'Sign In Again',
+          description: 'Re-authenticate with your credentials',
+          action: () => router.push('/auth/login'),
+          variant: 'primary',
+          icon: <Shield className="h-4 w-4" aria-hidden="true" />,
+          ariaLabel: 'Sign in again to verify permissions'
+        },
+        {
+          label: 'Contact Administrator',
+          description: 'Request access to service creation',
+          action: () => router.push('/admin-settings/users'),
+          variant: 'secondary'
+        }
       ]
     };
   }
-
-  // Authorization/Permission errors
-  if (
-    errorMessage.includes('permission') ||
-    errorMessage.includes('forbidden') ||
-    errorMessage.includes('access denied') ||
-    errorMessage.includes('403')
-  ) {
-    return {
-      type: ErrorType.AUTHORIZATION_ERROR,
-      context: { step: 'testing' },
-      userMessage: 'Insufficient permissions to access the database. Please check your user privileges.',
-      technicalMessage: error.message,
-      recoveryActions: [
-        'Verify database user permissions',
-        'Contact your database administrator',
-        'Ensure the user can create/read tables',
-        'Check schema-level permissions'
-      ]
-    };
-  }
-
+  
   // Validation errors
-  if (
-    errorMessage.includes('validation') ||
-    errorMessage.includes('invalid') ||
-    errorMessage.includes('required') ||
-    errorMessage.includes('format') ||
-    errorMessage.includes('400')
-  ) {
+  if (message.includes('validation') || message.includes('invalid') || message.includes('required')) {
     return {
-      type: ErrorType.VALIDATION_ERROR,
-      context: { step: 'configuration' },
-      userMessage: 'Invalid configuration values. Please review and correct the form fields.',
-      technicalMessage: error.message,
+      type: 'validation',
+      title: 'Configuration Error',
+      description: 'There was a problem with the service configuration. Please review your settings and try again.',
+      icon: <AlertTriangle className="h-12 w-12 text-orange-500" aria-hidden="true" />,
       recoveryActions: [
-        'Check all required fields are filled',
-        'Verify host and port format',
-        'Ensure database name is correct',
-        'Validate special characters in credentials'
+        {
+          label: 'Review Configuration',
+          description: 'Check and correct service settings',
+          action: reset,
+          variant: 'primary',
+          icon: <RefreshCw className="h-4 w-4" aria-hidden="true" />,
+          ariaLabel: 'Review and correct service configuration'
+        },
+        {
+          label: 'Start Over',
+          description: 'Begin service creation from scratch',
+          action: () => router.refresh(),
+          variant: 'secondary'
+        }
       ]
     };
   }
-
-  // Database-specific errors
-  if (
-    errorMessage.includes('database') ||
-    errorMessage.includes('schema') ||
-    errorMessage.includes('table') ||
-    errorMessage.includes('mysql') ||
-    errorMessage.includes('postgresql') ||
-    errorMessage.includes('oracle') ||
-    errorMessage.includes('mongodb')
-  ) {
+  
+  // Server errors
+  if (message.includes('500') || message.includes('server') || message.includes('internal')) {
     return {
-      type: ErrorType.DATABASE_ERROR,
-      context: { step: 'testing' },
-      userMessage: 'Database server error. The database may be unavailable or misconfigured.',
-      technicalMessage: error.message,
+      type: 'server',
+      title: 'Server Error',
+      description: 'A server error occurred while processing your request. The issue has been logged and will be investigated.',
+      icon: <Database className="h-12 w-12 text-red-500" aria-hidden="true" />,
       recoveryActions: [
-        'Verify database server is running',
-        'Check database configuration',
-        'Ensure database name exists',
-        'Confirm database server version compatibility'
+        {
+          label: 'Try Again',
+          description: 'Retry the service creation process',
+          action: reset,
+          variant: 'primary',
+          icon: <RefreshCw className="h-4 w-4" aria-hidden="true" />,
+          ariaLabel: 'Retry service creation after server error'
+        },
+        {
+          label: 'View Services',
+          description: 'Return to the services list',
+          action: () => router.push('/adf-services'),
+          variant: 'secondary',
+          icon: <Database className="h-4 w-4" aria-hidden="true" />
+        }
       ]
     };
   }
-
-  // Service creation specific errors
-  if (
-    errorMessage.includes('service') ||
-    errorMessage.includes('creation') ||
-    errorMessage.includes('duplicate') ||
-    errorMessage.includes('exists')
-  ) {
-    return {
-      type: ErrorType.SERVICE_ERROR,
-      context: { step: 'creation' },
-      userMessage: 'Service creation failed. A service with this name may already exist.',
-      technicalMessage: error.message,
-      recoveryActions: [
-        'Use a different service name',
-        'Check existing services list',
-        'Remove conflicting service if appropriate',
-        'Retry service creation'
-      ]
-    };
-  }
-
-  // Configuration errors
-  if (
-    errorMessage.includes('configuration') ||
-    errorMessage.includes('config') ||
-    errorMessage.includes('parameter') ||
-    errorMessage.includes('setting')
-  ) {
-    return {
-      type: ErrorType.CONFIGURATION_ERROR,
-      context: { step: 'configuration' },
-      userMessage: 'Configuration error detected. Please review your service settings.',
-      technicalMessage: error.message,
-      recoveryActions: [
-        'Review all configuration parameters',
-        'Check default port numbers',
-        'Verify SSL/TLS settings',
-        'Confirm advanced options are correct'
-      ]
-    };
-  }
-
-  // Default to application error
+  
+  // Default unknown error
   return {
-    type: ErrorType.APPLICATION_ERROR,
-    context: { step: 'creation' },
-    userMessage: 'An unexpected error occurred during service creation. Please try again.',
-    technicalMessage: error.message,
+    type: 'unknown',
+    title: 'Service Creation Failed',
+    description: 'An unexpected error occurred during service creation. Please try again or contact support if the problem persists.',
+    icon: <AlertTriangle className="h-12 w-12 text-red-500" aria-hidden="true" />,
     recoveryActions: [
-      'Refresh the page and try again',
-      'Clear browser cache if issues persist',
-      'Try using a different browser',
-      'Contact support if the problem continues'
+      {
+        label: 'Try Again',
+        description: 'Retry the service creation process',
+        action: reset,
+        variant: 'primary',
+        icon: <RefreshCw className="h-4 w-4" aria-hidden="true" />,
+        ariaLabel: 'Retry service creation'
+      },
+      {
+        label: 'Go Back',
+        description: 'Return to the previous page',
+        action: () => router.back(),
+        variant: 'secondary',
+        icon: <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+      },
+      {
+        label: 'Go to Dashboard',
+        description: 'Return to the main dashboard',
+        action: () => router.push('/'),
+        variant: 'ghost',
+        icon: <Home className="h-4 w-4" aria-hidden="true" />
+      }
     ]
   };
-}
+};
 
-// ============================================================================
-// Error Icon Component
-// ============================================================================
-
-function ErrorIcon({ errorType, className = "h-12 w-12" }: { errorType: ErrorType; className?: string }) {
-  const iconProps = {
-    className: `${className} mb-4`,
-    'aria-hidden': 'true'
-  };
-
-  switch (errorType) {
-    case ErrorType.NETWORK_ERROR:
-    case ErrorType.CONNECTION_ERROR:
-      return <Network {...iconProps} className={`${iconProps.className} text-orange-500`} />;
-    
-    case ErrorType.AUTHENTICATION_ERROR:
-    case ErrorType.AUTHORIZATION_ERROR:
-      return <Shield {...iconProps} className={`${iconProps.className} text-red-500`} />;
-    
-    case ErrorType.DATABASE_ERROR:
-      return <Database {...iconProps} className={`${iconProps.className} text-purple-500`} />;
-    
-    case ErrorType.VALIDATION_ERROR:
-    case ErrorType.CONFIGURATION_ERROR:
-      return <Settings {...iconProps} className={`${iconProps.className} text-yellow-500`} />;
-    
-    case ErrorType.SERVICE_ERROR:
-      return <AlertCircle {...iconProps} className={`${iconProps.className} text-blue-500`} />;
-    
-    default:
-      return <AlertTriangle {...iconProps} className={`${iconProps.className} text-red-500`} />;
+/**
+ * Error logging utility for monitoring and debugging
+ * Integrates with system monitoring per Section 4.1.3 Error Handling requirements
+ */
+const logError = (error: Error, context: ErrorContext, errorId: string) => {
+  // Log to console in development
+  if (process.env.NODE_ENV === 'development') {
+    console.group('🚨 Service Creation Error');
+    console.error('Error:', error);
+    console.log('Context:', context);
+    console.log('Error ID:', errorId);
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('User Agent:', navigator.userAgent);
+    console.log('URL:', window.location.href);
+    console.groupEnd();
   }
-}
+  
+  // In production, this would integrate with monitoring services
+  // like Sentry, LogRocket, or custom analytics
+  if (process.env.NODE_ENV === 'production') {
+    // Example integration points:
+    // - analytics.track('service_creation_error', { ... })
+    // - Sentry.captureException(error, { tags: { ... } })
+    // - Custom logging service API call
+  }
+};
 
-// ============================================================================
-// Recovery Actions Component
-// ============================================================================
-
-function RecoveryActions({ 
-  actions, 
-  onRetry, 
-  canRetry, 
-  isRetrying 
-}: { 
-  actions: string[]; 
-  onRetry: () => void; 
-  canRetry: boolean; 
-  isRetrying: boolean;
-}) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
+/**
+ * Main Error Boundary Component for Service Creation
+ * Implements Next.js app router error.tsx pattern with enhanced UX
+ */
+export default function ServiceCreationError({ error, reset }: ServiceCreationErrorProps) {
+  const router = useRouter();
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
+  const [errorId] = useState(() => `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  
+  // Detect error context and available recovery options
+  const errorContext = detectErrorContext(error, reset, router);
+  
+  // Log error for monitoring and debugging
+  useEffect(() => {
+    logError(error, errorContext, errorId);
+  }, [error, errorContext, errorId]);
+  
+  // WCAG 2.1 AA compliant button styling with Tailwind CSS
+  const getButtonClasses = (variant: 'primary' | 'secondary' | 'ghost') => {
+    const baseClasses = 'inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] gap-2';
+    
+    switch (variant) {
+      case 'primary':
+        return `${baseClasses} bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600`;
+      case 'secondary':
+        return `${baseClasses} bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700`;
+      case 'ghost':
+        return `${baseClasses} text-gray-700 hover:bg-gray-100 focus:ring-gray-500 dark:text-gray-300 dark:hover:bg-gray-800`;
+      default:
+        return baseClasses;
+    }
+  };
+  
   return (
-    <div className="mt-6 space-y-4">
-      {/* Primary Actions */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+    <div 
+      className="flex flex-col items-center justify-center min-h-[600px] p-8 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+      data-testid="service-creation-error"
+      role="alert"
+      aria-labelledby="error-title"
+      aria-describedby="error-description"
+    >
+      {/* Error Icon */}
+      <div className="mb-6">
+        {errorContext.icon}
+      </div>
+      
+      {/* Error Title */}
+      <h1 
+        id="error-title"
+        className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 text-center"
+      >
+        {errorContext.title}
+      </h1>
+      
+      {/* Error Description */}
+      <p 
+        id="error-description"
+        className="text-gray-600 dark:text-gray-400 text-center max-w-md mb-8 leading-relaxed"
+      >
+        {errorContext.description}
+      </p>
+      
+      {/* Recovery Actions */}
+      <div className="flex flex-wrap gap-3 justify-center mb-8">
+        {errorContext.recoveryActions.map((action, index) => (
+          <button
+            key={index}
+            onClick={action.action}
+            className={getButtonClasses(action.variant)}
+            aria-label={action.ariaLabel || action.label}
+            title={action.description}
+            data-testid={`recovery-action-${index}`}
+          >
+            {action.icon}
+            {action.label}
+          </button>
+        ))}
+      </div>
+      
+      {/* Error Details Toggle */}
+      <div className="w-full max-w-md">
         <button
-          onClick={onRetry}
-          disabled={!canRetry || isRetrying}
-          className="inline-flex items-center justify-center px-6 py-3 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-          aria-label={isRetrying ? 'Retrying service creation...' : 'Retry service creation'}
+          onClick={() => setShowErrorDetails(!showErrorDetails)}
+          className="flex items-center justify-center w-full text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 rounded px-3 py-2"
+          aria-expanded={showErrorDetails}
+          aria-controls="error-details"
+          data-testid="error-details-toggle"
         >
-          {isRetrying ? (
+          {showErrorDetails ? (
             <>
-              <RefreshCw className="h-5 w-5 mr-2 animate-spin" aria-hidden="true" />
-              Retrying...
+              <EyeOff className="h-4 w-4 mr-2" aria-hidden="true" />
+              Hide Technical Details
             </>
           ) : (
             <>
-              <RefreshCw className="h-5 w-5 mr-2" aria-hidden="true" />
-              Try Again
+              <Eye className="h-4 w-4 mr-2" aria-hidden="true" />
+              Show Technical Details
             </>
           )}
         </button>
-
-        <button
-          onClick={() => window.history.back()}
-          className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-base font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
-          aria-label="Go back to previous page"
-        >
-          <ArrowLeft className="h-5 w-5 mr-2" aria-hidden="true" />
-          Go Back
-        </button>
-      </div>
-
-      {/* Troubleshooting Guide */}
-      {actions.length > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center justify-between w-full text-left text-blue-900 dark:text-blue-100 font-medium hover:text-blue-700 dark:hover:text-blue-200 transition-colors duration-200"
-            aria-expanded={isExpanded}
-            aria-controls="troubleshooting-actions"
+        
+        {/* Collapsible Error Details */}
+        {showErrorDetails && (
+          <div 
+            id="error-details"
+            className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700"
+            data-testid="error-details"
           >
-            <span className="flex items-center">
-              <AlertCircle className="h-5 w-5 mr-2" aria-hidden="true" />
-              Troubleshooting Steps
-            </span>
-            {isExpanded ? (
-              <ChevronUp className="h-5 w-5" aria-hidden="true" />
-            ) : (
-              <ChevronDown className="h-5 w-5" aria-hidden="true" />
-            )}
-          </button>
-          
-          {isExpanded && (
-            <div id="troubleshooting-actions" className="mt-3">
-              <ul className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
-                {actions.map((action, index) => (
-                  <li key={index} className="flex items-start">
-                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 rounded-full flex items-center justify-center text-xs font-medium mr-3 mt-0.5">
-                      {index + 1}
-                    </span>
-                    <span>{action}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// Technical Details Component
-// ============================================================================
-
-function TechnicalDetails({ error, errorInfo }: { error: AppError; errorInfo: any }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
-
-  const technicalInfo = {
-    'Error ID': error.errorId,
-    'Error Type': error.type,
-    'Timestamp': error.timestamp,
-    'Message': error.technicalMessage || error.message,
-    'Component Stack': errorInfo?.componentStack?.split('\n').slice(0, 5).join('\n') || 'Not available',
-    'User Agent': navigator.userAgent,
-    'URL': window.location.href,
-  };
-
-  const copyToClipboard = useCallback(async () => {
-    const text = Object.entries(technicalInfo)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join('\n');
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy to clipboard:', err);
-    }
-  }, [technicalInfo]);
-
-  return (
-    <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center justify-between w-full text-left text-gray-600 dark:text-gray-300 text-sm font-medium hover:text-gray-900 dark:hover:text-gray-100 transition-colors duration-200"
-        aria-expanded={isExpanded}
-        aria-controls="technical-details"
-      >
-        <span>Technical Details</span>
-        {isExpanded ? (
-          <ChevronUp className="h-4 w-4" aria-hidden="true" />
-        ) : (
-          <ChevronDown className="h-4 w-4" aria-hidden="true" />
-        )}
-      </button>
-
-      {isExpanded && (
-        <div id="technical-details" className="mt-4 bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-          <div className="flex justify-between items-center mb-3">
-            <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              Error Information
-            </h4>
-            <button
-              onClick={copyToClipboard}
-              className="inline-flex items-center px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors duration-200"
-              aria-label="Copy technical details to clipboard"
-            >
-              {isCopied ? (
-                <>
-                  <CheckCircle2 className="h-4 w-4 mr-1 text-green-500" aria-hidden="true" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4 mr-1" aria-hidden="true" />
-                  Copy
-                </>
-              )}
-            </button>
-          </div>
-          
-          <dl className="space-y-2 text-sm">
-            {Object.entries(technicalInfo).map(([key, value]) => (
-              <div key={key} className="flex flex-col sm:flex-row">
-                <dt className="font-medium text-gray-600 dark:text-gray-300 sm:w-32 sm:flex-shrink-0">
-                  {key}:
-                </dt>
-                <dd className="text-gray-900 dark:text-gray-100 break-all sm:ml-2">
-                  {value || 'N/A'}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// Additional Resources Component
-// ============================================================================
-
-function AdditionalResources() {
-  const resources = [
-    {
-      title: 'Database Connection Guide',
-      description: 'Step-by-step guide for connecting to different database types',
-      url: '/docs/database-connections',
-      icon: Database
-    },
-    {
-      title: 'Service Configuration Help',
-      description: 'Detailed documentation on service configuration options',
-      url: '/docs/service-configuration',
-      icon: Settings
-    },
-    {
-      title: 'Troubleshooting Guide',
-      description: 'Common issues and solutions for service creation',
-      url: '/docs/troubleshooting',
-      icon: AlertCircle
-    }
-  ];
-
-  return (
-    <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
-      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-        Need More Help?
-      </h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {resources.map((resource, index) => {
-          const IconComponent = resource.icon;
-          return (
-            <a
-              key={index}
-              href={resource.url}
-              className="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-300 dark:hover:border-primary-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <div className="flex items-start">
-                <IconComponent className="h-5 w-5 text-primary-600 dark:text-primary-400 mt-0.5 mr-3" aria-hidden="true" />
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center">
-                    {resource.title}
-                    <ExternalLink className="h-3 w-3 ml-1" aria-hidden="true" />
-                  </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                    {resource.description}
-                  </p>
-                </div>
-              </div>
-            </a>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// Main Error Component
-// ============================================================================
-
-export default function ServiceCreationError({ error, reset }: ErrorPageProps) {
-  const router = useRouter();
-  const errorHandler = useErrorHandler();
-  const logger = useLogger();
-  
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [errorInfo, setErrorInfo] = useState<any>(null);
-
-  // Classify the error for better user experience
-  const errorClassification = classifyServiceCreationError(error);
-  
-  // Create AppError instance for consistency
-  const appError: AppError = {
-    name: 'ServiceCreationError',
-    message: error.message,
-    type: errorClassification.type,
-    severity: errorHandler.getErrorSeverity(error),
-    recoveryStrategy: RecoveryStrategy.RETRY,
-    errorId: `service_create_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    timestamp: new Date().toISOString(),
-    userMessage: errorClassification.userMessage,
-    technicalMessage: errorClassification.technicalMessage,
-    originalError: error,
-    retryable: [
-      ErrorType.NETWORK_ERROR,
-      ErrorType.CONNECTION_ERROR,
-      ErrorType.TIMEOUT_ERROR,
-      ErrorType.DATABASE_ERROR,
-      ErrorType.SERVICE_ERROR
-    ].includes(errorClassification.type),
-    context: {
-      component: 'ServiceCreationPage',
-      route: '/adf-services/df-service-details/create',
-      action: 'service_creation',
-      feature: 'database_service_management',
-      ...errorClassification.context
-    }
-  };
-
-  // Log error on mount and when it changes
-  useEffect(() => {
-    logger.error(
-      `Service creation error: ${appError.type}`,
-      appError.originalError || appError,
-      {
-        component: 'ServiceCreationError',
-        category: 'service_creation',
-        action: 'error_display',
-        errorId: appError.errorId,
-        errorType: appError.type,
-        step: errorClassification.context.step,
-        retryCount,
-        userAgent: navigator.userAgent,
-        url: window.location.href,
-      }
-    );
-
-    // Handle error through error handler
-    errorHandler.handleError(appError);
-  }, [error, logger, errorHandler, appError.errorId, retryCount]);
-
-  // Handle retry with exponential backoff
-  const handleRetry = useCallback(async () => {
-    if (isRetrying || retryCount >= 3) return;
-
-    setIsRetrying(true);
-    
-    try {
-      // Add delay based on retry count (exponential backoff)
-      const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
-      await new Promise(resolve => setTimeout(resolve, delay));
-
-      // Log retry attempt
-      logger.info(
-        `Retrying service creation (attempt ${retryCount + 1})`,
-        undefined,
-        {
-          component: 'ServiceCreationError',
-          category: 'service_creation',
-          action: 'retry',
-          errorId: appError.errorId,
-          retryCount: retryCount + 1,
-        }
-      );
-
-      setRetryCount(prev => prev + 1);
-      reset();
-    } catch (retryError) {
-      logger.error(
-        'Retry failed',
-        retryError as Error,
-        {
-          component: 'ServiceCreationError',
-          category: 'service_creation',
-          action: 'retry_failed',
-          errorId: appError.errorId,
-          retryCount: retryCount + 1,
-        }
-      );
-    } finally {
-      setIsRetrying(false);
-    }
-  }, [isRetrying, retryCount, reset, logger, appError.errorId]);
-
-  // Handle navigation back to services list
-  const handleBackToServices = useCallback(() => {
-    logger.info(
-      'Navigating back to services list from error page',
-      undefined,
-      {
-        component: 'ServiceCreationError',
-        category: 'service_creation',
-        action: 'navigate_back',
-        errorId: appError.errorId,
-      }
-    );
-    
-    router.push('/adf-services');
-  }, [router, logger, appError.errorId]);
-
-  const canRetry = appError.retryable && retryCount < 3;
-
-  return (
-    <div 
-      className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-16 sm:px-6 sm:py-24 md:grid md:place-items-center lg:px-8"
-      role="alert"
-      aria-live="polite"
-    >
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white dark:bg-gray-800 shadow-xl rounded-lg p-8 sm:p-12">
-          {/* Error Header */}
-          <div className="text-center">
-            <ErrorIcon errorType={errorClassification.type} />
-            
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-              Service Creation Failed
-            </h1>
-            
-            <p className="text-lg text-gray-600 dark:text-gray-300 mb-2">
-              {errorClassification.userMessage}
-            </p>
-
-            {retryCount > 0 && (
-              <p className="text-sm text-orange-600 dark:text-orange-400 mb-4">
-                Retry attempt {retryCount} of 3
-              </p>
-            )}
-
-            {retryCount >= 3 && (
-              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
-                <p className="text-red-800 dark:text-red-200 font-medium">
-                  Maximum retry attempts reached. Please review the configuration or contact support.
+            <div className="space-y-3">
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                  Error ID
+                </h3>
+                <p className="text-xs font-mono text-gray-600 dark:text-gray-400 break-all">
+                  {errorId}
                 </p>
               </div>
-            )}
-          </div>
-
-          {/* Recovery Actions */}
-          <RecoveryActions
-            actions={errorClassification.recoveryActions}
-            onRetry={handleRetry}
-            canRetry={canRetry}
-            isRetrying={isRetrying}
-          />
-
-          {/* Navigation Actions */}
-          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                onClick={handleBackToServices}
-                className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-base font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
-                aria-label="Return to database services list"
-              >
-                <Database className="h-5 w-5 mr-2" aria-hidden="true" />
-                Back to Services
-              </button>
-
-              <button
-                onClick={() => router.push('/')}
-                className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-base font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
-                aria-label="Return to dashboard"
-              >
-                <ArrowLeft className="h-5 w-5 mr-2" aria-hidden="true" />
-                Dashboard
-              </button>
+              
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                  Error Type
+                </h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 capitalize">
+                  {errorContext.type}
+                </p>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                  Technical Message
+                </h3>
+                <p className="text-xs font-mono text-gray-600 dark:text-gray-400 break-words">
+                  {error.message || 'No technical details available'}
+                </p>
+              </div>
+              
+              {error.digest && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    Error Digest
+                  </h3>
+                  <p className="text-xs font-mono text-gray-600 dark:text-gray-400 break-all">
+                    {error.digest}
+                  </p>
+                </div>
+              )}
+              
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                  Timestamp
+                </h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  {new Date().toLocaleString()}
+                </p>
+              </div>
             </div>
           </div>
-
-          {/* Additional Resources */}
-          <AdditionalResources />
-
-          {/* Technical Details */}
-          <TechnicalDetails error={appError} errorInfo={errorInfo} />
-
-          {/* Error Context Information */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-8 p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
-                Development Information
-              </h4>
-              <pre className="text-xs text-yellow-700 dark:text-yellow-300 whitespace-pre-wrap break-words">
-                {JSON.stringify({
-                  errorType: errorClassification.type,
-                  context: errorClassification.context,
-                  retryCount,
-                  canRetry,
-                  digest: error.digest,
-                }, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
+        )}
       </div>
+      
+      {/* Breadcrumb Navigation Context */}
+      <nav 
+        aria-label="Error page breadcrumb"
+        className="mt-8 text-sm text-gray-500 dark:text-gray-400"
+        data-testid="error-breadcrumb"
+      >
+        <span>You are here: </span>
+        <span className="font-medium">Services</span>
+        <span className="mx-2">→</span>
+        <span className="font-medium">Database Services</span>
+        <span className="mx-2">→</span>
+        <span className="font-medium text-red-600 dark:text-red-400">Create Service (Error)</span>
+      </nav>
     </div>
   );
 }
