@@ -1,867 +1,740 @@
 /**
- * Testing Utility Types for DreamFactory Admin Interface
+ * Testing utility types for Vitest, React Testing Library, Mock Service Worker, and component testing patterns.
+ * Provides type safety for test fixtures, mocks, and testing utilities ensuring comprehensive test coverage.
  * 
- * Comprehensive type definitions for the modernized testing framework stack:
+ * Supports:
  * - Vitest testing framework replacing Jest/Karma for 10x faster test execution
- * - Mock Service Worker (MSW) for realistic API mocking during development
- * - React Testing Library for component testing with accessibility focus
- * - Integration with React Hook Form and Zod validation
+ * - React Testing Library component testing with enhanced assertions
+ * - Mock Service Worker (MSW) for realistic API mocking during development and testing
  * - Performance testing types for build time optimization
- * - E2E testing integration with Playwright
- * 
- * @version 1.0.0
- * @framework React 19/Next.js 15.1
+ * - Accessibility testing utilities for WCAG 2.1 AA compliance
  */
 
-import type { RenderOptions, RenderResult, screen } from '@testing-library/react';
-import type { UserEvent } from '@testing-library/user-event';
-import type { MockInstance, MockedFunction, MockRestore } from 'vitest';
-import type { RestHandler, DefaultBodyType } from 'msw';
-import type { SetupServerApi } from 'msw/node';
-import type { 
-  UseFormReturn, 
-  FieldValues, 
-  FieldErrors,
-  FormState 
-} from 'react-hook-form';
-import type { ZodSchema, ZodIssue } from 'zod';
-import type { 
-  UseQueryResult, 
-  UseMutationResult, 
-  QueryClient 
-} from '@tanstack/react-query';
+import type { ReactElement, ReactNode } from 'react'
+import type { RenderOptions, RenderResult, queries } from '@testing-library/react'
+import type { vi } from 'vitest'
+import type { rest, setupWorker, setupServer } from 'msw'
+import type { UseFormReturn } from 'react-hook-form'
+import type { QueryClient } from '@tanstack/react-query'
+import type { z } from 'zod'
 
-// ============================================================================
-// Core API Types (Expected to be defined in src/types/api.ts)
-// ============================================================================
+// Re-export dependency types for testing utilities
+import type { ApiResponse, ApiError, ApiRequestOptions } from './api'
+import type { DatabaseService, DatabaseConnection, SchemaMetadata } from './database'
+import type { User, AdminUser, UserSession } from './user'
+
+// =================================================================================================
+// VITEST FRAMEWORK TYPES
+// =================================================================================================
 
 /**
- * Base API response structure for DreamFactory endpoints
+ * Enhanced Vitest test configuration replacing Jest/Karma patterns
+ * Provides 10x faster test execution with native TypeScript support
  */
-export interface ApiResponse<T = unknown> {
-  resource?: T;
-  meta?: {
-    count?: number;
-    schema?: string[];
-  };
-  error?: {
-    code: number;
-    message: string;
-    details?: unknown;
-  };
+export interface VitestConfig {
+  testMatch?: string[]
+  testIgnore?: string[]
+  coverage?: VitestCoverageConfig
+  setupFiles?: string[]
+  environment?: 'jsdom' | 'node' | 'happy-dom'
+  globals?: boolean
+  pool?: 'threads' | 'forks'
+  isolate?: boolean
+  reporters?: ('default' | 'verbose' | 'junit' | 'json' | 'html')[]
+  timeout?: number
 }
 
 /**
- * Database connection configuration
+ * Vitest coverage configuration for comprehensive test coverage reporting
  */
-export interface DatabaseConnection {
-  id?: string;
-  name: string;
-  type: 'mysql' | 'postgresql' | 'mongodb' | 'sql_server' | 'oracle' | 'snowflake';
-  host: string;
-  port: number;
-  database: string;
-  username: string;
-  password?: string;
-  is_active?: boolean;
-  created_date?: string;
-  last_modified_date?: string;
+export interface VitestCoverageConfig {
+  provider: 'v8' | 'istanbul'
+  reporter: ('text' | 'json' | 'html' | 'lcov')[]
+  include: string[]
+  exclude: string[]
+  thresholds: {
+    lines: number
+    functions: number
+    branches: number
+    statements: number
+  }
+  reportsDirectory: string
+  all: boolean
 }
 
 /**
- * User profile structure
+ * Vitest mock function type with enhanced TypeScript inference
  */
-export interface User {
-  id: number;
-  name: string;
-  first_name?: string;
-  last_name?: string;
-  email: string;
-  is_active: boolean;
-  role?: {
-    id: number;
-    name: string;
-    description?: string;
-  };
-  created_date?: string;
-  last_login_date?: string;
-}
-
-// ============================================================================
-// Vitest Testing Framework Types
-// ============================================================================
+export type MockFunction<TArgs extends unknown[] = unknown[], TReturn = unknown> = 
+  ReturnType<typeof vi.fn<TArgs, TReturn>>
 
 /**
- * Enhanced Vitest test context with DreamFactory-specific utilities
+ * Vitest spy function type for monitoring existing functions
  */
-export interface DreamFactoryTestContext {
-  /** Current test name for debugging */
-  testName: string;
-  /** Mock cleanup functions */
-  cleanup: MockRestore[];
-  /** Test-specific query client instance */
-  queryClient: QueryClient;
-  /** MSW server instance for API mocking */
-  server: SetupServerApi;
-  /** Performance measurement utilities */
-  performance: TestPerformanceUtils;
-}
+export type SpyFunction<T = unknown> = ReturnType<typeof vi.spyOn<T, keyof T>>
 
 /**
- * Vitest suite configuration for component testing
+ * Test suite configuration for database service management tests
  */
-export interface ComponentTestSuite {
-  /** Test description */
-  describe: string;
-  /** Setup function called before each test */
-  beforeEach?: (context: DreamFactoryTestContext) => void | Promise<void>;
-  /** Cleanup function called after each test */
-  afterEach?: (context: DreamFactoryTestContext) => void | Promise<void>;
-  /** Test cases definition */
-  tests: ComponentTestCase[];
+export interface TestSuiteConfig {
+  name: string
+  timeout?: number
+  retry?: number
+  skip?: boolean
+  only?: boolean
+  concurrent?: boolean
+  shuffle?: boolean
+}
+
+// =================================================================================================
+// REACT TESTING LIBRARY TYPES
+// =================================================================================================
+
+/**
+ * Enhanced render options for React components with providers
+ * Replaces Angular TestBed module configuration patterns
+ */
+export interface CustomRenderOptions extends Omit<RenderOptions, 'queries'> {
+  initialEntries?: string[]
+  authState?: {
+    user?: User | AdminUser | null
+    session?: UserSession | null
+    isAuthenticated?: boolean
+  }
+  queryClient?: QueryClient
+  theme?: 'light' | 'dark'
+  locale?: string
+  preloadedState?: Record<string, unknown>
+  renderWithProviders?: boolean
 }
 
 /**
- * Individual component test case
+ * Custom render result extending React Testing Library with additional utilities
  */
-export interface ComponentTestCase {
-  /** Test case description */
-  it: string;
-  /** Test implementation */
-  test: (context: DreamFactoryTestContext) => void | Promise<void>;
-  /** Skip this test */
-  skip?: boolean;
-  /** Only run this test */
-  only?: boolean;
-  /** Test timeout in milliseconds */
-  timeout?: number;
+export interface CustomRenderResult extends RenderResult {
+  user: {
+    click: (element: Element | null) => Promise<void>
+    type: (element: Element | null, text: string) => Promise<void>
+    clear: (element: Element | null) => Promise<void>
+    selectOptions: (element: Element | null, values: string | string[]) => Promise<void>
+    upload: (element: Element | null, file: File | File[]) => Promise<void>
+    keyboard: (text: string) => Promise<void>
+    tab: (options?: { shift?: boolean }) => Promise<void>
+  }
+  queryClient: QueryClient
+  history: unknown[]
 }
 
 /**
- * Vitest mock utilities for React components
- */
-export interface VitestMockUtils {
-  /** Mock React Hook Form implementation */
-  mockUseForm: <T extends FieldValues = FieldValues>() => MockedFunction<() => UseFormReturn<T>>;
-  
-  /** Mock React Query hooks */
-  mockUseQuery: <T = unknown>() => MockedFunction<() => UseQueryResult<T>>;
-  mockUseMutation: <T = unknown>() => MockedFunction<() => UseMutationResult<T>>;
-  
-  /** Mock Next.js router */
-  mockRouter: MockedFunction<() => {
-    push: MockedFunction<(url: string) => Promise<boolean>>;
-    replace: MockedFunction<(url: string) => Promise<boolean>>;
-    back: MockedFunction<() => void>;
-    pathname: string;
-    query: Record<string, string | string[]>;
-  }>;
-  
-  /** Mock local storage */
-  mockLocalStorage: MockedFunction<() => Storage>;
-  
-  /** Mock window.fetch for API calls */
-  mockFetch: MockedFunction<typeof fetch>;
-}
-
-// ============================================================================
-// React Testing Library Integration Types
-// ============================================================================
-
-/**
- * Enhanced render options for DreamFactory components
- */
-export interface DreamFactoryRenderOptions extends RenderOptions {
-  /** Pre-configured providers (QueryClient, Theme, etc.) */
-  withProviders?: boolean;
-  /** Initial router state for Next.js components */
-  initialRouter?: {
-    pathname: string;
-    query?: Record<string, string | string[]>;
-  };
-  /** Mock authenticated user context */
-  authenticatedUser?: User | null;
-  /** Initial React Query cache data */
-  initialQueryData?: Record<string, unknown>;
-  /** Custom theme or UI provider props */
-  themeConfig?: {
-    theme: 'light' | 'dark';
-    primaryColor?: string;
-  };
-}
-
-/**
- * Enhanced render result with DreamFactory utilities
- */
-export interface DreamFactoryRenderResult extends RenderResult {
-  /** User event utilities pre-configured for accessibility testing */
-  user: UserEvent;
-  /** Query client instance for testing server state */
-  queryClient: QueryClient;
-  /** Helper to wait for async operations */
-  waitForData: (timeout?: number) => Promise<void>;
-  /** Accessibility testing utilities */
-  axe: {
-    /** Run accessibility audit on rendered component */
-    check: () => Promise<AccessibilityViolation[]>;
-    /** Check specific WCAG guidelines */
-    checkWCAG: (level: 'A' | 'AA' | 'AAA') => Promise<AccessibilityViolation[]>;
-  };
-}
-
-/**
- * Accessibility violation report
- */
-export interface AccessibilityViolation {
-  id: string;
-  impact: 'minor' | 'moderate' | 'serious' | 'critical';
-  description: string;
-  help: string;
-  helpUrl: string;
-  nodes: Array<{
-    html: string;
-    target: string[];
-  }>;
-}
-
-/**
- * Component testing utilities for specific DreamFactory features
+ * Component testing utilities for database service management components
  */
 export interface ComponentTestUtils {
-  /** Database service component testing helpers */
-  database: {
-    /** Render database connection form with mock data */
-    renderConnectionForm: (
-      initialData?: Partial<DatabaseConnection>
-    ) => DreamFactoryRenderResult;
-    /** Simulate database connection test */
-    simulateConnectionTest: (
-      connection: DatabaseConnection
-    ) => Promise<{ success: boolean; error?: string }>;
-    /** Mock database schema response */
-    mockSchemaResponse: (tables: string[]) => void;
-  };
+  renderWithProviders: (
+    ui: ReactElement,
+    options?: CustomRenderOptions
+  ) => CustomRenderResult
   
-  /** API generation testing helpers */
-  apiGeneration: {
-    /** Render API generation wizard */
-    renderGenerationWizard: (
-      databaseId: string
-    ) => DreamFactoryRenderResult;
-    /** Simulate endpoint configuration */
-    simulateEndpointConfig: (
-      endpoints: Array<{ table: string; methods: string[] }>
-    ) => Promise<void>;
-    /** Mock OpenAPI spec generation */
-    mockOpenAPIGeneration: (spec: object) => void;
-  };
+  renderWithQueryClient: (
+    ui: ReactElement,
+    queryClient?: QueryClient
+  ) => CustomRenderResult
   
-  /** User management testing helpers */
-  userManagement: {
-    /** Render user form component */
-    renderUserForm: (initialData?: Partial<User>) => DreamFactoryRenderResult;
-    /** Simulate user creation workflow */
-    simulateUserCreation: (userData: Partial<User>) => Promise<void>;
-    /** Mock role assignment */
-    mockRoleAssignment: (userId: number, roleId: number) => void;
-  };
+  renderWithAuth: (
+    ui: ReactElement,
+    authState: CustomRenderOptions['authState']
+  ) => CustomRenderResult
+  
+  renderWithTheme: (
+    ui: ReactElement,
+    theme?: 'light' | 'dark'
+  ) => CustomRenderResult
+  
+  waitForLoadingToFinish: () => Promise<void>
+  expectAccessibleForm: (container: HTMLElement) => Promise<void>
+  expectValidationErrors: (errors: Record<string, string>) => Promise<void>
 }
 
-// ============================================================================
-// Mock Service Worker (MSW) Types
-// ============================================================================
-
 /**
- * MSW request handler factory for DreamFactory API endpoints
+ * Form testing utilities for React Hook Form with Zod validation
  */
-export interface MSWHandlerFactory {
-  /** Create handlers for database service endpoints */
-  database: {
-    /** Mock GET /api/v2/_schema endpoint */
-    getSchema: (response?: ApiResponse<any>) => RestHandler;
-    /** Mock POST /api/v2/_schema endpoint */
-    createService: (response?: ApiResponse<DatabaseConnection>) => RestHandler;
-    /** Mock POST /api/v2/_schema/{service}/_test endpoint */
-    testConnection: (response?: { success: boolean; error?: string }) => RestHandler;
-    /** Mock GET /api/v2/_schema/{service} endpoint */
-    getServiceDetails: (response?: ApiResponse<DatabaseConnection>) => RestHandler;
-  };
-  
-  /** Create handlers for authentication endpoints */
-  auth: {
-    /** Mock POST /api/v2/user/session endpoint */
-    login: (response?: ApiResponse<{ session_token: string; session_id: string }>) => RestHandler;
-    /** Mock DELETE /api/v2/user/session endpoint */
-    logout: (response?: ApiResponse<{ success: boolean }>) => RestHandler;
-    /** Mock GET /api/v2/user/profile endpoint */
-    getProfile: (response?: ApiResponse<User>) => RestHandler;
-  };
-  
-  /** Create handlers for system endpoints */
-  system: {
-    /** Mock GET /api/v2/system/admin endpoint */
-    getAdmins: (response?: ApiResponse<User[]>) => RestHandler;
-    /** Mock GET /api/v2/system/role endpoint */
-    getRoles: (response?: ApiResponse<any[]>) => RestHandler;
-    /** Mock GET /api/v2/system/config endpoint */
-    getConfig: (response?: ApiResponse<any>) => RestHandler;
-  };
+export interface FormTestHelpers<TFormData = Record<string, unknown>> {
+  fillForm: (data: Partial<TFormData>) => Promise<void>
+  submitForm: () => Promise<void>
+  clearForm: () => Promise<void>
+  expectFieldError: (fieldName: keyof TFormData, errorMessage: string) => Promise<void>
+  expectFormValid: () => Promise<void>
+  expectFormInvalid: () => Promise<void>
+  uploadFile: (fieldName: keyof TFormData, file: File) => Promise<void>
+  selectOption: (fieldName: keyof TFormData, value: string) => Promise<void>
+  triggerValidation: (fieldName?: keyof TFormData) => Promise<void>
+  getFieldValue: (fieldName: keyof TFormData) => unknown
+  getFormState: () => UseFormReturn<TFormData>['formState']
 }
 
 /**
- * MSW server configuration for different testing scenarios
+ * Database connection form testing scenario types
+ */
+export interface DatabaseConnectionTestScenarios {
+  validConnection: DatabaseConnection
+  invalidConnection: Partial<DatabaseConnection>
+  connectionWithSSL: DatabaseConnection
+  connectionTimeoutError: DatabaseConnection
+  connectionRefused: DatabaseConnection
+  authenticationError: DatabaseConnection
+}
+
+// =================================================================================================
+// MOCK SERVICE WORKER (MSW) TYPES
+// =================================================================================================
+
+/**
+ * MSW request handler configuration for DreamFactory API endpoints
+ */
+export interface MSWHandlerConfig {
+  baseUrl?: string
+  delay?: number | 'infinite'
+  status?: number
+  headers?: Record<string, string>
+  once?: boolean
+}
+
+/**
+ * MSW handler types for different API operations
+ */
+export type MSWHandler = ReturnType<typeof rest.get | typeof rest.post | typeof rest.put | typeof rest.patch | typeof rest.delete>
+
+/**
+ * MSW worker setup configuration for browser and Node.js environments
+ */
+export interface MSWWorkerConfig {
+  serviceWorker?: {
+    url?: string
+    options?: ServiceWorkerRegistrationOptions
+  }
+  onUnhandledRequest?: 'error' | 'warn' | 'bypass'
+  waitUntilReady?: boolean
+}
+
+/**
+ * MSW server setup configuration for Node.js testing environment
  */
 export interface MSWServerConfig {
-  /** Base URL for API endpoints */
-  baseUrl?: string;
-  /** Default response delay in milliseconds */
-  delay?: number;
-  /** Global error simulation */
-  simulateNetworkError?: boolean;
-  /** Authentication state simulation */
-  authState?: 'authenticated' | 'unauthenticated' | 'expired';
-  /** Default user context for authenticated requests */
-  defaultUser?: User;
+  onUnhandledRequest?: 'error' | 'warn' | 'bypass'
+  listen?: {
+    onUnhandledRequest?: 'error' | 'warn' | 'bypass'
+  }
 }
 
 /**
- * API mocking utilities for development and testing
+ * API mock response generators for consistent testing
  */
-export interface ApiMockUtils {
-  /** Setup MSW server with DreamFactory handlers */
-  setupServer: (config?: MSWServerConfig) => SetupServerApi;
-  /** Create mock responses for specific scenarios */
-  createMockResponse: <T>(data: T, options?: {
-    delay?: number;
-    status?: number;
-    headers?: Record<string, string>;
-  }) => ApiResponse<T>;
-  /** Simulate API errors */
-  simulateError: (
-    code: number,
-    message: string,
-    details?: unknown
-  ) => ApiResponse<never>;
-  /** Mock pagination responses */
-  createPaginatedResponse: <T>(
-    data: T[],
+export interface ApiMockGenerators {
+  successResponse: <T>(data: T, meta?: Record<string, unknown>) => ApiResponse<T>
+  errorResponse: (error: Partial<ApiError>) => ApiError
+  listResponse: <T>(items: T[], total?: number, offset?: number) => ApiResponse<T[]>
+  paginatedResponse: <T>(
+    items: T[],
     page: number,
     limit: number,
     total: number
-  ) => ApiResponse<T[]>;
-}
-
-// ============================================================================
-// Form Testing with React Hook Form + Zod
-// ============================================================================
-
-/**
- * Form testing utilities with validation support
- */
-export interface FormTestUtils<T extends FieldValues = FieldValues> {
-  /** Render form with React Hook Form integration */
-  renderForm: (
-    schema: ZodSchema<T>,
-    defaultValues?: Partial<T>
-  ) => DreamFactoryRenderResult & {
-    form: UseFormReturn<T>;
-    submitForm: (data?: Partial<T>) => Promise<void>;
-    getFieldError: (fieldName: keyof T) => string | undefined;
-    setFieldValue: (fieldName: keyof T, value: any) => Promise<void>;
-  };
-  
-  /** Test form validation scenarios */
-  testValidation: {
-    /** Test field-level validation */
-    testField: (
-      fieldName: keyof T,
-      validValues: any[],
-      invalidValues: Array<{ value: any; expectedError: string }>
-    ) => Promise<void>;
-    
-    /** Test form submission with valid data */
-    testValidSubmission: (validData: T) => Promise<void>;
-    
-    /** Test form submission with invalid data */
-    testInvalidSubmission: (
-      invalidData: Partial<T>,
-      expectedErrors: Partial<Record<keyof T, string>>
-    ) => Promise<void>;
-  };
-  
-  /** Simulate user interactions with form fields */
-  userInteractions: {
-    /** Type into text inputs */
-    typeInField: (fieldName: keyof T, value: string) => Promise<void>;
-    /** Select options from dropdowns */
-    selectOption: (fieldName: keyof T, value: string) => Promise<void>;
-    /** Click checkboxes and radio buttons */
-    clickCheckbox: (fieldName: keyof T) => Promise<void>;
-    /** Submit form */
-    submitForm: () => Promise<void>;
-    /** Clear form fields */
-    clearForm: () => Promise<void>;
-  };
+  ) => ApiResponse<T[]>
+  validationErrorResponse: (
+    field: string,
+    message: string
+  ) => ApiError
+  authErrorResponse: (type: 'unauthorized' | 'forbidden') => ApiError
+  serverErrorResponse: (message?: string) => ApiError
 }
 
 /**
- * Zod schema testing utilities
+ * Database service mock data factories
  */
-export interface ZodTestUtils {
-  /** Test schema validation with various inputs */
-  testSchema: <T>(
-    schema: ZodSchema<T>,
-    validInputs: unknown[],
-    invalidInputs: Array<{ input: unknown; expectedError: string }>
-  ) => void;
-  
-  /** Generate mock data that conforms to schema */
-  generateMockData: <T>(schema: ZodSchema<T>) => T;
-  
-  /** Test schema transformation and coercion */
-  testTransforms: <T>(
-    schema: ZodSchema<T>,
-    transformTests: Array<{ input: unknown; expectedOutput: T }>
-  ) => void;
-}
-
-// ============================================================================
-// Server State Testing (React Query/SWR)
-// ============================================================================
-
-/**
- * React Query testing utilities
- */
-export interface ReactQueryTestUtils {
-  /** Create test query client with custom configuration */
-  createTestQueryClient: (config?: {
-    defaultOptions?: any;
-    logger?: any;
-  }) => QueryClient;
-  
-  /** Mock query responses */
-  mockQuery: <T>(
-    queryKey: any[],
-    data: T,
-    options?: {
-      error?: Error;
-      isLoading?: boolean;
-      isError?: boolean;
-    }
-  ) => void;
-  
-  /** Mock mutation responses */
-  mockMutation: <T>(
-    mutationFn: string,
-    response: T,
-    options?: {
-      error?: Error;
-      isLoading?: boolean;
-      isError?: boolean;
-    }
-  ) => void;
-  
-  /** Test cache invalidation scenarios */
-  testCacheInvalidation: (
-    triggerAction: () => Promise<void>,
-    expectedInvalidatedKeys: any[][]
-  ) => Promise<void>;
-  
-  /** Test optimistic updates */
-  testOptimisticUpdate: <T>(
-    mutation: () => Promise<void>,
-    optimisticData: T,
-    rollbackData: T
-  ) => Promise<void>;
+export interface DatabaseServiceMockFactory {
+  createDatabaseService: (overrides?: Partial<DatabaseService>) => DatabaseService
+  createConnectionConfig: (type: string, overrides?: Partial<DatabaseConnection>) => DatabaseConnection
+  createSchemaMetadata: (overrides?: Partial<SchemaMetadata>) => SchemaMetadata
+  createTableList: (count: number) => SchemaMetadata[]
+  createFieldList: (tableId: string, count: number) => SchemaMetadata[]
+  createValidationScenarios: () => DatabaseConnectionTestScenarios
 }
 
 /**
- * SWR testing utilities
+ * User authentication mock data factories
  */
-export interface SWRTestUtils {
-  /** Create test SWR configuration */
-  createTestConfig: (config?: {
-    revalidateOnFocus?: boolean;
-    revalidateOnReconnect?: boolean;
-    refreshInterval?: number;
-  }) => any;
-  
-  /** Mock SWR data fetching */
-  mockSWRData: <T>(
-    key: string,
-    data: T,
-    options?: {
-      error?: Error;
-      isValidating?: boolean;
-    }
-  ) => void;
-  
-  /** Test revalidation scenarios */
-  testRevalidation: (
-    key: string,
-    triggerRevalidation: () => void
-  ) => Promise<void>;
+export interface AuthMockFactory {
+  createUser: (overrides?: Partial<User>) => User
+  createAdminUser: (overrides?: Partial<AdminUser>) => AdminUser
+  createUserSession: (user: User | AdminUser) => UserSession
+  createLoginCredentials: (type: 'user' | 'admin') => {
+    email: string
+    password: string
+  }
+  createJWTToken: (payload: Record<string, unknown>) => string
+  createAuthHeaders: (session: UserSession) => Record<string, string>
 }
 
-// ============================================================================
-// Performance Testing Types
-// ============================================================================
+// =================================================================================================
+// QUERY TESTING UTILITIES
+// =================================================================================================
 
 /**
- * Performance testing utilities for build optimization
+ * TanStack React Query testing utilities for server state management
  */
-export interface TestPerformanceUtils {
-  /** Measure component render performance */
-  measureRenderTime: (
-    renderFn: () => DreamFactoryRenderResult,
-    iterations?: number
+export interface QueryTestHelpers {
+  queryClient: QueryClient
+  
+  // Query state inspection
+  getQueryData: <T>(queryKey: unknown[]) => T | undefined
+  getQueryState: (queryKey: unknown[]) => unknown
+  invalidateQueries: (queryKey?: unknown[]) => Promise<void>
+  refetchQueries: (queryKey?: unknown[]) => Promise<void>
+  
+  // Cache management
+  clearCache: () => void
+  setQueryData: <T>(queryKey: unknown[], data: T) => void
+  removeQueries: (queryKey?: unknown[]) => void
+  
+  // Mutation testing
+  mockMutation: <TData, TError, TVariables>(
+    mutationFn: (variables: TVariables) => Promise<TData>
+  ) => MockFunction<[TVariables], Promise<TData>>
+  
+  // Loading and error states
+  expectQueryLoading: (queryKey: unknown[]) => void
+  expectQuerySuccess: <T>(queryKey: unknown[], data: T) => void
+  expectQueryError: (queryKey: unknown[], error: unknown) => void
+  
+  // Background sync testing
+  expectBackgroundRefetch: (queryKey: unknown[]) => Promise<void>
+  expectOptimisticUpdate: <T>(queryKey: unknown[], expectedData: T) => void
+}
+
+/**
+ * SWR testing utilities for configuration data
+ */
+export interface SWRTestHelpers {
+  mockSWRResponse: <T>(key: string, data: T, error?: unknown) => void
+  expectSWRLoading: (key: string) => void
+  expectSWRData: <T>(key: string, data: T) => void
+  expectSWRError: (key: string, error: unknown) => void
+  triggerRevalidation: (key: string) => Promise<void>
+  mockSWRMutation: <T>(key: string, mutationFn: () => Promise<T>) => void
+}
+
+// =================================================================================================
+// PERFORMANCE TESTING TYPES
+// =================================================================================================
+
+/**
+ * Performance benchmarks for component rendering and operations
+ */
+export interface PerformanceMetrics {
+  renderTime: number
+  mountTime: number
+  updateTime: number
+  unmountTime: number
+  memoryUsage: number
+  bundleSize?: number
+  cacheHitRate?: number
+}
+
+/**
+ * Performance testing utilities for build time optimization
+ */
+export interface PerformanceTestHelpers {
+  measureRenderTime: (component: ReactElement) => Promise<number>
+  measureUpdateTime: (
+    component: ReactElement,
+    updates: () => void
+  ) => Promise<number>
+  
+  measureMemoryUsage: () => number
+  measureBundleSize: (entryPoint: string) => Promise<number>
+  measureCachePerformance: (queryKey: unknown[]) => Promise<{
+    hitRate: number
+    missRate: number
+    averageResponseTime: number
+  }>
+  
+  expectPerformanceThreshold: (
+    metric: keyof PerformanceMetrics,
+    threshold: number,
+    actual: number
+  ) => void
+  
+  profileComponent: (
+    component: ReactElement,
+    interactions: () => Promise<void>
+  ) => Promise<PerformanceMetrics>
+  
+  expectSubFiveSecondOperation: (
+    operation: () => Promise<void>,
+    description: string
+  ) => Promise<void>
+}
+
+/**
+ * Build performance testing configuration
+ */
+export interface BuildPerformanceConfig {
+  entryPoints: string[]
+  thresholds: {
+    buildTime: number // milliseconds
+    bundleSize: number // bytes
+    treeShaking: number // percentage
+    codeSpitting: boolean
+  }
+  turbopackEnabled: boolean
+  outputDirectory: string
+}
+
+// =================================================================================================
+// ACCESSIBILITY TESTING TYPES
+// =================================================================================================
+
+/**
+ * WCAG 2.1 AA compliance testing utilities
+ */
+export interface AccessibilityTestHelpers {
+  checkAccessibility: (container: HTMLElement) => Promise<void>
+  expectNoAccessibilityViolations: (container: HTMLElement) => Promise<void>
+  expectKeyboardNavigation: (container: HTMLElement) => Promise<void>
+  expectScreenReaderSupport: (container: HTMLElement) => Promise<void>
+  expectColorContrast: (container: HTMLElement) => Promise<void>
+  expectFocusManagement: (container: HTMLElement) => Promise<void>
+  expectAriaLabels: (container: HTMLElement) => Promise<void>
+  
+  simulateKeyboardNavigation: (
+    keys: string[],
+    container?: HTMLElement
+  ) => Promise<void>
+  
+  simulateScreenReader: (
+    container: HTMLElement
+  ) => Promise<string[]>
+  
+  checkFormAccessibility: (
+    form: HTMLFormElement
   ) => Promise<{
-    average: number;
-    min: number;
-    max: number;
-    percentile95: number;
-  }>;
-  
-  /** Test bundle size impact */
-  measureBundleImpact: (
-    componentPath: string
-  ) => Promise<{
-    sizeBefore: number;
-    sizeAfter: number;
-    impact: number;
-  }>;
-  
-  /** Measure API call performance */
-  measureApiPerformance: (
-    apiCall: () => Promise<any>,
-    iterations?: number
-  ) => Promise<{
-    averageResponseTime: number;
-    successRate: number;
-    errorRate: number;
-  }>;
-  
-  /** Test memory usage during component lifecycle */
-  measureMemoryUsage: (
-    component: () => DreamFactoryRenderResult
-  ) => Promise<{
-    initialMemory: number;
-    peakMemory: number;
-    finalMemory: number;
-    memoryLeak: boolean;
-  }>;
+    hasLabels: boolean
+    hasErrorAnnouncements: boolean
+    hasRequiredIndicators: boolean
+    hasKeyboardSupport: boolean
+  }>
 }
 
 /**
- * Core Web Vitals testing for SSR performance
+ * Accessibility test configuration for WCAG 2.1 AA compliance
  */
-export interface WebVitalsTestUtils {
-  /** Measure Largest Contentful Paint (LCP) */
-  measureLCP: () => Promise<number>;
-  
-  /** Measure First Input Delay (FID) */
-  measureFID: () => Promise<number>;
-  
-  /** Measure Cumulative Layout Shift (CLS) */
-  measureCLS: () => Promise<number>;
-  
-  /** Test server-side rendering performance */
-  measureSSRPerformance: () => Promise<{
-    serverRenderTime: number;
-    hydrationTime: number;
-    totalRenderTime: number;
-  }>;
-  
-  /** Validate performance thresholds */
-  validatePerformanceThresholds: () => Promise<{
-    lcpPassed: boolean; // < 2.5s
-    fidPassed: boolean; // < 100ms
-    clsPassed: boolean; // < 0.1
-  }>;
+export interface AccessibilityTestConfig {
+  rules: {
+    'color-contrast': boolean
+    'keyboard-navigation': boolean
+    'screen-reader': boolean
+    'focus-management': boolean
+    'aria-labels': boolean
+    'form-labels': boolean
+  }
+  exclude: string[]
+  include: string[]
+  level: 'A' | 'AA' | 'AAA'
+  tags: string[]
 }
 
-// ============================================================================
-// E2E Testing Integration (Playwright)
-// ============================================================================
+// =================================================================================================
+// COMPONENT TESTING PATTERNS
+// =================================================================================================
 
 /**
- * E2E test scenario definitions
+ * Test scenario configuration for comprehensive component testing
  */
-export interface E2ETestScenario {
-  /** Scenario name */
-  name: string;
-  /** Test description */
-  description: string;
-  /** Steps to execute */
-  steps: E2ETestStep[];
-  /** Expected outcome */
-  expectedOutcome: string;
-  /** Browser compatibility */
-  browsers?: ('chromium' | 'firefox' | 'webkit')[];
-  /** Viewport sizes to test */
-  viewports?: Array<{ width: number; height: number }>;
+export interface TestScenario<TProps = Record<string, unknown>> {
+  name: string
+  props: TProps
+  setup?: () => Promise<void> | void
+  teardown?: () => Promise<void> | void
+  expectations: {
+    render: boolean
+    accessibility: boolean
+    performance: boolean
+    interactions: boolean
+  }
+  mocks?: Record<string, MockFunction>
+  queries?: Record<string, unknown>
 }
 
 /**
- * Individual E2E test step
+ * Database service component testing scenarios
  */
-export interface E2ETestStep {
-  /** Step description */
-  description: string;
-  /** Action to perform */
-  action: 'navigate' | 'click' | 'type' | 'wait' | 'assert' | 'custom';
-  /** CSS selector or element identifier */
-  selector?: string;
-  /** Value for type actions */
-  value?: string;
-  /** Wait conditions */
-  waitFor?: 'element' | 'network' | 'timeout';
-  /** Custom step implementation */
-  customAction?: () => Promise<void>;
-  /** Assertion details */
-  assertion?: {
-    type: 'text' | 'attribute' | 'visible' | 'count';
-    expected: any;
-  };
+export interface DatabaseServiceTestScenarios {
+  connectionForm: TestScenario[]
+  serviceList: TestScenario[]
+  schemaDiscovery: TestScenario[]
+  apiGeneration: TestScenario[]
+  errorHandling: TestScenario[]
+  loadingStates: TestScenario[]
+  accessibilityCompliance: TestScenario[]
 }
 
 /**
- * Playwright page object utilities
+ * Test fixture factory for creating reusable test data
  */
-export interface PlaywrightPageObjects {
-  /** Database service management page */
-  databaseServicePage: {
-    /** Navigate to service list */
-    navigateToServices: () => Promise<void>;
-    /** Create new database service */
-    createService: (connection: DatabaseConnection) => Promise<void>;
-    /** Test database connection */
-    testConnection: (serviceName: string) => Promise<boolean>;
-    /** Delete service */
-    deleteService: (serviceName: string) => Promise<void>;
-  };
-  
-  /** API generation workflow page */
-  apiGenerationPage: {
-    /** Navigate to API generation */
-    navigateToGeneration: (serviceId: string) => Promise<void>;
-    /** Configure endpoints */
-    configureEndpoints: (config: any) => Promise<void>;
-    /** Generate API documentation */
-    generateDocumentation: () => Promise<void>;
-    /** Preview generated APIs */
-    previewAPIs: () => Promise<string[]>;
-  };
-  
-  /** User management page */
-  userManagementPage: {
-    /** Navigate to user list */
-    navigateToUsers: () => Promise<void>;
-    /** Create new user */
-    createUser: (user: Partial<User>) => Promise<void>;
-    /** Edit user details */
-    editUser: (userId: number, updates: Partial<User>) => Promise<void>;
-    /** Assign role to user */
-    assignRole: (userId: number, roleId: number) => Promise<void>;
-  };
-}
-
-// ============================================================================
-// Test Fixture and Mock Data Types
-// ============================================================================
-
-/**
- * Test fixture factory for consistent test data
- */
-export interface TestFixtureFactory {
-  /** Generate database connection fixtures */
-  databaseConnection: (overrides?: Partial<DatabaseConnection>) => DatabaseConnection;
-  
-  /** Generate user fixtures */
-  user: (overrides?: Partial<User>) => User;
-  
-  /** Generate API response fixtures */
-  apiResponse: <T>(data: T, overrides?: Partial<ApiResponse<T>>) => ApiResponse<T>;
-  
-  /** Generate form validation error fixtures */
-  validationErrors: <T extends FieldValues>(
-    fields: (keyof T)[],
-    messages?: string[]
-  ) => FieldErrors<T>;
-  
-  /** Generate performance metrics fixtures */
-  performanceMetrics: () => {
-    renderTime: number;
-    memoryUsage: number;
-    bundleSize: number;
-  };
+export interface TestFixtureFactory<T = unknown> {
+  create: (overrides?: Partial<T>) => T
+  createMany: (count: number, overrides?: Partial<T>) => T[]
+  createInvalid: (invalidFields?: (keyof T)[]) => Partial<T>
+  createWithRelations: (relations: Record<string, unknown>) => T
 }
 
 /**
- * Global test utilities export
+ * Error testing utilities for comprehensive error handling validation
  */
-export interface DreamFactoryTestUtils {
-  /** Vitest mock utilities */
-  vitest: VitestMockUtils;
+export interface ErrorTestHelpers {
+  expectErrorBoundary: (error: Error) => Promise<void>
+  expectValidationError: (field: string, message: string) => Promise<void>
+  expectNetworkError: (status: number) => Promise<void>
+  expectAuthenticationError: () => Promise<void>
+  expectServerError: () => Promise<void>
   
-  /** React Testing Library utilities */
-  rtl: ComponentTestUtils;
+  simulateNetworkError: (endpoint: string) => void
+  simulateTimeoutError: (endpoint: string, delay: number) => void
+  simulateValidationError: (field: string, error: string) => void
   
-  /** MSW API mocking utilities */
-  msw: ApiMockUtils;
-  
-  /** Form testing utilities */
-  forms: FormTestUtils;
-  
-  /** Server state testing utilities */
-  serverState: {
-    reactQuery: ReactQueryTestUtils;
-    swr: SWRTestUtils;
-  };
-  
-  /** Performance testing utilities */
-  performance: TestPerformanceUtils & WebVitalsTestUtils;
-  
-  /** E2E testing utilities */
-  e2e: PlaywrightPageObjects;
-  
-  /** Test fixture factory */
-  fixtures: TestFixtureFactory;
-  
-  /** Accessibility testing utilities */
-  accessibility: {
-    /** Check WCAG compliance */
-    checkWCAG: (level: 'A' | 'AA' | 'AAA') => Promise<AccessibilityViolation[]>;
-    /** Test keyboard navigation */
-    testKeyboardNavigation: () => Promise<boolean>;
-    /** Test screen reader compatibility */
-    testScreenReader: () => Promise<boolean>;
-  };
+  expectErrorRecovery: (
+    errorSimulation: () => void,
+    recoveryAction: () => Promise<void>
+  ) => Promise<void>
 }
 
-// ============================================================================
-// Test Configuration Types
-// ============================================================================
+// =================================================================================================
+// SNAPSHOT TESTING TYPES
+// =================================================================================================
 
 /**
- * Vitest configuration for DreamFactory testing
+ * Snapshot testing configuration for component regression testing
  */
-export interface DreamFactoryTestConfig {
-  /** Test environment setup */
-  environment: 'jsdom' | 'node' | 'happy-dom';
+export interface SnapshotTestConfig {
+  updateSnapshots: boolean
+  snapshotFormat: {
+    escapeString: boolean
+    indent: number
+    min: boolean
+    printBasicPrototype: boolean
+    printFunctionName: boolean
+  }
+  snapshotDir: string
+  snapshotExtension: string
+}
+
+/**
+ * Component snapshot testing utilities
+ */
+export interface SnapshotTestHelpers {
+  expectComponentSnapshot: (component: ReactElement) => void
+  expectPropsSnapshot: (props: Record<string, unknown>) => void
+  expectStateSnapshot: (state: Record<string, unknown>) => void
+  expectQuerySnapshot: (queryKey: unknown[], data: unknown) => void
   
-  /** Global setup files */
-  setupFiles: string[];
+  createThemeSnapshots: (component: ReactElement) => void
+  createResponsiveSnapshots: (component: ReactElement) => void
+  createInteractionSnapshots: (
+    component: ReactElement,
+    interactions: () => Promise<void>
+  ) => Promise<void>
+}
+
+// =================================================================================================
+// INTEGRATION TESTING TYPES
+// =================================================================================================
+
+/**
+ * End-to-end testing configuration for Playwright integration
+ */
+export interface E2ETestConfig {
+  baseURL: string
+  timeout: number
+  retries: number
+  workers: number
+  browsers: ('chromium' | 'firefox' | 'webkit')[]
+  headless: boolean
+  screenshot: 'off' | 'only-on-failure' | 'on'
+  video: 'off' | 'on-first-retry' | 'retain-on-failure' | 'on'
+  trace: 'off' | 'on-first-retry' | 'retain-on-failure' | 'on'
+}
+
+/**
+ * Database service end-to-end testing scenarios
+ */
+export interface E2ETestScenarios {
+  userFlow: {
+    login: () => Promise<void>
+    createDatabaseService: (config: DatabaseConnection) => Promise<void>
+    testConnection: () => Promise<void>
+    discoverSchema: () => Promise<void>
+    generateAPI: () => Promise<void>
+    validateEndpoints: () => Promise<void>
+    logout: () => Promise<void>
+  }
   
-  /** Test file patterns */
-  include: string[];
+  errorFlows: {
+    invalidCredentials: () => Promise<void>
+    connectionTimeout: () => Promise<void>
+    invalidConfiguration: () => Promise<void>
+    networkError: () => Promise<void>
+  }
   
-  /** Files to exclude from testing */
-  exclude: string[];
+  performanceFlows: {
+    largeSchemaDiscovery: () => Promise<void>
+    bulkApiGeneration: () => Promise<void>
+    concurrentConnections: () => Promise<void>
+  }
+}
+
+// =================================================================================================
+// UTILITY TYPES AND EXPORTS
+// =================================================================================================
+
+/**
+ * Comprehensive testing context providing all testing utilities
+ */
+export interface TestingContext {
+  vitest: {
+    config: VitestConfig
+    mock: typeof vi.fn
+    spy: typeof vi.spyOn
+  }
   
-  /** Coverage configuration */
-  coverage: {
-    provider: 'v8' | 'istanbul';
-    reporter: string[];
-    thresholds: {
-      global: {
-        branches: number;
-        functions: number;
-        lines: number;
-        statements: number;
-      };
-    };
-  };
-  
-  /** MSW integration */
+  rtl: ComponentTestUtils
   msw: {
-    enabled: boolean;
-    baseUrl: string;
-    handlers: string[];
-  };
+    worker: ReturnType<typeof setupWorker>
+    server: ReturnType<typeof setupServer>
+    handlers: MSWHandler[]
+    mockGenerators: ApiMockGenerators
+  }
   
-  /** Performance testing */
+  queries: QueryTestHelpers
+  swr: SWRTestHelpers
+  forms: FormTestHelpers
+  performance: PerformanceTestHelpers
+  accessibility: AccessibilityTestHelpers
+  errors: ErrorTestHelpers
+  snapshots: SnapshotTestHelpers
+  
+  factories: {
+    database: DatabaseServiceMockFactory
+    auth: AuthMockFactory
+    fixtures: TestFixtureFactory
+  }
+  
+  scenarios: {
+    database: DatabaseServiceTestScenarios
+    e2e: E2ETestScenarios
+  }
+}
+
+/**
+ * Test suite metadata for comprehensive test organization
+ */
+export interface TestSuiteMetadata {
+  name: string
+  description: string
+  tags: string[]
+  category: 'unit' | 'integration' | 'e2e' | 'performance' | 'accessibility'
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  dependencies: string[]
+  estimatedDuration: number // milliseconds
+  parallelizable: boolean
+  flakyness: 'stable' | 'occasional' | 'frequent'
+  lastUpdated: string
+  author: string
+}
+
+/**
+ * Test execution report for comprehensive test result analysis
+ */
+export interface TestExecutionReport {
+  summary: {
+    total: number
+    passed: number
+    failed: number
+    skipped: number
+    duration: number // milliseconds
+    coverage: {
+      lines: number
+      functions: number
+      branches: number
+      statements: number
+    }
+  }
+  
   performance: {
-    enabled: boolean;
-    thresholds: {
-      renderTime: number;
-      bundleSize: number;
-      memoryUsage: number;
-    };
-  };
+    averageTestDuration: number
+    slowestTests: Array<{
+      name: string
+      duration: number
+    }>
+    memoryUsage: number
+    bundleSize: number
+  }
+  
+  accessibility: {
+    violations: Array<{
+      rule: string
+    severity: 'minor' | 'moderate' | 'serious' | 'critical'
+      element: string
+      message: string
+    }>
+    compliance: {
+      level: 'A' | 'AA' | 'AAA'
+      percentage: number
+    }
+  }
+  
+  flaky: Array<{
+    name: string
+    successRate: number
+    lastFailure: string
+  }>
+}
+
+// =================================================================================================
+// EXPORTS FOR EXTERNAL CONSUMPTION
+// =================================================================================================
+
+/**
+ * Re-export commonly used testing types for convenience
+ */
+export type {
+  // Vitest core types
+  MockFunction,
+  SpyFunction,
+  
+  // React Testing Library types
+  CustomRenderOptions,
+  CustomRenderResult,
+  
+  // MSW types
+  MSWHandler,
+  MSWWorkerConfig,
+  
+  // Query testing types
+  QueryTestHelpers,
+  
+  // Performance types
+  PerformanceMetrics,
+  
+  // Accessibility types
+  AccessibilityTestConfig,
+  
+  // Test scenario types
+  TestScenario,
+  TestFixtureFactory,
+  
+  // Comprehensive testing context
+  TestingContext
 }
 
 /**
- * Test runner utilities for CI/CD integration
+ * Default export providing the complete testing type system
  */
-export interface TestRunnerUtils {
-  /** Run unit tests with coverage */
-  runUnitTests: (config?: Partial<DreamFactoryTestConfig>) => Promise<{
-    passed: number;
-    failed: number;
-    coverage: number;
-  }>;
-  
-  /** Run integration tests with MSW */
-  runIntegrationTests: () => Promise<{
-    passed: number;
-    failed: number;
-    apiMocksCovered: number;
-  }>;
-  
-  /** Run E2E tests with Playwright */
-  runE2ETests: (browsers?: string[]) => Promise<{
-    passed: number;
-    failed: number;
-    browserCompatibility: Record<string, boolean>;
-  }>;
-  
-  /** Run performance tests */
-  runPerformanceTests: () => Promise<{
-    webVitals: {
-      lcp: number;
-      fid: number;
-      cls: number;
-    };
-    buildMetrics: {
-      buildTime: number;
-      bundleSize: number;
-    };
-  }>;
-  
-  /** Generate test reports */
-  generateReports: () => Promise<{
-    coverage: string;
-    performance: string;
-    accessibility: string;
-  }>;
-}
-
-// ============================================================================
-// Export Main Testing Interface
-// ============================================================================
-
-/**
- * Main testing utilities interface for DreamFactory Admin Interface
- * Provides comprehensive testing capabilities for the React/Next.js migration
- */
-export interface TestingUtils extends DreamFactoryTestUtils {
-  /** Test configuration */
-  config: DreamFactoryTestConfig;
-  
-  /** Test runner utilities */
-  runner: TestRunnerUtils;
-  
-  /** Initialize testing environment */
-  setup: () => Promise<void>;
-  
-  /** Cleanup testing environment */
-  cleanup: () => Promise<void>;
-}
-
-/**
- * Default export: Testing utilities factory
- */
-export declare function createTestingUtils(
-  config?: Partial<DreamFactoryTestConfig>
-): Promise<TestingUtils>;
+export default TestingContext
