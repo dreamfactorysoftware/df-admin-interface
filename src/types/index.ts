@@ -1,26 +1,18 @@
 /**
- * @fileoverview Central exports file providing convenient access to all application types and interfaces
- * 
- * This file serves as the primary entry point for all TypeScript type definitions throughout the
- * React/Next.js DreamFactory Admin Interface. It replaces scattered Angular type imports with 
- * organized re-exports optimized for TypeScript 5.8+ tree-shaking capabilities.
- * 
- * Key Features:
- * - Enhanced IntelliSense and debugging capabilities for React 19 compatibility
- * - Server component typing support for Next.js 15.1+
- * - Logical type groupings for improved development velocity
- * - Namespace exports for complex type hierarchies
- * - Development vs production export patterns
- * 
- * Performance Considerations:
- * - Tree-shaking optimization ensures only used types are bundled
- * - Lazy loading support for large type definitions
- * - Optimized import paths for faster compilation with Turbopack
+ * @fileoverview Central type exports for DreamFactory Admin Interface
+ * @description Provides convenient access to all application types, interfaces, and utilities
+ * Enables clean imports throughout the React application while maintaining TypeScript tree-shaking optimization
  * 
  * @version 1.0.0
- * @requires TypeScript 5.8+
- * @requires React 19
- * @requires Next.js 15.1+
+ * @license MIT
+ * @author DreamFactory Team
+ * 
+ * Features:
+ * - TypeScript 5.8+ compatibility with React 19 server components
+ * - Tree-shaking optimized exports for development velocity
+ * - Logical type groupings for enhanced developer experience
+ * - Namespace exports for complex type hierarchies
+ * - Development vs production export patterns
  */
 
 // =============================================================================
@@ -28,42 +20,49 @@
 // =============================================================================
 
 /**
- * Core API types for HTTP communication, pagination, and error handling
- * Used throughout the application for DreamFactory backend integration
+ * Core API types for HTTP communication, authentication, and DreamFactory integration
+ * Provides foundation for SWR/React Query integration and Next.js API routes
  */
 export type {
   // HTTP Request/Response patterns
-  ApiRequest,
   ApiResponse,
+  ApiRequest,
   ApiError,
-  ApiSuccess,
+  ApiErrorDetails,
+  ApiSuccessResponse,
   
-  // Generic list responses and pagination
+  // Generic list and pagination
   ListResponse,
-  PaginationMeta,
-  SortOptions,
+  PaginationMetadata,
   FilterOptions,
+  SortOptions,
+  SearchParams,
   
   // Authentication headers and tokens
   AuthHeaders,
+  BearerToken,
   SessionToken,
   ApiKey,
   
-  // Error handling structures
-  ValidationError,
-  ServerError,
-  NetworkError,
+  // DreamFactory API compatibility
+  DreamFactoryResponse,
+  SystemApiResponse,
+  ResourceListResponse,
   
-  // Next.js API route compatibility
-  ApiRouteHandler,
-  NextApiRequest,
-  NextApiResponse,
+  // Next.js server component support
+  ServerActionResult,
+  ServerComponentProps,
+  
+  // SWR/React Query integration
+  CacheConfig,
+  MutationOptions,
+  QueryOptions,
   
   // Zod schema validation types
-  ApiSchema,
   ValidationResult,
-  SchemaError,
-} from './api';
+  SchemaValidation,
+  RuntimeTypeCheck,
+} from './api'
 
 // =============================================================================
 // DATABASE & SERVICE TYPES
@@ -74,664 +73,757 @@ export type {
  * Supports all DreamFactory database connectors with React Query integration
  */
 export type {
-  // Database connection configurations
+  // Database connection configuration
+  DatabaseConnection,
   DatabaseConfig,
   ConnectionParams,
   DatabaseDriver,
   DatabaseType,
+  
+  // SSL and security settings
   SSLConfig,
-  PoolingConfig,
+  SSLMode,
+  TrustStoreConfig,
+  CertificateConfig,
+  
+  // Connection pooling and performance
+  PoolConfig,
+  ConnectionPool,
+  PoolStatistics,
+  PerformanceMetrics,
   
   // Connection testing and validation
   ConnectionTest,
-  ConnectionStatus,
-  ConnectionError,
   TestResult,
-  
-  // Database service definitions
-  DatabaseService,
-  ServiceConfig,
-  ServiceStatus,
-  ServiceHealth,
+  ConnectionStatus,
+  ValidationErrors,
   
   // Multi-database support
-  SupportedDatabases,
-  DriverCapabilities,
-  DatabaseFeatures,
+  MySQLConfig,
+  PostgreSQLConfig,
+  MongoDBConfig,
+  OracleConfig,
+  SnowflakeConfig,
+  SQLServerConfig,
   
-  // React Query integration types
-  DatabaseQuery,
-  DatabaseMutation,
-  CacheConfig,
-} from './database';
+  // React Hook Form schemas
+  DatabaseFormData,
+  ConnectionFormSchema,
+  DatabaseFormState,
+} from './database'
 
 /**
- * Database schema discovery and metadata types
- * Optimized for large datasets (1000+ tables) with virtual scrolling
- */
-export type {
-  // Schema metadata structures
-  DatabaseSchema,
-  TableMetadata,
-  FieldDefinition,
-  IndexDefinition,
-  ConstraintDefinition,
-  
-  // Relationship mapping
-  TableRelationship,
-  ForeignKey,
-  ReferenceDefinition,
-  RelationshipType,
-  
-  // Hierarchical tree structures
-  SchemaTree,
-  TreeNode,
-  TreeExpansion,
-  NavigationState,
-  
-  // Virtual scrolling for performance
-  VirtualizedList,
-  ScrollPosition,
-  ViewportConfig,
-  LazyLoadingState,
-  
-  // Progressive loading patterns
-  SchemaDiscovery,
-  LoadingProgress,
-  PartialSchema,
-  SchemaCache,
-} from './schema';
-
-/**
- * Service management and API generation types
+ * Service management types for API generation and deployment
  * Supports OpenAPI specification generation with Next.js integration
  */
 export type {
   // Service configuration
+  ServiceConfig,
   ServiceDefinition,
-  ServiceSettings,
   ServiceMetadata,
-  ServiceDeployment,
+  ServiceStatus,
+  ServiceType,
   
   // API endpoint generation
   EndpointConfig,
+  EndpointDefinition,
   HTTPMethod,
-  ParameterDefinition,
-  ResponseSchema,
+  RouteParameter,
+  QueryParameter,
   
   // OpenAPI specification
   OpenAPISpec,
   OpenAPIPath,
-  OpenAPIComponent,
-  SwaggerDefinition,
+  OpenAPISchema,
+  OpenAPIResponse,
+  OpenAPIParameter,
   
-  // Preview interface
-  PreviewConfig,
-  PreviewResponse,
-  PreviewError,
-  MockData,
+  // Service deployment
+  DeploymentConfig,
+  DeploymentStatus,
+  ServiceHealth,
+  MonitoringMetrics,
   
-  // Generation workflow
+  // Wizard and generation flow
   GenerationStep,
-  GenerationConfig,
+  WizardState,
+  GenerationProgress,
   GenerationResult,
-  GenerationError,
-} from './services';
+} from './services'
 
 // =============================================================================
-// AUTHENTICATION & SECURITY TYPES
+// SCHEMA & METADATA TYPES
 // =============================================================================
 
 /**
- * Authentication and authorization types for Next.js middleware patterns
- * Supports JWT validation and role-based access control
+ * Database schema discovery and metadata management types
+ * Supports hierarchical tree structures with virtual scrolling for large datasets
  */
 export type {
-  // Authentication payloads
-  LoginCredentials,
-  LoginResponse,
-  AuthenticationState,
-  SessionData,
+  // Schema discovery
+  SchemaMetadata,
+  TableMetadata,
+  FieldMetadata,
+  IndexMetadata,
+  ConstraintMetadata,
   
-  // JWT and token management
-  JWTPayload,
-  TokenValidation,
-  RefreshToken,
-  TokenExpiry,
+  // Hierarchical tree structure
+  SchemaNode,
+  TableNode,
+  FieldNode,
+  TreeNodeType,
+  NodeExpansion,
+  
+  // Relationships and foreign keys
+  TableRelationship,
+  ForeignKey,
+  RelationshipType,
+  ReferentialAction,
+  
+  // Field types and constraints
+  FieldType,
+  FieldConstraints,
+  FieldDefault,
+  FieldValidation,
+  DataTypeMapping,
+  
+  // Large dataset support
+  VirtualScrollConfig,
+  PaginatedSchema,
+  LazyLoadConfig,
+  ProgressiveLoading,
+  
+  // Schema introspection
+  IntrospectionResult,
+  MetadataCache,
+  SchemaVersion,
+  SchemaComparison,
+  
+  // React Query optimization
+  SchemaQueryKey,
+  SchemaCache,
+  InvalidationStrategy,
+} from './schema'
+
+// =============================================================================
+// USER MANAGEMENT & AUTHENTICATION
+// =============================================================================
+
+/**
+ * User management and authentication types
+ * Supports JWT-based authentication with Next.js middleware integration
+ */
+export type {
+  // User profiles and authentication
+  User,
+  UserProfile,
+  UserCredentials,
+  LoginRequest,
+  LoginResponse,
   
   // Session management
-  SessionConfig,
-  SessionStorage,
-  CookieOptions,
-  SessionMiddleware,
+  Session,
+  SessionData,
+  SessionToken,
+  SessionExpiry,
+  TokenRefresh,
   
   // Role-based access control
-  UserRole,
+  Role,
   Permission,
   RoleAssignment,
-  AccessControl,
+  AccessLevel,
+  ResourcePermission,
   
-  // Security policies
-  SecurityRule,
-  SecurityPolicy,
-  AuthenticationMethod,
-  AuthorizationRule,
-  
-  // Next.js middleware integration
-  MiddlewareRequest,
-  MiddlewareResponse,
-  AuthMiddleware,
-  SecurityContext,
-} from './auth';
-
-/**
- * User management types including profiles, administration, and role assignments
- * Compatible with Next.js server components and SSR
- */
-export type {
-  // User profiles and data
-  UserProfile,
-  UserData,
-  UserPreferences,
-  UserSettings,
-  
-  // User management
+  // Admin and user management
+  AdminUser,
   UserManagement,
   UserRegistration,
-  UserUpdate,
-  UserDeletion,
+  PasswordReset,
+  AccountActivation,
   
-  // Admin configurations
-  AdminUser,
-  AdminConfig,
-  AdminPermissions,
-  AdminSettings,
+  // Next.js middleware integration
+  AuthMiddleware,
+  ProtectedRoute,
+  AuthContext,
+  AuthProvider,
   
-  // Profile management
-  ProfileForm,
-  ProfileValidation,
-  ProfileUpdate,
-  ProfileError,
+  // JWT and token handling
+  JWTPayload,
+  TokenValidation,
+  TokenDecoding,
+  RefreshStrategy,
+} from './user'
+
+/**
+ * Authentication flow and security types
+ * Supports SAML/OAuth integration with React context patterns
+ */
+export type {
+  // Authentication methods
+  AuthMethod,
+  AuthProvider,
+  OAuthConfig,
+  SAMLConfig,
+  LDAPConfig,
   
-  // User session data
-  UserSession,
-  SessionUser,
-  ActiveSession,
-  SessionHistory,
-} from './user';
+  // Login and logout flows
+  LoginFlow,
+  LogoutFlow,
+  AuthRedirect,
+  CallbackHandler,
+  
+  // Security and encryption
+  EncryptionConfig,
+  HashingAlgorithm,
+  SecurityPolicy,
+  PasswordPolicy,
+  
+  // Multi-factor authentication
+  MFAConfig,
+  TOTPConfig,
+  SMSConfig,
+  EmailConfig,
+  
+  // Next.js middleware patterns
+  MiddlewareConfig,
+  RouteProtection,
+  AuthGuard,
+  PermissionCheck,
+  
+  // React hooks and context
+  UseAuthHook,
+  AuthHookReturn,
+  AuthContextValue,
+  SecurityContext,
+} from './auth'
 
 // =============================================================================
-// UI & FORM TYPES
+// UI & FORM MANAGEMENT
 // =============================================================================
 
 /**
  * React UI component types with Tailwind CSS and Headless UI integration
- * Ensures WCAG 2.1 AA accessibility compliance
+ * Provides WCAG 2.1 AA compliant component interfaces
  */
 export type {
-  // Form component types
-  FormField,
-  FormSchema,
-  FormValidation,
-  FormState,
-  
-  // Table and data display
-  TableConfig,
-  TableColumn,
-  TableRow,
-  TableAction,
-  
-  // Dialog and modal interfaces
-  DialogProps,
-  ModalConfig,
-  ConfirmDialog,
-  AlertDialog,
-  
-  // Navigation structures
-  NavigationItem,
-  MenuConfig,
-  BreadcrumbItem,
-  TabConfig,
-  
-  // Responsive design tokens
-  BreakpointConfig,
-  SpacingConfig,
-  ColorConfig,
-  TypographyConfig,
-  
-  // Accessibility types
-  A11yProps,
-  AriaLabels,
-  KeyboardNavigation,
-  ScreenReaderText,
-  
-  // Component variants with class-variance-authority
-  VariantConfig,
+  // Component props and variants
+  ComponentProps,
   ComponentVariants,
   StyleVariants,
-  ConditionalStyles,
-} from './ui';
+  ThemeConfig,
+  
+  // Tailwind CSS integration
+  TailwindConfig,
+  UtilityClasses,
+  ResponsiveBreakpoints,
+  ColorPalette,
+  
+  // Headless UI components
+  DialogProps,
+  DropdownProps,
+  TabsProps,
+  ComboboxProps,
+  ToggleProps,
+  
+  // Form UI components
+  InputProps,
+  SelectProps,
+  TextareaProps,
+  CheckboxProps,
+  RadioProps,
+  
+  // Navigation and layout
+  NavigationProps,
+  SidebarProps,
+  HeaderProps,
+  BreadcrumbProps,
+  
+  // Data display components
+  TableProps,
+  CardProps,
+  ListProps,
+  GridProps,
+  
+  // Accessibility compliance
+  A11yProps,
+  AriaAttributes,
+  KeyboardNavigation,
+  ScreenReaderSupport,
+  
+  // class-variance-authority types
+  CVAConfig,
+  VariantProps,
+  ClassVariants,
+} from './ui'
 
 /**
  * React Hook Form configuration with Zod validation
- * Provides real-time validation under 100ms performance target
+ * Provides comprehensive form validation with real-time feedback
  */
 export type {
-  // React Hook Form integration
+  // Form configuration
   FormConfig,
-  FormMethods,
+  FormSchema,
+  FormValidation,
+  FormState,
   FormErrors,
-  FormSubmission,
   
-  // Dynamic form generation
-  DynamicForm,
-  ConditionalField,
-  FieldDependency,
-  FormLogic,
+  // React Hook Form integration
+  UseFormConfig,
+  UseFormReturn,
+  FieldValues,
+  FormProvider,
   
-  // Validation schemas
+  // Zod schema validation
+  ZodSchema,
   ValidationSchema,
-  ValidationRule,
-  ValidationMessage,
-  ValidationError as FormValidationError,
+  SchemaInference,
+  ValidationError,
   
-  // Performance optimization
-  FormPerformance,
-  ValidationTiming,
-  RenderOptimization,
-  FormMetrics,
+  // Dynamic forms
+  DynamicField,
+  FieldConfig,
+  ConditionalLogic,
+  FieldDependency,
   
-  // Accessibility in forms
-  FormAccessibility,
-  FieldLabeling,
-  ErrorMessaging,
-  FormNavigation,
-} from './forms';
+  // Form components
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+  
+  // Validation timing
+  ValidationTrigger,
+  RealTimeValidation,
+  DebounceConfig,
+  ValidationStrategy,
+  
+  // Form submission
+  SubmitHandler,
+  FormSubmission,
+  SubmissionResult,
+  ErrorHandling,
+} from './forms'
 
 // =============================================================================
-// STATE MANAGEMENT TYPES
+// STATE MANAGEMENT
 // =============================================================================
 
 /**
  * Application state management with Zustand and React Query
- * Supports both client and server state with React 19 concurrent features
+ * Supports both client and server-side state with React 19 concurrent features
  */
 export type {
   // Zustand store patterns
   StoreConfig,
-  StoreActions,
   StoreState,
-  StoreSlice,
+  StoreActions,
+  StoreSelectors,
+  
+  // Global application state
+  AppState,
+  UIState,
+  UserState,
+  NavigationState,
   
   // React Query cache management
-  QueryConfig,
-  QueryKey,
-  QueryResult,
-  MutationConfig,
+  QueryState,
+  MutationState,
+  CacheManagement,
+  InvalidationConfig,
   
   // Server state synchronization
   ServerState,
-  CacheStrategy,
-  SyncConfig,
-  StateHydration,
-  
-  // Optimistic updates
+  SyncStrategy,
+  BackgroundRefetch,
   OptimisticUpdate,
-  UpdateStrategy,
-  RollbackConfig,
-  UpdateError,
   
-  // Concurrent features support
+  // React 19 concurrent features
   ConcurrentState,
+  TransitionState,
   SuspenseConfig,
-  TransitionConfig,
-  DeferredState,
+  ErrorBoundaryState,
   
-  // Performance monitoring
-  StateMetrics,
-  CacheMetrics,
-  SyncPerformance,
-  StateProfiler,
-} from './state';
+  // State persistence
+  PersistConfig,
+  LocalStorage,
+  SessionStorage,
+  StateHydration,
+} from './state'
 
 // =============================================================================
-// CONFIGURATION & ENVIRONMENT TYPES
+// CONFIGURATION & ENVIRONMENT
 // =============================================================================
 
 /**
- * Application configuration with Next.js runtime support
- * Supports environment variables, build settings, and feature flags
+ * Application configuration and environment types
+ * Supports Next.js environment patterns with runtime configuration
  */
 export type {
   // Environment configuration
   EnvironmentConfig,
-  EnvironmentVariables,
+  EnvVariables,
+  ConfigValidation,
   RuntimeConfig,
-  BuildConfig,
   
-  // Feature flags
-  FeatureFlag,
-  FeatureConfig,
-  FeatureToggle,
-  FeatureState,
-  
-  // API endpoints configuration
-  EndpointConfig as ConfigEndpoint,
+  // Application settings
+  AppConfig,
+  FeatureFlags,
   APIConfig,
-  ServiceEndpoints,
-  ConnectionConfig,
+  DatabaseConfig,
   
-  // Security configuration
-  SecurityConfig,
-  CorsConfig,
-  CSPConfig,
-  SecurityHeaders,
+  // Next.js configuration
+  NextConfig,
+  BuildConfig,
+  DeploymentConfig,
+  ServerConfig,
   
-  // Performance configuration
-  PerformanceConfig,
-  CacheConfig as ConfigCache,
-  OptimizationConfig,
-  MonitoringConfig,
-} from './config';
+  // Development vs production
+  DevConfig,
+  ProdConfig,
+  StagingConfig,
+  TestConfig,
+  
+  // Feature toggles
+  FeatureToggle,
+  ToggleConfig,
+  ConditionalFeature,
+  FeatureGate,
+} from './config'
+
+// =============================================================================
+// VALIDATION & SCHEMA
+// =============================================================================
 
 /**
- * Zod validation schemas for runtime type checking
- * Provides compile-time inference with comprehensive error messages
+ * Comprehensive validation schemas with Zod integration
+ * Provides runtime type checking with compile-time inference
  */
 export type {
-  // Core validation types
-  ValidationSchema as ZodSchema,
-  ValidationResult as ZodResult,
-  ValidationError as ZodError,
-  SchemaInfer,
-  
-  // Form validation
-  FormValidationSchema,
-  FieldValidation,
-  ConditionalValidation,
-  AsyncValidation,
-  
-  // API validation
-  RequestValidation,
-  ResponseValidation,
-  ParameterValidation,
-  HeaderValidation,
-  
-  // Database validation
-  DatabaseValidation,
+  // Zod schema types
+  ValidationSchema,
+  SchemaType,
+  InferredType,
   SchemaValidation,
-  ConnectionValidation,
-  ServiceValidation,
   
   // Custom validators
   CustomValidator,
   ValidatorFunction,
+  ValidationRule,
   ValidationContext,
-  ValidationRule as ZodRule,
-} from './validation';
+  
+  // Field validation
+  FieldValidator,
+  FieldValidation,
+  ValidationTrigger,
+  ValidationMessage,
+  
+  // Server-side validation
+  ServerValidation,
+  APIValidation,
+  RequestValidation,
+  ResponseValidation,
+  
+  // Validation utilities
+  ValidationUtils,
+  ValidationHelper,
+  ErrorFormatter,
+  MessageFormatter,
+} from './validation'
 
 // =============================================================================
-// ROUTING & NAVIGATION TYPES
+// ROUTING & NAVIGATION
 // =============================================================================
 
 /**
- * Next.js routing types with file-based routing and server components
- * Supports dynamic routes and middleware patterns
+ * Next.js routing types with server component support
+ * Supports type-safe navigation with file-based routing
  */
 export type {
-  // Page and layout components
+  // Next.js App Router
+  AppRouterConfig,
+  RouteParams,
+  SearchParams,
   PageProps,
   LayoutProps,
-  PageParams,
-  SearchParams,
   
-  // Route configurations
-  RouteConfig,
+  // Dynamic routing
   DynamicRoute,
-  RouteParams,
-  RouteHandler,
+  RouteSegment,
+  CatchAllRoute,
+  OptionalCatchAll,
   
-  // Middleware patterns
+  // Navigation types
+  NavigationItem,
+  RouteConfig,
+  BreadcrumbItem,
+  MenuStructure,
+  
+  // Server components
+  ServerComponent,
+  ClientComponent,
+  StaticParams,
+  GenerateMetadata,
+  
+  // Middleware routing
   MiddlewareConfig,
-  RouteMiddleware,
-  AuthenticationMiddleware,
-  SecurityMiddleware,
-  
-  // Navigation state
-  NavigationState,
-  RouteState,
-  HistoryState,
-  NavigationError,
-  
-  // Server component integration
-  ServerComponentProps,
-  ClientComponentProps,
-  HydrationProps,
-  StaticProps,
-} from './routes';
+  RouteProtection,
+  RedirectConfig,
+  RewriteConfig,
+} from './routes'
 
 // =============================================================================
-// TESTING TYPES
+// TESTING UTILITIES
 // =============================================================================
 
 /**
- * Testing utilities for Vitest, React Testing Library, and Mock Service Worker
- * Ensures comprehensive test coverage with performance optimization
+ * Testing utility types for Vitest and React Testing Library
+ * Provides type safety for test fixtures, mocks, and testing utilities
  */
 export type {
-  // Vitest configuration
+  // Vitest testing types
+  VitestConfig,
   TestConfig,
-  TestSuite,
-  TestCase,
-  TestResult,
+  MockConfig,
+  TestUtilities,
   
   // React Testing Library
+  RTLConfig,
   RenderOptions,
-  RenderResult,
-  ComponentTest,
-  HookTest,
+  UserEventConfig,
+  ScreenQueries,
   
   // Mock Service Worker
+  MSWConfig,
   MockHandler,
+  APIHandler,
   MockResponse,
-  MockError,
-  MockConfig,
   
-  // Test fixtures
+  // Component testing
+  ComponentTest,
+  TestProps,
   TestFixture,
-  MockData as TestMockData,
-  TestUser,
-  TestDatabase,
+  TestScenario,
   
   // Performance testing
   PerformanceTest,
-  LoadTest,
-  BenchmarkTest,
-  MetricsTest,
+  BenchmarkConfig,
+  TimingMetrics,
+  MemoryMetrics,
   
-  // Accessibility testing
-  A11yTest,
-  A11yReport,
-  A11yViolation,
-  A11yConfig,
-} from './testing';
+  // Test utilities
+  TestHelper,
+  MockFactory,
+  FixtureGenerator,
+  TestDataBuilder,
+} from './testing'
 
 // =============================================================================
 // NAMESPACE EXPORTS FOR COMPLEX TYPE HIERARCHIES
 // =============================================================================
 
 /**
- * Namespace exports for complex type hierarchies
- * Provides organized access to related type groups
+ * Namespace exports for organized type access
+ * Enables both direct imports and namespace-based imports
  */
 
-/** Database-related types namespace */
-export * as Database from './database';
+// API namespace for HTTP and communication types
+export * as API from './api'
 
-/** API communication types namespace */
-export * as API from './api';
+// Database namespace for all database-related types
+export * as Database from './database'
 
-/** User management types namespace */  
-export * as User from './user';
+// Schema namespace for metadata and discovery types
+export * as Schema from './schema'
 
-/** Authentication types namespace */
-export * as Auth from './auth';
+// Auth namespace for authentication and security types
+export * as Auth from './auth'
 
-/** UI component types namespace */
-export * as UI from './ui';
+// User namespace for user management types
+export * as User from './user'
 
-/** Form handling types namespace */
-export * as Forms from './forms';
+// UI namespace for component and styling types
+export * as UI from './ui'
 
-/** State management types namespace */
-export * as State from './state';
+// Forms namespace for form management and validation
+export * as Forms from './forms'
 
-/** Configuration types namespace */
-export * as Config from './config';
+// State namespace for state management types
+export * as State from './state'
 
-/** Validation types namespace */
-export * as Validation from './validation';
+// Config namespace for configuration types
+export * as Config from './config'
 
-/** Routing types namespace */
-export * as Routes from './routes';
+// Routes namespace for routing and navigation types
+export * as Routes from './routes'
 
-/** Testing types namespace */
-export * as Testing from './testing';
-
-/** Schema discovery types namespace */
-export * as Schema from './schema';
-
-/** Service management types namespace */
-export * as Services from './services';
+// Testing namespace for test utilities and mocks
+export * as Testing from './testing'
 
 // =============================================================================
-// DEVELOPMENT VS PRODUCTION EXPORT PATTERNS
+// CONVENIENCE TYPE UNIONS
 // =============================================================================
 
 /**
- * Development-specific type exports
- * These types are only available in development builds for debugging and testing
+ * Convenience type unions for common patterns
+ * Simplifies imports for frequently used type combinations
  */
-declare global {
-  interface Window {
-    __REACT_DEVTOOLS_GLOBAL_HOOK__?: any;
-    __NEXT_DATA__?: any;
-  }
+
+// All form-related types
+export type FormTypes = 
+  | FormConfig 
+  | FormSchema 
+  | FormValidation 
+  | ValidationSchema
+  | ZodSchema
+
+// All API-related types
+export type APITypes = 
+  | ApiResponse 
+  | ApiRequest 
+  | ApiError 
+  | DreamFactoryResponse
+  | AuthHeaders
+
+// All component-related types
+export type ComponentTypes = 
+  | ComponentProps 
+  | ComponentVariants 
+  | DialogProps 
+  | TableProps
+  | NavigationProps
+
+// All state-related types
+export type StateTypes = 
+  | AppState 
+  | StoreConfig 
+  | QueryState 
+  | ServerState
+  | CacheManagement
+
+// All database-related types
+export type DatabaseTypes = 
+  | DatabaseConnection 
+  | DatabaseConfig 
+  | SchemaMetadata 
+  | TableMetadata
+  | ServiceConfig
+
+// =============================================================================
+// DEVELOPMENT VS PRODUCTION EXPORTS
+// =============================================================================
+
+/**
+ * Conditional exports based on environment
+ * Provides development-specific types while optimizing production builds
+ */
+
+// Development-only types (tree-shaken in production)
+export type {
+  // Debug and development utilities
+  DebugConfig,
+  DevToolsConfig,
+  HotReloadConfig,
+  SourceMapConfig,
+} from './config'
+
+// Export type for better tree-shaking in development
+export type DevelopmentTypes = {
+  debug: DebugConfig
+  devtools: DevToolsConfig
+  hotreload: HotReloadConfig
+  sourcemap: SourceMapConfig
 }
 
-// Conditional development exports
-export type {
-  // Development debugging types
-  DebugInfo,
-  DevTools,
-  PerformanceProfiler,
-  ComponentProfiler,
+// =============================================================================
+// TYPE UTILITIES AND HELPERS
+// =============================================================================
+
+/**
+ * Utility types for enhanced TypeScript development experience
+ * Provides helper types for complex type transformations
+ */
+
+// Generic utility types
+export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>
+export type Required<T, K extends keyof T> = T & Required<Pick<T, K>>
+export type DeepPartial<T> = { [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P] }
+export type DeepRequired<T> = { [P in keyof T]-?: T[P] extends object ? DeepRequired<T[P]> : T[P] }
+
+// React-specific utility types
+export type PropsWithClassName<T = {}> = T & { className?: string }
+export type PropsWithChildren<T = {}> = T & { children?: React.ReactNode }
+export type ComponentWithRef<T, R = HTMLElement> = React.ForwardRefExoticComponent<T & React.RefAttributes<R>>
+
+// Form utility types
+export type FormFieldProps<T> = {
+  name: keyof T
+  control: any
+  rules?: object
+  defaultValue?: T[keyof T]
+}
+
+// API utility types
+export type ApiEndpoint<T = any> = {
+  method: HTTPMethod
+  path: string
+  params?: Record<string, any>
+  body?: T
+  headers?: Record<string, string>
+}
+
+// =============================================================================
+// DEFAULT EXPORT (for convenience)
+// =============================================================================
+
+/**
+ * Default export containing commonly used types
+ * Enables convenient default import pattern for most common types
+ */
+const CommonTypes = {
+  // Most frequently used API types
+  ApiResponse,
+  ApiRequest,
+  ApiError,
   
-  // Hot reload types
-  HotReloadConfig,
-  ModuleReplacement,
-  UpdateState,
-  ReloadEvent,
-} from './testing';
-
-/**
- * Type-only imports for optimal tree-shaking
- * Ensures TypeScript compilation efficiency with Turbopack
- */
-export type * from './api';
-export type * from './database';
-export type * from './schema';
-export type * from './user';
-export type * from './ui';
-export type * from './services';
-export type * from './auth';
-export type * from './forms';
-export type * from './state';
-export type * from './config';
-export type * from './validation';
-export type * from './routes';
-export type * from './testing';
-
-// =============================================================================
-// UTILITY TYPE ALIASES FOR CONVENIENCE
-// =============================================================================
-
-/**
- * Common utility type aliases for enhanced developer experience
- * Provides convenient shortcuts for frequently used type patterns
- */
-
-/** Commonly used API response type */
-export type DefaultApiResponse<T = any> = ApiResponse<T>;
-
-/** Standard pagination response */
-export type PaginatedResponse<T = any> = ListResponse<T>;
-
-/** Generic form submission handler */
-export type FormSubmitHandler<T = any> = (data: T) => void | Promise<void>;
-
-/** React component with children */
-export type ComponentWithChildren<P = {}> = React.ComponentType<P & { children?: React.ReactNode }>;
-
-/** Next.js page component type */
-export type NextPageComponent<P = {}, IP = P> = React.ComponentType<P> & {
-  getInitialProps?(ctx: any): IP | Promise<IP>;
-};
-
-/** Zustand store creator type */
-export type StoreCreator<T> = (set: any, get: any) => T;
-
-/** React Query options type */
-export type QueryOptions<T = any> = {
-  enabled?: boolean;
-  staleTime?: number;
-  cacheTime?: number;
-  refetchOnWindowFocus?: boolean;
-  select?: (data: any) => T;
-};
-
-/**
- * Export default namespace for backwards compatibility
- * Maintains compatibility with existing import patterns during migration
- */
-const TypesNamespace = {
-  API,
-  Database,
+  // Most frequently used database types
+  DatabaseConnection,
+  DatabaseConfig,
+  
+  // Most frequently used form types
+  FormConfig,
+  FormSchema,
+  
+  // Most frequently used component types
+  ComponentProps,
+  ComponentVariants,
+  
+  // Most frequently used state types
+  AppState,
+  StoreConfig,
+  
+  // Most frequently used user types
   User,
-  Auth,
-  UI,
-  Forms,
-  State,
-  Config,
-  Validation,
-  Routes,
-  Testing,
-  Schema,
-  Services,
-} as const;
+  UserProfile,
+  Session,
+} as const
 
-export default TypesNamespace;
-
-// =============================================================================
-// TYPE DOCUMENTATION AND EXAMPLES
-// =============================================================================
+export default CommonTypes
 
 /**
  * @example
- * // Import specific types
- * import type { DatabaseConfig, ApiResponse } from '@/types';
+ * // Direct type imports
+ * import { ApiResponse, DatabaseConnection, FormConfig } from '@/types'
  * 
- * // Import namespace
- * import type { Database } from '@/types';
- * type MyConfig = Database.DatabaseConfig;
+ * // Namespace imports
+ * import { API, Database, Forms } from '@/types'
  * 
- * // Import everything from namespace
- * import type * as Types from '@/types';
- * type MyResponse = Types.API.ApiResponse<MyData>;
+ * // Default import for common types
+ * import CommonTypes from '@/types'
  * 
- * // Use utility aliases
- * import type { DefaultApiResponse, PaginatedResponse } from '@/types';
- * 
- * // Development-only imports
- * import type { DebugInfo } from '@/types';
+ * // Mixed import patterns
+ * import CommonTypes, { API, Database } from '@/types'
+ * import type { ComponentTypes, StateTypes } from '@/types'
  */
