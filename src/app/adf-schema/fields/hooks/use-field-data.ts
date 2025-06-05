@@ -1,606 +1,575 @@
 /**
- * @fileoverview Custom React hook implementing SWR-based data fetching for individual database field metadata
- * with intelligent caching and automatic revalidation. Provides optimized field data retrieval for the field
- * details form component, supporting both create and edit modes with cache hit responses under 50ms per
- * React/Next.js Integration Requirements.
+ * Field Data Fetching Hook for React/Next.js DreamFactory Admin Interface
+ * 
+ * Custom React hook implementing SWR-based data fetching for individual database
+ * field metadata with intelligent caching and automatic revalidation. Provides
+ * optimized field data retrieval for the field details form component, supporting
+ * both create and edit modes with cache hit responses under 50ms per React/Next.js
+ * Integration Requirements.
  * 
  * Key Features:
- * - SWR/React Query for intelligent caching and synchronization per React/Next.js Integration Requirements
- * - Cache hit responses under 50ms per React/Next.js Integration Requirements
- * - Real-time data fetching with automatic revalidation per Section 4.3.2 Server State Management
- * - Type-safe configuration workflows per Section 5.2 Component Details
- * - Intelligent caching with TTL configuration (staleTime: 300 seconds, cacheTime: 900 seconds)
- * - Automatic background revalidation and error handling with retry logic
+ * - SWR-powered intelligent caching with TTL configuration (300s/900s)
+ * - Automatic background revalidation with retry logic
+ * - Type-safe field data fetching with TypeScript interfaces
  * - Cache invalidation patterns for field updates and deletions
- * - Support for conditional fetching based on field existence and edit mode
+ * - Conditional fetching based on field existence and edit mode
+ * - Real-time data synchronization with server state management
  * 
+ * @fileoverview Field data fetching hook with SWR integration
  * @version 1.0.0
- * @created 2024-12-28
- * @author DreamFactory Admin Interface Team
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import useSWR from 'swr';
+import useSWR, { KeyedMutator } from 'swr';
+import { useSWRConfig } from 'swr';
 import { useMemo, useCallback } from 'react';
-import { apiClient } from '@/lib/api-client';
-import type { DatabaseSchemaFieldType, FieldFormData } from '../field.types';
+import type { 
+  DatabaseSchemaFieldType,
+  FieldResponse 
+} from '../field.types';
+import type { 
+  ApiErrorResponse,
+  ApiRequestOptions 
+} from '../../../../types/api';
 
-// =============================================================================
-// INTERFACE DEFINITIONS
-// =============================================================================
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
 
 /**
- * Field data configuration for the hook
- * Controls fetching behavior and cache management
+ * Field data fetching configuration options
+ * Provides fine-grained control over data fetching behavior
  */
-export interface FieldDataConfig {
-  /** Database service name */
-  serviceName: string;
-  /** Database name */
-  databaseName?: string;
-  /** Table name */
-  tableName: string;
-  /** Field name for editing (null for create mode) */
-  fieldName?: string | null;
-  /** Enable conditional fetching (default: true) */
+export interface UseFieldDataOptions extends ApiRequestOptions {
+  /** Service name for database connection */
+  service?: string;
+  /** Table name containing the field */
+  table?: string;
+  /** Field name to fetch (undefined for create mode) */
+  fieldName?: string;
+  /** Whether to fetch field data (default: true) */
   enabled?: boolean;
-  /** Enable caching (default: true) */
-  enableCache?: boolean;
-  /** Revalidation on focus (default: false) */
+  /** Refresh interval in milliseconds (default: undefined - no auto refresh) */
+  refreshInterval?: number;
+  /** Revalidate on focus (default: true) */
   revalidateOnFocus?: boolean;
-  /** Revalidation on reconnect (default: true) */
+  /** Revalidate on reconnect (default: true) */
   revalidateOnReconnect?: boolean;
-  /** Revalidation on mount (default: true) */
-  revalidateOnMount?: boolean;
   /** Enable background revalidation (default: true) */
   revalidateIfStale?: boolean;
-  /** Refresh interval in milliseconds (default: undefined - no automatic refresh) */
-  refreshInterval?: number;
   /** Error retry count (default: 3) */
   errorRetryCount?: number;
-  /** Error retry interval in milliseconds (default: 1000) */
+  /** Error retry interval in milliseconds (default: 5000) */
   errorRetryInterval?: number;
 }
 
 /**
- * Field data API response structure
- * Matches DreamFactory API response format
+ * Hook return type providing field data and control methods
  */
-export interface FieldDataApiResponse {
-  /** Operation success flag */
-  success: boolean;
-  /** Field data */
-  data?: DatabaseSchemaFieldType;
-  /** Response message */
-  message?: string;
-  /** Error details if operation failed */
-  error?: {
-    code: string;
-    message: string;
-    details?: unknown;
-  };
-  /** Response metadata */
-  meta?: {
-    timestamp: number;
-    requestId: string;
-    service: string;
-    table: string;
-    field: string;
-  };
-}
-
-/**
- * Field data hook return type
- * Provides comprehensive field data management
- */
-export interface UseFieldDataReturn {
-  // Data states
-  /** Field data (null for create mode or when not found) */
-  fieldData: DatabaseSchemaFieldType | null;
-  /** Form-ready field data with defaults applied */
-  formData: FieldFormData | null;
-  /** Loading state */
+export interface UseFieldDataResult {
+  /** Field data - null for create mode or when loading */
+  field: DatabaseSchemaFieldType | null;
+  /** Loading state indicator */
   isLoading: boolean;
-  /** Validating/revalidating state */
+  /** Error state - null when no error */
+  error: ApiErrorResponse | null;
+  /** Data validation state - true when data is fresh */
   isValidating: boolean;
-  /** Error state */
-  error: Error | null;
-  /** Whether this is edit mode (fieldName provided) */
-  isEditMode: boolean;
-  /** Whether this is create mode (no fieldName) */
-  isCreateMode: boolean;
-  
-  // Cache management
-  /** Manually refetch field data */
-  refetch: () => Promise<DatabaseSchemaFieldType | undefined>;
-  /** Invalidate cache for this field */
-  invalidateCache: () => void;
-  /** Mutate cache data directly */
-  mutateCache: (data?: DatabaseSchemaFieldType | Promise<DatabaseSchemaFieldType>) => void;
-  
-  // Utility functions
-  /** Check if field exists */
-  exists: boolean;
-  /** Get field cache key */
-  getCacheKey: () => string[] | null;
-  /** Check if data is fresh (not stale) */
-  isFresh: boolean;
-  /** Check if data is stale but still usable */
-  isStale: boolean;
-}
-
-// =============================================================================
-// UTILITY FUNCTIONS
-// =============================================================================
-
-/**
- * Create cache key for field data
- * Follows consistent cache key pattern for field-related queries
- */
-function createFieldCacheKey(serviceName: string, tableName: string, fieldName: string): string[] {
-  return ['field-data', serviceName, tableName, fieldName];
+  /** Manual revalidation trigger */
+  revalidate: () => Promise<DatabaseSchemaFieldType | undefined>;
+  /** Mutate field data optimistically */
+  mutate: KeyedMutator<FieldResponse>;
+  /** Cache key used for this field */
+  cacheKey: string | null;
 }
 
 /**
- * Create API endpoint for field data
- * Constructs the DreamFactory API endpoint for field metadata
+ * Field cache configuration with performance optimization
+ * Implements intelligent caching per Section 5.2 Component Details
  */
-function createFieldEndpoint(serviceName: string, tableName: string, fieldName: string, databaseName?: string): string {
-  const baseService = databaseName ? `${serviceName}/${databaseName}` : serviceName;
-  return `/${baseService}/_schema/${tableName}/_field/${fieldName}`;
+export interface FieldCacheConfig {
+  /** Stale time in milliseconds (300 seconds = 5 minutes) */
+  staleTime: number;
+  /** Cache time in milliseconds (900 seconds = 15 minutes) */
+  cacheTime: number;
+  /** Dedupe interval in milliseconds (2 seconds) */
+  dedupingInterval: number;
+  /** Focus revalidation throttle in milliseconds (5 seconds) */
+  focusThrottleInterval: number;
 }
 
-/**
- * Transform API response to form data
- * Converts field metadata to React Hook Form compatible format
- */
-function transformToFormData(fieldData: DatabaseSchemaFieldType): FieldFormData {
-  return {
-    // Basic field information
-    name: fieldData.name || '',
-    alias: fieldData.alias || '',
-    label: fieldData.label || fieldData.name || '',
-    description: fieldData.description || '',
-    
-    // Type configuration
-    type: fieldData.type,
-    dbType: fieldData.dbType || '',
-    
-    // Size constraints
-    length: fieldData.length,
-    precision: fieldData.precision,
-    scale: fieldData.scale || 0,
-    
-    // Default value
-    default: fieldData.default,
-    
-    // Boolean flags
-    allowNull: fieldData.allowNull ?? true,
-    autoIncrement: fieldData.autoIncrement ?? false,
-    fixedLength: fieldData.fixedLength ?? false,
-    isAggregate: fieldData.isAggregate ?? false,
-    isForeignKey: fieldData.isForeignKey ?? false,
-    isPrimaryKey: fieldData.isPrimaryKey ?? false,
-    isUnique: fieldData.isUnique ?? false,
-    isVirtual: fieldData.isVirtual ?? false,
-    required: fieldData.required ?? false,
-    supportsMultibyte: fieldData.supportsMultibyte ?? false,
-    
-    // Reference configuration
-    refTable: fieldData.refTable,
-    refField: fieldData.refField,
-    refOnDelete: fieldData.refOnDelete,
-    refOnUpdate: fieldData.refOnUpdate,
-    
-    // Advanced configuration
-    picklist: fieldData.picklist,
-    validation: fieldData.validation,
-    dbFunction: fieldData.dbFunction?.map((func, index) => ({
-      use: func.use || [],
-      function: func.function || '',
-      id: `function-${index}`
-    })) || []
-  };
-}
-
-// =============================================================================
-// SWR FETCHER FUNCTION
-// =============================================================================
+// ============================================================================
+// CONSTANTS AND CONFIGURATION
+// ============================================================================
 
 /**
- * Fetcher function for field data
- * Retrieves individual field metadata from DreamFactory API
+ * Default cache configuration optimized for field metadata
+ * Per Section 5.2 Component Details schema metadata caching requirements
  */
-const fetchFieldData = async (
-  serviceName: string,
-  tableName: string,
-  fieldName: string,
-  databaseName?: string
-): Promise<DatabaseSchemaFieldType> => {
-  try {
-    const endpoint = createFieldEndpoint(serviceName, tableName, fieldName, databaseName);
-    const response: FieldDataApiResponse = await apiClient.get(endpoint);
-    
-    if (!response.success) {
-      throw new Error(
-        response.error?.message || 
-        response.message || 
-        `Failed to fetch field data: ${fieldName}`
-      );
-    }
-
-    if (!response.data) {
-      throw new Error(`Field "${fieldName}" not found in table "${tableName}"`);
-    }
-
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching field data:', error);
-    
-    // Enhance error with context
-    if (error instanceof Error) {
-      throw new Error(
-        `Failed to load field "${fieldName}" from table "${tableName}": ${error.message}`
-      );
-    }
-    
-    throw new Error(
-      `Failed to load field "${fieldName}" from table "${tableName}": Unknown error`
-    );
-  }
+const DEFAULT_CACHE_CONFIG: FieldCacheConfig = {
+  staleTime: 300_000,      // 5 minutes - fresh data window
+  cacheTime: 900_000,      // 15 minutes - cache retention time  
+  dedupingInterval: 2_000, // 2 seconds - dedupe identical requests
+  focusThrottleInterval: 5_000 // 5 seconds - throttle focus revalidation
 };
 
-// =============================================================================
-// MAIN HOOK IMPLEMENTATION
-// =============================================================================
+/**
+ * Default fetching options with performance optimization
+ */
+const DEFAULT_OPTIONS: Partial<UseFieldDataOptions> = {
+  enabled: true,
+  revalidateOnFocus: true,
+  revalidateOnReconnect: true,
+  revalidateIfStale: true,
+  errorRetryCount: 3,
+  errorRetryInterval: 5_000
+};
 
 /**
- * Custom React hook for fetching individual field data with SWR caching
- * 
- * Replaces Angular DfBaseCrudService.get() with SWR for field data fetching per Section 5.2
- * Component Details data fetching operations. Implements intelligent caching with TTL configuration
- * (staleTime: 300 seconds, cacheTime: 900 seconds) per Section 5.2 schema metadata caching requirements.
- * 
- * Performance optimizations ensure cache hit responses under 50ms per React/Next.js Integration
- * Requirements, with automatic background revalidation and comprehensive error handling following
- * Section 4.3.2 Server State Management workflows.
- * 
- * @param config - Field data configuration
- * @returns Field data management interface
+ * API endpoint patterns for field data fetching
  */
-export function useFieldData(config: FieldDataConfig): UseFieldDataReturn {
-  const {
-    serviceName,
-    databaseName,
-    tableName,
-    fieldName,
-    enabled = true,
-    enableCache = true,
-    revalidateOnFocus = false,
-    revalidateOnReconnect = true,
-    revalidateOnMount = true,
-    revalidateIfStale = true,
-    refreshInterval,
-    errorRetryCount = 3,
-    errorRetryInterval = 1000
-  } = config;
+const FIELD_ENDPOINTS = {
+  /** Get specific field metadata */
+  getField: (service: string, table: string, field: string) => 
+    `/api/v2/${service}/_schema/${table}/${field}`,
+  /** Get table fields list (for validation) */
+  getTableFields: (service: string, table: string) => 
+    `/api/v2/${service}/_schema/${table}`,
+} as const;
 
-  // ==========================================================================
-  // COMPUTED PROPERTIES
-  // ==========================================================================
+// ============================================================================
+// CACHE KEY GENERATION
+// ============================================================================
 
-  /** Whether this is edit mode (fieldName provided and not empty) */
-  const isEditMode = Boolean(fieldName && fieldName.trim().length > 0);
+/**
+ * Generates cache keys for field data with consistent formatting
+ * Ensures proper cache isolation between different fields
+ * 
+ * @param service - Database service name
+ * @param table - Table name
+ * @param fieldName - Field name (undefined for create mode)
+ * @returns Cache key string or null if insufficient parameters
+ */
+function generateFieldCacheKey(
+  service?: string, 
+  table?: string, 
+  fieldName?: string
+): string | null {
+  // Return null for create mode or missing required parameters
+  if (!service || !table || !fieldName) {
+    return null;
+  }
   
-  /** Whether this is create mode (no fieldName provided) */
-  const isCreateMode = !isEditMode;
+  return `field:${service}:${table}:${fieldName}`;
+}
 
-  /** Cache key for this field data query */
-  const cacheKey = useMemo(() => {
-    if (!isEditMode || !fieldName) {
-      return null;
-    }
-    return createFieldCacheKey(serviceName, tableName, fieldName);
-  }, [serviceName, tableName, fieldName, isEditMode]);
+/**
+ * Generates related cache keys for invalidation patterns
+ * Used to invalidate related data when field is modified
+ * 
+ * @param service - Database service name  
+ * @param table - Table name
+ * @returns Array of related cache key patterns
+ */
+function generateRelatedCacheKeys(service: string, table: string): string[] {
+  return [
+    `table:${service}:${table}`,           // Table metadata
+    `fields:${service}:${table}`,          // Table fields list
+    `schema:${service}`,                   // Full schema cache
+    `relationships:${service}:${table}`,   // Table relationships
+  ];
+}
 
-  // ==========================================================================
-  // SWR QUERY
-  // ==========================================================================
+// ============================================================================
+// DATA FETCHER FUNCTION
+// ============================================================================
 
-  /**
-   * SWR query for field data
-   * Conditionally fetches based on edit mode and enabled flag
-   */
-  const {
-    data: fieldData,
-    error,
-    isValidating,
-    mutate
-  } = useSWR(
-    // Conditional fetching - only fetch in edit mode when enabled
-    enabled && isEditMode && fieldName ? cacheKey : null,
-    // Fetcher function with proper parameters
-    ([, service, table, field]) => fetchFieldData(service, table, field, databaseName),
-    {
-      // Performance optimization - cache hit responses under 50ms per requirements
-      dedupingInterval: 50,
-      
-      // Intelligent caching configuration per Section 5.2 requirements
-      // staleTime: 300 seconds (5 minutes) - data considered fresh
-      revalidateIfStale,
-      revalidateOnMount,
-      revalidateOnFocus,
-      revalidateOnReconnect,
-      
-      // Cache time configuration - keep in cache for 900 seconds (15 minutes)
-      ...(enableCache && {
-        revalidateIfStale: true,
-        refreshInterval, // Manual or undefined for no auto-refresh
-      }),
-      
-      // Error handling with retry logic per Section 4.3.2
-      errorRetryCount,
-      errorRetryInterval,
-      shouldRetryOnError: (error) => {
-        // Don't retry on 404 errors (field not found)
-        if (error?.message?.includes('not found') || error?.message?.includes('404')) {
-          return false;
+/**
+ * SWR-compatible data fetcher for field metadata
+ * Implements proper error handling and response transformation
+ * 
+ * @param url - API endpoint URL
+ * @returns Promise resolving to field response data
+ * @throws ApiErrorResponse on fetch failures
+ */
+async function fetchFieldData(url: string): Promise<FieldResponse> {
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      credentials: 'include', // Include session cookies
+    });
+
+    // Handle HTTP error responses
+    if (!response.ok) {
+      const errorData: ApiErrorResponse = await response.json().catch(() => ({
+        success: false,
+        error: {
+          code: 'FETCH_ERROR',
+          message: `HTTP ${response.status}: ${response.statusText}`,
+          status_code: response.status as any,
         }
-        return true;
-      },
+      }));
       
-      // Error callback for logging
-      onError: (error) => {
-        console.error('Field data fetch error:', {
-          serviceName,
-          tableName,
-          fieldName,
-          error: error.message
-        });
-      },
-      
-      // Success callback for debugging
-      onSuccess: (data) => {
-        console.debug('Field data fetched successfully:', {
-          serviceName,
-          tableName,
-          fieldName: data?.name
-        });
-      }
+      throw errorData;
     }
+
+    // Parse and validate successful response
+    const data: FieldResponse = await response.json();
+    
+    // Validate response structure
+    if (!data.resource) {
+      throw {
+        success: false,
+        error: {
+          code: 'INVALID_RESPONSE',
+          message: 'Invalid field data response format',
+          status_code: 500,
+        }
+      } as ApiErrorResponse;
+    }
+
+    return data;
+  } catch (error) {
+    // Re-throw ApiErrorResponse objects as-is
+    if (error && typeof error === 'object' && 'error' in error) {
+      throw error;
+    }
+    
+    // Transform network/parsing errors to ApiErrorResponse
+    throw {
+      success: false,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: error instanceof Error ? error.message : 'Network request failed',
+        status_code: 500,
+        context: { originalError: error }
+      }
+    } as ApiErrorResponse;
+  }
+}
+
+// ============================================================================
+// MAIN HOOK IMPLEMENTATION
+// ============================================================================
+
+/**
+ * Custom React hook for fetching individual database field metadata
+ * 
+ * Implements SWR-based data fetching with intelligent caching and automatic
+ * revalidation. Optimized for field details form component with support for
+ * both create and edit modes. Cache hit responses under 50ms per React/Next.js
+ * Integration Requirements.
+ * 
+ * Features:
+ * - Intelligent caching with configurable TTL (staleTime: 300s, cacheTime: 900s)
+ * - Conditional fetching based on field existence and edit mode
+ * - Automatic background revalidation with exponential backoff retry logic
+ * - Type-safe field data retrieval with comprehensive error handling
+ * - Cache invalidation patterns for field updates and deletions
+ * - Real-time data synchronization with server state management
+ * 
+ * @param options - Configuration options for field data fetching
+ * @returns Hook result with field data, loading state, and control methods
+ * 
+ * @example
+ * ```tsx
+ * // Edit mode - fetch existing field
+ * const { field, isLoading, error, revalidate } = useFieldData({
+ *   service: 'database',
+ *   table: 'users', 
+ *   fieldName: 'email',
+ *   enabled: true
+ * });
+ * 
+ * // Create mode - no fetching
+ * const { field, isLoading } = useFieldData({
+ *   service: 'database',
+ *   table: 'users',
+ *   fieldName: undefined, // Create mode
+ *   enabled: false
+ * });
+ * ```
+ */
+export function useFieldData(options: UseFieldDataOptions = {}): UseFieldDataResult {
+  // Merge options with defaults
+  const config = useMemo(() => ({
+    ...DEFAULT_OPTIONS,
+    ...options
+  }), [options]);
+
+  // Generate cache key for this field
+  const cacheKey = useMemo(() => 
+    generateFieldCacheKey(config.service, config.table, config.fieldName),
+    [config.service, config.table, config.fieldName]
   );
 
-  // ==========================================================================
-  // DERIVED DATA
-  // ==========================================================================
-
-  /**
-   * Loading state computation
-   * True when no data and no error (initial load)
-   */
-  const isLoading = useMemo(() => {
-    if (isCreateMode) return false;
-    return !fieldData && !error && isValidating;
-  }, [fieldData, error, isValidating, isCreateMode]);
-
-  /**
-   * Form-ready data with defaults applied
-   * Transforms field data to React Hook Form compatible format
-   */
-  const formData = useMemo((): FieldFormData | null => {
-    if (isCreateMode) {
-      // Return default form data for create mode
-      return {
-        name: '',
-        alias: '',
-        label: '',
-        description: '',
-        type: 'string',
-        dbType: '',
-        length: null,
-        precision: null,
-        scale: 0,
-        default: null,
-        allowNull: true,
-        autoIncrement: false,
-        fixedLength: false,
-        isAggregate: false,
-        isForeignKey: false,
-        isPrimaryKey: false,
-        isUnique: false,
-        isVirtual: false,
-        required: false,
-        supportsMultibyte: false,
-        refTable: null,
-        refField: null,
-        refOnDelete: null,
-        refOnUpdate: null,
-        picklist: null,
-        validation: null,
-        dbFunction: []
-      };
-    }
-    
-    if (!fieldData) {
+  // Generate API endpoint URL
+  const apiUrl = useMemo(() => {
+    if (!cacheKey || !config.service || !config.table || !config.fieldName) {
       return null;
     }
+    return FIELD_ENDPOINTS.getField(config.service, config.table, config.fieldName);
+  }, [cacheKey, config.service, config.table, config.fieldName]);
+
+  // SWR configuration with performance optimization
+  const swrConfig = useMemo(() => ({
+    // Cache configuration per Section 5.2 Component Details
+    dedupingInterval: DEFAULT_CACHE_CONFIG.dedupingInterval,
+    focusThrottleInterval: DEFAULT_CACHE_CONFIG.focusThrottleInterval,
     
-    return transformToFormData(fieldData);
-  }, [fieldData, isCreateMode]);
+    // Revalidation settings
+    revalidateOnFocus: config.revalidateOnFocus,
+    revalidateOnReconnect: config.revalidateOnReconnect,
+    revalidateIfStale: config.revalidateIfStale,
+    refreshInterval: config.refreshInterval,
+    
+    // Error handling with exponential backoff
+    errorRetryCount: config.errorRetryCount,
+    errorRetryInterval: config.errorRetryInterval,
+    
+    // Performance optimization
+    shouldRetryOnError: (error: ApiErrorResponse) => {
+      // Don't retry on client errors (4xx)
+      if (error.error?.status_code && error.error.status_code >= 400 && error.error.status_code < 500) {
+        return false;
+      }
+      return true;
+    },
+    
+    // Error handling callback
+    onError: (error: ApiErrorResponse) => {
+      console.error('Field data fetch error:', {
+        service: config.service,
+        table: config.table,
+        field: config.fieldName,
+        error: error.error
+      });
+    },
+    
+    // Success callback for performance monitoring
+    onSuccess: (data: FieldResponse) => {
+      console.debug('Field data fetch success:', {
+        service: config.service,
+        table: config.table,
+        field: config.fieldName,
+        dataSize: JSON.stringify(data).length
+      });
+    }
+  }), [config]);
 
-  /**
-   * Check if field exists
-   * True if we have field data or if in create mode
-   */
-  const exists = useMemo(() => {
-    if (isCreateMode) return true;
-    return Boolean(fieldData);
-  }, [fieldData, isCreateMode]);
+  // Access SWR global configuration for cache operations
+  const { mutate: globalMutate } = useSWRConfig();
 
-  /**
-   * Check if data is fresh (not stale)
-   * Based on SWR internal state
-   */
-  const isFresh = useMemo(() => {
-    if (isCreateMode) return true;
-    return Boolean(fieldData && !isValidating);
-  }, [fieldData, isValidating, isCreateMode]);
+  // Execute SWR hook with conditional fetching
+  const {
+    data,
+    error,
+    isLoading,
+    isValidating,
+    mutate
+  } = useSWR<FieldResponse, ApiErrorResponse>(
+    // Only provide key if fetching is enabled and we have required parameters
+    config.enabled && apiUrl ? cacheKey : null,
+    // Fetcher function with URL binding
+    apiUrl ? () => fetchFieldData(apiUrl) : null,
+    swrConfig
+  );
 
-  /**
-   * Check if data is stale but still usable
-   * When we have data but it might be outdated
-   */
-  const isStale = useMemo(() => {
-    if (isCreateMode) return false;
-    return Boolean(fieldData && isValidating);
-  }, [fieldData, isValidating, isCreateMode]);
-
-  // ==========================================================================
-  // CACHE MANAGEMENT FUNCTIONS
-  // ==========================================================================
-
-  /**
-   * Manually refetch field data
-   * Forces a fresh fetch from the server
-   */
-  const refetch = useCallback(async () => {
-    if (!isEditMode || !fieldName) {
+  // Manual revalidation function
+  const revalidate = useCallback(async (): Promise<DatabaseSchemaFieldType | undefined> => {
+    if (!cacheKey || !apiUrl) {
       return undefined;
     }
     
-    return mutate();
-  }, [mutate, isEditMode, fieldName]);
-
-  /**
-   * Invalidate cache for this field
-   * Triggers revalidation on next access
-   */
-  const invalidateCache = useCallback(() => {
-    if (isEditMode) {
-      mutate(undefined, { revalidate: true });
+    try {
+      const response = await mutate();
+      return response?.resource;
+    } catch (error) {
+      console.error('Manual revalidation failed:', error);
+      throw error;
     }
-  }, [mutate, isEditMode]);
+  }, [cacheKey, apiUrl, mutate]);
 
-  /**
-   * Mutate cache data directly
-   * For optimistic updates or manual cache manipulation
-   */
-  const mutateCache = useCallback((data?: DatabaseSchemaFieldType | Promise<DatabaseSchemaFieldType>) => {
-    if (isEditMode) {
-      mutate(data, { revalidate: false });
+  // Cache invalidation helper for field mutations
+  const invalidateFieldCache = useCallback(async (): Promise<void> => {
+    if (!config.service || !config.table) {
+      return;
     }
-  }, [mutate, isEditMode]);
 
-  /**
-   * Get cache key for this field
-   * Useful for external cache management
-   */
-  const getCacheKey = useCallback(() => {
-    return cacheKey;
-  }, [cacheKey]);
+    // Invalidate current field cache
+    if (cacheKey) {
+      await globalMutate(cacheKey);
+    }
 
-  // ==========================================================================
-  // RETURN HOOK INTERFACE
-  // ==========================================================================
+    // Invalidate related caches for consistency
+    const relatedKeys = generateRelatedCacheKeys(config.service, config.table);
+    await Promise.all(
+      relatedKeys.map(key => globalMutate(
+        (key: string) => key.includes(config.service!) && key.includes(config.table!),
+        undefined,
+        { revalidate: true }
+      ))
+    );
+  }, [config.service, config.table, cacheKey, globalMutate]);
 
-  return {
-    // Data states
-    fieldData: fieldData || null,
-    formData,
-    isLoading,
-    isValidating,
-    error,
-    isEditMode,
-    isCreateMode,
-    
-    // Cache management
-    refetch,
-    invalidateCache,
-    mutateCache,
-    
-    // Utility functions
-    exists,
-    getCacheKey,
-    isFresh,
-    isStale
-  };
-}
-
-// =============================================================================
-// HOOK VARIANTS AND UTILITIES
-// =============================================================================
-
-/**
- * Simplified hook for just checking if field exists
- * Useful for validation purposes
- */
-export function useFieldExists(serviceName: string, tableName: string, fieldName: string) {
-  const { exists, isLoading, error } = useFieldData({
-    serviceName,
-    tableName,
-    fieldName,
-    enabled: Boolean(fieldName),
-    revalidateOnFocus: false,
-    revalidateOnMount: false
-  });
-
-  return {
-    exists: exists && !error,
-    loading: isLoading,
-    error
-  };
-}
-
-/**
- * Hook for field data with automatic form data transformation
- * Returns only the form-compatible data structure
- */
-export function useFieldFormData(serviceName: string, tableName: string, fieldName?: string | null) {
-  const { formData, isLoading, error, isEditMode, isCreateMode } = useFieldData({
-    serviceName,
-    tableName,
-    fieldName
-  });
-
-  return {
-    data: formData,
-    loading: isLoading,
-    error,
-    isEditMode,
-    isCreateMode
-  };
-}
-
-/**
- * Create cache key utility function
- * Useful for manual cache operations outside the hook
- */
-export function createFieldDataCacheKey(serviceName: string, tableName: string, fieldName: string): string[] {
-  return createFieldCacheKey(serviceName, tableName, fieldName);
-}
-
-/**
- * Type guard to check if data is valid field data
- */
-export function isValidFieldData(data: unknown): data is DatabaseSchemaFieldType {
-  return (
-    typeof data === 'object' &&
-    data !== null &&
-    'name' in data &&
-    'type' in data &&
-    typeof (data as any).name === 'string' &&
-    typeof (data as any).type === 'string'
+  // Enhanced mutate function with cache invalidation
+  const enhancedMutate: KeyedMutator<FieldResponse> = useCallback(
+    async (data, shouldRevalidate = true) => {
+      const result = await mutate(data, shouldRevalidate);
+      
+      // Trigger related cache invalidation on successful mutation
+      if (shouldRevalidate) {
+        await invalidateFieldCache();
+      }
+      
+      return result;
+    },
+    [mutate, invalidateFieldCache]
   );
+
+  // Extract field data from response
+  const field = useMemo(() => {
+    return data?.resource || null;
+  }, [data]);
+
+  // Return hook result with comprehensive state and controls
+  return {
+    field,
+    isLoading,
+    error,
+    isValidating,
+    revalidate,
+    mutate: enhancedMutate,
+    cacheKey
+  };
 }
 
-// =============================================================================
-// EXPORTS
-// =============================================================================
+// ============================================================================
+// UTILITY HOOKS AND HELPERS
+// ============================================================================
 
-export default useFieldData;
+/**
+ * Hook for batch field data operations with cache optimization
+ * Useful for table field management and bulk operations
+ * 
+ * @param service - Database service name
+ * @param table - Table name
+ * @returns Batch operation helpers
+ */
+export function useFieldDataBatch(service?: string, table?: string) {
+  const { mutate: globalMutate } = useSWRConfig();
 
-// Export types for external use
+  const invalidateAllFields = useCallback(async (): Promise<void> => {
+    if (!service || !table) {
+      return;
+    }
+
+    // Invalidate all field-related caches for the table
+    await globalMutate(
+      (key: string) => {
+        return typeof key === 'string' && (
+          key.startsWith(`field:${service}:${table}:`) ||
+          key.startsWith(`fields:${service}:${table}`) ||
+          key.startsWith(`table:${service}:${table}`)
+        );
+      },
+      undefined,
+      { revalidate: true }
+    );
+  }, [service, table, globalMutate]);
+
+  const preloadField = useCallback(async (fieldName: string): Promise<void> => {
+    if (!service || !table) {
+      return;
+    }
+
+    const url = FIELD_ENDPOINTS.getField(service, table, fieldName);
+    const cacheKey = generateFieldCacheKey(service, table, fieldName);
+    
+    if (cacheKey) {
+      // Preload data into cache without triggering component updates
+      globalMutate(cacheKey, fetchFieldData(url), { revalidate: false });
+    }
+  }, [service, table, globalMutate]);
+
+  return {
+    invalidateAllFields,
+    preloadField
+  };
+}
+
+/**
+ * Hook for field cache statistics and debugging
+ * Useful for performance monitoring and development
+ * 
+ * @param service - Database service name
+ * @param table - Table name  
+ * @returns Cache statistics and debug helpers
+ */
+export function useFieldDataCache(service?: string, table?: string) {
+  const { cache } = useSWRConfig();
+
+  const getCacheStats = useCallback((): {
+    totalFields: number;
+    cachedFields: string[];
+    staleCacheKeys: string[];
+  } => {
+    if (!service || !table) {
+      return { totalFields: 0, cachedFields: [], staleCacheKeys: [] };
+    }
+
+    const fieldPrefix = `field:${service}:${table}:`;
+    const cachedFields: string[] = [];
+    const staleCacheKeys: string[] = [];
+
+    // Iterate through cache entries
+    for (const [key] of cache) {
+      if (typeof key === 'string' && key.startsWith(fieldPrefix)) {
+        cachedFields.push(key);
+        
+        // Check if cache entry is stale (simplified check)
+        const cacheEntry = cache.get(key);
+        if (cacheEntry && Date.now() - (cacheEntry.timestamp || 0) > DEFAULT_CACHE_CONFIG.staleTime) {
+          staleCacheKeys.push(key);
+        }
+      }
+    }
+
+    return {
+      totalFields: cachedFields.length,
+      cachedFields,
+      staleCacheKeys
+    };
+  }, [service, table, cache]);
+
+  const clearFieldCache = useCallback((): void => {
+    if (!service || !table) {
+      return;
+    }
+
+    const fieldPrefix = `field:${service}:${table}:`;
+    
+    // Remove all field cache entries for the table
+    for (const [key] of cache) {
+      if (typeof key === 'string' && key.startsWith(fieldPrefix)) {
+        cache.delete(key);
+      }
+    }
+  }, [service, table, cache]);
+
+  return {
+    getCacheStats,
+    clearFieldCache
+  };
+}
+
+// Export types for external usage
 export type {
-  FieldDataConfig,
-  FieldDataApiResponse,
-  UseFieldDataReturn
+  UseFieldDataOptions,
+  UseFieldDataResult,
+  FieldCacheConfig
 };
