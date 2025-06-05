@@ -1,1415 +1,2022 @@
 /**
- * @fileoverview Custom React hook providing field type dropdown options and type-specific 
- * configuration data with memoized performance optimization. Manages the comprehensive list 
- * of database field types and their associated constraints, validation rules, and UI 
- * configuration requirements for the DreamFactory field management interface.
+ * Field Types Management Hook for React/Next.js DreamFactory Admin Interface
  * 
+ * Custom React hook providing field type dropdown options and type-specific configuration
+ * data with memoized performance optimization. Manages the comprehensive list of database
+ * field types and their associated constraints, validation rules, and UI configuration
+ * requirements while maintaining compatibility with existing Angular functionality.
+ * 
+ * Migrated from Angular df-field-details component type management with enhanced React
+ * patterns, performance optimization through useMemo, and comprehensive TypeScript interfaces
+ * for type-safe field type management across all field management components.
+ * 
+ * @fileoverview Field type management hook for database schema field configuration
  * @version 1.0.0
- * @created 2024-12-28
- * 
- * Key Features:
- * - Comprehensive field type support per existing Angular type dropdown functionality
- * - Memoized performance optimization for dropdown options per React best practices
- * - Type-safe field type configuration per Section 5.2 Component Details
- * - Consistent field type handling across all field management components
- * - Field type categorization and grouping for enhanced UX per Section 7.2 UI Use Cases
- * - TypeScript interfaces for type-safe field type management per React/Next.js Integration Requirements
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { useMemo } from 'react'
-import type { DreamFactoryFieldType } from '../field.types'
+import { useMemo, useCallback } from 'react';
+import type { 
+  FieldDataType, 
+  FieldFormData,
+  FIELD_TYPE_OPTIONS,
+  DatabaseSchemaFieldType
+} from '../field.types';
+import type { DatabaseType } from '../../../../types/database';
 
 // =============================================================================
-// FIELD TYPE INTERFACES AND TYPES
+// FIELD TYPE CONFIGURATION INTERFACES
 // =============================================================================
 
 /**
- * Field type option for dropdown display with enhanced categorization
+ * Field type configuration interface defining constraints and UI behavior
  */
-export interface FieldTypeOption {
-  /** Field type value matching DreamFactory types */
-  value: DreamFactoryFieldType | 'manual'
-  /** Display label for UI */
-  label: string
-  /** Field type description for tooltips and help text */
-  description: string
-  /** Category for grouping in dropdowns */
-  category: FieldTypeCategory
-  /** Whether this type is commonly used */
-  isCommon: boolean
-  /** Icon name for visual representation */
-  icon?: string
+export interface FieldTypeConfig {
+  /** Field type identifier */
+  type: FieldDataType | 'manual';
+  /** Display label for dropdown */
+  label: string;
+  /** Field type category for grouping */
+  category: 'Core' | 'Numeric' | 'Date/Time' | 'User' | 'Relationships' | 'Advanced' | 'Custom';
+  /** Description for help text */
+  description: string;
+  
+  // Form control configuration
+  /** Controls that should be enabled for this type */
+  enabledControls: FieldControlConfig;
+  /** Default values for form fields */
+  defaultValues: Partial<FieldFormData>;
+  /** Field validation requirements */
+  validationRules: FieldValidationRules;
+  /** Database-specific configurations */
+  databaseSupport: DatabaseTypeSupport;
+  
+  // UI behavior configuration
+  /** Whether this type supports length specification */
+  supportsLength: boolean;
+  /** Whether this type supports precision/scale */
+  supportsPrecision: boolean;
+  /** Whether this type can be auto-increment */
+  supportsAutoIncrement: boolean;
+  /** Whether this type can be primary key */
+  supportsPrimaryKey: boolean;
+  /** Whether this type can be foreign key */
+  supportsForeignKey: boolean;
+  /** Whether this type supports default values */
+  supportsDefault: boolean;
+  /** Whether this type supports picklist */
+  supportsPicklist: boolean;
 }
 
 /**
- * Field type categories for enhanced UX organization
+ * Form control configuration for dynamic field enabling/disabling
  */
-export type FieldTypeCategory = 
-  | 'text'
-  | 'numeric'
-  | 'datetime'
-  | 'boolean'
-  | 'binary'
-  | 'reference'
-  | 'special'
-  | 'manual'
-
-/**
- * Field configuration state determining which form controls are enabled/disabled
- */
-export interface FieldTypeConfiguration {
-  /** Whether manual database type entry is enabled */
-  dbTypeEnabled: boolean
-  /** Whether length constraint input is enabled */
-  lengthEnabled: boolean
-  /** Whether precision input is enabled */
-  precisionEnabled: boolean
-  /** Whether scale input is enabled */
-  scaleEnabled: boolean
-  /** Whether fixed length toggle is enabled */
-  fixedLengthEnabled: boolean
-  /** Whether multibyte support toggle is enabled */
-  supportsMultibyteEnabled: boolean
-  /** Whether picklist input is enabled */
-  picklistEnabled: boolean
-  /** Whether aggregate field toggle is enabled (for virtual fields) */
-  isAggregateEnabled: boolean
-  /** Default scale value when scale is enabled */
-  defaultScale?: number
-  /** Maximum length value for validation */
-  maxLength?: number
-  /** Supported constraints for this field type */
-  supportedConstraints: string[]
-  /** Validation rules specific to this field type */
-  validationRules: FieldValidationRule[]
+export interface FieldControlConfig {
+  /** Length input control */
+  length: boolean;
+  /** Precision input control */
+  precision: boolean;
+  /** Scale input control */
+  scale: boolean;
+  /** Fixed length toggle */
+  fixedLength: boolean;
+  /** Auto-increment toggle */
+  autoIncrement: boolean;
+  /** Default value input */
+  defaultValue: boolean;
+  /** Picklist configuration */
+  picklist: boolean;
+  /** Database function configuration */
+  dbFunctions: boolean;
+  /** Custom type input (for manual selection) */
+  customType: boolean;
 }
 
 /**
- * Validation rule for field type-specific validation
+ * Field validation rules for type-specific constraints
  */
-export interface FieldValidationRule {
-  /** Rule identifier */
-  rule: string
-  /** Human-readable message */
-  message: string
-  /** Rule parameters */
-  params?: Record<string, unknown>
+export interface FieldValidationRules {
+  /** Minimum length value */
+  minLength?: number;
+  /** Maximum length value */
+  maxLength?: number;
+  /** Minimum precision value */
+  minPrecision?: number;
+  /** Maximum precision value */
+  maxPrecision?: number;
+  /** Maximum scale value (relative to precision) */
+  maxScale?: number;
+  /** Required form fields for this type */
+  requiredFields: (keyof FieldFormData)[];
+  /** Incompatible constraint combinations */
+  incompatibleConstraints: Array<{
+    field: keyof FieldFormData;
+    value: any;
+    conflictsWith: Array<{ field: keyof FieldFormData; values: any[] }>;
+  }>;
 }
 
 /**
- * Field type metadata including supported features and constraints
+ * Database-specific type support configuration
+ */
+export interface DatabaseTypeSupport {
+  /** Supported database types */
+  supportedDatabases: DatabaseType[];
+  /** Database-specific type mappings */
+  nativeTypes: Partial<Record<DatabaseType, string>>;
+  /** Database-specific constraints */
+  constraints: Partial<Record<DatabaseType, {
+    maxLength?: number;
+    maxPrecision?: number;
+    supportsUnicode?: boolean;
+    supportsBinary?: boolean;
+  }>>;
+}
+
+/**
+ * Field type category configuration for UI grouping
+ */
+export interface FieldTypeCategory {
+  /** Category identifier */
+  id: string;
+  /** Category display label */
+  label: string;
+  /** Category description */
+  description: string;
+  /** Category icon identifier */
+  icon?: string;
+  /** Field types in this category */
+  types: (FieldDataType | 'manual')[];
+  /** Display order in UI */
+  order: number;
+}
+
+/**
+ * Field type metadata for enhanced UI functionality
  */
 export interface FieldTypeMetadata {
-  /** Field type configuration */
-  configuration: FieldTypeConfiguration
-  /** Supported database types for this field type */
-  supportedDbTypes: string[]
-  /** Default database type mapping */
-  defaultDbType?: string
-  /** Whether this type supports foreign key relationships */
-  supportsForeignKey: boolean
-  /** Whether this type supports primary key constraints */
-  supportsPrimaryKey: boolean
-  /** Whether this type supports unique constraints */
-  supportsUnique: boolean
-  /** Whether this type supports auto-increment */
-  supportsAutoIncrement: boolean
-  /** Whether this type supports default values */
-  supportsDefault: boolean
-  /** Example values for documentation */
-  examples: string[]
-}
-
-/**
- * Complete field type information combining option, configuration, and metadata
- */
-export interface FieldTypeInfo extends FieldTypeOption {
-  /** Type-specific metadata and configuration */
-  metadata: FieldTypeMetadata
-}
-
-/**
- * Hook return type providing all field type functionality
- */
-export interface UseFieldTypesReturn {
-  /** All available field type options */
-  fieldTypeOptions: FieldTypeOption[]
-  /** Field type options grouped by category */
-  fieldTypesByCategory: Record<FieldTypeCategory, FieldTypeOption[]>
-  /** Commonly used field types for quick access */
-  commonFieldTypes: FieldTypeOption[]
-  /** Get configuration for a specific field type */
-  getFieldTypeConfiguration: (fieldType: DreamFactoryFieldType | 'manual') => FieldTypeConfiguration
-  /** Get complete metadata for a specific field type */
-  getFieldTypeMetadata: (fieldType: DreamFactoryFieldType | 'manual') => FieldTypeMetadata
-  /** Get field type info including option and metadata */
-  getFieldTypeInfo: (fieldType: DreamFactoryFieldType | 'manual') => FieldTypeInfo | undefined
-  /** Check if a field type supports a specific feature */
-  supportsFeature: (fieldType: DreamFactoryFieldType | 'manual', feature: keyof FieldTypeMetadata) => boolean
+  /** Type identifier */
+  type: FieldDataType | 'manual';
+  /** Whether type requires specific database features */
+  requiresFeatures?: string[];
+  /** Performance considerations for this type */
+  performanceNotes?: string;
+  /** Common use cases and examples */
+  useCases?: string[];
+  /** Related types and migration paths */
+  relatedTypes?: FieldDataType[];
+  /** Version compatibility information */
+  compatibility?: {
+    dreamfactoryMinVersion?: string;
+    databaseVersions?: Partial<Record<DatabaseType, string>>;
+  };
 }
 
 // =============================================================================
-// FIELD TYPE DEFINITIONS AND CONFIGURATIONS
+// FIELD TYPE CONFIGURATION DATA
 // =============================================================================
 
 /**
- * Comprehensive field type options with categorization and metadata
- * Based on Angular implementation typeDropdownMenuOptions with enhanced organization
+ * Comprehensive field type configurations with enhanced metadata
+ * Migrated and enhanced from Angular component type management
  */
-const FIELD_TYPE_OPTIONS: FieldTypeOption[] = [
-  // Manual Type Entry
-  {
-    value: 'manual',
+const FIELD_TYPE_CONFIGURATIONS: Record<FieldDataType | 'manual', FieldTypeConfig> = {
+  // Manual type selection
+  manual: {
+    type: 'manual',
     label: 'I will manually enter a type',
-    description: 'Manually specify the database-specific field type',
-    category: 'manual',
-    isCommon: false,
-    icon: 'pencil'
-  },
-  
-  // Text Types
-  {
-    value: 'string',
-    label: 'String',
-    description: 'Variable-length character data with optional length limit',
-    category: 'text',
-    isCommon: true,
-    icon: 'text'
-  },
-  {
-    value: 'text',
-    label: 'Text',
-    description: 'Large text data for long content and descriptions',
-    category: 'text',
-    isCommon: true,
-    icon: 'document-text'
-  },
-  {
-    value: 'password',
-    label: 'Password',
-    description: 'Encrypted password field with special handling',
-    category: 'text',
-    isCommon: false,
-    icon: 'lock-closed'
-  },
-  {
-    value: 'email',
-    label: 'Email',
-    description: 'Email address with built-in validation',
-    category: 'text',
-    isCommon: true,
-    icon: 'at-symbol'
-  },
-  {
-    value: 'url',
-    label: 'URL',
-    description: 'Web URL with validation',
-    category: 'text',
-    isCommon: false,
-    icon: 'link'
+    category: 'Custom',
+    description: 'Define a custom database-specific type',
+    enabledControls: {
+      length: true,
+      precision: true,
+      scale: true,
+      fixedLength: true,
+      autoIncrement: true,
+      defaultValue: true,
+      picklist: true,
+      dbFunctions: true,
+      customType: true,
+    },
+    defaultValues: {
+      typeSelection: 'manual',
+      manualType: '',
+      supportsMultibyte: false,
+    },
+    validationRules: {
+      requiredFields: ['manualType'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle', 'mongodb', 'snowflake'],
+      nativeTypes: {},
+      constraints: {},
+    },
+    supportsLength: true,
+    supportsPrecision: true,
+    supportsAutoIncrement: true,
+    supportsPrimaryKey: true,
+    supportsForeignKey: true,
+    supportsDefault: true,
+    supportsPicklist: true,
   },
 
-  // Numeric Types
-  {
-    value: 'integer',
-    label: 'Integer',
-    description: 'Whole numbers without decimal places',
-    category: 'numeric',
-    isCommon: true,
-    icon: 'hashtag'
-  },
-  {
-    value: 'bigint',
-    label: 'Big Integer',
-    description: 'Large whole numbers for high-precision counting',
-    category: 'numeric',
-    isCommon: false,
-    icon: 'hashtag'
-  },
-  {
-    value: 'smallint',
-    label: 'Small Integer',
-    description: 'Small whole numbers with limited range',
-    category: 'numeric',
-    isCommon: false,
-    icon: 'hashtag'
-  },
-  {
-    value: 'decimal',
-    label: 'Decimal',
-    description: 'Fixed-point decimal numbers with specified precision',
-    category: 'numeric',
-    isCommon: true,
-    icon: 'calculator'
-  },
-  {
-    value: 'float',
-    label: 'Float',
-    description: 'Single-precision floating-point numbers',
-    category: 'numeric',
-    isCommon: false,
-    icon: 'calculator'
-  },
-  {
-    value: 'double',
-    label: 'Double',
-    description: 'Double-precision floating-point numbers',
-    category: 'numeric',
-    isCommon: false,
-    icon: 'calculator'
-  },
-  {
-    value: 'money',
-    label: 'Money',
-    description: 'Currency values with appropriate precision',
-    category: 'numeric',
-    isCommon: true,
-    icon: 'currency-dollar'
-  },
-
-  // Date/Time Types
-  {
-    value: 'date',
-    label: 'Date',
-    description: 'Date values without time component',
-    category: 'datetime',
-    isCommon: true,
-    icon: 'calendar'
-  },
-  {
-    value: 'time',
-    label: 'Time',
-    description: 'Time values without date component',
-    category: 'datetime',
-    isCommon: false,
-    icon: 'clock'
-  },
-  {
-    value: 'datetime',
-    label: 'DateTime',
-    description: 'Combined date and time values',
-    category: 'datetime',
-    isCommon: true,
-    icon: 'calendar'
-  },
-  {
-    value: 'timestamp',
-    label: 'Timestamp',
-    description: 'Precise timestamp with timezone support',
-    category: 'datetime',
-    isCommon: true,
-    icon: 'clock'
-  },
-  {
-    value: 'timestamp_on_create',
-    label: 'Timestamp on Create',
-    description: 'Automatically set timestamp when record is created',
-    category: 'special',
-    isCommon: true,
-    icon: 'plus-circle'
-  },
-  {
-    value: 'timestamp_on_update',
-    label: 'Timestamp on Update',
-    description: 'Automatically updated timestamp when record is modified',
-    category: 'special',
-    isCommon: true,
-    icon: 'pencil-square'
-  },
-
-  // Boolean Types
-  {
-    value: 'boolean',
-    label: 'Boolean',
-    description: 'True/false values',
-    category: 'boolean',
-    isCommon: true,
-    icon: 'check-circle'
-  },
-
-  // Binary Types
-  {
-    value: 'binary',
-    label: 'Binary',
-    description: 'Fixed-length binary data',
-    category: 'binary',
-    isCommon: false,
-    icon: 'document'
-  },
-  {
-    value: 'varbinary',
-    label: 'Variable Binary',
-    description: 'Variable-length binary data',
-    category: 'binary',
-    isCommon: false,
-    icon: 'document'
-  },
-  {
-    value: 'blob',
-    label: 'BLOB',
-    description: 'Binary large object for file storage',
-    category: 'binary',
-    isCommon: false,
-    icon: 'document'
-  },
-  {
-    value: 'medium_blob',
-    label: 'Medium BLOB',
-    description: 'Medium-sized binary large object',
-    category: 'binary',
-    isCommon: false,
-    icon: 'document'
-  },
-  {
-    value: 'long_blob',
-    label: 'Long BLOB',
-    description: 'Large binary large object for big files',
-    category: 'binary',
-    isCommon: false,
-    icon: 'document'
-  },
-
-  // Reference Types
-  {
-    value: 'reference',
-    label: 'Reference',
-    description: 'Foreign key reference to another table',
-    category: 'reference',
-    isCommon: true,
-    icon: 'link'
-  },
-  {
-    value: 'user_id',
-    label: 'User ID',
-    description: 'Reference to user table',
-    category: 'reference',
-    isCommon: true,
-    icon: 'user'
-  },
-  {
-    value: 'user_id_on_create',
-    label: 'User ID on Create',
-    description: 'Automatically set user ID when record is created',
-    category: 'special',
-    isCommon: true,
-    icon: 'user-plus'
-  },
-  {
-    value: 'user_id_on_update',
-    label: 'User ID on Update',
-    description: 'Automatically updated user ID when record is modified',
-    category: 'special',
-    isCommon: true,
-    icon: 'user-circle'
-  }
-]
-
-/**
- * Field type configurations determining form control states
- * Based on Angular component field enabling/disabling logic
- */
-const FIELD_TYPE_CONFIGURATIONS: Record<DreamFactoryFieldType | 'manual', FieldTypeConfiguration> = {
-  // Manual type entry configuration
-  manual: {
-    dbTypeEnabled: true,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default', 'unique', 'primary_key'],
-    validationRules: [
-      {
-        rule: 'required',
-        message: 'Database type is required when manual type is selected'
-      }
-    ]
-  },
-
-  // Text type configurations
-  string: {
-    dbTypeEnabled: false,
-    lengthEnabled: true,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: true,
-    supportsMultibyteEnabled: true,
-    picklistEnabled: true,
-    isAggregateEnabled: false,
-    maxLength: 65535,
-    supportedConstraints: ['not_null', 'default', 'unique', 'primary_key'],
-    validationRules: [
-      {
-        rule: 'maxLength',
-        message: 'String length cannot exceed database limits',
-        params: { max: 65535 }
-      }
-    ]
-  },
-
-  text: {
-    dbTypeEnabled: false,
-    lengthEnabled: true,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default'],
-    validationRules: []
-  },
-
-  password: {
-    dbTypeEnabled: false,
-    lengthEnabled: true,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: true,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null'],
-    validationRules: [
-      {
-        rule: 'minLength',
-        message: 'Password fields should have minimum length',
-        params: { min: 8 }
-      }
-    ]
-  },
-
-  email: {
-    dbTypeEnabled: false,
-    lengthEnabled: true,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    maxLength: 320,
-    supportedConstraints: ['not_null', 'default', 'unique'],
-    validationRules: [
-      {
-        rule: 'email',
-        message: 'Must be a valid email address format'
-      }
-    ]
-  },
-
-  url: {
-    dbTypeEnabled: false,
-    lengthEnabled: true,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    maxLength: 2048,
-    supportedConstraints: ['not_null', 'default'],
-    validationRules: [
-      {
-        rule: 'url',
-        message: 'Must be a valid URL format'
-      }
-    ]
-  },
-
-  // Numeric type configurations
-  integer: {
-    dbTypeEnabled: false,
-    lengthEnabled: true,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: true,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default', 'unique', 'primary_key'],
-    validationRules: [
-      {
-        rule: 'integer',
-        message: 'Must be a valid integer'
-      }
-    ]
-  },
-
-  bigint: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default', 'unique', 'primary_key'],
-    validationRules: [
-      {
-        rule: 'bigint',
-        message: 'Must be a valid big integer'
-      }
-    ]
-  },
-
-  smallint: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default', 'unique'],
-    validationRules: [
-      {
-        rule: 'smallint',
-        message: 'Must be a valid small integer'
-      }
-    ]
-  },
-
-  decimal: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: true,
-    scaleEnabled: true,
-    defaultScale: 0,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default', 'unique'],
-    validationRules: [
-      {
-        rule: 'decimal',
-        message: 'Must be a valid decimal number'
+  // Core types
+  id: {
+    type: 'id',
+    label: 'ID (Auto-increment)',
+    category: 'Core',
+    description: 'Auto-incrementing primary key',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: true,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: false,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'id',
+      isPrimaryKey: true,
+      autoIncrement: true,
+      required: true,
+      allowNull: false,
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [
+        {
+          field: 'allowNull',
+          value: true,
+          conflictsWith: [{ field: 'isPrimaryKey', values: [true] }],
+        },
+      ],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle'],
+      nativeTypes: {
+        mysql: 'INT AUTO_INCREMENT',
+        postgresql: 'SERIAL',
+        oracle: 'NUMBER GENERATED BY DEFAULT AS IDENTITY',
       },
-      {
-        rule: 'precision',
-        message: 'Precision must be greater than scale'
-      }
-    ]
-  },
-
-  float: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: true,
-    scaleEnabled: true,
-    defaultScale: 0,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default'],
-    validationRules: [
-      {
-        rule: 'float',
-        message: 'Must be a valid floating-point number'
-      }
-    ]
-  },
-
-  double: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: true,
-    scaleEnabled: true,
-    defaultScale: 0,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default'],
-    validationRules: [
-      {
-        rule: 'double',
-        message: 'Must be a valid double-precision number'
-      }
-    ]
-  },
-
-  money: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: true,
-    scaleEnabled: true,
-    defaultScale: 2,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default'],
-    validationRules: [
-      {
-        rule: 'money',
-        message: 'Must be a valid currency amount'
-      }
-    ]
-  },
-
-  // Date/Time type configurations
-  date: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default'],
-    validationRules: [
-      {
-        rule: 'date',
-        message: 'Must be a valid date'
-      }
-    ]
-  },
-
-  time: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default'],
-    validationRules: [
-      {
-        rule: 'time',
-        message: 'Must be a valid time'
-      }
-    ]
-  },
-
-  datetime: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default'],
-    validationRules: [
-      {
-        rule: 'datetime',
-        message: 'Must be a valid date and time'
-      }
-    ]
-  },
-
-  timestamp: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default'],
-    validationRules: [
-      {
-        rule: 'timestamp',
-        message: 'Must be a valid timestamp'
-      }
-    ]
-  },
-
-  // Boolean type configuration
-  boolean: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'default'],
-    validationRules: [
-      {
-        rule: 'boolean',
-        message: 'Must be true or false'
-      }
-    ]
-  },
-
-  // Binary type configurations
-  binary: {
-    dbTypeEnabled: false,
-    lengthEnabled: true,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null'],
-    validationRules: []
-  },
-
-  varbinary: {
-    dbTypeEnabled: false,
-    lengthEnabled: true,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null'],
-    validationRules: []
-  },
-
-  blob: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null'],
-    validationRules: []
-  },
-
-  medium_blob: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null'],
-    validationRules: []
-  },
-
-  long_blob: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null'],
-    validationRules: []
-  },
-
-  // Reference type configurations
-  reference: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'foreign_key'],
-    validationRules: [
-      {
-        rule: 'foreignKey',
-        message: 'Must reference a valid table and field'
-      }
-    ]
-  },
-
-  user_id: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null', 'foreign_key'],
-    validationRules: [
-      {
-        rule: 'userReference',
-        message: 'Must reference a valid user'
-      }
-    ]
-  },
-
-  // Special automatic type configurations
-  user_id_on_create: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null'],
-    validationRules: []
-  },
-
-  user_id_on_update: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null'],
-    validationRules: []
-  },
-
-  timestamp_on_create: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null'],
-    validationRules: []
-  },
-
-  timestamp_on_update: {
-    dbTypeEnabled: false,
-    lengthEnabled: false,
-    precisionEnabled: false,
-    scaleEnabled: false,
-    fixedLengthEnabled: false,
-    supportsMultibyteEnabled: false,
-    picklistEnabled: false,
-    isAggregateEnabled: false,
-    supportedConstraints: ['not_null'],
-    validationRules: []
-  }
-}
-
-/**
- * Field type metadata including database support and feature compatibility
- */
-const FIELD_TYPE_METADATA: Record<DreamFactoryFieldType | 'manual', FieldTypeMetadata> = {
-  manual: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.manual,
-    supportedDbTypes: ['*'], // All database types
-    supportsForeignKey: false,
+      constraints: {
+        mysql: { maxLength: 11 },
+        postgresql: { maxLength: 10 },
+        oracle: { maxPrecision: 38 },
+      },
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: true,
     supportsPrimaryKey: true,
-    supportsUnique: true,
-    supportsAutoIncrement: false,
-    supportsDefault: true,
-    examples: ['VARCHAR(255)', 'BIGINT UNSIGNED', 'ENUM("active","inactive")']
+    supportsForeignKey: false,
+    supportsDefault: false,
+    supportsPicklist: false,
   },
 
   string: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.string,
-    supportedDbTypes: ['VARCHAR', 'CHAR', 'TEXT', 'NVARCHAR', 'NCHAR'],
-    defaultDbType: 'VARCHAR',
-    supportsForeignKey: false,
+    type: 'string',
+    label: 'String',
+    category: 'Core',
+    description: 'Variable-length text field',
+    enabledControls: {
+      length: true,
+      precision: false,
+      scale: false,
+      fixedLength: true,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: true,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'string',
+      length: 255,
+      supportsMultibyte: true,
+    },
+    validationRules: {
+      minLength: 1,
+      maxLength: 65535,
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle', 'mongodb', 'snowflake'],
+      nativeTypes: {
+        mysql: 'VARCHAR',
+        postgresql: 'VARCHAR',
+        oracle: 'VARCHAR2',
+        mongodb: 'string',
+        snowflake: 'VARCHAR',
+      },
+      constraints: {
+        mysql: { maxLength: 65535, supportsUnicode: true },
+        postgresql: { maxLength: 65535, supportsUnicode: true },
+        oracle: { maxLength: 4000, supportsUnicode: true },
+        snowflake: { maxLength: 16777216, supportsUnicode: true },
+      },
+    },
+    supportsLength: true,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
     supportsPrimaryKey: true,
-    supportsUnique: true,
-    supportsAutoIncrement: false,
+    supportsForeignKey: true,
     supportsDefault: true,
-    examples: ['John Doe', 'Product Name', 'ABC123']
-  },
-
-  text: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.text,
-    supportedDbTypes: ['TEXT', 'LONGTEXT', 'MEDIUMTEXT', 'CLOB'],
-    defaultDbType: 'TEXT',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
-    supportsAutoIncrement: false,
-    supportsDefault: true,
-    examples: ['Long description text', 'Article content', 'JSON data']
-  },
-
-  password: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.password,
-    supportedDbTypes: ['VARCHAR', 'CHAR'],
-    defaultDbType: 'VARCHAR',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
-    supportsAutoIncrement: false,
-    supportsDefault: false,
-    examples: ['$2b$10$...', 'hashed_password_string']
-  },
-
-  email: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.email,
-    supportedDbTypes: ['VARCHAR'],
-    defaultDbType: 'VARCHAR',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: true,
-    supportsAutoIncrement: false,
-    supportsDefault: true,
-    examples: ['user@example.com', 'admin@company.org']
-  },
-
-  url: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.url,
-    supportedDbTypes: ['VARCHAR', 'TEXT'],
-    defaultDbType: 'VARCHAR',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
-    supportsAutoIncrement: false,
-    supportsDefault: true,
-    examples: ['https://example.com', 'https://api.service.com/endpoint']
+    supportsPicklist: true,
   },
 
   integer: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.integer,
-    supportedDbTypes: ['INT', 'INTEGER', 'BIGINT', 'SMALLINT'],
-    defaultDbType: 'INT',
-    supportsForeignKey: true,
-    supportsPrimaryKey: true,
-    supportsUnique: true,
+    type: 'integer',
+    label: 'Integer',
+    category: 'Core',
+    description: 'Whole number field',
+    enabledControls: {
+      length: true,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: true,
+      defaultValue: true,
+      picklist: true,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'integer',
+      length: 11,
+    },
+    validationRules: {
+      minLength: 1,
+      maxLength: 20,
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle', 'mongodb', 'snowflake'],
+      nativeTypes: {
+        mysql: 'INT',
+        postgresql: 'INTEGER',
+        oracle: 'NUMBER',
+        mongodb: 'int',
+        snowflake: 'INTEGER',
+      },
+      constraints: {
+        mysql: { maxLength: 11 },
+        postgresql: { maxLength: 10 },
+        oracle: { maxPrecision: 38 },
+      },
+    },
+    supportsLength: true,
+    supportsPrecision: false,
     supportsAutoIncrement: true,
-    supportsDefault: true,
-    examples: ['42', '1000', '-5']
-  },
-
-  bigint: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.bigint,
-    supportedDbTypes: ['BIGINT'],
-    defaultDbType: 'BIGINT',
-    supportsForeignKey: true,
     supportsPrimaryKey: true,
-    supportsUnique: true,
-    supportsAutoIncrement: true,
-    supportsDefault: true,
-    examples: ['9223372036854775807', '1000000000000']
-  },
-
-  smallint: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.smallint,
-    supportedDbTypes: ['SMALLINT', 'TINYINT'],
-    defaultDbType: 'SMALLINT',
     supportsForeignKey: true,
-    supportsPrimaryKey: true,
-    supportsUnique: true,
-    supportsAutoIncrement: true,
     supportsDefault: true,
-    examples: ['32767', '100', '0']
+    supportsPicklist: true,
   },
 
-  decimal: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.decimal,
-    supportedDbTypes: ['DECIMAL', 'NUMERIC'],
-    defaultDbType: 'DECIMAL',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: true,
+  text: {
+    type: 'text',
+    label: 'Text',
+    category: 'Core',
+    description: 'Large text content',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'text',
+      supportsMultibyte: true,
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [
+        {
+          field: 'isPrimaryKey',
+          value: true,
+          conflictsWith: [{ field: 'type', values: ['text'] }],
+        },
+      ],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle', 'mongodb', 'snowflake'],
+      nativeTypes: {
+        mysql: 'TEXT',
+        postgresql: 'TEXT',
+        oracle: 'CLOB',
+        mongodb: 'string',
+        snowflake: 'VARCHAR',
+      },
+      constraints: {
+        mysql: { supportsUnicode: true },
+        postgresql: { supportsUnicode: true },
+        oracle: { supportsUnicode: true },
+        snowflake: { maxLength: 16777216, supportsUnicode: true },
+      },
+    },
+    supportsLength: false,
+    supportsPrecision: false,
     supportsAutoIncrement: false,
-    supportsDefault: true,
-    examples: ['999.99', '12345.678', '0.001']
-  },
-
-  float: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.float,
-    supportedDbTypes: ['FLOAT', 'REAL'],
-    defaultDbType: 'FLOAT',
-    supportsForeignKey: false,
     supportsPrimaryKey: false,
-    supportsUnique: false,
-    supportsAutoIncrement: false,
-    supportsDefault: true,
-    examples: ['3.14159', '2.718', '1.414']
-  },
-
-  double: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.double,
-    supportedDbTypes: ['DOUBLE', 'DOUBLE PRECISION'],
-    defaultDbType: 'DOUBLE',
     supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
-    supportsAutoIncrement: false,
     supportsDefault: true,
-    examples: ['3.141592653589793', '2.718281828459045']
-  },
-
-  money: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.money,
-    supportedDbTypes: ['DECIMAL', 'MONEY', 'CURRENCY'],
-    defaultDbType: 'DECIMAL',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
-    supportsAutoIncrement: false,
-    supportsDefault: true,
-    examples: ['99.99', '1234.56', '0.01']
-  },
-
-  date: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.date,
-    supportedDbTypes: ['DATE'],
-    defaultDbType: 'DATE',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: true,
-    supportsAutoIncrement: false,
-    supportsDefault: true,
-    examples: ['2024-12-28', '1990-01-01', '2025-06-15']
-  },
-
-  time: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.time,
-    supportedDbTypes: ['TIME'],
-    defaultDbType: 'TIME',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
-    supportsAutoIncrement: false,
-    supportsDefault: true,
-    examples: ['14:30:00', '09:15:30', '23:59:59']
-  },
-
-  datetime: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.datetime,
-    supportedDbTypes: ['DATETIME', 'TIMESTAMP'],
-    defaultDbType: 'DATETIME',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: true,
-    supportsAutoIncrement: false,
-    supportsDefault: true,
-    examples: ['2024-12-28 14:30:00', '1990-01-01 00:00:00']
-  },
-
-  timestamp: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.timestamp,
-    supportedDbTypes: ['TIMESTAMP'],
-    defaultDbType: 'TIMESTAMP',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
-    supportsAutoIncrement: false,
-    supportsDefault: true,
-    examples: ['2024-12-28 14:30:00.123456', '1990-01-01 00:00:00.000000']
+    supportsPicklist: false,
   },
 
   boolean: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.boolean,
-    supportedDbTypes: ['BOOLEAN', 'TINYINT', 'BIT'],
-    defaultDbType: 'BOOLEAN',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
+    type: 'boolean',
+    label: 'Boolean',
+    category: 'Core',
+    description: 'True/false value',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'boolean',
+      default: 'false',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle', 'mongodb', 'snowflake'],
+      nativeTypes: {
+        mysql: 'TINYINT(1)',
+        postgresql: 'BOOLEAN',
+        oracle: 'NUMBER(1)',
+        mongodb: 'bool',
+        snowflake: 'BOOLEAN',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
     supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
     supportsDefault: true,
-    examples: ['true', 'false', '1', '0']
+    supportsPicklist: false,
   },
 
   binary: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.binary,
-    supportedDbTypes: ['BINARY', 'BYTEA'],
-    defaultDbType: 'BINARY',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
+    type: 'binary',
+    label: 'Binary',
+    category: 'Core',
+    description: 'Binary data storage',
+    enabledControls: {
+      length: true,
+      precision: false,
+      scale: false,
+      fixedLength: true,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: false,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'binary',
+      length: 255,
+    },
+    validationRules: {
+      minLength: 1,
+      maxLength: 65535,
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle'],
+      nativeTypes: {
+        mysql: 'BINARY',
+        postgresql: 'BYTEA',
+        oracle: 'RAW',
+      },
+      constraints: {
+        mysql: { maxLength: 255, supportsBinary: true },
+        postgresql: { supportsBinary: true },
+        oracle: { maxLength: 2000, supportsBinary: true },
+      },
+    },
+    supportsLength: true,
+    supportsPrecision: false,
     supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
     supportsDefault: false,
-    examples: ['Binary data', 'Fixed-length binary']
+    supportsPicklist: false,
   },
 
-  varbinary: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.varbinary,
-    supportedDbTypes: ['VARBINARY', 'BYTEA'],
-    defaultDbType: 'VARBINARY',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
+  // Numeric types
+  float: {
+    type: 'float',
+    label: 'Float',
+    category: 'Numeric',
+    description: 'Single precision floating point',
+    enabledControls: {
+      length: false,
+      precision: true,
+      scale: true,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'float',
+      precision: 7,
+      scale: 2,
+    },
+    validationRules: {
+      minPrecision: 1,
+      maxPrecision: 24,
+      maxScale: 23,
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle', 'snowflake'],
+      nativeTypes: {
+        mysql: 'FLOAT',
+        postgresql: 'REAL',
+        oracle: 'BINARY_FLOAT',
+        snowflake: 'FLOAT',
+      },
+      constraints: {
+        mysql: { maxPrecision: 24 },
+        postgresql: { maxPrecision: 24 },
+        oracle: { maxPrecision: 38 },
+        snowflake: { maxPrecision: 38 },
+      },
+    },
+    supportsLength: false,
+    supportsPrecision: true,
     supportsAutoIncrement: false,
-    supportsDefault: false,
-    examples: ['Variable binary data', 'Image data']
-  },
-
-  blob: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.blob,
-    supportedDbTypes: ['BLOB', 'BYTEA'],
-    defaultDbType: 'BLOB',
-    supportsForeignKey: false,
     supportsPrimaryKey: false,
-    supportsUnique: false,
-    supportsAutoIncrement: false,
-    supportsDefault: false,
-    examples: ['File contents', 'Image binary']
-  },
-
-  medium_blob: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.medium_blob,
-    supportedDbTypes: ['MEDIUMBLOB', 'BYTEA'],
-    defaultDbType: 'MEDIUMBLOB',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
-    supportsAutoIncrement: false,
-    supportsDefault: false,
-    examples: ['Medium file contents', 'Document data']
-  },
-
-  long_blob: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.long_blob,
-    supportedDbTypes: ['LONGBLOB', 'BYTEA'],
-    defaultDbType: 'LONGBLOB',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
-    supportsAutoIncrement: false,
-    supportsDefault: false,
-    examples: ['Large file contents', 'Video data']
-  },
-
-  reference: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.reference,
-    supportedDbTypes: ['INT', 'BIGINT', 'UUID'],
-    defaultDbType: 'INT',
     supportsForeignKey: true,
-    supportsPrimaryKey: false,
-    supportsUnique: true,
-    supportsAutoIncrement: false,
-    supportsDefault: false,
-    examples: ['123', '456789', 'uuid-string']
+    supportsDefault: true,
+    supportsPicklist: false,
   },
 
-  user_id: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.user_id,
-    supportedDbTypes: ['INT', 'BIGINT', 'UUID'],
-    defaultDbType: 'INT',
-    supportsForeignKey: true,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
+  double: {
+    type: 'double',
+    label: 'Double',
+    category: 'Numeric',
+    description: 'Double precision floating point',
+    enabledControls: {
+      length: false,
+      precision: true,
+      scale: true,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'double',
+      precision: 15,
+      scale: 2,
+    },
+    validationRules: {
+      minPrecision: 1,
+      maxPrecision: 53,
+      maxScale: 52,
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle', 'snowflake'],
+      nativeTypes: {
+        mysql: 'DOUBLE',
+        postgresql: 'DOUBLE PRECISION',
+        oracle: 'BINARY_DOUBLE',
+        snowflake: 'DOUBLE',
+      },
+      constraints: {
+        mysql: { maxPrecision: 53 },
+        postgresql: { maxPrecision: 53 },
+        oracle: { maxPrecision: 38 },
+        snowflake: { maxPrecision: 38 },
+      },
+    },
+    supportsLength: false,
+    supportsPrecision: true,
     supportsAutoIncrement: false,
-    supportsDefault: false,
-    examples: ['101', '202303', 'user-uuid']
+    supportsPrimaryKey: false,
+    supportsForeignKey: true,
+    supportsDefault: true,
+    supportsPicklist: false,
   },
 
-  user_id_on_create: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.user_id_on_create,
-    supportedDbTypes: ['INT', 'BIGINT', 'UUID'],
-    defaultDbType: 'INT',
-    supportsForeignKey: true,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
+  decimal: {
+    type: 'decimal',
+    label: 'Decimal',
+    category: 'Numeric',
+    description: 'Fixed precision decimal',
+    enabledControls: {
+      length: false,
+      precision: true,
+      scale: true,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'decimal',
+      precision: 10,
+      scale: 2,
+    },
+    validationRules: {
+      minPrecision: 1,
+      maxPrecision: 65,
+      maxScale: 30,
+      requiredFields: ['name', 'label', 'type', 'precision'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle', 'snowflake'],
+      nativeTypes: {
+        mysql: 'DECIMAL',
+        postgresql: 'DECIMAL',
+        oracle: 'NUMBER',
+        snowflake: 'DECIMAL',
+      },
+      constraints: {
+        mysql: { maxPrecision: 65 },
+        postgresql: { maxPrecision: 1000 },
+        oracle: { maxPrecision: 38 },
+        snowflake: { maxPrecision: 38 },
+      },
+    },
+    supportsLength: false,
+    supportsPrecision: true,
     supportsAutoIncrement: false,
-    supportsDefault: false,
-    examples: ['Auto-set on creation']
+    supportsPrimaryKey: true,
+    supportsForeignKey: true,
+    supportsDefault: true,
+    supportsPicklist: false,
   },
 
-  user_id_on_update: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.user_id_on_update,
-    supportedDbTypes: ['INT', 'BIGINT', 'UUID'],
-    defaultDbType: 'INT',
-    supportsForeignKey: true,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
+  // Date/time types
+  datetime: {
+    type: 'datetime',
+    label: 'DateTime',
+    category: 'Date/Time',
+    description: 'Date and time value',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'datetime',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle', 'snowflake'],
+      nativeTypes: {
+        mysql: 'DATETIME',
+        postgresql: 'TIMESTAMP',
+        oracle: 'TIMESTAMP',
+        snowflake: 'TIMESTAMP',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
     supportsAutoIncrement: false,
-    supportsDefault: false,
-    examples: ['Auto-updated on modification']
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: true,
+    supportsPicklist: false,
+  },
+
+  date: {
+    type: 'date',
+    label: 'Date',
+    category: 'Date/Time',
+    description: 'Date only value',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'date',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle', 'snowflake'],
+      nativeTypes: {
+        mysql: 'DATE',
+        postgresql: 'DATE',
+        oracle: 'DATE',
+        snowflake: 'DATE',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: true,
+    supportsPicklist: false,
+  },
+
+  time: {
+    type: 'time',
+    label: 'Time',
+    category: 'Date/Time',
+    description: 'Time only value',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'time',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle'],
+      nativeTypes: {
+        mysql: 'TIME',
+        postgresql: 'TIME',
+        oracle: 'TIMESTAMP',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: true,
+    supportsPicklist: false,
+  },
+
+  timestamp: {
+    type: 'timestamp',
+    label: 'Timestamp',
+    category: 'Date/Time',
+    description: 'Unix timestamp',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'timestamp',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle', 'snowflake'],
+      nativeTypes: {
+        mysql: 'TIMESTAMP',
+        postgresql: 'TIMESTAMP',
+        oracle: 'TIMESTAMP',
+        snowflake: 'TIMESTAMP',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: true,
+    supportsPicklist: false,
   },
 
   timestamp_on_create: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.timestamp_on_create,
-    supportedDbTypes: ['TIMESTAMP', 'DATETIME'],
-    defaultDbType: 'TIMESTAMP',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
+    type: 'timestamp_on_create',
+    label: 'Timestamp (On Create)',
+    category: 'Date/Time',
+    description: 'Automatically set on record creation',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: false,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'timestamp_on_create',
+      required: true,
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [
+        {
+          field: 'hasDefaultValue',
+          value: true,
+          conflictsWith: [{ field: 'type', values: ['timestamp_on_create'] }],
+        },
+      ],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle'],
+      nativeTypes: {
+        mysql: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+        postgresql: 'TIMESTAMP DEFAULT NOW()',
+        oracle: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
     supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
     supportsDefault: false,
-    examples: ['Auto-set on creation']
+    supportsPicklist: false,
   },
 
   timestamp_on_update: {
-    configuration: FIELD_TYPE_CONFIGURATIONS.timestamp_on_update,
-    supportedDbTypes: ['TIMESTAMP', 'DATETIME'],
-    defaultDbType: 'TIMESTAMP',
-    supportsForeignKey: false,
-    supportsPrimaryKey: false,
-    supportsUnique: false,
+    type: 'timestamp_on_update',
+    label: 'Timestamp (On Update)',
+    category: 'Date/Time',
+    description: 'Automatically set on record update',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: false,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'timestamp_on_update',
+      required: true,
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [
+        {
+          field: 'hasDefaultValue',
+          value: true,
+          conflictsWith: [{ field: 'type', values: ['timestamp_on_update'] }],
+        },
+      ],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql'],
+      nativeTypes: {
+        mysql: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        postgresql: 'TIMESTAMP DEFAULT NOW()',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
     supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
     supportsDefault: false,
-    examples: ['Auto-updated on modification']
-  }
-}
+    supportsPicklist: false,
+  },
+
+  // User-related types
+  user_id: {
+    type: 'user_id',
+    label: 'User ID',
+    category: 'User',
+    description: 'Reference to user ID',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'user_id',
+      isForeignKey: true,
+      refTable: 'user',
+      refField: 'id',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle'],
+      nativeTypes: {
+        mysql: 'INT',
+        postgresql: 'INTEGER',
+        oracle: 'NUMBER',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: true,
+    supportsDefault: true,
+    supportsPicklist: false,
+  },
+
+  user_id_on_create: {
+    type: 'user_id_on_create',
+    label: 'User ID (On Create)',
+    category: 'User',
+    description: 'Set to current user on creation',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: false,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'user_id_on_create',
+      required: true,
+      isForeignKey: true,
+      refTable: 'user',
+      refField: 'id',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle'],
+      nativeTypes: {
+        mysql: 'INT',
+        postgresql: 'INTEGER',
+        oracle: 'NUMBER',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: true,
+    supportsDefault: false,
+    supportsPicklist: false,
+  },
+
+  user_id_on_update: {
+    type: 'user_id_on_update',
+    label: 'User ID (On Update)',
+    category: 'User',
+    description: 'Set to current user on update',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: false,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'user_id_on_update',
+      required: true,
+      isForeignKey: true,
+      refTable: 'user',
+      refField: 'id',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle'],
+      nativeTypes: {
+        mysql: 'INT',
+        postgresql: 'INTEGER',
+        oracle: 'NUMBER',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: true,
+    supportsDefault: false,
+    supportsPicklist: false,
+  },
+
+  // Reference and advanced types
+  reference: {
+    type: 'reference',
+    label: 'Reference',
+    category: 'Relationships',
+    description: 'Foreign key reference',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'reference',
+      isForeignKey: true,
+      onDeleteAction: 'RESTRICT',
+      onUpdateAction: 'RESTRICT',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type', 'referenceTable', 'referenceField'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle'],
+      nativeTypes: {
+        mysql: 'INT',
+        postgresql: 'INTEGER',
+        oracle: 'NUMBER',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: true,
+    supportsDefault: true,
+    supportsPicklist: false,
+  },
+
+  json: {
+    type: 'json',
+    label: 'JSON',
+    category: 'Advanced',
+    description: 'JSON document storage',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'json',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'mongodb'],
+      nativeTypes: {
+        mysql: 'JSON',
+        postgresql: 'JSONB',
+        mongodb: 'object',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: true,
+    supportsPicklist: false,
+  },
+
+  xml: {
+    type: 'xml',
+    label: 'XML',
+    category: 'Advanced',
+    description: 'XML document storage',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'xml',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'postgresql', 'oracle'],
+      nativeTypes: {
+        mysql: 'TEXT',
+        postgresql: 'XML',
+        oracle: 'XMLTYPE',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: true,
+    supportsPicklist: false,
+  },
+
+  uuid: {
+    type: 'uuid',
+    label: 'UUID',
+    category: 'Advanced',
+    description: 'Universally unique identifier',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'uuid',
+      length: 36,
+      fixedLength: true,
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['postgresql', 'mysql'],
+      nativeTypes: {
+        postgresql: 'UUID',
+        mysql: 'CHAR(36)',
+      },
+      constraints: {
+        mysql: { maxLength: 36 },
+        postgresql: { maxLength: 36 },
+      },
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: true,
+    supportsForeignKey: true,
+    supportsDefault: true,
+    supportsPicklist: false,
+  },
+
+  // Additional advanced types for completeness
+  blob: {
+    type: 'blob',
+    label: 'BLOB',
+    category: 'Advanced',
+    description: 'Binary large object storage',
+    enabledControls: {
+      length: true,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: false,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'blob',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql', 'oracle'],
+      nativeTypes: {
+        mysql: 'BLOB',
+        oracle: 'BLOB',
+      },
+      constraints: {
+        mysql: { supportsBinary: true },
+        oracle: { supportsBinary: true },
+      },
+    },
+    supportsLength: true,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: false,
+    supportsPicklist: false,
+  },
+
+  clob: {
+    type: 'clob',
+    label: 'CLOB',
+    category: 'Advanced',
+    description: 'Character large object storage',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'clob',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['oracle'],
+      nativeTypes: {
+        oracle: 'CLOB',
+      },
+      constraints: {
+        oracle: { supportsUnicode: true },
+      },
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: false,
+    supportsPicklist: false,
+  },
+
+  // Geometric types (primarily PostgreSQL)
+  geometry: {
+    type: 'geometry',
+    label: 'Geometry',
+    category: 'Advanced',
+    description: 'Geometric data type',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'geometry',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['postgresql'],
+      nativeTypes: {
+        postgresql: 'GEOMETRY',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: false,
+    supportsPicklist: false,
+  },
+
+  point: {
+    type: 'point',
+    label: 'Point',
+    category: 'Advanced',
+    description: 'Geometric point data type',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'point',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['postgresql'],
+      nativeTypes: {
+        postgresql: 'POINT',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: false,
+    supportsPicklist: false,
+  },
+
+  linestring: {
+    type: 'linestring',
+    label: 'LineString',
+    category: 'Advanced',
+    description: 'Geometric line string data type',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'linestring',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['postgresql'],
+      nativeTypes: {
+        postgresql: 'LINESTRING',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: false,
+    supportsPicklist: false,
+  },
+
+  polygon: {
+    type: 'polygon',
+    label: 'Polygon',
+    category: 'Advanced',
+    description: 'Geometric polygon data type',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: true,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'polygon',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['postgresql'],
+      nativeTypes: {
+        postgresql: 'POLYGON',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: false,
+    supportsPicklist: false,
+  },
+
+  // MySQL specific types
+  enum: {
+    type: 'enum',
+    label: 'Enum',
+    category: 'Advanced',
+    description: 'Enumeration data type',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: true,
+      dbFunctions: false,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'enum',
+      enablePicklist: true,
+      picklistType: 'csv',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type', 'picklistValues'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql'],
+      nativeTypes: {
+        mysql: 'ENUM',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: true,
+    supportsPicklist: true,
+  },
+
+  set: {
+    type: 'set',
+    label: 'Set',
+    category: 'Advanced',
+    description: 'Set data type',
+    enabledControls: {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: true,
+      picklist: true,
+      dbFunctions: false,
+      customType: false,
+    },
+    defaultValues: {
+      typeSelection: 'predefined',
+      type: 'set',
+      enablePicklist: true,
+      picklistType: 'csv',
+    },
+    validationRules: {
+      requiredFields: ['name', 'label', 'type', 'picklistValues'],
+      incompatibleConstraints: [],
+    },
+    databaseSupport: {
+      supportedDatabases: ['mysql'],
+      nativeTypes: {
+        mysql: 'SET',
+      },
+      constraints: {},
+    },
+    supportsLength: false,
+    supportsPrecision: false,
+    supportsAutoIncrement: false,
+    supportsPrimaryKey: false,
+    supportsForeignKey: false,
+    supportsDefault: true,
+    supportsPicklist: true,
+  },
+};
+
+/**
+ * Field type categories for UI organization and grouping
+ */
+const FIELD_TYPE_CATEGORIES: FieldTypeCategory[] = [
+  {
+    id: 'custom',
+    label: 'Custom',
+    description: 'User-defined types and manual configuration',
+    icon: 'gear',
+    types: ['manual'],
+    order: 1,
+  },
+  {
+    id: 'core',
+    label: 'Core Types',
+    description: 'Fundamental data types for most use cases',
+    icon: 'database',
+    types: ['id', 'string', 'integer', 'text', 'boolean', 'binary'],
+    order: 2,
+  },
+  {
+    id: 'numeric',
+    label: 'Numeric Types',
+    description: 'Decimal, floating point, and precision numbers',
+    icon: 'calculator',
+    types: ['float', 'double', 'decimal'],
+    order: 3,
+  },
+  {
+    id: 'datetime',
+    label: 'Date/Time Types',
+    description: 'Date, time, and timestamp handling',
+    icon: 'calendar',
+    types: ['datetime', 'date', 'time', 'timestamp', 'timestamp_on_create', 'timestamp_on_update'],
+    order: 4,
+  },
+  {
+    id: 'user',
+    label: 'User Types',
+    description: 'User identification and tracking',
+    icon: 'user',
+    types: ['user_id', 'user_id_on_create', 'user_id_on_update'],
+    order: 5,
+  },
+  {
+    id: 'relationships',
+    label: 'Relationships',
+    description: 'Foreign keys and references',
+    icon: 'link',
+    types: ['reference'],
+    order: 6,
+  },
+  {
+    id: 'advanced',
+    label: 'Advanced Types',
+    description: 'Specialized data types and storage',
+    icon: 'puzzle',
+    types: ['json', 'xml', 'uuid', 'blob', 'clob', 'geometry', 'point', 'linestring', 'polygon', 'enum', 'set'],
+    order: 7,
+  },
+];
 
 // =============================================================================
 // REACT HOOK IMPLEMENTATION
 // =============================================================================
 
 /**
- * Custom React hook providing comprehensive field type management functionality
+ * Return type interface for the useFieldTypes hook
+ */
+export interface UseFieldTypesReturn {
+  /** Dropdown options for field type selection */
+  fieldTypeOptions: Array<{
+    label: string;
+    value: FieldDataType | 'manual';
+    category: string;
+    description: string;
+  }>;
+  
+  /** Grouped field type options by category */
+  groupedFieldTypeOptions: Array<{
+    category: FieldTypeCategory;
+    options: Array<{
+      label: string;
+      value: FieldDataType | 'manual';
+      description: string;
+    }>;
+  }>;
+  
+  /** Get configuration for a specific field type */
+  getFieldTypeConfig: (type: FieldDataType | 'manual') => FieldTypeConfig | null;
+  
+  /** Get enabled controls for a field type */
+  getEnabledControls: (type: FieldDataType | 'manual') => FieldControlConfig;
+  
+  /** Get default values for a field type */
+  getDefaultValues: (type: FieldDataType | 'manual') => Partial<FieldFormData>;
+  
+  /** Check if a field type supports a specific capability */
+  supportsCapability: (
+    type: FieldDataType | 'manual',
+    capability: keyof Pick<FieldTypeConfig, 
+      'supportsLength' | 'supportsPrecision' | 'supportsAutoIncrement' | 
+      'supportsPrimaryKey' | 'supportsForeignKey' | 'supportsDefault' | 'supportsPicklist'
+    >
+  ) => boolean;
+  
+  /** Get field types supported by a specific database */
+  getTypesForDatabase: (databaseType: DatabaseType) => (FieldDataType | 'manual')[];
+  
+  /** Get native database type for a field type */
+  getNativeType: (fieldType: FieldDataType | 'manual', databaseType: DatabaseType) => string | null;
+  
+  /** Validate field type constraints */
+  validateFieldTypeConstraints: (
+    type: FieldDataType | 'manual',
+    formData: Partial<FieldFormData>
+  ) => Array<{ field: string; message: string }>;
+  
+  /** Get validation rules for a field type */
+  getValidationRules: (type: FieldDataType | 'manual') => FieldValidationRules;
+  
+  /** Field type categories for UI organization */
+  fieldTypeCategories: FieldTypeCategory[];
+}
+
+/**
+ * Custom React hook for field type management with memoized performance optimization
  * 
- * Features:
- * - Memoized field type options for optimal performance
- * - Type-specific configuration for form control management
- * - Field type categorization for enhanced UX
- * - Comprehensive metadata and validation rules
- * - Type-safe API with full TypeScript support
+ * Provides comprehensive field type configuration data, dropdown options, and utility
+ * functions for type-safe field type management across all field management components.
+ * Implements memoization for optimal performance and prevents unnecessary re-renders.
  * 
- * @returns {UseFieldTypesReturn} Complete field type management functionality
+ * @returns UseFieldTypesReturn - Memoized field type configuration and utility functions
+ * 
+ * @example
+ * ```tsx
+ * const {
+ *   fieldTypeOptions,
+ *   groupedFieldTypeOptions,
+ *   getFieldTypeConfig,
+ *   supportsCapability,
+ *   getTypesForDatabase
+ * } = useFieldTypes();
+ * 
+ * // Use in field type dropdown
+ * <Select options={fieldTypeOptions} />
+ * 
+ * // Check if type supports length
+ * const canSetLength = supportsCapability('string', 'supportsLength');
+ * 
+ * // Get types for MySQL
+ * const mysqlTypes = getTypesForDatabase('mysql');
+ * ```
  */
 export function useFieldTypes(): UseFieldTypesReturn {
   /**
-   * Memoized field type options to prevent unnecessary re-renders
-   * Includes all available field types with categorization and metadata
+   * Memoized field type dropdown options
+   * Based on FIELD_TYPE_OPTIONS from field.types.ts with enhanced categorization
    */
-  const fieldTypeOptions = useMemo(() => FIELD_TYPE_OPTIONS, [])
+  const fieldTypeOptions = useMemo(() => {
+    return Object.values(FIELD_TYPE_CONFIGURATIONS).map(config => ({
+      label: config.label,
+      value: config.type,
+      category: config.category,
+      description: config.description,
+    }));
+  }, []);
 
   /**
-   * Memoized field types grouped by category for enhanced UX
-   * Enables category-based dropdown organization and filtering
+   * Memoized grouped field type options organized by category
+   * Enhances UX with logical type grouping per Section 7.2 UI Use Cases
    */
-  const fieldTypesByCategory = useMemo(() => {
-    const categories: Record<FieldTypeCategory, FieldTypeOption[]> = {
-      manual: [],
-      text: [],
-      numeric: [],
-      datetime: [],
-      boolean: [],
-      binary: [],
-      reference: [],
-      special: []
+  const groupedFieldTypeOptions = useMemo(() => {
+    return FIELD_TYPE_CATEGORIES.map(category => ({
+      category,
+      options: category.types.map(type => {
+        const config = FIELD_TYPE_CONFIGURATIONS[type];
+        return {
+          label: config.label,
+          value: config.type,
+          description: config.description,
+        };
+      }),
+    }));
+  }, []);
+
+  /**
+   * Memoized field type categories for UI organization
+   */
+  const fieldTypeCategories = useMemo(() => FIELD_TYPE_CATEGORIES, []);
+
+  /**
+   * Get configuration for a specific field type
+   * Provides type-safe access to field type configuration data
+   */
+  const getFieldTypeConfig = useCallback((type: FieldDataType | 'manual'): FieldTypeConfig | null => {
+    return FIELD_TYPE_CONFIGURATIONS[type] || null;
+  }, []);
+
+  /**
+   * Get enabled controls for a field type
+   * Determines which form controls should be enabled/disabled based on type
+   */
+  const getEnabledControls = useCallback((type: FieldDataType | 'manual'): FieldControlConfig => {
+    const config = FIELD_TYPE_CONFIGURATIONS[type];
+    return config?.enabledControls || {
+      length: false,
+      precision: false,
+      scale: false,
+      fixedLength: false,
+      autoIncrement: false,
+      defaultValue: false,
+      picklist: false,
+      dbFunctions: false,
+      customType: false,
+    };
+  }, []);
+
+  /**
+   * Get default values for a field type
+   * Provides intelligent form defaults based on field type selection
+   */
+  const getDefaultValues = useCallback((type: FieldDataType | 'manual'): Partial<FieldFormData> => {
+    const config = FIELD_TYPE_CONFIGURATIONS[type];
+    return config?.defaultValues || {};
+  }, []);
+
+  /**
+   * Check if a field type supports a specific capability
+   * Type-safe capability checking for dynamic UI behavior
+   */
+  const supportsCapability = useCallback((
+    type: FieldDataType | 'manual',
+    capability: keyof Pick<FieldTypeConfig, 
+      'supportsLength' | 'supportsPrecision' | 'supportsAutoIncrement' | 
+      'supportsPrimaryKey' | 'supportsForeignKey' | 'supportsDefault' | 'supportsPicklist'
+    >
+  ): boolean => {
+    const config = FIELD_TYPE_CONFIGURATIONS[type];
+    return config?.[capability] || false;
+  }, []);
+
+  /**
+   * Get field types supported by a specific database
+   * Filters available types based on database compatibility
+   */
+  const getTypesForDatabase = useCallback((databaseType: DatabaseType): (FieldDataType | 'manual')[] => {
+    return Object.values(FIELD_TYPE_CONFIGURATIONS)
+      .filter(config => config.databaseSupport.supportedDatabases.includes(databaseType))
+      .map(config => config.type);
+  }, []);
+
+  /**
+   * Get native database type for a field type
+   * Provides database-specific type mapping for DDL generation
+   */
+  const getNativeType = useCallback((
+    fieldType: FieldDataType | 'manual',
+    databaseType: DatabaseType
+  ): string | null => {
+    const config = FIELD_TYPE_CONFIGURATIONS[fieldType];
+    return config?.databaseSupport.nativeTypes[databaseType] || null;
+  }, []);
+
+  /**
+   * Validate field type constraints
+   * Comprehensive validation based on type-specific rules and constraints
+   */
+  const validateFieldTypeConstraints = useCallback((
+    type: FieldDataType | 'manual',
+    formData: Partial<FieldFormData>
+  ): Array<{ field: string; message: string }> => {
+    const config = FIELD_TYPE_CONFIGURATIONS[type];
+    const errors: Array<{ field: string; message: string }> = [];
+
+    if (!config) {
+      return [{ field: 'type', message: 'Invalid field type selected' }];
     }
 
-    fieldTypeOptions.forEach(option => {
-      categories[option.category].push(option)
-    })
+    const { validationRules } = config;
 
-    return categories
-  }, [fieldTypeOptions])
-
-  /**
-   * Memoized commonly used field types for quick access
-   * Provides frequently used types for improved user experience
-   */
-  const commonFieldTypes = useMemo(() => 
-    fieldTypeOptions.filter(option => option.isCommon),
-    [fieldTypeOptions]
-  )
-
-  /**
-   * Get field type configuration for form control management
-   * 
-   * @param fieldType - The field type to get configuration for
-   * @returns Field type configuration determining enabled/disabled controls
-   */
-  const getFieldTypeConfiguration = useMemo(() => 
-    (fieldType: DreamFactoryFieldType | 'manual'): FieldTypeConfiguration => {
-      return FIELD_TYPE_CONFIGURATIONS[fieldType] || FIELD_TYPE_CONFIGURATIONS.manual
-    },
-    []
-  )
-
-  /**
-   * Get complete metadata for a specific field type
-   * 
-   * @param fieldType - The field type to get metadata for
-   * @returns Complete field type metadata including database support and features
-   */
-  const getFieldTypeMetadata = useMemo(() =>
-    (fieldType: DreamFactoryFieldType | 'manual'): FieldTypeMetadata => {
-      return FIELD_TYPE_METADATA[fieldType] || FIELD_TYPE_METADATA.manual
-    },
-    []
-  )
-
-  /**
-   * Get complete field type information including option and metadata
-   * 
-   * @param fieldType - The field type to get info for
-   * @returns Complete field type information or undefined if not found
-   */
-  const getFieldTypeInfo = useMemo(() =>
-    (fieldType: DreamFactoryFieldType | 'manual'): FieldTypeInfo | undefined => {
-      const option = fieldTypeOptions.find(opt => opt.value === fieldType)
-      if (!option) return undefined
-
-      const metadata = getFieldTypeMetadata(fieldType)
-      return {
-        ...option,
-        metadata
+    // Check required fields
+    for (const requiredField of validationRules.requiredFields) {
+      const value = formData[requiredField];
+      if (value === undefined || value === null || value === '') {
+        errors.push({
+          field: requiredField,
+          message: `${requiredField} is required for ${config.label} type`
+        });
       }
-    },
-    [fieldTypeOptions, getFieldTypeMetadata]
-  )
+    }
+
+    // Check length constraints
+    if (validationRules.minLength && formData.length && formData.length < validationRules.minLength) {
+      errors.push({
+        field: 'length',
+        message: `Length must be at least ${validationRules.minLength} for ${config.label} type`
+      });
+    }
+
+    if (validationRules.maxLength && formData.length && formData.length > validationRules.maxLength) {
+      errors.push({
+        field: 'length',
+        message: `Length cannot exceed ${validationRules.maxLength} for ${config.label} type`
+      });
+    }
+
+    // Check precision constraints
+    if (validationRules.minPrecision && formData.precision && formData.precision < validationRules.minPrecision) {
+      errors.push({
+        field: 'precision',
+        message: `Precision must be at least ${validationRules.minPrecision} for ${config.label} type`
+      });
+    }
+
+    if (validationRules.maxPrecision && formData.precision && formData.precision > validationRules.maxPrecision) {
+      errors.push({
+        field: 'precision',
+        message: `Precision cannot exceed ${validationRules.maxPrecision} for ${config.label} type`
+      });
+    }
+
+    // Check scale constraints
+    if (validationRules.maxScale && formData.scale && formData.scale > validationRules.maxScale) {
+      errors.push({
+        field: 'scale',
+        message: `Scale cannot exceed ${validationRules.maxScale} for ${config.label} type`
+      });
+    }
+
+    // Check scale relative to precision
+    if (formData.precision && formData.scale && formData.scale > formData.precision) {
+      errors.push({
+        field: 'scale',
+        message: 'Scale cannot be greater than precision'
+      });
+    }
+
+    // Check incompatible constraints
+    for (const constraint of validationRules.incompatibleConstraints) {
+      if (formData[constraint.field] === constraint.value) {
+        for (const conflict of constraint.conflictsWith) {
+          if (conflict.values.includes(formData[conflict.field] as any)) {
+            errors.push({
+              field: constraint.field,
+              message: `${constraint.field} is incompatible with ${conflict.field} for ${config.label} type`
+            });
+          }
+        }
+      }
+    }
+
+    return errors;
+  }, []);
 
   /**
-   * Check if a field type supports a specific feature
-   * 
-   * @param fieldType - The field type to check
-   * @param feature - The feature property to check
-   * @returns Whether the field type supports the specified feature
+   * Get validation rules for a field type
+   * Provides access to type-specific validation constraints
    */
-  const supportsFeature = useMemo(() =>
-    (fieldType: DreamFactoryFieldType | 'manual', feature: keyof FieldTypeMetadata): boolean => {
-      const metadata = getFieldTypeMetadata(fieldType)
-      const featureValue = metadata[feature]
-      
-      // Handle boolean features
-      if (typeof featureValue === 'boolean') {
-        return featureValue
-      }
-      
-      // Handle array features (check if not empty)
-      if (Array.isArray(featureValue)) {
-        return featureValue.length > 0
-      }
-      
-      // Handle other features (check if truthy)
-      return Boolean(featureValue)
-    },
-    [getFieldTypeMetadata]
-  )
+  const getValidationRules = useCallback((type: FieldDataType | 'manual'): FieldValidationRules => {
+    const config = FIELD_TYPE_CONFIGURATIONS[type];
+    return config?.validationRules || {
+      requiredFields: [],
+      incompatibleConstraints: [],
+    };
+  }, []);
 
-  return {
+  // Return memoized hook interface
+  return useMemo(() => ({
     fieldTypeOptions,
-    fieldTypesByCategory,
-    commonFieldTypes,
-    getFieldTypeConfiguration,
-    getFieldTypeMetadata,
-    getFieldTypeInfo,
-    supportsFeature
-  }
+    groupedFieldTypeOptions,
+    getFieldTypeConfig,
+    getEnabledControls,
+    getDefaultValues,
+    supportsCapability,
+    getTypesForDatabase,
+    getNativeType,
+    validateFieldTypeConstraints,
+    getValidationRules,
+    fieldTypeCategories,
+  }), [
+    fieldTypeOptions,
+    groupedFieldTypeOptions,
+    getFieldTypeConfig,
+    getEnabledControls,
+    getDefaultValues,
+    supportsCapability,
+    getTypesForDatabase,
+    getNativeType,
+    validateFieldTypeConstraints,
+    getValidationRules,
+    fieldTypeCategories,
+  ]);
 }
-
-// =============================================================================
-// EXPORTS
-// =============================================================================
-
-export default useFieldTypes
 
 /**
- * Re-export types for convenient importing
+ * Export field type configuration constants for external use
+ */
+export { FIELD_TYPE_CONFIGURATIONS, FIELD_TYPE_CATEGORIES };
+
+/**
+ * Export type definitions for external consumption
  */
 export type {
-  FieldTypeOption,
+  FieldTypeConfig,
+  FieldControlConfig,
+  FieldValidationRules,
+  DatabaseTypeSupport,
   FieldTypeCategory,
-  FieldTypeConfiguration,
-  FieldValidationRule,
   FieldTypeMetadata,
-  FieldTypeInfo,
-  UseFieldTypesReturn
-}
+};
