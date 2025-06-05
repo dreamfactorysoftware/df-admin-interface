@@ -1,443 +1,274 @@
 'use client';
 
-/**
- * Profile Management Page Component
- * 
- * Next.js page component for comprehensive user profile management implementing
- * React Hook Form with Zod validation, SWR data fetching, and tabbed interface
- * for profile details, security questions, and password updates.
- * 
- * Migrated from Angular DfProfileComponent to React 19 with:
- * - Server-side rendering for initial page loads under 2 seconds
- * - Real-time validation under 100ms with React Hook Form + Zod
- * - SWR-backed data synchronization for instant profile updates
- * - Tailwind CSS responsive design with Headless UI components
- * - WCAG 2.1 AA compliance for accessibility
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19 / Next.js 15.1
- */
-
-import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { Tab } from '@headlessui/react';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import useSWR, { mutate } from 'swr';
-import { toast } from 'react-hot-toast';
-import { 
-  UserIcon, 
-  ShieldCheckIcon, 
-  KeyIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon 
-} from '@heroicons/react/24/outline';
+import useSWR from 'swr';
+import { useRouter } from 'next/navigation';
 
-// Type imports
-import { 
-  UserProfile, 
-  userProfileUpdateSchema,
-  changePasswordSchema,
-  ApiResponse 
-} from '@/types/user';
-
-// Hook imports
-import { useProfile } from '@/hooks/use-profile';
-import { usePassword } from '@/hooks/use-password';
-import { useAuth } from '@/hooks/use-auth';
-
-// Component imports
+// Import UI components
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-// API client import
+// Import custom hooks and utilities
+import { useProfile } from '@/hooks/use-profile';
+import { usePassword } from '@/hooks/use-password';
 import { apiClient } from '@/lib/api-client';
+import { profileSchema, securityQuestionSchema, passwordUpdateSchema } from '@/lib/validations/profile';
+import { UserProfile } from '@/types/user';
 
-// ============================================================================
-// Form Schemas and Types
-// ============================================================================
-
-/**
- * Security question form schema with validation
- */
-const securityQuestionSchema = z.object({
-  security_question: z.string()
-    .min(1, 'Security question is required')
-    .max(255, 'Security question too long'),
-  security_answer: z.string()
-    .min(1, 'Security answer is required')
-    .max(255, 'Security answer too long'),
+// Define form schemas
+const profileFormSchema = z.object({
+  profileDetailsGroup: z.object({
+    username: z.string().optional(),
+    email: z.string().email('Invalid email address'),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    name: z.string().min(1, 'Name is required'),
+    phone: z.string().optional(),
+  }),
+  currentPassword: z.string().optional(),
 });
 
-/**
- * Profile details form type (derived from Zod schema)
- */
-type ProfileDetailsForm = z.infer<typeof userProfileUpdateSchema>;
+const securityQuestionFormSchema = z.object({
+  securityQuestion: z.string().optional(),
+  securityAnswer: z.string().optional(),
+});
 
-/**
- * Security question form type
- */
-type SecurityQuestionForm = z.infer<typeof securityQuestionSchema>;
+const passwordFormSchema = z.object({
+  oldPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(16, 'Password must be at least 16 characters'),
+  confirmPassword: z.string().min(1, 'Password confirmation is required'),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
 
-/**
- * Password update form type (derived from Zod schema)
- */
-type PasswordUpdateForm = z.infer<typeof changePasswordSchema>;
+type ProfileFormData = z.infer<typeof profileFormSchema>;
+type SecurityQuestionFormData = z.infer<typeof securityQuestionFormSchema>;
+type PasswordFormData = z.infer<typeof passwordFormSchema>;
 
-/**
- * Tab configuration for the profile interface
- */
-interface ProfileTab {
-  id: string;
-  name: string;
-  icon: React.ComponentType<{ className?: string }>;
-  description: string;
-}
-
-/**
- * Alert state for user feedback
- */
-interface AlertState {
-  show: boolean;
-  type: 'success' | 'error' | 'warning' | 'info';
-  message: string;
-}
-
-// ============================================================================
-// Main Profile Page Component
-// ============================================================================
-
-/**
- * Profile page component with tabbed interface for comprehensive profile management
- */
-export default function ProfilePage(): React.JSX.Element {
+export default function ProfilePage() {
   const router = useRouter();
-  const { user, isAuthenticated, updateProfile: updateAuthProfile } = useAuth();
-  
-  // State management
-  const [selectedTabIndex, setSelectedTabIndex] = useState<number>(0);
-  const [alert, setAlert] = useState<AlertState>({ 
-    show: false, 
-    type: 'info', 
-    message: '' 
-  });
-  const [needsCurrentPassword, setNeedsCurrentPassword] = useState<boolean>(false);
-  const [isSmallScreen, setIsSmallScreen] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState('details');
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertType, setAlertType] = useState<'success' | 'error'>('error');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [needPassword, setNeedPassword] = useState(false);
+  const [loginAttribute, setLoginAttribute] = useState('email');
 
-  // SWR data fetching for profile
-  const { 
-    data: profileData, 
-    error: profileError, 
-    isLoading: profileLoading,
-    mutate: mutateProfile 
-  } = useSWR<UserProfile>(
-    isAuthenticated ? '/api/profile' : null,
+  // SWR data fetching for user profile
+  const { data: currentProfile, error, mutate: mutateProfile } = useSWR<UserProfile>(
+    '/api/v2/user/profile',
     apiClient.get,
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: true,
-      dedupingInterval: 30000, // 30 seconds
+      errorRetryCount: 3,
     }
   );
 
-  // Hooks for profile and password operations
-  const { updateProfile, isUpdating: profileUpdating } = useProfile();
-  const { updatePassword, isUpdating: passwordUpdating } = usePassword();
+  // Custom hooks for profile and password operations
+  const { updateProfile, isUpdating: isUpdatingProfile } = useProfile();
+  const { updatePassword, updateSecurityQuestion, isUpdating: isUpdatingPassword } = usePassword();
 
-  // ============================================================================
-  // Form Setup with React Hook Form + Zod
-  // ============================================================================
-
-  // Profile details form
-  const profileForm = useForm<ProfileDetailsForm>({
-    resolver: zodResolver(userProfileUpdateSchema),
-    mode: 'onChange', // Real-time validation under 100ms
+  // Initialize React Hook Forms
+  const profileForm = useForm<ProfileFormData>({
+    resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      first_name: '',
-      last_name: '',
-      display_name: '',
-      email: '',
-      username: '',
-      phone: '',
-      is_active: true,
+      profileDetailsGroup: {
+        username: '',
+        email: '',
+        firstName: '',
+        lastName: '',
+        name: '',
+        phone: '',
+      },
     },
+    mode: 'onChange', // Real-time validation
   });
 
-  // Security question form
-  const securityForm = useForm<SecurityQuestionForm>({
-    resolver: zodResolver(securityQuestionSchema),
+  const securityQuestionForm = useForm<SecurityQuestionFormData>({
+    resolver: zodResolver(securityQuestionFormSchema),
+    defaultValues: {
+      securityQuestion: '',
+      securityAnswer: '',
+    },
     mode: 'onChange',
-    defaultValues: {
-      security_question: '',
-      security_answer: '',
-    },
   });
 
-  // Password update form
-  const passwordForm = useForm<PasswordUpdateForm>({
-    resolver: zodResolver(changePasswordSchema),
+  const passwordForm = useForm<PasswordFormData>({
+    resolver: zodResolver(passwordFormSchema),
+    defaultValues: {
+      oldPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
     mode: 'onChange',
-    defaultValues: {
-      old_password: '',
-      new_password: '',
-      new_password_confirmation: '',
-    },
   });
 
-  // ============================================================================
-  // Effects and Event Handlers
-  // ============================================================================
-
-  /**
-   * Initialize responsive breakpoint detection
-   */
+  // Load initial profile data
   useEffect(() => {
-    const checkScreenSize = () => {
-      setIsSmallScreen(window.innerWidth < 768);
-    };
-
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
-
-  /**
-   * Populate forms when profile data loads
-   */
-  useEffect(() => {
-    if (profileData) {
-      // Populate profile form
+    if (currentProfile) {
       profileForm.reset({
-        first_name: profileData.first_name || '',
-        last_name: profileData.last_name || '',
-        display_name: profileData.display_name || '',
-        email: profileData.email || '',
-        username: profileData.username || '',
-        phone: profileData.phone || '',
-        is_active: profileData.is_active ?? true,
+        profileDetailsGroup: {
+          username: currentProfile.username || '',
+          email: currentProfile.email || '',
+          firstName: currentProfile.firstName || '',
+          lastName: currentProfile.lastName || '',
+          name: currentProfile.name || '',
+          phone: currentProfile.phone || '',
+        },
       });
 
-      // Populate security form
-      securityForm.reset({
-        security_question: profileData.security_question || '',
-        security_answer: '', // Never pre-populate answer for security
+      securityQuestionForm.reset({
+        securityQuestion: currentProfile.securityQuestion || '',
+        securityAnswer: '', // Never pre-fill security answer for security
       });
     }
-  }, [profileData, profileForm, securityForm]);
+  }, [currentProfile, profileForm, securityQuestionForm]);
 
-  /**
-   * Monitor email changes to determine if current password is needed
-   */
+  // Monitor email changes to determine if current password is needed
   useEffect(() => {
     const subscription = profileForm.watch((value, { name }) => {
-      if (name === 'email' && profileData) {
-        const emailChanged = value.email !== profileData.email;
-        setNeedsCurrentPassword(emailChanged);
+      if (name === 'profileDetailsGroup.email') {
+        const currentEmail = currentProfile?.email || '';
+        const newEmail = value.profileDetailsGroup?.email || '';
         
-        if (emailChanged) {
-          profileForm.setValue('current_password', '', { shouldValidate: true });
+        if (currentEmail !== newEmail) {
+          setNeedPassword(true);
+          profileForm.setValue('currentPassword', '');
         } else {
-          profileForm.unregister('current_password');
+          setNeedPassword(false);
+          profileForm.unregister('currentPassword');
         }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [profileForm, profileData]);
+  }, [profileForm, currentProfile]);
 
-  /**
-   * Clear alerts when switching tabs
-   */
+  // System configuration for login attribute
   useEffect(() => {
-    setAlert({ show: false, type: 'info', message: '' });
-  }, [selectedTabIndex]);
+    const fetchSystemConfig = async () => {
+      try {
+        const config = await apiClient.get('/api/v2/system/environment');
+        const attr = config?.authentication?.loginAttribute || 'email';
+        setLoginAttribute(attr);
+        
+        // Update validators based on login attribute
+        if (attr === 'username') {
+          profileForm.setValue('profileDetailsGroup.username', currentProfile?.username || '');
+        } else {
+          profileForm.setValue('profileDetailsGroup.email', currentProfile?.email || '');
+        }
+      } catch (error) {
+        console.error('Failed to fetch system configuration:', error);
+      }
+    };
 
-  /**
-   * Handle authentication redirect
-   */
-  useEffect(() => {
-    if (!isAuthenticated && !profileLoading) {
-      router.push('/login');
+    fetchSystemConfig();
+  }, [currentProfile, profileForm]);
+
+  const triggerAlert = (type: 'success' | 'error', message: string) => {
+    setAlertType(type);
+    setAlertMessage(message);
+    setShowAlert(true);
+    
+    // Auto-hide success alerts after 5 seconds
+    if (type === 'success') {
+      setTimeout(() => setShowAlert(false), 5000);
     }
-  }, [isAuthenticated, profileLoading, router]);
+  };
 
-  // ============================================================================
-  // Form Submission Handlers
-  // ============================================================================
-
-  /**
-   * Handle profile details update with optimistic updates
-   */
-  const handleProfileUpdate = useCallback(async (data: ProfileDetailsForm) => {
-    if (!profileData) return;
-
+  const onUpdateProfile = async (data: ProfileFormData) => {
     try {
-      setAlert({ show: false, type: 'info', message: '' });
+      if (!currentProfile) return;
 
-      const updatePayload: Partial<UserProfile> = {
+      const body: Partial<UserProfile> = {
+        ...currentProfile,
+        ...data.profileDetailsGroup,
+      };
+
+      if (needPassword && data.currentPassword) {
+        body.currentPassword = data.currentPassword;
+      }
+
+      await updateProfile(body);
+      await mutateProfile(); // Refresh data
+      
+      triggerAlert('success', 'Profile updated successfully');
+      
+      // Reset password requirement
+      if (needPassword) {
+        setNeedPassword(false);
+        profileForm.unregister('currentPassword');
+      }
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.error?.message || 'Failed to update profile';
+      triggerAlert('error', errorMessage);
+    }
+  };
+
+  const onUpdateSecurityQuestion = async (data: SecurityQuestionFormData) => {
+    try {
+      if (!currentProfile) return;
+
+      await updateSecurityQuestion({
+        ...currentProfile,
         ...data,
-        ...(needsCurrentPassword && { current_password: data.current_password }),
-      };
-
-      // Optimistic update
-      const optimisticData = { ...profileData, ...updatePayload };
-      mutateProfile(optimisticData, false);
-
-      const updatedProfile = await updateProfile(updatePayload);
-
-      // Update authentication context
-      updateAuthProfile(updatedProfile);
-
-      // Show success message
-      setAlert({
-        show: true,
-        type: 'success',
-        message: 'Profile updated successfully'
       });
 
-      // Reset form state
-      profileForm.reset(data);
-      setNeedsCurrentPassword(false);
-
-      // Revalidate data
-      mutateProfile();
-
+      await mutateProfile();
+      triggerAlert('success', 'Security question updated successfully');
+      
+      // Clear the security answer field for security
+      securityQuestionForm.setValue('securityAnswer', '');
     } catch (error: any) {
-      console.error('Profile update error:', error);
-      
-      // Rollback optimistic update
-      mutateProfile();
-      
-      setAlert({
-        show: true,
-        type: 'error',
-        message: error.message || 'Failed to update profile'
-      });
+      const errorMessage = error?.response?.data?.error?.message || 'Failed to update security question';
+      triggerAlert('error', errorMessage);
     }
-  }, [profileData, needsCurrentPassword, updateProfile, updateAuthProfile, profileForm, mutateProfile]);
+  };
 
-  /**
-   * Handle security question update
-   */
-  const handleSecurityQuestionUpdate = useCallback(async (data: SecurityQuestionForm) => {
-    if (!profileData) return;
-
+  const onUpdatePassword = async (data: PasswordFormData) => {
     try {
-      setAlert({ show: false, type: 'info', message: '' });
-
-      const updatePayload: Partial<UserProfile> = {
-        security_question: data.security_question,
-        security_answer: data.security_answer,
-      };
-
-      await updateProfile(updatePayload);
-
-      setAlert({
-        show: true,
-        type: 'success',
-        message: 'Security question updated successfully'
-      });
-
-      // Clear security answer for security
-      securityForm.setValue('security_answer', '');
-      
-      // Revalidate data
-      mutateProfile();
-
-    } catch (error: any) {
-      console.error('Security question update error:', error);
-      
-      setAlert({
-        show: true,
-        type: 'error',
-        message: error.message || 'Failed to update security question'
-      });
-    }
-  }, [profileData, updateProfile, securityForm, mutateProfile]);
-
-  /**
-   * Handle password update
-   */
-  const handlePasswordUpdate = useCallback(async (data: PasswordUpdateForm) => {
-    try {
-      setAlert({ show: false, type: 'info', message: '' });
-
       await updatePassword({
-        old_password: data.old_password,
-        new_password: data.new_password,
-        new_password_confirmation: data.new_password_confirmation,
+        oldPassword: data.oldPassword,
+        newPassword: data.newPassword,
       });
 
-      setAlert({
-        show: true,
-        type: 'success',
-        message: 'Password updated successfully'
-      });
-
-      // Reset password form
+      triggerAlert('success', 'Password updated successfully');
       passwordForm.reset();
-
     } catch (error: any) {
-      console.error('Password update error:', error);
-      
-      setAlert({
-        show: true,
-        type: 'error',
-        message: error.message || 'Failed to update password'
-      });
+      const errorMessage = error?.response?.data?.error?.message || 'Failed to update password';
+      triggerAlert('error', errorMessage);
     }
-  }, [updatePassword, passwordForm]);
+  };
 
-  /**
-   * Dismiss alert
-   */
-  const dismissAlert = useCallback(() => {
-    setAlert({ show: false, type: 'info', message: '' });
-  }, []);
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setShowAlert(false); // Hide alerts when switching tabs
+  };
 
-  // ============================================================================
-  // Tab Configuration
-  // ============================================================================
-
-  const tabs: ProfileTab[] = [
-    {
-      id: 'details',
-      name: 'Profile Details',
-      icon: UserIcon,
-      description: 'Manage your personal information and contact details',
-    },
-    {
-      id: 'security',
-      name: 'Security Question',
-      icon: ShieldCheckIcon,
-      description: 'Set up your security question for account recovery',
-    },
-    {
-      id: 'password',
-      name: 'Change Password',
-      icon: KeyIcon,
-      description: 'Update your account password',
-    },
-  ];
-
-  // ============================================================================
-  // Loading and Error States
-  // ============================================================================
-
-  if (!isAuthenticated) {
-    return <LoadingSpinner className="min-h-screen" />;
+  // Loading state
+  if (!currentProfile && !error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
-  if (profileError) {
+  // Error state
+  if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Alert className="max-w-md">
-          <ExclamationTriangleIcon className="h-4 w-4" />
-          <AlertDescription>
+      <div className="container mx-auto px-4 py-8">
+        <Alert className="border-red-200 bg-red-50">
+          <AlertDescription className="text-red-800">
             Failed to load profile data. Please try refreshing the page.
           </AlertDescription>
         </Alert>
@@ -445,389 +276,374 @@ export default function ProfilePage(): React.JSX.Element {
     );
   }
 
-  if (profileLoading || !profileData) {
-    return <LoadingSpinner className="min-h-screen" />;
-  }
-
-  // ============================================================================
-  // Render Component
-  // ============================================================================
-
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="space-y-6">
         {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Profile Settings
-          </h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Manage your account settings and preferences
+        <div className="border-b border-border pb-4">
+          <h1 className="text-3xl font-bold tracking-tight">Profile Settings</h1>
+          <p className="text-muted-foreground mt-2">
+            Manage your account settings and security preferences.
           </p>
         </div>
 
-        {/* Main Content Card */}
-        <Card className="shadow-lg">
-          <CardHeader className="border-b border-gray-200 dark:border-gray-700">
-            <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">
-              Account Management
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent className="p-0">
-            <Tab.Group 
-              selectedIndex={selectedTabIndex} 
-              onChange={setSelectedTabIndex}
-              as="div"
-              className={isSmallScreen ? 'space-y-4' : 'flex'}
+        {/* Alert Banner */}
+        {showAlert && (
+          <Alert 
+            className={`${
+              alertType === 'success' 
+                ? 'border-green-200 bg-green-50' 
+                : 'border-red-200 bg-red-50'
+            }`}
+          >
+            <AlertDescription 
+              className={`${
+                alertType === 'success' ? 'text-green-800' : 'text-red-800'
+              }`}
             >
-              {/* Tab Navigation */}
-              <Tab.List 
-                className={`
-                  ${isSmallScreen 
-                    ? 'flex overflow-x-auto border-b border-gray-200 dark:border-gray-700' 
-                    : 'flex-col w-64 border-r border-gray-200 dark:border-gray-700'
-                  }
-                  bg-gray-50 dark:bg-gray-800
-                `}
+              {alertMessage}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-2 h-auto p-0 text-current"
+                onClick={() => setShowAlert(false)}
+                aria-label="Dismiss alert"
               >
-                {tabs.map((tab, index) => (
-                  <Tab
-                    key={tab.id}
-                    className={({ selected }) => `
-                      ${isSmallScreen ? 'flex-shrink-0 px-4 py-3' : 'w-full px-6 py-4 text-left'}
-                      flex items-center space-x-3 cursor-pointer transition-colors duration-200
-                      ${selected
-                        ? 'bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400 border-blue-500'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }
-                      ${isSmallScreen && selected ? 'border-b-2' : ''}
-                      ${!isSmallScreen && selected ? 'border-r-2' : ''}
-                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset
-                    `}
-                    aria-describedby={`tab-${tab.id}-description`}
-                  >
-                    <tab.icon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
-                    <div className={isSmallScreen ? 'hidden sm:block' : ''}>
-                      <div className="font-medium">{tab.name}</div>
-                      {!isSmallScreen && (
-                        <div 
-                          id={`tab-${tab.id}-description`}
-                          className="text-xs text-gray-500 dark:text-gray-400 mt-1"
-                        >
-                          {tab.description}
-                        </div>
+                ×
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Tabbed Interface */}
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="details">Profile Details</TabsTrigger>
+            <TabsTrigger value="security">Security Question</TabsTrigger>
+            <TabsTrigger value="password">Password</TabsTrigger>
+          </TabsList>
+
+          {/* Profile Details Tab */}
+          <TabsContent value="details" className="space-y-6">
+            <div className="rounded-lg border bg-card p-6">
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-xl font-semibold">Profile Information</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Update your personal information and contact details.
+                  </p>
+                </div>
+
+                <Form {...profileForm}>
+                  <form onSubmit={profileForm.handleSubmit(onUpdateProfile)} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Username field - shown only if login attribute is username */}
+                      {loginAttribute === 'username' && (
+                        <FormField
+                          control={profileForm.control}
+                          name="profileDetailsGroup.username"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Username*</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  placeholder="Enter username"
+                                  aria-describedby="username-error"
+                                />
+                              </FormControl>
+                              <FormMessage id="username-error" />
+                            </FormItem>
+                          )}
+                        />
                       )}
-                    </div>
-                  </Tab>
-                ))}
-              </Tab.List>
 
-              {/* Tab Panels */}
-              <Tab.Panels className={isSmallScreen ? '' : 'flex-1'}>
-                {/* Profile Details Tab */}
-                <Tab.Panel className="p-6 focus:outline-none">
-                  {alert.show && (
-                    <Alert 
-                      className={`mb-6 ${
-                        alert.type === 'success' ? 'border-green-200 bg-green-50 text-green-800' :
-                        alert.type === 'error' ? 'border-red-200 bg-red-50 text-red-800' :
-                        'border-blue-200 bg-blue-50 text-blue-800'
-                      }`}
-                      role="alert"
-                      aria-live="polite"
-                    >
-                      {alert.type === 'success' ? (
-                        <CheckCircleIcon className="h-4 w-4" />
-                      ) : (
-                        <ExclamationTriangleIcon className="h-4 w-4" />
-                      )}
-                      <AlertDescription>
-                        {alert.message}
-                        <button
-                          onClick={dismissAlert}
-                          className="ml-4 text-sm underline hover:no-underline"
-                          aria-label="Dismiss alert"
-                        >
-                          Dismiss
-                        </button>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  <FormProvider {...profileForm}>
-                    <form 
-                      onSubmit={profileForm.handleSubmit(handleProfileUpdate)}
-                      className="space-y-6"
-                      noValidate
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Input
-                          label="First Name"
-                          name="first_name"
-                          type="text"
-                          autoComplete="given-name"
-                          required
-                          aria-describedby="first-name-error"
-                        />
-
-                        <Input
-                          label="Last Name"
-                          name="last_name"
-                          type="text"
-                          autoComplete="family-name"
-                          required
-                          aria-describedby="last-name-error"
-                        />
-
-                        <Input
-                          label="Display Name"
-                          name="display_name"
-                          type="text"
-                          autoComplete="name"
-                          className="md:col-span-2"
-                          aria-describedby="display-name-error"
-                        />
-
-                        <Input
-                          label="Email Address"
-                          name="email"
-                          type="email"
-                          autoComplete="email"
-                          required
-                          className="md:col-span-2"
-                          aria-describedby="email-error"
-                        />
-
-                        <Input
-                          label="Username"
-                          name="username"
-                          type="text"
-                          autoComplete="username"
-                          aria-describedby="username-error"
-                        />
-
-                        <Input
-                          label="Phone Number"
-                          name="phone"
-                          type="tel"
-                          autoComplete="tel"
-                          aria-describedby="phone-error"
-                        />
-
-                        {needsCurrentPassword && (
-                          <Input
-                            label="Current Password"
-                            name="current_password"
-                            type="password"
-                            autoComplete="current-password"
-                            required
-                            className="md:col-span-2"
-                            aria-describedby="current-password-error"
-                            description="Required when changing email address"
-                          />
+                      {/* Email field */}
+                      <FormField
+                        control={profileForm.control}
+                        name="profileDetailsGroup.email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              Email{loginAttribute === 'email' ? '*' : ''}
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="email"
+                                placeholder="Enter email address"
+                                aria-describedby="email-error"
+                              />
+                            </FormControl>
+                            <FormMessage id="email-error" />
+                          </FormItem>
                         )}
-                      </div>
+                      />
 
-                      <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            profileForm.reset();
-                            setNeedsCurrentPassword(false);
-                          }}
-                          disabled={profileUpdating}
-                        >
-                          Reset
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={profileUpdating || !profileForm.formState.isValid}
-                          loading={profileUpdating}
-                        >
-                          Save Changes
-                        </Button>
-                      </div>
-                    </form>
-                  </FormProvider>
-                </Tab.Panel>
+                      {/* Name field */}
+                      <FormField
+                        control={profileForm.control}
+                        name="profileDetailsGroup.name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Display Name*</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                placeholder="Enter display name"
+                                aria-describedby="name-error"
+                              />
+                            </FormControl>
+                            <FormMessage id="name-error" />
+                          </FormItem>
+                        )}
+                      />
 
-                {/* Security Question Tab */}
-                <Tab.Panel className="p-6 focus:outline-none">
-                  {alert.show && (
-                    <Alert 
-                      className={`mb-6 ${
-                        alert.type === 'success' ? 'border-green-200 bg-green-50 text-green-800' :
-                        alert.type === 'error' ? 'border-red-200 bg-red-50 text-red-800' :
-                        'border-blue-200 bg-blue-50 text-blue-800'
-                      }`}
-                      role="alert"
-                      aria-live="polite"
-                    >
-                      {alert.type === 'success' ? (
-                        <CheckCircleIcon className="h-4 w-4" />
-                      ) : (
-                        <ExclamationTriangleIcon className="h-4 w-4" />
+                      {/* First Name field */}
+                      <FormField
+                        control={profileForm.control}
+                        name="profileDetailsGroup.firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                placeholder="Enter first name"
+                                aria-describedby="firstName-error"
+                              />
+                            </FormControl>
+                            <FormMessage id="firstName-error" />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Last Name field */}
+                      <FormField
+                        control={profileForm.control}
+                        name="profileDetailsGroup.lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                placeholder="Enter last name"
+                                aria-describedby="lastName-error"
+                              />
+                            </FormControl>
+                            <FormMessage id="lastName-error" />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Phone field */}
+                      <FormField
+                        control={profileForm.control}
+                        name="profileDetailsGroup.phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone Number</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="tel"
+                                placeholder="Enter phone number"
+                                aria-describedby="phone-error"
+                              />
+                            </FormControl>
+                            <FormMessage id="phone-error" />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Current Password field - shown only when email changes */}
+                    {needPassword && (
+                      <FormField
+                        control={profileForm.control}
+                        name="currentPassword"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Current Password*</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="password"
+                                placeholder="Enter current password"
+                                aria-describedby="currentPassword-error"
+                              />
+                            </FormControl>
+                            <FormMessage id="currentPassword-error" />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+
+                    <div className="flex justify-end">
+                      <Button 
+                        type="submit" 
+                        disabled={isUpdatingProfile}
+                        className="min-w-[100px]"
+                      >
+                        {isUpdatingProfile ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Security Question Tab */}
+          <TabsContent value="security" className="space-y-6">
+            <div className="rounded-lg border bg-card p-6">
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-xl font-semibold">Security Question</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Set up a security question for account recovery purposes.
+                  </p>
+                </div>
+
+                <Form {...securityQuestionForm}>
+                  <form onSubmit={securityQuestionForm.handleSubmit(onUpdateSecurityQuestion)} className="space-y-4">
+                    <FormField
+                      control={securityQuestionForm.control}
+                      name="securityQuestion"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Security Question</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              placeholder="Enter your security question"
+                              aria-describedby="securityQuestion-error"
+                            />
+                          </FormControl>
+                          <FormMessage id="securityQuestion-error" />
+                        </FormItem>
                       )}
-                      <AlertDescription>
-                        {alert.message}
-                        <button
-                          onClick={dismissAlert}
-                          className="ml-4 text-sm underline hover:no-underline"
-                          aria-label="Dismiss alert"
-                        >
-                          Dismiss
-                        </button>
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                    />
 
-                  <FormProvider {...securityForm}>
-                    <form 
-                      onSubmit={securityForm.handleSubmit(handleSecurityQuestionUpdate)}
-                      className="space-y-6"
-                      noValidate
-                    >
-                      <div className="space-y-4">
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Set up a security question to help recover your account if you forget your password.
-                        </p>
-
-                        <Input
-                          label="Security Question"
-                          name="security_question"
-                          type="text"
-                          placeholder="e.g., What was the name of your first pet?"
-                          required
-                          aria-describedby="security-question-error"
-                        />
-
-                        <Input
-                          label="Security Answer"
-                          name="security_answer"
-                          type="text"
-                          placeholder="Enter your answer"
-                          required
-                          aria-describedby="security-answer-error"
-                          description="This answer will be used to verify your identity"
-                        />
-                      </div>
-
-                      <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => securityForm.reset()}
-                          disabled={profileUpdating}
-                        >
-                          Reset
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={profileUpdating || !securityForm.formState.isValid}
-                          loading={profileUpdating}
-                        >
-                          Update Security Question
-                        </Button>
-                      </div>
-                    </form>
-                  </FormProvider>
-                </Tab.Panel>
-
-                {/* Password Update Tab */}
-                <Tab.Panel className="p-6 focus:outline-none">
-                  {alert.show && (
-                    <Alert 
-                      className={`mb-6 ${
-                        alert.type === 'success' ? 'border-green-200 bg-green-50 text-green-800' :
-                        alert.type === 'error' ? 'border-red-200 bg-red-50 text-red-800' :
-                        'border-blue-200 bg-blue-50 text-blue-800'
-                      }`}
-                      role="alert"
-                      aria-live="polite"
-                    >
-                      {alert.type === 'success' ? (
-                        <CheckCircleIcon className="h-4 w-4" />
-                      ) : (
-                        <ExclamationTriangleIcon className="h-4 w-4" />
+                    <FormField
+                      control={securityQuestionForm.control}
+                      name="securityAnswer"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Security Answer</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              placeholder="Enter your security answer"
+                              aria-describedby="securityAnswer-error"
+                            />
+                          </FormControl>
+                          <FormMessage id="securityAnswer-error" />
+                        </FormItem>
                       )}
-                      <AlertDescription>
-                        {alert.message}
-                        <button
-                          onClick={dismissAlert}
-                          className="ml-4 text-sm underline hover:no-underline"
-                          aria-label="Dismiss alert"
-                        >
-                          Dismiss
-                        </button>
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                    />
 
-                  <FormProvider {...passwordForm}>
-                    <form 
-                      onSubmit={passwordForm.handleSubmit(handlePasswordUpdate)}
-                      className="space-y-6"
-                      noValidate
-                    >
-                      <div className="space-y-4">
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Choose a strong password with at least 8 characters including uppercase, lowercase, and numbers.
-                        </p>
+                    <div className="flex justify-end">
+                      <Button 
+                        type="submit" 
+                        disabled={isUpdatingPassword}
+                        className="min-w-[100px]"
+                      >
+                        {isUpdatingPassword ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </div>
+            </div>
+          </TabsContent>
 
-                        <Input
-                          label="Current Password"
-                          name="old_password"
-                          type="password"
-                          autoComplete="current-password"
-                          required
-                          aria-describedby="old-password-error"
-                        />
+          {/* Password Update Tab */}
+          <TabsContent value="password" className="space-y-6">
+            <div className="rounded-lg border bg-card p-6">
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-xl font-semibold">Change Password</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Update your account password. Password must be at least 16 characters.
+                  </p>
+                </div>
 
-                        <Input
-                          label="New Password"
-                          name="new_password"
-                          type="password"
-                          autoComplete="new-password"
-                          required
-                          aria-describedby="new-password-error"
-                        />
+                <Form {...passwordForm}>
+                  <form onSubmit={passwordForm.handleSubmit(onUpdatePassword)} className="space-y-4">
+                    <FormField
+                      control={passwordForm.control}
+                      name="oldPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Current Password*</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="password"
+                              placeholder="Enter current password"
+                              aria-describedby="oldPassword-error"
+                            />
+                          </FormControl>
+                          <FormMessage id="oldPassword-error" />
+                        </FormItem>
+                      )}
+                    />
 
-                        <Input
-                          label="Confirm New Password"
-                          name="new_password_confirmation"
-                          type="password"
-                          autoComplete="new-password"
-                          required
-                          aria-describedby="new-password-confirmation-error"
-                        />
-                      </div>
+                    <FormField
+                      control={passwordForm.control}
+                      name="newPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>New Password*</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="password"
+                              placeholder="Enter new password (min 16 characters)"
+                              aria-describedby="newPassword-error"
+                            />
+                          </FormControl>
+                          <FormMessage id="newPassword-error" />
+                        </FormItem>
+                      )}
+                    />
 
-                      <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => passwordForm.reset()}
-                          disabled={passwordUpdating}
-                        >
-                          Reset
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={passwordUpdating || !passwordForm.formState.isValid}
-                          loading={passwordUpdating}
-                        >
-                          Update Password
-                        </Button>
-                      </div>
-                    </form>
-                  </FormProvider>
-                </Tab.Panel>
-              </Tab.Panels>
-            </Tab.Group>
-          </CardContent>
-        </Card>
+                    <FormField
+                      control={passwordForm.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirm New Password*</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              type="password"
+                              placeholder="Confirm new password"
+                              aria-describedby="confirmPassword-error"
+                            />
+                          </FormControl>
+                          <FormMessage id="confirmPassword-error" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex justify-end">
+                      <Button 
+                        type="submit" 
+                        disabled={isUpdatingPassword}
+                        className="min-w-[100px]"
+                      >
+                        {isUpdatingPassword ? 'Updating...' : 'Update Password'}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
