@@ -1,79 +1,215 @@
 /**
- * GitHub Scripts Import Dialog Component System
+ * @fileoverview Barrel export file for GitHub Scripts Dialog Component System
+ * @version 1.0.0
+ * @since 2024-12-19
  * 
- * Barrel export file providing centralized access to the GitHub scripts import dialog
- * component, type definitions, utility functions, and hooks. Enables clean imports
- * throughout the React 19/Next.js 15.1 application following modern conventions.
+ * Centralized export structure for the GitHub scripts dialog component and related types.
+ * Provides clean imports for React 19 components with TypeScript definitions and utility
+ * functions for GitHub repository integration.
  * 
- * @example
- * ```tsx
- * import { ScriptsGithubDialog, type ScriptsGithubDialogProps } from '@/components/ui/scripts-github-dialog';
- * import { validateGithubUrl, detectRepositoryInfo } from '@/components/ui/scripts-github-dialog';
+ * Key Features:
+ * - Tree-shaking support for optimal bundle size with Turbopack
+ * - TypeScript export patterns for enhanced IDE support
+ * - Clean component import structure for React 19 components
+ * - Named exports for component, interfaces, and utility functions
+ * - React component library export patterns for clean API surface
+ * 
+ * Usage Examples:
+ * ```typescript
+ * // Import main component
+ * import { ScriptsGithubDialog } from '@/components/ui/scripts-github-dialog';
+ * 
+ * // Import specific types
+ * import type { 
+ *   ScriptsGithubDialogProps, 
+ *   GitHubScriptContent,
+ *   DialogState 
+ * } from '@/components/ui/scripts-github-dialog';
+ * 
+ * // Import utilities
+ * import { 
+ *   isGitHubFileUrl, 
+ *   DEFAULT_FILE_CONFIG 
+ * } from '@/components/ui/scripts-github-dialog';
  * ```
  */
 
-// Main Component Exports
-export { default as ScriptsGithubDialog } from './scripts-github-dialog';
-export { ScriptsGithubDialog as ScriptsGithubDialogComponent } from './scripts-github-dialog';
+// =============================================================================
+// MAIN COMPONENT EXPORTS
+// =============================================================================
 
-// Type Definitions Export
+export {
+  ScriptsGithubDialog,
+  default as ScriptsGithubDialogDefault
+} from './scripts-github-dialog';
+
+// =============================================================================
+// CORE TYPE EXPORTS
+// =============================================================================
+
 export type {
+  // Primary component props
   ScriptsGithubDialogProps,
-  GitHubRepositoryInfo,
-  GitHubAuthCredentials,
-  ScriptFileConfig,
-  GitHubApiResponse,
-  GitHubFileContent,
+  DialogAriaConfig,
+  
+  // Component state and context
+  DialogStateContext,
+  ScriptsGithubDialogRef,
+  
+  // Form and validation types
+  GitHubUrlFormData,
+  GitHubDialogFormState,
   FormValidationSchema,
-  DialogState,
-  ScriptImportResult,
-  GitHubErrorResponse,
-  RepositoryVisibility,
-  SupportedScriptExtension,
-  GitHubUrlParseResult,
-  AuthenticationMethod,
-  ImportProgressState,
-  ValidationError
 } from './types';
 
-// Utility Functions Export
-export {
-  validateGithubUrl,
-  parseGithubUrl,
-  detectRepositoryInfo,
-  extractFileExtension,
-  buildGithubApiUrl,
-  isValidScriptFile,
-  parseRepositoryPath,
-  sanitizeFileContent
-} from './utils';
+// =============================================================================
+// GITHUB API TYPE EXPORTS
+// =============================================================================
 
-// Custom Hooks Export
-export {
-  useGithubApi,
-  useGithubAuth,
-  useRepositoryValidation,
-  useScriptImport,
-  useGithubUrlParser
-} from './hooks';
-
-// Constants Export
-export {
-  SUPPORTED_SCRIPT_EXTENSIONS,
-  GITHUB_API_BASE_URL,
-  DEFAULT_DIALOG_CONFIG,
-  VALIDATION_DEBOUNCE_MS,
-  MAX_FILE_SIZE_BYTES
-} from './constants';
-
-// Re-export commonly used types for convenience
 export type {
-  DialogProps,
-  DialogState as BaseDialogState
-} from '../dialog/types';
+  // Repository and user information
+  GitHubRepositoryInfo,
+  GitHubUserInfo,
+  GitHubRepositoryPermissions,
+  
+  // File content and metadata
+  GitHubFileContent,
+  GitHubScriptContent,
+  FileMetadata,
+  
+  // API response types
+  GitHubApiResponse,
+  GitHubRepositoryResponse,
+  GitHubFileResponse,
+  GitHubUserResponse,
+  
+  // URL parsing
+  GitHubUrlParts,
+} from './types';
+
+// =============================================================================
+// AUTHENTICATION TYPE EXPORTS
+// =============================================================================
+
+export type {
+  // Authentication credentials and state
+  GitHubAuthCredentials,
+  GitHubAuthState,
+  GitHubRateLimit,
+} from './types';
+
+// =============================================================================
+// FILE VALIDATION TYPE EXPORTS
+// =============================================================================
+
+export type {
+  // File types and configuration
+  ScriptFileExtension,
+  ScriptLanguage,
+  ScriptFileConfig,
+  FileProcessingOptions,
+  ValidationResult,
+  
+  // Type mappings
+  ExtensionLanguageMap,
+} from './types';
+
+// =============================================================================
+// STATE MANAGEMENT TYPE EXPORTS
+// =============================================================================
+
+export {
+  // Dialog state enumeration
+  DialogState
+} from './types';
+
+export type {
+  // State management types
+  DialogStates,
+} from './types';
+
+// =============================================================================
+// ERROR HANDLING TYPE EXPORTS
+// =============================================================================
+
+export type {
+  // Error types and interfaces
+  GitHubDialogError,
+  GitHubDialogErrorType,
+  GitHubErrorContext,
+  ErrorRecoveryOptions,
+} from './types';
+
+// =============================================================================
+// CALLBACK TYPE EXPORTS
+// =============================================================================
+
+export type {
+  // Event handler types
+  OnSuccessCallback,
+  OnErrorCallback,
+  OnStateChangeCallback,
+  OnProgressCallback,
+  DialogEventHandlers,
+} from './types';
+
+// =============================================================================
+// UTILITY TYPE EXPORTS
+// =============================================================================
+
+export type {
+  // Component and props utilities
+  PartialDialogProps,
+  RequiredDialogProps,
+  DialogConfiguration,
+  ComponentProps,
+} from './types';
+
+// =============================================================================
+// CONSTANT EXPORTS
+// =============================================================================
+
+export {
+  // Default configuration
+  DEFAULT_FILE_CONFIG,
+  
+  // Extension mappings
+  EXTENSION_LANGUAGE_MAP,
+} from './types';
+
+// =============================================================================
+// UTILITY FUNCTION EXPORTS
+// =============================================================================
+
+export {
+  // Type guards and validators
+  isGitHubDialogError,
+  isGitHubFileUrl,
+} from './types';
+
+// =============================================================================
+// RE-EXPORTS FOR CONVENIENCE
+// =============================================================================
 
 /**
- * Default export for the main component
- * Enables import ScriptsGithubDialog from 'path' syntax
+ * Default export - main component for direct import compatibility
+ * Supports both named and default import patterns
  */
-export { default } from './scripts-github-dialog';
+export { ScriptsGithubDialog as default } from './scripts-github-dialog';
+
+// =============================================================================
+// TYPE-ONLY EXPORTS (EXPLICIT)
+// =============================================================================
+
+/**
+ * Explicitly type-only exports for better tree-shaking
+ * These ensure that only type information is imported, not runtime code
+ */
+export type {
+  ScriptsGithubDialogProps as Props,
+  GitHubScriptContent as ScriptContent,
+  GitHubDialogError as DialogError,
+  DialogState as State,
+  ScriptFileExtension as FileExtension,
+  ScriptLanguage as Language,
+} from './types';
