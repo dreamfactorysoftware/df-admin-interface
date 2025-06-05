@@ -1,335 +1,528 @@
 /**
- * TypeScript type definitions for the Input component system
- * Provides interfaces for React Hook Form integration, validation, and accessibility compliance
+ * Input Component Type Definitions
  * 
- * @file src/components/ui/input/input.types.ts
- * @since 1.0.0
+ * Comprehensive TypeScript interfaces for React 19 input components with
+ * React Hook Form integration, Zod validation support, and WCAG 2.1 AA
+ * accessibility compliance.
+ * 
+ * @fileoverview Input component type definitions for accessible, responsive React components
+ * @version 1.0.0
  */
 
-import { InputHTMLAttributes, ReactNode } from 'react';
-import { FieldPath, FieldValues, UseControllerProps } from 'react-hook-form';
+import { type ReactNode, type InputHTMLAttributes, type TextareaHTMLAttributes, type RefObject } from 'react';
+import { type FieldPath, type FieldValues, type UseFormReturn, type RegisterOptions, type FieldError } from 'react-hook-form';
+import { type ZodSchema, type ZodType } from 'zod';
+import { 
+  type AccessibilityProps, 
+  type SizeVariant, 
+  type ColorVariant, 
+  type StateVariant,
+  type BaseComponentProps,
+  type FormComponentProps,
+  type ControlledProps,
+  type ThemeProps,
+  type FocusProps,
+  type ValidationState,
+  type ResponsiveProps
+} from '@/types/ui';
 
 /**
- * Base input variant types following design system from Section 7.7.1
+ * Input component variant types supporting different visual styles
+ * Each variant maintains WCAG 2.1 AA contrast compliance
  */
-export type InputVariant = 'outline' | 'filled' | 'ghost';
+export type InputVariant = 
+  | 'outline'    // Default outlined input with border
+  | 'filled'     // Filled background input
+  | 'ghost'      // Minimal styling with subtle background
+  | 'underlined' // Bottom border only
+  | 'floating';  // Floating label design
 
 /**
- * Input size variants with WCAG 2.1 AA minimum touch targets
+ * Input component size variants with responsive support
+ * All sizes maintain minimum 44px touch target for accessibility
  */
-export type InputSize = 'sm' | 'md' | 'lg';
+export type InputSize = 'sm' | 'md' | 'lg' | 'xl';
 
 /**
- * Input state types for styling and accessibility
+ * Input component state variants for visual feedback
  */
-export type InputState = 'default' | 'error' | 'success' | 'warning';
+export type InputState = 
+  | 'default'
+  | 'focused'
+  | 'error'
+  | 'success'
+  | 'warning'
+  | 'disabled'
+  | 'readonly'
+  | 'loading';
 
 /**
- * Extended input props with React Hook Form integration and accessibility features
+ * Supported HTML input types with validation considerations
  */
-export interface BaseInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
-  /**
-   * Input variant following design system
-   * @default 'outline'
-   */
+export type InputType = 
+  | 'text'
+  | 'password'
+  | 'email'
+  | 'url'
+  | 'tel'
+  | 'search'
+  | 'number'
+  | 'date'
+  | 'datetime-local'
+  | 'time'
+  | 'month'
+  | 'week'
+  | 'color'
+  | 'file'
+  | 'hidden';
+
+/**
+ * Label positioning options for form layout flexibility
+ */
+export type LabelPosition = 'top' | 'left' | 'right' | 'inside' | 'floating' | 'none';
+
+/**
+ * Input validation severity levels
+ */
+export type ValidationSeverity = 'error' | 'warning' | 'info' | 'success';
+
+/**
+ * Core input component props interface
+ * Extends base HTML input attributes with enhanced type safety
+ */
+export interface BaseInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'prefix'> {
+  /** Input variant for visual styling */
   variant?: InputVariant;
-  
-  /**
-   * Input size with minimum touch target compliance
-   * @default 'md'
-   */
+  /** Input size for responsive design */
   size?: InputSize;
-  
-  /**
-   * Current input state for styling and ARIA attributes
-   * @default 'default'
-   */
+  /** Current input state for visual feedback */
   state?: InputState;
-  
-  /**
-   * Error message for validation display
-   */
+  /** Label text content */
+  label?: string;
+  /** Label positioning relative to input */
+  labelPosition?: LabelPosition;
+  /** Helper text below input */
+  helperText?: string;
+  /** Validation error message */
   error?: string;
+  /** Success message */
+  successMessage?: string;
+  /** Warning message */
+  warningMessage?: string;
+  /** Additional context or instructions */
+  description?: string;
+  /** Show label visually (false makes it screen-reader only) */
+  showLabel?: boolean;
   
-  /**
-   * Help text displayed below the input
-   */
-  helpText?: string;
-  
-  /**
-   * Element to display before the input (icon, text, etc.)
-   */
-  prefix?: ReactNode;
-  
-  /**
-   * Element to display after the input (icon, button, etc.)
-   */
-  suffix?: ReactNode;
-  
-  /**
-   * Whether the input is in a loading state
-   */
-  loading?: boolean;
-  
-  /**
-   * Custom class name for additional styling
-   */
-  className?: string;
-  
-  /**
-   * Custom class name for the container wrapper
-   */
-  containerClassName?: string;
-  
-  /**
-   * Enhanced accessibility label for screen readers
-   */
+  // Enhanced accessibility props
+  /** Screen reader label override */
   'aria-label'?: string;
-  
-  /**
-   * ID of element that describes this input
-   */
+  /** ID of element describing the input */
   'aria-describedby'?: string;
-  
-  /**
-   * Whether input is required (adds ARIA and visual indicators)
-   */
-  required?: boolean;
-  
-  /**
-   * Custom validation message for screen readers
-   */
-  'aria-invalid'?: boolean;
-  
-  /**
-   * Additional ARIA attributes for accessibility
-   */
+  /** ID of element labeling the input */
+  'aria-labelledby'?: string;
+  /** Invalid state for screen readers */
+  'aria-invalid'?: boolean | 'grammar' | 'spelling';
+  /** Input validation requirements description */
+  'aria-required'?: boolean;
+  /** Error message announcement for screen readers */
   'aria-errormessage'?: string;
+  
+  // Visual enhancements
+  /** Icon or content before input */
+  prefix?: ReactNode;
+  /** Icon or content after input */
+  suffix?: ReactNode;
+  /** Show clear button when input has value */
+  clearable?: boolean;
+  /** Show password visibility toggle (password inputs) */
+  showPasswordToggle?: boolean;
+  /** Loading spinner inside input */
+  loading?: boolean;
+  /** Character count display */
+  showCharacterCount?: boolean;
+  /** Custom placeholder text */
+  placeholder?: string;
 }
 
 /**
- * Props for React Hook Form controlled input
+ * React Hook Form integration props
+ * Provides seamless integration with form validation
  */
-export interface ControlledInputProps<
+export interface ReactHookFormProps<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
-> extends BaseInputProps {
-  /**
-   * React Hook Form controller props
-   */
-  control?: UseControllerProps<TFieldValues, TName>['control'];
-  
-  /**
-   * Field name for React Hook Form
-   */
-  name: TName;
-  
-  /**
-   * Default value for the field
-   */
-  defaultValue?: UseControllerProps<TFieldValues, TName>['defaultValue'];
-  
-  /**
-   * Validation rules for React Hook Form
-   */
-  rules?: UseControllerProps<TFieldValues, TName>['rules'];
-  
-  /**
-   * Whether to disable form state subscription for performance
-   */
-  shouldUnregister?: UseControllerProps<TFieldValues, TName>['shouldUnregister'];
+> {
+  /** Form instance from useForm hook */
+  form?: UseFormReturn<TFieldValues>;
+  /** Field name for form registration */
+  name?: TName;
+  /** Validation rules for React Hook Form */
+  rules?: RegisterOptions<TFieldValues, TName>;
+  /** Transform value on change */
+  transform?: {
+    input?: (value: any) => any;
+    output?: (value: any) => any;
+  };
+  /** Manual field error override */
+  fieldError?: FieldError;
+  /** Validation mode override */
+  mode?: 'onChange' | 'onBlur' | 'onSubmit' | 'onTouched' | 'all';
 }
 
 /**
- * Input container props for consistent layout and spacing
+ * Zod schema validation integration
  */
-export interface InputContainerProps {
-  /**
-   * Container size following input size
-   */
-  size?: InputSize;
+export interface ZodValidationProps {
+  /** Zod schema for input validation */
+  schema?: ZodSchema;
+  /** Custom validation function using Zod */
+  zodValidate?: (value: any) => { success: boolean; error?: string };
+  /** Validation trigger timing */
+  validateOn?: 'change' | 'blur' | 'submit';
+  /** Show validation errors immediately */
+  showValidationErrors?: boolean;
+}
+
+/**
+ * Advanced input formatting and masking options
+ */
+export interface InputFormattingProps {
+  /** Input mask pattern (e.g., phone numbers, dates) */
+  mask?: string | ((value: string) => string);
+  /** Character used for mask placeholders */
+  maskChar?: string;
+  /** Allow incomplete mask input */
+  alwaysShowMask?: boolean;
+  /** Format value for display */
+  format?: (value: string) => string;
+  /** Parse formatted value back to raw value */
+  parse?: (value: string) => string;
+  /** Text transformation */
+  transform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none';
+  /** Remove formatting characters on blur */
+  cleanOnBlur?: boolean;
+}
+
+/**
+ * Input styling and theming configuration
+ */
+export interface InputStylingProps {
+  /** Container CSS classes */
+  containerClassName?: string;
+  /** Label CSS classes */
+  labelClassName?: string;
+  /** Input element CSS classes */
+  inputClassName?: string;
+  /** Helper text CSS classes */
+  helperClassName?: string;
+  /** Error message CSS classes */
+  errorClassName?: string;
+  /** Success message CSS classes */
+  successClassName?: string;
+  /** Prefix/suffix container CSS classes */
+  affixClassName?: string;
+  /** Custom CSS variables for theming */
+  cssVariables?: Record<string, string>;
+  /** Border radius override */
+  borderRadius?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  /** Shadow depth */
+  shadow?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
+}
+
+/**
+ * Responsive input configuration
+ */
+export interface InputResponsiveProps extends ResponsiveProps {
+  /** Size per breakpoint */
+  responsiveSize?: {
+    xs?: InputSize;
+    sm?: InputSize;
+    md?: InputSize;
+    lg?: InputSize;
+    xl?: InputSize;
+  };
+  /** Label position per breakpoint */
+  responsiveLabelPosition?: {
+    xs?: LabelPosition;
+    sm?: LabelPosition;
+    md?: LabelPosition;
+    lg?: LabelPosition;
+    xl?: LabelPosition;
+  };
+  /** Stacking behavior on small screens */
+  stackOnMobile?: boolean;
+}
+
+/**
+ * Input event handlers with enhanced type safety
+ */
+export interface InputEventProps {
+  /** Value change handler */
+  onValueChange?: (value: string, event?: React.ChangeEvent<HTMLInputElement>) => void;
+  /** Focus event with enhanced context */
+  onFocusChange?: (focused: boolean, event?: React.FocusEvent<HTMLInputElement>) => void;
+  /** Validation state change */
+  onValidationChange?: (validation: ValidationState) => void;
+  /** Clear button click */
+  onClear?: () => void;
+  /** Prefix/suffix click handlers */
+  onPrefixClick?: () => void;
+  onSuffixClick?: () => void;
+  /** Enter key press in input */
+  onEnterPress?: (value: string) => void;
+  /** Escape key press */
+  onEscapePress?: () => void;
+}
+
+/**
+ * Complete input component props interface
+ * Combines all input-related interfaces for comprehensive type safety
+ */
+export interface InputProps extends 
+  BaseInputProps,
+  ReactHookFormProps,
+  ZodValidationProps,
+  InputFormattingProps,
+  InputStylingProps,
+  InputResponsiveProps,
+  InputEventProps,
+  AccessibilityProps,
+  ThemeProps,
+  FocusProps {
   
-  /**
-   * Container variant for styling
-   */
-  variant?: InputVariant;
+  /** Component reference for imperative operations */
+  ref?: RefObject<HTMLInputElement>;
+  /** Test ID for automated testing */
+  'data-testid'?: string;
+  /** Custom input component render function */
+  renderInput?: (props: InputHTMLAttributes<HTMLInputElement>) => ReactNode;
+  /** Custom label render function */
+  renderLabel?: (label: string, required?: boolean) => ReactNode;
+  /** Custom error render function */
+  renderError?: (error: string) => ReactNode;
+  /** Custom helper text render function */
+  renderHelper?: (helper: string) => ReactNode;
+}
+
+/**
+ * Textarea-specific props extending input functionality
+ */
+export interface TextareaProps extends 
+  Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'size'>,
+  Omit<InputProps, 'type' | 'prefix' | 'suffix' | 'showPasswordToggle'> {
   
-  /**
-   * Current state for container styling
-   */
-  state?: InputState;
-  
-  /**
-   * Whether container has prefix element
-   */
-  hasPrefix?: boolean;
-  
-  /**
-   * Whether container has suffix element
-   */
-  hasSuffix?: boolean;
-  
-  /**
-   * Whether input is disabled
-   */
-  disabled?: boolean;
-  
-  /**
-   * Whether input is readonly
-   */
-  readonly?: boolean;
-  
-  /**
-   * Whether input is focused (for styling)
-   */
-  focused?: boolean;
-  
-  /**
-   * Custom class name
-   */
-  className?: string;
-  
-  /**
-   * Children components (prefix, input, suffix)
-   */
+  /** Auto-resize behavior */
+  autoResize?: boolean;
+  /** Minimum number of visible rows */
+  minRows?: number;
+  /** Maximum number of visible rows */
+  maxRows?: number;
+  /** Resize handle visibility */
+  resize?: 'none' | 'vertical' | 'horizontal' | 'both';
+  /** Textarea reference */
+  ref?: RefObject<HTMLTextAreaElement>;
+}
+
+/**
+ * Input group configuration for related inputs
+ */
+export interface InputGroupProps {
+  /** Group orientation */
+  orientation?: 'horizontal' | 'vertical';
+  /** Spacing between inputs */
+  spacing?: 'compact' | 'normal' | 'relaxed';
+  /** Group validation state */
+  groupValidation?: ValidationState;
+  /** Shared prefix for all inputs */
+  groupPrefix?: ReactNode;
+  /** Shared suffix for all inputs */
+  groupSuffix?: ReactNode;
+  /** Group label */
+  groupLabel?: string;
+  /** Group description */
+  groupDescription?: string;
+  /** Group error message */
+  groupError?: string;
+  /** Children inputs */
   children: ReactNode;
-  
-  /**
-   * Click handler for container (focus management)
-   */
-  onClick?: () => void;
 }
 
 /**
- * Input prefix/suffix element props
+ * Input field state management interface
  */
-export interface InputAdornmentProps {
-  /**
-   * Element content (icon, text, button)
-   */
-  children: ReactNode;
-  
-  /**
-   * Position of the adornment
-   */
-  position: 'prefix' | 'suffix';
-  
-  /**
-   * Input size for consistent sizing
-   */
-  size?: InputSize;
-  
-  /**
-   * Whether adornment is clickable
-   */
-  clickable?: boolean;
-  
-  /**
-   * Click handler for interactive adornments
-   */
-  onClick?: () => void;
-  
-  /**
-   * Custom class name
-   */
-  className?: string;
-  
-  /**
-   * ARIA label for interactive adornments
-   */
-  'aria-label'?: string;
-}
-
-/**
- * Focus ring configuration for accessibility compliance
- */
-export interface InputFocusRing {
-  /**
-   * Focus ring width in pixels
-   */
-  width: string;
-  
-  /**
-   * Focus ring color (must meet 3:1 contrast ratio)
-   */
-  color: string;
-  
-  /**
-   * Focus ring offset for visibility
-   */
-  offset: string;
-  
-  /**
-   * Focus ring border radius
-   */
-  borderRadius?: string;
-}
-
-/**
- * Validation state configuration
- */
-export interface InputValidationState {
-  /**
-   * Whether input is valid
-   */
+export interface InputFieldState {
+  /** Current input value */
+  value: string;
+  /** Input has been modified */
+  isDirty: boolean;
+  /** Input has been focused */
+  isTouched: boolean;
+  /** Input is currently focused */
+  isFocused: boolean;
+  /** Input is valid */
   isValid: boolean;
-  
-  /**
-   * Validation error message
-   */
-  errorMessage?: string;
-  
-  /**
-   * Success message for positive feedback
-   */
-  successMessage?: string;
-  
-  /**
-   * Warning message for important notices
-   */
-  warningMessage?: string;
-  
-  /**
-   * Field name for error tracking
-   */
-  fieldName?: string;
+  /** Input is currently validating */
+  isValidating: boolean;
+  /** Validation error message */
+  error?: string;
+  /** Success message */
+  success?: string;
+  /** Warning message */
+  warning?: string;
 }
 
 /**
- * Theme-aware styling configuration
+ * Input context for form field management
  */
-export interface InputThemeConfig {
-  /**
-   * Light theme colors
-   */
-  light: {
-    background: string;
-    border: string;
-    text: string;
-    placeholder: string;
-    focusRing: InputFocusRing;
+export interface InputContextValue {
+  /** Form-wide validation state */
+  formValidation?: ValidationState;
+  /** Default input variant */
+  defaultVariant?: InputVariant;
+  /** Default input size */
+  defaultSize?: InputSize;
+  /** Theme configuration */
+  theme?: {
+    colors?: Record<string, string>;
+    spacing?: Record<string, string>;
+    borderRadius?: Record<string, string>;
   };
-  
-  /**
-   * Dark theme colors
-   */
-  dark: {
-    background: string;
-    border: string;
-    text: string;
-    placeholder: string;
-    focusRing: InputFocusRing;
+  /** Accessibility preferences */
+  accessibility?: {
+    announceErrors?: boolean;
+    highlightRequired?: boolean;
+    useHighContrast?: boolean;
+    reducedMotion?: boolean;
+  };
+  /** Form submission state */
+  isSubmitting?: boolean;
+  /** Form disabled state */
+  isDisabled?: boolean;
+}
+
+/**
+ * Input validation configuration
+ */
+export interface InputValidationConfig {
+  /** Validation rules */
+  rules: {
+    required?: boolean | string;
+    minLength?: number | { value: number; message: string };
+    maxLength?: number | { value: number; message: string };
+    pattern?: RegExp | { value: RegExp; message: string };
+    min?: number | { value: number; message: string };
+    max?: number | { value: number; message: string };
+    validate?: Record<string, (value: any) => boolean | string>;
+  };
+  /** Custom validation messages */
+  messages?: {
+    required?: string;
+    invalid?: string;
+    tooShort?: string;
+    tooLong?: string;
+    patternMismatch?: string;
+    rangeUnderflow?: string;
+    rangeOverflow?: string;
+  };
+  /** Validation timing */
+  timing?: {
+    debounce?: number;
+    validateOnMount?: boolean;
+    validateOnChange?: boolean;
+    validateOnBlur?: boolean;
   };
 }
 
 /**
- * Export utility type for input refs
+ * Input component size configuration with responsive values
+ */
+export interface InputSizeConfig {
+  /** Height values for each size */
+  height: Record<InputSize, string>;
+  /** Padding values for each size */
+  padding: Record<InputSize, { x: string; y: string }>;
+  /** Font size for each size */
+  fontSize: Record<InputSize, string>;
+  /** Border radius for each size */
+  borderRadius: Record<InputSize, string>;
+  /** Icon size for each size */
+  iconSize: Record<InputSize, string>;
+}
+
+/**
+ * Input variant styling configuration
+ */
+export interface InputVariantConfig {
+  /** Base styles for each variant */
+  base: Record<InputVariant, string>;
+  /** State-specific styles */
+  states: Record<InputState, Record<InputVariant, string>>;
+  /** Focus styles */
+  focus: Record<InputVariant, string>;
+  /** Hover styles */
+  hover: Record<InputVariant, string>;
+}
+
+/**
+ * Complete input component configuration
+ */
+export interface InputConfig {
+  /** Size configuration */
+  sizes: InputSizeConfig;
+  /** Variant styling */
+  variants: InputVariantConfig;
+  /** Default props */
+  defaults: {
+    variant: InputVariant;
+    size: InputSize;
+    labelPosition: LabelPosition;
+  };
+  /** Animation configuration */
+  animations: {
+    transition: string;
+    focusTransition: string;
+    labelTransition: string;
+  };
+}
+
+/**
+ * Export utility types for component development
+ */
+export type InputPropsWithoutChildren = Omit<InputProps, 'children'>;
+export type InputElementProps = InputHTMLAttributes<HTMLInputElement>;
+export type TextareaElementProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
+
+/**
+ * Re-export relevant types from dependencies for convenience
+ */
+export type {
+  FieldPath,
+  FieldValues,
+  UseFormReturn,
+  RegisterOptions,
+  FieldError
+} from 'react-hook-form';
+
+export type {
+  ZodSchema,
+  ZodType
+} from 'zod';
+
+/**
+ * Input component forward ref type for TypeScript
  */
 export type InputRef = HTMLInputElement;
+export type TextareaRef = HTMLTextAreaElement;
 
 /**
- * Export utility type for common input events
+ * Input component factory types for dynamic creation
  */
-export type InputChangeEvent = React.ChangeEvent<HTMLInputElement>;
-export type InputFocusEvent = React.FocusEvent<HTMLInputElement>;
-export type InputKeyboardEvent = React.KeyboardEvent<HTMLInputElement>;
+export interface InputFactory {
+  /** Create input with predefined configuration */
+  createInput: (config: Partial<InputConfig>) => React.ComponentType<InputProps>;
+  /** Create textarea with predefined configuration */
+  createTextarea: (config: Partial<InputConfig>) => React.ComponentType<TextareaProps>;
+  /** Create input group with predefined configuration */
+  createInputGroup: (config: Partial<InputGroupProps>) => React.ComponentType<InputGroupProps>;
+}
