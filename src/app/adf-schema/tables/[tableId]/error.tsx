@@ -1,365 +1,331 @@
 'use client';
 
-/**
- * Table Details Error Component
- * 
- * Error boundary component for table details page implementing React error boundary pattern.
- * Provides user-friendly error display with recovery options and detailed error information
- * for development environments. Maintains accessible design and consistent styling.
- * 
- * Features:
- * - React error boundary with graceful fallback UI
- * - Categorized error types with specific recovery actions
- * - WCAG 2.1 AA accessibility compliance with proper ARIA attributes
- * - Development mode detailed error information
- * - User-friendly error messages with actionable suggestions
- * - Responsive design with Tailwind CSS
- * 
- * @fileoverview Table details error boundary component
- * @version 1.0.0
- * @created 2024-12-28
- */
-
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import {
+import React from 'react';
+import { useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertContent, AlertIcon } from '@/components/ui/alert';
+import { 
   ExclamationTriangleIcon,
   ArrowPathIcon,
   HomeIcon,
-  ChevronLeftIcon,
-  BugAntIcon,
-  ServerIcon,
-  KeyIcon,
-  WifiIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
-import { cn } from '@/lib/utils';
 
 /**
- * Error types for categorized error handling
+ * Error boundary props interface for Next.js app router error boundaries
  */
-type ErrorType = 
-  | 'network'
-  | 'authentication' 
-  | 'authorization'
-  | 'not-found'
-  | 'validation'
-  | 'server'
-  | 'unknown';
-
-/**
- * Error information interface
- */
-interface ErrorInfo {
-  type: ErrorType;
-  title: string;
-  description: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  suggestions: string[];
-  recoveryActions: Array<{
-    label: string;
-    action: () => void;
-    variant: 'primary' | 'secondary';
-  }>;
-}
-
-/**
- * Props interface for TableDetailsError
- */
-interface TableDetailsErrorProps {
-  error: Error & { digest?: string; status?: number };
+interface ErrorBoundaryProps {
+  error: Error & { digest?: string };
   reset: () => void;
 }
 
 /**
- * Categorize error based on error object properties
+ * Error classification for improved user messaging and recovery options
  */
-function categorizeError(error: Error & { status?: number }): ErrorType {
-  const status = error.status;
-  const message = error.message?.toLowerCase() || '';
-
-  // HTTP status-based categorization
-  if (status === 401) return 'authentication';
-  if (status === 403) return 'authorization';
-  if (status === 404) return 'not-found';
-  if (status === 400) return 'validation';
-  if (status && status >= 500) return 'server';
-
-  // Message-based categorization
-  if (message.includes('network') || message.includes('fetch')) return 'network';
-  if (message.includes('unauthorized') || message.includes('login')) return 'authentication';
-  if (message.includes('forbidden') || message.includes('permission')) return 'authorization';
-  if (message.includes('not found') || message.includes('does not exist')) return 'not-found';
-  if (message.includes('validation') || message.includes('invalid')) return 'validation';
-  if (message.includes('server') || message.includes('internal')) return 'server';
-
-  return 'unknown';
+interface ErrorClassification {
+  type: 'network' | 'validation' | 'permission' | 'not-found' | 'server' | 'unknown';
+  title: string;
+  description: string;
+  recoverable: boolean;
+  suggested_actions: string[];
 }
 
 /**
- * Main TableDetailsError component
+ * Classifies errors for appropriate user messaging and recovery options
+ * @param error - The error object to classify
+ * @returns Classified error information for user-friendly display
  */
-export function TableDetailsError({ error, reset }: TableDetailsErrorProps) {
-  const router = useRouter();
-
-  // Log error for monitoring in development
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Table Details Error:', error);
-    }
-  }, [error]);
-
-  // Categorize the error
-  const errorType = categorizeError(error);
-
-  // Get error information based on type
-  const getErrorInfo = (): ErrorInfo => {
-    const commonActions = [
-      {
-        label: 'Try Again',
-        action: reset,
-        variant: 'primary' as const,
-      },
-      {
-        label: 'Go Back',
-        action: () => router.back(),
-        variant: 'secondary' as const,
-      },
-    ];
-
-    switch (errorType) {
-      case 'network':
-        return {
-          type: 'network',
-          title: 'Network Connection Error',
-          description: 'Unable to connect to the server. Please check your internet connection and try again.',
-          icon: WifiIcon,
-          suggestions: [
-            'Check your internet connection',
-            'Verify VPN or proxy settings',
-            'Try refreshing the page',
-            'Contact your system administrator if the problem persists',
-          ],
-          recoveryActions: commonActions,
-        };
-
-      case 'authentication':
-        return {
-          type: 'authentication',
-          title: 'Authentication Required',
-          description: 'You need to log in to access this table. Please authenticate and try again.',
-          icon: KeyIcon,
-          suggestions: [
-            'Log in to your account',
-            'Check if your session has expired',
-            'Verify your credentials',
-            'Contact an administrator for access',
-          ],
-          recoveryActions: [
-            {
-              label: 'Log In',
-              action: () => router.push('/auth/login'),
-              variant: 'primary',
-            },
-            ...commonActions,
-          ],
-        };
-
-      case 'authorization':
-        return {
-          type: 'authorization',
-          title: 'Access Denied',
-          description: 'You do not have permission to access this table or perform this operation.',
-          icon: ExclamationTriangleIcon,
-          suggestions: [
-            'Contact your administrator for access permissions',
-            'Verify you have the correct role assigned',
-            'Check if the table exists and you have read access',
-            'Try accessing a different table or service',
-          ],
-          recoveryActions: [
-            {
-              label: 'Contact Admin',
-              action: () => router.push('/admin-settings/users'),
-              variant: 'primary',
-            },
-            ...commonActions,
-          ],
-        };
-
-      case 'not-found':
-        return {
-          type: 'not-found',
-          title: 'Table Not Found',
-          description: 'The requested table could not be found. It may have been deleted or moved.',
-          icon: ExclamationTriangleIcon,
-          suggestions: [
-            'Verify the table name is correct',
-            'Check if the table exists in the database',
-            'Refresh the schema discovery',
-            'Try accessing the table list to find the correct name',
-          ],
-          recoveryActions: [
-            {
-              label: 'View Tables',
-              action: () => router.push('/adf-schema/tables'),
-              variant: 'primary',
-            },
-            ...commonActions,
-          ],
-        };
-
-      case 'validation':
-        return {
-          type: 'validation',
-          title: 'Validation Error',
-          description: 'The provided data is invalid or incomplete. Please check your input and try again.',
-          icon: ExclamationTriangleIcon,
-          suggestions: [
-            'Review the form data for errors',
-            'Check required fields are completed',
-            'Verify data formats and constraints',
-            'Check for duplicate names or conflicts',
-          ],
-          recoveryActions: commonActions,
-        };
-
-      case 'server':
-        return {
-          type: 'server',
-          title: 'Server Error',
-          description: 'An internal server error occurred. The development team has been notified.',
-          icon: ServerIcon,
-          suggestions: [
-            'Try again in a few moments',
-            'Check if other features are working',
-            'Contact support if the problem persists',
-            'Save your work and refresh the page',
-          ],
-          recoveryActions: [
-            ...commonActions,
-            {
-              label: 'Report Issue',
-              action: () => window.open('mailto:support@dreamfactory.com', '_blank'),
-              variant: 'secondary',
-            },
-          ],
-        };
-
-      default:
-        return {
-          type: 'unknown',
-          title: 'Unexpected Error',
-          description: 'An unexpected error occurred while loading the table details.',
-          icon: BugAntIcon,
-          suggestions: [
-            'Try refreshing the page',
-            'Clear your browser cache',
-            'Check for browser console errors',
-            'Report this issue to support',
-          ],
-          recoveryActions: [
-            ...commonActions,
-            {
-              label: 'Report Bug',
-              action: () => window.open('mailto:support@dreamfactory.com', '_blank'),
-              variant: 'secondary',
-            },
-          ],
-        };
-    }
+function classifyError(error: Error): ErrorClassification {
+  const message = error.message.toLowerCase();
+  
+  // Network-related errors
+  if (message.includes('network') || message.includes('fetch') || message.includes('connection')) {
+    return {
+      type: 'network',
+      title: 'Connection Problem',
+      description: 'Unable to connect to the server. Please check your internet connection and try again.',
+      recoverable: true,
+      suggested_actions: [
+        'Check your internet connection',
+        'Retry the operation',
+        'Refresh the page if the problem persists'
+      ]
+    };
+  }
+  
+  // Validation errors
+  if (message.includes('validation') || message.includes('invalid') || message.includes('required')) {
+    return {
+      type: 'validation',
+      title: 'Data Validation Error',
+      description: 'The table data contains invalid or missing required information.',
+      recoverable: true,
+      suggested_actions: [
+        'Check all required fields are filled',
+        'Verify data formats are correct',
+        'Contact support if validation rules are unclear'
+      ]
+    };
+  }
+  
+  // Permission/authorization errors
+  if (message.includes('unauthorized') || message.includes('forbidden') || message.includes('permission')) {
+    return {
+      type: 'permission',
+      title: 'Access Denied',
+      description: 'You do not have permission to access or modify this table.',
+      recoverable: false,
+      suggested_actions: [
+        'Contact your administrator for access',
+        'Verify you are logged in with the correct account',
+        'Return to the tables list'
+      ]
+    };
+  }
+  
+  // Not found errors
+  if (message.includes('not found') || message.includes('404')) {
+    return {
+      type: 'not-found',
+      title: 'Table Not Found',
+      description: 'The requested table could not be found or may have been deleted.',
+      recoverable: false,
+      suggested_actions: [
+        'Check the table name is correct',
+        'Verify the table still exists',
+        'Return to the tables list to browse available tables'
+      ]
+    };
+  }
+  
+  // Server errors
+  if (message.includes('server') || message.includes('500') || message.includes('internal')) {
+    return {
+      type: 'server',
+      title: 'Server Error',
+      description: 'An unexpected server error occurred while processing your request.',
+      recoverable: true,
+      suggested_actions: [
+        'Wait a moment and try again',
+        'Check server status',
+        'Contact support if the problem persists'
+      ]
+    };
+  }
+  
+  // Unknown/generic errors
+  return {
+    type: 'unknown',
+    title: 'Unexpected Error',
+    description: 'An unexpected error occurred while loading the table details.',
+    recoverable: true,
+    suggested_actions: [
+      'Try refreshing the page',
+      'Check your connection',
+      'Contact support if the problem persists'
+    ]
   };
+}
 
-  const errorInfo = getErrorInfo();
-  const Icon = errorInfo.icon;
+/**
+ * Logs error details for debugging and monitoring purposes
+ * @param error - The error to log
+ * @param context - Additional context information
+ */
+function logError(error: Error, context: { page: string; user_action?: string }) {
+  // Enhanced error logging for debugging and monitoring
+  const errorDetails = {
+    timestamp: new Date().toISOString(),
+    error_type: error.name,
+    error_message: error.message,
+    error_stack: error.stack,
+    digest: (error as any).digest,
+    page_context: context.page,
+    user_action: context.user_action,
+    user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : 'SSR',
+    url: typeof window !== 'undefined' ? window.location.href : 'SSR'
+  };
+  
+  // Log to console in development, would integrate with monitoring service in production
+  if (process.env.NODE_ENV === 'development') {
+    console.error('🚨 Table Details Error:', errorDetails);
+  }
+  
+  // In production, this would send to monitoring service (e.g., Sentry, DataDog)
+  // Example: monitoringService.captureError(errorDetails);
+}
 
+/**
+ * Next.js error boundary component for table details functionality
+ * Provides graceful error handling and recovery options with user-friendly messaging
+ */
+export default function TableDetailsError({ error, reset }: ErrorBoundaryProps) {
+  const classification = classifyError(error);
+  
+  useEffect(() => {
+    // Log error for debugging and monitoring
+    logError(error, {
+      page: 'table-details',
+      user_action: 'page_load_or_interaction'
+    });
+  }, [error]);
+  
+  /**
+   * Handles retry action with loading state management
+   */
+  const handleRetry = () => {
+    logError(error, {
+      page: 'table-details',
+      user_action: 'retry_attempted'
+    });
+    reset();
+  };
+  
+  /**
+   * Navigates back to tables list
+   */
+  const handleGoToTables = () => {
+    window.location.href = '/adf-schema/tables';
+  };
+  
+  /**
+   * Navigates to home page
+   */
+  const handleGoHome = () => {
+    window.location.href = '/';
+  };
+  
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Error Content */}
-        <div className="min-h-[600px] flex items-center justify-center">
-          <div className="text-center max-w-2xl mx-auto">
-            {/* Error Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="rounded-full bg-red-100 dark:bg-red-900/20 p-4">
-                <Icon className="h-12 w-12 text-red-600 dark:text-red-500" aria-hidden="true" />
-              </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-16 sm:px-6 sm:py-24 md:grid md:place-items-center lg:px-8">
+      <div className="max-w-max mx-auto">
+        <main className="sm:flex">
+          {/* Error Icon */}
+          <div className="flex-shrink-0">
+            <div className="flex items-center justify-center w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-lg">
+              <ExclamationTriangleIcon 
+                className="w-8 h-8 text-red-600 dark:text-red-400" 
+                aria-hidden="true"
+              />
             </div>
-
-            {/* Error Title */}
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              {errorInfo.title}
-            </h1>
-
-            {/* Error Description */}
-            <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-              {errorInfo.description}
-            </p>
-
-            {/* Error Details (Development Only) */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mb-8 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg text-left">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                  Development Error Details:
-                </h3>
-                <pre className="text-xs text-red-600 dark:text-red-400 whitespace-pre-wrap break-words">
-                  {error.message}
-                  {error.stack && '\n\nStack Trace:\n' + error.stack}
-                  {error.digest && '\n\nError Digest: ' + error.digest}
-                </pre>
-              </div>
-            )}
-
-            {/* Recovery Actions */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-8">
-              {errorInfo.recoveryActions.map((action, index) => (
-                <button
-                  key={index}
-                  onClick={action.action}
-                  className={cn(
-                    'inline-flex items-center px-6 py-3 text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2',
-                    action.variant === 'primary'
-                      ? 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500'
-                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500'
-                  )}
-                >
-                  {action.label === 'Try Again' && (
-                    <ArrowPathIcon className="h-4 w-4 mr-2" aria-hidden="true" />
-                  )}
-                  {action.label === 'Go Back' && (
-                    <ChevronLeftIcon className="h-4 w-4 mr-2" aria-hidden="true" />
-                  )}
-                  {action.label.includes('Home') && (
-                    <HomeIcon className="h-4 w-4 mr-2" aria-hidden="true" />
-                  )}
-                  {action.label}
-                </button>
-              ))}
+          </div>
+          
+          {/* Error Content */}
+          <div className="sm:ml-6">
+            <div className="sm:border-l sm:border-gray-200 dark:sm:border-gray-700 sm:pl-6">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white sm:text-3xl">
+                {classification.title}
+              </h1>
+              <p className="mt-2 text-base text-gray-600 dark:text-gray-300">
+                {classification.description}
+              </p>
             </div>
-
-            {/* Suggestions */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6 text-left">
-              <h3 className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-3">
-                Troubleshooting Suggestions:
-              </h3>
-              <ul className="space-y-2 text-sm text-blue-800 dark:text-blue-300">
-                {errorInfo.suggestions.map((suggestion, index) => (
+            
+            {/* Error Details Alert */}
+            <div className="mt-6">
+              <Alert variant="error" className="max-w-lg">
+                <AlertIcon />
+                <AlertContent>
+                  <div className="space-y-2">
+                    <p className="font-medium">What happened?</p>
+                    <p className="text-sm">{error.message}</p>
+                    {error.digest && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Error ID: {error.digest}
+                      </p>
+                    )}
+                  </div>
+                </AlertContent>
+              </Alert>
+            </div>
+            
+            {/* Suggested Actions */}
+            <div className="mt-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                Suggested Actions
+              </h2>
+              <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                {classification.suggested_actions.map((action, index) => (
                   <li key={index} className="flex items-start">
-                    <span className="flex-shrink-0 w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3" />
-                    {suggestion}
+                    <span className="flex-shrink-0 w-5 h-5 text-gray-400 mr-2">•</span>
+                    <span>{action}</span>
                   </li>
                 ))}
               </ul>
             </div>
+            
+            {/* Action Buttons */}
+            <div className="mt-8 flex flex-col sm:flex-row gap-3">
+              {classification.recoverable && (
+                <Button
+                  onClick={handleRetry}
+                  variant="primary"
+                  className="inline-flex items-center gap-2"
+                >
+                  <ArrowPathIcon className="w-4 h-4" />
+                  Try Again
+                </Button>
+              )}
+              
+              <Button
+                onClick={handleGoToTables}
+                variant="secondary"
+                className="inline-flex items-center gap-2"
+              >
+                <DocumentTextIcon className="w-4 h-4" />
+                Browse Tables
+              </Button>
+              
+              <Button
+                onClick={handleGoHome}
+                variant="outline"
+                className="inline-flex items-center gap-2"
+              >
+                <HomeIcon className="w-4 h-4" />
+                Go Home
+              </Button>
+            </div>
+            
+            {/* Technical Details (Development Only) */}
+            {process.env.NODE_ENV === 'development' && (
+              <details className="mt-8 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Technical Details (Development Only)
+                </summary>
+                <div className="mt-3 text-xs text-gray-600 dark:text-gray-400 space-y-2">
+                  <div>
+                    <strong>Error Type:</strong> {error.name}
+                  </div>
+                  <div>
+                    <strong>Message:</strong> {error.message}
+                  </div>
+                  {error.digest && (
+                    <div>
+                      <strong>Digest:</strong> {error.digest}
+                    </div>
+                  )}
+                  {error.stack && (
+                    <div>
+                      <strong>Stack Trace:</strong>
+                      <pre className="mt-1 whitespace-pre-wrap text-xs">{error.stack}</pre>
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
+            
+            {/* Help Section */}
+            <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                Need Help?
+              </h3>
+              <p className="text-sm text-blue-700 dark:text-blue-200">
+                If this error persists, please contact your system administrator or 
+                check the DreamFactory documentation for troubleshooting guidance.
+              </p>
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Screen reader announcement */}
-      <div className="sr-only" role="alert" aria-live="assertive">
-        Error occurred: {errorInfo.title}. {errorInfo.description}
+        </main>
       </div>
     </div>
   );
 }
-
-export default TableDetailsError;
