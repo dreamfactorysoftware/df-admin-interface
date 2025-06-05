@@ -1,1200 +1,1055 @@
 /**
- * Database Field Configuration Form Component
+ * @fileoverview Field Form Component - React/Next.js Migration
  * 
- * Comprehensive React component for creating and editing database field configurations
- * using React Hook Form with Zod validation. Handles all field attributes including
- * name, type, constraints, relationships, and database functions with real-time
- * validation under 100ms.
+ * Comprehensive database field configuration form using React Hook Form with Zod validation.
+ * Handles all field attributes (name, type, constraints, relationships) with real-time validation,
+ * dynamic control enabling/disabling based on field type selection, and integration with the 
+ * df-function-use component for database function management.
  * 
- * Features:
- * - React Hook Form with Zod schema validators
- * - Dynamic control enabling/disabling based on field type
- * - Real-time validation with sub-100ms response times
- * - Tailwind CSS 4.1+ styling with consistent theme injection
- * - WCAG 2.1 AA compliance through Headless UI integration
- * - Database function management integration
- * - Optimistic updates with React Query
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @version 2.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-'use client'
+'use client';
 
-import React, { useMemo, useCallback, useEffect, useState } from 'react'
-import { useForm, Controller, useWatch } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useForm, useController, FormProvider, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Switch } from '@headlessui/react';
 import { 
-  Listbox, 
-  ListboxButton, 
-  ListboxOptions, 
+  Listbox,
+  ListboxButton,
+  ListboxOptions,
   ListboxOption,
-  Switch,
-  Disclosure,
-  DisclosureButton,
-  DisclosurePanel,
-  Tab,
-  TabGroup,
-  TabList,
-  TabPanels,
-  TabPanel
-} from '@headlessui/react'
+  Combobox,
+  ComboboxInput,
+  ComboboxButton,
+  ComboboxOptions,
+  ComboboxOption,
+  Label,
+  Description
+} from '@headlessui/react';
 import { 
-  ChevronDownIcon, 
   ChevronUpDownIcon,
-  InformationCircleIcon,
-  ExclamationTriangleIcon,
   CheckIcon,
-  XMarkIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  BeakerIcon,
   Cog6ToothIcon
-} from '@heroicons/react/24/outline'
-import { cva, type VariantProps } from 'class-variance-authority'
-import { cn } from '@/lib/utils'
+} from '@heroicons/react/24/outline';
+import { cn } from '@/lib/utils';
 
-// Type imports
-import type {
-  FieldFormData,
-  FieldType,
-  ReferenceAction,
-  DatabaseSchemaFieldType,
-  FieldFormSubmissionContext,
-  FieldTypeConfiguration,
-  FieldFormError,
-  FIELD_TYPES,
-  REFERENCE_ACTIONS
-} from './df-field-details.types'
+// ============================================================================
+// TYPES AND INTERFACES
+// ============================================================================
+
 import {
-  FieldFormDataSchema,
-  createFieldFormDefaults
-} from './df-field-details.types'
+  DatabaseSchemaFieldType,
+  FieldFormData,
+  CreateFieldSchema,
+  UpdateFieldSchema,
+  DbFunctionUseType
+} from './df-field-details.types';
 
-// Component imports
-import { FunctionUseForm } from './df-function-use/function-use-form'
-
-// Hook imports
-import { useDebounce } from '@/hooks/use-debounce'
-import { useNotifications } from '@/hooks/use-notifications'
-import { useLoading } from '@/hooks/use-loading'
-
-// =============================================================================
-// COMPONENT VARIANTS AND STYLING
-// =============================================================================
-
-const formGroupVariants = cva(
-  "space-y-4 p-4 rounded-lg border transition-all duration-200",
-  {
-    variants: {
-      variant: {
-        default: "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800",
-        error: "border-red-300 bg-red-50 dark:border-red-600 dark:bg-red-900/20",
-        warning: "border-yellow-300 bg-yellow-50 dark:border-yellow-600 dark:bg-yellow-900/20",
-        success: "border-green-300 bg-green-50 dark:border-green-600 dark:bg-green-900/20"
-      },
-      size: {
-        sm: "p-2 space-y-2",
-        md: "p-4 space-y-4",
-        lg: "p-6 space-y-6"
-      }
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "md"
-    }
+/**
+ * Enhanced Zod schema for field form with conditional validation
+ */
+const FieldFormSchema = z.object({
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(64, 'Field name must be 64 characters or less')
+    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Field name must be a valid identifier'),
+  
+  type: z.string().min(1, 'Field type is required'),
+  
+  label: z.string()
+    .min(1, 'Field label is required')
+    .max(128, 'Field label must be 128 characters or less'),
+  
+  allowNull: z.boolean().default(true),
+  required: z.boolean().default(false),
+  
+  description: z.string()
+    .max(512, 'Description must be 512 characters or less')
+    .nullable()
+    .optional(),
+  
+  default: z.string()
+    .max(255, 'Default value must be 255 characters or less')
+    .nullable()
+    .optional(),
+  
+  length: z.number()
+    .int()
+    .min(1, 'Length must be positive')
+    .max(2147483647, 'Length too large')
+    .nullable()
+    .optional(),
+  
+  precision: z.number()
+    .int()
+    .min(1, 'Precision must be positive')
+    .max(65, 'Precision cannot exceed 65')
+    .nullable()
+    .optional(),
+  
+  scale: z.number()
+    .int()
+    .min(0, 'Scale must be non-negative')
+    .max(30, 'Scale cannot exceed 30')
+    .default(0),
+  
+  // Advanced properties
+  isPrimaryKey: z.boolean().default(false),
+  isUnique: z.boolean().default(false),
+  autoIncrement: z.boolean().default(false),
+  isForeignKey: z.boolean().default(false),
+  
+  // Foreign key relationships
+  refTable: z.string()
+    .min(1, 'Referenced table is required when foreign key is enabled')
+    .nullable()
+    .optional(),
+  
+  refField: z.string()
+    .min(1, 'Referenced field is required when foreign key is enabled')
+    .nullable()
+    .optional(),
+  
+  refOnDelete: z.enum(['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'])
+    .nullable()
+    .optional(),
+  
+  refOnUpdate: z.enum(['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'])
+    .nullable()
+    .optional(),
+  
+  // Database function support
+  dbFunction: z.array(z.object({
+    use: z.array(z.string()).min(1, 'At least one function use is required'),
+    function: z.string().min(1, 'Function name is required'),
+  })).nullable().optional(),
+  
+  // Other properties
+  picklist: z.string().nullable().optional(),
+  validation: z.string().nullable().optional(),
+  fixedLength: z.boolean().default(false),
+  supportsMultibyte: z.boolean().default(false),
+  isVirtual: z.boolean().default(false),
+  isAggregate: z.boolean().default(false),
+}).refine((data) => {
+  // Custom validation: require reference fields when foreign key is enabled
+  if (data.isForeignKey) {
+    return data.refTable && data.refField;
   }
-)
-
-const labelVariants = cva(
-  "block text-sm font-medium transition-colors duration-200",
-  {
-    variants: {
-      state: {
-        default: "text-gray-700 dark:text-gray-300",
-        error: "text-red-700 dark:text-red-300",
-        disabled: "text-gray-400 dark:text-gray-600"
-      },
-      required: {
-        true: "after:content-['*'] after:ml-1 after:text-red-500",
-        false: ""
-      }
-    },
-    defaultVariants: {
-      state: "default",
-      required: false
-    }
+  return true;
+}, {
+  message: "Referenced table and field are required when foreign key is enabled",
+  path: ["refTable"]
+}).refine((data) => {
+  // Custom validation: length required for certain types
+  const typesRequiringLength = ['varchar', 'char', 'string', 'text'];
+  if (typesRequiringLength.includes(data.type.toLowerCase()) && !data.length) {
+    return false;
   }
-)
-
-const inputVariants = cva(
-  "w-full rounded-lg border transition-all duration-200 focus:ring-2 focus:ring-offset-2",
-  {
-    variants: {
-      state: {
-        default: "border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white",
-        error: "border-red-500 focus:border-red-500 focus:ring-red-500 dark:border-red-400",
-        disabled: "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800"
-      },
-      size: {
-        sm: "px-2 py-1 text-sm",
-        md: "px-3 py-2 text-sm",
-        lg: "px-4 py-3 text-base"
-      }
-    },
-    defaultVariants: {
-      state: "default",
-      size: "md"
-    }
+  return true;
+}, {
+  message: "Length is required for this field type",
+  path: ["length"]
+}).refine((data) => {
+  // Custom validation: precision required for decimal types
+  const decimalTypes = ['decimal', 'numeric', 'float', 'double'];
+  if (decimalTypes.includes(data.type.toLowerCase()) && !data.precision) {
+    return false;
   }
-)
+  return true;
+}, {
+  message: "Precision is required for numeric field types",
+  path: ["precision"]
+});
 
-// =============================================================================
-// FIELD TYPE CONFIGURATION
-// =============================================================================
+/**
+ * Form data type inferred from schema
+ */
+type FormData = z.infer<typeof FieldFormSchema>;
 
-const FIELD_TYPE_CONFIGURATIONS: Record<FieldType, FieldTypeConfiguration> = {
-  id: {
-    supportsLength: false,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: false,
-    supportsAutoIncrement: true,
-    supportsUnique: true,
-    supportsForeignKey: false,
-    requiredProperties: ['isPrimaryKey'],
-    disabledProperties: ['allowNull', 'isForeignKey']
-  },
-  string: {
-    supportsLength: true,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: true,
-    supportsAutoIncrement: false,
-    supportsUnique: true,
-    supportsForeignKey: true,
-    requiredProperties: [],
-    disabledProperties: ['autoIncrement']
-  },
-  text: {
-    supportsLength: true,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: true,
-    supportsAutoIncrement: false,
-    supportsUnique: false,
-    supportsForeignKey: false,
-    requiredProperties: [],
-    disabledProperties: ['autoIncrement', 'isUnique', 'isPrimaryKey']
-  },
-  integer: {
-    supportsLength: true,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: true,
-    supportsAutoIncrement: true,
-    supportsUnique: true,
-    supportsForeignKey: true,
-    requiredProperties: [],
-    disabledProperties: []
-  },
-  bigint: {
-    supportsLength: true,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: true,
-    supportsAutoIncrement: true,
-    supportsUnique: true,
-    supportsForeignKey: true,
-    requiredProperties: [],
-    disabledProperties: []
-  },
-  decimal: {
-    supportsLength: false,
-    supportsPrecision: true,
-    supportsScale: true,
-    supportsDefault: true,
-    supportsAutoIncrement: false,
-    supportsUnique: true,
-    supportsForeignKey: false,
-    requiredProperties: ['precision'],
-    disabledProperties: ['autoIncrement']
-  },
-  float: {
-    supportsLength: false,
-    supportsPrecision: true,
-    supportsScale: true,
-    supportsDefault: true,
-    supportsAutoIncrement: false,
-    supportsUnique: true,
-    supportsForeignKey: false,
-    requiredProperties: [],
-    disabledProperties: ['autoIncrement']
-  },
-  double: {
-    supportsLength: false,
-    supportsPrecision: true,
-    supportsScale: true,
-    supportsDefault: true,
-    supportsAutoIncrement: false,
-    supportsUnique: true,
-    supportsForeignKey: false,
-    requiredProperties: [],
-    disabledProperties: ['autoIncrement']
-  },
-  boolean: {
-    supportsLength: false,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: true,
-    supportsAutoIncrement: false,
-    supportsUnique: false,
-    supportsForeignKey: false,
-    requiredProperties: [],
-    disabledProperties: ['autoIncrement', 'isUnique', 'length', 'precision', 'scale']
-  },
-  date: {
-    supportsLength: false,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: true,
-    supportsAutoIncrement: false,
-    supportsUnique: true,
-    supportsForeignKey: false,
-    requiredProperties: [],
-    disabledProperties: ['autoIncrement']
-  },
-  datetime: {
-    supportsLength: false,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: true,
-    supportsAutoIncrement: false,
-    supportsUnique: true,
-    supportsForeignKey: false,
-    requiredProperties: [],
-    disabledProperties: ['autoIncrement']
-  },
-  time: {
-    supportsLength: false,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: true,
-    supportsAutoIncrement: false,
-    supportsUnique: true,
-    supportsForeignKey: false,
-    requiredProperties: [],
-    disabledProperties: ['autoIncrement']
-  },
-  timestamp: {
-    supportsLength: false,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: true,
-    supportsAutoIncrement: false,
-    supportsUnique: true,
-    supportsForeignKey: false,
-    requiredProperties: [],
-    disabledProperties: ['autoIncrement']
-  },
-  json: {
-    supportsLength: false,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: true,
-    supportsAutoIncrement: false,
-    supportsUnique: false,
-    supportsForeignKey: false,
-    requiredProperties: [],
-    disabledProperties: ['autoIncrement', 'isUnique', 'isPrimaryKey']
-  },
-  binary: {
-    supportsLength: true,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: false,
-    supportsAutoIncrement: false,
-    supportsUnique: false,
-    supportsForeignKey: false,
-    requiredProperties: [],
-    disabledProperties: ['autoIncrement', 'isUnique', 'isPrimaryKey', 'default']
-  },
-  reference: {
-    supportsLength: false,
-    supportsPrecision: false,
-    supportsScale: false,
-    supportsDefault: false,
-    supportsAutoIncrement: false,
-    supportsUnique: true,
-    supportsForeignKey: true,
-    requiredProperties: ['isForeignKey', 'refTable', 'refField'],
-    disabledProperties: ['autoIncrement']
-  }
+/**
+ * Component props interface
+ */
+export interface FieldFormProps {
+  /** Current field being edited (null for create mode) */
+  field?: DatabaseSchemaFieldType | null;
+  /** Whether form is in edit mode vs create mode */
+  mode?: 'create' | 'edit' | 'view';
+  /** Table ID for context */
+  tableId: string;
+  /** Service ID for context */
+  serviceId: string;
+  /** Available field types for the database */
+  availableTypes?: Array<{ value: string; label: string; category?: string }>;
+  /** Available tables for foreign key references */
+  availableTables?: Array<{ value: string; label: string }>;
+  /** Whether form is loading */
+  isLoading?: boolean;
+  /** Whether form is disabled */
+  disabled?: boolean;
+  /** Form submission handler */
+  onSubmit: (data: FormData) => Promise<void>;
+  /** Form cancellation handler */
+  onCancel?: () => void;
+  /** Form change handler for auto-save */
+  onChange?: (data: Partial<FormData>) => void;
+  /** Validation error handler */
+  onValidationError?: (errors: Record<string, any>) => void;
+  /** Field deletion handler (edit mode only) */
+  onDelete?: () => Promise<void>;
+  /** Custom CSS classes */
+  className?: string;
 }
 
-// =============================================================================
-// COMPONENT INTERFACES
-// =============================================================================
+// ============================================================================
+// FIELD TYPE DEFINITIONS AND HELPERS
+// ============================================================================
 
-interface FieldFormProps {
-  /** Initial field data for edit mode */
-  initialData?: DatabaseSchemaFieldType
+/**
+ * Default field types grouped by category
+ */
+const DEFAULT_FIELD_TYPES = [
+  // String types
+  { value: 'string', label: 'String', category: 'Text' },
+  { value: 'text', label: 'Text', category: 'Text' },
+  { value: 'varchar', label: 'VARCHAR', category: 'Text' },
+  { value: 'char', label: 'CHAR', category: 'Text' },
   
-  /** Form submission context */
-  context: FieldFormSubmissionContext
+  // Numeric types
+  { value: 'integer', label: 'Integer', category: 'Numeric' },
+  { value: 'bigint', label: 'Big Integer', category: 'Numeric' },
+  { value: 'smallint', label: 'Small Integer', category: 'Numeric' },
+  { value: 'decimal', label: 'Decimal', category: 'Numeric' },
+  { value: 'float', label: 'Float', category: 'Numeric' },
+  { value: 'double', label: 'Double', category: 'Numeric' },
   
-  /** Callback for form submission */
-  onSubmit: (data: FieldFormData) => Promise<void>
+  // Date/Time types
+  { value: 'date', label: 'Date', category: 'Date/Time' },
+  { value: 'time', label: 'Time', category: 'Date/Time' },
+  { value: 'datetime', label: 'DateTime', category: 'Date/Time' },
+  { value: 'timestamp', label: 'Timestamp', category: 'Date/Time' },
   
-  /** Callback for form cancellation */
-  onCancel: () => void
-  
-  /** Loading state for external operations */
-  isLoading?: boolean
-  
-  /** Available database tables for foreign key references */
-  availableTables?: Array<{ name: string; label: string }>
-  
-  /** Available fields for selected reference table */
-  availableFields?: Array<{ name: string; label: string; type: string }>
-  
-  /** Callback for table selection changes */
-  onTableChange?: (tableName: string) => void
-  
-  /** Error state and messages */
-  error?: FieldFormError | null
-  
-  /** Success state */
-  isSuccess?: boolean
-  
-  /** Form validation mode */
-  validationMode?: 'onChange' | 'onBlur' | 'onSubmit'
-}
+  // Other types
+  { value: 'boolean', label: 'Boolean', category: 'Other' },
+  { value: 'json', label: 'JSON', category: 'Other' },
+  { value: 'binary', label: 'Binary', category: 'Other' },
+  { value: 'uuid', label: 'UUID', category: 'Other' },
+];
 
-interface ValidationState {
-  isValidating: boolean
-  lastValidation: Date | null
-  validationTime: number
-}
+/**
+ * Foreign key action options
+ */
+const FOREIGN_KEY_ACTIONS = [
+  { value: 'CASCADE', label: 'CASCADE' },
+  { value: 'SET NULL', label: 'SET NULL' },
+  { value: 'RESTRICT', label: 'RESTRICT' },
+  { value: 'NO ACTION', label: 'NO ACTION' },
+];
 
-// =============================================================================
+/**
+ * Helper function to determine if field type supports length
+ */
+const supportsLength = (type: string): boolean => {
+  const lengthTypes = ['varchar', 'char', 'string', 'text', 'binary'];
+  return lengthTypes.includes(type.toLowerCase());
+};
+
+/**
+ * Helper function to determine if field type supports precision/scale
+ */
+const supportsPrecisionScale = (type: string): boolean => {
+  const precisionTypes = ['decimal', 'numeric', 'float', 'double'];
+  return precisionTypes.includes(type.toLowerCase());
+};
+
+/**
+ * Helper function to determine if field type supports auto increment
+ */
+const supportsAutoIncrement = (type: string): boolean => {
+  const autoIncrementTypes = ['integer', 'bigint', 'smallint'];
+  return autoIncrementTypes.includes(type.toLowerCase());
+};
+
+// ============================================================================
 // MAIN COMPONENT
-// =============================================================================
+// ============================================================================
 
-export function FieldForm({
-  initialData,
-  context,
+/**
+ * Field Form Component
+ * 
+ * Provides comprehensive database field configuration with real-time validation,
+ * dynamic control management, and integration with function-use components.
+ */
+export default function FieldForm({
+  field = null,
+  mode = 'create',
+  tableId,
+  serviceId,
+  availableTypes = DEFAULT_FIELD_TYPES,
+  availableTables = [],
+  isLoading = false,
+  disabled = false,
   onSubmit,
   onCancel,
-  isLoading = false,
-  availableTables = [],
-  availableFields = [],
-  onTableChange,
-  error,
-  isSuccess = false,
-  validationMode = 'onChange'
+  onChange,
+  onValidationError,
+  onDelete,
+  className
 }: FieldFormProps) {
-  // =============================================================================
-  // HOOKS AND STATE
-  // =============================================================================
   
-  const { addNotification } = useNotifications()
-  const { setLoading } = useLoading()
-  const [validationState, setValidationState] = useState<ValidationState>({
-    isValidating: false,
-    lastValidation: null,
-    validationTime: 0
-  })
-  const [activeTab, setActiveTab] = useState(0)
-
+  // ========================================================================
+  // STATE AND FORM SETUP
+  // ========================================================================
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [functionUseDialogOpen, setFunctionUseDialogOpen] = useState(false);
+  
   // Initialize form with React Hook Form and Zod validation
-  const form = useForm<FieldFormData>({
-    resolver: zodResolver(FieldFormDataSchema),
-    defaultValues: createFieldFormDefaults(initialData),
-    mode: validationMode,
+  const form = useForm<FormData>({
+    resolver: zodResolver(FieldFormSchema),
+    mode: 'onChange',
     reValidateMode: 'onChange',
-    shouldFocusError: true,
-    shouldUnregister: false,
-    criteriaMode: 'all'
-  })
-
+    defaultValues: useMemo(() => ({
+      name: field?.name || '',
+      type: field?.type || '',
+      label: field?.label || '',
+      allowNull: field?.allowNull ?? true,
+      required: field?.required ?? false,
+      description: field?.description || '',
+      default: field?.default || '',
+      length: field?.length || null,
+      precision: field?.precision || null,
+      scale: field?.scale || 0,
+      isPrimaryKey: field?.isPrimaryKey ?? false,
+      isUnique: field?.isUnique ?? false,
+      autoIncrement: field?.autoIncrement ?? false,
+      isForeignKey: field?.isForeignKey ?? false,
+      refTable: field?.refTable || '',
+      refField: field?.refField || '',
+      refOnDelete: field?.refOnDelete || null,
+      refOnUpdate: field?.refOnUpdate || null,
+      dbFunction: field?.dbFunction || null,
+      picklist: field?.picklist || '',
+      validation: field?.validation || '',
+      fixedLength: field?.fixedLength ?? false,
+      supportsMultibyte: field?.supportsMultibyte ?? false,
+      isVirtual: field?.isVirtual ?? false,
+      isAggregate: field?.isAggregate ?? false,
+    }), [field]),
+  });
+  
   const {
     control,
     handleSubmit,
-    formState: { errors, isValid, isDirty, isSubmitting, touchedFields },
+    watch,
     setValue,
-    getValues,
-    reset,
-    trigger,
-    watch
-  } = form
-
-  // Watch field type for dynamic configuration
-  const selectedType = useWatch({ control, name: 'type' })
-  const isForeignKey = useWatch({ control, name: 'isForeignKey' })
-  const isPrimaryKey = useWatch({ control, name: 'isPrimaryKey' })
-  const autoIncrement = useWatch({ control, name: 'autoIncrement' })
-  const selectedRefTable = useWatch({ control, name: 'refTable' })
-
-  // Debounced validation for performance optimization
-  const debouncedTrigger = useDebounce(trigger, 100)
-
-  // =============================================================================
-  // COMPUTED VALUES
-  // =============================================================================
-
-  // Get field type configuration
-  const fieldConfig = useMemo(() => {
-    return FIELD_TYPE_CONFIGURATIONS[selectedType] || FIELD_TYPE_CONFIGURATIONS.string
-  }, [selectedType])
-
-  // Determine field visibility and state
-  const fieldStates = useMemo(() => {
-    return {
-      length: {
-        visible: fieldConfig.supportsLength,
-        enabled: fieldConfig.supportsLength && !fieldConfig.disabledProperties.includes('length'),
-        required: fieldConfig.requiredProperties.includes('length')
-      },
-      precision: {
-        visible: fieldConfig.supportsPrecision,
-        enabled: fieldConfig.supportsPrecision && !fieldConfig.disabledProperties.includes('precision'),
-        required: fieldConfig.requiredProperties.includes('precision')
-      },
-      scale: {
-        visible: fieldConfig.supportsScale,
-        enabled: fieldConfig.supportsScale && !fieldConfig.disabledProperties.includes('scale'),
-        required: fieldConfig.requiredProperties.includes('scale')
-      },
-      default: {
-        visible: fieldConfig.supportsDefault,
-        enabled: fieldConfig.supportsDefault && !fieldConfig.disabledProperties.includes('default'),
-        required: fieldConfig.requiredProperties.includes('default')
-      },
-      autoIncrement: {
-        visible: fieldConfig.supportsAutoIncrement,
-        enabled: fieldConfig.supportsAutoIncrement && !fieldConfig.disabledProperties.includes('autoIncrement'),
-        required: fieldConfig.requiredProperties.includes('autoIncrement')
-      },
-      isUnique: {
-        visible: fieldConfig.supportsUnique,
-        enabled: fieldConfig.supportsUnique && !fieldConfig.disabledProperties.includes('isUnique') && !isPrimaryKey,
-        required: fieldConfig.requiredProperties.includes('isUnique')
-      },
-      foreignKey: {
-        visible: fieldConfig.supportsForeignKey,
-        enabled: fieldConfig.supportsForeignKey && !fieldConfig.disabledProperties.includes('isForeignKey'),
-        required: fieldConfig.requiredProperties.includes('isForeignKey')
-      }
+    clearErrors,
+    formState: { errors, isValid, isDirty, touchedFields }
+  } = form;
+  
+  // Watch key fields for dynamic behavior
+  const watchedType = useWatch({ control, name: 'type' });
+  const watchedIsForeignKey = useWatch({ control, name: 'isForeignKey' });
+  const watchedIsPrimaryKey = useWatch({ control, name: 'isPrimaryKey' });
+  const watchedAutoIncrement = useWatch({ control, name: 'autoIncrement' });
+  
+  // ========================================================================
+  // DYNAMIC FORM BEHAVIOR
+  // ========================================================================
+  
+  // Effect to handle field type changes and enable/disable relevant controls
+  useEffect(() => {
+    if (!watchedType) return;
+    
+    // Clear length when not supported
+    if (!supportsLength(watchedType)) {
+      setValue('length', null);
+      clearErrors('length');
     }
-  }, [fieldConfig, isPrimaryKey])
-
-  // =============================================================================
-  // VALIDATION HANDLERS
-  // =============================================================================
-
-  const validateField = useCallback(async (fieldName?: keyof FieldFormData) => {
-    const startTime = performance.now()
-    setValidationState(prev => ({ ...prev, isValidating: true }))
-
+    
+    // Clear precision/scale when not supported
+    if (!supportsPrecisionScale(watchedType)) {
+      setValue('precision', null);
+      setValue('scale', 0);
+      clearErrors(['precision', 'scale']);
+    }
+    
+    // Disable auto increment for unsupported types
+    if (!supportsAutoIncrement(watchedType) && watchedAutoIncrement) {
+      setValue('autoIncrement', false);
+      clearErrors('autoIncrement');
+    }
+    
+    // Primary keys cannot be null and are required
+    if (watchedIsPrimaryKey) {
+      setValue('allowNull', false);
+      setValue('required', true);
+      clearErrors(['allowNull', 'required']);
+    }
+    
+  }, [watchedType, watchedAutoIncrement, watchedIsPrimaryKey, setValue, clearErrors]);
+  
+  // Effect to handle foreign key relationship changes
+  useEffect(() => {
+    if (!watchedIsForeignKey) {
+      setValue('refTable', '');
+      setValue('refField', '');
+      setValue('refOnDelete', null);
+      setValue('refOnUpdate', null);
+      clearErrors(['refTable', 'refField', 'refOnDelete', 'refOnUpdate']);
+    }
+  }, [watchedIsForeignKey, setValue, clearErrors]);
+  
+  // Effect to call onChange handler when form data changes
+  useEffect(() => {
+    if (onChange && isDirty) {
+      const subscription = watch((data) => {
+        onChange(data as Partial<FormData>);
+      });
+      return () => subscription.unsubscribe();
+    }
+  }, [watch, onChange, isDirty]);
+  
+  // ========================================================================
+  // EVENT HANDLERS
+  // ========================================================================
+  
+  const handleFormSubmit = useCallback(async (data: FormData) => {
     try {
-      const result = await trigger(fieldName)
-      const endTime = performance.now()
-      const validationTime = endTime - startTime
-
-      setValidationState({
-        isValidating: false,
-        lastValidation: new Date(),
-        validationTime
-      })
-
-      // Performance monitoring - warn if validation takes longer than 100ms
-      if (validationTime > 100) {
-        console.warn(`Field validation took ${validationTime.toFixed(2)}ms (target: <100ms)`)
-      }
-
-      return result
+      setIsSubmitting(true);
+      await onSubmit(data);
     } catch (error) {
-      setValidationState(prev => ({ ...prev, isValidating: false }))
-      console.error('Validation error:', error)
-      return false
-    }
-  }, [trigger])
-
-  // =============================================================================
-  // FORM HANDLERS
-  // =============================================================================
-
-  const handleFormSubmit = useCallback(async (data: FieldFormData) => {
-    try {
-      setLoading(true)
-      
-      // Apply field type-specific transformations
-      const transformedData = { ...data }
-      
-      // Clear irrelevant fields based on type configuration
-      if (!fieldStates.length.enabled) transformedData.length = null
-      if (!fieldStates.precision.enabled) transformedData.precision = null
-      if (!fieldStates.scale.enabled) transformedData.scale = 0
-      if (!fieldStates.default.enabled) transformedData.default = null
-      if (!fieldStates.autoIncrement.enabled) transformedData.autoIncrement = false
-      if (!fieldStates.foreignKey.enabled) {
-        transformedData.isForeignKey = false
-        transformedData.refTable = null
-        transformedData.refField = null
-        transformedData.refOnDelete = null
-        transformedData.refOnUpdate = null
-      }
-
-      // Enforce required field constraints
-      if (fieldConfig.requiredProperties.includes('isPrimaryKey')) {
-        transformedData.isPrimaryKey = true
-      }
-      if (fieldConfig.requiredProperties.includes('isForeignKey')) {
-        transformedData.isForeignKey = true
-      }
-
-      await onSubmit(transformedData)
-      
-      addNotification({
-        type: 'success',
-        title: context.isEditMode ? 'Field Updated' : 'Field Created',
-        message: `Field "${data.name}" has been ${context.isEditMode ? 'updated' : 'created'} successfully.`
-      })
-    } catch (submitError) {
-      console.error('Form submission error:', submitError)
-      addNotification({
-        type: 'error',
-        title: 'Submission Failed',
-        message: 'Failed to save field configuration. Please try again.'
-      })
+      console.error('Field form submission error:', error);
     } finally {
-      setLoading(false)
+      setIsSubmitting(false);
     }
-  }, [onSubmit, fieldStates, fieldConfig, context, addNotification, setLoading])
-
-  const handleFieldTypeChange = useCallback((newType: FieldType) => {
-    setValue('type', newType, { shouldValidate: true, shouldDirty: true })
+  }, [onSubmit]);
+  
+  const handleFormError = useCallback((errors: Record<string, any>) => {
+    console.warn('Field form validation errors:', errors);
+    onValidationError?.(errors);
+  }, [onValidationError]);
+  
+  const handleDelete = useCallback(async () => {
+    if (!onDelete) return;
     
-    // Reset conflicting values when type changes
-    const newConfig = FIELD_TYPE_CONFIGURATIONS[newType]
-    
-    // Clear unsupported attributes
-    if (!newConfig.supportsLength) setValue('length', null)
-    if (!newConfig.supportsPrecision) setValue('precision', null)
-    if (!newConfig.supportsScale) setValue('scale', 0)
-    if (!newConfig.supportsDefault) setValue('default', null)
-    if (!newConfig.supportsAutoIncrement) setValue('autoIncrement', false)
-    if (!newConfig.supportsUnique) setValue('isUnique', false)
-    if (!newConfig.supportsForeignKey) {
-      setValue('isForeignKey', false)
-      setValue('refTable', null)
-      setValue('refField', null)
-      setValue('refOnDelete', null)
-      setValue('refOnUpdate', null)
+    try {
+      setIsSubmitting(true);
+      await onDelete();
+    } catch (error) {
+      console.error('Field deletion error:', error);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Set required attributes
-    if (newConfig.requiredProperties.includes('isPrimaryKey')) {
-      setValue('isPrimaryKey', true)
-      setValue('allowNull', false)
+  }, [onDelete]);
+  
+  const handleCancel = useCallback(() => {
+    if (onCancel) {
+      onCancel();
     }
-    if (newConfig.requiredProperties.includes('isForeignKey')) {
-      setValue('isForeignKey', true)
-    }
-
-    // Trigger validation after changes
-    debouncedTrigger()
-  }, [setValue, debouncedTrigger])
-
-  const handleReferenceTableChange = useCallback((tableName: string | null) => {
-    setValue('refTable', tableName, { shouldValidate: true })
-    setValue('refField', null) // Reset field selection when table changes
-    
-    if (tableName && onTableChange) {
-      onTableChange(tableName)
-    }
-  }, [setValue, onTableChange])
-
-  // =============================================================================
-  // EFFECTS
-  // =============================================================================
-
-  // Apply initial validation on mount
-  useEffect(() => {
-    if (initialData) {
-      const timer = setTimeout(() => {
-        trigger()
-      }, 100)
-      return () => clearTimeout(timer)
-    }
-  }, [initialData, trigger])
-
-  // Update loading state
-  useEffect(() => {
-    setLoading(isLoading || isSubmitting)
-  }, [isLoading, isSubmitting, setLoading])
-
-  // Handle auto-increment and primary key relationship
-  useEffect(() => {
-    if (autoIncrement && !isPrimaryKey) {
-      setValue('isPrimaryKey', true, { shouldValidate: true })
-    }
-    if (isPrimaryKey) {
-      setValue('allowNull', false, { shouldValidate: true })
-      setValue('isUnique', false, { shouldValidate: true }) // Primary key implies uniqueness
-    }
-  }, [autoIncrement, isPrimaryKey, setValue])
-
-  // =============================================================================
+  }, [onCancel]);
+  
+  // ========================================================================
   // RENDER HELPERS
-  // =============================================================================
-
-  const renderFieldError = (fieldName: keyof FieldFormData) => {
-    const fieldError = errors[fieldName]
-    if (!fieldError) return null
-
+  // ========================================================================
+  
+  /**
+   * Render field type selector with grouped options
+   */
+  const renderTypeSelector = useCallback(() => {
+    const groupedTypes = availableTypes.reduce((groups, type) => {
+      const category = type.category || 'Other';
+      if (!groups[category]) groups[category] = [];
+      groups[category].push(type);
+      return groups;
+    }, {} as Record<string, typeof availableTypes>);
+    
     return (
-      <div className="mt-1 flex items-center gap-1 text-sm text-red-600 dark:text-red-400">
-        <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0" />
-        <span>{fieldError.message}</span>
-      </div>
-    )
-  }
-
-  const renderFieldHelp = (text: string) => (
-    <div className="mt-1 flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
-      <InformationCircleIcon className="h-4 w-4 flex-shrink-0" />
-      <span>{text}</span>
-    </div>
-  )
-
-  // =============================================================================
-  // TAB PANELS
-  // =============================================================================
-
-  const BasicFieldsPanel = () => (
-    <div className={formGroupVariants()}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Field Name */}
-        <div>
-          <label className={labelVariants({ required: true })}>
-            Field Name
-          </label>
-          <Controller
-            name="name"
-            control={control}
-            render={({ field }) => (
-              <input
-                {...field}
-                type="text"
-                className={inputVariants({ 
-                  state: errors.name ? 'error' : 'default' 
-                })}
-                placeholder="Enter field name"
-                autoComplete="off"
-                aria-describedby={errors.name ? `${field.name}-error` : `${field.name}-help`}
-              />
-            )}
-          />
-          {renderFieldError('name')}
-          {!errors.name && renderFieldHelp('Unique identifier for the database field')}
-        </div>
-
-        {/* Field Label */}
-        <div>
-          <label className={labelVariants({ required: true })}>
-            Field Label
-          </label>
-          <Controller
-            name="label"
-            control={control}
-            render={({ field }) => (
-              <input
-                {...field}
-                type="text"
-                className={inputVariants({ 
-                  state: errors.label ? 'error' : 'default' 
-                })}
-                placeholder="Enter display label"
-                autoComplete="off"
-                aria-describedby={errors.label ? `${field.name}-error` : `${field.name}-help`}
-              />
-            )}
-          />
-          {renderFieldError('label')}
-          {!errors.label && renderFieldHelp('Human-readable name for the field')}
-        </div>
-      </div>
-
-      {/* Field Type */}
-      <div>
-        <label className={labelVariants({ required: true })}>
-          Field Type
-        </label>
+      <div className="space-y-2">
+        <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+          Field Type <span className="text-red-500">*</span>
+        </Label>
         <Controller
           name="type"
           control={control}
           render={({ field }) => (
-            <Listbox value={field.value} onChange={handleFieldTypeChange}>
+            <Listbox value={field.value} onChange={field.onChange} disabled={disabled || isLoading}>
               <div className="relative">
                 <ListboxButton className={cn(
-                  inputVariants({ state: errors.type ? 'error' : 'default' }),
-                  "flex items-center justify-between"
+                  "relative w-full cursor-default rounded-lg bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-orange-300 sm:text-sm",
+                  "border border-gray-300 dark:border-gray-600",
+                  errors.type && "border-red-500 dark:border-red-400",
+                  (disabled || isLoading) && "opacity-50 cursor-not-allowed"
                 )}>
-                  <span className="capitalize">{field.value}</span>
-                  <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
+                  <span className="block truncate text-gray-900 dark:text-gray-100">
+                    {field.value ? availableTypes.find(t => t.value === field.value)?.label || field.value : 'Select a type...'}
+                  </span>
+                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                    <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                  </span>
                 </ListboxButton>
-                <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white border border-gray-300 shadow-lg dark:bg-gray-700 dark:border-gray-600">
-                  {(['id', 'string', 'text', 'integer', 'bigint', 'decimal', 'float', 'double', 'boolean', 'date', 'datetime', 'time', 'timestamp', 'json', 'binary', 'reference'] as const).map((type) => (
-                    <ListboxOption
-                      key={type}
-                      value={type}
-                      className="relative cursor-pointer select-none py-2 pl-8 pr-4 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 data-[selected]:bg-blue-100 dark:data-[selected]:bg-blue-900/40"
-                    >
-                      {({ selected }) => (
-                        <>
-                          <span className={cn(
-                            "block truncate capitalize",
-                            selected ? "font-semibold" : "font-normal"
-                          )}>
-                            {type}
-                          </span>
-                          {selected && (
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-blue-600 dark:text-blue-400">
-                              <CheckIcon className="h-4 w-4" />
-                            </span>
+                <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                  {Object.entries(groupedTypes).map(([category, types]) => (
+                    <div key={category}>
+                      <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">
+                        {category}
+                      </div>
+                      {types.map((type) => (
+                        <ListboxOption
+                          key={type.value}
+                          value={type.value}
+                          className={({ active, selected }) => cn(
+                            "relative cursor-default select-none py-2 pl-10 pr-4",
+                            active ? "bg-indigo-100 dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100" : "text-gray-900 dark:text-gray-100"
                           )}
-                        </>
-                      )}
-                    </ListboxOption>
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span className={cn("block truncate", selected ? "font-medium" : "font-normal")}>
+                                {type.label}
+                              </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-600 dark:text-indigo-400">
+                                  <CheckIcon className="h-5 w-5" aria-hidden="true" />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                      ))}
+                    </div>
                   ))}
                 </ListboxOptions>
               </div>
             </Listbox>
           )}
         />
-        {renderFieldError('type')}
-        {!errors.type && renderFieldHelp('Data type determines validation rules and constraints')}
+        {errors.type && (
+          <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+            <ExclamationTriangleIcon className="h-4 w-4" />
+            {errors.type.message}
+          </p>
+        )}
       </div>
-
-      {/* Description */}
-      <div>
-        <label className={labelVariants()}>
-          Description
-        </label>
+    );
+  }, [availableTypes, control, errors.type, disabled, isLoading]);
+  
+  /**
+   * Render constraint toggles section
+   */
+  const renderConstraintToggles = useCallback(() => (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Constraints</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Primary Key Toggle */}
         <Controller
-          name="description"
+          name="isPrimaryKey"
           control={control}
           render={({ field }) => (
-            <textarea
-              {...field}
-              value={field.value || ''}
-              rows={3}
-              className={inputVariants({ 
-                state: errors.description ? 'error' : 'default' 
-              })}
-              placeholder="Optional field description"
-              aria-describedby={errors.description ? `${field.name}-error` : `${field.name}-help`}
-            />
-          )}
-        />
-        {renderFieldError('description')}
-        {!errors.description && renderFieldHelp('Optional documentation for this field')}
-      </div>
-    </div>
-  )
-
-  const ConstraintsPanel = () => (
-    <div className={formGroupVariants()}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Basic Constraints */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Basic Constraints</h3>
-          
-          {/* Required Field */}
-          <div className="flex items-center justify-between">
-            <div>
-              <label className={labelVariants()}>Required Field</label>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Field must have a value</p>
-            </div>
-            <Controller
-              name="required"
-              control={control}
-              render={({ field }) => (
-                <Switch
-                  checked={field.value}
-                  onChange={field.onChange}
-                  className="group relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 data-[checked]:bg-blue-600 dark:bg-gray-600 dark:data-[checked]:bg-blue-500"
-                >
-                  <span className="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out group-data-[checked]:translate-x-5" />
-                </Switch>
-              )}
-            />
-          </div>
-
-          {/* Allow Null */}
-          <div className="flex items-center justify-between">
-            <div>
-              <label className={labelVariants({ 
-                state: fieldConfig.disabledProperties.includes('allowNull') || isPrimaryKey ? 'disabled' : 'default'
-              })}>
-                Allow Null
-              </label>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Field can be empty</p>
-            </div>
-            <Controller
-              name="allowNull"
-              control={control}
-              render={({ field }) => (
-                <Switch
-                  checked={field.value}
-                  onChange={field.onChange}
-                  disabled={fieldConfig.disabledProperties.includes('allowNull') || isPrimaryKey}
-                  className="group relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 data-[checked]:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-600 dark:data-[checked]:bg-blue-500"
-                >
-                  <span className="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out group-data-[checked]:translate-x-5" />
-                </Switch>
-              )}
-            />
-          </div>
-
-          {/* Unique Field */}
-          {fieldStates.isUnique.visible && (
             <div className="flex items-center justify-between">
-              <div>
-                <label className={labelVariants({ 
-                  state: !fieldStates.isUnique.enabled ? 'disabled' : 'default'
-                })}>
-                  Unique Values
-                </label>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Enforce unique values</p>
+              <div className="flex-1">
+                <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Primary Key
+                </Label>
+                <Description className="text-sm text-gray-500 dark:text-gray-400">
+                  Uniquely identifies each record
+                </Description>
               </div>
-              <Controller
-                name="isUnique"
-                control={control}
-                render={({ field }) => (
-                  <Switch
-                    checked={field.value}
-                    onChange={field.onChange}
-                    disabled={!fieldStates.isUnique.enabled}
-                    className="group relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 data-[checked]:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-600 dark:data-[checked]:bg-blue-500"
-                  >
-                    <span className="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out group-data-[checked]:translate-x-5" />
-                  </Switch>
+              <Switch
+                checked={field.value}
+                onChange={field.onChange}
+                disabled={disabled || isLoading}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  field.value ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700",
+                  (disabled || isLoading) && "opacity-50 cursor-not-allowed"
                 )}
-              />
-            </div>
-          )}
-
-          {/* Primary Key */}
-          <div className="flex items-center justify-between">
-            <div>
-              <label className={labelVariants()}>Primary Key</label>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Make this the primary key</p>
-            </div>
-            <Controller
-              name="isPrimaryKey"
-              control={control}
-              render={({ field }) => (
-                <Switch
-                  checked={field.value}
-                  onChange={field.onChange}
-                  className="group relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 data-[checked]:bg-blue-600 dark:bg-gray-600 dark:data-[checked]:bg-blue-500"
-                >
-                  <span className="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out group-data-[checked]:translate-x-5" />
-                </Switch>
-              )}
-            />
-          </div>
-
-          {/* Auto Increment */}
-          {fieldStates.autoIncrement.visible && (
-            <div className="flex items-center justify-between">
-              <div>
-                <label className={labelVariants({ 
-                  state: !fieldStates.autoIncrement.enabled ? 'disabled' : 'default'
-                })}>
-                  Auto Increment
-                </label>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Automatically generate values</p>
-              </div>
-              <Controller
-                name="autoIncrement"
-                control={control}
-                render={({ field }) => (
-                  <Switch
-                    checked={field.value}
-                    onChange={field.onChange}
-                    disabled={!fieldStates.autoIncrement.enabled}
-                    className="group relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 data-[checked]:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-600 dark:data-[checked]:bg-blue-500"
-                  >
-                    <span className="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out group-data-[checked]:translate-x-5" />
-                  </Switch>
-                )}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Type-Specific Constraints */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Type-Specific Constraints</h3>
-          
-          {/* Length */}
-          {fieldStates.length.visible && (
-            <div>
-              <label className={labelVariants({ 
-                required: fieldStates.length.required,
-                state: !fieldStates.length.enabled ? 'disabled' : 'default'
-              })}>
-                Length
-              </label>
-              <Controller
-                name="length"
-                control={control}
-                render={({ field }) => (
-                  <input
-                    {...field}
-                    type="number"
-                    value={field.value || ''}
-                    disabled={!fieldStates.length.enabled}
-                    min={1}
-                    max={65535}
-                    className={inputVariants({ 
-                      state: errors.length ? 'error' : !fieldStates.length.enabled ? 'disabled' : 'default' 
-                    })}
-                    placeholder="Max character length"
-                  />
-                )}
-              />
-              {renderFieldError('length')}
-              {!errors.length && renderFieldHelp('Maximum number of characters')}
-            </div>
-          )}
-
-          {/* Precision */}
-          {fieldStates.precision.visible && (
-            <div>
-              <label className={labelVariants({ 
-                required: fieldStates.precision.required,
-                state: !fieldStates.precision.enabled ? 'disabled' : 'default'
-              })}>
-                Precision
-              </label>
-              <Controller
-                name="precision"
-                control={control}
-                render={({ field }) => (
-                  <input
-                    {...field}
-                    type="number"
-                    value={field.value || ''}
-                    disabled={!fieldStates.precision.enabled}
-                    min={1}
-                    max={65}
-                    className={inputVariants({ 
-                      state: errors.precision ? 'error' : !fieldStates.precision.enabled ? 'disabled' : 'default' 
-                    })}
-                    placeholder="Total digits"
-                  />
-                )}
-              />
-              {renderFieldError('precision')}
-              {!errors.precision && renderFieldHelp('Total number of digits')}
-            </div>
-          )}
-
-          {/* Scale */}
-          {fieldStates.scale.visible && (
-            <div>
-              <label className={labelVariants({ 
-                required: fieldStates.scale.required,
-                state: !fieldStates.scale.enabled ? 'disabled' : 'default'
-              })}>
-                Scale
-              </label>
-              <Controller
-                name="scale"
-                control={control}
-                render={({ field }) => (
-                  <input
-                    {...field}
-                    type="number"
-                    disabled={!fieldStates.scale.enabled}
-                    min={0}
-                    max={30}
-                    className={inputVariants({ 
-                      state: errors.scale ? 'error' : !fieldStates.scale.enabled ? 'disabled' : 'default' 
-                    })}
-                    placeholder="Decimal places"
-                  />
-                )}
-              />
-              {renderFieldError('scale')}
-              {!errors.scale && renderFieldHelp('Number of decimal places')}
-            </div>
-          )}
-
-          {/* Default Value */}
-          {fieldStates.default.visible && (
-            <div>
-              <label className={labelVariants({ 
-                state: !fieldStates.default.enabled ? 'disabled' : 'default'
-              })}>
-                Default Value
-              </label>
-              <Controller
-                name="default"
-                control={control}
-                render={({ field }) => (
-                  <input
-                    {...field}
-                    type="text"
-                    value={field.value || ''}
-                    disabled={!fieldStates.default.enabled}
-                    className={inputVariants({ 
-                      state: errors.default ? 'error' : !fieldStates.default.enabled ? 'disabled' : 'default' 
-                    })}
-                    placeholder="Default field value"
-                  />
-                )}
-              />
-              {renderFieldError('default')}
-              {!errors.default && renderFieldHelp('Value used when no value is provided')}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-
-  const RelationshipsPanel = () => (
-    <div className={formGroupVariants()}>
-      {fieldStates.foreignKey.visible ? (
-        <div className="space-y-6">
-          {/* Foreign Key Toggle */}
-          <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <div>
-              <label className={labelVariants()}>Enable Foreign Key Relationship</label>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Create a reference to another table
-              </p>
-            </div>
-            <Controller
-              name="isForeignKey"
-              control={control}
-              render={({ field }) => (
-                <Switch
-                  checked={field.value}
-                  onChange={field.onChange}
-                  className="group relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 data-[checked]:bg-blue-600 dark:bg-gray-600 dark:data-[checked]:bg-blue-500"
-                >
-                  <span className="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out group-data-[checked]:translate-x-5" />
-                </Switch>
-              )}
-            />
-          </div>
-
-          {/* Foreign Key Configuration */}
-          {isForeignKey && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Reference Table */}
-              <div>
-                <label className={labelVariants({ required: true })}>
-                  Reference Table
-                </label>
-                <Controller
-                  name="refTable"
-                  control={control}
-                  render={({ field }) => (
-                    <Listbox value={field.value} onChange={handleReferenceTableChange}>
-                      <div className="relative">
-                        <ListboxButton className={cn(
-                          inputVariants({ state: errors.refTable ? 'error' : 'default' }),
-                          "flex items-center justify-between"
-                        )}>
-                          <span>{field.value || 'Select table...'}</span>
-                          <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
-                        </ListboxButton>
-                        <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white border border-gray-300 shadow-lg dark:bg-gray-700 dark:border-gray-600">
-                          {availableTables.map((table) => (
-                            <ListboxOption
-                              key={table.name}
-                              value={table.name}
-                              className="relative cursor-pointer select-none py-2 pl-8 pr-4 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 data-[selected]:bg-blue-100 dark:data-[selected]:bg-blue-900/40"
-                            >
-                              {({ selected }) => (
-                                <>
-                                  <span className={cn(
-                                    "block truncate",
-                                    selected ? "font-semibold" : "font-normal"
-                                  )}>
-                                    {table.label || table.name}
-                                  </span>
-                                  {selected && (
-                                    <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-blue-600 dark:text-blue-400">
-                                      <CheckIcon className="h-4 w-4" />
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                            </ListboxOption>
-                          ))}
-                        </ListboxOptions>
-                      </div>
-                    </Listbox>
+              >
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                    field.value ? "translate-x-6" : "translate-x-1"
                   )}
                 />
-                {renderFieldError('refTable')}
+              </Switch>
+            </div>
+          )}
+        />
+        
+        {/* Unique Toggle */}
+        <Controller
+          name="isUnique"
+          control={control}
+          render={({ field }) => (
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Unique
+                </Label>
+                <Description className="text-sm text-gray-500 dark:text-gray-400">
+                  Values must be unique across records
+                </Description>
               </div>
-
-              {/* Reference Field */}
-              <div>
-                <label className={labelVariants({ required: true })}>
-                  Reference Field
-                </label>
+              <Switch
+                checked={field.value}
+                onChange={field.onChange}
+                disabled={disabled || isLoading || watchedIsPrimaryKey}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  field.value ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700",
+                  (disabled || isLoading || watchedIsPrimaryKey) && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                    field.value ? "translate-x-6" : "translate-x-1"
+                  )}
+                />
+              </Switch>
+            </div>
+          )}
+        />
+        
+        {/* Allow Null Toggle */}
+        <Controller
+          name="allowNull"
+          control={control}
+          render={({ field }) => (
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Allow Null
+                </Label>
+                <Description className="text-sm text-gray-500 dark:text-gray-400">
+                  Field can have null values
+                </Description>
+              </div>
+              <Switch
+                checked={field.value}
+                onChange={field.onChange}
+                disabled={disabled || isLoading || watchedIsPrimaryKey}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  field.value ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700",
+                  (disabled || isLoading || watchedIsPrimaryKey) && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                    field.value ? "translate-x-6" : "translate-x-1"
+                  )}
+                />
+              </Switch>
+            </div>
+          )}
+        />
+        
+        {/* Required Toggle */}
+        <Controller
+          name="required"
+          control={control}
+          render={({ field }) => (
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Required
+                </Label>
+                <Description className="text-sm text-gray-500 dark:text-gray-400">
+                  Field is required for record creation
+                </Description>
+              </div>
+              <Switch
+                checked={field.value}
+                onChange={field.onChange}
+                disabled={disabled || isLoading}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  field.value ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700",
+                  (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                    field.value ? "translate-x-6" : "translate-x-1"
+                  )}
+                />
+              </Switch>
+            </div>
+          )}
+        />
+        
+        {/* Auto Increment Toggle (only for supported types) */}
+        {supportsAutoIncrement(watchedType) && (
+          <Controller
+            name="autoIncrement"
+            control={control}
+            render={({ field }) => (
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Auto Increment
+                  </Label>
+                  <Description className="text-sm text-gray-500 dark:text-gray-400">
+                    Automatically increment value
+                  </Description>
+                </div>
+                <Switch
+                  checked={field.value}
+                  onChange={field.onChange}
+                  disabled={disabled || isLoading}
+                  className={cn(
+                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                    field.value ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700",
+                    (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                      field.value ? "translate-x-6" : "translate-x-1"
+                    )}
+                  />
+                </Switch>
+              </div>
+            )}
+          />
+        )}
+      </div>
+    </div>
+  ), [control, disabled, isLoading, watchedIsPrimaryKey, watchedType]);
+  
+  // ========================================================================
+  // MAIN RENDER
+  // ========================================================================
+  
+  return (
+    <div className={cn("space-y-8", className)}>
+      <FormProvider {...form}>
+        <form onSubmit={handleSubmit(handleFormSubmit, handleFormError)} className="space-y-6">
+          
+          {/* Basic Information Section */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
+              Basic Information
+            </h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Field Name */}
+              <div className="space-y-2">
+                <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Field Name <span className="text-red-500">*</span>
+                </Label>
                 <Controller
-                  name="refField"
+                  name="name"
                   control={control}
                   render={({ field }) => (
-                    <Listbox 
-                      value={field.value} 
-                      onChange={field.onChange}
-                      disabled={!selectedRefTable}
-                    >
-                      <div className="relative">
-                        <ListboxButton className={cn(
-                          inputVariants({ 
-                            state: errors.refField ? 'error' : !selectedRefTable ? 'disabled' : 'default' 
-                          }),
-                          "flex items-center justify-between"
-                        )}>
-                          <span>{field.value || 'Select field...'}</span>
-                          <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
-                        </ListboxButton>
-                        {selectedRefTable && (
-                          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white border border-gray-300 shadow-lg dark:bg-gray-700 dark:border-gray-600">
-                            {availableFields.map((fieldOption) => (
+                    <input
+                      {...field}
+                      type="text"
+                      disabled={disabled || isLoading || mode === 'edit'}
+                      className={cn(
+                        "block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                        errors.name && "border-red-500 dark:border-red-400",
+                        (disabled || isLoading || mode === 'edit') && "opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-900"
+                      )}
+                      placeholder="Enter field name (e.g., user_id, first_name)"
+                    />
+                  )}
+                />
+                {errors.name && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <ExclamationTriangleIcon className="h-4 w-4" />
+                    {errors.name.message}
+                  </p>
+                )}
+                {mode === 'edit' && (
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                    <InformationCircleIcon className="h-4 w-4" />
+                    Field name cannot be changed in edit mode
+                  </p>
+                )}
+              </div>
+              
+              {/* Field Label */}
+              <div className="space-y-2">
+                <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Display Label <span className="text-red-500">*</span>
+                </Label>
+                <Controller
+                  name="label"
+                  control={control}
+                  render={({ field }) => (
+                    <input
+                      {...field}
+                      type="text"
+                      disabled={disabled || isLoading}
+                      className={cn(
+                        "block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                        errors.label && "border-red-500 dark:border-red-400",
+                        (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                      )}
+                      placeholder="Enter display label (e.g., User ID, First Name)"
+                    />
+                  )}
+                />
+                {errors.label && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <ExclamationTriangleIcon className="h-4 w-4" />
+                    {errors.label.message}
+                  </p>
+                )}
+              </div>
+              
+              {/* Field Type */}
+              <div className="lg:col-span-2">
+                {renderTypeSelector()}
+              </div>
+              
+              {/* Description */}
+              <div className="lg:col-span-2 space-y-2">
+                <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Description
+                </Label>
+                <Controller
+                  name="description"
+                  control={control}
+                  render={({ field }) => (
+                    <textarea
+                      {...field}
+                      rows={3}
+                      disabled={disabled || isLoading}
+                      className={cn(
+                        "block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                        errors.description && "border-red-500 dark:border-red-400",
+                        (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                      )}
+                      placeholder="Enter field description..."
+                    />
+                  )}
+                />
+                {errors.description && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <ExclamationTriangleIcon className="h-4 w-4" />
+                    {errors.description.message}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Type-Specific Configuration */}
+          {watchedType && (
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
+                Type Configuration
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Length (for string types) */}
+                {supportsLength(watchedType) && (
+                  <div className="space-y-2">
+                    <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                      Length {supportsLength(watchedType) && <span className="text-red-500">*</span>}
+                    </Label>
+                    <Controller
+                      name="length"
+                      control={control}
+                      render={({ field }) => (
+                        <input
+                          {...field}
+                          type="number"
+                          min="1"
+                          max="2147483647"
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                          disabled={disabled || isLoading}
+                          className={cn(
+                            "block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                            errors.length && "border-red-500 dark:border-red-400",
+                            (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                          )}
+                          placeholder="e.g., 255"
+                        />
+                      )}
+                    />
+                    {errors.length && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                        <ExclamationTriangleIcon className="h-4 w-4" />
+                        {errors.length.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {/* Precision (for numeric types) */}
+                {supportsPrecisionScale(watchedType) && (
+                  <div className="space-y-2">
+                    <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                      Precision <span className="text-red-500">*</span>
+                    </Label>
+                    <Controller
+                      name="precision"
+                      control={control}
+                      render={({ field }) => (
+                        <input
+                          {...field}
+                          type="number"
+                          min="1"
+                          max="65"
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                          disabled={disabled || isLoading}
+                          className={cn(
+                            "block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                            errors.precision && "border-red-500 dark:border-red-400",
+                            (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                          )}
+                          placeholder="e.g., 10"
+                        />
+                      )}
+                    />
+                    {errors.precision && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                        <ExclamationTriangleIcon className="h-4 w-4" />
+                        {errors.precision.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {/* Scale (for numeric types) */}
+                {supportsPrecisionScale(watchedType) && (
+                  <div className="space-y-2">
+                    <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                      Scale
+                    </Label>
+                    <Controller
+                      name="scale"
+                      control={control}
+                      render={({ field }) => (
+                        <input
+                          {...field}
+                          type="number"
+                          min="0"
+                          max="30"
+                          disabled={disabled || isLoading}
+                          className={cn(
+                            "block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                            errors.scale && "border-red-500 dark:border-red-400",
+                            (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                          )}
+                          placeholder="e.g., 2"
+                        />
+                      )}
+                    />
+                    {errors.scale && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                        <ExclamationTriangleIcon className="h-4 w-4" />
+                        {errors.scale.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {/* Default Value */}
+                <div className="space-y-2">
+                  <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Default Value
+                  </Label>
+                  <Controller
+                    name="default"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        {...field}
+                        type="text"
+                        disabled={disabled || isLoading}
+                        className={cn(
+                          "block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                          errors.default && "border-red-500 dark:border-red-400",
+                          (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                        )}
+                        placeholder="Enter default value..."
+                      />
+                    )}
+                  />
+                  {errors.default && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <ExclamationTriangleIcon className="h-4 w-4" />
+                      {errors.default.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Constraints Section */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            {renderConstraintToggles()}
+          </div>
+          
+          {/* Foreign Key Configuration */}
+          {watchedIsForeignKey && (
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
+                Foreign Key Configuration
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Referenced Table */}
+                <div className="space-y-2">
+                  <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Referenced Table <span className="text-red-500">*</span>
+                  </Label>
+                  <Controller
+                    name="refTable"
+                    control={control}
+                    render={({ field }) => (
+                      <Listbox value={field.value} onChange={field.onChange} disabled={disabled || isLoading}>
+                        <div className="relative">
+                          <ListboxButton className={cn(
+                            "relative w-full cursor-default rounded-lg bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-orange-300 sm:text-sm",
+                            "border border-gray-300 dark:border-gray-600",
+                            errors.refTable && "border-red-500 dark:border-red-400",
+                            (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                          )}>
+                            <span className="block truncate text-gray-900 dark:text-gray-100">
+                              {field.value || 'Select a table...'}
+                            </span>
+                            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                              <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                            </span>
+                          </ListboxButton>
+                          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                            {availableTables.map((table) => (
                               <ListboxOption
-                                key={fieldOption.name}
-                                value={fieldOption.name}
-                                className="relative cursor-pointer select-none py-2 pl-8 pr-4 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 data-[selected]:bg-blue-100 dark:data-[selected]:bg-blue-900/40"
+                                key={table.value}
+                                value={table.value}
+                                className={({ active }) => cn(
+                                  "relative cursor-default select-none py-2 pl-10 pr-4",
+                                  active ? "bg-indigo-100 dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100" : "text-gray-900 dark:text-gray-100"
+                                )}
                               >
                                 {({ selected }) => (
                                   <>
-                                    <div>
-                                      <span className={cn(
-                                        "block truncate",
-                                        selected ? "font-semibold" : "font-normal"
-                                      )}>
-                                        {fieldOption.label || fieldOption.name}
-                                      </span>
-                                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        {fieldOption.type}
-                                      </span>
-                                    </div>
+                                    <span className={cn("block truncate", selected ? "font-medium" : "font-normal")}>
+                                      {table.label}
+                                    </span>
                                     {selected && (
-                                      <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-blue-600 dark:text-blue-400">
-                                        <CheckIcon className="h-4 w-4" />
+                                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-600 dark:text-indigo-400">
+                                        <CheckIcon className="h-5 w-5" aria-hidden="true" />
                                       </span>
                                     )}
                                   </>
@@ -1202,302 +1057,497 @@ export function FieldForm({
                               </ListboxOption>
                             ))}
                           </ListboxOptions>
+                        </div>
+                      </Listbox>
+                    )}
+                  />
+                  {errors.refTable && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <ExclamationTriangleIcon className="h-4 w-4" />
+                      {errors.refTable.message}
+                    </p>
+                  )}
+                </div>
+                
+                {/* Referenced Field */}
+                <div className="space-y-2">
+                  <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Referenced Field <span className="text-red-500">*</span>
+                  </Label>
+                  <Controller
+                    name="refField"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        {...field}
+                        type="text"
+                        disabled={disabled || isLoading}
+                        className={cn(
+                          "block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                          errors.refField && "border-red-500 dark:border-red-400",
+                          (disabled || isLoading) && "opacity-50 cursor-not-allowed"
                         )}
-                      </div>
-                    </Listbox>
+                        placeholder="Enter referenced field name..."
+                      />
+                    )}
+                  />
+                  {errors.refField && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <ExclamationTriangleIcon className="h-4 w-4" />
+                      {errors.refField.message}
+                    </p>
                   )}
-                />
-                {renderFieldError('refField')}
-              </div>
-
-              {/* On Delete Action */}
-              <div>
-                <label className={labelVariants()}>
-                  On Delete Action
-                </label>
-                <Controller
-                  name="refOnDelete"
-                  control={control}
-                  render={({ field }) => (
-                    <Listbox value={field.value} onChange={field.onChange}>
-                      <div className="relative">
-                        <ListboxButton className={cn(
-                          inputVariants({ state: 'default' }),
-                          "flex items-center justify-between"
-                        )}>
-                          <span>{field.value || 'Select action...'}</span>
-                          <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
-                        </ListboxButton>
-                        <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white border border-gray-300 shadow-lg dark:bg-gray-700 dark:border-gray-600">
-                          {(['NO ACTION', 'CASCADE', 'SET NULL', 'SET DEFAULT', 'RESTRICT'] as const).map((action) => (
-                            <ListboxOption
-                              key={action}
-                              value={action}
-                              className="relative cursor-pointer select-none py-2 pl-8 pr-4 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 data-[selected]:bg-blue-100 dark:data-[selected]:bg-blue-900/40"
-                            >
-                              {({ selected }) => (
-                                <>
-                                  <span className={cn(
-                                    "block truncate",
-                                    selected ? "font-semibold" : "font-normal"
-                                  )}>
-                                    {action}
-                                  </span>
-                                  {selected && (
-                                    <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-blue-600 dark:text-blue-400">
-                                      <CheckIcon className="h-4 w-4" />
+                </div>
+                
+                {/* On Delete Action */}
+                <div className="space-y-2">
+                  <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    On Delete
+                  </Label>
+                  <Controller
+                    name="refOnDelete"
+                    control={control}
+                    render={({ field }) => (
+                      <Listbox value={field.value} onChange={field.onChange} disabled={disabled || isLoading}>
+                        <div className="relative">
+                          <ListboxButton className={cn(
+                            "relative w-full cursor-default rounded-lg bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-orange-300 sm:text-sm",
+                            "border border-gray-300 dark:border-gray-600",
+                            (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                          )}>
+                            <span className="block truncate text-gray-900 dark:text-gray-100">
+                              {field.value || 'Select action...'}
+                            </span>
+                            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                              <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                            </span>
+                          </ListboxButton>
+                          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                            {FOREIGN_KEY_ACTIONS.map((action) => (
+                              <ListboxOption
+                                key={action.value}
+                                value={action.value}
+                                className={({ active }) => cn(
+                                  "relative cursor-default select-none py-2 pl-10 pr-4",
+                                  active ? "bg-indigo-100 dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100" : "text-gray-900 dark:text-gray-100"
+                                )}
+                              >
+                                {({ selected }) => (
+                                  <>
+                                    <span className={cn("block truncate", selected ? "font-medium" : "font-normal")}>
+                                      {action.label}
                                     </span>
-                                  )}
-                                </>
-                              )}
-                            </ListboxOption>
-                          ))}
-                        </ListboxOptions>
-                      </div>
-                    </Listbox>
-                  )}
-                />
-              </div>
-
-              {/* On Update Action */}
-              <div>
-                <label className={labelVariants()}>
-                  On Update Action
-                </label>
-                <Controller
-                  name="refOnUpdate"
-                  control={control}
-                  render={({ field }) => (
-                    <Listbox value={field.value} onChange={field.onChange}>
-                      <div className="relative">
-                        <ListboxButton className={cn(
-                          inputVariants({ state: 'default' }),
-                          "flex items-center justify-between"
-                        )}>
-                          <span>{field.value || 'Select action...'}</span>
-                          <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
-                        </ListboxButton>
-                        <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white border border-gray-300 shadow-lg dark:bg-gray-700 dark:border-gray-600">
-                          {(['NO ACTION', 'CASCADE', 'SET NULL', 'SET DEFAULT', 'RESTRICT'] as const).map((action) => (
-                            <ListboxOption
-                              key={action}
-                              value={action}
-                              className="relative cursor-pointer select-none py-2 pl-8 pr-4 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 data-[selected]:bg-blue-100 dark:data-[selected]:bg-blue-900/40"
-                            >
-                              {({ selected }) => (
-                                <>
-                                  <span className={cn(
-                                    "block truncate",
-                                    selected ? "font-semibold" : "font-normal"
-                                  )}>
-                                    {action}
-                                  </span>
-                                  {selected && (
-                                    <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-blue-600 dark:text-blue-400">
-                                      <CheckIcon className="h-4 w-4" />
+                                    {selected && (
+                                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-600 dark:text-indigo-400">
+                                        <CheckIcon className="h-5 w-5" aria-hidden="true" />
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </ListboxOption>
+                            ))}
+                          </ListboxOptions>
+                        </div>
+                      </Listbox>
+                    )}
+                  />
+                </div>
+                
+                {/* On Update Action */}
+                <div className="space-y-2">
+                  <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    On Update
+                  </Label>
+                  <Controller
+                    name="refOnUpdate"
+                    control={control}
+                    render={({ field }) => (
+                      <Listbox value={field.value} onChange={field.onChange} disabled={disabled || isLoading}>
+                        <div className="relative">
+                          <ListboxButton className={cn(
+                            "relative w-full cursor-default rounded-lg bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-orange-300 sm:text-sm",
+                            "border border-gray-300 dark:border-gray-600",
+                            (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                          )}>
+                            <span className="block truncate text-gray-900 dark:text-gray-100">
+                              {field.value || 'Select action...'}
+                            </span>
+                            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                              <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                            </span>
+                          </ListboxButton>
+                          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                            {FOREIGN_KEY_ACTIONS.map((action) => (
+                              <ListboxOption
+                                key={action.value}
+                                value={action.value}
+                                className={({ active }) => cn(
+                                  "relative cursor-default select-none py-2 pl-10 pr-4",
+                                  active ? "bg-indigo-100 dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100" : "text-gray-900 dark:text-gray-100"
+                                )}
+                              >
+                                {({ selected }) => (
+                                  <>
+                                    <span className={cn("block truncate", selected ? "font-medium" : "font-normal")}>
+                                      {action.label}
                                     </span>
-                                  )}
-                                </>
-                              )}
-                            </ListboxOption>
-                          ))}
-                        </ListboxOptions>
-                      </div>
-                    </Listbox>
-                  )}
-                />
+                                    {selected && (
+                                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-600 dark:text-indigo-400">
+                                        <CheckIcon className="h-5 w-5" aria-hidden="true" />
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </ListboxOption>
+                            ))}
+                          </ListboxOptions>
+                        </div>
+                      </Listbox>
+                    )}
+                  />
+                </div>
               </div>
             </div>
           )}
-        </div>
-      ) : (
-        <div className="text-center py-8">
-          <InformationCircleIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Foreign key relationships are not supported for the selected field type
-          </p>
-        </div>
-      )}
-    </div>
-  )
-
-  const FunctionsPanel = () => (
-    <div className={formGroupVariants()}>
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Cog6ToothIcon className="h-5 w-5 text-gray-500" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Database Functions</h3>
-        </div>
-        
-        <Controller
-          name="dbFunction"
-          control={control}
-          render={({ field }) => (
-            <FunctionUseForm
-              value={field.value || []}
-              onChange={field.onChange}
-              fieldType={selectedType}
-              tableName={context.tableName}
-              fieldName={getValues('name')}
-            />
-          )}
-        />
-      </div>
-    </div>
-  )
-
-  // =============================================================================
-  // MAIN RENDER
-  // =============================================================================
-
-  return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-      {/* Form Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {context.isEditMode ? 'Edit Field' : 'Create Field'}
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Configure database field properties and constraints
-          </p>
-        </div>
-        
-        {/* Validation Status */}
-        {validationState.isValidating && (
-          <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
-            <span>Validating...</span>
-          </div>
-        )}
-        
-        {validationState.lastValidation && !validationState.isValidating && (
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            Last validated: {validationState.validationTime.toFixed(0)}ms
-          </div>
-        )}
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-4 dark:bg-red-900/20 dark:border-red-800">
-          <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
-            <ExclamationTriangleIcon className="h-5 w-5 flex-shrink-0" />
-            <span className="font-medium">{error.message}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Success Display */}
-      {isSuccess && (
-        <div className="rounded-lg bg-green-50 border border-green-200 p-4 dark:bg-green-900/20 dark:border-green-800">
-          <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
-            <CheckIcon className="h-5 w-5 flex-shrink-0" />
-            <span className="font-medium">Field saved successfully</span>
-          </div>
-        </div>
-      )}
-
-      {/* Tab Navigation */}
-      <TabGroup selectedIndex={activeTab} onChange={setActiveTab}>
-        <TabList className="flex space-x-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
-          {[
-            { name: 'Basic', key: 'basic' },
-            { name: 'Constraints', key: 'constraints' },
-            { name: 'Relationships', key: 'relationships' },
-            { name: 'Functions', key: 'functions' }
-          ].map((tab, index) => (
-            <Tab
-              key={tab.key}
-              className="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ui-selected:bg-white ui-selected:text-blue-700 ui-selected:shadow ui-not-selected:text-gray-700 ui-not-selected:hover:bg-white/50 ui-not-selected:hover:text-gray-900 dark:ui-selected:bg-gray-700 dark:ui-selected:text-blue-300 dark:ui-not-selected:text-gray-300 dark:ui-not-selected:hover:bg-gray-700/50"
+          
+          {/* Advanced Options (Collapsible) */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center justify-between w-full text-left"
             >
-              {tab.name}
-            </Tab>
-          ))}
-        </TabList>
-
-        <TabPanels className="mt-6">
-          <TabPanel className="space-y-6">
-            <BasicFieldsPanel />
-          </TabPanel>
-          
-          <TabPanel className="space-y-6">
-            <ConstraintsPanel />
-          </TabPanel>
-          
-          <TabPanel className="space-y-6">
-            <RelationshipsPanel />
-          </TabPanel>
-          
-          <TabPanel className="space-y-6">
-            <FunctionsPanel />
-          </TabPanel>
-        </TabPanels>
-      </TabGroup>
-
-      {/* Form Actions */}
-      <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-4">
-          {/* Form Status */}
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {isDirty ? (
-              <span className="flex items-center gap-1">
-                <div className="h-2 w-2 bg-yellow-500 rounded-full" />
-                Unsaved changes
-              </span>
-            ) : (
-              <span className="flex items-center gap-1">
-                <div className="h-2 w-2 bg-green-500 rounded-full" />
-                Saved
-              </span>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                Advanced Options
+              </h3>
+              <ChevronUpDownIcon 
+                className={cn(
+                  "h-5 w-5 text-gray-400 transition-transform",
+                  showAdvanced && "rotate-180"
+                )}
+              />
+            </button>
+            
+            {showAdvanced && (
+              <div className="mt-6 space-y-6">
+                {/* Database Functions */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      Database Functions
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => setFunctionUseDialogOpen(true)}
+                      disabled={disabled || isLoading}
+                      className={cn(
+                        "inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md",
+                        "bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2",
+                        (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <BeakerIcon className="h-4 w-4" />
+                      Manage Functions
+                    </button>
+                  </div>
+                  <Description className="text-sm text-gray-500 dark:text-gray-400">
+                    Configure database functions to be applied to this field during operations.
+                  </Description>
+                </div>
+                
+                {/* Additional Advanced Toggles */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Controller
+                    name="fixedLength"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            Fixed Length
+                          </Label>
+                          <Description className="text-sm text-gray-500 dark:text-gray-400">
+                            Field has fixed character length
+                          </Description>
+                        </div>
+                        <Switch
+                          checked={field.value}
+                          onChange={field.onChange}
+                          disabled={disabled || isLoading}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                            field.value ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700",
+                            (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                              field.value ? "translate-x-6" : "translate-x-1"
+                            )}
+                          />
+                        </Switch>
+                      </div>
+                    )}
+                  />
+                  
+                  <Controller
+                    name="supportsMultibyte"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            Multibyte Support
+                          </Label>
+                          <Description className="text-sm text-gray-500 dark:text-gray-400">
+                            Field supports multibyte characters
+                          </Description>
+                        </div>
+                        <Switch
+                          checked={field.value}
+                          onChange={field.onChange}
+                          disabled={disabled || isLoading}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                            field.value ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700",
+                            (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                              field.value ? "translate-x-6" : "translate-x-1"
+                            )}
+                          />
+                        </Switch>
+                      </div>
+                    )}
+                  />
+                  
+                  <Controller
+                    name="isVirtual"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            Virtual Field
+                          </Label>
+                          <Description className="text-sm text-gray-500 dark:text-gray-400">
+                            Field is computed, not stored
+                          </Description>
+                        </div>
+                        <Switch
+                          checked={field.value}
+                          onChange={field.onChange}
+                          disabled={disabled || isLoading}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                            field.value ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700",
+                            (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                              field.value ? "translate-x-6" : "translate-x-1"
+                            )}
+                          />
+                        </Switch>
+                      </div>
+                    )}
+                  />
+                  
+                  <Controller
+                    name="isAggregate"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            Aggregate Field
+                          </Label>
+                          <Description className="text-sm text-gray-500 dark:text-gray-400">
+                            Field represents aggregate data
+                          </Description>
+                        </div>
+                        <Switch
+                          checked={field.value}
+                          onChange={field.onChange}
+                          disabled={disabled || isLoading}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                            field.value ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700",
+                            (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                              field.value ? "translate-x-6" : "translate-x-1"
+                            )}
+                          />
+                        </Switch>
+                      </div>
+                    )}
+                  />
+                </div>
+                
+                {/* Validation Rules */}
+                <div className="space-y-2">
+                  <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Validation Rules
+                  </Label>
+                  <Controller
+                    name="validation"
+                    control={control}
+                    render={({ field }) => (
+                      <textarea
+                        {...field}
+                        rows={3}
+                        disabled={disabled || isLoading}
+                        className={cn(
+                          "block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                          errors.validation && "border-red-500 dark:border-red-400",
+                          (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                        )}
+                        placeholder="Enter validation rules (e.g., regex patterns, constraints)..."
+                      />
+                    )}
+                  />
+                  {errors.validation && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <ExclamationTriangleIcon className="h-4 w-4" />
+                      {errors.validation.message}
+                    </p>
+                  )}
+                </div>
+                
+                {/* Picklist Values */}
+                <div className="space-y-2">
+                  <Label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Picklist Values
+                  </Label>
+                  <Controller
+                    name="picklist"
+                    control={control}
+                    render={({ field }) => (
+                      <textarea
+                        {...field}
+                        rows={3}
+                        disabled={disabled || isLoading}
+                        className={cn(
+                          "block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm",
+                          errors.picklist && "border-red-500 dark:border-red-400",
+                          (disabled || isLoading) && "opacity-50 cursor-not-allowed"
+                        )}
+                        placeholder="Enter comma-separated values for enum/picklist fields..."
+                      />
+                    )}
+                  />
+                  {errors.picklist && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <ExclamationTriangleIcon className="h-4 w-4" />
+                      {errors.picklist.message}
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
           </div>
           
-          {/* Validation Status */}
-          <div className="text-sm">
-            {isValid ? (
-              <span className="text-green-600 dark:text-green-400">Valid</span>
-            ) : (
-              <span className="text-red-600 dark:text-red-400">
-                {Object.keys(errors).length} error{Object.keys(errors).length !== 1 ? 's' : ''}
-              </span>
+          {/* Form Actions */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-end bg-gray-50 dark:bg-gray-900 p-6 rounded-lg">
+            {/* Delete Button (Edit Mode Only) */}
+            {mode === 'edit' && onDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={disabled || isLoading || isSubmitting}
+                className={cn(
+                  "inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md",
+                  "bg-red-600 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2",
+                  "sm:order-first sm:mr-auto",
+                  (disabled || isLoading || isSubmitting) && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Cog6ToothIcon className="h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete Field'
+                )}
+              </button>
             )}
+            
+            {/* Cancel Button */}
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={disabled || isLoading || isSubmitting}
+              className={cn(
+                "inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md",
+                "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2",
+                (disabled || isLoading || isSubmitting) && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              Cancel
+            </button>
+            
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={disabled || isLoading || isSubmitting || !isValid}
+              className={cn(
+                "inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md",
+                "bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2",
+                (disabled || isLoading || isSubmitting || !isValid) && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              {isSubmitting ? (
+                <>
+                  <Cog6ToothIcon className="h-4 w-4 animate-spin" />
+                  {mode === 'create' ? 'Creating...' : 'Updating...'}
+                </>
+              ) : (
+                mode === 'create' ? 'Create Field' : 'Update Field'
+              )}
+            </button>
+          </div>
+        </form>
+      </FormProvider>
+      
+      {/* TODO: Function Use Dialog */}
+      {/* This would integrate with the df-function-use component when available */}
+      {functionUseDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+              Database Functions Configuration
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              Function configuration component will be integrated here.
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setFunctionUseDialogOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
-          >
-            Cancel
-          </button>
-          
-          <button
-            type="submit"
-            disabled={!isValid || isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-blue-500 dark:hover:bg-blue-600"
-          >
-            {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                {context.isEditMode ? 'Updating...' : 'Creating...'}
-              </span>
-            ) : (
-              context.isEditMode ? 'Update Field' : 'Create Field'
-            )}
-          </button>
-        </div>
-      </div>
-    </form>
-  )
+      )}
+    </div>
+  );
 }
 
-// =============================================================================
-// EXPORTS
-// =============================================================================
+// ============================================================================
+// EXPORT DEFAULT COMPONENT
+// ============================================================================
 
-export default FieldForm
-export type { FieldFormProps }
+export { FieldForm };
