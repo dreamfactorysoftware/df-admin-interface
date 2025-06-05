@@ -1,195 +1,261 @@
 /**
- * @fileoverview Central exports file for all Zod validation schemas used throughout the schema management components.
- * Provides centralized access to validation schemas for field, table, database, and common validation workflows.
- * Enables clean imports and consistent schema usage across React Hook Form integrations.
+ * Schema Validation Barrel Export
  * 
- * @version React 19 / Next.js 15.1 / TypeScript 5.8+
- * @requires Zod schema validation for React Hook Form integration
- * @performance Real-time validation under 100ms per React/Next.js Integration Requirements
+ * Centralized export file providing type-safe access to all Zod validation schemas
+ * used throughout the schema management components. Enables clean imports and
+ * consistent validation patterns across field, table, and database workflows.
+ * 
+ * @module SchemaValidation
+ * @version 1.0.0
+ * @requires react-hook-form ^7.52.0
+ * @requires zod ^3.22.0
+ * @since TypeScript 5.8+
  */
 
 // CSV Validation Schemas
-// Exports for bulk input validation, tag selectors, and import field lists
+// Provides validation for comma-separated values used in bulk operations,
+// tag selectors, and import field lists
 export {
   csvSchema,
-  bulkIdSchema,
-  tagSelectorSchema,
-  importFieldListSchema,
-  type CsvValidationResult,
-  type BulkIdInput,
-  type TagSelectorInput,
-  type ImportFieldList
+  type CsvData,
+  type CsvValidationResult
 } from './csv-validation';
 
 // Field Validation Schemas  
-// Comprehensive schemas for database field configuration and validation rules
+// Comprehensive schemas for database field configuration supporting all field types,
+// constraints, relationships, and validation rules with React Hook Form integration
 export {
+  // Base field schemas
   fieldSchema,
-  fieldConstraintSchema,
-  fieldRelationshipSchema,
-  fieldTypeSchema,
+  fieldCreateSchema,
+  fieldUpdateSchema,
   fieldMetadataSchema,
-  picklistSchema,
-  fieldValidationRulesSchema,
-  conditionalFieldSchema,
+  
+  // Field type-specific schemas
+  stringFieldSchema,
+  numberFieldSchema,
+  booleanFieldSchema,
+  dateFieldSchema,
+  textFieldSchema,
   jsonFieldSchema,
+  
+  // Field constraint schemas
+  fieldConstraintsSchema,
+  fieldRelationshipSchema,
+  fieldValidationRulesSchema,
+  
+  // Picklist and options schemas
+  fieldPicklistSchema,
+  fieldOptionsSchema,
+  
+  // Type inference exports
   type FieldFormData,
-  type FieldConstraintData,
-  type FieldRelationshipData,
-  type FieldTypeData,
+  type FieldCreateData,
+  type FieldUpdateData,
   type FieldMetadata,
-  type PicklistData,
+  type FieldConstraints,
+  type FieldRelationship,
   type FieldValidationRules,
-  type ConditionalFieldData,
-  type JsonFieldData
+  type FieldPicklist,
+  type FieldOptions
 } from './field-validation';
 
 // Table Validation Schemas
-// Schemas for table creation, modification, and configuration workflows
+// Schemas for database table management including creation, modification,
+// and configuration with comprehensive metadata and relationship validation
 export {
+  // Base table schemas
   tableSchema,
+  tableCreateSchema,
+  tableUpdateSchema,
   tableMetadataSchema,
+  
+  // Table configuration schemas
+  tableConfigurationSchema,
   tableRelationshipSchema,
-  tableConstraintSchema,
+  tableConstraintsSchema,
+  
+  // Table filtering and search schemas
   tableFilterSchema,
   tableSearchSchema,
-  tableConfigurationSchema,
-  schemaIntegritySchema,
+  tablePaginationSchema,
+  
+  // Table import/export schemas
+  tableImportSchema,
+  tableExportSchema,
+  
+  // Type inference exports
   type TableFormData,
+  type TableCreateData,
+  type TableUpdateData,
   type TableMetadata,
-  type TableRelationshipData,
-  type TableConstraintData,
-  type TableFilterData,
-  type TableSearchData,
   type TableConfiguration,
-  type SchemaIntegrityData
+  type TableRelationship,
+  type TableConstraints,
+  type TableFilter,
+  type TableSearch,
+  type TablePagination,
+  type TableImport,
+  type TableExport
 } from './table-validation';
 
 // Common Validation Utilities
-// Shared validation patterns and utilities used across all schema components
+// Shared validation patterns, utilities, and common schemas used across
+// all schema management components for consistent behavior
 export {
+  // Database connection schemas
   databaseConnectionSchema,
-  serviceNameSchema,
+  connectionTestSchema,
+  connectionConfigSchema,
+  
+  // Identifier validation schemas
   identifierSchema,
-  configurationSchema,
-  connectionParametersSchema,
-  hostValidationSchema,
-  portValidationSchema,
-  urlValidationSchema,
-  emailValidationSchema,
-  passwordValidationSchema,
-  type DatabaseConnectionData,
-  type ServiceNameData,
-  type IdentifierData,
-  type ConfigurationData,
-  type ConnectionParameters,
-  type HostValidation,
-  type PortValidation,
-  type UrlValidation,
-  type EmailValidation,
-  type PasswordValidation
+  serviceNameSchema,
+  tableNameSchema,
+  fieldNameSchema,
+  
+  // Common field schemas
+  nameSchema,
+  descriptionSchema,
+  urlSchema,
+  portSchema,
+  usernameSchema,
+  passwordSchema,
+  
+  // Configuration schemas
+  paginationSchema,
+  sortingSchema,
+  filteringSchema,
+  
+  // API generation schemas
+  endpointConfigSchema,
+  apiParameterSchema,
+  apiResponseSchema,
+  
+  // Validation utilities
+  createConditionalSchema,
+  createOptionalSchema,
+  createArraySchema,
+  validateRequired,
+  validateLength,
+  validateFormat,
+  validateRange,
+  
+  // Type inference exports
+  type DatabaseConnection,
+  type ConnectionTest,
+  type ConnectionConfig,
+  type Identifier,
+  type ServiceName,
+  type TableName,
+  type FieldName,
+  type Name,
+  type Description,
+  type Pagination,
+  type Sorting,
+  type Filtering,
+  type EndpointConfig,
+  type ApiParameter,
+  type ApiResponse,
+  type ValidationUtils
 } from './common-validation';
 
-// Re-export validation utilities from lib/validation for convenience
+// Re-export commonly used validation utilities for convenience
 export {
-  createFormConfig,
-  zodResolver,
-  transformErrors,
-  validateWithDebounce,
-  resetFormDefaults,
-  type ValidationResult,
-  type FormConfig,
-  type ErrorTransform,
-  type ValidationTiming
-} from '../../../lib/validation';
+  createConditionalSchema as conditional,
+  createOptionalSchema as optional,
+  createArraySchema as array,
+  validateRequired as required,
+  validateLength as length,
+  validateFormat as format,
+  validateRange as range
+} from './common-validation';
 
 /**
- * Schema validation registry for type-safe schema access
- * Enables consistent validation patterns across all schema management components
+ * Validation Schema Categories
+ * 
+ * Organized grouping of validation schemas by functional area for easier
+ * discovery and usage in complex form validation scenarios.
  */
-export const SchemaRegistry = {
-  // CSV validation schemas
+export const ValidationSchemas = {
   csv: {
-    basic: 'csvSchema',
-    bulkId: 'bulkIdSchema',
-    tagSelector: 'tagSelectorSchema',
-    importFieldList: 'importFieldListSchema'
+    csvSchema
   },
-  
-  // Field validation schemas
   field: {
-    basic: 'fieldSchema',
-    constraint: 'fieldConstraintSchema',
-    relationship: 'fieldRelationshipSchema',
-    type: 'fieldTypeSchema',
-    metadata: 'fieldMetadataSchema',
-    picklist: 'picklistSchema',
-    validationRules: 'fieldValidationRulesSchema',
-    conditional: 'conditionalFieldSchema',
-    json: 'jsonFieldSchema'
+    fieldSchema,
+    fieldCreateSchema,
+    fieldUpdateSchema,
+    fieldMetadataSchema,
+    stringFieldSchema,
+    numberFieldSchema,
+    booleanFieldSchema,
+    dateFieldSchema,
+    textFieldSchema,
+    jsonFieldSchema,
+    fieldConstraintsSchema,
+    fieldRelationshipSchema,
+    fieldValidationRulesSchema,
+    fieldPicklistSchema,
+    fieldOptionsSchema
   },
-  
-  // Table validation schemas
   table: {
-    basic: 'tableSchema',
-    metadata: 'tableMetadataSchema',
-    relationship: 'tableRelationshipSchema',
-    constraint: 'tableConstraintSchema',
-    filter: 'tableFilterSchema',
-    search: 'tableSearchSchema',
-    configuration: 'tableConfigurationSchema',
-    integrity: 'schemaIntegritySchema'
+    tableSchema,
+    tableCreateSchema,
+    tableUpdateSchema,
+    tableMetadataSchema,
+    tableConfigurationSchema,
+    tableRelationshipSchema,
+    tableConstraintsSchema,
+    tableFilterSchema,
+    tableSearchSchema,
+    tablePaginationSchema,
+    tableImportSchema,
+    tableExportSchema
   },
-  
-  // Common validation schemas
   common: {
-    connection: 'databaseConnectionSchema',
-    serviceName: 'serviceNameSchema',
-    identifier: 'identifierSchema',
-    configuration: 'configurationSchema',
-    connectionParameters: 'connectionParametersSchema',
-    host: 'hostValidationSchema',
-    port: 'portValidationSchema',
-    url: 'urlValidationSchema',
-    email: 'emailValidationSchema',
-    password: 'passwordValidationSchema'
+    databaseConnectionSchema,
+    connectionTestSchema,
+    connectionConfigSchema,
+    identifierSchema,
+    serviceNameSchema,
+    tableNameSchema,
+    fieldNameSchema,
+    nameSchema,
+    descriptionSchema,
+    urlSchema,
+    portSchema,
+    usernameSchema,
+    passwordSchema,
+    paginationSchema,
+    sortingSchema,
+    filteringSchema,
+    endpointConfigSchema,
+    apiParameterSchema,
+    apiResponseSchema
   }
 } as const;
 
 /**
- * Type utility for inferring schema types from the registry
- * Provides compile-time type safety for schema access patterns
+ * Validation Utilities
+ * 
+ * Collection of utility functions for creating and composing validation schemas
+ * with consistent patterns across the application.
  */
-export type SchemaRegistryType = typeof SchemaRegistry;
-export type CsvSchemaKeys = keyof SchemaRegistryType['csv'];
-export type FieldSchemaKeys = keyof SchemaRegistryType['field'];
-export type TableSchemaKeys = keyof SchemaRegistryType['table'];
-export type CommonSchemaKeys = keyof SchemaRegistryType['common'];
+export const ValidationUtils = {
+  conditional: createConditionalSchema,
+  optional: createOptionalSchema,
+  array: createArraySchema,
+  required: validateRequired,
+  length: validateLength,
+  format: validateFormat,
+  range: validateRange
+} as const;
 
 /**
- * Helper type for schema validation results
- * Provides consistent typing for all validation operations
+ * Default export providing access to all validation schemas and utilities
+ * for cases where a single import is preferred.
  */
-export type SchemaValidationResult<T> = {
-  success: boolean;
-  data?: T;
-  error?: {
-    issues: Array<{
-      path: (string | number)[];
-      message: string;
-      code: string;
-    }>;
-    message: string;
-  };
-};
-
-/**
- * Utility function for creating type-safe schema accessors
- * Enables runtime schema retrieval with compile-time type checking
- */
-export function getSchemaByPath<
-  Category extends keyof SchemaRegistryType,
-  Key extends keyof SchemaRegistryType[Category]
->(category: Category, key: Key): string {
-  return SchemaRegistry[category][key] as string;
-}
+export default {
+  schemas: ValidationSchemas,
+  utils: ValidationUtils
+} as const;
