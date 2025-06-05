@@ -1,572 +1,643 @@
-'use client'
-
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useLocalStorage } from './use-local-storage'
-import type { 
-  DatabaseServiceRow, 
-  DatabaseServiceConfig,
-  DatabaseType 
-} from '../types/database-service'
-
 /**
- * Current service state interface for the hook
- */
-export interface CurrentServiceState {
-  /** Currently selected service ID */
-  serviceId: number | null
-  /** Currently selected service data (when available) */
-  service: DatabaseServiceRow | null
-  /** Loading state for service operations */
-  isLoading: boolean
-  /** Error state for service operations */
-  error: string | null
-  /** Whether the current service is valid */
-  isValid: boolean
-  /** Last validation timestamp */
-  lastValidated: number | null
-}
-
-/**
- * Service validation result
- */
-export interface ServiceValidationResult {
-  isValid: boolean
-  service?: DatabaseServiceRow
-  error?: string
-}
-
-/**
- * Configuration options for the current service hook
- */
-export interface UseCurrentServiceOptions {
-  /** Enable automatic service validation */
-  autoValidate?: boolean
-  /** Validation interval in milliseconds */
-  validationInterval?: number
-  /** Enable automatic cleanup of invalid services */
-  autoCleanupInvalid?: boolean
-  /** Custom service validation function */
-  customValidator?: (serviceId: number) => Promise<ServiceValidationResult>
-  /** Enable debug logging */
-  debug?: boolean
-}
-
-/**
- * Current service context hook return type
- */
-export interface UseCurrentServiceReturn {
-  /** Current service state */
-  state: CurrentServiceState
-  /** Select a service by ID */
-  selectService: (serviceId: number, service?: DatabaseServiceRow) => Promise<void>
-  /** Clear the current service selection */
-  clearService: () => void
-  /** Reset service state (clear + reset error states) */
-  resetService: () => void
-  /** Validate the current service */
-  validateService: () => Promise<ServiceValidationResult>
-  /** Refresh current service data */
-  refreshService: () => Promise<void>
-  /** Check if a specific service is currently selected */
-  isServiceSelected: (serviceId: number) => boolean
-  /** Get current service type */
-  getCurrentServiceType: () => DatabaseType | null
-}
-
-/**
- * Storage key for current service persistence
- */
-const CURRENT_SERVICE_STORAGE_KEY = 'dreamfactory_current_service_id'
-
-/**
- * Default validation interval (5 minutes)
- */
-const DEFAULT_VALIDATION_INTERVAL = 5 * 60 * 1000
-
-/**
- * Current service context hook that manages selected database service state,
- * localStorage persistence, and service-related operations.
+ * Current Service Management Hook
  * 
- * Replaces Angular DfCurrentServiceService with React state management and
- * localStorage synchronization for service selection workflows.
+ * Manages selected database service state, localStorage persistence, and service-related
+ * operations. Replaces Angular DfCurrentServiceService with React state management and
+ * localStorage synchronization for service selection workflows across the application.
  * 
  * Features:
- * - Persistent service selection across browser sessions
- * - Automatic service validation and cleanup
- * - Real-time service state updates
- * - Error handling and fallback mechanisms
- * - Integration with service listing and validation
+ * - Current service ID state management with localStorage persistence
+ * - Service selection workflows with automatic state updates and validation
+ * - Service clearing functionality for logout and reset scenarios
+ * - Integration with service listing and validation for selected service verification
+ * - Fallback handling for invalid service IDs with automatic cleanup
+ * - Service context sharing across components with reactive updates
  * 
- * @param options - Configuration options for the hook
- * @returns Service state and management functions
+ * @fileoverview Current service context hook for DreamFactory Admin Interface
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocalStorage } from './use-local-storage';
+import type {
+  DatabaseService,
+  ServiceId,
+  CurrentServiceState,
+  CurrentServiceActions,
+  UseCurrentServiceReturn,
+  UseCurrentServiceOptions,
+  ServiceValidationResult,
+  ServiceSelectionEvent,
+  CurrentServiceStorageData,
+  ServiceChangeReason,
+  CurrentServiceError,
+  DatabaseServiceQueryKeys,
+} from '../types/database-service';
+
+// =============================================================================
+// CONSTANTS AND CONFIGURATION
+// =============================================================================
+
+/**
+ * Default configuration for current service management
+ */
+const DEFAULT_OPTIONS: Required<Omit<UseCurrentServiceOptions, 'onServiceChange' | 'onValidationFailed' | 'onServiceCleared'>> = {
+  autoValidate: true,
+  autoClearInvalid: true,
+  enableAutoRefresh: false,
+  refreshInterval: 5 * 60 * 1000, // 5 minutes
+  storageKey: 'currentServiceId',
+  defaultServiceId: null,
+} as const;
+
+/**
+ * Storage configuration for current service data
+ */
+const STORAGE_CONFIG = {
+  version: 1,
+  expiresIn: 24 * 60 * 60 * 1000, // 24 hours
+  syncAcrossTabs: true,
+  serialize: true,
+} as const;
+
+/**
+ * Query configuration for service validation
+ */
+const QUERY_CONFIG = {
+  staleTime: 5 * 60 * 1000, // 5 minutes
+  cacheTime: 10 * 60 * 1000, // 10 minutes
+  retry: 2,
+  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: true,
+} as const;
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Validates if a service ID is properly formatted
+ */
+const isValidServiceId = (serviceId: unknown): serviceId is number => {
+  return typeof serviceId === 'number' && Number.isInteger(serviceId) && serviceId > 0;
+};
+
+/**
+ * Creates storage data structure from service information
+ */
+const createStorageData = (serviceId: ServiceId, service?: DatabaseService): CurrentServiceStorageData => ({
+  serviceId,
+  timestamp: Date.now(),
+  version: STORAGE_CONFIG.version,
+  metadata: service ? {
+    serviceName: service.name,
+    serviceType: service.type,
+    lastValidated: Date.now(),
+  } : undefined,
+});
+
+/**
+ * Extracts service ID from various input types
+ */
+const extractServiceId = (input: ServiceId | DatabaseService): ServiceId => {
+  if (input === null || typeof input === 'number') {
+    return input;
+  }
+  if (typeof input === 'object' && 'id' in input) {
+    return input.id;
+  }
+  return null;
+};
+
+/**
+ * Creates a service selection event object
+ */
+const createSelectionEvent = (
+  previousService: DatabaseService | null,
+  newService: DatabaseService | null,
+  source: ServiceSelectionEvent['source']
+): ServiceSelectionEvent => ({
+  previousServiceId: previousService?.id || null,
+  newServiceId: newService?.id || null,
+  previousService,
+  newService,
+  timestamp: Date.now(),
+  source,
+});
+
+// =============================================================================
+// MAIN HOOK IMPLEMENTATION
+// =============================================================================
+
+/**
+ * Current Service Management Hook
+ * 
+ * Provides comprehensive current service state management with localStorage persistence,
+ * automatic validation, and reactive updates. Manages the selected database service
+ * context throughout the application lifecycle.
+ * 
+ * @param options - Configuration options for hook behavior
+ * @returns Current service state and management functions
  * 
  * @example
  * ```typescript
- * const { 
- *   state, 
- *   selectService, 
- *   clearService, 
- *   validateService 
+ * // Basic usage
+ * const {
+ *   currentService,
+ *   currentServiceId,
+ *   setCurrentService,
+ *   clearCurrentService,
+ *   hasCurrentService,
+ *   isLoading,
+ *   error
+ * } = useCurrentService();
+ * 
+ * // With custom options
+ * const {
+ *   currentService,
+ *   setCurrentService,
+ *   validateCurrentService
  * } = useCurrentService({
  *   autoValidate: true,
- *   validationInterval: 300000 // 5 minutes
- * })
+ *   autoClearInvalid: true,
+ *   onServiceChange: (service) => {
+ *     console.log('Service changed:', service?.name);
+ *   },
+ *   onValidationFailed: (serviceId) => {
+ *     console.log('Service validation failed:', serviceId);
+ *   }
+ * });
  * 
- * // Select a service
- * await selectService(123, serviceData)
+ * // Setting current service
+ * const handleServiceSelect = (service: DatabaseService) => {
+ *   setCurrentService(service.id);
+ * };
  * 
- * // Check current state
- * if (state.serviceId && state.isValid) {
- *   console.log('Current service:', state.service?.name)
- * }
- * 
- * // Clear on logout
- * clearService()
+ * // Clearing current service
+ * const handleLogout = () => {
+ *   clearCurrentService();
+ * };
  * ```
  */
 export function useCurrentService(
   options: UseCurrentServiceOptions = {}
 ): UseCurrentServiceReturn {
-  const {
-    autoValidate = true,
-    validationInterval = DEFAULT_VALIDATION_INTERVAL,
-    autoCleanupInvalid = true,
-    customValidator,
-    debug = false
-  } = options
+  // Merge options with defaults
+  const config = { ...DEFAULT_OPTIONS, ...options };
+  
+  // Query client for cache management
+  const queryClient = useQueryClient();
+  
+  // Refs for stable references
+  const optionsRef = useRef(options);
+  const configRef = useRef(config);
+  
+  // Update refs when options change
+  useEffect(() => {
+    optionsRef.current = options;
+    configRef.current = { ...DEFAULT_OPTIONS, ...options };
+  }, [options]);
 
-  // localStorage integration for persistence
-  const [persistedServiceId, setPersistedServiceId, removePersistedServiceId] = useLocalStorage<number>(
-    CURRENT_SERVICE_STORAGE_KEY,
+  // =============================================================================
+  // STATE MANAGEMENT
+  // =============================================================================
+
+  // LocalStorage persistence for service ID
+  const [storageData, setStorageData, removeStorageData, isStorageLoading] = useLocalStorage<CurrentServiceStorageData>(
+    config.storageKey,
     {
-      defaultValue: undefined,
-      syncAcrossTabs: true,
-      validator: (value): value is number => typeof value === 'number' && value > 0,
-      enableCleanup: true
+      defaultValue: createStorageData(config.defaultServiceId),
+      version: STORAGE_CONFIG.version,
+      expiresIn: STORAGE_CONFIG.expiresIn,
+      syncAcrossTabs: STORAGE_CONFIG.syncAcrossTabs,
+      serialize: STORAGE_CONFIG.serialize,
+      validator: (value): value is CurrentServiceStorageData => {
+        if (!value || typeof value !== 'object') return false;
+        const data = value as Record<string, unknown>;
+        return (
+          (data.serviceId === null || isValidServiceId(data.serviceId)) &&
+          typeof data.timestamp === 'number' &&
+          typeof data.version === 'number'
+        );
+      },
+      migrator: (oldValue, newVersion) => {
+        // Handle storage migration if needed
+        if (newVersion > oldValue.version) {
+          return createStorageData(
+            oldValue.value?.serviceId || null,
+            undefined
+          );
+        }
+        return oldValue.value;
+      },
     }
-  )
+  );
 
-  // Internal state management
-  const [state, setState] = useState<CurrentServiceState>({
-    serviceId: null,
-    service: null,
+  // Current service state
+  const [currentState, setCurrentState] = useState<CurrentServiceState>({
+    currentServiceId: null,
+    currentService: null,
     isLoading: false,
     error: null,
-    isValid: false,
-    lastValidated: null
-  })
+    lastUpdated: null,
+  });
 
-  // Refs for preventing memory leaks and stale closures
-  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
-  const mountedRef = useRef(true)
+  // Service validation error tracking
+  const [validationError, setValidationError] = useState<CurrentServiceError | null>(null);
 
-  /**
-   * Debug logging utility
-   */
-  const debugLog = useCallback((message: string, data?: any) => {
-    if (debug) {
-      console.log(`[useCurrentService] ${message}`, data || '')
-    }
-  }, [debug])
+  // =============================================================================
+  // SERVICE VALIDATION QUERY
+  // =============================================================================
 
-  /**
-   * Update internal state with proper error handling
-   */
-  const updateState = useCallback((updates: Partial<CurrentServiceState>) => {
-    if (!mountedRef.current) return
-    
-    setState(prevState => {
-      const newState = { ...prevState, ...updates }
-      debugLog('State updated', newState)
-      return newState
-    })
-  }, [debugLog])
+  // Get services list for validation
+  const { data: servicesList } = useQuery({
+    queryKey: ['database-services', 'list'] as const,
+    queryFn: async () => {
+      // This would normally call the API, but for now we'll use cached data
+      const cachedServices = queryClient.getQueryData(['database-services', 'list']);
+      return cachedServices as DatabaseService[] || [];
+    },
+    ...QUERY_CONFIG,
+    enabled: !!currentState.currentServiceId,
+  });
 
-  /**
-   * Default service validation function using fetch
-   */
-  const defaultValidator = useCallback(async (serviceId: number): Promise<ServiceValidationResult> => {
-    try {
-      // Cancel any existing validation request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-
-      const controller = new AbortController()
-      abortControllerRef.current = controller
-
-      debugLog('Validating service', serviceId)
-
-      // In a real implementation, this would call the DreamFactory API
-      // For now, we'll simulate validation
-      const response = await fetch(`/api/database/services/${serviceId}`, {
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return {
-            isValid: false,
-            error: 'Service not found or has been deleted'
-          }
-        }
-        throw new Error(`Service validation failed: ${response.statusText}`)
-      }
-
-      const serviceData: DatabaseServiceRow = await response.json()
+  // Service validation query
+  const {
+    data: validationResult,
+    isLoading: isValidating,
+    error: validationQueryError,
+    refetch: revalidateService,
+  } = useQuery({
+    queryKey: ['current-service-validation', currentState.currentServiceId] as const,
+    queryFn: async (): Promise<ServiceValidationResult> => {
+      const serviceId = currentState.currentServiceId;
       
-      // Validate service is active and accessible
-      if (!serviceData.is_active) {
+      if (!isValidServiceId(serviceId)) {
         return {
           isValid: false,
-          service: serviceData,
-          error: 'Service is inactive'
+          error: 'Invalid service ID',
+        };
+      }
+
+      try {
+        // Find service in cached list first
+        const service = servicesList?.find(s => s.id === serviceId);
+        
+        if (!service) {
+          return {
+            isValid: false,
+            error: 'Service not found',
+          };
+        }
+
+        if (!service.is_active) {
+          return {
+            isValid: false,
+            service,
+            error: 'Service is inactive',
+            isInactive: true,
+          };
+        }
+
+        return {
+          isValid: true,
+          service,
+        };
+      } catch (error) {
+        return {
+          isValid: false,
+          error: error instanceof Error ? error.message : 'Validation failed',
+        };
+      }
+    },
+    ...QUERY_CONFIG,
+    enabled: !!(currentState.currentServiceId && config.autoValidate && servicesList),
+    onSuccess: (result) => {
+      if (result.isValid && result.service) {
+        setCurrentState(prev => ({
+          ...prev,
+          currentService: result.service!,
+          error: null,
+          lastUpdated: Date.now(),
+        }));
+        setValidationError(null);
+      } else if (!result.isValid && config.autoClearInvalid) {
+        // Auto-clear invalid service
+        handleClearService('validation_failed');
+        setValidationError(result.error as CurrentServiceError || 'VALIDATION_FAILED');
+        
+        // Notify callback
+        if (optionsRef.current.onValidationFailed && currentState.currentServiceId) {
+          optionsRef.current.onValidationFailed(currentState.currentServiceId);
         }
       }
+    },
+    onError: (error) => {
+      setValidationError('NETWORK_ERROR');
+      if (config.autoClearInvalid) {
+        handleClearService('validation_failed');
+      }
+    },
+  });
 
-      return {
-        isValid: true,
-        service: serviceData
-      }
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        debugLog('Validation aborted')
-        return { isValid: false, error: 'Validation cancelled' }
-      }
+  // =============================================================================
+  // STATE SYNCHRONIZATION
+  // =============================================================================
 
-      debugLog('Validation error', error)
-      return {
-        isValid: false,
-        error: error instanceof Error ? error.message : 'Unknown validation error'
-      }
-    } finally {
-      if (abortControllerRef.current?.signal.aborted) {
-        abortControllerRef.current = null
-      }
+  // Initialize state from storage
+  useEffect(() => {
+    if (!isStorageLoading && storageData) {
+      const serviceId = storageData.serviceId;
+      setCurrentState(prev => ({
+        ...prev,
+        currentServiceId: serviceId,
+        lastUpdated: storageData.timestamp,
+      }));
     }
-  }, [debugLog])
+  }, [storageData, isStorageLoading]);
+
+  // Update loading state
+  useEffect(() => {
+    setCurrentState(prev => ({
+      ...prev,
+      isLoading: isStorageLoading || isValidating,
+    }));
+  }, [isStorageLoading, isValidating]);
+
+  // Update error state
+  useEffect(() => {
+    const error = validationError || 
+                 (validationQueryError ? 'NETWORK_ERROR' : null) ||
+                 (validationResult && !validationResult.isValid ? 'VALIDATION_FAILED' : null);
+    
+    setCurrentState(prev => ({
+      ...prev,
+      error: error,
+    }));
+  }, [validationError, validationQueryError, validationResult]);
+
+  // =============================================================================
+  // ACTION HANDLERS
+  // =============================================================================
 
   /**
-   * Validate the current service
+   * Internal handler for service changes
    */
-  const validateService = useCallback(async (): Promise<ServiceValidationResult> => {
-    const currentServiceId = state.serviceId || persistedServiceId
-
-    if (!currentServiceId) {
-      return { isValid: false, error: 'No service selected' }
+  const handleServiceChange = useCallback((
+    newServiceId: ServiceId,
+    newService: DatabaseService | null,
+    reason: ServiceChangeReason
+  ) => {
+    const previousService = currentState.currentService;
+    
+    // Update storage
+    if (newServiceId !== null) {
+      const storageData = createStorageData(newServiceId, newService || undefined);
+      setStorageData(storageData);
+    } else {
+      removeStorageData();
     }
 
-    updateState({ isLoading: true, error: null })
-
-    try {
-      const validator = customValidator || defaultValidator
-      const result = await validator(currentServiceId)
-
-      updateState({
-        isLoading: false,
-        isValid: result.isValid,
-        service: result.service || null,
-        error: result.error || null,
-        lastValidated: Date.now()
-      })
-
-      // Auto-cleanup invalid services if enabled
-      if (!result.isValid && autoCleanupInvalid) {
-        debugLog('Auto-cleaning invalid service', currentServiceId)
-        removePersistedServiceId()
-        updateState({
-          serviceId: null,
-          service: null,
-          isValid: false
-        })
-      }
-
-      return result
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Validation failed'
-      updateState({
-        isLoading: false,
-        error: errorMessage,
-        isValid: false,
-        lastValidated: Date.now()
-      })
-
-      return { isValid: false, error: errorMessage }
-    }
-  }, [
-    state.serviceId,
-    persistedServiceId,
-    customValidator,
-    defaultValidator,
-    autoCleanupInvalid,
-    updateState,
-    removePersistedServiceId,
-    debugLog
-  ])
-
-  /**
-   * Select a service by ID with optional service data
-   */
-  const selectService = useCallback(async (
-    serviceId: number, 
-    service?: DatabaseServiceRow
-  ): Promise<void> => {
-    if (serviceId <= 0) {
-      throw new Error('Invalid service ID')
-    }
-
-    debugLog('Selecting service', { serviceId, hasServiceData: !!service })
-
-    // Update state immediately for optimistic UI
-    updateState({
-      serviceId,
-      service: service || null,
+    // Update state
+    setCurrentState(prev => ({
+      ...prev,
+      currentServiceId: newServiceId,
+      currentService: newService,
+      lastUpdated: Date.now(),
       error: null,
-      isValid: !!service, // If service data provided, assume valid initially
-      lastValidated: service ? Date.now() : null
-    })
+    }));
 
-    // Persist to localStorage
-    setPersistedServiceId(serviceId)
+    // Clear validation error
+    setValidationError(null);
 
-    // Validate service if not provided or if auto-validation is enabled
-    if (!service || autoValidate) {
-      try {
-        await validateService()
-      } catch (error) {
-        debugLog('Service selection validation failed', error)
-        // Don't throw here - validation failure is handled in state
-      }
+    // Invalidate validation query
+    queryClient.invalidateQueries(['current-service-validation']);
+
+    // Notify callback
+    if (optionsRef.current.onServiceChange) {
+      optionsRef.current.onServiceChange(newService);
     }
-  }, [
-    setPersistedServiceId,
-    autoValidate,
-    validateService,
-    updateState,
-    debugLog
-  ])
+
+    // Create selection event for potential listeners
+    const selectionEvent = createSelectionEvent(
+      previousService,
+      newService,
+      reason === 'user_selection' ? 'user' : 'auto'
+    );
+    
+    // Could emit this event if needed for other components
+    // eventEmitter.emit('service-selection-changed', selectionEvent);
+  }, [currentState.currentService, setStorageData, removeStorageData, queryClient]);
 
   /**
-   * Clear the current service selection
+   * Internal handler for clearing service
    */
-  const clearService = useCallback(() => {
-    debugLog('Clearing current service')
-
-    // Cancel any ongoing validation
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      abortControllerRef.current = null
+  const handleClearService = useCallback((reason: ServiceChangeReason) => {
+    handleServiceChange(null, null, reason);
+    
+    if (optionsRef.current.onServiceCleared) {
+      optionsRef.current.onServiceCleared();
     }
+  }, [handleServiceChange]);
 
-    // Clear validation timeout
-    if (validationTimeoutRef.current) {
-      clearTimeout(validationTimeoutRef.current)
-      validationTimeoutRef.current = null
-    }
-
-    // Clear persisted data
-    removePersistedServiceId()
-
-    // Reset state
-    updateState({
-      serviceId: null,
-      service: null,
-      isLoading: false,
-      error: null,
-      isValid: false,
-      lastValidated: null
-    })
-  }, [removePersistedServiceId, updateState, debugLog])
+  // =============================================================================
+  // PUBLIC ACTIONS
+  // =============================================================================
 
   /**
-   * Reset service state (clear + reset error states)
+   * Set current service by ID or service object
    */
-  const resetService = useCallback(() => {
-    debugLog('Resetting service state')
-    clearService()
-  }, [clearService, debugLog])
+  const setCurrentService = useCallback((input: ServiceId | DatabaseService) => {
+    const serviceId = extractServiceId(input);
+    const service = typeof input === 'object' ? input : null;
+    
+    if (serviceId === currentState.currentServiceId) {
+      return; // No change needed
+    }
+
+    handleServiceChange(serviceId, service, 'user_selection');
+  }, [currentState.currentServiceId, handleServiceChange]);
+
+  /**
+   * Set current service by service object
+   */
+  const setCurrentServiceObject = useCallback((service: DatabaseService | null) => {
+    const serviceId = service?.id || null;
+    handleServiceChange(serviceId, service, 'user_selection');
+  }, [handleServiceChange]);
+
+  /**
+   * Clear current service
+   */
+  const clearCurrentService = useCallback(() => {
+    handleClearService('manual_clear');
+  }, [handleClearService]);
 
   /**
    * Refresh current service data
    */
-  const refreshService = useCallback(async (): Promise<void> => {
-    const currentServiceId = state.serviceId || persistedServiceId
-
-    if (!currentServiceId) {
-      debugLog('No service to refresh')
-      return
+  const refreshCurrentService = useCallback(async () => {
+    if (!currentState.currentServiceId) {
+      return;
     }
 
-    debugLog('Refreshing current service', currentServiceId)
-    await validateService()
-  }, [state.serviceId, persistedServiceId, validateService, debugLog])
+    try {
+      await revalidateService();
+    } catch (error) {
+      setValidationError('NETWORK_ERROR');
+    }
+  }, [currentState.currentServiceId, revalidateService]);
 
   /**
-   * Check if a specific service is currently selected
+   * Validate current service
    */
-  const isServiceSelected = useCallback((serviceId: number): boolean => {
-    const currentId = state.serviceId || persistedServiceId
-    return currentId === serviceId
-  }, [state.serviceId, persistedServiceId])
-
-  /**
-   * Get current service type
-   */
-  const getCurrentServiceType = useCallback((): DatabaseType | null => {
-    return state.service?.type || null
-  }, [state.service?.type])
-
-  /**
-   * Setup automatic validation timer
-   */
-  const setupValidationTimer = useCallback(() => {
-    if (!autoValidate || validationInterval <= 0) return
-
-    const scheduleNextValidation = () => {
-      if (validationTimeoutRef.current) {
-        clearTimeout(validationTimeoutRef.current)
-      }
-
-      validationTimeoutRef.current = setTimeout(() => {
-        if (mountedRef.current && (state.serviceId || persistedServiceId)) {
-          debugLog('Auto-validating service')
-          validateService().then(() => {
-            if (mountedRef.current) {
-              scheduleNextValidation()
-            }
-          })
-        }
-      }, validationInterval)
+  const validateCurrentService = useCallback(async (): Promise<boolean> => {
+    if (!currentState.currentServiceId) {
+      return false;
     }
 
-    scheduleNextValidation()
-  }, [
-    autoValidate,
-    validationInterval,
-    state.serviceId,
-    persistedServiceId,
-    validateService,
-    debugLog
-  ])
+    try {
+      const result = await revalidateService();
+      return result.data?.isValid || false;
+    } catch (error) {
+      return false;
+    }
+  }, [currentState.currentServiceId, revalidateService]);
 
-  // Initialize state from localStorage on mount
+  // =============================================================================
+  // AUTO REFRESH LOGIC
+  // =============================================================================
+
+  // Auto refresh timer
   useEffect(() => {
-    if (persistedServiceId && persistedServiceId !== state.serviceId) {
-      debugLog('Initializing from localStorage', persistedServiceId)
-      
-      updateState({
-        serviceId: persistedServiceId,
-        service: null,
-        isValid: false,
-        lastValidated: null
-      })
-
-      // Validate on initialization if auto-validate is enabled
-      if (autoValidate) {
-        validateService()
-      }
+    if (!config.enableAutoRefresh || !currentState.currentServiceId) {
+      return;
     }
-  }, [persistedServiceId, state.serviceId, autoValidate, validateService, updateState, debugLog])
 
-  // Setup automatic validation timer
-  useEffect(() => {
-    setupValidationTimer()
+    const interval = setInterval(() => {
+      refreshCurrentService();
+    }, config.refreshInterval);
 
-    return () => {
-      if (validationTimeoutRef.current) {
-        clearTimeout(validationTimeoutRef.current)
-        validationTimeoutRef.current = null
-      }
-    }
-  }, [setupValidationTimer])
+    return () => clearInterval(interval);
+  }, [config.enableAutoRefresh, config.refreshInterval, currentState.currentServiceId, refreshCurrentService]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false
+  // =============================================================================
+  // COMPUTED VALUES
+  // =============================================================================
 
-      // Cancel any ongoing validation
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
+  const hasCurrentService = !!currentState.currentServiceId;
+  const currentServiceName = currentState.currentService?.name || null;
+  const currentServiceType = currentState.currentService?.type || null;
+  const isCurrentServiceActive = currentState.currentService?.is_active || false;
 
-      // Clear validation timeout
-      if (validationTimeoutRef.current) {
-        clearTimeout(validationTimeoutRef.current)
-      }
-    }
-  }, [])
+  // =============================================================================
+  // RETURN HOOK INTERFACE
+  // =============================================================================
 
   return {
-    state,
-    selectService,
-    clearService,
-    resetService,
-    validateService,
-    refreshService,
-    isServiceSelected,
-    getCurrentServiceType
-  }
+    // State
+    currentServiceId: currentState.currentServiceId,
+    currentService: currentState.currentService,
+    isLoading: currentState.isLoading,
+    error: currentState.error,
+    lastUpdated: currentState.lastUpdated,
+
+    // Actions
+    setCurrentService,
+    setCurrentServiceObject,
+    clearCurrentService,
+    refreshCurrentService,
+    validateCurrentService,
+
+    // Computed values
+    hasCurrentService,
+    currentServiceName,
+    currentServiceType,
+    isCurrentServiceActive,
+  };
+}
+
+// =============================================================================
+// CONTEXT PROVIDER HOOK
+// =============================================================================
+
+/**
+ * Hook for providing current service context to child components
+ * 
+ * @param options - Configuration options
+ * @returns Context provider value
+ * 
+ * @example
+ * ```typescript
+ * function CurrentServiceProvider({ children }: { children: React.ReactNode }) {
+ *   const currentServiceContext = useCurrentServiceContext();
+ *   
+ *   return (
+ *     <CurrentServiceContext.Provider value={currentServiceContext}>
+ *       {children}
+ *     </CurrentServiceContext.Provider>
+ *   );
+ * }
+ * ```
+ */
+export function useCurrentServiceContext(options: UseCurrentServiceOptions = {}) {
+  return useCurrentService(options);
+}
+
+// =============================================================================
+// UTILITY HOOKS
+// =============================================================================
+
+/**
+ * Simple hook that just returns the current service ID
+ */
+export function useCurrentServiceId(): ServiceId {
+  const { currentServiceId } = useCurrentService({ autoValidate: false });
+  return currentServiceId;
 }
 
 /**
- * Utility hook for checking if any service is currently selected
- * 
- * @returns Boolean indicating if a service is selected
+ * Simple hook that just returns the current service object
+ */
+export function useCurrentServiceObject(): DatabaseService | null {
+  const { currentService } = useCurrentService();
+  return currentService;
+}
+
+/**
+ * Hook that returns whether any service is currently selected
  */
 export function useHasCurrentService(): boolean {
-  const { state } = useCurrentService({ autoValidate: false })
-  return !!state.serviceId && state.isValid
+  const { hasCurrentService } = useCurrentService({ autoValidate: false });
+  return hasCurrentService;
 }
 
 /**
- * Utility hook for getting only the current service ID
- * 
- * @returns Current service ID or null
+ * Hook for service clearing on logout
  */
-export function useCurrentServiceId(): number | null {
-  const { state } = useCurrentService({ autoValidate: false })
-  return state.serviceId
+export function useCurrentServiceLogout() {
+  const { clearCurrentService } = useCurrentService({ autoValidate: false });
+  
+  return useCallback(() => {
+    clearCurrentService();
+  }, [clearCurrentService]);
 }
 
-/**
- * Utility hook for getting only the current service data
- * 
- * @returns Current service data or null
- */
-export function useCurrentServiceData(): DatabaseServiceRow | null {
-  const { state } = useCurrentService({ autoValidate: false })
-  return state.service
-}
+// =============================================================================
+// EXPORTS
+// =============================================================================
 
-/**
- * Utility hook for current service operations without state
- * 
- * @returns Service management functions only
- */
-export function useCurrentServiceActions(): Pick<
+export type {
   UseCurrentServiceReturn,
-  'selectService' | 'clearService' | 'resetService' | 'validateService' | 'refreshService'
-> {
-  const { 
-    selectService, 
-    clearService, 
-    resetService, 
-    validateService, 
-    refreshService 
-  } = useCurrentService({ autoValidate: false })
+  UseCurrentServiceOptions,
+  ServiceValidationResult,
+  ServiceSelectionEvent,
+  CurrentServiceState,
+  CurrentServiceActions,
+};
 
-  return {
-    selectService,
-    clearService,
-    resetService,
-    validateService,
-    refreshService
-  }
-}
-
-export default useCurrentService
+// Default export
+export default useCurrentService;
