@@ -1,1457 +1,1705 @@
 /**
- * Comprehensive Vitest Test Suite for Field Editing Page Component
+ * Field Edit Page Component Test Suite
  * 
- * This test suite validates the React/Next.js implementation of the database field 
- * editing interface, covering field form validation, data fetching, user interactions, 
+ * Comprehensive Vitest test suite for the field editing page component using React Testing Library
+ * and Mock Service Worker for API mocking. Tests field form validation, data fetching, user interactions,
  * and error scenarios with comprehensive coverage for all field types and attributes.
  * 
- * Key Testing Objectives:
- * - Convert Angular TestBed configuration to Vitest with React Testing Library setup
- * - Replace HttpClientTestingModule with Mock Service Worker (MSW) for API mocking
- * - Transform Angular ComponentFixture testing to React Testing Library patterns
- * - Implement React Hook Form testing scenarios with form validation and submission
- * - Add React Query caching and invalidation testing patterns with MSW integration
- * - Test Next.js dynamic routing navigation with field ID parameter handling
- * - Convert Angular form control testing to React Hook Form field validation testing
+ * This test suite migrates from Angular TestBed configuration to Vitest with React Testing Library setup,
+ * replacing HttpClientTestingModule with MSW for realistic API mocking and enhanced testing performance.
  * 
- * Performance Targets:
- * - 10x faster test execution with Vitest 2.1.0
- * - React Hook Form validation under 100ms
+ * Test Coverage Areas:
+ * - React Hook Form validation and submission testing
+ * - All DatabaseSchemaFieldType values and attributes
+ * - Next.js dynamic routing navigation with field ID parameter handling
+ * - MSW integration for field management API testing scenarios
+ * - Performance testing for React Hook Form validation and field type handling
+ * - TanStack React Query caching and invalidation testing patterns
+ * - WCAG 2.1 AA accessibility compliance validation
+ * - Error boundary and loading state testing
+ * - Comprehensive user interaction workflows
+ * 
+ * Performance Requirements:
+ * - Test suite execution under 10 seconds (10x faster than Jest/Karma)
+ * - Form validation response time under 100ms
  * - 90%+ code coverage for comprehensive test validation
- * - Real-time validation testing for all DatabaseSchemaFieldType values
+ * - Memory usage optimization for large schema testing scenarios
+ * 
+ * @fileoverview Field edit page component comprehensive test suite
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+ / Vitest 2.1.0
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, beforeAll } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import React from 'react';
+import { describe, test, expect, beforeEach, afterEach, vi, beforeAll, type Mock } from 'vitest';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useRouter, useParams } from 'next/navigation';
-import { http, HttpResponse } from 'msw';
-import { server } from '../../../../test/mocks/server';
+import { QueryClient } from '@tanstack/react-query';
 
-// Import the component under test
+// Test utilities and providers
+import { 
+  renderWithProviders, 
+  renderWithForm, 
+  renderWithQuery,
+  accessibilityUtils,
+  headlessUIUtils,
+  testUtils,
+  middlewareUtils
+} from '../../../../test/utils/test-utils';
+
+// Component under test
 import FieldEditPage from './page';
 
-// Import types and test utilities
+// Type definitions and schemas
 import type { 
-  DatabaseSchemaFieldType, 
-  FieldFormData, 
-  DreamFactoryFieldType,
-  DbFunctionUseType,
-  FieldValidationError 
+  DatabaseSchemaFieldType,
+  FieldFormData,
+  FieldDataType,
+  ReferentialAction,
+  FunctionUseOperation,
+  TableReference
 } from '../field.types';
+
+// Mock data and utilities
+import { 
+  createFieldMockData,
+  createTableReferenceMockData,
+  createFieldFormMockData
+} from '../../../../test/utils/component-factories';
+
+// MSW handlers for field management
+import { rest } from 'msw';
+import { server } from '../../../../test/mocks/server';
+
+// Performance measurement utilities
+import { measureTestPerformance } from '../../../../test/utils/performance-helpers';
 
 // Mock Next.js navigation hooks
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
   useParams: vi.fn(),
   useSearchParams: vi.fn(),
-  usePathname: vi.fn(),
+  usePathname: vi.fn(() => '/adf-schema/fields/test-field-id'),
   notFound: vi.fn(),
+  redirect: vi.fn(),
 }));
 
-// Mock React Hook Form for validation testing
-vi.mock('react-hook-form', async () => {
-  const actual = await vi.importActual('react-hook-form');
-  return {
-    ...actual,
-    useForm: vi.fn(() => ({
-      control: {},
-      handleSubmit: vi.fn((fn) => fn),
-      formState: { 
-        errors: {}, 
-        isSubmitting: false, 
-        isValid: true,
-        isDirty: false,
-        touchedFields: {},
-        dirtyFields: {},
-      },
-      setValue: vi.fn(),
-      getValues: vi.fn(),
-      reset: vi.fn(),
-      watch: vi.fn(),
-      trigger: vi.fn(),
-      clearErrors: vi.fn(),
-      setError: vi.fn(),
-    })),
-    Controller: ({ render }: any) => render({ field: { value: '', onChange: vi.fn() } }),
-  };
-});
-
-// Mock Zod schema validation
-vi.mock('zod', () => ({
-  z: {
-    string: () => ({
-      min: () => ({ max: () => ({ optional: () => ({}) }) }),
-      email: () => ({ optional: () => ({}) }),
-      url: () => ({ optional: () => ({}) }),
-      regex: () => ({ optional: () => ({}) }),
-      optional: () => ({}),
-    }),
-    number: () => ({
-      min: () => ({ max: () => ({ optional: () => ({}) }) }),
-      positive: () => ({ optional: () => ({}) }),
-      int: () => ({ optional: () => ({}) }),
-      optional: () => ({}),
-    }),
-    boolean: () => ({ optional: () => ({}) }),
-    array: () => ({ optional: () => ({}) }),
-    object: () => ({ optional: () => ({}) }),
-    enum: () => ({ optional: () => ({}) }),
-    union: () => ({ optional: () => ({}) }),
-    literal: () => ({ optional: () => ({}) }),
-    nullable: () => ({ optional: () => ({}) }),
-    preprocess: () => ({ optional: () => ({}) }),
+// Mock React Hook Form for specific test scenarios
+const mockFormMethods = {
+  register: vi.fn(),
+  handleSubmit: vi.fn(),
+  watch: vi.fn(),
+  setValue: vi.fn(),
+  getValues: vi.fn(),
+  trigger: vi.fn(),
+  reset: vi.fn(),
+  clearErrors: vi.fn(),
+  setError: vi.fn(),
+  formState: {
+    errors: {},
+    isValid: true,
+    isSubmitting: false,
+    isDirty: false,
+    isLoading: false,
+    isSubmitted: false,
+    isValidating: false,
+    touchedFields: {},
+    dirtyFields: {},
+    validatingFields: {},
+    defaultValues: {},
   },
-}));
+  control: {} as any,
+};
+
+// =============================================================================
+// TEST DATA FACTORIES AND MOCK DATA
+// =============================================================================
 
 /**
- * Mock Field Data Factory for Testing All Field Types
- * Generates realistic field data covering all DatabaseSchemaFieldType properties
+ * Comprehensive field test data covering all DatabaseSchemaFieldType scenarios
  */
-const createMockField = (overrides: Partial<DatabaseSchemaFieldType> = {}): DatabaseSchemaFieldType => ({
+const createMockFieldData = (overrides: Partial<DatabaseSchemaFieldType> = {}): DatabaseSchemaFieldType => ({
   name: 'test_field',
-  alias: null,
   label: 'Test Field',
+  alias: null,
   description: 'Test field description',
-  type: 'string' as DreamFactoryFieldType,
-  dbType: 'varchar',
+  type: 'string',
+  dbType: 'VARCHAR(255)',
   length: 255,
   precision: null,
   scale: 0,
-  default: null,
-  allowNull: true,
-  autoIncrement: false,
   fixedLength: false,
-  supportsMultibyte: true,
-  isAggregate: false,
-  isForeignKey: false,
-  isPrimaryKey: false,
-  isUnique: false,
-  isVirtual: false,
+  supportsMultibyte: false,
   required: false,
+  allowNull: true,
+  isPrimaryKey: false,
+  isForeignKey: false,
+  isUnique: false,
+  autoIncrement: false,
+  isVirtual: false,
+  isAggregate: false,
+  default: null,
+  validation: null,
+  picklist: null,
   refTable: null,
   refField: null,
-  refOnUpdate: null,
   refOnDelete: null,
-  picklist: null,
-  validation: null,
+  refOnUpdate: null,
   dbFunction: null,
-  native: [],
+  native: null,
   value: [],
   ...overrides,
 });
 
 /**
- * Field Type Test Data Generator
- * Creates comprehensive test scenarios for all DreamFactory field types
+ * Mock form data for all field types and configurations
  */
-const generateFieldTypeTestData = (): Array<{
-  fieldType: DreamFactoryFieldType;
-  mockData: Partial<DatabaseSchemaFieldType>;
-  formDefaults: Partial<FieldFormData>;
-  validationTests: Array<{ input: any; expectedValid: boolean; description: string }>;
-}> => {
-  return [
-    {
-      fieldType: 'string',
-      mockData: { type: 'string', dbType: 'varchar', length: 255 },
-      formDefaults: { type: 'string', length: 255, allowNull: true },
-      validationTests: [
-        { input: 'Valid string', expectedValid: true, description: 'Valid string input' },
-        { input: '', expectedValid: true, description: 'Empty string when allowNull is true' },
-        { input: 'A'.repeat(256), expectedValid: false, description: 'String exceeding length limit' },
-      ],
-    },
-    {
-      fieldType: 'integer',
-      mockData: { type: 'integer', dbType: 'int', length: 11 },
-      formDefaults: { type: 'integer', length: 11, scale: 0 },
-      validationTests: [
-        { input: 42, expectedValid: true, description: 'Valid integer' },
-        { input: 0, expectedValid: true, description: 'Zero value' },
-        { input: -123, expectedValid: true, description: 'Negative integer' },
-        { input: 'not_a_number', expectedValid: false, description: 'Non-numeric string' },
-        { input: 3.14, expectedValid: false, description: 'Decimal value for integer field' },
-      ],
-    },
-    {
-      fieldType: 'boolean',
-      mockData: { type: 'boolean', dbType: 'tinyint' },
-      formDefaults: { type: 'boolean', default: false },
-      validationTests: [
-        { input: true, expectedValid: true, description: 'Boolean true' },
-        { input: false, expectedValid: true, description: 'Boolean false' },
-        { input: 'true', expectedValid: true, description: 'String "true"' },
-        { input: 'false', expectedValid: true, description: 'String "false"' },
-        { input: 1, expectedValid: true, description: 'Numeric 1' },
-        { input: 0, expectedValid: true, description: 'Numeric 0' },
-        { input: 'invalid', expectedValid: false, description: 'Invalid boolean string' },
-      ],
-    },
-    {
-      fieldType: 'datetime',
-      mockData: { type: 'datetime', dbType: 'datetime' },
-      formDefaults: { type: 'datetime', default: null },
-      validationTests: [
-        { input: '2024-01-15 10:30:00', expectedValid: true, description: 'Valid datetime string' },
-        { input: '2024-01-15', expectedValid: true, description: 'Valid date string' },
-        { input: 'CURRENT_TIMESTAMP', expectedValid: true, description: 'Database function' },
-        { input: 'invalid-date', expectedValid: false, description: 'Invalid date format' },
-        { input: '2024-13-45', expectedValid: false, description: 'Invalid date values' },
-      ],
-    },
-    {
-      fieldType: 'decimal',
-      mockData: { type: 'decimal', dbType: 'decimal', precision: 10, scale: 2 },
-      formDefaults: { type: 'decimal', precision: 10, scale: 2 },
-      validationTests: [
-        { input: 123.45, expectedValid: true, description: 'Valid decimal' },
-        { input: '123.45', expectedValid: true, description: 'Valid decimal string' },
-        { input: 0, expectedValid: true, description: 'Zero decimal' },
-        { input: -123.45, expectedValid: true, description: 'Negative decimal' },
-        { input: 12345678.123, expectedValid: false, description: 'Exceeds precision' },
-        { input: 'not_a_number', expectedValid: false, description: 'Non-numeric string' },
-      ],
-    },
-    {
-      fieldType: 'email',
-      mockData: { type: 'email', dbType: 'varchar', length: 320 },
-      formDefaults: { type: 'email', length: 320, validation: '^[^@]+@[^@]+\\.[^@]+$' },
-      validationTests: [
-        { input: 'user@example.com', expectedValid: true, description: 'Valid email' },
-        { input: 'test.email+tag@example.co.uk', expectedValid: true, description: 'Complex valid email' },
-        { input: 'invalid.email', expectedValid: false, description: 'Missing @ symbol' },
-        { input: '@example.com', expectedValid: false, description: 'Missing local part' },
-        { input: 'user@', expectedValid: false, description: 'Missing domain' },
-      ],
-    },
-    {
-      fieldType: 'text',
-      mockData: { type: 'text', dbType: 'text' },
-      formDefaults: { type: 'text', length: null },
-      validationTests: [
-        { input: 'Short text', expectedValid: true, description: 'Short text' },
-        { input: 'A'.repeat(10000), expectedValid: true, description: 'Long text content' },
-        { input: '', expectedValid: true, description: 'Empty text when allowNull is true' },
-      ],
-    },
-  ];
-};
-
-/**
- * Database Function Usage Test Data
- * Mock data for testing function usage configurations
- */
-const createMockDbFunction = (overrides: Partial<DbFunctionUseType> = {}): DbFunctionUseType => ({
-  use: ['insert', 'update'],
-  function: 'NOW()',
+const createMockFormData = (overrides: Partial<FieldFormData> = {}): FieldFormData => ({
+  name: 'test_field',
+  label: 'Test Field',
+  alias: '',
+  description: 'Test field description',
+  typeSelection: 'predefined',
+  type: 'string',
+  dbType: 'VARCHAR(255)',
+  manualType: '',
+  length: 255,
+  precision: undefined,
+  scale: 0,
+  fixedLength: false,
+  supportsMultibyte: false,
+  required: false,
+  allowNull: true,
+  isPrimaryKey: false,
+  isForeignKey: false,
+  isUnique: false,
+  autoIncrement: false,
+  isVirtual: false,
+  isAggregate: false,
+  default: '',
+  hasDefaultValue: false,
+  enableValidation: false,
+  validationRules: undefined,
+  enablePicklist: false,
+  picklistType: 'csv',
+  picklistValues: '',
+  picklistOptions: [],
+  referenceTable: '',
+  referenceField: '',
+  onDeleteAction: 'RESTRICT',
+  onUpdateAction: 'RESTRICT',
+  enableDbFunctions: false,
+  dbFunctions: [],
   ...overrides,
 });
 
 /**
- * Test Component Wrapper with React Query and Form Providers
- * Provides necessary providers for isolated testing environment
+ * Mock table references for foreign key testing
  */
-const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        cacheTime: 0,
-        staleTime: 0,
-      },
-      mutations: {
-        retry: false,
-      },
-    },
-  });
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
-};
+const createMockTableReferences = (): TableReference[] => [
+  {
+    name: 'users',
+    label: 'Users',
+    fields: [
+      createMockFieldData({ name: 'id', type: 'id', isPrimaryKey: true }),
+      createMockFieldData({ name: 'email', type: 'string', required: true }),
+      createMockFieldData({ name: 'name', type: 'string' }),
+    ],
+    schema: 'public',
+  },
+  {
+    name: 'roles',
+    label: 'Roles',
+    fields: [
+      createMockFieldData({ name: 'id', type: 'id', isPrimaryKey: true }),
+      createMockFieldData({ name: 'name', type: 'string', required: true }),
+      createMockFieldData({ name: 'permissions', type: 'json' }),
+    ],
+    schema: 'public',
+  },
+];
 
 /**
- * Helper function to render component with all required providers
+ * All field type test scenarios for comprehensive coverage
  */
-const renderWithProviders = (component: React.ReactElement) => {
-  return render(component, { wrapper: TestWrapper });
-};
+const allFieldTypes: FieldDataType[] = [
+  'id', 'string', 'integer', 'text', 'boolean', 'binary',
+  'float', 'double', 'decimal', 'datetime', 'date', 'time',
+  'timestamp', 'timestamp_on_create', 'timestamp_on_update',
+  'user_id', 'user_id_on_create', 'user_id_on_update',
+  'reference', 'json', 'xml', 'uuid', 'blob', 'clob',
+  'geometry', 'point', 'linestring', 'polygon', 'enum', 'set'
+];
+
+/**
+ * Referential action test scenarios
+ */
+const allReferentialActions: ReferentialAction[] = [
+  'CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION', 'SET DEFAULT'
+];
+
+/**
+ * Function use operation test scenarios
+ */
+const allFunctionUseOperations: FunctionUseOperation[] = [
+  'SELECT', 'FILTER', 'INSERT', 'UPDATE'
+];
+
+// =============================================================================
+// MSW API HANDLERS FOR FIELD MANAGEMENT TESTING
+// =============================================================================
+
+/**
+ * MSW handlers for comprehensive field management API testing
+ */
+const fieldApiHandlers = [
+  // Get field details
+  rest.get('/api/v2/:service/_schema/:table/:fieldId', (req, res, ctx) => {
+    const { service, table, fieldId } = req.params;
+    
+    if (fieldId === 'non-existent-field') {
+      return res(
+        ctx.status(404),
+        ctx.json({
+          error: { code: 404, message: 'Field not found' }
+        })
+      );
+    }
+
+    if (fieldId === 'error-field') {
+      return res(
+        ctx.status(500),
+        ctx.json({
+          error: { code: 500, message: 'Internal server error' }
+        })
+      );
+    }
+
+    const mockField = createMockFieldData({
+      name: fieldId as string,
+      label: `${fieldId} Field`,
+      type: fieldId === 'foreign-key-field' ? 'reference' : 'string',
+      isForeignKey: fieldId === 'foreign-key-field',
+      refTable: fieldId === 'foreign-key-field' ? 'users' : null,
+      refField: fieldId === 'foreign-key-field' ? 'id' : null,
+    });
+
+    return res(
+      ctx.status(200),
+      ctx.json({
+        resource: [mockField]
+      })
+    );
+  }),
+
+  // Update field
+  rest.patch('/api/v2/:service/_schema/:table/:fieldId', (req, res, ctx) => {
+    const { fieldId } = req.params;
+    
+    if (fieldId === 'readonly-field') {
+      return res(
+        ctx.status(403),
+        ctx.json({
+          error: { code: 403, message: 'Field is read-only and cannot be modified' }
+        })
+      );
+    }
+
+    if (fieldId === 'validation-error-field') {
+      return res(
+        ctx.status(422),
+        ctx.json({
+          error: { 
+            code: 422, 
+            message: 'Validation failed',
+            details: {
+              name: ['Field name must be unique'],
+              length: ['Length must be greater than 0']
+            }
+          }
+        })
+      );
+    }
+
+    return res(
+      ctx.status(200),
+      ctx.json({
+        success: true,
+        resource: [createMockFieldData({ name: fieldId as string })]
+      })
+    );
+  }),
+
+  // Get table references for foreign key configuration
+  rest.get('/api/v2/:service/_schema', (req, res, ctx) => {
+    const service = req.params.service;
+    
+    if (service === 'error-service') {
+      return res(
+        ctx.status(500),
+        ctx.json({
+          error: { code: 500, message: 'Failed to fetch schema' }
+        })
+      );
+    }
+
+    return res(
+      ctx.status(200),
+      ctx.json({
+        resource: [
+          {
+            name: 'users',
+            label: 'Users',
+            access: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+            field: [
+              createMockFieldData({ name: 'id', type: 'id', isPrimaryKey: true }),
+              createMockFieldData({ name: 'email', type: 'string', required: true }),
+              createMockFieldData({ name: 'name', type: 'string' }),
+            ]
+          },
+          {
+            name: 'roles',
+            label: 'Roles', 
+            access: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+            field: [
+              createMockFieldData({ name: 'id', type: 'id', isPrimaryKey: true }),
+              createMockFieldData({ name: 'name', type: 'string', required: true }),
+            ]
+          }
+        ]
+      })
+    );
+  }),
+
+  // Test database connection
+  rest.post('/api/v2/system/service/test', (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json({
+        success: true,
+        message: 'Connection successful'
+      })
+    );
+  }),
+];
+
+// =============================================================================
+// TEST SUITE SETUP AND CONFIGURATION
+// =============================================================================
 
 describe('FieldEditPage Component', () => {
-  // Mock implementations for Next.js navigation
-  const mockPush = vi.fn();
-  const mockReplace = vi.fn();
-  const mockBack = vi.fn();
-  const mockRefresh = vi.fn();
+  let mockRouter: {
+    push: Mock;
+    replace: Mock;
+    back: Mock;
+    refresh: Mock;
+    prefetch: Mock;
+  };
 
-  // Test field data for different scenarios
-  const mockStringField = createMockField({
-    name: 'username',
-    type: 'string',
-    dbType: 'varchar',
-    length: 50,
-    required: true,
-    isUnique: true,
-    validation: '^[a-zA-Z0-9_]+$',
-  });
+  let mockParams: {
+    service: string;
+    table: string;
+    fieldId: string;
+  };
 
-  const mockIntegerField = createMockField({
-    name: 'age',
-    type: 'integer',
-    dbType: 'int',
-    length: 11,
-    allowNull: true,
-    default: 0,
-  });
-
-  const mockForeignKeyField = createMockField({
-    name: 'user_id',
-    type: 'integer',
-    dbType: 'int',
-    length: 11,
-    isForeignKey: true,
-    refTable: 'users',
-    refField: 'id',
-    refOnDelete: 'CASCADE',
-    refOnUpdate: 'CASCADE',
-  });
-
-  const mockDateTimeField = createMockField({
-    name: 'created_at',
-    type: 'datetime',
-    dbType: 'datetime',
-    default: 'CURRENT_TIMESTAMP',
-    dbFunction: [createMockDbFunction({ use: ['insert'], function: 'NOW()' })],
-  });
+  let queryClient: QueryClient;
+  let user: ReturnType<typeof userEvent.setup>;
 
   beforeAll(() => {
-    // Setup MSW handlers for field management API endpoints
-    server.use(
-      // Field detail retrieval endpoint
-      http.get('/api/v2/:serviceName/_schema/:tableName/:fieldName', ({ params }) => {
-        const { serviceName, tableName, fieldName } = params;
-        
-        // Return different mock data based on field name for testing
-        let fieldData: DatabaseSchemaFieldType;
-        
-        switch (fieldName) {
-          case 'username':
-            fieldData = mockStringField;
-            break;
-          case 'age':
-            fieldData = mockIntegerField;
-            break;
-          case 'user_id':
-            fieldData = mockForeignKeyField;
-            break;
-          case 'created_at':
-            fieldData = mockDateTimeField;
-            break;
-          case 'nonexistent_field':
-            return HttpResponse.json(
-              { error: { code: 404, message: 'Field not found' } },
-              { status: 404 }
-            );
-          default:
-            fieldData = mockStringField;
-        }
-        
-        return HttpResponse.json({
-          resource: [fieldData],
-          meta: { count: 1 },
-        });
-      }),
-
-      // Field update endpoint
-      http.patch('/api/v2/:serviceName/_schema/:tableName/:fieldName', async ({ request, params }) => {
-        const body = await request.json();
-        const { fieldName } = params;
-        
-        // Simulate validation error for testing
-        if (body.name === 'invalid_field_name') {
-          return HttpResponse.json(
-            {
-              error: {
-                code: 400,
-                message: 'Invalid field name',
-                details: { name: ['Field name contains invalid characters'] },
-              },
-            },
-            { status: 400 }
-          );
-        }
-
-        // Simulate server error for testing
-        if (fieldName === 'error_field') {
-          return HttpResponse.json(
-            {
-              error: {
-                code: 500,
-                message: 'Internal server error',
-              },
-            },
-            { status: 500 }
-          );
-        }
-
-        return HttpResponse.json({
-          success: true,
-          message: `Field ${fieldName} updated successfully`,
-          resource: { ...mockStringField, ...body },
-        });
-      }),
-
-      // Field deletion endpoint
-      http.delete('/api/v2/:serviceName/_schema/:tableName/:fieldName', ({ params }) => {
-        const { fieldName } = params;
-        
-        if (fieldName === 'protected_field') {
-          return HttpResponse.json(
-            {
-              error: {
-                code: 403,
-                message: 'Cannot delete protected field',
-              },
-            },
-            { status: 403 }
-          );
-        }
-
-        return HttpResponse.json({
-          success: true,
-          message: `Field ${fieldName} deleted successfully`,
-        });
-      }),
-
-      // Related tables endpoint for foreign key testing
-      http.get('/api/v2/:serviceName/_schema', () => {
-        return HttpResponse.json({
-          resource: [
-            { name: 'users', label: 'Users' },
-            { name: 'profiles', label: 'User Profiles' },
-            { name: 'orders', label: 'Orders' },
-          ],
-        });
-      }),
-
-      // Table fields endpoint for reference field dropdown
-      http.get('/api/v2/:serviceName/_schema/:tableName', ({ params }) => {
-        const { tableName } = params;
-        
-        const fields = {
-          users: [
-            { name: 'id', type: 'id' },
-            { name: 'username', type: 'string' },
-            { name: 'email', type: 'email' },
-          ],
-          profiles: [
-            { name: 'id', type: 'id' },
-            { name: 'user_id', type: 'integer' },
-            { name: 'display_name', type: 'string' },
-          ],
-        };
-
-        return HttpResponse.json({
-          resource: fields[tableName as keyof typeof fields] || [],
-        });
-      }),
-
-      // Field validation endpoint for real-time validation
-      http.post('/api/v2/:serviceName/_schema/:tableName/_validate_field', async ({ request }) => {
-        const body = await request.json();
-        const validationErrors: FieldValidationError[] = [];
-
-        // Simulate field validation logic
-        if (body.name === '') {
-          validationErrors.push({
-            path: ['name'],
-            message: 'Field name is required',
-            code: 'required',
-          });
-        }
-
-        if (body.name && !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(body.name)) {
-          validationErrors.push({
-            path: ['name'],
-            message: 'Field name must start with a letter and contain only letters, numbers, and underscores',
-            code: 'invalid_format',
-          });
-        }
-
-        if (body.type === 'string' && (!body.length || body.length <= 0)) {
-          validationErrors.push({
-            path: ['length'],
-            message: 'String fields must have a positive length',
-            code: 'invalid_length',
-          });
-        }
-
-        if (body.type === 'decimal' && (!body.precision || body.precision <= 0)) {
-          validationErrors.push({
-            path: ['precision'],
-            message: 'Decimal fields must have a positive precision',
-            code: 'invalid_precision',
-          });
-        }
-
-        return HttpResponse.json({
-          isValid: validationErrors.length === 0,
-          errors: validationErrors,
-          timestamp: Date.now(),
-          fieldName: body.name,
-        });
-      }),
-
-      // Error scenario endpoints
-      http.get('/api/v2/error-service/_schema/error-table/error-field', () => {
-        return HttpResponse.json(
-          { error: { code: 500, message: 'Internal server error' } },
-          { status: 500 }
-        );
-      }),
-
-      http.get('/api/v2/network-error/_schema/test-table/test-field', () => {
-        return HttpResponse.error();
-      }),
-    );
+    // Add field management API handlers to MSW server
+    server.use(...fieldApiHandlers);
   });
 
   beforeEach(() => {
-    // Reset all mocks before each test
+    // Reset all mocks
     vi.clearAllMocks();
-    
-    // Setup default mock implementations
-    (useRouter as any).mockReturnValue({
-      push: mockPush,
-      replace: mockReplace,
-      back: mockBack,
-      refresh: mockRefresh,
+
+    // Setup mock router
+    mockRouter = {
+      push: vi.fn(),
+      replace: vi.fn(),
+      back: vi.fn(),
+      refresh: vi.fn(),
       prefetch: vi.fn(),
+    };
+
+    // Setup mock params
+    mockParams = {
+      service: 'test-db',
+      table: 'test-table',
+      fieldId: 'test-field-id',
+    };
+
+    // Setup React Query client with optimized settings for testing
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          gcTime: 0,
+          staleTime: 0,
+        },
+        mutations: {
+          retry: false,
+        },
+      },
     });
 
-    (useParams as any).mockReturnValue({
-      service: 'test-service',
-      table: 'test-table',
-      fieldId: 'username',
-    });
+    // Setup user event
+    user = userEvent.setup();
+
+    // Configure Next.js navigation mocks
+    (useRouter as Mock).mockReturnValue(mockRouter);
+    (useParams as Mock).mockReturnValue(mockParams);
   });
 
   afterEach(() => {
-    // Clean up after each test
-    vi.clearAllMocks();
+    // Clear query client cache
+    queryClient.clear();
+    
+    // Reset MSW handlers
+    server.resetHandlers();
   });
 
-  describe('Component Rendering and Initial State', () => {
-    it('should render the field editing page with correct heading', async () => {
-      renderWithProviders(<FieldEditPage />);
+  // =============================================================================
+  // COMPONENT RENDERING AND BASIC FUNCTIONALITY TESTS
+  // =============================================================================
 
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /edit field/i })).toBeInTheDocument();
+  describe('Component Rendering', () => {
+    test('renders field edit form with loading state initially', async () => {
+      const { container } = renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
       });
 
-      expect(screen.getByText(/username/i)).toBeInTheDocument();
-      expect(screen.getByText(/configure field properties/i)).toBeInTheDocument();
-    });
-
-    it('should display loading state during initial field data fetch', () => {
-      renderWithProviders(<FieldEditPage />);
-
+      // Check initial loading state
       expect(screen.getByTestId('field-edit-loading')).toBeInTheDocument();
-      expect(screen.getByText(/loading field data/i)).toBeInTheDocument();
-    });
-
-    it('should display field breadcrumb navigation', async () => {
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('breadcrumb-navigation')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('test-service')).toBeInTheDocument();
-      expect(screen.getByText('test-table')).toBeInTheDocument();
-      expect(screen.getByText('username')).toBeInTheDocument();
-    });
-
-    it('should render field form with all essential input fields', async () => {
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
-      });
-
-      expect(screen.getByLabelText(/field label/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/field type/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/allow null/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/required/i)).toBeInTheDocument();
-    });
-
-    it('should populate form fields with existing field data', async () => {
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('username')).toBeInTheDocument();
-      });
-
-      expect(screen.getByDisplayValue('Test Field')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('string')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('50')).toBeInTheDocument();
-    });
-  });
-
-  describe('React Hook Form Integration and Validation', () => {
-    it('should display validation errors in real-time under 100ms', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
-      });
-
-      const fieldNameInput = screen.getByLabelText(/field name/i);
       
-      // Clear the field and enter invalid data
-      await user.clear(fieldNameInput);
-      await user.type(fieldNameInput, '123invalid');
+      // Verify accessibility of loading state
+      expect(screen.getByTestId('field-edit-loading')).toHaveAttribute('aria-live', 'polite');
+      expect(screen.getByTestId('field-edit-loading')).toHaveAttribute('aria-label', 'Loading field data');
 
-      // Verify real-time validation occurs quickly
-      const startTime = performance.now();
+      // Wait for data to load
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+
+      // Verify form accessibility
+      expect(screen.getByTestId('field-edit-form')).toHaveAttribute('role', 'form');
+      expect(screen.getByTestId('field-edit-form')).toHaveAttribute('aria-label', 'Edit field configuration');
       
-      await waitFor(() => {
-        expect(screen.getByText(/field name must start with a letter/i)).toBeInTheDocument();
-      });
-
-      const validationTime = performance.now() - startTime;
-      expect(validationTime).toBeLessThan(100); // Under 100ms requirement
+      // Check container has proper structure
+      expect(container.firstChild).toHaveClass('field-edit-page');
     });
 
-    it('should validate required fields and display appropriate errors', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
+    test('renders error state when field data fails to load', async () => {
+      mockParams.fieldId = 'error-field';
+      (useParams as Mock).mockReturnValue(mockParams);
 
-      await waitFor(() => {
-        expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
       });
 
-      const fieldNameInput = screen.getByLabelText(/field name/i);
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-error')).toBeInTheDocument();
+      });
+
+      // Verify error message accessibility
+      expect(screen.getByTestId('field-edit-error')).toHaveAttribute('role', 'alert');
+      expect(screen.getByTestId('field-edit-error')).toHaveAttribute('aria-live', 'assertive');
       
-      // Clear required field
-      await user.clear(fieldNameInput);
-      await user.tab(); // Trigger blur event
-
-      await waitFor(() => {
-        expect(screen.getByText(/field name is required/i)).toBeInTheDocument();
-      });
-
-      expect(screen.getByTestId('field-name-error')).toHaveClass('text-red-600');
-    });
-
-    it('should validate field length constraints based on field type', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/length/i)).toBeInTheDocument();
-      });
-
-      const lengthInput = screen.getByLabelText(/length/i);
+      // Check error message content
+      expect(screen.getByText(/failed to load field data/i)).toBeInTheDocument();
       
-      // Enter invalid length
-      await user.clear(lengthInput);
-      await user.type(lengthInput, '0');
-
-      await waitFor(() => {
-        expect(screen.getByText(/string fields must have a positive length/i)).toBeInTheDocument();
-      });
+      // Verify retry button is present and accessible
+      const retryButton = screen.getByRole('button', { name: /retry/i });
+      expect(retryButton).toBeInTheDocument();
+      expect(retryButton).not.toBeDisabled();
     });
 
-    it('should validate decimal precision and scale for numeric fields', async () => {
-      // Switch to integer field to test precision validation
-      (useParams as any).mockReturnValue({
-        service: 'test-service',
-        table: 'test-table',
-        fieldId: 'age',
+    test('renders not found state for non-existent field', async () => {
+      mockParams.fieldId = 'non-existent-field';
+      (useParams as Mock).mockReturnValue(mockParams);
+
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
       });
-
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/field type/i)).toBeInTheDocument();
-      });
-
-      // Change to decimal type
-      const typeSelect = screen.getByLabelText(/field type/i);
-      await user.selectOptions(typeSelect, 'decimal');
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/precision/i)).toBeInTheDocument();
-      });
-
-      const precisionInput = screen.getByLabelText(/precision/i);
-      await user.clear(precisionInput);
-      await user.type(precisionInput, '0');
-
-      await waitFor(() => {
-        expect(screen.getByText(/decimal fields must have a positive precision/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should validate email format for email field types', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/field type/i)).toBeInTheDocument();
-      });
-
-      // Change to email type
-      const typeSelect = screen.getByLabelText(/field type/i);
-      await user.selectOptions(typeSelect, 'email');
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/validation/i)).toBeInTheDocument();
-      });
-
-      expect(screen.getByDisplayValue(/\^.*@.*\$/)).toBeInTheDocument(); // Email regex pattern
-    });
-
-    it('should clear validation errors when valid data is entered', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
-      });
-
-      const fieldNameInput = screen.getByLabelText(/field name/i);
-      
-      // Enter invalid data first
-      await user.clear(fieldNameInput);
-      await user.type(fieldNameInput, '123invalid');
-
-      await waitFor(() => {
-        expect(screen.getByText(/field name must start with a letter/i)).toBeInTheDocument();
-      });
-
-      // Enter valid data
-      await user.clear(fieldNameInput);
-      await user.type(fieldNameInput, 'valid_field_name');
-
-      await waitFor(() => {
-        expect(screen.queryByText(/field name must start with a letter/i)).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Field Type-Specific Form Controls', () => {
-    generateFieldTypeTestData().forEach(({ fieldType, mockData, formDefaults, validationTests }) => {
-      describe(`${fieldType} field type`, () => {
-        beforeEach(() => {
-          // Mock field data for specific type
-          server.use(
-            http.get('/api/v2/test-service/_schema/test-table/test-field', () => {
-              return HttpResponse.json({
-                resource: [createMockField(mockData)],
-                meta: { count: 1 },
-              });
-            })
-          );
-          
-          (useParams as any).mockReturnValue({
-            service: 'test-service',
-            table: 'test-table',
-            fieldId: 'test-field',
-          });
-        });
-
-        it(`should display correct form controls for ${fieldType} field`, async () => {
-          renderWithProviders(<FieldEditPage />);
-
-          await waitFor(() => {
-            expect(screen.getByDisplayValue(fieldType)).toBeInTheDocument();
-          });
-
-          // Check type-specific controls are visible
-          if (fieldType === 'string' || fieldType === 'text') {
-            expect(screen.getByLabelText(/length/i)).toBeInTheDocument();
-          }
-          
-          if (fieldType === 'decimal' || fieldType === 'float') {
-            expect(screen.getByLabelText(/precision/i)).toBeInTheDocument();
-            expect(screen.getByLabelText(/scale/i)).toBeInTheDocument();
-          }
-          
-          if (fieldType === 'integer' || fieldType === 'bigint') {
-            expect(screen.getByLabelText(/auto increment/i)).toBeInTheDocument();
-          }
-        });
-
-        validationTests.forEach(({ input, expectedValid, description }) => {
-          it(`should ${expectedValid ? 'accept' : 'reject'} ${description}`, async () => {
-            const user = userEvent.setup();
-            renderWithProviders(<FieldEditPage />);
-
-            await waitFor(() => {
-              expect(screen.getByLabelText(/default value/i)).toBeInTheDocument();
-            });
-
-            const defaultValueInput = screen.getByLabelText(/default value/i);
-            await user.clear(defaultValueInput);
-            await user.type(defaultValueInput, String(input));
-
-            if (!expectedValid) {
-              await waitFor(() => {
-                expect(screen.getByTestId('default-value-error')).toBeInTheDocument();
-              });
-            } else {
-              await waitFor(() => {
-                expect(screen.queryByTestId('default-value-error')).not.toBeInTheDocument();
-              });
-            }
-          });
-        });
-      });
-    });
-
-    it('should show foreign key configuration when isForeignKey is enabled', async () => {
-      (useParams as any).mockReturnValue({
-        service: 'test-service',
-        table: 'test-table',
-        fieldId: 'user_id',
-      });
-
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/is foreign key/i)).toBeInTheDocument();
-      });
-
-      const foreignKeyToggle = screen.getByLabelText(/is foreign key/i);
-      
-      // Should already be checked for user_id field
-      expect(foreignKeyToggle).toBeChecked();
-      
-      // Foreign key configuration should be visible
-      expect(screen.getByLabelText(/reference table/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/reference field/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/on delete action/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/on update action/i)).toBeInTheDocument();
-    });
-
-    it('should hide foreign key configuration when isForeignKey is disabled', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/is foreign key/i)).toBeInTheDocument();
-      });
-
-      const foreignKeyToggle = screen.getByLabelText(/is foreign key/i);
-      
-      if (foreignKeyToggle.checked) {
-        await user.click(foreignKeyToggle);
-      }
-
-      await waitFor(() => {
-        expect(screen.queryByLabelText(/reference table/i)).not.toBeInTheDocument();
-      });
-
-      expect(screen.queryByLabelText(/reference field/i)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText(/on delete action/i)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText(/on update action/i)).not.toBeInTheDocument();
-    });
-
-    it('should show function usage configuration when dbFunction is configured', async () => {
-      (useParams as any).mockReturnValue({
-        service: 'test-service',
-        table: 'test-table',
-        fieldId: 'created_at',
-      });
-
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/database functions/i)).toBeInTheDocument();
-      });
-
-      expect(screen.getByTestId('function-usage-table')).toBeInTheDocument();
-      expect(screen.getByText('NOW()')).toBeInTheDocument();
-      expect(screen.getByText('insert')).toBeInTheDocument();
-    });
-  });
-
-  describe('Form Submission and Data Persistence', () => {
-    it('should submit form data successfully and show success message', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
-      });
-
-      const saveButton = screen.getByRole('button', { name: /save changes/i });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('success-message')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/field updated successfully/i)).toBeInTheDocument();
-    });
-
-    it('should handle server validation errors and display them in form', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
-      });
-
-      // Enter invalid field name that will trigger server error
-      const fieldNameInput = screen.getByLabelText(/field name/i);
-      await user.clear(fieldNameInput);
-      await user.type(fieldNameInput, 'invalid_field_name');
-
-      const saveButton = screen.getByRole('button', { name: /save changes/i });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/invalid field name/i)).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/field name contains invalid characters/i)).toBeInTheDocument();
-    });
-
-    it('should handle network errors gracefully', async () => {
-      (useParams as any).mockReturnValue({
-        service: 'test-service',
-        table: 'test-table',
-        fieldId: 'error_field',
-      });
-
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
-      });
-
-      const saveButton = screen.getByRole('button', { name: /save changes/i });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/internal server error/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
-    });
-
-    it('should show loading state during form submission', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
-      });
-
-      const saveButton = screen.getByRole('button', { name: /save changes/i });
-      await user.click(saveButton);
-
-      // Check for loading state immediately after click
-      expect(screen.getByTestId('form-submitting')).toBeInTheDocument();
-      expect(saveButton).toBeDisabled();
-      expect(screen.getByText(/saving changes/i)).toBeInTheDocument();
-    });
-
-    it('should prevent duplicate submissions while saving', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
-      });
-
-      const saveButton = screen.getByRole('button', { name: /save changes/i });
-      
-      // Click multiple times rapidly
-      await user.click(saveButton);
-      await user.click(saveButton);
-      await user.click(saveButton);
-
-      // Verify button is disabled and only one request is made
-      expect(saveButton).toBeDisabled();
-      
-      // Wait for submission to complete
-      await waitFor(() => {
-        expect(screen.getByTestId('success-message')).toBeInTheDocument();
-      });
-    });
-
-    it('should track form dirty state and warn about unsaved changes', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/field label/i)).toBeInTheDocument();
-      });
-
-      // Modify a field to make form dirty
-      const labelInput = screen.getByLabelText(/field label/i);
-      await user.clear(labelInput);
-      await user.type(labelInput, 'Modified Label');
-
-      // Check that form is marked as dirty
-      expect(screen.getByTestId('form-dirty-indicator')).toBeInTheDocument();
-      expect(screen.getByText(/you have unsaved changes/i)).toBeInTheDocument();
-    });
-  });
-
-  describe('Field Deletion Functionality', () => {
-    it('should show delete confirmation dialog when delete button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /delete field/i })).toBeInTheDocument();
-      });
-
-      const deleteButton = screen.getByRole('button', { name: /delete field/i });
-      await user.click(deleteButton);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('delete-confirmation-dialog')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/are you sure you want to delete/i)).toBeInTheDocument();
-      expect(screen.getByText(/this action cannot be undone/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /confirm delete/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
-    });
-
-    it('should delete field successfully and redirect to field list', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /delete field/i })).toBeInTheDocument();
-      });
-
-      const deleteButton = screen.getByRole('button', { name: /delete field/i });
-      await user.click(deleteButton);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /confirm delete/i })).toBeInTheDocument();
-      });
-
-      const confirmButton = screen.getByRole('button', { name: /confirm delete/i });
-      await user.click(confirmButton);
-
-      await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/adf-schema/fields?service=test-service&table=test-table');
-      });
-    });
-
-    it('should handle deletion errors and show appropriate message', async () => {
-      (useParams as any).mockReturnValue({
-        service: 'test-service',
-        table: 'test-table',
-        fieldId: 'protected_field',
-      });
-
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /delete field/i })).toBeInTheDocument();
-      });
-
-      const deleteButton = screen.getByRole('button', { name: /delete field/i });
-      await user.click(deleteButton);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /confirm delete/i })).toBeInTheDocument();
-      });
-
-      const confirmButton = screen.getByRole('button', { name: /confirm delete/i });
-      await user.click(confirmButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/cannot delete protected field/i)).toBeInTheDocument();
-      });
-
-      expect(screen.getByTestId('deletion-error-message')).toBeInTheDocument();
-    });
-
-    it('should cancel deletion when cancel button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /delete field/i })).toBeInTheDocument();
-      });
-
-      const deleteButton = screen.getByRole('button', { name: /delete field/i });
-      await user.click(deleteButton);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
-      });
-
-      const cancelButton = screen.getByRole('button', { name: /cancel/i });
-      await user.click(cancelButton);
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('delete-confirmation-dialog')).not.toBeInTheDocument();
-      });
-
-      // Verify no navigation occurred
-      expect(mockPush).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Navigation and Routing', () => {
-    it('should navigate back to fields list when back button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /back to fields/i })).toBeInTheDocument();
-      });
-
-      const backButton = screen.getByRole('button', { name: /back to fields/i });
-      await user.click(backButton);
-
-      expect(mockPush).toHaveBeenCalledWith('/adf-schema/fields?service=test-service&table=test-table');
-    });
-
-    it('should navigate to field creation page when duplicate button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /duplicate field/i })).toBeInTheDocument();
-      });
-
-      const duplicateButton = screen.getByRole('button', { name: /duplicate field/i });
-      await user.click(duplicateButton);
-
-      expect(mockPush).toHaveBeenCalledWith('/adf-schema/fields/new?service=test-service&table=test-table&duplicate=username');
-    });
-
-    it('should handle 404 error when field is not found', async () => {
-      (useParams as any).mockReturnValue({
-        service: 'test-service',
-        table: 'test-table',
-        fieldId: 'nonexistent_field',
-      });
-
-      renderWithProviders(<FieldEditPage />);
 
       await waitFor(() => {
         expect(screen.getByTestId('field-not-found')).toBeInTheDocument();
       });
 
+      // Verify not found message
       expect(screen.getByText(/field not found/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /back to fields/i })).toBeInTheDocument();
+      
+      // Check navigation options
+      expect(screen.getByRole('button', { name: /go back/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /view all fields/i })).toBeInTheDocument();
     });
 
-    it('should update URL parameters when navigating between fields', async () => {
-      renderWithProviders(<FieldEditPage />);
+    test('handles navigation parameters correctly', () => {
+      const customParams = {
+        service: 'custom-service',
+        table: 'custom-table',
+        fieldId: 'custom-field',
+      };
+      
+      (useParams as Mock).mockReturnValue(customParams);
 
-      await waitFor(() => {
-        expect(screen.getByText('test-service')).toBeInTheDocument();
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
       });
 
-      expect(screen.getByText('test-table')).toBeInTheDocument();
-      expect(screen.getByText('username')).toBeInTheDocument();
+      // Verify the component uses the correct parameters for API calls
+      expect(useParams).toHaveBeenCalled();
+      
+      // Check that the service and table info is displayed
+      expect(screen.getByText(new RegExp(customParams.service, 'i'))).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(customParams.table, 'i'))).toBeInTheDocument();
     });
   });
 
-  describe('React Query Caching and Data Management', () => {
-    it('should cache field data and display cache status', async () => {
-      renderWithProviders(<FieldEditPage />);
+  // =============================================================================
+  // FORM FIELD TESTING AND VALIDATION
+  // =============================================================================
 
-      await waitFor(() => {
-        expect(screen.getByTestId('field-cache-status')).toBeInTheDocument();
+  describe('Form Field Testing', () => {
+    beforeEach(async () => {
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
       });
 
-      expect(screen.getByText(/cached/i)).toBeInTheDocument();
-    });
-
-    it('should invalidate cache after successful update', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
+      // Wait for form to load
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
-      });
-
-      const saveButton = screen.getByRole('button', { name: /save changes/i });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('cache-invalidated-indicator')).toBeInTheDocument();
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
       });
     });
 
-    it('should implement optimistic updates for better user experience', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
+    test('validates required field name input', async () => {
+      const nameInput = screen.getByLabelText(/field name/i);
+      
+      // Clear the field name
+      await user.clear(nameInput);
+      await user.tab();
 
+      // Check validation error appears
       await waitFor(() => {
-        expect(screen.getByLabelText(/field label/i)).toBeInTheDocument();
+        expect(screen.getByText(/field name is required/i)).toBeInTheDocument();
       });
 
+      // Verify error message accessibility
+      const errorMessage = screen.getByText(/field name is required/i);
+      expect(errorMessage).toHaveAttribute('role', 'alert');
+      expect(nameInput).toHaveAttribute('aria-invalid', 'true');
+      expect(nameInput).toHaveAttribute('aria-describedby');
+    });
+
+    test('validates field name format and reserved words', async () => {
+      const nameInput = screen.getByLabelText(/field name/i);
+
+      // Test invalid format
+      await user.clear(nameInput);
+      await user.type(nameInput, '123invalid');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.getByText(/field name must start with a letter/i)).toBeInTheDocument();
+      });
+
+      // Test reserved word
+      await user.clear(nameInput);
+      await user.type(nameInput, 'id');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.getByText(/field name conflicts with system reserved words/i)).toBeInTheDocument();
+      });
+
+      // Test valid name
+      await user.clear(nameInput);
+      await user.type(nameInput, 'valid_field_name');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.queryByText(/field name/i)).not.toBeInTheDocument();
+      });
+    });
+
+    test('validates field label requirements', async () => {
       const labelInput = screen.getByLabelText(/field label/i);
+
+      // Test empty label
       await user.clear(labelInput);
-      await user.type(labelInput, 'Optimistically Updated Label');
-
-      const saveButton = screen.getByRole('button', { name: /save changes/i });
-      await user.click(saveButton);
-
-      // Verify optimistic update appears immediately
-      expect(screen.getByTestId('optimistic-update-active')).toBeInTheDocument();
-    });
-
-    it('should handle stale data and background refetch appropriately', async () => {
-      renderWithProviders(<FieldEditPage />);
+      await user.tab();
 
       await waitFor(() => {
-        expect(screen.getByTestId('data-freshness-indicator')).toBeInTheDocument();
+        expect(screen.getByText(/field label is required/i)).toBeInTheDocument();
       });
 
-      // Simulate stale data scenario
-      expect(screen.getByText(/data may be stale/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /refresh data/i })).toBeInTheDocument();
+      // Test label too long
+      await user.clear(labelInput);
+      await user.type(labelInput, 'a'.repeat(256));
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.getByText(/field label must be 255 characters or less/i)).toBeInTheDocument();
+      });
+
+      // Test valid label
+      await user.clear(labelInput);
+      await user.type(labelInput, 'Valid Field Label');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.queryByText(/field label/i)).not.toBeInTheDocument();
+      });
+    });
+
+    test('handles field type selection and type-specific options', async () => {
+      const typeSelect = screen.getByLabelText(/field type/i);
+
+      // Test string type selection
+      await user.selectOptions(typeSelect, 'string');
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText(/length/i)).toBeInTheDocument();
+        expect(screen.queryByLabelText(/precision/i)).not.toBeInTheDocument();
+      });
+
+      // Test decimal type selection
+      await user.selectOptions(typeSelect, 'decimal');
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText(/precision/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/scale/i)).toBeInTheDocument();
+      });
+
+      // Test reference type selection
+      await user.selectOptions(typeSelect, 'reference');
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText(/reference table/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/reference field/i)).toBeInTheDocument();
+      });
+    });
+
+    test('validates numeric constraints for length and precision', async () => {
+      const typeSelect = screen.getByLabelText(/field type/i);
+      
+      // Select decimal type to show precision/scale fields
+      await user.selectOptions(typeSelect, 'decimal');
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText(/precision/i)).toBeInTheDocument();
+      });
+
+      const precisionInput = screen.getByLabelText(/precision/i);
+      const scaleInput = screen.getByLabelText(/scale/i);
+
+      // Test invalid precision
+      await user.clear(precisionInput);
+      await user.type(precisionInput, '0');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.getByText(/precision must be at least 1/i)).toBeInTheDocument();
+      });
+
+      // Test scale greater than precision
+      await user.clear(precisionInput);
+      await user.type(precisionInput, '5');
+      await user.clear(scaleInput);
+      await user.type(scaleInput, '10');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.getByText(/scale cannot be greater than precision/i)).toBeInTheDocument();
+      });
     });
   });
 
-  describe('Error Handling and Edge Cases', () => {
-    it('should handle network connectivity issues gracefully', async () => {
-      (useParams as any).mockReturnValue({
-        service: 'network-error',
-        table: 'test-table',
-        fieldId: 'test-field',
-      });
+  // =============================================================================
+  // COMPREHENSIVE FIELD TYPE TESTING
+  // =============================================================================
 
-      renderWithProviders(<FieldEditPage />);
+  describe('All Field Types Testing', () => {
+    beforeEach(async () => {
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
 
       await waitFor(() => {
-        expect(screen.getByTestId('network-error-message')).toBeInTheDocument();
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
       });
-
-      expect(screen.getByText(/network error/i)).toBeInTheDocument();
-      expect(screen.getByText(/check your connection/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
     });
 
-    it('should provide retry functionality after errors', async () => {
-      (useParams as any).mockReturnValue({
-        service: 'error-service',
-        table: 'error-table',
-        fieldId: 'error-field',
+    test.each(allFieldTypes)('handles %s field type configuration', async (fieldType) => {
+      const typeSelect = screen.getByLabelText(/field type/i);
+      
+      await user.selectOptions(typeSelect, fieldType);
+      
+      // Wait for type-specific fields to appear
+      await waitFor(() => {
+        expect(typeSelect).toHaveValue(fieldType);
       });
 
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
+      // Verify type-specific fields are shown/hidden correctly
+      switch (fieldType) {
+        case 'string':
+        case 'text':
+          expect(screen.getByLabelText(/length/i)).toBeInTheDocument();
+          expect(screen.queryByLabelText(/precision/i)).not.toBeInTheDocument();
+          break;
+          
+        case 'decimal':
+        case 'float':
+        case 'double':
+          expect(screen.getByLabelText(/precision/i)).toBeInTheDocument();
+          if (fieldType === 'decimal') {
+            expect(screen.getByLabelText(/scale/i)).toBeInTheDocument();
+          }
+          break;
+          
+        case 'reference':
+          expect(screen.getByLabelText(/reference table/i)).toBeInTheDocument();
+          expect(screen.getByLabelText(/reference field/i)).toBeInTheDocument();
+          break;
+          
+        case 'id':
+          expect(screen.getByLabelText(/auto increment/i)).toBeChecked();
+          expect(screen.getByLabelText(/primary key/i)).toBeChecked();
+          break;
+          
+        case 'timestamp_on_create':
+        case 'timestamp_on_update':
+          expect(screen.queryByLabelText(/default value/i)).not.toBeInTheDocument();
+          break;
+      }
+
+      // Verify accessibility attributes
+      expect(typeSelect).toHaveAttribute('aria-label');
+      expect(typeSelect).not.toHaveAttribute('aria-invalid');
+    });
+
+    test('validates field type constraints and compatibility', async () => {
+      const typeSelect = screen.getByLabelText(/field type/i);
+      const primaryKeyCheckbox = screen.getByLabelText(/primary key/i);
+      const allowNullCheckbox = screen.getByLabelText(/allow null/i);
+
+      // Test primary key constraint
+      await user.check(primaryKeyCheckbox);
+      
+      await waitFor(() => {
+        expect(allowNullCheckbox).not.toBeChecked();
+        expect(allowNullCheckbox).toBeDisabled();
+      });
+
+      // Test auto-increment with non-numeric type
+      await user.selectOptions(typeSelect, 'string');
+      const autoIncrementCheckbox = screen.getByLabelText(/auto increment/i);
+      
+      await user.check(autoIncrementCheckbox);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/auto increment is only available for numeric types/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  // =============================================================================
+  // FOREIGN KEY AND RELATIONSHIP TESTING
+  // =============================================================================
+
+  describe('Foreign Key Configuration', () => {
+    beforeEach(async () => {
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
 
       await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
       });
 
-      const retryButton = screen.getByRole('button', { name: /retry/i });
-      await user.click(retryButton);
-
-      expect(screen.getByTestId('field-edit-loading')).toBeInTheDocument();
+      // Set up foreign key field
+      const typeSelect = screen.getByLabelText(/field type/i);
+      await user.selectOptions(typeSelect, 'reference');
+      
+      const foreignKeyCheckbox = screen.getByLabelText(/foreign key/i);
+      await user.check(foreignKeyCheckbox);
     });
 
-    it('should handle concurrent modification conflicts', async () => {
-      // Mock concurrent modification scenario
+    test('loads and displays available reference tables', async () => {
+      await waitFor(() => {
+        expect(screen.getByLabelText(/reference table/i)).toBeInTheDocument();
+      });
+
+      const tableSelect = screen.getByLabelText(/reference table/i);
+      
+      // Verify tables are loaded
+      await waitFor(() => {
+        expect(screen.getByRole('option', { name: /users/i })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: /roles/i })).toBeInTheDocument();
+      });
+    });
+
+    test('loads reference fields when table is selected', async () => {
+      const tableSelect = screen.getByLabelText(/reference table/i);
+      
+      await user.selectOptions(tableSelect, 'users');
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText(/reference field/i)).toBeInTheDocument();
+      });
+
+      const fieldSelect = screen.getByLabelText(/reference field/i);
+      
+      // Verify fields are loaded for selected table
+      await waitFor(() => {
+        expect(screen.getByRole('option', { name: /id/i })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: /email/i })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: /name/i })).toBeInTheDocument();
+      });
+    });
+
+    test.each(allReferentialActions)('handles %s referential action', async (action) => {
+      const onDeleteSelect = screen.getByLabelText(/on delete action/i);
+      const onUpdateSelect = screen.getByLabelText(/on update action/i);
+
+      await user.selectOptions(onDeleteSelect, action);
+      await user.selectOptions(onUpdateSelect, action);
+
+      expect(onDeleteSelect).toHaveValue(action);
+      expect(onUpdateSelect).toHaveValue(action);
+
+      // Verify help text is updated for the selected action
+      await waitFor(() => {
+        const helpText = screen.getByText(new RegExp(action, 'i'));
+        expect(helpText).toBeInTheDocument();
+      });
+    });
+
+    test('validates foreign key configuration requirements', async () => {
+      const tableSelect = screen.getByLabelText(/reference table/i);
+      const fieldSelect = screen.getByLabelText(/reference field/i);
+
+      // Try to submit without selecting table
+      const submitButton = screen.getByRole('button', { name: /save field/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/reference table must be specified/i)).toBeInTheDocument();
+      });
+
+      // Select table but not field
+      await user.selectOptions(tableSelect, 'users');
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/reference field must be specified/i)).toBeInTheDocument();
+      });
+
+      // Complete configuration
+      await user.selectOptions(fieldSelect, 'id');
+      
+      // Should no longer show validation errors
+      await waitFor(() => {
+        expect(screen.queryByText(/reference table must be specified/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/reference field must be specified/i)).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // =============================================================================
+  // DATABASE FUNCTION TESTING
+  // =============================================================================
+
+  describe('Database Function Configuration', () => {
+    beforeEach(async () => {
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+
+      // Enable database functions
+      const enableFunctionsCheckbox = screen.getByLabelText(/enable database functions/i);
+      await user.check(enableFunctionsCheckbox);
+    });
+
+    test('adds and removes database function configurations', async () => {
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /add function/i })).toBeInTheDocument();
+      });
+
+      const addButton = screen.getByRole('button', { name: /add function/i });
+      
+      // Add first function
+      await user.click(addButton);
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText(/function expression/i)).toBeInTheDocument();
+      });
+
+      // Add second function
+      await user.click(addButton);
+      
+      await waitFor(() => {
+        expect(screen.getAllByLabelText(/function expression/i)).toHaveLength(2);
+      });
+
+      // Remove first function
+      const removeButtons = screen.getAllByRole('button', { name: /remove function/i });
+      await user.click(removeButtons[0]);
+      
+      await waitFor(() => {
+        expect(screen.getAllByLabelText(/function expression/i)).toHaveLength(1);
+      });
+    });
+
+    test.each(allFunctionUseOperations)('configures %s function operation', async (operation) => {
+      const addButton = screen.getByRole('button', { name: /add function/i });
+      await user.click(addButton);
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText(/function expression/i)).toBeInTheDocument();
+      });
+
+      const operationCheckbox = screen.getByLabelText(new RegExp(operation, 'i'));
+      await user.check(operationCheckbox);
+
+      expect(operationCheckbox).toBeChecked();
+
+      // Verify help text for operation
+      const helpText = screen.getByText(new RegExp(`apply function during ${operation.toLowerCase()}`, 'i'));
+      expect(helpText).toBeInTheDocument();
+    });
+
+    test('validates function expression syntax', async () => {
+      const addButton = screen.getByRole('button', { name: /add function/i });
+      await user.click(addButton);
+      
+      await waitFor(() => {
+        expect(screen.getByLabelText(/function expression/i)).toBeInTheDocument();
+      });
+
+      const functionInput = screen.getByLabelText(/function expression/i);
+      
+      // Test empty function
+      await user.tab();
+      
+      await waitFor(() => {
+        expect(screen.getByText(/function expression is required/i)).toBeInTheDocument();
+      });
+
+      // Test valid function
+      await user.type(functionInput, 'UPPER({field})');
+      await user.tab();
+      
+      await waitFor(() => {
+        expect(screen.queryByText(/function expression is required/i)).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // =============================================================================
+  // VALIDATION AND PICKLIST TESTING
+  // =============================================================================
+
+  describe('Validation and Picklist Configuration', () => {
+    beforeEach(async () => {
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+    });
+
+    test('configures field validation rules', async () => {
+      const enableValidationCheckbox = screen.getByLabelText(/enable validation/i);
+      await user.check(enableValidationCheckbox);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/minimum length/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/maximum length/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/pattern/i)).toBeInTheDocument();
+      });
+
+      // Configure string validation
+      const minLengthInput = screen.getByLabelText(/minimum length/i);
+      const maxLengthInput = screen.getByLabelText(/maximum length/i);
+      const patternInput = screen.getByLabelText(/pattern/i);
+
+      await user.type(minLengthInput, '5');
+      await user.type(maxLengthInput, '50');
+      await user.type(patternInput, '^[A-Za-z]+$');
+
+      expect(minLengthInput).toHaveValue(5);
+      expect(maxLengthInput).toHaveValue(50);
+      expect(patternInput).toHaveValue('^[A-Za-z]+$');
+    });
+
+    test('validates validation rule constraints', async () => {
+      const enableValidationCheckbox = screen.getByLabelText(/enable validation/i);
+      await user.check(enableValidationCheckbox);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/minimum length/i)).toBeInTheDocument();
+      });
+
+      const minLengthInput = screen.getByLabelText(/minimum length/i);
+      const maxLengthInput = screen.getByLabelText(/maximum length/i);
+
+      // Test max length less than min length
+      await user.type(minLengthInput, '50');
+      await user.type(maxLengthInput, '10');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.getByText(/maximum length must be greater than or equal to minimum length/i)).toBeInTheDocument();
+      });
+    });
+
+    test('configures picklist values', async () => {
+      const enablePicklistCheckbox = screen.getByLabelText(/enable picklist/i);
+      await user.check(enablePicklistCheckbox);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/picklist type/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/picklist values/i)).toBeInTheDocument();
+      });
+
+      // Test CSV format
+      const typeSelect = screen.getByLabelText(/picklist type/i);
+      await user.selectOptions(typeSelect, 'csv');
+
+      const valuesInput = screen.getByLabelText(/picklist values/i);
+      await user.type(valuesInput, 'Option 1,Option 2,Option 3');
+
+      expect(valuesInput).toHaveValue('Option 1,Option 2,Option 3');
+
+      // Test JSON format
+      await user.selectOptions(typeSelect, 'json');
+      await user.clear(valuesInput);
+      await user.type(valuesInput, '["Option 1","Option 2","Option 3"]');
+
+      expect(valuesInput).toHaveValue('["Option 1","Option 2","Option 3"]');
+    });
+
+    test('validates picklist value format', async () => {
+      const enablePicklistCheckbox = screen.getByLabelText(/enable picklist/i);
+      await user.check(enablePicklistCheckbox);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/picklist values/i)).toBeInTheDocument();
+      });
+
+      const typeSelect = screen.getByLabelText(/picklist type/i);
+      const valuesInput = screen.getByLabelText(/picklist values/i);
+
+      // Test invalid JSON format
+      await user.selectOptions(typeSelect, 'json');
+      await user.type(valuesInput, 'invalid json');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.getByText(/invalid json format/i)).toBeInTheDocument();
+      });
+
+      // Test valid JSON format
+      await user.clear(valuesInput);
+      await user.type(valuesInput, '["valid","json"]');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.queryByText(/invalid json format/i)).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // =============================================================================
+  // FORM SUBMISSION AND ERROR HANDLING
+  // =============================================================================
+
+  describe('Form Submission and Error Handling', () => {
+    beforeEach(async () => {
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+    });
+
+    test('submits valid field configuration successfully', async () => {
+      // Fill out form with valid data
+      const nameInput = screen.getByLabelText(/field name/i);
+      const labelInput = screen.getByLabelText(/field label/i);
+      const descriptionInput = screen.getByLabelText(/description/i);
+
+      await user.clear(nameInput);
+      await user.type(nameInput, 'new_field_name');
+      await user.clear(labelInput);
+      await user.type(labelInput, 'New Field Label');
+      await user.type(descriptionInput, 'Field description');
+
+      // Submit form
+      const submitButton = screen.getByRole('button', { name: /save field/i });
+      await user.click(submitButton);
+
+      // Check loading state
+      await waitFor(() => {
+        expect(submitButton).toBeDisabled();
+        expect(screen.getByText(/saving/i)).toBeInTheDocument();
+      });
+
+      // Check success state
+      await waitFor(() => {
+        expect(screen.getByText(/field saved successfully/i)).toBeInTheDocument();
+      });
+
+      // Verify navigation back to field list
+      expect(mockRouter.push).toHaveBeenCalledWith('/adf-schema/fields');
+    });
+
+    test('handles validation errors from server', async () => {
+      mockParams.fieldId = 'validation-error-field';
+      (useParams as Mock).mockReturnValue(mockParams);
+
+      // Submit form to trigger validation error
+      const submitButton = screen.getByRole('button', { name: /save field/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/validation failed/i)).toBeInTheDocument();
+        expect(screen.getByText(/field name must be unique/i)).toBeInTheDocument();
+        expect(screen.getByText(/length must be greater than 0/i)).toBeInTheDocument();
+      });
+
+      // Verify form fields show error states
+      const nameInput = screen.getByLabelText(/field name/i);
+      const lengthInput = screen.getByLabelText(/length/i);
+
+      expect(nameInput).toHaveAttribute('aria-invalid', 'true');
+      expect(lengthInput).toHaveAttribute('aria-invalid', 'true');
+    });
+
+    test('handles server errors gracefully', async () => {
+      mockParams.fieldId = 'readonly-field';
+      (useParams as Mock).mockReturnValue(mockParams);
+
+      const submitButton = screen.getByRole('button', { name: /save field/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/field is read-only and cannot be modified/i)).toBeInTheDocument();
+      });
+
+      // Verify error alert accessibility
+      const errorAlert = screen.getByRole('alert');
+      expect(errorAlert).toBeInTheDocument();
+      expect(errorAlert).toHaveAttribute('aria-live', 'assertive');
+    });
+
+    test('prevents submission when form is invalid', async () => {
+      const nameInput = screen.getByLabelText(/field name/i);
+      
+      // Clear required field
+      await user.clear(nameInput);
+      
+      const submitButton = screen.getByRole('button', { name: /save field/i });
+      await user.click(submitButton);
+
+      // Button should remain enabled (not submit)
+      expect(submitButton).not.toBeDisabled();
+      
+      // Should show validation error
+      await waitFor(() => {
+        expect(screen.getByText(/field name is required/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  // =============================================================================
+  // PERFORMANCE AND OPTIMIZATION TESTING
+  // =============================================================================
+
+  describe('Performance and Optimization', () => {
+    test('form validation completes within performance requirements', async () => {
+      const performanceTest = measureTestPerformance('form-validation', async () => {
+        renderWithQuery(<FieldEditPage />, {
+          queryClient,
+          providerOptions: {
+            router: mockRouter,
+          },
+        });
+
+        await waitFor(() => {
+          expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+        });
+
+        const nameInput = screen.getByLabelText(/field name/i);
+        
+        // Trigger validation
+        const startTime = performance.now();
+        await user.type(nameInput, 'test_field');
+        await user.tab();
+        const endTime = performance.now();
+
+        // Validation should complete within 100ms
+        expect(endTime - startTime).toBeLessThan(100);
+      });
+
+      const duration = await performanceTest();
+      expect(duration).toBeLessThan(1000); // Overall test should complete in under 1 second
+    });
+
+    test('handles large schema data efficiently', async () => {
+      // Mock large schema response
       server.use(
-        http.patch('/api/v2/test-service/_schema/test-table/username', () => {
-          return HttpResponse.json(
-            {
-              error: {
-                code: 409,
-                message: 'Conflict: Field was modified by another user',
-                details: { version: 'outdated' },
-              },
-            },
-            { status: 409 }
+        rest.get('/api/v2/:service/_schema', (req, res, ctx) => {
+          const largeTables = Array.from({ length: 100 }, (_, i) => ({
+            name: `table_${i}`,
+            label: `Table ${i}`,
+            access: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+            field: Array.from({ length: 50 }, (_, j) => 
+              createMockFieldData({ 
+                name: `field_${j}`, 
+                type: 'string',
+                label: `Field ${j}`
+              })
+            )
+          }));
+
+          return res(
+            ctx.status(200),
+            ctx.json({ resource: largeTables })
           );
         })
       );
 
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
-      });
-
-      const saveButton = screen.getByRole('button', { name: /save changes/i });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('conflict-resolution-dialog')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/field was modified by another user/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /reload latest version/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /overwrite changes/i })).toBeInTheDocument();
-    });
-  });
-
-  describe('Accessibility and User Experience', () => {
-    it('should have proper ARIA labels and semantic structure', async () => {
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('main')).toBeInTheDocument();
-      });
-
-      expect(screen.getByRole('form')).toHaveAttribute('aria-label', 'Edit field form');
-      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
-      
-      // Check form fieldsets have proper labels
-      expect(screen.getByRole('group', { name: /basic properties/i })).toBeInTheDocument();
-      expect(screen.getByRole('group', { name: /constraints/i })).toBeInTheDocument();
-      expect(screen.getByRole('group', { name: /advanced options/i })).toBeInTheDocument();
-    });
-
-    it('should support keyboard navigation throughout the form', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
-      });
-
-      // Test tab navigation through form fields
-      await user.tab();
-      expect(screen.getByLabelText(/field name/i)).toHaveFocus();
-
-      await user.tab();
-      expect(screen.getByLabelText(/field label/i)).toHaveFocus();
-
-      await user.tab();
-      expect(screen.getByLabelText(/field type/i)).toHaveFocus();
-
-      await user.tab();
-      expect(screen.getByLabelText(/description/i)).toHaveFocus();
-    });
-
-    it('should announce form validation errors to screen readers', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
-      });
-
-      const fieldNameInput = screen.getByLabelText(/field name/i);
-      await user.clear(fieldNameInput);
-      await user.tab();
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument();
-      });
-
-      expect(screen.getByRole('alert')).toHaveTextContent(/field name is required/i);
-    });
-
-    it('should provide clear focus indicators for all interactive elements', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
-      });
-
-      const saveButton = screen.getByRole('button', { name: /save changes/i });
-      saveButton.focus();
-
-      expect(saveButton).toHaveClass('focus:ring-2', 'focus:ring-blue-500');
-    });
-
-    it('should maintain focus context during dynamic content changes', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/is foreign key/i)).toBeInTheDocument();
-      });
-
-      const foreignKeyToggle = screen.getByLabelText(/is foreign key/i);
-      await user.click(foreignKeyToggle);
-
-      // Check that focus moves to the newly revealed reference table field
-      await waitFor(() => {
-        expect(screen.getByLabelText(/reference table/i)).toHaveFocus();
-      });
-    });
-  });
-
-  describe('Performance and Optimization', () => {
-    it('should render form within performance requirements', async () => {
       const startTime = performance.now();
       
-      renderWithProviders(<FieldEditPage />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
       });
 
-      const renderTime = performance.now() - startTime;
-      expect(renderTime).toBeLessThan(100); // Initial render under 100ms
-    });
-
-    it('should implement debounced validation to reduce API calls', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldEditPage />);
-
       await waitFor(() => {
-        expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
       });
 
-      const fieldNameInput = screen.getByLabelText(/field name/i);
+      // Enable foreign key to trigger schema loading
+      const typeSelect = screen.getByLabelText(/field type/i);
+      await user.selectOptions(typeSelect, 'reference');
       
-      // Type rapidly to test debouncing
-      await user.type(fieldNameInput, 'rapid_typing_test');
-
-      // Verify debounced validation indicator
-      await waitFor(() => {
-        expect(screen.getByTestId('validation-debounce-indicator')).toHaveTextContent(/debounced/i);
-      });
-    });
-
-    it('should use React.memo for expensive form sections', async () => {
-      renderWithProviders(<FieldEditPage />);
+      const foreignKeyCheckbox = screen.getByLabelText(/foreign key/i);
+      await user.check(foreignKeyCheckbox);
 
       await waitFor(() => {
-        expect(screen.getByTestId('memoized-form-section')).toBeInTheDocument();
+        expect(screen.getByLabelText(/reference table/i)).toBeInTheDocument();
       });
 
-      // Verify component render count optimization
-      expect(screen.getByTestId('form-section-render-count')).toHaveTextContent('1');
-    });
-
-    it('should lazy load complex form components for better initial load', async () => {
-      renderWithProviders(<FieldEditPage />);
-
-      // Check that complex components are lazy loaded
-      expect(screen.getByTestId('function-usage-lazy-loading')).toBeInTheDocument();
+      const endTime = performance.now();
       
-      await waitFor(() => {
-        expect(screen.getByTestId('function-usage-loaded')).toBeInTheDocument();
+      // Should handle large data sets efficiently
+      expect(endTime - startTime).toBeLessThan(3000);
+    });
+
+    test('optimizes React Query cache usage', async () => {
+      // Pre-populate cache
+      queryClient.setQueryData(['field', 'test-db', 'test-table', 'test-field-id'], 
+        createMockFieldData({ name: 'cached_field' })
+      );
+
+      const startTime = performance.now();
+
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
       });
+
+      // Should load immediately from cache
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+
+      const endTime = performance.now();
+      
+      // Cache hit should be very fast
+      expect(endTime - startTime).toBeLessThan(100);
+    });
+  });
+
+  // =============================================================================
+  // ACCESSIBILITY TESTING
+  // =============================================================================
+
+  describe('Accessibility Compliance', () => {
+    beforeEach(async () => {
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+    });
+
+    test('meets WCAG 2.1 AA compliance requirements', async () => {
+      const form = screen.getByTestId('field-edit-form');
+      
+      // Test basic accessibility requirements
+      expect(accessibilityUtils.hasAriaLabel(form)).toBe(true);
+      expect(accessibilityUtils.isKeyboardAccessible(form)).toBe(true);
+      
+      // Test all form fields have proper labels
+      const inputs = form.querySelectorAll('input, select, textarea');
+      inputs.forEach(input => {
+        expect(accessibilityUtils.hasAriaLabel(input as HTMLElement)).toBe(true);
+      });
+    });
+
+    test('supports keyboard navigation throughout form', async () => {
+      const form = screen.getByTestId('field-edit-form');
+      
+      const navigationResult = await accessibilityUtils.testKeyboardNavigation(form, user);
+      
+      expect(navigationResult.success).toBe(true);
+      expect(navigationResult.focusedElements.length).toBeGreaterThan(0);
+      
+      // Verify tab order is logical
+      const focusableElements = accessibilityUtils.getFocusableElements(form);
+      expect(focusableElements.length).toBeGreaterThan(5); // Should have multiple focusable elements
+    });
+
+    test('provides proper error announcements for screen readers', async () => {
+      const nameInput = screen.getByLabelText(/field name/i);
+      
+      // Trigger validation error
+      await user.clear(nameInput);
+      await user.tab();
+
+      await waitFor(() => {
+        const errorMessage = screen.getByText(/field name is required/i);
+        expect(errorMessage).toHaveAttribute('role', 'alert');
+        expect(errorMessage).toHaveAttribute('aria-live', 'assertive');
+      });
+
+      // Verify input has aria-invalid
+      expect(nameInput).toHaveAttribute('aria-invalid', 'true');
+      expect(nameInput).toHaveAttribute('aria-describedby');
+    });
+
+    test('maintains focus management in dynamic content', async () => {
+      const enableFunctionsCheckbox = screen.getByLabelText(/enable database functions/i);
+      await user.check(enableFunctionsCheckbox);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /add function/i })).toBeInTheDocument();
+      });
+
+      const addButton = screen.getByRole('button', { name: /add function/i });
+      await user.click(addButton);
+
+      await waitFor(() => {
+        const functionInput = screen.getByLabelText(/function expression/i);
+        expect(functionInput).toBeInTheDocument();
+        
+        // Focus should be managed properly
+        expect(document.activeElement).toBe(functionInput);
+      });
+    });
+
+    test('provides sufficient color contrast and text sizing', async () => {
+      const form = screen.getByTestId('field-edit-form');
+      const allElements = form.querySelectorAll('*');
+      
+      // Test color contrast for text elements
+      Array.from(allElements).forEach(element => {
+        if (element.textContent && element.textContent.trim()) {
+          expect(accessibilityUtils.hasAdequateContrast(element as HTMLElement)).toBe(true);
+        }
+      });
+    });
+  });
+
+  // =============================================================================
+  // NAVIGATION AND ROUTING TESTING
+  // =============================================================================
+
+  describe('Navigation and Routing', () => {
+    test('navigates back to field list on cancel', async () => {
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+
+      const cancelButton = screen.getByRole('button', { name: /cancel/i });
+      await user.click(cancelButton);
+
+      expect(mockRouter.back).toHaveBeenCalled();
+    });
+
+    test('shows unsaved changes warning on navigation', async () => {
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+
+      // Make changes to form
+      const nameInput = screen.getByLabelText(/field name/i);
+      await user.type(nameInput, '_modified');
+
+      // Try to navigate away
+      const cancelButton = screen.getByRole('button', { name: /cancel/i });
+      await user.click(cancelButton);
+
+      // Should show confirmation dialog
+      await waitFor(() => {
+        expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /discard changes/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /continue editing/i })).toBeInTheDocument();
+      });
+    });
+
+    test('handles invalid field ID parameter', async () => {
+      mockParams.fieldId = '';
+      (useParams as Mock).mockReturnValue(mockParams);
+
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/invalid field identifier/i)).toBeInTheDocument();
+      });
+    });
+
+    test('updates URL when field name changes', async () => {
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+
+      const nameInput = screen.getByLabelText(/field name/i);
+      await user.clear(nameInput);
+      await user.type(nameInput, 'new_field_name');
+
+      // Submit to save
+      const submitButton = screen.getByRole('button', { name: /save field/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(mockRouter.replace).toHaveBeenCalledWith(
+          expect.stringContaining('new_field_name')
+        );
+      });
+    });
+  });
+
+  // =============================================================================
+  // REACT QUERY INTEGRATION TESTING
+  // =============================================================================
+
+  describe('React Query Integration', () => {
+    test('invalidates related queries on successful update', async () => {
+      const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+
+      // Submit form
+      const submitButton = screen.getByRole('button', { name: /save field/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/field saved successfully/i)).toBeInTheDocument();
+      });
+
+      // Verify cache invalidation
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: ['fields', 'test-db', 'test-table']
+      });
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: ['schema', 'test-db', 'test-table']
+      });
+    });
+
+    test('handles optimistic updates correctly', async () => {
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+
+      const labelInput = screen.getByLabelText(/field label/i);
+      await user.clear(labelInput);
+      await user.type(labelInput, 'Updated Label');
+
+      // Check optimistic update in cache
+      const cachedData = queryClient.getQueryData(['field', 'test-db', 'test-table', 'test-field-id']);
+      expect(cachedData).toBeDefined();
+    });
+
+    test('shows stale data indicator when appropriate', async () => {
+      // Set stale time to 0 to force stale state
+      queryClient.setQueryDefaults(['field'], { staleTime: 0 });
+
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+
+      // Wait for data to become stale
+      await waitFor(() => {
+        expect(screen.getByTestId('stale-data-indicator')).toBeInTheDocument();
+      });
+    });
+  });
+
+  // =============================================================================
+  // ERROR BOUNDARY TESTING
+  // =============================================================================
+
+  describe('Error Boundary Testing', () => {
+    test('catches and displays field loading errors', async () => {
+      // Mock console.error to prevent test noise
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Force an error by using invalid service
+      mockParams.service = 'error-service';
+      (useParams as Mock).mockReturnValue(mockParams);
+
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
+      });
+
+      // Verify error boundary UI
+      expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /go back/i })).toBeInTheDocument();
+
+      consoleSpy.mockRestore();
+    });
+
+    test('recovers from errors when retry is clicked', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Start with error
+      mockParams.service = 'error-service';
+      (useParams as Mock).mockReturnValue(mockParams);
+
+      renderWithQuery(<FieldEditPage />, {
+        queryClient,
+        providerOptions: {
+          router: mockRouter,
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
+      });
+
+      // Fix the error condition
+      mockParams.service = 'test-db';
+      (useParams as Mock).mockReturnValue(mockParams);
+
+      // Click retry
+      const retryButton = screen.getByRole('button', { name: /try again/i });
+      await user.click(retryButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('field-edit-form')).toBeInTheDocument();
+      });
+
+      consoleSpy.mockRestore();
     });
   });
 });
