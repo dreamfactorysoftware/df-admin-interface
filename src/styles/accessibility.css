@@ -1,146 +1,55 @@
-/**
- * Accessibility Stylesheet - WCAG 2.1 AA Compliance
+/*
+ * DreamFactory Admin Interface - Accessibility Stylesheet
+ * WCAG 2.1 AA Compliance Implementation
  * 
- * This stylesheet implements comprehensive accessibility features for the DreamFactory Admin Interface,
- * ensuring WCAG 2.1 AA compliance across all components and interactions.
- * 
- * Features:
- * - Focus management with keyboard navigation support
- * - Screen reader utilities and live regions
- * - Skip link implementation for improved navigation
- * - High contrast mode and reduced motion support
+ * This stylesheet implements comprehensive accessibility features including:
+ * - Focus management with minimum 2px width and 3:1 contrast ratio
+ * - Screen reader support and assistive technology optimization
  * - Touch target accessibility with minimum 44x44px interactive areas
- * - Enhanced keyboard navigation patterns
+ * - High contrast mode and reduced motion preference support
+ * - Skip link implementation for improved navigation accessibility
+ * - Keyboard navigation enhancements with proper focus ordering
  */
 
-/* =============================================================================
-   FOCUS MANAGEMENT SYSTEM - WCAG 2.1 AA Compliant
-   ============================================================================= */
+/* ==========================================================================
+   SCREEN READER AND ASSISTIVE TECHNOLOGY UTILITIES
+   ========================================================================== */
 
 /**
- * Primary focus ring system with 3:1 contrast minimum for UI components
- * Implements focus-visible to show focus only during keyboard navigation
- */
-.focus-accessible:focus-visible {
-  outline: 2px solid #4f46e5; /* 7.14:1 contrast vs white, 3.2:1 vs light backgrounds */
-  outline-offset: 2px;
-  border-radius: 0.375rem;
-  transition: outline-color 0.15s ease-in-out;
-}
-
-.focus-accessible:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* Focus ring variants for different component states */
-.focus-error:focus-visible {
-  outline: 2px solid #dc2626; /* 5.25:1 contrast vs white */
-  outline-offset: 2px;
-}
-
-.focus-success:focus-visible {
-  outline: 2px solid #16a34a; /* 4.89:1 contrast vs white */
-  outline-offset: 2px;
-}
-
-.focus-warning:focus-visible {
-  outline: 2px solid #d97706; /* 4.68:1 contrast vs white */
-  outline-offset: 2px;
-}
-
-/* Enhanced focus ring for critical actions */
-.focus-thick:focus-visible {
-  outline: 3px solid #4f46e5;
-  outline-offset: 2px;
-}
-
-/* Focus within containers for complex components */
-.focus-within-highlight:focus-within {
-  box-shadow: 0 0 0 2px #4f46e5;
-  border-radius: 0.5rem;
-}
-
-/* =============================================================================
-   SKIP LINKS FOR SCREEN READER NAVIGATION
-   ============================================================================= */
-
-/**
- * Skip link implementation per WCAG guidelines
- * Provides keyboard users quick access to main content areas
- */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 6px;
-  background: #4f46e5;
-  color: white;
-  padding: 8px 12px;
-  text-decoration: none;
-  border-radius: 0.375rem;
-  font-weight: 600;
-  font-size: 0.875rem;
-  z-index: 1000;
-  transition: top 0.2s ease-in-out;
-  border: 2px solid transparent;
-}
-
-.skip-link:focus {
-  top: 6px;
-  outline: 2px solid #1e40af;
-  outline-offset: 2px;
-}
-
-.skip-link:hover {
-  background: #3730a3;
-  text-decoration: underline;
-}
-
-/* Skip link container */
-.skip-links {
-  position: relative;
-  z-index: 1000;
-}
-
-/* Multiple skip links support */
-.skip-link + .skip-link {
-  left: 120px; /* Offset for multiple skip links */
-}
-
-/* =============================================================================
-   SCREEN READER UTILITIES
-   ============================================================================= */
-
-/**
- * Screen reader only content - visually hidden but accessible to AT
- * Implements the sr-only pattern for accessibility
+ * Screen reader only content - visually hidden but accessible to screen readers
+ * Follows modern best practices for accessibility hiding techniques
  */
 .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
-/* Focusable sr-only content (for skip links, etc.) */
+/**
+ * Screen reader only content that becomes visible when focused
+ * Useful for skip links and focus-revealed content
+ */
 .sr-only-focusable:focus {
-  position: static;
-  width: auto;
-  height: auto;
-  padding: inherit;
-  margin: inherit;
-  overflow: visible;
-  clip: auto;
-  white-space: normal;
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: inherit !important;
+  margin: inherit !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+  border: inherit !important;
 }
 
 /**
  * Live regions for dynamic content announcements
- * Used for status updates, error messages, and loading states
+ * Ensures screen readers announce content changes appropriately
  */
 .live-region-polite {
   position: absolute;
@@ -158,289 +67,237 @@
   overflow: hidden;
 }
 
-/* Enhanced live region for important announcements */
-.live-region-status {
-  position: absolute;
-  left: -10000px;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-}
-
-/* =============================================================================
-   TOUCH TARGET ACCESSIBILITY - WCAG 2.1 AA Minimum 44x44px
-   ============================================================================= */
+/* ==========================================================================
+   SKIP LINK IMPLEMENTATION
+   ========================================================================== */
 
 /**
- * Minimum touch target sizes for mobile accessibility
- * Ensures all interactive elements meet 44x44px requirement
+ * Skip link for keyboard navigation - WCAG 2.1 AA requirement
+ * Allows users to bypass repetitive navigation content
+ * Minimum 3:1 contrast ratio with 4.5:1 for enhanced accessibility
+ */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background-color: #4f46e5; /* Primary-600: 7.14:1 contrast vs white */
+  color: #ffffff;
+  padding: 8px 16px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.25rem;
+  border-radius: 0.375rem; /* 6px */
+  z-index: 9999;
+  border: 2px solid transparent;
+  transition: all 0.2s ease-in-out;
+  white-space: nowrap;
+}
+
+.skip-link:focus {
+  top: 6px;
+  outline: 2px solid #fbbf24; /* Warning-400: High contrast outline */
+  outline-offset: 2px;
+}
+
+.skip-link:hover {
+  background-color: #4338ca; /* Primary-700: Enhanced contrast */
+  transform: translateY(1px);
+}
+
+.skip-link:active {
+  background-color: #3730a3; /* Primary-800: Active state */
+  transform: translateY(2px);
+}
+
+/* Multiple skip links container */
+.skip-links {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+}
+
+.skip-links .skip-link + .skip-link {
+  left: calc(6px + 120px); /* Offset additional skip links */
+}
+
+/* ==========================================================================
+   FOCUS MANAGEMENT SYSTEM
+   ========================================================================== */
+
+/**
+ * Base focus styles for all interactive elements
+ * Implements WCAG 2.1 AA focus indicator requirements
+ * Minimum 2px width with 3:1 contrast ratio for UI components
+ */
+.focus-ring {
+  outline: 2px solid #4f46e5; /* Primary-600: 7.14:1 contrast vs white */
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+/**
+ * Enhanced focus indicators for form elements
+ * Provides stronger visual feedback for critical interactive elements
+ */
+.focus-ring-enhanced {
+  outline: 3px solid #4f46e5;
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+}
+
+/**
+ * Error state focus indicators
+ * Used for form validation and error highlighting
+ */
+.focus-ring-error {
+  outline: 2px solid #dc2626; /* Error-600: 5.25:1 contrast vs white */
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+/**
+ * Success state focus indicators
+ * Used for successful actions and valid form fields
+ */
+.focus-ring-success {
+  outline: 2px solid #16a34a; /* Success-600: 4.89:1 contrast vs white */
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+/**
+ * Focus-visible pseudo-class support for keyboard-only focus
+ * Ensures focus indicators only appear during keyboard navigation
+ */
+.focus-visible-only:focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.focus-visible-only:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   TOUCH TARGET ACCESSIBILITY
+   ========================================================================== */
+
+/**
+ * Minimum touch target size enforcement - WCAG 2.1 AA requirement
+ * Ensures all interactive elements meet 44x44px minimum size
  */
 .touch-target {
   min-height: 44px;
   min-width: 44px;
-}
-
-.touch-target-large {
-  min-height: 48px;
-  min-width: 48px;
-}
-
-/* Button touch targets */
-.btn-accessible {
-  min-height: 44px;
-  min-width: 44px;
-  padding: 0.75rem 1rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  border-radius: 0.375rem;
-  transition: all 0.15s ease-in-out;
-  text-decoration: none;
-  cursor: pointer;
-  border: 1px solid transparent;
-}
-
-/* Input field touch targets */
-.input-accessible {
-  min-height: 44px;
-  padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 1rem;
-  line-height: 1.5;
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-}
-
-.input-accessible:focus {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-}
-
-/* Link touch targets */
-.link-accessible {
-  min-height: 44px;
-  min-width: 44px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0.5rem;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-  transition: color 0.15s ease-in-out;
-}
-
-/* Icon button touch targets */
-.icon-btn-accessible {
-  min-height: 44px;
-  min-width: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.75rem;
-  border: none;
-  background: transparent;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  transition: background-color 0.15s ease-in-out;
-}
-
-.icon-btn-accessible:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-/* =============================================================================
-   KEYBOARD NAVIGATION ENHANCEMENTS
-   ============================================================================= */
-
-/**
- * Enhanced keyboard navigation patterns
- * Implements proper focus ordering and keyboard interaction support
- */
-
-/* Focus trap for modals and dialogs */
-.focus-trap {
   position: relative;
 }
 
-.focus-trap:focus {
-  outline: none;
+/**
+ * Touch target for smaller visual elements
+ * Extends the clickable area while maintaining visual appearance
+ */
+.touch-target-extended::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-height: 44px;
+  min-width: 44px;
+  z-index: -1;
 }
-
-/* Roving tabindex for complex widgets */
-.roving-tabindex [role="option"],
-.roving-tabindex [role="tab"],
-.roving-tabindex [role="menuitem"] {
-  outline: none;
-}
-
-.roving-tabindex [role="option"]:focus-visible,
-.roving-tabindex [role="tab"]:focus-visible,
-.roving-tabindex [role="menuitem"]:focus-visible {
-  background-color: rgba(79, 70, 229, 0.1);
-  outline: 2px solid #4f46e5;
-  outline-offset: -2px;
-}
-
-/* Table navigation */
-.table-accessible {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-.table-accessible th,
-.table-accessible td {
-  padding: 0.75rem;
-  text-align: left;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.table-accessible th {
-  background-color: #f9fafb;
-  font-weight: 600;
-  color: #111827;
-}
-
-.table-accessible tr:focus-within {
-  background-color: rgba(79, 70, 229, 0.05);
-}
-
-.table-accessible button,
-.table-accessible a {
-  min-height: 32px; /* Slightly smaller for table context */
-  min-width: 32px;
-}
-
-/* Form navigation and grouping */
-.form-accessible fieldset {
-  border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.form-accessible legend {
-  font-weight: 600;
-  padding: 0 0.5rem;
-  color: #374151;
-}
-
-.form-accessible .form-group {
-  margin-bottom: 1rem;
-}
-
-.form-accessible label {
-  display: block;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-  color: #374151;
-}
-
-.form-accessible .required::after {
-  content: " *";
-  color: #dc2626;
-}
-
-/* Error state styling */
-.form-accessible .error {
-  border-color: #dc2626;
-  background-color: #fef2f2;
-}
-
-.form-accessible .error:focus {
-  border-color: #dc2626;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
-}
-
-.form-accessible .error-message {
-  color: #dc2626;
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-/* =============================================================================
-   HIGH CONTRAST MODE SUPPORT
-   ============================================================================= */
 
 /**
- * High contrast mode support for users with visual impairments
- * Respects Windows High Contrast mode and provides enhanced contrast options
+ * Interactive element base styles with accessibility compliance
+ * Applied to buttons, links, and other clickable elements
  */
+.interactive-element {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease-in-out;
+}
 
-/* Windows High Contrast Mode detection */
+.interactive-element:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   HIGH CONTRAST MODE SUPPORT
+   ========================================================================== */
+
+/**
+ * High contrast mode detection and adjustments
+ * Ensures visibility in Windows High Contrast mode and other assistive displays
+ */
 @media (prefers-contrast: high) {
-  .focus-accessible:focus-visible,
-  .btn-accessible:focus,
-  .input-accessible:focus,
-  .link-accessible:focus {
-    outline: 3px solid ButtonText;
-    outline-offset: 2px;
+  .focus-ring,
+  .focus-visible-only:focus-visible {
+    outline-width: 3px;
+    outline-style: solid;
   }
   
-  .btn-accessible {
-    border: 2px solid ButtonText;
+  .skip-link {
+    border-width: 3px;
+    font-weight: 700;
   }
   
-  .input-accessible {
-    border: 2px solid ButtonText;
+  /* Enhanced borders for high contrast */
+  .interactive-element {
+    border: 2px solid currentColor;
   }
   
-  /* Enhanced contrast for text */
-  body {
-    background: Canvas;
-    color: CanvasText;
+  /* Stronger shadows for separation */
+  .card,
+  .modal,
+  .dropdown {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5) !important;
+  }
+}
+
+/**
+ * Forced colors mode support (Windows High Contrast)
+ * Ensures proper rendering in forced-colors environments
+ */
+@media (forced-colors: active) {
+  .focus-ring,
+  .focus-ring-enhanced,
+  .focus-ring-error,
+  .focus-ring-success,
+  .focus-visible-only:focus-visible {
+    outline-color: Highlight;
   }
   
-  .table-accessible th {
-    background: ButtonFace;
+  .skip-link {
+    background-color: ButtonFace;
     color: ButtonText;
-    border: 1px solid ButtonText;
+    border-color: ButtonText;
   }
   
-  .table-accessible td {
-    border: 1px solid ButtonText;
+  .interactive-element:disabled {
+    color: GrayText;
+    border-color: GrayText;
   }
 }
 
-/* Manual high contrast class */
-.high-contrast {
-  --bg-primary: #000000;
-  --bg-secondary: #ffffff;
-  --text-primary: #ffffff;
-  --text-secondary: #000000;
-  --border-color: #ffffff;
-  --focus-color: #ffff00;
-}
-
-.high-contrast .focus-accessible:focus-visible {
-  outline: 3px solid var(--focus-color);
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-}
-
-.high-contrast .btn-accessible {
-  background-color: var(--bg-secondary);
-  color: var(--text-secondary);
-  border: 2px solid var(--border-color);
-}
-
-.high-contrast .input-accessible {
-  background-color: var(--bg-secondary);
-  color: var(--text-secondary);
-  border: 2px solid var(--border-color);
-}
-
-/* =============================================================================
-   REDUCED MOTION PREFERENCE SUPPORT
-   ============================================================================= */
+/* ==========================================================================
+   REDUCED MOTION PREFERENCES
+   ========================================================================== */
 
 /**
  * Reduced motion support for users with vestibular disorders
- * Respects prefers-reduced-motion media query
+ * Respects prefers-reduced-motion user preference
  */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -452,357 +309,159 @@
     scroll-behavior: auto !important;
   }
   
-  /* Keep essential focus transitions but make them instant */
-  .focus-accessible:focus-visible,
-  .btn-accessible:focus,
-  .input-accessible:focus {
+  /* Maintain essential feedback for interactions */
+  .skip-link,
+  .focus-ring,
+  .focus-ring-enhanced,
+  .focus-ring-error,
+  .focus-ring-success {
     transition: none;
   }
   
-  /* Disable parallax and transform animations */
-  .parallax {
+  /* Remove transform animations but keep opacity for visibility */
+  .interactive-element:hover,
+  .interactive-element:active {
     transform: none !important;
   }
-  
-  /* Maintain smooth scrolling for skip links */
-  .skip-link:focus {
-    transition: none;
-  }
 }
 
-/* Manual reduced motion class */
-.reduced-motion * {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
-}
-
-/* =============================================================================
-   ASSISTIVE TECHNOLOGY OPTIMIZATIONS
-   ============================================================================= */
+/* ==========================================================================
+   KEYBOARD NAVIGATION ENHANCEMENTS
+   ========================================================================== */
 
 /**
- * Enhanced support for screen readers and other assistive technologies
+ * Enhanced keyboard navigation styles
+ * Provides clear visual feedback for keyboard users
  */
-
-/* Improved table accessibility */
-.data-table {
-  caption-side: top;
+.keyboard-navigation {
+  /* Ensure focus trap containers are properly marked */
+  isolation: isolate;
 }
 
-.data-table caption {
+.keyboard-navigation [tabindex="-1"]:focus {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/**
+ * Focus trap styling for modals and dialogs
+ * Ensures keyboard focus remains within modal boundaries
+ */
+.focus-trap {
+  position: relative;
+}
+
+.focus-trap-boundary {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/**
+ * Skip to content targets
+ * Ensures skip link destinations are properly styled and accessible
+ */
+.skip-target {
+  position: relative;
+  scroll-margin-top: 2rem;
+}
+
+.skip-target:focus {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+/* ==========================================================================
+   FORM ACCESSIBILITY ENHANCEMENTS
+   ========================================================================== */
+
+/**
+ * Accessible form styling with clear visual feedback
+ * Supports screen readers and keyboard navigation
+ */
+.form-control {
+  min-height: 44px;
+  border: 2px solid #d1d5db; /* Gray-300: Sufficient contrast */
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.form-control:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.form-control[aria-invalid="true"] {
+  border-color: #dc2626;
+}
+
+.form-control[aria-invalid="true"]:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/**
+ * Form labels with enhanced accessibility
+ * Ensures proper association and visual clarity
+ */
+.form-label {
+  display: block;
   font-weight: 600;
-  font-size: 1.125rem;
-  margin-bottom: 0.5rem;
-  text-align: left;
-  color: #374151;
-}
-
-.data-table th[scope="col"] {
-  background-color: #f3f4f6;
-}
-
-.data-table th[scope="row"] {
-  background-color: #f9fafb;
-  font-weight: 600;
-}
-
-/* Enhanced form accessibility */
-.form-accessible .help-text {
   font-size: 0.875rem;
-  color: #6b7280;
+  line-height: 1.25rem;
+  color: #374151; /* Gray-700: 10.89:1 contrast vs white */
+  margin-bottom: 0.5rem;
+}
+
+.form-label.required::after {
+  content: ' *';
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/**
+ * Error and help text styling
+ * Provides clear feedback for form validation
+ */
+.form-error {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: #dc2626;
   margin-top: 0.25rem;
 }
 
-.form-accessible input[aria-describedby],
-.form-accessible textarea[aria-describedby],
-.form-accessible select[aria-describedby] {
-  position: relative;
-}
-
-/* Status and alert regions */
-.status-message {
-  padding: 1rem;
-  border-radius: 0.5rem;
-  border-left: 4px solid;
-  background-color: #f3f4f6;
-  margin: 1rem 0;
-}
-
-.status-message.success {
-  border-left-color: #10b981;
-  background-color: #ecfdf5;
-  color: #065f46;
-}
-
-.status-message.error {
-  border-left-color: #ef4444;
-  background-color: #fef2f2;
-  color: #991b1b;
-}
-
-.status-message.warning {
-  border-left-color: #f59e0b;
-  background-color: #fffbeb;
-  color: #92400e;
-}
-
-.status-message.info {
-  border-left-color: #3b82f6;
-  background-color: #eff6ff;
-  color: #1e40af;
-}
-
-/* Progress indicators */
-.progress-accessible {
-  width: 100%;
-  height: 8px;
-  background-color: #e5e7eb;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.progress-accessible .progress-bar {
-  height: 100%;
-  background-color: #4f46e5;
-  transition: width 0.3s ease-in-out;
-}
-
-.progress-accessible[aria-busy="true"] .progress-bar {
-  animation: progress-indeterminate 2s linear infinite;
-}
-
-@keyframes progress-indeterminate {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-/* Tooltip accessibility */
-.tooltip-accessible {
-  position: relative;
-  display: inline-block;
-}
-
-.tooltip-accessible .tooltip-content {
-  position: absolute;
-  bottom: 125%;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: #1f2937;
-  color: white;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
+.form-help {
   font-size: 0.875rem;
-  white-space: nowrap;
-  z-index: 1000;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
+  line-height: 1.25rem;
+  color: #6b7280; /* Gray-500: 4.61:1 contrast vs white */
+  margin-top: 0.25rem;
 }
 
-.tooltip-accessible:hover .tooltip-content,
-.tooltip-accessible:focus .tooltip-content {
-  opacity: 1;
-  visibility: visible;
-}
-
-/* Modal accessibility */
-.modal-accessible {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-accessible .modal-content {
-  background-color: white;
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-  max-width: 90vw;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-}
-
-.modal-accessible .modal-content:focus {
-  outline: 2px solid #4f46e5;
-  outline-offset: -2px;
-}
-
-/* Enhanced link styling for better accessibility */
-.link-accessible-enhanced {
-  color: #4f46e5;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-  text-decoration-thickness: 1px;
-}
-
-.link-accessible-enhanced:hover {
-  color: #3730a3;
-  text-decoration-thickness: 2px;
-}
-
-.link-accessible-enhanced:focus {
-  outline: 2px solid #4f46e5;
-  outline-offset: 2px;
-  border-radius: 0.125rem;
-}
-
-/* Visited link styling */
-.link-accessible-enhanced:visited {
-  color: #7c3aed;
-}
-
-/* External link indicator */
-.external-link::after {
-  content: " ↗";
-  font-size: 0.875em;
-  opacity: 0.7;
-}
-
-/* =============================================================================
-   RESPONSIVE ACCESSIBILITY
-   ============================================================================= */
+/* ==========================================================================
+   LIVE REGION UTILITIES
+   ========================================================================== */
 
 /**
- * Responsive adjustments for accessibility across different screen sizes
+ * Accessible status announcements
+ * For dynamic content updates and user feedback
  */
-
-/* Mobile-first touch targets */
-@media (max-width: 768px) {
-  .touch-target,
-  .btn-accessible,
-  .input-accessible,
-  .link-accessible,
-  .icon-btn-accessible {
-    min-height: 48px;
-    min-width: 48px;
-  }
-  
-  /* Larger text for mobile */
-  .form-accessible label {
-    font-size: 1rem;
-  }
-  
-  .form-accessible input,
-  .form-accessible textarea,
-  .form-accessible select {
-    font-size: 1rem;
-  }
-  
-  /* Enhanced spacing for mobile */
-  .form-accessible .form-group {
-    margin-bottom: 1.5rem;
-  }
-}
-
-/* Tablet adjustments */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .btn-accessible {
-    min-height: 44px;
-    min-width: 44px;
-  }
-}
-
-/* Desktop enhancements */
-@media (min-width: 1025px) {
-  /* Hover states for non-touch devices */
-  .btn-accessible:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
-  
-  .link-accessible-enhanced:hover {
-    text-decoration-thickness: 2px;
-  }
-  
-  /* Enhanced focus visible for keyboard users */
-  .focus-accessible:focus-visible {
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2);
-  }
-}
-
-/* Print accessibility */
-@media print {
-  .skip-link,
-  .live-region-polite,
-  .live-region-assertive,
-  .live-region-status {
-    display: none;
-  }
-  
-  .focus-accessible:focus-visible {
-    outline: 2px solid black;
-  }
-  
-  /* Ensure sufficient contrast in print */
-  * {
-    background: transparent !important;
-    color: black !important;
-    box-shadow: none !important;
-    text-shadow: none !important;
-  }
-  
-  a,
-  a:visited {
-    text-decoration: underline;
-  }
-  
-  a[href^="http"]:after {
-    content: " (" attr(href) ")";
-  }
-}
-
-/* =============================================================================
-   UTILITY CLASSES FOR ACCESSIBILITY
-   ============================================================================= */
-
-/**
- * Utility classes for common accessibility patterns
- */
-
-/* Hide content visually but keep for screen readers */
-.visually-hidden {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
-}
-
-/* Show visually hidden content on focus */
-.visually-hidden-focusable:focus {
-  position: static !important;
-  width: auto !important;
-  height: auto !important;
-  padding: inherit !important;
-  margin: inherit !important;
-  overflow: visible !important;
-  clip: auto !important;
-  white-space: normal !important;
-}
-
-/* Hide from screen readers but show visually */
-.aria-hidden {
-  speak: none;
-}
-
-/* Force screen reader announcement */
-.force-announce {
+.status-announcement {
   position: absolute;
   left: -10000px;
   width: 1px;
@@ -810,56 +469,291 @@
   overflow: hidden;
 }
 
-/* Enhanced button reset for accessible custom buttons */
-.btn-reset {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: inherit;
+/**
+ * Loading states with accessible announcements
+ * Ensures screen readers are informed of loading states
+ */
+.loading-indicator[aria-live] {
+  position: relative;
+}
+
+.loading-indicator::after {
+  content: attr(aria-label);
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   RESPONSIVE ACCESSIBILITY ADJUSTMENTS
+   ========================================================================== */
+
+/**
+ * Mobile-specific accessibility enhancements
+ * Ensures touch targets and interactions work well on mobile devices
+ */
+@media (max-width: 768px) {
+  .touch-target,
+  .interactive-element {
+    min-height: 48px; /* Slightly larger for mobile */
+    min-width: 48px;
+  }
+  
+  .form-control {
+    min-height: 48px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+  
+  .skip-link {
+    left: 4px;
+    padding: 12px 16px;
+    font-size: 1rem;
+  }
+}
+
+/**
+ * Tablet-specific adjustments
+ * Balances between mobile and desktop requirements
+ */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .interactive-element {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ==========================================================================
+   PRINT ACCESSIBILITY
+   ========================================================================== */
+
+/**
+ * Print styles that maintain accessibility
+ * Ensures printed content remains usable and clear
+ */
+@media print {
+  .skip-link,
+  .focus-ring,
+  .focus-ring-enhanced,
+  .focus-ring-error,
+  .focus-ring-success {
+    display: none !important;
+  }
+  
+  .interactive-element {
+    border: 1px solid #000;
+  }
+  
+  .form-control {
+    border: 1px solid #000;
+    background: transparent;
+  }
+}
+
+/* ==========================================================================
+   UTILITY CLASSES FOR ACCESSIBILITY
+   ========================================================================== */
+
+/**
+ * Accessibility utility classes for common patterns
+ * Can be used throughout the application for consistent accessibility
+ */
+
+/* Hide decorative elements from screen readers */
+.aria-hidden {
+  aria-hidden: true;
+}
+
+/* Mark elements as presentation only */
+.presentation {
+  role: presentation;
+}
+
+/* Ensure text content is selectable for copy/paste accessibility */
+.text-selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+/* Prevent text selection for UI controls */
+.text-non-selectable {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Enhanced cursor feedback for interactive elements */
+.cursor-pointer {
   cursor: pointer;
+}
+
+.cursor-not-allowed {
+  cursor: not-allowed;
+}
+
+/* Focus management utilities */
+.focus-within:focus-within {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.focus-none:focus {
   outline: none;
 }
 
-/* Accessible text sizing */
-.text-accessible-small {
+/* High contrast text utilities */
+.text-high-contrast {
+  color: #000000;
+  background-color: #ffffff;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .text-high-contrast {
+    color: #ffffff;
+    background-color: #000000;
+  }
+}
+
+/* ==========================================================================
+   COMPONENT-SPECIFIC ACCESSIBILITY OVERRIDES
+   ========================================================================== */
+
+/**
+ * Modal and dialog accessibility
+ * Ensures proper focus management and screen reader support
+ */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.modal-content {
+  position: relative;
+  max-height: 90vh;
+  overflow-y: auto;
+  focus: outline-2px solid #4f46e5;
+  focus: outline-offset-2px;
+}
+
+/**
+ * Tooltip accessibility
+ * Ensures tooltips are accessible to keyboard and screen reader users
+ */
+.tooltip {
+  position: absolute;
+  z-index: 1001;
+  max-width: 320px;
+  padding: 0.5rem;
+  background-color: #1f2937;
+  color: #ffffff;
+  border-radius: 0.375rem;
   font-size: 0.875rem;
-  line-height: 1.5;
+  line-height: 1.25rem;
 }
 
-.text-accessible-base {
-  font-size: 1rem;
-  line-height: 1.5;
+.tooltip[role="tooltip"] {
+  border: 1px solid #374151;
 }
 
-.text-accessible-large {
-  font-size: 1.125rem; /* 18px - Large text threshold for 3:1 contrast */
-  line-height: 1.5;
+/**
+ * Menu and dropdown accessibility
+ * Supports keyboard navigation and proper ARIA implementation
+ */
+.dropdown-menu {
+  position: absolute;
+  z-index: 50;
+  min-width: 12rem;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
-.text-accessible-xl {
-  font-size: 1.25rem;
-  line-height: 1.4;
+.dropdown-item {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.75rem;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
 }
 
-/* Accessible spacing utilities */
-.space-accessible-xs {
-  margin: 0.25rem;
+.dropdown-item:focus,
+.dropdown-item:hover {
+  background-color: #f3f4f6;
+  outline: none;
 }
 
-.space-accessible-sm {
-  margin: 0.5rem;
+.dropdown-item:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: -2px;
 }
 
-.space-accessible-md {
-  margin: 1rem;
+.dropdown-item[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
-.space-accessible-lg {
-  margin: 1.5rem;
-}
+/* ==========================================================================
+   DARK MODE ACCESSIBILITY CONSIDERATIONS
+   ========================================================================== */
 
-.space-accessible-xl {
-  margin: 2rem;
+/**
+ * Dark mode specific accessibility adjustments
+ * Maintains contrast ratios and accessibility in dark themes
+ */
+@media (prefers-color-scheme: dark) {
+  .focus-ring,
+  .focus-visible-only:focus-visible {
+    outline-color: #818cf8; /* Primary-400: Adjusted for dark backgrounds */
+  }
+  
+  .skip-link {
+    background-color: #4338ca; /* Primary-700: Better contrast on dark */
+    color: #ffffff;
+  }
+  
+  .form-control {
+    border-color: #4b5563; /* Gray-600: Appropriate dark mode contrast */
+    background-color: #1f2937; /* Gray-800 */
+    color: #f9fafb; /* Gray-50 */
+  }
+  
+  .form-control:focus {
+    border-color: #818cf8; /* Primary-400: Dark mode focus color */
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+  }
+  
+  .form-label {
+    color: #d1d5db; /* Gray-300: Good contrast on dark backgrounds */
+  }
+  
+  .form-help {
+    color: #9ca3af; /* Gray-400: Sufficient contrast in dark mode */
+  }
+  
+  .dropdown-menu {
+    background-color: #1f2937;
+    border-color: #374151;
+  }
+  
+  .dropdown-item:focus,
+  .dropdown-item:hover {
+    background-color: #374151;
+  }
 }
