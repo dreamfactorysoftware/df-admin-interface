@@ -1,933 +1,912 @@
-/**
- * Authentication Hook for DreamFactory Admin Interface
- * 
- * Primary authentication hook that manages login/logout workflows, JWT token handling,
- * and authentication state. Replaces Angular AuthService with React Query mutations,
- * Zustand state management, and Next.js middleware integration for comprehensive
- * authentication functionality throughout the application.
- * 
- * Key Features:
- * - React Query mutations for login, logout, and session validation with automatic error handling
- * - Zustand state integration for authentication status and user data persistence
- * - JWT token management with automatic refresh and Next.js middleware integration
- * - User permission caching with role-based access control using React Query intelligent caching
- * - Session validation on component mount with token expiration handling
- * - HTTP-only cookie integration with SameSite=Strict configuration for enhanced security
- * 
- * Security Implementation:
- * - HTTP-only cookies prevent XSS attacks on session tokens per Section 5.2 requirements
- * - SameSite=Strict configuration prevents CSRF attacks
- * - Automatic token refresh prevents session interruption
- * - Secure logout with complete session cleanup
- * - JWT validation with Next.js middleware integration
- * - Role-based permission caching with intelligent invalidation
- * 
- * Performance Characteristics:
- * - React Query caching provides cache hit responses under 50ms per Section 3.2.4
- * - Background revalidation maintains session freshness
- * - Optimistic updates for seamless user experience
- * - Intelligent retry logic for network resilience
- * - Permission queries cached for 5 minutes with background updates
- * 
- * @example
- * ```tsx
- * function LoginPage() {
- *   const {
- *     login,
- *     logout,
- *     user,
- *     isAuthenticated,
- *     isLoading,
- *     hasPermission,
- *     isAdmin,
- *     error,
- *     startTransition,
- *     isPending
- *   } = useAuth();
- * 
- *   const handleLogin = (credentials) => {
- *     startTransition(() => {
- *       login(credentials).catch(console.error);
- *     });
- *   };
- * 
- *   return (
- *     <div>
- *       {isAuthenticated ? (
- *         <div>
- *           <h1>Welcome, {user?.name}</h1>
- *           {hasPermission('admin') && <AdminPanel />}
- *           <button onClick={logout}>Logout</button>
- *         </div>
- *       ) : (
- *         <LoginForm onSubmit={handleLogin} isLoading={isPending} />
- *       )}
- *     </div>
- *   );
- * }
- * ```
- */
-
 'use client';
 
-import { useCallback, useTransition, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { 
+import { useSession } from './use-session';
+import type {
   LoginCredentials,
   LoginResponse,
-  UserSession,
+  RegisterDetails,
   AuthError,
   AuthErrorCode,
-  JWTPayload,
-  UseAuthReturn,
-  SessionCookieConfig,
-  DEFAULT_COOKIE_CONFIG,
-  PROTECTED_ROUTES
-} from '@/types/auth';
-import { UserProfile, UserPermissions } from '@/types/user';
-import { useSession, SessionCookieManager, SessionAPI } from '@/hooks/use-session';
+  UserSession,
+  AuthState,
+  AuthActions,
+  AuthStore,
+  ForgetPasswordRequest,
+  UpdatePasswordRequest,
+  UpdatePasswordResponse,
+  OAuthLoginRequest,
+  SAMLAuthParams,
+  UseAuthConfig,
+} from '../types/auth';
+import type { UserProfile } from '../types/user';
 
-// ============================================================================
-// Constants and Configuration
-// ============================================================================
+// =============================================================================
+// CONSTANTS AND CONFIGURATION
+// =============================================================================
 
-/**
- * Authentication configuration constants
- * Optimized for DreamFactory deployment patterns with enhanced security
- */
-const AUTH_CONFIG = {
-  API_BASE_URL: '/api/v2/user',
-  LOGIN_REDIRECT: '/home',
-  LOGOUT_REDIRECT: '/login',
-  PERMISSION_CACHE_TIME: 5 * 60 * 1000, // 5 minutes
-  PERMISSION_STALE_TIME: 2 * 60 * 1000, // 2 minutes
-  MAX_RETRY_ATTEMPTS: 3,
-  RETRY_DELAY: 1000, // 1 second base delay
+const AUTH_QUERY_KEYS = {
+  session: ['auth', 'session'] as const,
+  user: ['auth', 'user'] as const,
+  permissions: ['auth', 'permissions'] as const,
+  roles: ['auth', 'roles'] as const,
 } as const;
 
-/**
- * Query keys for React Query cache management
- * Provides consistent cache key patterns across the application
- */
-export const authQueryKeys = {
-  all: ['auth'] as const,
-  session: () => [...authQueryKeys.all, 'session'] as const,
-  user: () => [...authQueryKeys.all, 'user'] as const,
-  permissions: (userId: number) => [...authQueryKeys.all, 'permissions', userId] as const,
-  roles: (userId: number) => [...authQueryKeys.all, 'roles', userId] as const,
+const AUTH_MUTATION_KEYS = {
+  login: 'auth.login',
+  logout: 'auth.logout',
+  register: 'auth.register',
+  refresh: 'auth.refresh',
+  forgotPassword: 'auth.forgotPassword',
+  updatePassword: 'auth.updatePassword',
+  oauthLogin: 'auth.oauthLogin',
+  samlLogin: 'auth.samlLogin',
 } as const;
 
-// ============================================================================
-// Authentication API Client
-// ============================================================================
-
-/**
- * Authentication API client for server communication
- * Handles login, logout, session management, and permission validation
- */
-class AuthAPI {
-  private static baseUrl = AUTH_CONFIG.API_BASE_URL;
-
-  /**
-   * Authenticates user with provided credentials
-   * Returns comprehensive login response with session data
-   */
-  static async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    const response = await fetch(`${this.baseUrl}/session`, {
-      method: 'POST',
-      credentials: 'include', // Include HTTP-only cookies
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        email: credentials.email || credentials.username,
-        password: credentials.password,
-        remember: credentials.rememberMe || false,
-        duration: credentials.rememberMe ? 604800 : 86400, // 7 days or 24 hours
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      
-      // Handle specific authentication error scenarios
-      if (response.status === 401) {
-        throw new Error('Invalid credentials. Please check your email and password.');
-      } else if (response.status === 423) {
-        throw new Error('Account is locked. Please contact your administrator.');
-      } else if (response.status === 429) {
-        throw new Error('Too many login attempts. Please try again later.');
-      }
-      
-      throw new Error(errorData.message || `Authentication failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    // Store session token in HTTP-only cookie
-    if (data.session_token || data.sessionToken) {
-      const token = data.session_token || data.sessionToken;
-      const expiresAt = data.tokenExpiryDate 
-        ? new Date(data.tokenExpiryDate).getTime()
-        : Date.now() + (data.rememberMe ? 604800000 : 86400000); // 7 days or 24 hours
-      
-      SessionCookieManager.setSessionToken(token, expiresAt);
-    }
-
-    return this.transformLoginResponse(data);
-  }
-
-  /**
-   * Logs out the user and terminates the session
-   * Ensures complete cleanup of session data and cookies
-   */
-  static async logout(): Promise<void> {
-    try {
-      await fetch(`${this.baseUrl}/session`, {
-        method: 'DELETE',
-        credentials: 'include', // Include HTTP-only cookies
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-    } catch (error) {
-      // Log error but don't prevent client-side cleanup
-      console.error('Server logout error:', error);
-    } finally {
-      // Always clear client-side session data
-      SessionCookieManager.clearSessionToken();
-    }
-  }
-
-  /**
-   * Refreshes the current session token
-   * Extends session without requiring re-authentication
-   */
-  static async refreshSession(): Promise<UserSession> {
-    const response = await fetch(`${this.baseUrl}/session`, {
-      method: 'PUT',
-      credentials: 'include', // Include HTTP-only cookies
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Session expired. Please log in again.');
-      }
-      
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Session refresh failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    // Update the HTTP-only cookie with new token
-    if (data.session_token || data.sessionToken) {
-      const token = data.session_token || data.sessionToken;
-      const expiresAt = data.tokenExpiryDate 
-        ? new Date(data.tokenExpiryDate).getTime()
-        : Date.now() + (24 * 60 * 60 * 1000); // 24 hours default
-      
-      SessionCookieManager.setSessionToken(token, expiresAt);
-    }
-
-    return this.transformToUserSession(data);
-  }
-
-  /**
-   * Validates the current session with the server
-   * Returns session validation result with user data
-   */
-  static async validateSession(): Promise<{ valid: boolean; user?: UserSession }> {
-    try {
-      const response = await fetch(`${this.baseUrl}/session`, {
-        method: 'GET',
-        credentials: 'include', // Include HTTP-only cookies
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          return { valid: false };
-        }
-        throw new Error(`Session validation failed: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const user = this.transformToUserSession(data);
-      
-      return { valid: true, user };
-    } catch (error) {
-      console.error('Session validation error:', error);
-      return { valid: false };
-    }
-  }
-
-  /**
-   * Fetches user permissions based on roles and service access
-   * Returns comprehensive permission set for RBAC implementation
-   */
-  static async getUserPermissions(userId: number): Promise<UserPermissions> {
-    const response = await fetch(`${this.baseUrl}/${userId}/permissions`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch user permissions: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return this.transformToUserPermissions(data);
-  }
-
-  /**
-   * Fetches user roles for role-based access control
-   * Returns detailed role information with service access rights
-   */
-  static async getUserRoles(userId: number): Promise<any[]> {
-    const response = await fetch(`${this.baseUrl}/${userId}/roles`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch user roles: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  /**
-   * Transforms API login response to LoginResponse format
-   * Ensures consistent data structure across the application
-   */
-  private static transformLoginResponse(data: any): LoginResponse {
-    return {
-      session_token: data.session_token || data.sessionToken,
-      sessionToken: data.sessionToken || data.session_token,
-      email: data.email,
-      firstName: data.firstName || data.first_name || '',
-      lastName: data.lastName || data.last_name || '',
-      name: data.name || `${data.firstName || data.first_name || ''} ${data.lastName || data.last_name || ''}`.trim(),
-      id: data.id,
-      isRootAdmin: data.isRootAdmin || data.is_root_admin || false,
-      isSysAdmin: data.isSysAdmin || data.is_sys_admin || false,
-      roleId: data.roleId || data.role_id || 0,
-      role_id: data.role_id,
-      host: data.host || '',
-      lastLoginDate: data.lastLoginDate || data.last_login_date || '',
-      tokenExpiryDate: data.tokenExpiryDate || data.token_expiry_date || new Date(Date.now() + 86400000).toISOString(),
-      sessionId: data.sessionId || data.session_id || '',
-    };
-  }
-
-  /**
-   * Transforms API response to UserSession format
-   * Provides consistent session data structure
-   */
-  private static transformToUserSession(data: any): UserSession {
-    return {
-      email: data.email,
-      firstName: data.firstName || data.first_name || '',
-      lastName: data.lastName || data.last_name || '',
-      name: data.name || `${data.firstName || data.first_name || ''} ${data.lastName || data.last_name || ''}`.trim(),
-      host: data.host || '',
-      id: data.id,
-      isRootAdmin: data.isRootAdmin || data.is_root_admin || false,
-      isSysAdmin: data.isSysAdmin || data.is_sys_admin || false,
-      lastLoginDate: data.lastLoginDate || data.last_login_date || '',
-      sessionId: data.sessionId || data.session_id || '',
-      sessionToken: data.sessionToken || data.session_token || '',
-      tokenExpiryDate: new Date(data.tokenExpiryDate || data.token_expiry_date || Date.now() + 86400000),
-      roleId: data.roleId || data.role_id || 0,
-      role_id: data.role_id,
-    };
-  }
-
-  /**
-   * Transforms API response to UserPermissions format
-   * Provides comprehensive permission data for RBAC
-   */
-  private static transformToUserPermissions(data: any): UserPermissions {
-    return {
-      isSystemAdmin: data.is_sys_admin || data.isSystemAdmin || false,
-      canManageUsers: data.can_manage_users || false,
-      canManageRoles: data.can_manage_roles || false,
-      canManageServices: data.can_manage_services || false,
-      canManageApps: data.can_manage_apps || false,
-      canViewReports: data.can_view_reports || false,
-      canConfigureSystem: data.can_configure_system || false,
-      canManageFiles: data.can_manage_files || false,
-      canManageScripts: data.can_manage_scripts || false,
-      canManageScheduler: data.can_manage_scheduler || false,
-      canManageCache: data.can_manage_cache || false,
-      canManageCors: data.can_manage_cors || false,
-      canManageEmailTemplates: data.can_manage_email_templates || false,
-      canManageLookupKeys: data.can_manage_lookup_keys || false,
-      serviceAccess: data.service_access || [],
-      appAccess: data.app_access || [],
-    };
-  }
-}
-
-// ============================================================================
-// Auth Store Integration (Zustand)
-// ============================================================================
-
-/**
- * Authentication store state interface
- * Defines the shape of authentication state managed by Zustand
- */
-interface AuthStore {
-  user: UserSession | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: AuthError | null;
-  permissions: UserPermissions | null;
-  lastActivity: Date | null;
-  
-  // Actions
-  setUser: (user: UserSession | null) => void;
-  setAuthenticated: (authenticated: boolean) => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: AuthError | null) => void;
-  setPermissions: (permissions: UserPermissions | null) => void;
-  updateLastActivity: () => void;
-  reset: () => void;
-}
-
-/**
- * Mock Zustand store implementation
- * This would be replaced with actual Zustand store import in production
- * For now, we'll use a simple implementation to demonstrate the pattern
- */
-let authStore: AuthStore = {
-  user: null,
-  isAuthenticated: false,
-  isLoading: false,
-  error: null,
-  permissions: null,
-  lastActivity: null,
-  
-  setUser: (user) => { authStore.user = user; },
-  setAuthenticated: (authenticated) => { authStore.isAuthenticated = authenticated; },
-  setLoading: (loading) => { authStore.isLoading = loading; },
-  setError: (error) => { authStore.error = error; },
-  setPermissions: (permissions) => { authStore.permissions = permissions; },
-  updateLastActivity: () => { authStore.lastActivity = new Date(); },
-  reset: () => {
-    authStore.user = null;
-    authStore.isAuthenticated = false;
-    authStore.isLoading = false;
-    authStore.error = null;
-    authStore.permissions = null;
-    authStore.lastActivity = null;
-  }
+const DEFAULT_CONFIG: Required<UseAuthConfig> = {
+  redirectIfUnauthenticated: true,
+  redirectTo: '/login',
+  requiredPermissions: [],
+  enableAutoRefresh: true,
 };
 
-// ============================================================================
-// Main Authentication Hook
-// ============================================================================
+// Token refresh timing configuration
+const TOKEN_REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes before expiry
+const TOKEN_REFRESH_INTERVAL = 30 * 60 * 1000; // Check every 30 minutes
+
+// =============================================================================
+// ERROR HANDLING UTILITIES
+// =============================================================================
 
 /**
- * Primary authentication hook with comprehensive functionality
- * 
- * Provides complete authentication management including login/logout workflows,
- * session validation, permission checking, and automatic token refresh.
- * Integrates with React Query for intelligent caching and background synchronization.
- * 
- * Key Features:
- * - React Query mutations for optimistic updates and error handling
- * - Zustand state integration for global authentication state
- * - HTTP-only cookie management with security best practices
- * - Automatic session refresh and expiration handling
- * - Role-based access control with intelligent permission caching
- * - Next.js router integration for navigation management
- * - React 19 concurrent features with transitions
+ * Creates a standardized authentication error object
  */
-export function useAuth(): UseAuthReturn {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [isPending, startTransition] = useTransition();
-  
-  // Integrate with existing session management hook
-  const {
-    user: sessionUser,
-    isAuthenticated: sessionAuthenticated,
-    isLoading: sessionLoading,
-    error: sessionError,
-    logout: sessionLogout,
-    refresh: sessionRefresh,
-    hasPermission: sessionHasPermission,
-    hasRole: sessionHasRole,
-    isAdmin: sessionIsAdmin,
-    isRootAdmin: sessionIsRootAdmin,
-  } = useSession();
-
-  // ============================================================================
-  // Permission Queries with Intelligent Caching
-  // ============================================================================
-
-  /**
-   * User permissions query with React Query caching
-   * Provides comprehensive permission data for RBAC implementation
-   */
-  const {
-    data: permissions,
-    error: permissionsError,
-    isLoading: isLoadingPermissions,
-  } = useQuery({
-    queryKey: authQueryKeys.permissions(sessionUser?.id || 0),
-    queryFn: () => AuthAPI.getUserPermissions(sessionUser!.id),
-    enabled: sessionAuthenticated && !!sessionUser?.id,
-    staleTime: AUTH_CONFIG.PERMISSION_STALE_TIME,
-    gcTime: AUTH_CONFIG.PERMISSION_CACHE_TIME,
-    refetchOnWindowFocus: false,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && error.message.includes('401')) {
-        return false;
-      }
-      return failureCount < AUTH_CONFIG.MAX_RETRY_ATTEMPTS;
-    },
-  });
-
-  /**
-   * User roles query with intelligent caching
-   * Provides detailed role information for access control
-   */
-  const {
-    data: roles,
-    isLoading: isLoadingRoles,
-  } = useQuery({
-    queryKey: authQueryKeys.roles(sessionUser?.id || 0),
-    queryFn: () => AuthAPI.getUserRoles(sessionUser!.id),
-    enabled: sessionAuthenticated && !!sessionUser?.id,
-    staleTime: AUTH_CONFIG.PERMISSION_STALE_TIME,
-    gcTime: AUTH_CONFIG.PERMISSION_CACHE_TIME,
-    refetchOnWindowFocus: false,
-  });
-
-  // ============================================================================
-  // Authentication Mutations
-  // ============================================================================
-
-  /**
-   * Login mutation with optimistic updates and error handling
-   * Handles complete authentication workflow including session establishment
-   */
-  const loginMutation = useMutation({
-    mutationFn: AuthAPI.login,
-    onMutate: async (credentials) => {
-      // Set loading state
-      authStore.setLoading(true);
-      authStore.setError(null);
-      
-      return { credentials };
-    },
-    onSuccess: async (loginResponse, credentials) => {
-      // Transform login response to user session
-      const userSession: UserSession = {
-        email: loginResponse.email,
-        firstName: loginResponse.firstName,
-        lastName: loginResponse.lastName,
-        name: loginResponse.name,
-        host: loginResponse.host,
-        id: loginResponse.id,
-        isRootAdmin: loginResponse.isRootAdmin,
-        isSysAdmin: loginResponse.isSysAdmin,
-        lastLoginDate: loginResponse.lastLoginDate,
-        sessionId: loginResponse.sessionId,
-        sessionToken: loginResponse.sessionToken || loginResponse.session_token || '',
-        tokenExpiryDate: new Date(loginResponse.tokenExpiryDate),
-        roleId: loginResponse.roleId,
-        role_id: loginResponse.role_id,
-      };
-
-      // Update authentication state
-      authStore.setUser(userSession);
-      authStore.setAuthenticated(true);
-      authStore.setLoading(false);
-      authStore.updateLastActivity();
-
-      // Invalidate and refetch session-related queries
-      await queryClient.invalidateQueries({ queryKey: authQueryKeys.session() });
-      await queryClient.invalidateQueries({ queryKey: authQueryKeys.user() });
-      
-      // Pre-fetch user permissions for immediate access
-      if (userSession.id) {
-        queryClient.prefetchQuery({
-          queryKey: authQueryKeys.permissions(userSession.id),
-          queryFn: () => AuthAPI.getUserPermissions(userSession.id),
-          staleTime: AUTH_CONFIG.PERMISSION_STALE_TIME,
-        });
-      }
-
-      // Navigate to appropriate route after successful login
-      startTransition(() => {
-        router.push(AUTH_CONFIG.LOGIN_REDIRECT);
-      });
-    },
-    onError: (error) => {
-      // Create structured error object
-      const authError: AuthError = {
-        code: 'LOGIN_FAILED' as AuthErrorCode,
-        message: error instanceof Error ? error.message : 'Login failed',
-        timestamp: new Date(),
-        retryable: true,
-      };
-
-      authStore.setError(authError);
-      authStore.setLoading(false);
-      
-      console.error('Login failed:', error);
-    },
-    retry: false, // Don't retry login attempts automatically
-  });
-
-  /**
-   * Logout mutation with comprehensive cleanup
-   * Ensures complete session termination and state cleanup
-   */
-  const logoutMutation = useMutation({
-    mutationFn: AuthAPI.logout,
-    onMutate: async () => {
-      // Immediately set loading state
-      authStore.setLoading(true);
-      
-      return {};
-    },
-    onSuccess: async () => {
-      // Clear all authentication state
-      authStore.reset();
-      
-      // Clear all authentication-related cache
-      queryClient.removeQueries({ queryKey: authQueryKeys.all });
-      queryClient.removeQueries({ queryKey: ['session'] });
-      queryClient.removeQueries({ queryKey: ['user'] });
-      
-      // Navigate to login page
-      startTransition(() => {
-        router.push(AUTH_CONFIG.LOGOUT_REDIRECT);
-      });
-    },
-    onError: (error) => {
-      console.error('Logout error:', error);
-      
-      // Even if server logout fails, clear local state
-      authStore.reset();
-      queryClient.removeQueries({ queryKey: authQueryKeys.all });
-      
-      startTransition(() => {
-        router.push(AUTH_CONFIG.LOGOUT_REDIRECT);
-      });
-    },
-  });
-
-  /**
-   * Session validation mutation for manual session checks
-   * Allows components to trigger session validation
-   */
-  const validateSessionMutation = useMutation({
-    mutationFn: AuthAPI.validateSession,
-    onSuccess: (result) => {
-      if (result.valid && result.user) {
-        authStore.setUser(result.user);
-        authStore.setAuthenticated(true);
-      } else {
-        authStore.setAuthenticated(false);
-        authStore.setUser(null);
-      }
-    },
-    onError: (error) => {
-      console.error('Session validation error:', error);
-      authStore.setAuthenticated(false);
-      authStore.setUser(null);
-    },
-  });
-
-  // ============================================================================
-  // Permission and Role Helpers
-  // ============================================================================
-
-  /**
-   * Enhanced permission checking with caching
-   * Combines session-based permissions with cached permission data
-   */
-  const hasPermission = useCallback((permission: string): boolean => {
-    // Use session-based permission check as primary method
-    if (sessionHasPermission(permission)) {
-      return true;
-    }
-
-    // Fallback to cached permissions if available
-    if (permissions) {
-      // System admins have all permissions
-      if (permissions.isSystemAdmin) return true;
-
-      // Check specific permissions based on permission string
-      switch (permission.toLowerCase()) {
-        case 'admin':
-        case 'system_admin':
-          return permissions.isSystemAdmin;
-        case 'manage_users':
-          return permissions.canManageUsers;
-        case 'manage_roles':
-          return permissions.canManageRoles;
-        case 'manage_services':
-          return permissions.canManageServices;
-        case 'manage_apps':
-          return permissions.canManageApps;
-        case 'view_reports':
-          return permissions.canViewReports;
-        case 'configure_system':
-          return permissions.canConfigureSystem;
-        case 'manage_files':
-          return permissions.canManageFiles;
-        case 'manage_scripts':
-          return permissions.canManageScripts;
-        case 'manage_scheduler':
-          return permissions.canManageScheduler;
-        case 'manage_cache':
-          return permissions.canManageCache;
-        case 'manage_cors':
-          return permissions.canManageCors;
-        case 'manage_email_templates':
-          return permissions.canManageEmailTemplates;
-        case 'manage_lookup_keys':
-          return permissions.canManageLookupKeys;
-        default:
-          return false;
-      }
-    }
-
-    return false;
-  }, [sessionHasPermission, permissions]);
-
-  /**
-   * Enhanced role checking with multiple role sources
-   * Combines session-based roles with cached role data
-   */
-  const hasRole = useCallback((roleId: number): boolean => {
-    // Use session-based role check as primary method
-    if (sessionHasRole(roleId)) {
-      return true;
-    }
-
-    // Fallback to cached roles if available
-    if (roles && Array.isArray(roles)) {
-      return roles.some(role => role.id === roleId);
-    }
-
-    return false;
-  }, [sessionHasRole, roles]);
-
-  // ============================================================================
-  // Action Wrappers with State Integration
-  // ============================================================================
-
-  /**
-   * Login action wrapper with transition support
-   * Provides consistent interface for login operations
-   */
-  const login = useCallback(async (credentials: LoginCredentials): Promise<LoginResponse> => {
-    return new Promise((resolve, reject) => {
-      startTransition(() => {
-        loginMutation.mutateAsync(credentials)
-          .then(resolve)
-          .catch(reject);
-      });
-    });
-  }, [loginMutation, startTransition]);
-
-  /**
-   * Logout action wrapper with transition support
-   * Ensures consistent logout behavior across the application
-   */
-  const logout = useCallback(async (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      startTransition(() => {
-        logoutMutation.mutateAsync()
-          .then(() => {
-            // Also call session logout for complete cleanup
-            sessionLogout().catch(console.error);
-            resolve();
-          })
-          .catch(reject);
-      });
-    });
-  }, [logoutMutation, sessionLogout, startTransition]);
-
-  /**
-   * Session refresh wrapper
-   * Delegates to session hook for consistency
-   */
-  const refresh = useCallback(async (): Promise<void> => {
-    await sessionRefresh();
-    
-    // Invalidate permission cache after refresh
-    if (sessionUser?.id) {
-      await queryClient.invalidateQueries({ 
-        queryKey: authQueryKeys.permissions(sessionUser.id) 
-      });
-    }
-  }, [sessionRefresh, sessionUser?.id, queryClient]);
-
-  /**
-   * Session validation wrapper
-   * Provides manual session checking capability
-   */
-  const checkSession = useCallback(async (): Promise<boolean> => {
-    const result = await validateSessionMutation.mutateAsync();
-    return result.valid;
-  }, [validateSessionMutation]);
-
-  // ============================================================================
-  // Computed State and Error Handling
-  // ============================================================================
-
-  /**
-   * Comprehensive loading state
-   * Combines all loading states for consistent UX
-   */
-  const isLoading = sessionLoading || 
-                   isLoadingPermissions || 
-                   isLoadingRoles || 
-                   loginMutation.isPending || 
-                   logoutMutation.isPending ||
-                   authStore.isLoading;
-
-  /**
-   * Centralized error handling
-   * Prioritizes errors based on severity and recency
-   */
-  const error: AuthError | null = (() => {
-    // Prioritize authentication errors
-    if (loginMutation.error) {
-      return {
-        code: 'LOGIN_FAILED' as AuthErrorCode,
-        message: loginMutation.error instanceof Error ? loginMutation.error.message : 'Login failed',
-        timestamp: new Date(),
-        retryable: true,
-      };
-    }
-
-    if (logoutMutation.error) {
-      return {
-        code: 'LOGOUT_ERROR' as AuthErrorCode,
-        message: logoutMutation.error instanceof Error ? logoutMutation.error.message : 'Logout failed',
-        timestamp: new Date(),
-        retryable: true,
-      };
-    }
-
-    // Include session errors
-    if (sessionError) {
-      return sessionError;
-    }
-
-    // Include permission errors
-    if (permissionsError) {
-      return {
-        code: 'PERMISSION_FETCH_ERROR' as AuthErrorCode,
-        message: permissionsError instanceof Error ? permissionsError.message : 'Failed to fetch permissions',
-        timestamp: new Date(),
-        retryable: true,
-      };
-    }
-
-    return authStore.error;
-  })();
-
-  // ============================================================================
-  // Activity Monitoring Integration
-  // ============================================================================
-
-  /**
-   * Update last activity with Zustand store integration
-   * Tracks user activity for session management
-   */
-  const updateLastActivity = useCallback((): void => {
-    authStore.updateLastActivity();
-  }, []);
-
-  // ============================================================================
-  // Effect for State Synchronization
-  // ============================================================================
-
-  /**
-   * Synchronize session state with auth store
-   * Ensures consistency between session hook and auth store
-   */
-  useEffect(() => {
-    if (sessionUser) {
-      authStore.setUser(sessionUser);
-      authStore.setAuthenticated(sessionAuthenticated);
-    }
-  }, [sessionUser, sessionAuthenticated]);
-
-  // ============================================================================
-  // Return Hook Interface
-  // ============================================================================
-
+function createAuthError(
+  code: AuthErrorCode,
+  message: string,
+  context?: string | Record<string, any>,
+  statusCode?: number
+): AuthError {
   return {
-    // Core state - prioritize session state over store state
-    user: sessionUser || authStore.user,
-    isAuthenticated: sessionAuthenticated,
-    isLoading,
-    error,
-    
-    // Actions
-    login,
-    logout,
-    refresh,
-    checkSession,
-    
-    // React 19 concurrent features
-    startTransition,
-    isPending: isPending || loginMutation.isPending || logoutMutation.isPending,
-    
-    // RBAC integration - enhanced with cached permissions
-    hasPermission,
-    hasRole,
-    isAdmin: sessionIsAdmin || authStore.user?.isSysAdmin || false,
-    isRootAdmin: sessionIsRootAdmin || authStore.user?.isRootAdmin || false,
+    code,
+    message,
+    context,
+    statusCode,
+    timestamp: new Date().toISOString(),
+    requestId: crypto.randomUUID?.() || Math.random().toString(36),
   };
 }
 
-// ============================================================================
-// Additional Exports
-// ============================================================================
+/**
+ * Parses HTTP errors into standardized auth errors
+ */
+function parseHttpError(error: any): AuthError {
+  if (error?.status === 401) {
+    return createAuthError(
+      AuthErrorCode.UNAUTHORIZED,
+      'Authentication required',
+      error?.message || 'Invalid or expired credentials',
+      401
+    );
+  }
+
+  if (error?.status === 403) {
+    return createAuthError(
+      AuthErrorCode.FORBIDDEN,
+      'Access denied',
+      error?.message || 'Insufficient permissions',
+      403
+    );
+  }
+
+  if (error?.status === 422) {
+    return createAuthError(
+      AuthErrorCode.VALIDATION_ERROR,
+      'Validation failed',
+      error?.message || 'Invalid input data',
+      422
+    );
+  }
+
+  if (error?.name === 'NetworkError' || error?.code === 'NETWORK_ERROR') {
+    return createAuthError(
+      AuthErrorCode.NETWORK_ERROR,
+      'Network connection failed',
+      error?.message || 'Unable to connect to authentication server'
+    );
+  }
+
+  return createAuthError(
+    AuthErrorCode.SERVER_ERROR,
+    'Authentication error',
+    error?.message || 'An unexpected error occurred',
+    error?.status || 500
+  );
+}
+
+// =============================================================================
+// API CLIENT FUNCTIONS
+// =============================================================================
 
 /**
- * Authentication API client for external use
- * Provides direct access to authentication API operations
+ * Makes authenticated API requests with automatic token handling
  */
-export { AuthAPI };
+async function makeAuthenticatedRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const response = await fetch(endpoint, {
+    ...options,
+    credentials: 'include', // Include HTTP-only cookies
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw {
+      status: response.status,
+      statusText: response.statusText,
+      message: errorData.message || response.statusText,
+      ...errorData,
+    };
+  }
+
+  return response.json();
+}
 
 /**
- * Authentication query keys for external cache management
- * Enables consistent cache key usage across components
+ * Login API call with credential validation
  */
-export { authQueryKeys };
+async function loginAPI(credentials: LoginCredentials): Promise<LoginResponse> {
+  // Determine the correct endpoint based on credentials
+  const endpoint = credentials.email ? '/api/auth/user/session' : '/api/auth/admin/session';
+  
+  const response = await makeAuthenticatedRequest<LoginResponse>(endpoint, {
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  });
+
+  return response;
+}
 
 /**
- * Default export for convenient importing
+ * Login with existing JWT token
  */
+async function loginWithTokenAPI(token: string): Promise<LoginResponse> {
+  const response = await makeAuthenticatedRequest<LoginResponse>('/api/auth/session/validate', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response;
+}
+
+/**
+ * Logout API call with session cleanup
+ */
+async function logoutAPI(userData?: UserSession | null): Promise<void> {
+  const endpoint = userData?.isSysAdmin ? '/api/auth/admin/session' : '/api/auth/user/session';
+  
+  await makeAuthenticatedRequest<void>(endpoint, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * User registration API call
+ */
+async function registerAPI(details: RegisterDetails): Promise<LoginResponse> {
+  const response = await makeAuthenticatedRequest<LoginResponse>('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(details),
+  });
+
+  return response;
+}
+
+/**
+ * Password reset request API call
+ */
+async function forgotPasswordAPI(request: ForgetPasswordRequest): Promise<{ success: boolean; message: string }> {
+  const response = await makeAuthenticatedRequest<{ success: boolean; message: string }>('/api/auth/password/forgot', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+
+  return response;
+}
+
+/**
+ * Password update API call
+ */
+async function updatePasswordAPI(request: UpdatePasswordRequest): Promise<UpdatePasswordResponse> {
+  const response = await makeAuthenticatedRequest<UpdatePasswordResponse>('/api/auth/password/update', {
+    method: 'PUT',
+    body: JSON.stringify(request),
+  });
+
+  return response;
+}
+
+/**
+ * OAuth login API call
+ */
+async function oauthLoginAPI(request: OAuthLoginRequest): Promise<LoginResponse> {
+  const response = await makeAuthenticatedRequest<LoginResponse>('/api/auth/oauth/login', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+
+  return response;
+}
+
+/**
+ * SAML login API call
+ */
+async function samlLoginAPI(params: SAMLAuthParams): Promise<LoginResponse> {
+  const response = await makeAuthenticatedRequest<LoginResponse>('/api/auth/saml/login', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+
+  return response;
+}
+
+/**
+ * Token refresh API call
+ */
+async function refreshTokenAPI(): Promise<{ token: string; expiresAt: string }> {
+  const response = await makeAuthenticatedRequest<{ token: string; expiresAt: string }>('/api/auth/token/refresh', {
+    method: 'POST',
+  });
+
+  return response;
+}
+
+/**
+ * User permissions API call
+ */
+async function getUserPermissionsAPI(userId: number): Promise<string[]> {
+  const response = await makeAuthenticatedRequest<{ permissions: string[] }>(`/api/auth/users/${userId}/permissions`, {
+    method: 'GET',
+  });
+
+  return response.permissions;
+}
+
+// =============================================================================
+// CORE AUTHENTICATION HOOK
+// =============================================================================
+
+/**
+ * Primary authentication hook for DreamFactory Admin Interface
+ * 
+ * Provides comprehensive authentication management with:
+ * - React Query mutations for login, logout, and session validation
+ * - Zustand state integration for authentication status and user data
+ * - JWT token management with automatic refresh capabilities
+ * - User permission caching with RBAC using React Query intelligent caching
+ * - Session validation on component mount with token expiration handling
+ * - HTTP-only cookie integration with SameSite=Strict configuration
+ * - Next.js middleware integration for server-side authentication
+ * 
+ * @param config Configuration options for authentication behavior
+ * @returns Authentication state and actions interface
+ */
+export function useAuth(config: UseAuthConfig = {}): AuthState & AuthActions {
+  const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  
+  // Integrate with session management hook
+  const {
+    session,
+    user,
+    isAuthenticated: sessionAuthenticated,
+    isLoading: sessionLoading,
+    error: sessionError,
+    login: sessionLogin,
+    logout: sessionLogout,
+    refresh: sessionRefresh,
+    validateSession,
+    clearSession,
+    hasRole,
+    hasPermission,
+    canAccessService,
+  } = useSession({
+    enabled: true,
+    refreshInterval: TOKEN_REFRESH_INTERVAL,
+    onSessionExpired: () => {
+      // Handle session expiration by clearing state and redirecting
+      clearAuthState();
+      if (finalConfig.redirectIfUnauthenticated) {
+        router.push(finalConfig.redirectTo);
+      }
+    },
+    onSessionRefreshed: (session) => {
+      // Update auth cache when session is refreshed
+      queryClient.setQueryData(AUTH_QUERY_KEYS.session, session);
+      queryClient.setQueryData(AUTH_QUERY_KEYS.user, session.user);
+    },
+  });
+
+  // =============================================================================
+  // AUTHENTICATION STATE QUERIES
+  // =============================================================================
+
+  // User permissions query with intelligent caching
+  const permissionsQuery = useQuery({
+    queryKey: AUTH_QUERY_KEYS.permissions,
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return getUserPermissionsAPI(user.id);
+    },
+    enabled: !!user?.id && sessionAuthenticated,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    cacheTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error: any) => {
+      // Don't retry on authentication errors
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+  });
+
+  // =============================================================================
+  // AUTHENTICATION MUTATIONS
+  // =============================================================================
+
+  // Login mutation with comprehensive error handling
+  const loginMutation = useMutation({
+    mutationKey: [AUTH_MUTATION_KEYS.login],
+    mutationFn: async (credentials: LoginCredentials): Promise<LoginResponse> => {
+      try {
+        const response = await loginAPI(credentials);
+        return response;
+      } catch (error) {
+        throw parseHttpError(error);
+      }
+    },
+    onSuccess: async (response) => {
+      // Update session state via session hook
+      if (response.user && response.sessionToken) {
+        const sessionData = {
+          token: {
+            token: response.sessionToken,
+            expires_at: response.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            user_id: response.user.id,
+            session_id: response.user.sessionId || crypto.randomUUID?.() || Math.random().toString(36),
+          },
+          user: response.user,
+          lastActivity: new Date().toISOString(),
+          expiresAt: response.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        };
+        
+        // Invalidate all auth-related queries to trigger fresh data fetch
+        await queryClient.invalidateQueries({ queryKey: ['auth'] });
+        
+        // Set fresh session data
+        queryClient.setQueryData(AUTH_QUERY_KEYS.session, sessionData);
+        queryClient.setQueryData(AUTH_QUERY_KEYS.user, response.user);
+      }
+    },
+    onError: (error: AuthError) => {
+      // Clear any stale auth data on login failure
+      clearAuthState();
+    },
+  });
+
+  // Login with JWT token mutation
+  const loginWithTokenMutation = useMutation({
+    mutationKey: [AUTH_MUTATION_KEYS.login, 'token'],
+    mutationFn: async (token: string): Promise<LoginResponse> => {
+      try {
+        const response = await loginWithTokenAPI(token);
+        return response;
+      } catch (error) {
+        throw parseHttpError(error);
+      }
+    },
+    onSuccess: async (response) => {
+      if (response.user && response.sessionToken) {
+        // Same session update logic as regular login
+        const sessionData = {
+          token: {
+            token: response.sessionToken,
+            expires_at: response.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            user_id: response.user.id,
+            session_id: response.user.sessionId || crypto.randomUUID?.() || Math.random().toString(36),
+          },
+          user: response.user,
+          lastActivity: new Date().toISOString(),
+          expiresAt: response.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        };
+        
+        await queryClient.invalidateQueries({ queryKey: ['auth'] });
+        queryClient.setQueryData(AUTH_QUERY_KEYS.session, sessionData);
+        queryClient.setQueryData(AUTH_QUERY_KEYS.user, response.user);
+      }
+    },
+    onError: () => {
+      clearAuthState();
+    },
+  });
+
+  // Logout mutation with cleanup
+  const logoutMutation = useMutation({
+    mutationKey: [AUTH_MUTATION_KEYS.logout],
+    mutationFn: async (): Promise<void> => {
+      try {
+        await logoutAPI(user);
+      } catch (error) {
+        // Continue with logout even if API call fails
+        console.warn('Logout API call failed, continuing with local cleanup:', error);
+      }
+    },
+    onSettled: async () => {
+      // Always clear state and redirect, regardless of API success
+      await clearAuthState();
+      
+      // Use session logout for complete cleanup
+      try {
+        await sessionLogout();
+      } catch (error) {
+        console.warn('Session logout failed:', error);
+      }
+      
+      // Redirect to login page
+      router.push(finalConfig.redirectTo);
+    },
+  });
+
+  // User registration mutation
+  const registerMutation = useMutation({
+    mutationKey: [AUTH_MUTATION_KEYS.register],
+    mutationFn: async (details: RegisterDetails): Promise<LoginResponse> => {
+      try {
+        const response = await registerAPI(details);
+        return response;
+      } catch (error) {
+        throw parseHttpError(error);
+      }
+    },
+    onSuccess: async (response) => {
+      // Same session setup as login
+      if (response.user && response.sessionToken) {
+        const sessionData = {
+          token: {
+            token: response.sessionToken,
+            expires_at: response.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            user_id: response.user.id,
+            session_id: response.user.sessionId || crypto.randomUUID?.() || Math.random().toString(36),
+          },
+          user: response.user,
+          lastActivity: new Date().toISOString(),
+          expiresAt: response.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        };
+        
+        await queryClient.invalidateQueries({ queryKey: ['auth'] });
+        queryClient.setQueryData(AUTH_QUERY_KEYS.session, sessionData);
+        queryClient.setQueryData(AUTH_QUERY_KEYS.user, response.user);
+      }
+    },
+  });
+
+  // Token refresh mutation
+  const refreshMutation = useMutation({
+    mutationKey: [AUTH_MUTATION_KEYS.refresh],
+    mutationFn: async (): Promise<{ token: string; expiresAt: string }> => {
+      try {
+        const response = await refreshTokenAPI();
+        return response;
+      } catch (error) {
+        throw parseHttpError(error);
+      }
+    },
+    onSuccess: async (response) => {
+      // Update session token data
+      if (session) {
+        const updatedSession = {
+          ...session,
+          token: {
+            ...session.token,
+            token: response.token,
+            expires_at: response.expiresAt,
+          },
+          expiresAt: response.expiresAt,
+          lastActivity: new Date().toISOString(),
+        };
+        
+        queryClient.setQueryData(AUTH_QUERY_KEYS.session, updatedSession);
+      }
+    },
+    onError: () => {
+      // If refresh fails, logout user
+      clearAuthState();
+      if (finalConfig.redirectIfUnauthenticated) {
+        router.push(finalConfig.redirectTo);
+      }
+    },
+  });
+
+  // Forgot password mutation
+  const forgotPasswordMutation = useMutation({
+    mutationKey: [AUTH_MUTATION_KEYS.forgotPassword],
+    mutationFn: async (request: ForgetPasswordRequest): Promise<{ success: boolean; message: string }> => {
+      try {
+        const response = await forgotPasswordAPI(request);
+        return response;
+      } catch (error) {
+        throw parseHttpError(error);
+      }
+    },
+  });
+
+  // Update password mutation
+  const updatePasswordMutation = useMutation({
+    mutationKey: [AUTH_MUTATION_KEYS.updatePassword],
+    mutationFn: async (request: UpdatePasswordRequest): Promise<UpdatePasswordResponse> => {
+      try {
+        const response = await updatePasswordAPI(request);
+        return response;
+      } catch (error) {
+        throw parseHttpError(error);
+      }
+    },
+    onSuccess: async (response) => {
+      // Update session token if provided
+      if (response.sessionToken && session) {
+        const updatedSession = {
+          ...session,
+          token: {
+            ...session.token,
+            token: response.sessionToken,
+          },
+          lastActivity: new Date().toISOString(),
+        };
+        
+        queryClient.setQueryData(AUTH_QUERY_KEYS.session, updatedSession);
+      }
+    },
+  });
+
+  // OAuth login mutation
+  const oauthLoginMutation = useMutation({
+    mutationKey: [AUTH_MUTATION_KEYS.oauthLogin],
+    mutationFn: async (request: OAuthLoginRequest): Promise<LoginResponse> => {
+      try {
+        const response = await oauthLoginAPI(request);
+        return response;
+      } catch (error) {
+        throw parseHttpError(error);
+      }
+    },
+    onSuccess: async (response) => {
+      // Same session setup as regular login
+      if (response.user && response.sessionToken) {
+        const sessionData = {
+          token: {
+            token: response.sessionToken,
+            expires_at: response.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            user_id: response.user.id,
+            session_id: response.user.sessionId || crypto.randomUUID?.() || Math.random().toString(36),
+          },
+          user: response.user,
+          lastActivity: new Date().toISOString(),
+          expiresAt: response.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        };
+        
+        await queryClient.invalidateQueries({ queryKey: ['auth'] });
+        queryClient.setQueryData(AUTH_QUERY_KEYS.session, sessionData);
+        queryClient.setQueryData(AUTH_QUERY_KEYS.user, response.user);
+      }
+    },
+  });
+
+  // SAML login mutation
+  const samlLoginMutation = useMutation({
+    mutationKey: [AUTH_MUTATION_KEYS.samlLogin],
+    mutationFn: async (params: SAMLAuthParams): Promise<LoginResponse> => {
+      try {
+        const response = await samlLoginAPI(params);
+        return response;
+      } catch (error) {
+        throw parseHttpError(error);
+      }
+    },
+    onSuccess: async (response) => {
+      // Same session setup as regular login
+      if (response.user && response.sessionToken) {
+        const sessionData = {
+          token: {
+            token: response.sessionToken,
+            expires_at: response.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            user_id: response.user.id,
+            session_id: response.user.sessionId || crypto.randomUUID?.() || Math.random().toString(36),
+          },
+          user: response.user,
+          lastActivity: new Date().toISOString(),
+          expiresAt: response.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        };
+        
+        await queryClient.invalidateQueries({ queryKey: ['auth'] });
+        queryClient.setQueryData(AUTH_QUERY_KEYS.session, sessionData);
+        queryClient.setQueryData(AUTH_QUERY_KEYS.user, response.user);
+      }
+    },
+  });
+
+  // =============================================================================
+  // UTILITY FUNCTIONS
+  // =============================================================================
+
+  /**
+   * Clears all authentication state from React Query cache
+   */
+  const clearAuthState = useCallback(async (): Promise<void> => {
+    await queryClient.invalidateQueries({ queryKey: ['auth'] });
+    queryClient.removeQueries({ queryKey: ['auth'] });
+    clearSession();
+  }, [queryClient, clearSession]);
+
+  /**
+   * Checks if current user has all required permissions
+   */
+  const checkPermissions = useCallback((requiredPermissions: string[]): boolean => {
+    if (!requiredPermissions.length) return true;
+    if (!user || !sessionAuthenticated) return false;
+    
+    const userPermissions = permissionsQuery.data || [];
+    return requiredPermissions.every(permission => userPermissions.includes(permission));
+  }, [user, sessionAuthenticated, permissionsQuery.data]);
+
+  /**
+   * Automatic token refresh based on expiration time
+   */
+  useEffect(() => {
+    if (!finalConfig.enableAutoRefresh || !session?.expiresAt) return;
+
+    const expiryTime = new Date(session.expiresAt).getTime();
+    const currentTime = Date.now();
+    const timeUntilExpiry = expiryTime - currentTime;
+
+    // If token expires within threshold, refresh it
+    if (timeUntilExpiry > 0 && timeUntilExpiry <= TOKEN_REFRESH_THRESHOLD) {
+      refreshMutation.mutate();
+    }
+
+    // Set up automatic refresh before expiry
+    const refreshTimeout = setTimeout(() => {
+      if (sessionAuthenticated && !refreshMutation.isPending) {
+        refreshMutation.mutate();
+      }
+    }, Math.max(0, timeUntilExpiry - TOKEN_REFRESH_THRESHOLD));
+
+    return () => clearTimeout(refreshTimeout);
+  }, [session?.expiresAt, sessionAuthenticated, finalConfig.enableAutoRefresh, refreshMutation]);
+
+  /**
+   * Permission-based access control with redirect
+   */
+  useEffect(() => {
+    if (!finalConfig.redirectIfUnauthenticated) return;
+    
+    // Check authentication
+    if (!sessionLoading && !sessionAuthenticated) {
+      router.push(finalConfig.redirectTo);
+      return;
+    }
+
+    // Check permissions
+    if (sessionAuthenticated && finalConfig.requiredPermissions.length > 0) {
+      if (!permissionsQuery.isLoading && !checkPermissions(finalConfig.requiredPermissions)) {
+        router.push('/unauthorized');
+        return;
+      }
+    }
+  }, [
+    sessionAuthenticated,
+    sessionLoading,
+    permissionsQuery.isLoading,
+    finalConfig.redirectIfUnauthenticated,
+    finalConfig.redirectTo,
+    finalConfig.requiredPermissions,
+    checkPermissions,
+    router,
+  ]);
+
+  // =============================================================================
+  // ACTION IMPLEMENTATIONS
+  // =============================================================================
+
+  const login = useCallback(async (credentials: LoginCredentials): Promise<void> => {
+    await loginMutation.mutateAsync(credentials);
+  }, [loginMutation]);
+
+  const loginWithToken = useCallback(async (token: string): Promise<void> => {
+    await loginWithTokenMutation.mutateAsync(token);
+  }, [loginWithTokenMutation]);
+
+  const logout = useCallback(async (): Promise<void> => {
+    await logoutMutation.mutateAsync();
+  }, [logoutMutation]);
+
+  const register = useCallback(async (details: RegisterDetails): Promise<void> => {
+    await registerMutation.mutateAsync(details);
+  }, [registerMutation]);
+
+  const refreshToken = useCallback(async (): Promise<void> => {
+    await refreshMutation.mutateAsync();
+  }, [refreshMutation]);
+
+  const forgotPassword = useCallback(async (request: ForgetPasswordRequest): Promise<{ success: boolean; message: string }> => {
+    return await forgotPasswordMutation.mutateAsync(request);
+  }, [forgotPasswordMutation]);
+
+  const updatePassword = useCallback(async (request: UpdatePasswordRequest): Promise<UpdatePasswordResponse> => {
+    return await updatePasswordMutation.mutateAsync(request);
+  }, [updatePasswordMutation]);
+
+  const oauthLogin = useCallback(async (request: OAuthLoginRequest): Promise<void> => {
+    await oauthLoginMutation.mutateAsync(request);
+  }, [oauthLoginMutation]);
+
+  const samlLogin = useCallback(async (params: SAMLAuthParams): Promise<void> => {
+    await samlLoginMutation.mutateAsync(params);
+  }, [samlLoginMutation]);
+
+  const updateUser = useCallback((userData: Partial<UserSession>): void => {
+    if (user) {
+      const updatedUser = { ...user, ...userData };
+      queryClient.setQueryData(AUTH_QUERY_KEYS.user, updatedUser);
+      
+      if (session) {
+        const updatedSession = { ...session, user: updatedUser };
+        queryClient.setQueryData(AUTH_QUERY_KEYS.session, updatedSession);
+      }
+    }
+  }, [user, session, queryClient]);
+
+  const clearError = useCallback((): void => {
+    // Reset mutation errors
+    loginMutation.reset();
+    registerMutation.reset();
+    refreshMutation.reset();
+    forgotPasswordMutation.reset();
+    updatePasswordMutation.reset();
+    oauthLoginMutation.reset();
+    samlLoginMutation.reset();
+  }, [
+    loginMutation,
+    registerMutation,
+    refreshMutation,
+    forgotPasswordMutation,
+    updatePasswordMutation,
+    oauthLoginMutation,
+    samlLoginMutation,
+  ]);
+
+  const checkSession = useCallback(async (): Promise<boolean> => {
+    try {
+      const result = await validateSession();
+      return result.success;
+    } catch (error) {
+      return false;
+    }
+  }, [validateSession]);
+
+  // =============================================================================
+  // COMPUTED STATE
+  // =============================================================================
+
+  const isLoading = useMemo(() => {
+    return sessionLoading || 
+           loginMutation.isPending || 
+           registerMutation.isPending || 
+           refreshMutation.isPending || 
+           permissionsQuery.isLoading;
+  }, [
+    sessionLoading,
+    loginMutation.isPending,
+    registerMutation.isPending,
+    refreshMutation.isPending,
+    permissionsQuery.isLoading,
+  ]);
+
+  const error = useMemo(() => {
+    return (sessionError as AuthError) ||
+           (loginMutation.error as AuthError) ||
+           (registerMutation.error as AuthError) ||
+           (refreshMutation.error as AuthError) ||
+           (forgotPasswordMutation.error as AuthError) ||
+           (updatePasswordMutation.error as AuthError) ||
+           (oauthLoginMutation.error as AuthError) ||
+           (samlLoginMutation.error as AuthError) ||
+           (permissionsQuery.error ? parseHttpError(permissionsQuery.error) : null);
+  }, [
+    sessionError,
+    loginMutation.error,
+    registerMutation.error,
+    refreshMutation.error,
+    forgotPasswordMutation.error,
+    updatePasswordMutation.error,
+    oauthLoginMutation.error,
+    samlLoginMutation.error,
+    permissionsQuery.error,
+  ]);
+
+  const isRefreshing = useMemo(() => {
+    return refreshMutation.isPending;
+  }, [refreshMutation.isPending]);
+
+  const permissions = useMemo(() => {
+    return permissionsQuery.data || [];
+  }, [permissionsQuery.data]);
+
+  // =============================================================================
+  // RETURN INTERFACE
+  // =============================================================================
+
+  return {
+    // Authentication state
+    isAuthenticated: sessionAuthenticated,
+    isLoading,
+    user,
+    error,
+    isRefreshing,
+    permissions,
+
+    // Authentication actions
+    login,
+    loginWithToken,
+    logout,
+    register,
+    refreshToken,
+    forgotPassword,
+    updatePassword,
+    oauthLogin,
+    samlLogin,
+    updateUser,
+    clearError,
+    checkSession,
+
+    // Permission and role checking (delegated to session hook)
+    hasRole,
+    hasPermission,
+    canAccessService,
+    checkPermissions,
+
+    // Additional utilities
+    clearAuthState,
+  };
+}
+
+// =============================================================================
+// EXPORT TYPES AND UTILITIES
+// =============================================================================
+
+export type UseAuthReturn = ReturnType<typeof useAuth>;
+
+export {
+  AUTH_QUERY_KEYS,
+  AUTH_MUTATION_KEYS,
+  createAuthError,
+  parseHttpError,
+  type AuthState,
+  type AuthActions,
+  type AuthStore,
+  type UseAuthConfig,
+};
+
 export default useAuth;
