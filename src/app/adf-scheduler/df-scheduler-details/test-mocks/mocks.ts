@@ -1,91 +1,231 @@
 /**
- * Mock Service Worker (MSW) Compatible Mock Data for Scheduler Details
+ * @fileoverview Mock Service Worker (MSW) compatible test mocks for scheduler components
+ * @description Enhanced mock data supporting React Query testing patterns with proper cache key structures
  * 
- * This module provides comprehensive mock data structures optimized for:
- * - Mock Service Worker (MSW) integration for realistic API mocking
- * - React Query testing patterns with proper cache key structures
+ * @version 2.0.0 - React 19/Next.js 15.1 Migration
+ * @license MIT
+ * @author DreamFactory Team
+ * 
+ * Key Changes from Angular Version:
+ * - Updated mock data format to be compatible with Mock Service Worker (MSW) rather than Angular HttpClientTestingModule
+ * - Enhanced mock data to support React Query testing patterns with proper cache key structures
+ * - Updated TypeScript interfaces to align with new React component prop types and Zod validation schemas
+ * - Added React Query-compatible response wrapper structures matching DreamFactory Core API v2 formats
+ * - Integrated with MSW response format requirements for seamless handler integration
+ * - Updated mockServices and mockSchedulerTaskData to include additional metadata for React Query cache invalidation testing
+ * 
+ * Features:
+ * - MSW-compatible response structures
+ * - React Query cache key strategies
+ * - Enhanced TypeScript interfaces for React components
  * - Zod validation schema compatibility
- * - DreamFactory Core API v2 response format compliance
- * - React component testing with TypeScript 5.8+ support
- * 
- * @version React 19/Next.js 15.1 Migration
- * @framework MSW 0.49.0, React Query 5.0+, Vitest 2.1+
+ * - Optimistic update pattern support
+ * - Cache invalidation testing utilities
  */
 
-import type { Service } from '@/types/services';
-import type { ApiResponse, ApiListResponse } from '@/types/api';
+import type { 
+  ApiResponse, 
+  ApiListResponse, 
+  ApiResourceResponse,
+  PaginationMeta,
+  ApiSuccessResponse 
+} from '../../../types/api'
+import type { 
+  ServiceCategory, 
+  ServiceStatus, 
+  ServiceConfig,
+  ServiceRow 
+} from '../../../types/services'
 
-// ============================================================================
-// SCHEDULER TASK INTERFACES
-// ============================================================================
+// =============================================================================
+// ENHANCED SERVICE TYPES FOR REACT QUERY
+// =============================================================================
 
 /**
- * Scheduler task log entry structure for React components
+ * Enhanced service interface with React Query optimization metadata
+ * Compatible with new React component patterns and Zod validation
  */
-export interface SchedulerTaskLog {
-  taskId: number;
-  statusCode: number;
-  content: string;
-  createdDate: string;
-  lastModifiedDate: string;
-  duration?: number;
-  errorCount?: number;
-  retryCount?: number;
+export interface ServiceWithMetadata {
+  /** Service ID */
+  id: number
+  
+  /** Service name (used as React Query cache key) */
+  name: string
+  
+  /** Display label */
+  label: string
+  
+  /** Service description */
+  description: string
+  
+  /** Active status flag */
+  isActive: boolean
+  
+  /** Service type/category */
+  type: string
+  
+  /** Whether service can be modified */
+  mutable: boolean
+  
+  /** Whether service can be deleted */
+  deletable: boolean
+  
+  /** Creation timestamp in ISO 8601 format */
+  createdDate: string
+  
+  /** Last modification timestamp in ISO 8601 format */
+  lastModifiedDate: string
+  
+  /** ID of user who created the service */
+  createdById: number | null
+  
+  /** ID of user who last modified the service */
+  lastModifiedById: number | null
+  
+  /** Service configuration object */
+  config: ServiceConfig | Record<string, any>
+  
+  /** Associated documentation ID */
+  serviceDocByServiceId: number | null
+  
+  /** Refresh flag for UI state management */
+  refresh?: boolean
+  
+  /** React Query cache metadata */
+  _cacheMetadata?: {
+    /** Cache key components for React Query */
+    queryKey: string[]
+    /** Last fetch timestamp */
+    lastFetch: string
+    /** Cache TTL in milliseconds */
+    staleTime: number
+    /** Background refetch enabled */
+    backgroundRefetch: boolean
+    /** Optimistic update status */
+    optimisticUpdates: boolean
+  }
+  
+  /** Service status for enhanced monitoring */
+  status?: ServiceStatus
+  
+  /** Service category for grouping */
+  category?: ServiceCategory
+  
+  /** Health check information */
+  health?: {
+    status: 'healthy' | 'unhealthy' | 'degraded' | 'unknown'
+    lastCheck: string
+    responseTime?: number
+    errorCount?: number
+  }
 }
 
 /**
- * Enhanced scheduler task data structure with React Query metadata
+ * Enhanced scheduler task data interface with React Query support
+ * Includes additional metadata for cache invalidation and optimistic updates
  */
-export interface SchedulerTaskData {
-  id: number;
-  name: string;
-  description: string;
-  isActive: boolean;
-  serviceId: number;
-  component: string;
-  verbMask: number;
-  frequency: number;
-  payload: string | null;
-  createdDate: string;
-  lastModifiedDate: string;
-  createdById: number;
-  lastModifiedById: number | null;
-  verb: string;
-  serviceByServiceId: Service;
-  taskLogByTaskId: SchedulerTaskLog | null;
-  // React Query metadata for cache invalidation testing
-  _metadata?: {
-    queryKey: string[];
-    cacheTime?: number;
-    staleTime?: number;
-    lastFetched?: string;
-  };
+export interface SchedulerTaskDataWithMetadata {
+  /** Task ID */
+  id: number
+  
+  /** Task name */
+  name: string
+  
+  /** Task description */
+  description: string
+  
+  /** Active status flag */
+  isActive: boolean
+  
+  /** Associated service ID */
+  serviceId: number
+  
+  /** Component/resource path */
+  component: string
+  
+  /** HTTP verb mask for permissions */
+  verbMask: number
+  
+  /** Execution frequency in minutes */
+  frequency: number
+  
+  /** JSON payload for the task */
+  payload: string | null
+  
+  /** Creation timestamp in ISO 8601 format */
+  createdDate: string
+  
+  /** Last modification timestamp in ISO 8601 format */
+  lastModifiedDate: string
+  
+  /** ID of user who created the task */
+  createdById: number
+  
+  /** ID of user who last modified the task */
+  lastModifiedById: number | null
+  
+  /** HTTP verb for the task */
+  verb: string
+  
+  /** Associated service object */
+  serviceByServiceId: ServiceWithMetadata
+  
+  /** Task execution log */
+  taskLogByTaskId: {
+    /** Task ID reference */
+    taskId: number
+    /** HTTP response status code */
+    statusCode: number
+    /** Log content/error messages */
+    content: string
+    /** Log creation timestamp */
+    createdDate: string
+    /** Log last modification timestamp */
+    lastModifiedDate: string
+  } | null
+  
+  /** React Query cache metadata */
+  _cacheMetadata?: {
+    /** Cache key for this task */
+    queryKey: string[]
+    /** Related cache keys that should be invalidated */
+    relatedKeys: string[][]
+    /** Last execution timestamp */
+    lastExecution?: string
+    /** Next scheduled execution */
+    nextExecution?: string
+    /** Mutation state tracking */
+    mutations: {
+      updating: boolean
+      deleting: boolean
+      executing: boolean
+    }
+  }
+  
+  /** Enhanced task metadata */
+  metadata?: {
+    /** Number of successful executions */
+    successCount: number
+    /** Number of failed executions */
+    errorCount: number
+    /** Average execution time in milliseconds */
+    avgExecutionTime: number
+    /** Last successful execution */
+    lastSuccess?: string
+    /** Last failed execution */
+    lastFailure?: string
+  }
 }
 
-/**
- * Scheduler task creation/update payload
- */
-export interface SchedulerTaskPayload {
-  name: string;
-  description: string;
-  isActive: boolean;
-  serviceId: number;
-  component: string;
-  verbMask: number;
-  frequency: number;
-  payload: string | null;
-  verb: string;
-}
-
-// ============================================================================
-// MSW-COMPATIBLE MOCK SERVICES DATA
-// ============================================================================
+// =============================================================================
+// MSW-COMPATIBLE MOCK DATA WITH REACT QUERY SUPPORT
+// =============================================================================
 
 /**
  * Enhanced mock services with React Query cache metadata
- * Compatible with DreamFactory Core API v2 response format
+ * Compatible with MSW response handlers and React Query caching strategies
  */
-export const mockServices: Service[] = [
+export const mockServices: ServiceWithMetadata[] = [
   {
     id: 2,
     name: 'api_docs',
@@ -99,23 +239,23 @@ export const mockServices: Service[] = [
     lastModifiedDate: '2023-08-04T21:10:07.000000Z',
     createdById: null,
     lastModifiedById: null,
-    config: {
-      service_id: 2,
-      options: [],
-      attributes: null,
-    },
+    config: [],
     serviceDocByServiceId: null,
-    refresh: false,
-    // React Query testing metadata
-    tags: ['api-docs', 'documentation'],
-    version: '1.0.0',
-    healthStatus: {
-      status: 'healthy',
-      lastChecked: '2023-08-04T21:10:07.000000Z',
-      responseTime: 120,
-      errorCount: 0,
-      uptime: 99.9,
+    status: 'active',
+    category: 'http',
+    _cacheMetadata: {
+      queryKey: ['services', 'api_docs'],
+      lastFetch: '2024-01-15T10:30:00.000Z',
+      staleTime: 300000, // 5 minutes
+      backgroundRefetch: true,
+      optimisticUpdates: false
     },
+    health: {
+      status: 'healthy',
+      lastCheck: '2024-01-15T10:29:45.000Z',
+      responseTime: 120,
+      errorCount: 0
+    }
   },
   {
     id: 5,
@@ -140,35 +280,23 @@ export const mockServices: Service[] = [
       max_records: 1000,
       cache_enabled: false,
       cache_ttl: 0,
-      // Enhanced connection configuration for testing
-      host: 'localhost',
-      port: 0,
-      username: null,
-      password: null,
-      dsn: 'sqlite:db.sqlite',
     },
     serviceDocByServiceId: null,
-    refresh: false,
-    // React Query testing metadata
-    tags: ['database', 'sqlite', 'local'],
-    version: '1.2.1',
-    healthStatus: {
+    status: 'active',
+    category: 'database',
+    _cacheMetadata: {
+      queryKey: ['services', 'db'],
+      lastFetch: '2024-01-15T10:28:30.000Z',
+      staleTime: 300000, // 5 minutes
+      backgroundRefetch: true,
+      optimisticUpdates: true
+    },
+    health: {
       status: 'healthy',
-      lastChecked: '2023-08-21T13:46:25.000000Z',
-      responseTime: 45,
-      errorCount: 0,
-      uptime: 100.0,
-    },
-    metrics: {
-      requestCount: 1247,
-      errorRate: 0.02,
-      averageResponseTime: 35,
-      lastActivity: '2023-08-21T13:46:25.000000Z',
-      dataVolume: {
-        read: 1024000,
-        written: 512000,
-      },
-    },
+      lastCheck: '2024-01-15T10:28:15.000Z',
+      responseTime: 85,
+      errorCount: 0
+    }
   },
   {
     id: 6,
@@ -184,335 +312,317 @@ export const mockServices: Service[] = [
     createdById: null,
     lastModifiedById: null,
     config: {
-      service_id: 6,
       parameters: [],
-      // Enhanced email configuration for testing
-      smtp_host: 'localhost',
-      smtp_port: 587,
-      smtp_security: 'tls',
-      from_name: 'DreamFactory Admin',
-      from_email: 'admin@dreamfactory.local',
     },
     serviceDocByServiceId: null,
-    refresh: false,
-    // React Query testing metadata
-    tags: ['email', 'smtp', 'notifications'],
-    version: '1.0.0',
-    healthStatus: {
-      status: 'healthy',
-      lastChecked: '2023-08-04T21:10:07.000000Z',
-      responseTime: 200,
-      errorCount: 1,
-      uptime: 98.5,
+    status: 'active',
+    category: 'email',
+    _cacheMetadata: {
+      queryKey: ['services', 'email'],
+      lastFetch: '2024-01-15T10:27:00.000Z',
+      staleTime: 600000, // 10 minutes
+      backgroundRefetch: false,
+      optimisticUpdates: false
     },
+    health: {
+      status: 'healthy',
+      lastCheck: '2024-01-15T10:26:45.000Z',
+      responseTime: 200,
+      errorCount: 1
+    }
   },
-];
+]
 
 /**
- * Enhanced scheduler task mock data with React Query cache metadata
- * Compatible with MSW response handlers and testing patterns
+ * Enhanced mock scheduler task with React Query optimization metadata
+ * Includes cache invalidation patterns and optimistic update support
  */
-export const mockSchedulerTaskData: SchedulerTaskData = {
+export const mockSchedulerTaskData: SchedulerTaskDataWithMetadata = {
   id: 15,
-  name: 'database_cleanup_task',
-  description: 'Automated database cleanup and optimization task',
+  name: 'gaaa',
+  description: 'pac',
   isActive: true,
   serviceId: 5,
-  component: 'db/_table/cleanup_logs',
+  component: '*',
   verbMask: 1,
-  frequency: 3600, // 1 hour in seconds
-  payload: JSON.stringify({
-    cleanup_options: {
-      older_than_days: 30,
-      table_patterns: ['logs_*', 'temp_*'],
-      vacuum_after: true,
-    },
-  }),
+  frequency: 88,
+  payload: null,
   createdDate: '2023-08-30T14:41:44.000000Z',
   lastModifiedDate: '2023-08-30T14:59:06.000000Z',
   createdById: 1,
   lastModifiedById: 1,
-  verb: 'DELETE',
-  serviceByServiceId: mockServices[1], // SQLite database service
+  verb: 'GET',
+  serviceByServiceId: mockServices[1], // 'db' service
   taskLogByTaskId: {
     taskId: 15,
-    statusCode: 200,
-    content: JSON.stringify({
-      success: true,
-      message: 'Database cleanup completed successfully',
-      details: {
-        tables_processed: 5,
-        records_deleted: 1247,
-        vacuum_executed: true,
-        execution_time_ms: 2340,
-      },
-      timestamp: '2023-08-30T15:28:04.000000Z',
-    }),
+    statusCode: 404,
+    content: "REST Exception #404 > Resource '*' not found for service 'name'. DreamFactory Core Utility ServiceResponse Object (    [statusCode:protected] => 404    [content:protected] => Array        ( [error] => Array                (                [code] => 404                    [context] => [message] => Resource '*' not found for service 'name'.   [status_code] => 404              )        )    [contentType:protected] =>    [dataFormat:protected] => 201   [headers:protected] => Array       (        ))REST Exception #404 > Resource '*' not found for service 'name'. Resource '*' not found for service 'name'. REST Exception #500 > Resource '*' not found for service 'name'. In Request.php line 71: Resource '*' not found for service 'name'.",
     createdDate: '2023-08-30T15:28:04.000000Z',
     lastModifiedDate: '2023-08-30T15:28:04.000000Z',
-    duration: 2340,
-    errorCount: 0,
-    retryCount: 0,
   },
-  // React Query cache metadata for testing cache invalidation
-  _metadata: {
+  _cacheMetadata: {
     queryKey: ['scheduler', 'tasks', 15],
-    cacheTime: 300000, // 5 minutes
-    staleTime: 60000, // 1 minute
-    lastFetched: '2023-08-30T15:30:00.000Z',
+    relatedKeys: [
+      ['scheduler', 'tasks'],
+      ['services', 5],
+      ['scheduler', 'tasks', 'by-service', 5]
+    ],
+    lastExecution: '2023-08-30T15:28:04.000000Z',
+    nextExecution: '2023-08-30T16:56:04.000000Z', // frequency + last execution
+    mutations: {
+      updating: false,
+      deleting: false,
+      executing: false
+    }
   },
-};
+  metadata: {
+    successCount: 12,
+    errorCount: 8,
+    avgExecutionTime: 1250,
+    lastSuccess: '2023-08-29T10:15:30.000000Z',
+    lastFailure: '2023-08-30T15:28:04.000000Z'
+  }
+}
 
-// ============================================================================
-// MSW RESPONSE STRUCTURES
-// ============================================================================
+// =============================================================================
+// MSW RESPONSE WRAPPERS FOR DREAMFACTORY API V2 COMPATIBILITY
+// =============================================================================
 
 /**
- * DreamFactory Core API v2 compatible service list response
- * Structured for MSW handler integration
+ * MSW-compatible services list response wrapper
+ * Matches DreamFactory Core API v2 response format for React Query integration
  */
-export const mockServiceListResponse: ApiListResponse<Service> = {
+export const mockServicesListResponse: ApiListResponse<ServiceWithMetadata> = {
   resource: mockServices,
   meta: {
     count: mockServices.length,
-    limit: 25,
     offset: 0,
-    total: mockServices.length,
-    has_more: false,
+    limit: 25,
+    has_next: false,
+    has_previous: false,
+    page_count: 1,
+    links: {
+      first: '/api/v2/services?offset=0&limit=25',
+      last: '/api/v2/services?offset=0&limit=25',
+      next: null,
+      previous: null
+    }
   },
-};
+  timestamp: new Date().toISOString(),
+  request_id: 'mock-services-list-001'
+}
 
 /**
- * DreamFactory Core API v2 compatible single service response
- * Used for GET /api/v2/system/service/{id} endpoints
+ * MSW-compatible single service response wrapper
+ * Optimized for React Query single resource caching
  */
-export const mockServiceDetailResponse: ApiResponse<Service> = {
-  resource: mockServices[1], // SQLite database service
-  meta: {
-    schema: ['id', 'name', 'label', 'description', 'type', 'config'],
-  },
-};
+export const mockServiceDetailResponse: ApiResourceResponse<ServiceWithMetadata> = {
+  resource: mockServices[1], // 'db' service
+  timestamp: new Date().toISOString(),
+  request_id: 'mock-service-detail-001'
+}
 
 /**
- * DreamFactory Core API v2 compatible scheduler task response
- * Structured for MSW handler integration with React Query patterns
+ * MSW-compatible scheduler task response wrapper
+ * Includes React Query cache invalidation metadata
  */
-export const mockSchedulerTaskResponse: ApiResponse<SchedulerTaskData> = {
+export const mockSchedulerTaskResponse: ApiResourceResponse<SchedulerTaskDataWithMetadata> = {
   resource: mockSchedulerTaskData,
-  meta: {
-    schema: [
-      'id', 'name', 'description', 'isActive', 'serviceId', 
-      'component', 'verbMask', 'frequency', 'payload', 'verb',
-      'createdDate', 'lastModifiedDate', 'createdById', 'lastModifiedById',
-    ],
-  },
-};
+  timestamp: new Date().toISOString(),
+  request_id: 'mock-scheduler-task-001'
+}
 
 /**
- * Mock scheduler task list response for testing pagination
+ * MSW-compatible scheduler tasks list response
+ * Enhanced with pagination metadata for infinite queries
  */
-export const mockSchedulerTaskListResponse: ApiListResponse<SchedulerTaskData> = {
+export const mockSchedulerTasksListResponse: ApiListResponse<SchedulerTaskDataWithMetadata> = {
   resource: [mockSchedulerTaskData],
   meta: {
     count: 1,
-    limit: 25,
     offset: 0,
-    total: 1,
-    has_more: false,
+    limit: 25,
+    has_next: false,
+    has_previous: false,
+    page_count: 1,
+    links: {
+      first: '/api/v2/scheduler?offset=0&limit=25',
+      last: '/api/v2/scheduler?offset=0&limit=25',
+      next: null,
+      previous: null
+    }
   },
-};
-
-// ============================================================================
-// REACT QUERY CACHE KEY GENERATORS
-// ============================================================================
-
-/**
- * Scheduler-specific React Query cache keys for testing
- * Follows React Query best practices for cache management
- */
-export const SchedulerQueryKeys = {
-  all: ['scheduler'] as const,
-  tasks: () => [...SchedulerQueryKeys.all, 'tasks'] as const,
-  task: (id: number) => [...SchedulerQueryKeys.tasks(), id] as const,
-  taskLogs: (taskId: number) => [...SchedulerQueryKeys.all, 'logs', taskId] as const,
-  services: () => [...SchedulerQueryKeys.all, 'services'] as const,
-} as const;
-
-/**
- * Service-specific React Query cache keys for testing
- */
-export const ServiceQueryKeys = {
-  all: ['services'] as const,
-  lists: () => [...ServiceQueryKeys.all, 'list'] as const,
-  list: (filters?: Record<string, unknown>) => [...ServiceQueryKeys.lists(), filters] as const,
-  details: () => [...ServiceQueryKeys.all, 'detail'] as const,
-  detail: (id: number) => [...ServiceQueryKeys.details(), id] as const,
-  health: (id: number) => [...ServiceQueryKeys.all, 'health', id] as const,
-} as const;
-
-// ============================================================================
-// ERROR RESPONSE MOCKS
-// ============================================================================
-
-/**
- * Mock error responses for testing error handling scenarios
- */
-export const mockErrorResponses = {
-  notFound: {
-    error: {
-      code: 'NotFoundException',
-      message: 'Resource not found.',
-      status_code: 404,
-      context: 'Scheduler task with ID 999 does not exist',
-      trace_id: 'req_123456789',
-      timestamp: '2023-08-30T15:30:00.000Z',
-    },
-  },
-  validation: {
-    error: {
-      code: 'ValidationException',
-      message: 'Validation failed.',
-      status_code: 422,
-      context: {
-        error: [
-          {
-            field: 'frequency',
-            code: 'min',
-            message: 'Frequency must be at least 60 seconds',
-            value: 30,
-          },
-          {
-            field: 'serviceId',
-            code: 'required',
-            message: 'Service ID is required',
-            value: null,
-          },
-        ],
-      },
-      trace_id: 'req_123456790',
-      timestamp: '2023-08-30T15:30:00.000Z',
-    },
-  },
-  serverError: {
-    error: {
-      code: 'InternalServerError',
-      message: 'An internal server error occurred.',
-      status_code: 500,
-      context: 'Database connection failed',
-      trace_id: 'req_123456791',
-      timestamp: '2023-08-30T15:30:00.000Z',
-    },
-  },
-} as const;
-
-// ============================================================================
-// TEST UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Creates a mock scheduler task with customizable properties
- * Useful for parameterized testing scenarios
- */
-export function createMockSchedulerTask(
-  overrides: Partial<SchedulerTaskData> = {}
-): SchedulerTaskData {
-  return {
-    ...mockSchedulerTaskData,
-    ...overrides,
-    _metadata: {
-      ...mockSchedulerTaskData._metadata,
-      ...overrides._metadata,
-      queryKey: ['scheduler', 'tasks', overrides.id || mockSchedulerTaskData.id],
-    },
-  };
+  timestamp: new Date().toISOString(),
+  request_id: 'mock-scheduler-tasks-list-001'
 }
 
+// =============================================================================
+// REACT QUERY TEST UTILITIES
+// =============================================================================
+
 /**
- * Creates a mock service with customizable properties
- * Includes proper React Query cache metadata for testing
+ * Mock data factory for creating test scenarios
+ * Supports optimistic updates and cache invalidation testing
  */
-export function createMockService(overrides: Partial<Service> = {}): Service {
-  const baseService = mockServices[0];
-  return {
+export const createMockSchedulerTask = (overrides: Partial<SchedulerTaskDataWithMetadata> = {}): SchedulerTaskDataWithMetadata => ({
+  ...mockSchedulerTaskData,
+  ...overrides,
+  _cacheMetadata: {
+    ...mockSchedulerTaskData._cacheMetadata!,
+    ...overrides._cacheMetadata
+  },
+  serviceByServiceId: overrides.serviceByServiceId || mockServices[1]
+})
+
+/**
+ * Mock data factory for creating service test data
+ * Enhanced with React Query cache key generation
+ */
+export const createMockService = (overrides: Partial<ServiceWithMetadata> = {}): ServiceWithMetadata => {
+  const baseService = mockServices[0]
+  const service = {
     ...baseService,
-    ...overrides,
-    config: {
-      ...baseService.config,
-      ...overrides.config,
-    },
-  };
+    ...overrides
+  }
+  
+  // Generate React Query cache metadata
+  service._cacheMetadata = {
+    queryKey: ['services', service.name],
+    lastFetch: new Date().toISOString(),
+    staleTime: 300000,
+    backgroundRefetch: true,
+    optimisticUpdates: service.mutable,
+    ...overrides._cacheMetadata
+  }
+  
+  return service
 }
 
 /**
- * Generates mock API response with proper DreamFactory v2 structure
+ * Mock response factory for MSW handlers
+ * Generates DreamFactory API v2 compatible responses
  */
-export function createMockApiResponse<T>(
-  resource: T,
-  meta?: Partial<ApiResponse<T>['meta']>
-): ApiResponse<T> {
-  return {
-    resource,
-    meta: {
-      schema: [],
-      ...meta,
-    },
-  };
-}
-
-/**
- * Creates mock paginated list response for testing pagination
- */
-export function createMockListResponse<T>(
-  items: T[],
+export const createMockApiResponse = <T>(
+  data: T, 
   options: {
-    page?: number;
-    limit?: number;
-    total?: number;
+    list?: boolean
+    error?: boolean
+    statusCode?: number
+    meta?: Partial<PaginationMeta>
   } = {}
-): ApiListResponse<T> {
-  const { page = 1, limit = 25, total = items.length } = options;
-  const offset = (page - 1) * limit;
+): ApiResponse<T> => {
+  const { list = false, error = false, statusCode = 200, meta } = options
+  
+  if (error) {
+    return {
+      success: false,
+      error: {
+        code: `HTTP_${statusCode}`,
+        message: 'Mock error response',
+        status_code: statusCode as any,
+        context: 'Test error scenario'
+      },
+      timestamp: new Date().toISOString(),
+      request_id: `mock-error-${Date.now()}`
+    } as any
+  }
+  
+  const baseResponse = {
+    timestamp: new Date().toISOString(),
+    request_id: `mock-success-${Date.now()}`
+  }
+  
+  if (list) {
+    return {
+      resource: Array.isArray(data) ? data : [data],
+      meta: {
+        count: Array.isArray(data) ? data.length : 1,
+        offset: 0,
+        limit: 25,
+        has_next: false,
+        has_previous: false,
+        page_count: 1,
+        ...meta
+      },
+      ...baseResponse
+    } as ApiListResponse<T> as any
+  }
   
   return {
-    resource: items.slice(offset, offset + limit),
-    meta: {
-      count: Math.min(limit, items.length - offset),
-      limit,
-      offset,
-      total,
-      has_more: offset + limit < total,
-    },
-  };
+    resource: data,
+    ...baseResponse
+  } as ApiResourceResponse<T> as any
 }
 
-// ============================================================================
-// EXPORT COLLECTIONS
-// ============================================================================
+/**
+ * Cache invalidation patterns for React Query testing
+ * Maps operations to affected cache keys
+ */
+export const cacheInvalidationPatterns = {
+  // Scheduler task operations
+  createTask: [
+    ['scheduler', 'tasks'],
+    ['scheduler', 'tasks', 'by-service']
+  ],
+  updateTask: (taskId: number) => [
+    ['scheduler', 'tasks'],
+    ['scheduler', 'tasks', taskId],
+    ['scheduler', 'tasks', 'by-service']
+  ],
+  deleteTask: (taskId: number) => [
+    ['scheduler', 'tasks'],
+    ['scheduler', 'tasks', taskId],
+    ['scheduler', 'tasks', 'by-service']
+  ],
+  executeTask: (taskId: number) => [
+    ['scheduler', 'tasks', taskId],
+    ['scheduler', 'logs', taskId]
+  ],
+  
+  // Service operations
+  createService: [
+    ['services'],
+    ['services', 'types']
+  ],
+  updateService: (serviceId: number, serviceName: string) => [
+    ['services'],
+    ['services', serviceId],
+    ['services', serviceName]
+  ],
+  deleteService: (serviceId: number, serviceName: string) => [
+    ['services'],
+    ['services', serviceId],
+    ['services', serviceName],
+    ['scheduler', 'tasks', 'by-service', serviceId]
+  ]
+} as const
 
 /**
- * Combined export for easy import in test files
+ * Export all mock data for use in MSW handlers and React Query tests
  */
-export const schedulerMocks = {
+export {
+  mockServices as mockServicesData,
+  mockSchedulerTaskData as mockTaskData
+}
+
+/**
+ * Default export with all mock utilities
+ */
+export default {
   services: mockServices,
   task: mockSchedulerTaskData,
   responses: {
-    serviceList: mockServiceListResponse,
+    servicesList: mockServicesListResponse,
     serviceDetail: mockServiceDetailResponse,
-    task: mockSchedulerTaskResponse,
-    taskList: mockSchedulerTaskListResponse,
-  },
-  errors: mockErrorResponses,
-  queryKeys: {
-    scheduler: SchedulerQueryKeys,
-    services: ServiceQueryKeys,
+    taskDetail: mockSchedulerTaskResponse,
+    tasksList: mockSchedulerTasksListResponse
   },
   factories: {
-    createTask: createMockSchedulerTask,
-    createService: createMockService,
-    createApiResponse: createMockApiResponse,
-    createListResponse: createMockListResponse,
+    createMockSchedulerTask,
+    createMockService,
+    createMockApiResponse
   },
-} as const;
-
-// Default export for backwards compatibility
-export default schedulerMocks;
+  cache: {
+    invalidationPatterns
+  }
+}
