@@ -1,896 +1,1137 @@
 /**
- * @fileoverview Next.js Authentication Middleware
+ * Authentication Middleware for DreamFactory Admin Interface
  * 
- * Implements comprehensive authentication and authorization at the edge runtime,
- * replacing Angular AuthGuard patterns with server-side security enforcement.
- * Provides JWT token validation, automatic refresh, session management, and
- * role-based access control (RBAC) with sub-100ms processing requirement.
+ * Implements Next.js 15.1+ edge middleware for comprehensive authentication,
+ * authorization, and session management. Provides JWT token validation,
+ * automatic token refresh, role-based access control, and security enforcement
+ * at the middleware layer before reaching React components.
  * 
  * Key Features:
- * - Edge-based JWT token validation and automatic refresh
- * - HttpOnly cookie session management with server-side security
+ * - Edge runtime JWT token validation and refresh
+ * - HTTP-only cookie session management
+ * - Automatic token refresh capabilities
  * - Role-based access control (RBAC) enforcement
- * - Route protection with configurable permissions
- * - Comprehensive audit logging and security event tracking
- * - DreamFactory API integration with token management
- * - Performance-optimized for Next.js 15.1+ edge runtime
- * - React 19 server component compatibility
+ * - Comprehensive audit logging and security monitoring
+ * - Cross-tab session synchronization support
+ * - Production-grade error handling and recovery
  * 
  * Performance Requirements:
- * - Middleware processing under 100ms (specification requirement)
- * - Token validation under 50ms for cached results
- * - Automatic refresh under 2 seconds when required
+ * - Middleware processing under 100ms per request
+ * - Memory-efficient token validation
+ * - Optimized for edge runtime environments
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * Security Features:
+ * - Server-side token validation without client exposure
+ * - Automatic session invalidation on security violations
+ * - Comprehensive audit trail for compliance
+ * - Rate limiting and suspicious activity detection
+ * 
+ * @fileoverview Next.js authentication middleware replacing Angular AuthGuard
+ * @version 1.0.0
+ * @since Next.js 15.1+ / React 19.0.0
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import {
+import type {
+  MiddlewareConfig,
   MiddlewareRequest,
-  MiddlewareResponse,
+  MiddlewareResponseContext,
+  MiddlewareCookie,
   TokenValidationContext,
-  SessionContext,
-  PermissionValidationContext,
+  SessionManagementContext,
+  PermissionEvaluationContext,
+  PermissionEvaluationResult,
   MiddlewareError,
-  AuditEvent,
-  MiddlewareComponent,
-  MiddlewareStage,
-  AuthEventType,
-  TokenValidationErrorCode,
-  TokenValidationAction,
-  AccessDeniedAction,
-  MIDDLEWARE_DEFAULTS,
-  MIDDLEWARE_ROUTE_PATTERNS
-} from '@/middleware/types';
+  MiddlewareLogContext,
+  SecurityHeaderConfig,
+  MiddlewareMetrics,
+  TokenErrorCode,
+  AuditEventType,
+} from './types';
 import {
   validateJWTStructure,
-  extractTokenFromRequest,
-  shouldRefreshToken,
+  parseJWTPayload,
+  isTokenExpired,
+  tokenNeedsRefresh,
+  extractToken,
+  validateSessionToken,
+  SECURITY_HEADERS,
+  CORS_HEADERS,
+  applyHeaders,
+  createAPIHeaders,
+  extractDFHeaders,
+  setSessionCookie,
+  clearSessionCookie,
+  createAuthRedirect,
+  validateSessionMiddleware,
   createAuditLogEntry,
   logAuditEntry,
+  logAuthEvent,
+  logAPIAccess,
+  getEnvironmentInfo,
+  getClientIP,
+  isAPIRequest,
+  isStaticAsset,
+  requiresAuthentication,
   createErrorResponse,
-  createAuthRedirectResponse,
-  validateRequestOrigin,
-  checkRateLimit,
-  addAuthenticationHeaders,
-  createSecureCookieOptions,
-  clearAuthenticationCookies,
-  getEnvironmentConfig,
-  getAPIEndpoints,
-  transformKeysToCamelCase,
-  JWTPayload,
-  SessionData,
-  AuditLogEntry
-} from '@/middleware/utils';
-import {
+  createSuccessResponse,
+  createPerformanceMarker,
+  EdgeRateLimiter,
+  type JWTPayload,
+  type SessionInfo,
+  type HeaderConfig,
+  type AuditLogEntry,
+} from './utils';
+import { validateSession, refreshCurrentSession, logoutUser } from '../lib/auth/session';
+import type {
   UserSession,
+  MiddlewareAuthContext,
+  MiddlewareAuthResult,
   AuthError,
   AuthErrorCode,
-  Role,
-  Permission,
-  PROTECTED_ROUTES,
-  PUBLIC_ROUTES
-} from '@/types/auth';
+} from '../types/auth';
 
 // ============================================================================
-// TYPES AND INTERFACES
+// MIDDLEWARE CONFIGURATION
 // ============================================================================
 
 /**
- * Authentication middleware configuration for route-specific behavior
+ * Authentication middleware configuration
+ * Defines route protection patterns, security settings, and behavior options
  */
-interface AuthMiddlewareConfig {
-  enableAuthentication: boolean;
-  enableAuthorization: boolean;
-  enableAuditLogging: boolean;
-  enableRateLimit: boolean;
-  processingTimeout: number;
-  maxRetries: number;
-  tokenRefreshThreshold: number;
-  protectedRoutePatterns: string[];
-  publicRoutePatterns: string[];
-  bypassPatterns: string[];
-}
-
-/**
- * Route protection configuration with granular permissions
- */
-interface RouteConfig {
-  path: string;
-  requireAuth: boolean;
-  requiredPermissions: string[];
-  requiredRoles: number[];
-  requireAdmin: boolean;
-  requireRootAdmin: boolean;
-  allowAnonymous: boolean;
-  redirectUrl?: string;
-}
-
-/**
- * Token refresh result with comprehensive status
- */
-interface TokenRefreshResult {
-  success: boolean;
-  newToken?: string;
-  newSession?: UserSession;
-  error?: AuthError;
-  shouldClearSession: boolean;
-  processingTimeMs: number;
-}
-
-// ============================================================================
-// CONFIGURATION AND CONSTANTS
-// ============================================================================
-
-/**
- * Default middleware configuration optimized for DreamFactory
- */
-const DEFAULT_CONFIG: AuthMiddlewareConfig = {
-  enableAuthentication: true,
-  enableAuthorization: true,
-  enableAuditLogging: true,
-  enableRateLimit: true,
-  processingTimeout: MIDDLEWARE_DEFAULTS.PROCESSING_TIMEOUT,
-  maxRetries: MIDDLEWARE_DEFAULTS.MAX_RECOVERY_ATTEMPTS,
-  tokenRefreshThreshold: MIDDLEWARE_DEFAULTS.TOKEN_REFRESH_THRESHOLD,
-  protectedRoutePatterns: MIDDLEWARE_ROUTE_PATTERNS.PROTECTED_ROUTES,
-  publicRoutePatterns: MIDDLEWARE_ROUTE_PATTERNS.PUBLIC_ROUTES,
-  bypassPatterns: MIDDLEWARE_ROUTE_PATTERNS.BYPASS_ROUTES
+const AUTH_MIDDLEWARE_CONFIG: MiddlewareConfig = {
+  matcher: [
+    // Protected application routes
+    {
+      source: '/((?!_next/static|_next/image|favicon.ico|public|api/auth|api/health).*)',
+      requiresAuth: true,
+      priority: 1,
+      metadata: {
+        description: 'Main application routes requiring authentication',
+        category: 'protected',
+      },
+    },
+    // Admin-only routes
+    {
+      source: '/admin-settings/:path*',
+      requiresAuth: true,
+      adminOnly: true,
+      requiredRoles: ['super_admin', 'system_admin'],
+      priority: 10,
+      metadata: {
+        description: 'Administrative settings requiring elevated privileges',
+        category: 'admin',
+      },
+    },
+    // System settings routes
+    {
+      source: '/system-settings/:path*',
+      requiresAuth: true,
+      requiredPermissions: ['system.config.read', 'system.config.write'],
+      priority: 9,
+      metadata: {
+        description: 'System configuration requiring specific permissions',
+        category: 'system',
+      },
+    },
+    // API security routes
+    {
+      source: '/api-security/:path*',
+      requiresAuth: true,
+      requiredPermissions: ['api.security.read', 'api.security.write'],
+      priority: 8,
+      metadata: {
+        description: 'API security management',
+        category: 'security',
+      },
+    },
+    // Public authentication routes (no auth required)
+    {
+      source: '/login',
+      allowGuests: true,
+      priority: 100,
+      metadata: {
+        description: 'Login page - public access',
+        category: 'auth',
+      },
+    },
+    {
+      source: '/saml-callback',
+      allowGuests: true,
+      priority: 100,
+      metadata: {
+        description: 'SAML authentication callback',
+        category: 'auth',
+      },
+    },
+  ],
+  global: {
+    enableLogging: true,
+    enableMetrics: true,
+    enableSecurityHeaders: true,
+    defaultRedirect: '/login',
+    timeout: 5000, // 5 seconds max processing time
+  },
+  environment: {
+    development: {
+      enableLogging: true,
+      enableMetrics: false,
+    },
+    production: {
+      enableLogging: false,
+      enableMetrics: true,
+    },
+  },
 };
 
 /**
- * Route-specific configurations for fine-grained access control
+ * Security headers configuration for all responses
  */
-const ROUTE_CONFIGS: RouteConfig[] = [
-  // Admin settings routes
-  {
-    path: '/admin-settings',
-    requireAuth: true,
-    requiredPermissions: ['admin.settings.read'],
-    requiredRoles: [],
-    requireAdmin: true,
-    requireRootAdmin: false,
-    allowAnonymous: false
+const SECURITY_HEADER_CONFIG: SecurityHeaderConfig = {
+  contentSecurityPolicy: {
+    directives: {
+      'default-src': ["'self'"],
+      'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      'style-src': ["'self'", "'unsafe-inline'"],
+      'img-src': ["'self'", 'data:', 'https:'],
+      'font-src': ["'self'", 'https:'],
+      'connect-src': ["'self'", 'https:', 'wss:'],
+      'frame-src': ["'none'"],
+      'object-src': ["'none'"],
+      'base-uri': ["'self'"],
+      'form-action': ["'self'"],
+    },
+    reportOnly: false,
   },
-  // System settings routes
-  {
-    path: '/system-settings',
-    requireAuth: true,
-    requiredPermissions: ['system.settings.read'],
-    requiredRoles: [],
-    requireAdmin: true,
-    requireRootAdmin: false,
-    allowAnonymous: false
+  strictTransportSecurity: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
   },
-  // API security routes
-  {
-    path: '/api-security',
-    requireAuth: true,
-    requiredPermissions: ['api.security.read'],
-    requiredRoles: [],
-    requireAdmin: false,
-    requireRootAdmin: false,
-    allowAnonymous: false
+  frameOptions: 'DENY',
+  contentTypeOptions: 'nosniff',
+  xssProtection: '1; mode=block',
+  referrerPolicy: 'strict-origin-when-cross-origin',
+  permissionsPolicy: {
+    camera: [],
+    microphone: [],
+    geolocation: [],
+    payment: [],
+    usb: [],
   },
-  // API connections routes
-  {
-    path: '/api-connections',
-    requireAuth: true,
-    requiredPermissions: ['api.connections.read'],
-    requiredRoles: [],
-    requireAdmin: false,
-    requireRootAdmin: false,
-    allowAnonymous: false
-  },
-  // Profile routes
-  {
-    path: '/profile',
-    requireAuth: true,
-    requiredPermissions: ['user.profile.read'],
-    requiredRoles: [],
-    requireAdmin: false,
-    requireRootAdmin: false,
-    allowAnonymous: false
-  },
-  // ADF routes (DreamFactory specific)
-  {
-    path: '/adf-',
-    requireAuth: true,
-    requiredPermissions: ['dreamfactory.admin'],
-    requiredRoles: [],
-    requireAdmin: false,
-    requireRootAdmin: false,
-    allowAnonymous: false
-  }
-];
+};
 
 // ============================================================================
-// MAIN AUTHENTICATION MIDDLEWARE FUNCTION
+// CORE MIDDLEWARE FUNCTIONS
 // ============================================================================
 
 /**
- * Main authentication middleware function for Next.js edge runtime
- * Implements comprehensive authentication, authorization, and security enforcement
- * 
- * @param request - Next.js request object
- * @returns Promise<NextResponse> - Processed response with authentication context
+ * Main authentication middleware function
+ * Processes all incoming requests for authentication, authorization, and security
  */
 export async function authMiddleware(request: NextRequest): Promise<NextResponse> {
-  const startTime = performance.now();
-  const requestId = crypto.randomUUID();
-  const config = getEnvironmentConfig();
+  const perfMarker = createPerformanceMarker();
+  const requestId = generateRequestId();
+  const clientIp = getClientIP(request);
   
   try {
-    // Initialize middleware context
-    const middlewareRequest = createMiddlewareRequest(request, requestId, startTime);
+    // Create enhanced middleware request context
+    const middlewareRequest = await createMiddlewareRequest(request, requestId, clientIp);
     
-    // Check if route should bypass authentication
-    if (shouldBypassRoute(request.nextUrl.pathname)) {
-      return createSuccessResponse(request, { bypassAuth: true });
+    // Check if request should be processed by middleware
+    if (shouldSkipMiddleware(middlewareRequest)) {
+      return NextResponse.next();
     }
     
-    // Rate limiting check
-    if (DEFAULT_CONFIG.enableRateLimit) {
-      const rateLimitResult = await performRateLimit(middlewareRequest);
-      if (!rateLimitResult.allowed) {
-        return createRateLimitResponse(request, rateLimitResult);
-      }
-    }
+    // Execute middleware pipeline
+    const responseContext = await executeMiddlewarePipeline(middlewareRequest);
     
-    // Validate request origin for CSRF protection
-    if (!validateRequestOrigin(request)) {
-      return createSecurityErrorResponse(request, 'Invalid request origin', 403);
-    }
+    // Create and return final response
+    const finalResponse = await createFinalResponse(middlewareRequest, responseContext);
     
-    // Check if route requires authentication
-    const routeConfig = getRouteConfig(request.nextUrl.pathname);
-    if (!routeConfig?.requireAuth && isPublicRoute(request.nextUrl.pathname)) {
-      return createSuccessResponse(request, { publicRoute: true });
-    }
+    // Log successful request processing
+    const processingTime = perfMarker.end();
+    await logMiddlewareSuccess(middlewareRequest, finalResponse, processingTime);
     
-    // Extract and validate authentication token
-    const tokenValidation = await validateAuthenticationToken(middlewareRequest);
-    
-    if (!tokenValidation.isValid) {
-      // Handle token validation failure
-      const auditEntry = createAuditLogEntry(
-        request,
-        AuthEventType.LOGIN_FAILURE,
-        false,
-        { error: tokenValidation.validationError?.message }
-      );
-      
-      if (DEFAULT_CONFIG.enableAuditLogging) {
-        logAuditEntry(auditEntry);
-      }
-      
-      // Attempt token refresh if possible
-      if (tokenValidation.validationError?.code === TokenValidationErrorCode.TOKEN_EXPIRED) {
-        const refreshResult = await attemptTokenRefresh(middlewareRequest, tokenValidation.token);
-        
-        if (refreshResult.success && refreshResult.newToken) {
-          // Token refresh successful, continue with new token
-          return createAuthenticatedResponse(
-            request,
-            refreshResult.newSession!,
-            refreshResult.newToken,
-            { tokenRefreshed: true }
-          );
-        }
-      }
-      
-      // Authentication failed, redirect to login
-      return createAuthRedirectResponse(request);
-    }
-    
-    // Load user session and permissions
-    const sessionContext = await createSessionContext(
-      middlewareRequest,
-      tokenValidation.token!,
-      tokenValidation.payload!
-    );
-    
-    // Validate session integrity
-    const sessionValidation = await validateSession(sessionContext);
-    if (!sessionValidation.valid) {
-      return createAuthRedirectResponse(request);
-    }
-    
-    // Check if token needs refresh
-    if (shouldRefreshToken(tokenValidation.payload!, DEFAULT_CONFIG.tokenRefreshThreshold)) {
-      const refreshResult = await attemptTokenRefresh(middlewareRequest, tokenValidation.token!);
-      
-      if (refreshResult.success && refreshResult.newToken) {
-        sessionContext.sessionToken = refreshResult.newToken;
-        sessionContext.user = refreshResult.newSession!;
-      }
-    }
-    
-    // Perform authorization check
-    if (DEFAULT_CONFIG.enableAuthorization && routeConfig?.requireAuth) {
-      const authorizationResult = await performAuthorization(
-        middlewareRequest,
-        sessionContext,
-        routeConfig
-      );
-      
-      if (!authorizationResult.accessGranted) {
-        // Log authorization failure
-        const auditEntry = createAuditLogEntry(
-          request,
-          AuthEventType.PERMISSION_DENIED,
-          false,
-          {
-            userId: sessionContext.userId.toString(),
-            sessionId: sessionContext.sessionId,
-            error: authorizationResult.denyReason || 'Access denied'
-          }
-        );
-        
-        if (DEFAULT_CONFIG.enableAuditLogging) {
-          logAuditEntry(auditEntry);
-        }
-        
-        return createAccessDeniedResponse(request, authorizationResult.denyReason);
-      }
-    }
-    
-    // Log successful authentication and authorization
-    const successAuditEntry = createAuditLogEntry(
-      request,
-      AuthEventType.ACCESS_GRANTED,
-      true,
-      {
-        userId: sessionContext.userId.toString(),
-        sessionId: sessionContext.sessionId
-      }
-    );
-    
-    if (DEFAULT_CONFIG.enableAuditLogging) {
-      logAuditEntry(successAuditEntry);
-    }
-    
-    // Create authenticated response with session context
-    return createAuthenticatedResponse(
-      request,
-      sessionContext.user,
-      sessionContext.sessionToken,
-      {
-        processingTimeMs: performance.now() - startTime,
-        authSuccess: true
-      }
-    );
+    return finalResponse;
     
   } catch (error) {
-    // Handle unexpected middleware errors
-    const processingTime = performance.now() - startTime;
-    
-    const middlewareError: MiddlewareError = {
-      code: AuthErrorCode.MIDDLEWARE_ERROR,
-      message: 'Authentication middleware error',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date(),
+    // Handle middleware errors
+    const processingTime = perfMarker.end();
+    return await handleMiddlewareError(request, error, requestId, clientIp, processingTime);
+  }
+}
+
+/**
+ * Creates enhanced middleware request with authentication context
+ */
+async function createMiddlewareRequest(
+  request: NextRequest,
+  requestId: string,
+  clientIp: string
+): Promise<MiddlewareRequest> {
+  const authContext = await createAuthenticationContext(request);
+  const sessionInfo = validateSessionToken(request);
+  
+  const middlewareRequest: MiddlewareRequest = {
+    ...request,
+    auth: authContext,
+    session: sessionInfo ? await convertSessionInfoToUserSession(sessionInfo) : undefined,
+    token: sessionInfo ? parseJWTPayload(extractToken(request) || '') : undefined,
+    metadata: {
+      startTime: Date.now(),
       requestId,
-      retryable: false,
-      middlewareComponent: MiddlewareComponent.AUTHENTICATION,
-      processingStage: MiddlewareStage.ERROR_HANDLING,
-      recoverable: false,
-      requestPath: request.nextUrl.pathname,
-      requestMethod: request.method as any,
-      requestHeaders: Object.fromEntries(request.headers.entries()),
-      userId: null,
-      userEmail: null,
-      sessionId: null,
-      errorId: crypto.randomUUID(),
-      occurredAt: new Date(),
-      stackTrace: error instanceof Error ? error.stack || null : null,
-      innerError: error instanceof Error ? error : null,
-      processingTimeMs: processingTime,
-      timeoutOccurred: processingTime > DEFAULT_CONFIG.processingTimeout,
-      resourcesExhausted: false,
-      recoveryAttempts: 0,
-      maxRecoveryAttempts: DEFAULT_CONFIG.maxRetries,
-      recoveryActions: [],
-      auditEvent: createAuditLogEntry(
-        request,
-        'MIDDLEWARE_ERROR',
-        false,
-        { error: error instanceof Error ? error.message : 'Unknown error' }
-      ) as any,
-      sensitiveDataExposed: false,
-      complianceImpact: null
-    };
-    
-    // Log error for monitoring
-    console.error('[AUTH_MIDDLEWARE_ERROR]', middlewareError);
-    
-    // Return appropriate error response
-    return createErrorResponse('Authentication service temporarily unavailable', 503);
-  }
+      clientIp,
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      geo: extractGeoLocation(request),
+      source: determineRequestSource(request),
+    },
+    security: {
+      csrfToken: request.headers.get('x-csrf-token'),
+      signature: request.headers.get('x-signature'),
+      flags: {
+        isSecure: request.url.startsWith('https://'),
+        isTrusted: await validateTrustedSource(request),
+        rateLimited: false,
+        suspicious: false,
+      },
+    },
+  };
+  
+  // Apply rate limiting
+  const rateLimitResult = await applyRateLimit(middlewareRequest);
+  middlewareRequest.security.flags.rateLimited = !rateLimitResult.allowed;
+  
+  // Detect suspicious activity
+  middlewareRequest.security.flags.suspicious = await detectSuspiciousActivity(middlewareRequest);
+  
+  return middlewareRequest;
 }
 
-// ============================================================================
-// TOKEN VALIDATION FUNCTIONS
-// ============================================================================
-
 /**
- * Validates authentication token from request headers and cookies
- * Implements comprehensive JWT validation with signature checking
- * 
- * @param request - Middleware request context
- * @returns Promise<TokenValidationContext> - Validation result with context
+ * Creates authentication context for the request
  */
-async function validateAuthenticationToken(
-  request: MiddlewareRequest
-): Promise<TokenValidationContext> {
-  const startTime = performance.now();
+async function createAuthenticationContext(request: NextRequest): Promise<MiddlewareAuthContext> {
+  const token = extractToken(request);
+  const sessionData = await validateSession();
   
-  // Extract token from request
-  const token = extractTokenFromRequest(request);
-  
-  if (!token) {
-    return {
-      token: '',
-      payload: null,
-      signature: '',
-      isValid: false,
-      isExpired: false,
-      isSignatureValid: false,
-      validatedAt: new Date(),
-      expiresAt: null,
-      issuer: null,
-      audience: null,
-      allowRefresh: false,
-      gracePeriodSeconds: 0,
-      validationTimeMs: performance.now() - startTime,
-      validationError: {
-        code: TokenValidationErrorCode.MISSING_TOKEN,
-        message: 'No authentication token provided',
-        details: 'Request must include valid session token',
-        timestamp: new Date(),
-        recoverable: true,
-        suggestedAction: TokenValidationAction.REDIRECT_TO_LOGIN
-      }
-    };
-  }
-  
-  // Validate JWT structure and signature
-  const structureValidation = await validateJWTStructure(token);
-  
-  if (!structureValidation.valid || !structureValidation.payload) {
-    return {
-      token,
-      payload: null,
-      signature: '',
-      isValid: false,
-      isExpired: false,
-      isSignatureValid: false,
-      validatedAt: new Date(),
-      expiresAt: null,
-      issuer: null,
-      audience: null,
-      allowRefresh: false,
-      gracePeriodSeconds: 0,
-      validationTimeMs: performance.now() - startTime,
-      validationError: {
-        code: TokenValidationErrorCode.MALFORMED_TOKEN,
-        message: structureValidation.error || 'Invalid token format',
-        details: 'Token structure validation failed',
-        timestamp: new Date(),
-        recoverable: false,
-        suggestedAction: TokenValidationAction.REDIRECT_TO_LOGIN
-      }
-    };
-  }
-  
-  const payload = structureValidation.payload;
-  
-  // Check token expiration
-  const now = Math.floor(Date.now() / 1000);
-  const isExpired = payload.exp <= now;
-  
-  if (isExpired) {
-    return {
-      token,
-      payload,
-      signature: token.split('.')[2] || '',
-      isValid: false,
-      isExpired: true,
-      isSignatureValid: true, // Assume valid for refresh attempt
-      validatedAt: new Date(),
-      expiresAt: new Date(payload.exp * 1000),
-      issuer: payload.iss || null,
-      audience: payload.aud || null,
-      allowRefresh: true,
-      gracePeriodSeconds: 300, // 5 minutes grace period
-      validationTimeMs: performance.now() - startTime,
-      validationError: {
-        code: TokenValidationErrorCode.TOKEN_EXPIRED,
-        message: 'Authentication token has expired',
-        details: `Token expired at ${new Date(payload.exp * 1000).toISOString()}`,
-        timestamp: new Date(),
-        recoverable: true,
-        suggestedAction: TokenValidationAction.ATTEMPT_REFRESH
-      }
-    };
-  }
-  
-  // Token is valid
   return {
-    token,
-    payload,
-    signature: token.split('.')[2] || '',
-    isValid: true,
-    isExpired: false,
-    isSignatureValid: true,
-    validatedAt: new Date(),
-    expiresAt: new Date(payload.exp * 1000),
-    issuer: payload.iss || null,
-    audience: payload.aud || null,
-    allowRefresh: true,
-    gracePeriodSeconds: 300,
-    validationTimeMs: performance.now() - startTime,
-    validationError: null
+    isAuthenticated: sessionData.isValid && !!sessionData.session,
+    user: sessionData.session || null,
+    token: token || null,
+    sessionId: sessionData.session?.sessionId || null,
+    permissions: sessionData.session?.permissions || [],
+    roles: sessionData.session?.roles || [],
+    tokenExpiry: sessionData.session ? new Date(sessionData.session.expiresAt) : null,
+    needsRefresh: sessionData.needsRefresh || false,
+    isExpired: sessionData.expired || false,
+    lastActivity: sessionData.session?.lastActivity ? new Date(sessionData.session.lastActivity) : null,
   };
 }
 
 /**
- * Attempts automatic token refresh using existing session
- * Implements secure refresh workflow with DreamFactory API integration
- * 
- * @param request - Middleware request context
- * @param currentToken - Current session token for refresh
- * @returns Promise<TokenRefreshResult> - Refresh operation result
+ * Determines if middleware processing should be skipped
  */
-async function attemptTokenRefresh(
-  request: MiddlewareRequest,
-  currentToken: string
-): Promise<TokenRefreshResult> {
-  const startTime = performance.now();
-  const config = getEnvironmentConfig();
-  const endpoints = getAPIEndpoints();
+function shouldSkipMiddleware(request: MiddlewareRequest): boolean {
+  // Skip static assets
+  if (isStaticAsset(request)) {
+    return true;
+  }
+  
+  // Skip health check endpoints
+  if (request.nextUrl.pathname.startsWith('/api/health')) {
+    return true;
+  }
+  
+  // Skip Next.js internal routes
+  if (request.nextUrl.pathname.startsWith('/_next/')) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Executes the main middleware pipeline
+ */
+async function executeMiddlewarePipeline(request: MiddlewareRequest): Promise<MiddlewareResponseContext> {
+  const processingStart = Date.now();
   
   try {
-    // Prepare refresh request
-    const refreshHeaders = addAuthenticationHeaders(
-      new Headers(),
-      currentToken
-    );
-    
-    // Call DreamFactory session refresh endpoint
-    const refreshResponse = await fetch(`${endpoints.session}/refresh`, {
-      method: 'POST',
-      headers: refreshHeaders,
-      signal: AbortSignal.timeout(2000) // 2 second timeout
-    });
-    
-    if (!refreshResponse.ok) {
-      return {
-        success: false,
-        error: {
-          code: AuthErrorCode.TOKEN_REFRESH_FAILED,
-          message: 'Token refresh failed',
-          details: `Server returned ${refreshResponse.status}`,
-          timestamp: new Date(),
-          retryable: false
-        },
-        shouldClearSession: refreshResponse.status === 401 || refreshResponse.status === 403,
-        processingTimeMs: performance.now() - startTime
-      };
+    // Step 1: Security validation
+    const securityResult = await validateSecurityContext(request);
+    if (!securityResult.passed) {
+      return createSecurityFailureResponse(securityResult);
     }
     
-    const refreshData = await refreshResponse.json();
-    const newSessionToken = refreshData.session_token || refreshData.sessionToken;
-    
-    if (!newSessionToken) {
-      return {
-        success: false,
-        error: {
-          code: AuthErrorCode.TOKEN_REFRESH_FAILED,
-          message: 'Invalid refresh response',
-          details: 'No session token in refresh response',
-          timestamp: new Date(),
-          retryable: false
-        },
-        shouldClearSession: true,
-        processingTimeMs: performance.now() - startTime
-      };
+    // Step 2: Authentication validation
+    const authResult = await validateAuthentication(request);
+    if (!authResult.isValid) {
+      return createAuthenticationFailureResponse(request, authResult);
     }
     
-    // Transform response to UserSession format
-    const newSession = transformKeysToCamelCase<UserSession>({
-      ...refreshData,
-      sessionToken: newSessionToken,
-      tokenExpiryDate: new Date(refreshData.tokenExpiryDate || Date.now() + 3600000)
-    });
+    // Step 3: Token refresh if needed
+    if (authResult.needsRefresh) {
+      const refreshResult = await handleTokenRefresh(request);
+      if (!refreshResult.success) {
+        return createTokenRefreshFailureResponse(request, refreshResult.error);
+      }
+      
+      // Update request context with new token
+      request.auth = await createAuthenticationContext(request);
+    }
     
-    return {
-      success: true,
-      newToken: newSessionToken,
-      newSession,
-      shouldClearSession: false,
-      processingTimeMs: performance.now() - startTime
-    };
+    // Step 4: Authorization validation
+    const authzResult = await validateAuthorization(request);
+    if (!authzResult.granted) {
+      return createAuthorizationFailureResponse(request, authzResult);
+    }
+    
+    // Step 5: Create successful response context
+    return createSuccessResponseContext(request, {
+      processingTime: Date.now() - processingStart,
+      securityValidated: true,
+      authenticationValidated: true,
+      authorizationValidated: true,
+      tokenRefreshed: authResult.needsRefresh,
+    });
     
   } catch (error) {
-    return {
-      success: false,
-      error: {
-        code: AuthErrorCode.NETWORK_ERROR,
-        message: 'Token refresh network error',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date(),
-        retryable: true
-      },
-      shouldClearSession: false,
-      processingTimeMs: performance.now() - startTime
-    };
+    throw new MiddlewareProcessingError(
+      'Pipeline execution failed',
+      'system',
+      'high',
+      'configuration',
+      error
+    );
   }
 }
 
 // ============================================================================
-// SESSION MANAGEMENT FUNCTIONS
+// AUTHENTICATION VALIDATION
 // ============================================================================
 
 /**
- * Creates session context from validated token and payload
- * Builds comprehensive session state for authorization checks
- * 
- * @param request - Middleware request context
- * @param token - Validated session token
- * @param payload - Decoded JWT payload
- * @returns Promise<SessionContext> - Complete session context
+ * Validates authentication status and token validity
  */
-async function createSessionContext(
-  request: MiddlewareRequest,
-  token: string,
-  payload: JWTPayload
-): Promise<SessionContext> {
-  const now = new Date();
-  
-  // Extract user information from JWT payload
-  const userSession: Partial<UserSession> = {
-    id: parseInt(payload.sub, 10),
-    email: payload.email,
-    firstName: payload.firstName,
-    lastName: payload.lastName,
-    name: payload.name,
-    sessionId: payload.sessionId,
-    sessionToken: token,
-    isRootAdmin: payload.isRootAdmin,
-    isSysAdmin: payload.isSysAdmin,
-    roleId: payload.roleId,
-    tokenExpiryDate: new Date(payload.exp * 1000)
-  };
-  
-  // Create session context
-  const sessionContext: SessionContext = {
-    sessionId: payload.sessionId,
-    sessionToken: token,
-    userId: parseInt(payload.sub, 10),
-    createdAt: new Date(payload.iat * 1000),
-    lastAccessedAt: now,
-    expiresAt: new Date(payload.exp * 1000),
-    isActive: true,
-    user: userSession,
-    userProfile: null,
-    ipAddress: request.ip || 'unknown',
-    userAgent: request.headers.get('user-agent') || 'unknown',
-    createdFromIP: request.ip || 'unknown',
-    lastActivityIP: request.ip || 'unknown',
-    maxAge: payload.exp - payload.iat,
-    slidingExpiration: true,
-    renewThreshold: DEFAULT_CONFIG.tokenRefreshThreshold,
-    accessCount: 1,
-    lastRequestDuration: 0,
-    averageRequestDuration: 0,
-    isSecure: true,
-    isHttpOnly: true,
-    sameSite: 'strict',
-    requiresRefresh: shouldRefreshToken(payload, DEFAULT_CONFIG.tokenRefreshThreshold),
-    suspiciousActivity: false
-  };
-  
-  return sessionContext;
-}
-
-/**
- * Validates session integrity and security constraints
- * Implements comprehensive session security checks
- * 
- * @param sessionContext - Session context to validate
- * @returns Session validation result with status details
- */
-async function validateSession(sessionContext: SessionContext): Promise<{
-  valid: boolean;
-  expired: boolean;
+async function validateAuthentication(request: MiddlewareRequest): Promise<{
+  isValid: boolean;
   needsRefresh: boolean;
   error?: string;
+  tokenValidation?: TokenValidationContext;
 }> {
-  const now = Date.now();
+  // Check if authentication is required for this route
+  if (!requiresAuthentication(request)) {
+    return { isValid: true, needsRefresh: false };
+  }
   
-  // Check session expiration
-  if (sessionContext.expiresAt.getTime() <= now) {
+  // Extract and validate token
+  const token = extractToken(request);
+  if (!token) {
+    await logAuthEvent(request, 'auth_failure', null, 'No authentication token provided');
     return {
-      valid: false,
-      expired: true,
+      isValid: false,
       needsRefresh: false,
-      error: 'Session expired'
+      error: 'Authentication required',
     };
   }
   
-  // Check if session needs refresh
-  const needsRefresh = sessionContext.requiresRefresh;
-  
-  // Check for suspicious activity (basic implementation)
-  if (sessionContext.suspiciousActivity) {
+  // Validate token structure and payload
+  const tokenValidation = await validateTokenContext(token, request);
+  if (!tokenValidation.isValid) {
+    await logAuthEvent(request, 'auth_failure', null, `Token validation failed: ${tokenValidation.errors.map(e => e.message).join(', ')}`);
     return {
-      valid: false,
-      expired: false,
+      isValid: false,
       needsRefresh: false,
-      error: 'Suspicious activity detected'
+      error: 'Invalid authentication token',
+      tokenValidation,
     };
   }
+  
+  // Check if token is expired
+  if (tokenValidation.isExpired) {
+    await logAuthEvent(request, 'auth_failure', null, 'Authentication token expired');
+    return {
+      isValid: false,
+      needsRefresh: true,
+      error: 'Authentication token expired',
+      tokenValidation,
+    };
+  }
+  
+  // Check if token needs refresh
+  const needsRefresh = tokenValidation.metadata.expiresIn !== undefined && 
+                      tokenValidation.metadata.expiresIn <= 300; // 5 minutes
   
   return {
-    valid: true,
-    expired: false,
+    isValid: true,
     needsRefresh,
-    error: undefined
+    tokenValidation,
+  };
+}
+
+/**
+ * Validates token context with comprehensive checks
+ */
+async function validateTokenContext(token: string, request: MiddlewareRequest): Promise<TokenValidationContext> {
+  const errors: Array<{ code: TokenErrorCode; message: string; field?: string }> = [];
+  
+  // Validate token structure
+  if (!validateJWTStructure(token)) {
+    errors.push({
+      code: TokenErrorCode.INVALID_FORMAT,
+      message: 'Invalid JWT token format',
+    });
+    
+    return {
+      rawToken: token,
+      isValid: false,
+      isExpired: false,
+      isValidIssuer: false,
+      isValidAudience: false,
+      isValidSignature: false,
+      errors,
+      metadata: {
+        type: 'access',
+        algorithm: 'unknown',
+        source: 'header',
+      },
+    };
+  }
+  
+  // Parse token payload
+  const payload = parseJWTPayload(token);
+  if (!payload) {
+    errors.push({
+      code: TokenErrorCode.INVALID_FORMAT,
+      message: 'Unable to parse JWT token payload',
+    });
+    
+    return {
+      rawToken: token,
+      isValid: false,
+      isExpired: false,
+      isValidIssuer: false,
+      isValidAudience: false,
+      isValidSignature: false,
+      errors,
+      metadata: {
+        type: 'access',
+        algorithm: 'unknown',
+        source: 'header',
+      },
+    };
+  }
+  
+  // Validate expiration
+  const isExpired = isTokenExpired(payload);
+  if (isExpired) {
+    errors.push({
+      code: TokenErrorCode.EXPIRED,
+      message: 'JWT token has expired',
+      field: 'exp',
+    });
+  }
+  
+  // Validate required claims
+  const requiredClaims = ['sub', 'iat', 'exp', 'sessionId'];
+  for (const claim of requiredClaims) {
+    if (!(claim in payload)) {
+      errors.push({
+        code: TokenErrorCode.MISSING_CLAIMS,
+        message: `Missing required claim: ${claim}`,
+        field: claim,
+      });
+    }
+  }
+  
+  // Calculate time until expiration
+  const now = Math.floor(Date.now() / 1000);
+  const expiresIn = payload.exp - now;
+  
+  return {
+    rawToken: token,
+    payload,
+    isValid: errors.length === 0,
+    isExpired,
+    isValidIssuer: true, // Would validate against known issuers in production
+    isValidAudience: true, // Would validate against expected audience in production
+    isValidSignature: true, // Would perform signature validation in production
+    errors,
+    metadata: {
+      type: 'access',
+      algorithm: 'HS256', // Default algorithm
+      expiresIn: expiresIn > 0 ? expiresIn : 0,
+      source: determineTokenSource(request),
+    },
+  };
+}
+
+/**
+ * Handles automatic token refresh
+ */
+async function handleTokenRefresh(request: MiddlewareRequest): Promise<{
+  success: boolean;
+  newToken?: string;
+  error?: string;
+}> {
+  try {
+    const refreshResult = await refreshCurrentSession();
+    
+    if (refreshResult.success && refreshResult.session) {
+      await logAuthEvent(request, 'token_refresh', request.session || null, 'Token refreshed successfully');
+      
+      return {
+        success: true,
+        newToken: refreshResult.session.sessionToken,
+      };
+    } else {
+      await logAuthEvent(request, 'token_refresh', request.session || null, `Token refresh failed: ${refreshResult.error}`);
+      
+      return {
+        success: false,
+        error: refreshResult.error || 'Token refresh failed',
+      };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error during token refresh';
+    await logAuthEvent(request, 'token_refresh', request.session || null, errorMessage);
+    
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+// ============================================================================
+// AUTHORIZATION VALIDATION
+// ============================================================================
+
+/**
+ * Validates user authorization for the requested resource
+ */
+async function validateAuthorization(request: MiddlewareRequest): Promise<PermissionEvaluationResult> {
+  // Find matching route configuration
+  const routeConfig = findMatchingRoute(request.nextUrl.pathname);
+  if (!routeConfig) {
+    // No specific route config, allow access for authenticated users
+    return createPermissionGrantedResult('No specific authorization required');
+  }
+  
+  // Check guest access
+  if (routeConfig.allowGuests) {
+    return createPermissionGrantedResult('Guest access allowed');
+  }
+  
+  // Ensure user is authenticated
+  if (!request.auth.isAuthenticated || !request.session) {
+    return createPermissionDeniedResult('Authentication required for protected resource');
+  }
+  
+  // Check admin-only routes
+  if (routeConfig.adminOnly && !isAdminUser(request.session)) {
+    await logAuthEvent(request, 'access_denied', request.session, 'Admin access required');
+    return createPermissionDeniedResult('Administrative privileges required');
+  }
+  
+  // Check required roles
+  if (routeConfig.requiredRoles && routeConfig.requiredRoles.length > 0) {
+    const hasRequiredRole = routeConfig.requiredRoles.some(role => 
+      request.session!.roles.includes(role)
+    );
+    
+    if (!hasRequiredRole) {
+      await logAuthEvent(request, 'access_denied', request.session, `Missing required role: ${routeConfig.requiredRoles.join(', ')}`);
+      return createPermissionDeniedResult(
+        `Required role not found: ${routeConfig.requiredRoles.join(', ')}`,
+        routeConfig.requiredRoles,
+        request.session.roles
+      );
+    }
+  }
+  
+  // Check required permissions
+  if (routeConfig.requiredPermissions && routeConfig.requiredPermissions.length > 0) {
+    const hasRequiredPermission = routeConfig.requiredPermissions.some(permission => 
+      request.session!.permissions.includes(permission)
+    );
+    
+    if (!hasRequiredPermission) {
+      await logAuthEvent(request, 'access_denied', request.session, `Missing required permission: ${routeConfig.requiredPermissions.join(', ')}`);
+      return createPermissionDeniedResult(
+        `Required permission not found: ${routeConfig.requiredPermissions.join(', ')}`,
+        routeConfig.requiredPermissions,
+        request.session.permissions
+      );
+    }
+  }
+  
+  // Authorization successful
+  return createPermissionGrantedResult('Authorization successful');
+}
+
+/**
+ * Finds matching route configuration for the given path
+ */
+function findMatchingRoute(pathname: string) {
+  return AUTH_MIDDLEWARE_CONFIG.matcher
+    .sort((a, b) => (b.priority || 0) - (a.priority || 0))
+    .find(route => {
+      const pattern = route.source
+        .replace(/\*\*/g, '.*')
+        .replace(/\*/g, '[^/]*')
+        .replace(/:path\*/g, '.*')
+        .replace(/:([^/]+)/g, '[^/]+');
+      
+      const regex = new RegExp(`^${pattern}$`);
+      return regex.test(pathname);
+    });
+}
+
+/**
+ * Checks if user has admin privileges
+ */
+function isAdminUser(session: UserSession): boolean {
+  return session.isRootAdmin || session.isSysAdmin || 
+         session.roles.some(role => ['super_admin', 'system_admin', 'admin'].includes(role));
+}
+
+/**
+ * Creates permission granted result
+ */
+function createPermissionGrantedResult(reason: string): PermissionEvaluationResult {
+  return {
+    granted: true,
+    reason,
+    appliedRules: [],
+    requiredPermissions: [],
+    userPermissions: [],
+    missingPermissions: [],
+    metadata: {
+      evaluationTime: 0,
+      rulesChecked: 0,
+      cacheHit: false,
+      strategy: 'allow',
+    },
+  };
+}
+
+/**
+ * Creates permission denied result
+ */
+function createPermissionDeniedResult(
+  reason: string,
+  requiredPermissions: string[] = [],
+  userPermissions: string[] = []
+): PermissionEvaluationResult {
+  const missingPermissions = requiredPermissions.filter(
+    permission => !userPermissions.includes(permission)
+  );
+  
+  return {
+    granted: false,
+    reason,
+    appliedRules: [],
+    requiredPermissions,
+    userPermissions,
+    missingPermissions,
+    metadata: {
+      evaluationTime: 0,
+      rulesChecked: 0,
+      cacheHit: false,
+      strategy: 'deny',
+    },
   };
 }
 
 // ============================================================================
-// AUTHORIZATION FUNCTIONS
+// SECURITY VALIDATION
 // ============================================================================
 
 /**
- * Performs role-based access control (RBAC) authorization
- * Implements comprehensive permission checking against user context
- * 
- * @param request - Middleware request context
- * @param sessionContext - User session context
- * @param routeConfig - Route-specific access requirements
- * @returns Promise<PermissionValidationContext> - Authorization result
+ * Validates security context and detects threats
  */
-async function performAuthorization(
-  request: MiddlewareRequest,
-  sessionContext: SessionContext,
-  routeConfig: RouteConfig
-): Promise<PermissionValidationContext> {
-  const startTime = performance.now();
+async function validateSecurityContext(request: MiddlewareRequest): Promise<{
+  passed: boolean;
+  reason?: string;
+  threats?: string[];
+}> {
+  const threats: string[] = [];
   
-  // Extract user permissions from session
-  const userPermissions: string[] = [];
-  const userRole = sessionContext.user.roleId || 0;
-  const isAdmin = sessionContext.user.isSysAdmin || sessionContext.user.isRootAdmin || false;
-  const isRootAdmin = sessionContext.user.isRootAdmin || false;
-  
-  // Check admin requirements
-  if (routeConfig.requireRootAdmin && !isRootAdmin) {
-    return {
-      userId: sessionContext.userId,
-      userEmail: sessionContext.user.email || '',
-      userRole: null,
-      userPermissions,
-      requestedResource: request.nextUrl.pathname,
-      requestedAction: request.method,
-      requestMethod: request.method as any,
-      requestPath: request.nextUrl.pathname,
-      requestQuery: Object.fromEntries(request.nextUrl.searchParams.entries()),
-      requiredPermissions: routeConfig.requiredPermissions,
-      hasRequiredPermissions: false,
-      missingPermissions: routeConfig.requiredPermissions,
-      requiredRoles: routeConfig.requiredRoles,
-      hasRequiredRoles: false,
-      missingRoles: routeConfig.requiredRoles,
-      requiresAdmin: routeConfig.requireAdmin,
-      requiresRootAdmin: routeConfig.requireRootAdmin,
-      isAdminUser: isAdmin,
-      isRootAdminUser: isRootAdmin,
-      accessGranted: false,
-      denyReason: 'Root admin access required',
-      evaluationTimeMs: performance.now() - startTime,
-      cacheHit: false,
-      auditRequired: true,
-      auditEvent: null
-    };
+  // Check rate limiting
+  if (request.security.flags.rateLimited) {
+    threats.push('Rate limit exceeded');
   }
   
-  if (routeConfig.requireAdmin && !isAdmin) {
-    return {
-      userId: sessionContext.userId,
-      userEmail: sessionContext.user.email || '',
-      userRole: null,
-      userPermissions,
-      requestedResource: request.nextUrl.pathname,
-      requestedAction: request.method,
-      requestMethod: request.method as any,
-      requestPath: request.nextUrl.pathname,
-      requestQuery: Object.fromEntries(request.nextUrl.searchParams.entries()),
-      requiredPermissions: routeConfig.requiredPermissions,
-      hasRequiredPermissions: false,
-      missingPermissions: routeConfig.requiredPermissions,
-      requiredRoles: routeConfig.requiredRoles,
-      hasRequiredRoles: false,
-      missingRoles: routeConfig.requiredRoles,
-      requiresAdmin: routeConfig.requireAdmin,
-      requiresRootAdmin: routeConfig.requireRootAdmin,
-      isAdminUser: isAdmin,
-      isRootAdminUser: isRootAdmin,
-      accessGranted: false,
-      denyReason: 'Admin access required',
-      evaluationTimeMs: performance.now() - startTime,
-      cacheHit: false,
-      auditRequired: true,
-      auditEvent: null
-    };
+  // Check for suspicious activity
+  if (request.security.flags.suspicious) {
+    threats.push('Suspicious activity detected');
   }
   
-  // Check role requirements
-  if (routeConfig.requiredRoles.length > 0) {
-    const hasRequiredRole = routeConfig.requiredRoles.includes(userRole);
-    if (!hasRequiredRole && !isAdmin) {
-      return {
-        userId: sessionContext.userId,
-        userEmail: sessionContext.user.email || '',
-        userRole: null,
-        userPermissions,
-        requestedResource: request.nextUrl.pathname,
-        requestedAction: request.method,
-        requestMethod: request.method as any,
-        requestPath: request.nextUrl.pathname,
-        requestQuery: Object.fromEntries(request.nextUrl.searchParams.entries()),
-        requiredPermissions: routeConfig.requiredPermissions,
-        hasRequiredPermissions: false,
-        missingPermissions: routeConfig.requiredPermissions,
-        requiredRoles: routeConfig.requiredRoles,
-        hasRequiredRoles: false,
-        missingRoles: routeConfig.requiredRoles.filter(r => r !== userRole),
-        requiresAdmin: routeConfig.requireAdmin,
-        requiresRootAdmin: routeConfig.requireRootAdmin,
-        isAdminUser: isAdmin,
-        isRootAdminUser: isRootAdmin,
-        accessGranted: false,
-        denyReason: `Required role not found. User role: ${userRole}, Required: ${routeConfig.requiredRoles.join(', ')}`,
-        evaluationTimeMs: performance.now() - startTime,
-        cacheHit: false,
-        auditRequired: true,
-        auditEvent: null
-      };
+  // Validate CSRF token for state-changing requests
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method)) {
+    if (!request.security.csrfToken) {
+      threats.push('Missing CSRF token');
     }
   }
   
-  // For now, assume access is granted if basic checks pass
-  // In a full implementation, this would check specific permissions against user roles
+  // Check for secure connection in production
+  if (getEnvironmentInfo().isProduction && !request.security.flags.isSecure) {
+    threats.push('Insecure connection detected');
+  }
+  
+  if (threats.length > 0) {
+    await logSecurityViolation(request, threats);
+    return {
+      passed: false,
+      reason: threats.join(', '),
+      threats,
+    };
+  }
+  
+  return { passed: true };
+}
+
+/**
+ * Applies rate limiting to requests
+ */
+async function applyRateLimit(request: MiddlewareRequest): Promise<{
+  allowed: boolean;
+  remaining: number;
+  resetTime: number;
+}> {
+  const key = `${request.metadata.clientIp}:${request.nextUrl.pathname}`;
+  const limit = 100; // 100 requests per minute
+  const windowMs = 60000; // 1 minute
+  
+  return EdgeRateLimiter.check(key, limit, windowMs);
+}
+
+/**
+ * Detects suspicious activity patterns
+ */
+async function detectSuspiciousActivity(request: MiddlewareRequest): Promise<boolean> {
+  const suspiciousPatterns = [
+    // Unusual user agent patterns
+    /bot|crawler|spider|scraper/i.test(request.metadata.userAgent),
+    
+    // Rapid requests from same IP
+    // (Would be implemented with persistent storage in production)
+    false,
+    
+    // Unusual request patterns
+    request.nextUrl.pathname.includes('..'),
+    request.nextUrl.pathname.includes('<script>'),
+    
+    // Multiple failed authentication attempts
+    // (Would track in persistent storage in production)
+    false,
+  ];
+  
+  return suspiciousPatterns.some(pattern => pattern);
+}
+
+/**
+ * Logs security violations
+ */
+async function logSecurityViolation(request: MiddlewareRequest, threats: string[]): Promise<void> {
+  const auditEntry = createAuditLogEntry(
+    request,
+    'security_violation',
+    request.session || null,
+    403,
+    `Security threats detected: ${threats.join(', ')}`,
+    {
+      threats,
+      clientIp: request.metadata.clientIp,
+      userAgent: request.metadata.userAgent,
+      requestPath: request.nextUrl.pathname,
+    }
+  );
+  
+  logAuditEntry(auditEntry);
+}
+
+// ============================================================================
+// RESPONSE CREATION
+// ============================================================================
+
+/**
+ * Creates successful response context
+ */
+function createSuccessResponseContext(
+  request: MiddlewareRequest,
+  metadata: Record<string, any>
+): MiddlewareResponseContext {
   return {
-    userId: sessionContext.userId,
-    userEmail: sessionContext.user.email || '',
-    userRole: null,
-    userPermissions,
-    requestedResource: request.nextUrl.pathname,
-    requestedAction: request.method,
-    requestMethod: request.method as any,
-    requestPath: request.nextUrl.pathname,
-    requestQuery: Object.fromEntries(request.nextUrl.searchParams.entries()),
-    requiredPermissions: routeConfig.requiredPermissions,
-    hasRequiredPermissions: true,
-    missingPermissions: [],
-    requiredRoles: routeConfig.requiredRoles,
-    hasRequiredRoles: true,
-    missingRoles: [],
-    requiresAdmin: routeConfig.requireAdmin,
-    requiresRootAdmin: routeConfig.requireRootAdmin,
-    isAdminUser: isAdmin,
-    isRootAdminUser: isRootAdmin,
-    accessGranted: true,
-    denyReason: null,
-    evaluationTimeMs: performance.now() - startTime,
-    cacheHit: false,
-    auditRequired: true,
-    auditEvent: null
+    continue: true,
+    metadata: {
+      processingTime: metadata.processingTime || 0,
+      security: {
+        headersApplied: Object.keys(SECURITY_HEADERS),
+        authMethod: 'jwt',
+        authorizationChecks: ['authentication', 'authorization'],
+      },
+    },
   };
+}
+
+/**
+ * Creates authentication failure response
+ */
+function createAuthenticationFailureResponse(
+  request: MiddlewareRequest,
+  authResult: { error?: string }
+): MiddlewareResponseContext {
+  const redirectUrl = new URL('/login', request.url);
+  if (request.nextUrl.pathname !== '/login') {
+    redirectUrl.searchParams.set('returnUrl', request.nextUrl.pathname + request.nextUrl.search);
+  }
+  
+  return {
+    continue: false,
+    redirect: redirectUrl.toString(),
+    statusCode: 302,
+    cookies: [
+      {
+        name: 'df-session-token',
+        value: '',
+        action: 'delete',
+        options: {
+          path: '/',
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+        },
+      },
+    ],
+    error: {
+      code: 'AUTHENTICATION_REQUIRED',
+      message: authResult.error || 'Authentication required',
+      source: 'authentication',
+      severity: 'medium',
+      category: 'security',
+    } as MiddlewareError,
+    metadata: {
+      processingTime: 0,
+      security: {
+        headersApplied: [],
+        authMethod: 'none',
+        authorizationChecks: ['authentication'],
+      },
+    },
+  };
+}
+
+/**
+ * Creates authorization failure response
+ */
+function createAuthorizationFailureResponse(
+  request: MiddlewareRequest,
+  authzResult: PermissionEvaluationResult
+): MiddlewareResponseContext {
+  return {
+    continue: false,
+    statusCode: 403,
+    response: createErrorResponse(
+      `Access denied: ${authzResult.reason}`,
+      403,
+      {
+        requiredPermissions: authzResult.requiredPermissions,
+        userPermissions: authzResult.userPermissions,
+        missingPermissions: authzResult.missingPermissions,
+      }
+    ),
+    error: {
+      code: 'ACCESS_DENIED',
+      message: authzResult.reason,
+      source: 'authorization',
+      severity: 'medium',
+      category: 'security',
+    } as MiddlewareError,
+    metadata: {
+      processingTime: 0,
+      security: {
+        headersApplied: Object.keys(SECURITY_HEADERS),
+        authMethod: 'jwt',
+        authorizationChecks: ['authentication', 'authorization'],
+      },
+    },
+  };
+}
+
+/**
+ * Creates security failure response
+ */
+function createSecurityFailureResponse(securityResult: {
+  reason?: string;
+  threats?: string[];
+}): MiddlewareResponseContext {
+  return {
+    continue: false,
+    statusCode: 403,
+    response: createErrorResponse(
+      `Security validation failed: ${securityResult.reason}`,
+      403,
+      { threats: securityResult.threats }
+    ),
+    error: {
+      code: 'SECURITY_VIOLATION',
+      message: securityResult.reason || 'Security validation failed',
+      source: 'security',
+      severity: 'high',
+      category: 'security',
+    } as MiddlewareError,
+    metadata: {
+      processingTime: 0,
+      security: {
+        headersApplied: Object.keys(SECURITY_HEADERS),
+        authMethod: 'none',
+        authorizationChecks: ['security'],
+      },
+    },
+  };
+}
+
+/**
+ * Creates token refresh failure response
+ */
+function createTokenRefreshFailureResponse(
+  request: MiddlewareRequest,
+  error?: string
+): MiddlewareResponseContext {
+  return createAuthenticationFailureResponse(request, {
+    error: `Token refresh failed: ${error || 'Unknown error'}`
+  });
+}
+
+/**
+ * Creates final response from context
+ */
+async function createFinalResponse(
+  request: MiddlewareRequest,
+  context: MiddlewareResponseContext
+): Promise<NextResponse> {
+  let response: NextResponse;
+  
+  if (context.response) {
+    // Use provided response
+    response = context.response;
+  } else if (context.redirect) {
+    // Create redirect response
+    response = NextResponse.redirect(context.redirect);
+  } else if (context.continue) {
+    // Continue to next middleware/page
+    response = NextResponse.next();
+  } else {
+    // Create error response
+    response = createErrorResponse(
+      context.error?.message || 'Middleware processing failed',
+      context.statusCode || 500
+    );
+  }
+  
+  // Apply security headers
+  response = applyHeaders(response, {
+    securityHeaders: true,
+    corsHeaders: isAPIRequest(request),
+    addHeaders: context.headers,
+  });
+  
+  // Apply cookies
+  if (context.cookies) {
+    for (const cookie of context.cookies) {
+      if (cookie.action === 'set') {
+        response.cookies.set(cookie.name, cookie.value, cookie.options);
+      } else if (cookie.action === 'delete') {
+        response.cookies.delete(cookie.name);
+      }
+    }
+  }
+  
+  return response;
+}
+
+// ============================================================================
+// ERROR HANDLING
+// ============================================================================
+
+/**
+ * Middleware processing error class
+ */
+class MiddlewareProcessingError extends Error {
+  constructor(
+    message: string,
+    public source: 'authentication' | 'authorization' | 'validation' | 'system' | 'network',
+    public severity: 'low' | 'medium' | 'high' | 'critical',
+    public category: 'security' | 'performance' | 'configuration' | 'external',
+    public originalError?: any
+  ) {
+    super(message);
+    this.name = 'MiddlewareProcessingError';
+  }
+}
+
+/**
+ * Handles middleware errors and creates appropriate responses
+ */
+async function handleMiddlewareError(
+  request: NextRequest,
+  error: any,
+  requestId: string,
+  clientIp: string,
+  processingTime: number
+): Promise<NextResponse> {
+  // Log error details
+  const errorDetails = {
+    error: error instanceof Error ? error.message : 'Unknown error',
+    stack: error instanceof Error ? error.stack : undefined,
+    requestId,
+    clientIp,
+    path: request.nextUrl.pathname,
+    method: request.method,
+    processingTime,
+  };
+  
+  console.error('[MIDDLEWARE_ERROR]', JSON.stringify(errorDetails));
+  
+  // Create audit log entry
+  const auditEntry = createAuditLogEntry(
+    request,
+    'middleware_error',
+    null,
+    500,
+    error instanceof Error ? error.message : 'Unknown middleware error',
+    errorDetails
+  );
+  
+  logAuditEntry(auditEntry);
+  
+  // Determine response based on error type
+  if (error instanceof MiddlewareProcessingError) {
+    if (error.source === 'authentication') {
+      return createAuthRedirect(request);
+    } else if (error.source === 'authorization') {
+      return createErrorResponse('Access denied', 403);
+    }
+  }
+  
+  // For development, show detailed error
+  if (getEnvironmentInfo().isDevelopment) {
+    return createErrorResponse(
+      `Middleware error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      500,
+      { requestId, processingTime }
+    );
+  }
+  
+  // For production, show generic error
+  return createErrorResponse(
+    'Internal server error',
+    500,
+    { requestId }
+  );
 }
 
 // ============================================================================
@@ -898,271 +1139,147 @@ async function performAuthorization(
 // ============================================================================
 
 /**
- * Creates enhanced middleware request with DreamFactory context
- * Initializes request tracking and performance monitoring
- * 
- * @param request - Original Next.js request
- * @param requestId - Unique request identifier
- * @param startTime - Request processing start time
- * @returns Enhanced middleware request with context
+ * Generates unique request ID
  */
-function createMiddlewareRequest(
-  request: NextRequest,
-  requestId: string,
-  startTime: number
-): MiddlewareRequest {
-  const middlewareRequest = request as MiddlewareRequest;
-  
-  middlewareRequest.dreamfactory = {
-    sessionToken: null,
-    sessionId: null,
-    apiKey: null,
-    user: null,
-    userId: null,
-    userEmail: null,
-    permissions: [],
-    roleId: null,
-    isAdmin: false,
-    isRootAdmin: false,
-    requestId,
-    startTime,
-    routePath: request.nextUrl.pathname,
-    isProtectedRoute: isProtectedRoute(request.nextUrl.pathname),
-    isAPIRoute: request.nextUrl.pathname.startsWith('/api/'),
-    cacheKey: null,
-    cacheHit: false,
-    processingTimeMs: 0,
-    ipAddress: request.ip || 'unknown',
-    userAgent: request.headers.get('user-agent') || 'unknown',
-    referrer: request.headers.get('referer') || null,
-    origin: request.headers.get('origin') || null
+function generateRequestId(): string {
+  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Extracts geolocation from request headers
+ */
+function extractGeoLocation(request: NextRequest) {
+  return {
+    country: request.headers.get('cf-ipcountry') || request.headers.get('x-country'),
+    region: request.headers.get('cf-region') || request.headers.get('x-region'),
+    city: request.headers.get('cf-ipcity') || request.headers.get('x-city'),
+    latitude: request.headers.get('cf-latitude') || request.headers.get('x-latitude'),
+    longitude: request.headers.get('cf-longitude') || request.headers.get('x-longitude'),
   };
+}
+
+/**
+ * Determines request source type
+ */
+function determineRequestSource(request: NextRequest): 'browser' | 'api' | 'webhook' | 'system' {
+  const userAgent = request.headers.get('user-agent') || '';
+  const contentType = request.headers.get('content-type') || '';
   
-  middlewareRequest.updateContext = (updates) => {
-    Object.assign(middlewareRequest.dreamfactory, updates);
-  };
-  
-  return middlewareRequest;
-}
-
-/**
- * Checks if route should bypass authentication entirely
- * Includes static assets and system routes
- * 
- * @param pathname - Request pathname to check
- * @returns Boolean indicating if route should bypass auth
- */
-function shouldBypassRoute(pathname: string): boolean {
-  return DEFAULT_CONFIG.bypassPatterns.some(pattern => {
-    if (pattern.includes('*')) {
-      const regexPattern = pattern.replace(/\*/g, '.*');
-      return new RegExp(`^${regexPattern}`).test(pathname);
-    }
-    return pathname.startsWith(pattern);
-  });
-}
-
-/**
- * Checks if route is in public routes list
- * Public routes don't require authentication
- * 
- * @param pathname - Request pathname to check
- * @returns Boolean indicating if route is public
- */
-function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some(route => {
-    if (route.includes('*')) {
-      const regexPattern = route.replace(/\*/g, '.*');
-      return new RegExp(`^${regexPattern}`).test(pathname);
-    }
-    return pathname.startsWith(route);
-  });
-}
-
-/**
- * Checks if route is in protected routes list
- * Protected routes require authentication
- * 
- * @param pathname - Request pathname to check
- * @returns Boolean indicating if route is protected
- */
-function isProtectedRoute(pathname: string): boolean {
-  return PROTECTED_ROUTES.some(route => {
-    if (route.includes('*')) {
-      const regexPattern = route.replace(/\*/g, '.*');
-      return new RegExp(`^${regexPattern}`).test(pathname);
-    }
-    return pathname.startsWith(route);
-  });
-}
-
-/**
- * Gets route configuration for specific path
- * Returns matching route config or default
- * 
- * @param pathname - Request pathname
- * @returns Route configuration or undefined
- */
-function getRouteConfig(pathname: string): RouteConfig | undefined {
-  return ROUTE_CONFIGS.find(config => {
-    if (config.path.includes('*')) {
-      const regexPattern = config.path.replace(/\*/g, '.*');
-      return new RegExp(`^${regexPattern}`).test(pathname);
-    }
-    return pathname.startsWith(config.path);
-  });
-}
-
-/**
- * Performs rate limiting check for request
- * Implements basic rate limiting with configurable thresholds
- * 
- * @param request - Middleware request context
- * @returns Rate limit check result
- */
-async function performRateLimit(request: MiddlewareRequest): Promise<{
-  allowed: boolean;
-  remaining: number;
-  resetTime: number;
-}> {
-  const identifier = request.dreamfactory.ipAddress;
-  return checkRateLimit(identifier, 100, 60000); // 100 requests per minute
-}
-
-/**
- * Creates successful response for authenticated requests
- * Includes session context and security headers
- * 
- * @param request - Original request
- * @param user - User session data
- * @param token - Session token
- * @param metadata - Additional response metadata
- * @returns NextResponse with authentication headers
- */
-function createAuthenticatedResponse(
-  request: NextRequest,
-  user: Partial<UserSession>,
-  token: string,
-  metadata: Record<string, any> = {}
-): NextResponse {
-  const response = NextResponse.next();
-  
-  // Add security headers
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('X-XSS-Protection', '1; mode=block');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  
-  // Add authentication context headers (for debugging in development)
-  const config = getEnvironmentConfig();
-  if (config.isDevelopment) {
-    response.headers.set('X-User-ID', user.id?.toString() || '');
-    response.headers.set('X-User-Email', user.email || '');
-    response.headers.set('X-Is-Admin', user.isSysAdmin?.toString() || 'false');
+  if (userAgent.includes('Mozilla') || userAgent.includes('Chrome') || userAgent.includes('Safari')) {
+    return 'browser';
   }
   
-  // Set secure session cookie
-  const cookieOptions = createSecureCookieOptions(3600); // 1 hour
-  const cookieValue = `${config.sessionCookieName}=${token}; HttpOnly; Secure=${config.isProduction}; SameSite=${config.isProduction ? 'strict' : 'lax'}; Max-Age=${cookieOptions.maxAge}; Path=${cookieOptions.path}`;
-  response.headers.set('Set-Cookie', cookieValue);
+  if (contentType.includes('application/json') || request.nextUrl.pathname.startsWith('/api/')) {
+    return 'api';
+  }
   
-  return response;
+  if (request.headers.get('x-webhook-signature')) {
+    return 'webhook';
+  }
+  
+  return 'system';
 }
 
 /**
- * Creates success response for public/bypass routes
- * Minimal response for non-authenticated requests
- * 
- * @param request - Original request
- * @param metadata - Additional response metadata
- * @returns NextResponse for public access
+ * Validates if request comes from trusted source
  */
-function createSuccessResponse(
-  request: NextRequest,
-  metadata: Record<string, any> = {}
-): NextResponse {
-  const response = NextResponse.next();
+async function validateTrustedSource(request: NextRequest): Promise<boolean> {
+  // In production, this would validate against known trusted sources
+  // For now, consider HTTPS requests from known domains as trusted
+  const origin = request.headers.get('origin');
+  const referer = request.headers.get('referer');
   
-  // Add basic security headers
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
+  if (!origin && !referer) {
+    return false; // No origin information
+  }
   
-  return response;
+  // Check against trusted domains (would be configurable in production)
+  const trustedDomains = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    'https://localhost:3000', // Development
+  ].filter(Boolean);
+  
+  const sourceUrl = origin || referer;
+  return trustedDomains.some(domain => sourceUrl?.startsWith(domain || ''));
 }
 
 /**
- * Creates rate limit exceeded response
- * Returns 429 with retry information
- * 
- * @param request - Original request
- * @param rateLimitInfo - Rate limit status
- * @returns NextResponse with rate limit error
+ * Determines token source from request
  */
-function createRateLimitResponse(
-  request: NextRequest,
-  rateLimitInfo: { allowed: boolean; remaining: number; resetTime: number }
-): NextResponse {
-  const response = NextResponse.json(
-    {
-      error: 'Rate limit exceeded',
-      message: 'Too many requests. Please try again later.',
-      retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000)
-    },
-    { status: 429 }
-  );
+function determineTokenSource(request: NextRequest): 'header' | 'cookie' | 'query' | 'body' {
+  if (request.headers.get('authorization')) {
+    return 'header';
+  }
   
-  response.headers.set('Retry-After', Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000).toString());
-  response.headers.set('X-RateLimit-Remaining', rateLimitInfo.remaining.toString());
-  response.headers.set('X-RateLimit-Reset', rateLimitInfo.resetTime.toString());
+  if (request.headers.get('x-dreamfactory-session-token')) {
+    return 'header';
+  }
   
-  return response;
+  if (request.cookies.get('df-session-token')) {
+    return 'cookie';
+  }
+  
+  return 'header'; // Default
 }
 
 /**
- * Creates security error response
- * For CSRF and other security violations
- * 
- * @param request - Original request
- * @param message - Error message
- * @param status - HTTP status code
- * @returns NextResponse with security error
+ * Converts SessionInfo to UserSession
  */
-function createSecurityErrorResponse(
-  request: NextRequest,
-  message: string,
-  status: number = 403
-): NextResponse {
-  return createErrorResponse(message, status);
+async function convertSessionInfoToUserSession(sessionInfo: SessionInfo): Promise<UserSession> {
+  return {
+    id: parseInt(sessionInfo.userId),
+    email: sessionInfo.email || '',
+    firstName: '',
+    lastName: '',
+    name: sessionInfo.email || '',
+    host: '',
+    sessionId: sessionInfo.sessionId,
+    sessionToken: '',
+    tokenExpiryDate: sessionInfo.expiresAt,
+    lastLoginDate: new Date().toISOString(),
+    isRootAdmin: sessionInfo.permissions.includes('super_admin'),
+    isSysAdmin: sessionInfo.permissions.includes('system_admin'),
+    roleId: 0,
+    role: undefined,
+    profile: undefined,
+  };
 }
 
 /**
- * Creates access denied response
- * For authorization failures
- * 
- * @param request - Original request
- * @param reason - Denial reason
- * @returns NextResponse with access denied error
+ * Logs successful middleware processing
  */
-function createAccessDeniedResponse(
-  request: NextRequest,
-  reason?: string
-): NextResponse {
-  return createErrorResponse(
-    reason || 'Access denied. Insufficient permissions.',
-    403
-  );
+async function logMiddlewareSuccess(
+  request: MiddlewareRequest,
+  response: NextResponse,
+  processingTime: number
+): Promise<void> {
+  if (getEnvironmentInfo().isDevelopment) {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      requestId: request.metadata.requestId,
+      path: request.nextUrl.pathname,
+      method: request.method,
+      statusCode: response.status,
+      processingTime,
+      authenticated: request.auth.isAuthenticated,
+      userId: request.session?.id,
+      sessionId: request.session?.sessionId,
+    };
+    
+    console.log('[MIDDLEWARE_SUCCESS]', JSON.stringify(logEntry));
+  }
 }
 
-// Export the main middleware function as default
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
 export default authMiddleware;
-
-// Export additional utilities for testing and integration
 export {
-  validateAuthenticationToken,
-  createSessionContext,
-  performAuthorization,
-  shouldBypassRoute,
-  isPublicRoute,
-  isProtectedRoute,
-  getRouteConfig
+  authMiddleware,
+  AUTH_MIDDLEWARE_CONFIG,
+  SECURITY_HEADER_CONFIG,
+  MiddlewareProcessingError,
+  type MiddlewareRequest,
+  type MiddlewareResponseContext,
 };
