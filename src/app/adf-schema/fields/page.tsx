@@ -1,689 +1,844 @@
 /**
- * @fileoverview Next.js page component providing the main database fields listing interface
- * for a selected table. Implements TanStack Virtual for handling large field datasets,
- * filtering and sorting capabilities, and navigation to individual field creation/editing routes.
- * Replaces Angular field listing functionality with React Query for intelligent caching
- * and Next.js routing integration.
+ * Database Fields Listing Page Component
  * 
- * @version 1.0.0
- * @created 2024-12-28
+ * Next.js page component providing the main database fields listing interface for a selected table.
+ * Implements TanStack Virtual for handling large field datasets (1,000+ fields), filtering and sorting 
+ * capabilities, and navigation to individual field creation/editing routes. Replaces Angular field 
+ * listing functionality with React Query for intelligent caching and Next.js routing integration.
  * 
  * Features:
- * - TanStack Virtual implementation for databases with 1,000+ fields per Section 5.2
- * - React Query caching with cache hit responses under 50ms
- * - SSR pages under 2 seconds per React/Next.js Integration Requirements
- * - Comprehensive field filtering, sorting, and search functionality
- * - Next.js routing integration for field management workflows
- * - Tailwind CSS 4.1+ styling with consistent theme injection
+ * - Server-side rendering with sub-2-second page loads
+ * - TanStack Virtual table for optimal performance with large datasets
+ * - React Query data fetching with <50ms cache hit responses
+ * - Real-time filtering, sorting, and search functionality
+ * - Field type-based visual indicators and constraint status displays
+ * - Seamless navigation to field creation and editing routes
+ * - Tailwind CSS styling with consistent theme injection
+ * - WCAG 2.1 AA accessibility compliance
+ * 
+ * @fileoverview Database fields listing page for schema discovery
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-'use client'
+'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState, useCallback, Suspense } from 'react';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  createColumnHelper,
-  flexRender,
+  useReactTable,
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
-  useReactTable,
   type ColumnDef,
-  type SortingState,
   type ColumnFiltersState,
-} from '@tanstack/react-table'
-import { useVirtualizer } from '@tanstack/react-virtual'
+  type SortingState,
+  type VisibilityState,
+  flexRender,
+} from '@tanstack/react-table';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useRef, useEffect } from 'react';
 import { 
   MagnifyingGlassIcon,
   PlusIcon,
-  FunnelIcon,
+  AdjustmentsHorizontalIcon,
   ArrowUpIcon,
   ArrowDownIcon,
-  PencilIcon,
   EyeIcon,
+  PencilIcon,
+  TrashIcon,
   KeyIcon,
   LinkIcon,
-} from '@heroicons/react/24/outline'
+  ClockIcon,
+  ShieldCheckIcon,
+  ExclamationTriangleIcon
+} from '@heroicons/react/24/outline';
 import { 
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
+  CheckCircleIcon, 
+  XCircleIcon,
   InformationCircleIcon 
-} from '@heroicons/react/24/solid'
+} from '@heroicons/react/24/solid';
 
-// Types and utilities
-import type {
+// Import types and utilities
+import type { 
   DatabaseSchemaFieldType,
-  FieldTableRow,
-  DreamFactoryFieldType,
+  FieldDataType,
+  FieldPageParams,
   FieldSearchParams,
-  FieldRouteParams,
-} from './field.types'
-
-// =============================================================================
-// TYPES AND INTERFACES
-// =============================================================================
-
-interface FieldsPageProps {
-  params: FieldRouteParams
-  searchParams: FieldSearchParams
-}
-
-interface FieldFilterOptions {
-  types: DreamFactoryFieldType[]
-  constraints: string[]
-  nullable: boolean[]
-  virtual: boolean[]
-}
-
-// =============================================================================
-// COLUMN HELPER AND DEFINITIONS
-// =============================================================================
-
-const columnHelper = createColumnHelper<FieldTableRow>()
-
-const createFieldColumns = (): ColumnDef<FieldTableRow>[] => [
-  columnHelper.accessor('name', {
-    header: 'Field Name',
-    size: 200,
-    minSize: 150,
-    cell: ({ row, getValue }) => (
-      <div className="flex items-center space-x-2">
-        <div className="flex items-center space-x-1">
-          {row.original.isPrimaryKey && (
-            <KeyIcon className="w-4 h-4 text-yellow-500" title="Primary Key" />
-          )}
-          {row.original.isForeignKey && (
-            <LinkIcon className="w-4 h-4 text-blue-500" title="Foreign Key" />
-          )}
-          {row.original.isVirtual && (
-            <EyeIcon className="w-4 h-4 text-purple-500" title="Virtual Field" />
-          )}
-        </div>
-        <span className="font-medium text-gray-900 dark:text-gray-100">
-          {getValue()}
-        </span>
-      </div>
-    ),
-    enableSorting: true,
-    enableColumnFilter: true,
-  }),
-
-  columnHelper.accessor('type', {
-    header: 'Type',
-    size: 120,
-    minSize: 100,
-    cell: ({ getValue }) => {
-      const type = getValue()
-      const getTypeColor = (fieldType: DreamFactoryFieldType) => {
-        if (['string', 'text', 'email', 'url'].includes(fieldType)) 
-          return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-        if (['integer', 'bigint', 'smallint', 'decimal', 'float', 'double'].includes(fieldType))
-          return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-        if (['date', 'time', 'datetime', 'timestamp'].includes(fieldType))
-          return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'
-        if (fieldType === 'boolean')
-          return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
-      }
-
-      return (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(type)}`}>
-          {type}
-        </span>
-      )
-    },
-    enableSorting: true,
-    enableColumnFilter: true,
-  }),
-
-  columnHelper.accessor('dbType', {
-    header: 'Database Type',
-    size: 140,
-    minSize: 120,
-    cell: ({ getValue }) => (
-      <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-        {getValue() || 'N/A'}
-      </span>
-    ),
-    enableSorting: true,
-  }),
-
-  columnHelper.accessor('constraints', {
-    header: 'Constraints',
-    size: 200,
-    minSize: 150,
-    cell: ({ row }) => {
-      const constraints = []
-      if (row.original.required) constraints.push('NOT NULL')
-      if (row.original.isPrimaryKey) constraints.push('PRIMARY KEY')
-      if (row.original.isForeignKey) constraints.push('FOREIGN KEY')
-      if (row.original.length) constraints.push(`LENGTH(${row.original.length})`)
-      
-      return (
-        <div className="flex flex-wrap gap-1">
-          {constraints.map((constraint, index) => (
-            <span
-              key={index}
-              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-            >
-              {constraint}
-            </span>
-          ))}
-        </div>
-      )
-    },
-    enableSorting: false,
-  }),
-
-  columnHelper.accessor('default', {
-    header: 'Default Value',
-    size: 150,
-    minSize: 120,
-    cell: ({ getValue }) => {
-      const defaultValue = getValue()
-      return defaultValue ? (
-        <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-          {String(defaultValue)}
-        </span>
-      ) : (
-        <span className="text-sm text-gray-400 dark:text-gray-600 italic">
-          None
-        </span>
-      )
-    },
-    enableSorting: true,
-  }),
-
-  columnHelper.display({
-    id: 'actions',
-    header: 'Actions',
-    size: 100,
-    minSize: 80,
-    cell: ({ row }) => (
-      <div className="flex items-center space-x-1">
-        <button
-          className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-          title="Edit Field"
-          onClick={() => handleEditField(row.original.name)}
-        >
-          <PencilIcon className="w-4 h-4" />
-        </button>
-      </div>
-    ),
-    enableSorting: false,
-  }),
-]
-
-// =============================================================================
-// UTILITY FUNCTIONS
-// =============================================================================
+  FieldListResponse
+} from './field.types';
+import type { ApiErrorResponse } from '@/types/api';
 
 /**
- * Transforms DatabaseSchemaFieldType to FieldTableRow for table display
+ * Enhanced field data structure for table display
+ * Extends base field type with computed display properties
  */
-const transformFieldToTableRow = (field: DatabaseSchemaFieldType): FieldTableRow => ({
-  id: field.name,
-  name: field.name,
-  alias: field.alias || '',
-  type: field.type,
-  dbType: field.dbType || '',
-  isVirtual: field.isVirtual,
-  isAggregate: field.isAggregate,
-  required: field.required,
-  constraints: buildConstraintsString(field),
-  isPrimaryKey: field.isPrimaryKey,
-  isForeignKey: field.isForeignKey,
-  refTable: field.refTable || undefined,
-  length: field.length || undefined,
-  default: field.default ?? undefined,
-})
-
-/**
- * Builds a constraints summary string for display
- */
-const buildConstraintsString = (field: DatabaseSchemaFieldType): string => {
-  const constraints = []
-  if (field.required) constraints.push('NOT NULL')
-  if (field.isPrimaryKey) constraints.push('PK')
-  if (field.isForeignKey) constraints.push('FK')
-  if (field.isUnique) constraints.push('UNIQUE')
-  if (field.autoIncrement) constraints.push('AUTO_INCREMENT')
-  return constraints.join(', ')
+interface EnhancedFieldData extends DatabaseSchemaFieldType {
+  /** Display-friendly type label */
+  typeLabel: string;
+  /** Constraint indicators */
+  constraints: Array<{
+    type: 'primary' | 'foreign' | 'unique' | 'required' | 'auto_increment';
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+  }>;
+  /** Field size display string */
+  sizeDisplay: string | null;
+  /** Has default value indicator */
+  hasDefault: boolean;
+  /** Validation rule count */
+  validationCount: number;
 }
 
 /**
- * Navigation handlers
+ * Field management hook interface (simulated until actual hook is implemented)
+ * Provides data fetching and mutation capabilities for field operations
  */
-let routerRef: ReturnType<typeof useRouter> | null = null
-
-const handleEditField = (fieldName: string) => {
-  if (routerRef) {
-    routerRef.push(`/adf-schema/fields/${encodeURIComponent(fieldName)}`)
-  }
+interface UseFieldManagement {
+  /** Field listing query */
+  fields: {
+    data?: FieldListResponse;
+    isLoading: boolean;
+    isError: boolean;
+    error?: ApiErrorResponse;
+    refetch: () => void;
+  };
+  /** Delete field mutation */
+  deleteField: {
+    mutate: (fieldName: string) => void;
+    isPending: boolean;
+  };
+  /** Bulk delete mutation */
+  bulkDelete: {
+    mutate: (fieldNames: string[]) => void;
+    isPending: boolean;
+  };
 }
-
-const handleCreateField = () => {
-  if (routerRef) {
-    routerRef.push('/adf-schema/fields/new')
-  }
-}
-
-// =============================================================================
-// MOCK API CLIENT (replace with actual implementation)
-// =============================================================================
 
 /**
- * Mock API client - replace with actual implementation from src/lib/api-client.ts
+ * Simulated field management hook
+ * TODO: Replace with actual implementation from src/hooks/use-field-management.ts
  */
-const mockApiClient = {
-  async getTableFields(serviceName: string, tableName: string): Promise<DatabaseSchemaFieldType[]> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50))
-    
-    // Mock data for development - replace with actual API call
-    const mockFields: DatabaseSchemaFieldType[] = Array.from({ length: 50 }, (_, i) => ({
-      name: `field_${i + 1}`,
-      alias: i % 3 === 0 ? `alias_${i + 1}` : null,
-      label: `Field ${i + 1}`,
-      type: ['string', 'integer', 'boolean', 'datetime', 'text'][i % 5] as DreamFactoryFieldType,
-      dbType: ['VARCHAR(255)', 'INT', 'BOOLEAN', 'DATETIME', 'TEXT'][i % 5],
-      required: i % 4 === 0,
-      allowNull: i % 4 !== 0,
-      isPrimaryKey: i === 0,
-      isForeignKey: i % 7 === 0 && i > 0,
-      isUnique: i % 5 === 0,
-      isVirtual: i % 10 === 0,
-      isAggregate: false,
-      autoIncrement: i === 0,
-      length: i % 3 === 0 ? 255 : null,
-      precision: null,
-      scale: 0,
-      default: i % 6 === 0 ? `default_${i}` : null,
-      description: `Description for field ${i + 1}`,
-      fixedLength: false,
-      supportsMultibyte: i % 2 === 0,
-      refTable: i % 7 === 0 && i > 0 ? `ref_table_${i}` : null,
-      refField: i % 7 === 0 && i > 0 ? `ref_field_${i}` : null,
-      refOnDelete: null,
-      refOnUpdate: null,
-      validation: null,
-      picklist: null,
-      dbFunction: [],
-      native: null,
-      value: [],
-    }))
-    
-    return mockFields
-  }
-}
-
-// =============================================================================
-// MAIN COMPONENT
-// =============================================================================
-
-/**
- * Fields listing page component
- */
-export default function FieldsPage({ params, searchParams }: FieldsPageProps) {
-  const router = useRouter()
-  routerRef = router // Set global router reference for action handlers
+function useFieldManagement(serviceName: string, tableName: string): UseFieldManagement {
+  const queryClient = useQueryClient();
   
-  const urlSearchParams = useSearchParams()
+  // Field listing query with React Query
+  const fieldsQuery = useQuery({
+    queryKey: ['fields', serviceName, tableName],
+    queryFn: async (): Promise<FieldListResponse> => {
+      // Simulate API call - replace with actual API client
+      const response = await fetch(`/api/v2/${serviceName}/_schema/${tableName}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch fields');
+      }
+      return response.json();
+    },
+    staleTime: 300000, // 5 minutes
+    gcTime: 900000,    // 15 minutes  
+    refetchOnWindowFocus: false,
+    retry: 2,
+  });
+
+  // Delete mutations (simulated)
+  const deleteField = {
+    mutate: useCallback((fieldName: string) => {
+      // TODO: Implement actual delete mutation
+      console.log('Delete field:', fieldName);
+      queryClient.invalidateQueries({ queryKey: ['fields', serviceName, tableName] });
+    }, [serviceName, tableName, queryClient]),
+    isPending: false,
+  };
+
+  const bulkDelete = {
+    mutate: useCallback((fieldNames: string[]) => {
+      // TODO: Implement actual bulk delete mutation
+      console.log('Bulk delete fields:', fieldNames);
+      queryClient.invalidateQueries({ queryKey: ['fields', serviceName, tableName] });
+    }, [serviceName, tableName, queryClient]),
+    isPending: false,
+  };
+
+  return {
+    fields: {
+      data: fieldsQuery.data,
+      isLoading: fieldsQuery.isLoading,
+      isError: fieldsQuery.isError,
+      error: fieldsQuery.error as ApiErrorResponse,
+      refetch: fieldsQuery.refetch,
+    },
+    deleteField,
+    bulkDelete,
+  };
+}
+
+/**
+ * Utility function to format field size display
+ */
+function formatFieldSize(field: DatabaseSchemaFieldType): string | null {
+  if (field.length) {
+    if (field.precision && field.scale !== undefined) {
+      return `${field.length},${field.scale}`;
+    }
+    return field.length.toString();
+  }
+  if (field.precision && field.scale !== undefined) {
+    return `${field.precision},${field.scale}`;
+  }
+  return null;
+}
+
+/**
+ * Utility function to get field type display label
+ */
+function getFieldTypeLabel(type: FieldDataType): string {
+  const typeLabels: Record<FieldDataType, string> = {
+    'id': 'ID',
+    'string': 'String',
+    'integer': 'Integer',
+    'text': 'Text',
+    'boolean': 'Boolean',
+    'binary': 'Binary',
+    'float': 'Float',
+    'double': 'Double',
+    'decimal': 'Decimal',
+    'datetime': 'DateTime',
+    'date': 'Date',
+    'time': 'Time',
+    'timestamp': 'Timestamp',
+    'timestamp_on_create': 'Created At',
+    'timestamp_on_update': 'Updated At',
+    'user_id': 'User ID',
+    'user_id_on_create': 'Created By',
+    'user_id_on_update': 'Updated By',
+    'reference': 'Reference',
+    'json': 'JSON',
+    'xml': 'XML',
+    'uuid': 'UUID',
+    'blob': 'BLOB',
+    'clob': 'CLOB',
+    'geometry': 'Geometry',
+    'point': 'Point',
+    'linestring': 'LineString',
+    'polygon': 'Polygon',
+    'enum': 'Enum',
+    'set': 'Set',
+  };
+  return typeLabels[type] || type.toUpperCase();
+}
+
+/**
+ * Enhanced field data transformation utility
+ */
+function enhanceFieldData(fields: DatabaseSchemaFieldType[]): EnhancedFieldData[] {
+  return fields.map(field => {
+    const constraints = [];
+    
+    // Add constraint indicators
+    if (field.isPrimaryKey) {
+      constraints.push({
+        type: 'primary' as const,
+        label: 'Primary Key',
+        icon: KeyIcon,
+        color: 'text-yellow-600',
+      });
+    }
+    
+    if (field.isForeignKey) {
+      constraints.push({
+        type: 'foreign' as const,
+        label: 'Foreign Key',
+        icon: LinkIcon,
+        color: 'text-blue-600',
+      });
+    }
+    
+    if (field.isUnique) {
+      constraints.push({
+        type: 'unique' as const,
+        label: 'Unique',
+        icon: ShieldCheckIcon,
+        color: 'text-purple-600',
+      });
+    }
+    
+    if (field.required) {
+      constraints.push({
+        type: 'required' as const,
+        label: 'Required',
+        icon: ExclamationTriangleIcon,
+        color: 'text-red-600',
+      });
+    }
+    
+    if (field.autoIncrement) {
+      constraints.push({
+        type: 'auto_increment' as const,
+        label: 'Auto Increment',
+        icon: ClockIcon,
+        color: 'text-green-600',
+      });
+    }
+
+    return {
+      ...field,
+      typeLabel: getFieldTypeLabel(field.type),
+      constraints,
+      sizeDisplay: formatFieldSize(field),
+      hasDefault: Boolean(field.default),
+      validationCount: field.validation ? JSON.parse(field.validation || '[]').length : 0,
+    };
+  });
+}
+
+/**
+ * Field type badge component
+ */
+function FieldTypeBadge({ type, dbType }: { type: FieldDataType; dbType?: string | null }) {
+  const label = getFieldTypeLabel(type);
+  const colors = {
+    id: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    string: 'bg-blue-100 text-blue-800 border-blue-200',
+    integer: 'bg-green-100 text-green-800 border-green-200',
+    text: 'bg-purple-100 text-purple-800 border-purple-200',
+    boolean: 'bg-gray-100 text-gray-800 border-gray-200',
+    datetime: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    reference: 'bg-orange-100 text-orange-800 border-orange-200',
+  };
+  
+  const colorClass = colors[type] || 'bg-gray-100 text-gray-800 border-gray-200';
+  
+  return (
+    <span 
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colorClass}`}
+      title={dbType || undefined}
+    >
+      {label}
+    </span>
+  );
+}
+
+/**
+ * Constraint indicators component
+ */
+function ConstraintIndicators({ constraints }: { constraints: EnhancedFieldData['constraints'] }) {
+  if (constraints.length === 0) return null;
+  
+  return (
+    <div className="flex items-center gap-1">
+      {constraints.map((constraint, index) => {
+        const Icon = constraint.icon;
+        return (
+          <Icon
+            key={`${constraint.type}-${index}`}
+            className={`h-4 w-4 ${constraint.color}`}
+            title={constraint.label}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Action buttons component for field row
+ */
+function FieldActions({ 
+  field, 
+  onEdit, 
+  onDelete 
+}: { 
+  field: EnhancedFieldData;
+  onEdit: (fieldName: string) => void;
+  onDelete: (fieldName: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => onEdit(field.name)}
+        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+        title="Edit field"
+        aria-label={`Edit field ${field.name}`}
+      >
+        <PencilIcon className="h-4 w-4" />
+      </button>
+      
+      <button
+        onClick={() => onDelete(field.name)}
+        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+        title="Delete field"
+        aria-label={`Delete field ${field.name}`}
+        disabled={field.isPrimaryKey} // Prevent deleting primary keys
+      >
+        <TrashIcon className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Loading skeleton component
+ */
+function FieldTableSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 10 }).map((_, index) => (
+        <div key={index} className="flex items-center space-x-4 p-4 bg-white rounded-lg border">
+          <div className="h-4 bg-gray-200 rounded w-1/4 animate-pulse" />
+          <div className="h-4 bg-gray-200 rounded w-1/6 animate-pulse" />
+          <div className="h-4 bg-gray-200 rounded w-1/8 animate-pulse" />
+          <div className="h-4 bg-gray-200 rounded w-1/12 animate-pulse" />
+          <div className="h-4 bg-gray-200 rounded w-1/12 animate-pulse" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Error message component
+ */
+function ErrorMessage({ 
+  error, 
+  onRetry 
+}: { 
+  error: ApiErrorResponse; 
+  onRetry: () => void;
+}) {
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+      <XCircleIcon className="h-12 w-12 text-red-400 mx-auto mb-4" />
+      <h3 className="text-lg font-medium text-red-900 mb-2">
+        Failed to Load Fields
+      </h3>
+      <p className="text-red-700 mb-4">
+        {error.error?.message || 'An unexpected error occurred while loading the field list.'}
+      </p>
+      <button
+        onClick={onRetry}
+        className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+      >
+        Try Again
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Empty state component
+ */
+function EmptyState({ onCreateField }: { onCreateField: () => void }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+      <InformationCircleIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+      <h3 className="text-lg font-medium text-gray-900 mb-2">
+        No Fields Found
+      </h3>
+      <p className="text-gray-500 mb-6 max-w-sm mx-auto">
+        This table doesn't have any fields yet. Create your first field to get started with your database schema.
+      </p>
+      <button
+        onClick={onCreateField}
+        className="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
+      >
+        <PlusIcon className="h-4 w-4 mr-2" />
+        Create First Field
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Main Fields Page Component
+ */
+export default function FieldsPage() {
+  const router = useRouter();
+  const params = useParams<FieldPageParams>();
+  const searchParams = useSearchParams();
   
   // Extract route parameters
-  const { service: serviceName, table: tableName } = params
+  const serviceName = params.service;
+  const tableName = params.table;
   
-  // State management
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = useState(searchParams.search || '')
-  const [typeFilter, setTypeFilter] = useState<DreamFactoryFieldType | 'all'>('all')
-  const [constraintFilter, setConstraintFilter] = useState<string>('all')
+  // Extract search parameters for filtering and sorting
+  const initialSearch = searchParams.get('search') || '';
+  const initialSort = searchParams.get('sort') || 'name';
+  const initialOrder = searchParams.get('order') || 'asc';
+  const initialType = searchParams.get('type') as FieldDataType | undefined;
+  const initialConstraint = searchParams.get('constraint') as 'primary' | 'foreign' | 'unique' | 'required' | undefined;
   
-  // React Query for field data fetching with intelligent caching
-  const {
-    data: fieldsData = [],
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
-    queryKey: ['table-fields', serviceName, tableName],
-    queryFn: () => mockApiClient.getTableFields(serviceName, tableName),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnWindowFocus: false,
-    enabled: !!(serviceName && tableName),
-  })
-
-  // Transform data for table display
-  const tableData = useMemo(() => 
-    fieldsData.map(transformFieldToTableRow),
-    [fieldsData]
-  )
-
-  // Column definitions
-  const columns = useMemo(() => createFieldColumns(), [])
-
-  // Apply filters
-  const filteredData = useMemo(() => {
-    let filtered = tableData
-
-    // Type filter
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter(row => row.type === typeFilter)
-    }
-
-    // Constraint filter
-    if (constraintFilter !== 'all') {
-      filtered = filtered.filter(row => {
-        switch (constraintFilter) {
-          case 'primary_key':
-            return row.isPrimaryKey
-          case 'foreign_key':
-            return row.isForeignKey
-          case 'required':
-            return row.required
-          case 'virtual':
-            return row.isVirtual
-          default:
-            return true
-        }
-      })
-    }
-
-    return filtered
-  }, [tableData, typeFilter, constraintFilter])
-
-  // Table configuration
+  // Component state
+  const [globalFilter, setGlobalFilter] = useState(initialSearch);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: initialSort, desc: initialOrder === 'desc' }
+  ]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
+  
+  // Refs for virtualization
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Data fetching
+  const { fields, deleteField, bulkDelete } = useFieldManagement(serviceName, tableName);
+  
+  // Transform field data for enhanced display
+  const enhancedFields = useMemo(() => {
+    if (!fields.data?.resource) return [];
+    return enhanceFieldData(fields.data.resource);
+  }, [fields.data?.resource]);
+  
+  // Table column definitions with TanStack Table
+  const columns = useMemo<ColumnDef<EnhancedFieldData>[]>(() => [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          checked={table.getIsAllPageRowsSelected()}
+          onChange={table.getToggleAllPageRowsSelectedHandler()}
+          aria-label="Select all fields"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          checked={row.getIsSelected()}
+          onChange={row.getToggleSelectedHandler()}
+          aria-label={`Select field ${row.original.name}`}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+      size: 50,
+    },
+    {
+      accessorKey: 'name',
+      header: ({ column }) => (
+        <button
+          className="flex items-center gap-2 font-medium text-left"
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        >
+          Field Name
+          {column.getIsSorted() === 'asc' ? (
+            <ArrowUpIcon className="h-4 w-4" />
+          ) : column.getIsSorted() === 'desc' ? (
+            <ArrowDownIcon className="h-4 w-4" />
+          ) : null}
+        </button>
+      ),
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900">{row.original.name}</span>
+          {row.original.label && row.original.label !== row.original.name && (
+            <span className="text-sm text-gray-500">{row.original.label}</span>
+          )}
+        </div>
+      ),
+      size: 200,
+    },
+    {
+      accessorKey: 'typeLabel',
+      header: 'Type',
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-1">
+          <FieldTypeBadge type={row.original.type} dbType={row.original.dbType} />
+          {row.original.sizeDisplay && (
+            <span className="text-xs text-gray-500">({row.original.sizeDisplay})</span>
+          )}
+        </div>
+      ),
+      size: 120,
+    },
+    {
+      accessorKey: 'constraints',
+      header: 'Constraints',
+      cell: ({ row }) => <ConstraintIndicators constraints={row.original.constraints} />,
+      enableSorting: false,
+      size: 120,
+    },
+    {
+      accessorKey: 'hasDefault',
+      header: 'Default',
+      cell: ({ row }) => (
+        <div className="flex items-center">
+          {row.original.hasDefault ? (
+            <CheckCircleIcon className="h-4 w-4 text-green-500" title={`Default: ${row.original.default}`} />
+          ) : (
+            <span className="text-gray-400">—</span>
+          )}
+        </div>
+      ),
+      size: 80,
+    },
+    {
+      accessorKey: 'validationCount',
+      header: 'Validation',
+      cell: ({ row }) => (
+        row.original.validationCount > 0 ? (
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            {row.original.validationCount} rule{row.original.validationCount !== 1 ? 's' : ''}
+          </span>
+        ) : (
+          <span className="text-gray-400">—</span>
+        )
+      ),
+      size: 100,
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <FieldActions
+          field={row.original}
+          onEdit={handleEditField}
+          onDelete={handleDeleteField}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+      size: 100,
+    },
+  ], []);
+  
+  // Initialize table with TanStack Table
   const table = useReactTable({
-    data: filteredData,
+    data: enhancedFields,
     columns,
     state: {
-      sorting,
-      columnFilters,
       globalFilter,
+      columnFilters,
+      sorting,
+      columnVisibility,
+      rowSelection,
     },
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnFiltersChange: setColumnFilters,
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    globalFilterFn: 'includesString',
-  })
-
-  // Virtualization setup for large datasets
-  const tableContainerRef = useState<HTMLDivElement | null>(null)[0]
-  const { rows } = table.getRowModel()
+    getSortedRowModel: getSortedRowModel(),
+    enableRowSelection: true,
+    enableMultiRowSelection: true,
+  });
   
+  // Setup virtualization for large datasets
+  const { rows } = table.getRowModel();
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
-    getScrollElement: () => tableContainerRef,
-    estimateSize: () => 60, // Estimated row height
-    overscan: 10,
-  })
-
-  // Extract unique filter options
-  const filterOptions: FieldFilterOptions = useMemo(() => ({
-    types: Array.from(new Set(tableData.map(field => field.type))),
-    constraints: ['primary_key', 'foreign_key', 'required', 'virtual'],
-    nullable: [true, false],
-    virtual: [true, false],
-  }), [tableData])
-
-  // Update URL search params when filters change
-  useEffect(() => {
-    const params = new URLSearchParams()
-    if (globalFilter) params.set('search', globalFilter)
-    if (typeFilter !== 'all') params.set('type', typeFilter)
-    if (constraintFilter !== 'all') params.set('constraint', constraintFilter)
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 60, // Estimated row height in pixels
+    overscan: 10, // Render extra rows for smooth scrolling
+  });
+  
+  // Navigation handlers
+  const handleCreateField = useCallback(() => {
+    router.push(`/adf-schema/fields/new?service=${serviceName}&table=${tableName}`);
+  }, [router, serviceName, tableName]);
+  
+  const handleEditField = useCallback((fieldName: string) => {
+    router.push(`/adf-schema/fields/${fieldName}?service=${serviceName}&table=${tableName}`);
+  }, [router, serviceName, tableName]);
+  
+  const handleDeleteField = useCallback((fieldName: string) => {
+    if (window.confirm(`Are you sure you want to delete the field "${fieldName}"? This action cannot be undone.`)) {
+      deleteField.mutate(fieldName);
+    }
+  }, [deleteField]);
+  
+  const handleBulkDelete = useCallback(() => {
+    const selectedRows = table.getFilteredSelectedRowModel().rows;
+    const fieldNames = selectedRows.map(row => row.original.name);
     
-    const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`
-    window.history.replaceState(null, '', newUrl)
-  }, [globalFilter, typeFilter, constraintFilter])
-
-  // Loading state
-  if (isLoading) {
+    if (fieldNames.length === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete ${fieldNames.length} field${fieldNames.length !== 1 ? 's' : ''}? This action cannot be undone.`;
+    
+    if (window.confirm(confirmMessage)) {
+      bulkDelete.mutate(fieldNames);
+      setRowSelection({});
+    }
+  }, [table, bulkDelete]);
+  
+  // Update URL parameters when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    
+    if (globalFilter) params.set('search', globalFilter);
+    if (sorting.length > 0) {
+      params.set('sort', sorting[0].id);
+      params.set('order', sorting[0].desc ? 'desc' : 'asc');
+    }
+    
+    const newUrl = params.toString() ? `?${params.toString()}` : '';
+    router.replace(`/adf-schema/fields${newUrl}`, { scroll: false });
+  }, [globalFilter, sorting, router]);
+  
+  // Handle loading state
+  if (fields.isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="px-4 sm:px-6 lg:px-8 py-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-6"></div>
-            <div className="space-y-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Error state
-  if (isError) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <ExclamationTriangleIcon className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-            Error Loading Fields
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            {error instanceof Error ? error.message : 'Failed to load table fields'}
+      <div className="container mx-auto px-6 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">Database Fields</h1>
+          <p className="text-gray-600 mt-2">
+            Loading fields for {serviceName}.{tableName}...
           </p>
+        </div>
+        <FieldTableSkeleton />
+      </div>
+    );
+  }
+  
+  // Handle error state
+  if (fields.isError) {
+    return (
+      <div className="container mx-auto px-6 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">Database Fields</h1>
+          <p className="text-gray-600 mt-2">
+            Error loading fields for {serviceName}.{tableName}
+          </p>
+        </div>
+        <ErrorMessage error={fields.error!} onRetry={fields.refetch} />
+      </div>
+    );
+  }
+  
+  const selectedRowCount = Object.keys(rowSelection).length;
+  
+  return (
+    <div className="container mx-auto px-6 py-8">
+      {/* Page Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Database Fields</h1>
+            <p className="text-gray-600 mt-2">
+              Manage fields for <span className="font-medium">{serviceName}.{tableName}</span>
+            </p>
+          </div>
           <button
-            onClick={() => window.location.reload()}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
+            onClick={handleCreateField}
+            className="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
           >
-            Try Again
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Create Field
           </button>
         </div>
       </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="sm:flex sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              Fields: {tableName}
-            </h1>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Service: {serviceName} • {filteredData.length} field{filteredData.length !== 1 ? 's' : ''}
-            </p>
+      
+      {/* Filter and Actions Bar */}
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 flex-1">
+          {/* Search Input */}
+          <div className="relative max-w-sm">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search fields..."
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 text-sm w-full"
+            />
           </div>
-          <div className="mt-4 sm:mt-0">
+          
+          {/* Field Count */}
+          <span className="text-sm text-gray-500">
+            {enhancedFields.length} field{enhancedFields.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        
+        {/* Bulk Actions */}
+        {selectedRowCount > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">
+              {selectedRowCount} selected
+            </span>
             <button
-              onClick={handleCreateField}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 transition-colors"
+              onClick={handleBulkDelete}
+              className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+              disabled={bulkDelete.isPending}
             >
-              <PlusIcon className="w-4 h-4 mr-2" />
-              Add Field
+              <TrashIcon className="h-4 w-4 mr-1" />
+              Delete Selected
             </button>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Search */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search fields..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 sm:text-sm"
-              />
-            </div>
-
-            {/* Type Filter */}
-            <div>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value as DreamFactoryFieldType | 'all')}
-                className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 sm:text-sm"
-              >
-                <option value="all">All Types</option>
-                {filterOptions.types.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Constraint Filter */}
-            <div>
-              <select
-                value={constraintFilter}
-                onChange={(e) => setConstraintFilter(e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 sm:text-sm"
-              >
-                <option value="all">All Constraints</option>
-                <option value="primary_key">Primary Key</option>
-                <option value="foreign_key">Foreign Key</option>
-                <option value="required">Required</option>
-                <option value="virtual">Virtual</option>
-              </select>
-            </div>
-
-            {/* Clear Filters */}
-            <div className="flex items-center">
-              <button
-                onClick={() => {
-                  setGlobalFilter('')
-                  setTypeFilter('all')
-                  setConstraintFilter('all')
-                  setColumnFilters([])
-                }}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-              >
-                <FunnelIcon className="w-4 h-4 mr-2" />
-                Clear Filters
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <div
-              ref={tableContainerRef}
-              className="max-h-[600px] overflow-auto"
-              style={{ contain: 'strict' }}
-            >
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
-                  {table.getHeaderGroups().map(headerGroup => (
-                    <tr key={headerGroup.id}>
-                      {headerGroup.headers.map(header => (
-                        <th
-                          key={header.id}
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                          style={{ width: header.getSize() }}
-                          onClick={header.column.getToggleSortingHandler()}
-                        >
-                          <div className="flex items-center space-x-1">
-                            <span>
-                              {flexRender(header.column.columnDef.header, header.getContext())}
-                            </span>
-                            {header.column.getCanSort() && (
-                              <span className="flex flex-col">
-                                <ArrowUpIcon 
-                                  className={`w-3 h-3 ${
-                                    header.column.getIsSorted() === 'asc' 
-                                      ? 'text-blue-600 dark:text-blue-400' 
-                                      : 'text-gray-300 dark:text-gray-600'
-                                  }`} 
-                                />
-                                <ArrowDownIcon 
-                                  className={`w-3 h-3 -mt-1 ${
-                                    header.column.getIsSorted() === 'desc' 
-                                      ? 'text-blue-600 dark:text-blue-400' 
-                                      : 'text-gray-300 dark:text-gray-600'
-                                  }`} 
-                                />
-                              </span>
-                            )}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  ))}
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {rowVirtualizer.getVirtualItems().map(virtualRow => {
-                    const row = rows[virtualRow.index]
-                    return (
-                      <tr
-                        key={row.id}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                        style={{
-                          height: `${virtualRow.size}px`,
-                          transform: `translateY(${virtualRow.start}px)`,
-                        }}
-                      >
-                        {row.getVisibleCells().map(cell => (
-                          <td
-                            key={cell.id}
-                            className="px-6 py-4 whitespace-nowrap text-sm"
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Table Footer */}
-          {filteredData.length === 0 && !isLoading && (
-            <div className="text-center py-12">
-              <InformationCircleIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                No Fields Found
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                {globalFilter || typeFilter !== 'all' || constraintFilter !== 'all'
-                  ? 'No fields match your current filters.'
-                  : 'This table has no fields defined yet.'}
-              </p>
-              {(globalFilter || typeFilter !== 'all' || constraintFilter !== 'all') && (
-                <button
-                  onClick={() => {
-                    setGlobalFilter('')
-                    setTypeFilter('all')
-                    setConstraintFilter('all')
-                  }}
-                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Performance Stats (Development Only) */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-            <div>Total Fields: {tableData.length}</div>
-            <div>Filtered Fields: {filteredData.length}</div>
-            <div>Virtual Rows: {rowVirtualizer.getVirtualItems().length}</div>
           </div>
         )}
       </div>
+      
+      {/* Table Content */}
+      {enhancedFields.length === 0 ? (
+        <EmptyState onCreateField={handleCreateField} />
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          {/* Table Header */}
+          <div className="border-b border-gray-200 bg-gray-50">
+            {table.getHeaderGroups().map(headerGroup => (
+              <div key={headerGroup.id} className="flex">
+                {headerGroup.headers.map(header => (
+                  <div
+                    key={header.id}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    style={{ width: header.getSize() }}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())
+                    }
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          
+          {/* Virtualized Table Body */}
+          <div
+            ref={tableContainerRef}
+            className="overflow-auto"
+            style={{ height: '600px' }}
+          >
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                position: 'relative',
+              }}
+            >
+              {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                const row = rows[virtualRow.index];
+                return (
+                  <div
+                    key={row.id}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                    className="flex items-center border-b border-gray-100 hover:bg-gray-50"
+                  >
+                    {row.getVisibleCells().map(cell => (
+                      <div
+                        key={cell.id}
+                        className="px-4 py-3"
+                        style={{ width: cell.column.getSize() }}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  )
+  );
 }
