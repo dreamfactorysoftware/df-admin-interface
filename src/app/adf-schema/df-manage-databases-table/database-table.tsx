@@ -1,708 +1,437 @@
 'use client';
 
 /**
- * Database Service Management Table Component
+ * React component that displays and manages a table of database service entries
+ * with TanStack Virtual for large dataset handling.
  * 
- * React component that displays and manages a table of database service entries with TanStack Virtual
- * for large dataset handling. Replaces Angular DfManageDatabasesTableComponent with React Query 
- * for data fetching, Headless UI table components with Tailwind CSS styling, and Next.js routing
- * for navigation.
+ * Replaces Angular DfManageDatabasesTableComponent with React Query for data fetching,
+ * Headless UI table components with Tailwind CSS styling, and Next.js routing for navigation.
+ * Provides database service listing, view actions, and data filtering capabilities
+ * optimized for handling 1000+ database entries per Section 5.2 Component Details.
  * 
- * Features:
- * - TanStack Virtual implementation for databases with 1,000+ tables
- * - React Query for advanced data fetching operations with intelligent caching
- * - Cache hit responses under 50ms with TTL configuration (staleTime: 300 seconds)
- * - Headless UI components with Tailwind CSS 4.1+ styling
- * - Next.js routing for database detail navigation
- * - Accessibility compliance (WCAG 2.1 AA)
- * - Real-time filtering and search capabilities
- * 
- * @version 1.0.0
- * @author DreamFactory Admin Interface Migration Team
+ * @module DatabaseTable
+ * @see Section 5.2 Component Details - Database Service Management Component
+ * @see React/Next.js Integration Requirements - Cache hit responses under 50ms
  */
 
-import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { 
+  createColumnHelper,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type SortingState,
+  type ColumnFiltersState
+} from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { 
-  EyeIcon, 
-  MagnifyingGlassIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  XCircleIcon
-} from '@heroicons/react/24/outline';
-import { 
-  DatabaseServiceRow, 
-  DatabaseType,
-  databaseQueryKeys 
-} from '../../../types/database';
+import { Eye, Database, Filter, RefreshCw } from 'lucide-react';
 
-// ============================================================================
-// TYPES AND INTERFACES
-// ============================================================================
+// UI Components
+import { ManageTable } from '@/components/ui/manage-table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
-/** Table column definition for database services */
-interface DatabaseServiceColumn {
-  key: keyof DatabaseServiceRow | 'actions';
-  label: string;
-  sortable?: boolean;
-  width?: string;
-  render?: (service: DatabaseServiceRow) => React.ReactNode;
-}
+// Types and interfaces
+import type { DatabaseService, DatabaseType } from '@/types/database';
+import type { GenericListResponse } from '@/types/service';
 
-/** Table filtering and sorting state */
-interface TableState {
-  searchTerm: string;
-  sortBy: keyof DatabaseServiceRow | null;
-  sortDirection: 'asc' | 'desc';
-  typeFilter: DatabaseType | 'all';
-  statusFilter: 'all' | 'active' | 'inactive';
-}
+// Hooks and utilities
+import { useDebounce } from '@/hooks/use-debounce';
+import { useAppStore } from '@/stores/app-store';
+import { cn } from '@/lib/utils';
 
-/** Connection status indicator props */
-interface ConnectionStatusProps {
-  status?: DatabaseServiceRow['connection_status'];
-  lastTested?: string;
-}
-
-/** Action button props for database service rows */
-interface ActionButtonProps {
-  service: DatabaseServiceRow;
-  onNavigate: (serviceName: string) => void;
-}
-
-// ============================================================================
-// MOCK DATA FETCHING FUNCTIONS (TO BE REPLACED WITH ACTUAL API CALLS)
-// ============================================================================
-
-/** 
- * Fetches database services from the API
- * Note: This is a mock implementation. In production, this would use the actual API client
- * from src/lib/api-client.ts once it's implemented.
+/**
+ * Database row data interface for table display
+ * Maps from full DatabaseService to simplified table row format
  */
-const fetchDatabaseServices = async (): Promise<DatabaseServiceRow[]> => {
-  // Simulate API delay for realistic testing
-  await new Promise(resolve => setTimeout(resolve, 100));
+export interface DatabaseRowData {
+  /** Service ID */
+  id: number;
+  /** Service name (unique identifier) */
+  name: string;
+  /** Service description */
+  description: string;
+  /** Service display label */
+  label: string;
+  /** Database type */
+  type: DatabaseType;
+  /** Service active status */
+  isActive: boolean;
+}
+
+/**
+ * Column helper for type-safe column definitions
+ */
+const columnHelper = createColumnHelper<DatabaseRowData>();
+
+/**
+ * Database type display metadata
+ */
+const DATABASE_TYPE_LABELS: Record<DatabaseType, string> = {
+  mysql: 'MySQL',
+  postgresql: 'PostgreSQL',
+  oracle: 'Oracle Database',
+  mongodb: 'MongoDB',
+  snowflake: 'Snowflake'
+};
+
+/**
+ * Placeholder hook for database services data fetching
+ * TODO: Implement actual hook with React Query and API client
+ */
+function useDatabaseServices() {
+  return useQuery({
+    queryKey: ['database-services'],
+    queryFn: async (): Promise<GenericListResponse<DatabaseService>> => {
+      // Placeholder implementation - replace with actual API call
+      const response = await fetch('/api/v2/system/service?group=Database');
+      if (!response.ok) {
+        throw new Error('Failed to fetch database services');
+      }
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes cache per React Query TTL configuration
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    retry: 2
+  });
+}
+
+/**
+ * Placeholder hook for service types data fetching
+ * TODO: Implement actual hook with React Query and API client
+ */
+function useServiceTypes() {
+  return useQuery({
+    queryKey: ['service-types', 'Database'],
+    queryFn: async () => {
+      // Placeholder implementation - replace with actual API call
+      const response = await fetch('/api/v2/system/service_type?group=Database');
+      if (!response.ok) {
+        throw new Error('Failed to fetch service types');
+      }
+      return response.json();
+    },
+    staleTime: 15 * 60 * 1000, // 15 minutes cache for service types
+    cacheTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: false
+  });
+}
+
+/**
+ * Props interface for DatabaseTable component
+ */
+export interface DatabaseTableProps {
+  /** Optional CSS class name */
+  className?: string;
+  /** Whether to show system services */
+  showSystemServices?: boolean;
+}
+
+/**
+ * Database table component with virtual scrolling and filtering
+ * 
+ * Features:
+ * - TanStack Virtual for performance with 1000+ entries
+ * - React Query for intelligent caching (cache hit responses under 50ms)
+ * - Real-time filtering with debounced input
+ * - Next.js routing for navigation
+ * - WCAG 2.1 AA accessibility compliance
+ * 
+ * @param props Component props
+ * @returns Database table component
+ */
+export function DatabaseTable({ 
+  className,
+  showSystemServices = false 
+}: DatabaseTableProps) {
+  const router = useRouter();
+  const { preferences } = useAppStore();
   
-  // Mock data representing database services
-  const mockServices: DatabaseServiceRow[] = [
-    {
-      id: 1,
-      name: 'mysql_main',
-      label: 'MySQL Main Database',
-      description: 'Primary MySQL database for application data',
-      type: 'mysql',
-      is_active: true,
-      deletable: true,
-      connection_status: 'connected',
-      last_tested: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
-      created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(), // 30 days ago
-      last_modified_date: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-    },
-    {
-      id: 2,
-      name: 'postgres_analytics',
-      label: 'PostgreSQL Analytics',
-      description: 'Analytics and reporting database',
-      type: 'postgresql',
-      is_active: true,
-      deletable: true,
-      connection_status: 'connected',
-      last_tested: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-      created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20).toISOString(),
-      last_modified_date: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-    },
-    {
-      id: 3,
-      name: 'mongo_sessions',
-      label: 'MongoDB Session Store',
-      description: 'Session storage and user data',
-      type: 'mongodb',
-      is_active: false,
-      deletable: true,
-      connection_status: 'disconnected',
-      last_tested: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-      created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 15).toISOString(),
-      last_modified_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-    },
-    {
-      id: 4,
-      name: 'oracle_enterprise',
-      label: 'Oracle Enterprise DB',
-      description: 'Enterprise data warehouse',
-      type: 'oracle',
-      is_active: true,
-      deletable: false,
-      connection_status: 'testing',
-      last_tested: new Date().toISOString(),
-      created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 60).toISOString(),
-      last_modified_date: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
-    },
-    {
-      id: 5,
-      name: 'snowflake_warehouse',
-      label: 'Snowflake Data Warehouse',
-      description: 'Cloud data warehouse for large-scale analytics',
-      type: 'snowflake',
-      is_active: true,
-      deletable: true,
-      connection_status: 'error',
-      last_tested: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      created_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
-      last_modified_date: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
-    },
-  ];
+  // Local state for table interactions
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Simulate many more services for performance testing
-  for (let i = 6; i <= 1000; i++) {
-    const types: DatabaseType[] = ['mysql', 'postgresql', 'mongodb', 'oracle', 'snowflake'];
-    const statuses: DatabaseServiceRow['connection_status'][] = ['connected', 'disconnected', 'testing', 'error'];
+  // Debounced global filter for performance
+  const debouncedGlobalFilter = useDebounce(globalFilter, 300);
+  
+  // Data fetching with React Query
+  const { 
+    data: servicesResponse, 
+    isLoading, 
+    error, 
+    refetch 
+  } = useDatabaseServices();
+  
+  const { data: serviceTypesResponse } = useServiceTypes();
+  
+  /**
+   * Transform service data to table row format
+   * Filters active services and maps to simplified interface
+   */
+  const tableData = useMemo(() => {
+    if (!servicesResponse?.resource) return [];
     
-    mockServices.push({
-      id: i,
-      name: `database_${i.toString().padStart(4, '0')}`,
-      label: `Database Service ${i}`,
-      description: `Mock database service for performance testing ${i}`,
-      type: types[i % types.length],
-      is_active: Math.random() > 0.2, // 80% active
-      deletable: Math.random() > 0.1, // 90% deletable
-      connection_status: statuses[i % statuses.length],
-      last_tested: new Date(Date.now() - Math.random() * 1000 * 60 * 60 * 24 * 7).toISOString(),
-      created_date: new Date(Date.now() - Math.random() * 1000 * 60 * 60 * 24 * 365).toISOString(),
-      last_modified_date: new Date(Date.now() - Math.random() * 1000 * 60 * 60 * 24 * 30).toISOString(),
-    });
+    return servicesResponse.resource
+      .filter(service => service.isActive && (showSystemServices || !service.name.startsWith('_')))
+      .map((service): DatabaseRowData => ({
+        id: service.id || 0,
+        name: service.name,
+        description: service.description || '',
+        label: service.label,
+        type: service.type,
+        isActive: service.isActive
+      }));
+  }, [servicesResponse, showSystemServices]);
+  
+  /**
+   * Column definitions with sorting and filtering
+   */
+  const columns = useMemo<ColumnDef<DatabaseRowData>[]>(() => [
+    columnHelper.accessor('name', {
+      header: 'Name',
+      cell: ({ row }) => (
+        <Link 
+          href={`/adf-schema/df-manage-databases-table/${row.original.name}`}
+          className="font-medium text-primary hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+        >
+          {row.original.name}
+        </Link>
+      ),
+      enableSorting: true,
+      enableColumnFilter: true
+    }),
+    columnHelper.accessor('label', {
+      header: 'Label',
+      cell: ({ getValue }) => getValue() || '',
+      enableSorting: true,
+      enableColumnFilter: true
+    }),
+    columnHelper.accessor('description', {
+      header: 'Description',
+      cell: ({ getValue }) => (
+        <span className="text-muted-foreground line-clamp-2">
+          {getValue() || 'No description'}
+        </span>
+      ),
+      enableSorting: false,
+      enableColumnFilter: true
+    }),
+    columnHelper.accessor('type', {
+      header: 'Type',
+      cell: ({ getValue }) => {
+        const type = getValue();
+        return (
+          <div className="flex items-center gap-2">
+            <Database className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">
+              {DATABASE_TYPE_LABELS[type] || type}
+            </span>
+          </div>
+        );
+      },
+      enableSorting: true,
+      enableColumnFilter: true,
+      filterFn: 'equals'
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleViewDatabase(row.original.name)}
+            className="h-8 w-8 p-0"
+            aria-label={`View database ${row.original.name}`}
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+      enableSorting: false
+    })
+  ], []);
+  
+  /**
+   * Navigate to database detail view
+   */
+  const handleViewDatabase = useCallback((serviceName: string) => {
+    router.push(`/adf-schema/df-manage-databases-table/${serviceName}`);
+  }, [router]);
+  
+  /**
+   * Handle table refresh
+   */
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetch]);
+  
+  /**
+   * React Table instance configuration
+   */
+  const table = useReactTable({
+    data: tableData,
+    columns,
+    state: {
+      sorting,
+      columnFilters,
+      globalFilter: debouncedGlobalFilter
+    },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableMultiSort: true,
+    defaultColumn: {
+      minSize: 50,
+      maxSize: 500
+    }
+  });
+  
+  /**
+   * Virtual scrolling configuration for large datasets
+   * Optimized for 1000+ database entries per technical requirements
+   */
+  const tableContainerRef = React.useRef<HTMLDivElement>(null);
+  const { rows } = table.getRowModel();
+  
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 56, // Estimated row height in pixels
+    overscan: 10, // Render extra rows for smooth scrolling
+    measureElement:
+      typeof window !== 'undefined' &&
+      navigator.userAgent.indexOf('Firefox') === -1
+        ? element => element?.getBoundingClientRect().height
+        : undefined
+  });
+  
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="text-center">
+          <Database className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-2 text-lg font-medium">Failed to load database services</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {error instanceof Error ? error.message : 'An unexpected error occurred'}
+          </p>
+          <Button
+            onClick={handleRefresh}
+            className="mt-4"
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
   }
   
-  return mockServices;
-};
-
-/**
- * Fetches available service types for filtering
- * Note: This is a mock implementation. In production, this would use the actual API client.
- */
-const fetchServiceTypes = async (): Promise<DatabaseType[]> => {
-  await new Promise(resolve => setTimeout(resolve, 50));
-  return ['mysql', 'postgresql', 'mongodb', 'oracle', 'snowflake'];
-};
-
-// ============================================================================
-// UTILITY COMPONENTS
-// ============================================================================
-
-/**
- * Connection Status Indicator Component
- * Displays the current connection status with appropriate styling and icons
- */
-const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ status, lastTested }) => {
-  const statusConfig = useMemo(() => {
-    switch (status) {
-      case 'connected':
-        return {
-          icon: CheckCircleIcon,
-          text: 'Connected',
-          className: 'text-green-600 bg-green-50 border-green-200',
-        };
-      case 'disconnected':
-        return {
-          icon: XCircleIcon,
-          text: 'Disconnected',
-          className: 'text-gray-600 bg-gray-50 border-gray-200',
-        };
-      case 'testing':
-        return {
-          icon: ExclamationTriangleIcon,
-          text: 'Testing',
-          className: 'text-yellow-600 bg-yellow-50 border-yellow-200 animate-pulse',
-        };
-      case 'error':
-        return {
-          icon: XCircleIcon,
-          text: 'Error',
-          className: 'text-red-600 bg-red-50 border-red-200',
-        };
-      default:
-        return {
-          icon: ExclamationTriangleIcon,
-          text: 'Unknown',
-          className: 'text-gray-600 bg-gray-50 border-gray-200',
-        };
-    }
-  }, [status]);
-
-  const Icon = statusConfig.icon;
-
   return (
-    <div className="flex flex-col items-start space-y-1">
-      <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-md border text-xs font-medium ${statusConfig.className}`}>
-        <Icon className="h-3 w-3" />
-        <span>{statusConfig.text}</span>
+    <div className={cn('space-y-4', className)}>
+      {/* Table Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Database Services</h2>
+          <p className="text-sm text-muted-foreground">
+            Manage and configure database connections for API generation
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
+            Refresh
+          </Button>
+        </div>
       </div>
-      {lastTested && (
-        <span className="text-xs text-gray-500">
-          Tested: {new Date(lastTested).toLocaleString()}
-        </span>
+      
+      {/* Filter Controls */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="flex-1">
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search database services..."
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="pl-9"
+              aria-label="Filter database services"
+            />
+          </div>
+        </div>
+        
+        <div className="text-sm text-muted-foreground">
+          {isLoading ? 'Loading...' : `${table.getFilteredRowModel().rows.length} services`}
+        </div>
+      </div>
+      
+      {/* Table Content */}
+      <div className="rounded-md border">
+        <ManageTable
+          table={table}
+          isLoading={isLoading}
+          virtualizer={rowVirtualizer}
+          containerRef={tableContainerRef}
+          emptyState={{
+            icon: Database,
+            title: 'No database services found',
+            description: showSystemServices 
+              ? 'No active database services are currently configured.'
+              : 'No active database services are currently configured. System services are hidden.',
+            action: (
+              <Button
+                variant="outline"
+                onClick={() => router.push('/adf-services/create')}
+              >
+                <Database className="mr-2 h-4 w-4" />
+                Create Database Service
+              </Button>
+            )
+          }}
+          className="min-h-[400px]"
+        />
+      </div>
+      
+      {/* Table Footer */}
+      {table.getFilteredRowModel().rows.length > 0 && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div>
+            Showing {table.getFilteredRowModel().rows.length} of {tableData.length} services
+          </div>
+          {tableData.length >= 1000 && (
+            <div className="text-xs">
+              Virtual scrolling active for optimal performance
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
-};
-
-/**
- * Action Button Component
- * Renders action buttons for each database service row
- */
-const ActionButton: React.FC<ActionButtonProps> = ({ service, onNavigate }) => {
-  const handleViewClick = useCallback(() => {
-    onNavigate(service.name);
-  }, [service.name, onNavigate]);
-
-  return (
-    <div className="flex items-center space-x-2">
-      <button
-        onClick={handleViewClick}
-        className="inline-flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-        aria-label={`View details for ${service.label}`}
-      >
-        <EyeIcon className="h-4 w-4" />
-        <span>View</span>
-      </button>
-    </div>
-  );
-};
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
-/**
- * Database Table Component
- * 
- * Displays a virtualized table of database services with filtering, sorting,
- * and navigation capabilities. Optimized for handling 1000+ database entries
- * with TanStack Virtual and React Query caching.
- */
-export const DatabaseTable: React.FC = () => {
-  const router = useRouter();
-  const parentRef = useRef<HTMLDivElement>(null);
-  
-  // ========================================
-  // STATE MANAGEMENT
-  // ========================================
-  
-  const [tableState, setTableState] = useState<TableState>({
-    searchTerm: '',
-    sortBy: 'name',
-    sortDirection: 'asc',
-    typeFilter: 'all',
-    statusFilter: 'all',
-  });
-
-  // ========================================
-  // DATA FETCHING WITH REACT QUERY
-  // ========================================
-  
-  /** 
-   * Database services query with intelligent caching
-   * - staleTime: 300 seconds (5 minutes) per requirements
-   * - Optimized for cache hit responses under 50ms
-   */
-  const {
-    data: databaseServices = [],
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: databaseQueryKeys.services(),
-    queryFn: fetchDatabaseServices,
-    staleTime: 300 * 1000, // 5 minutes - per Section 5.2 Component Details
-    cacheTime: 900 * 1000, // 15 minutes
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-  });
-
-  /** Service types query for filtering */
-  const { data: serviceTypes = [] } = useQuery({
-    queryKey: ['service-types'],
-    queryFn: fetchServiceTypes,
-    staleTime: 600 * 1000, // 10 minutes
-    cacheTime: 1800 * 1000, // 30 minutes
-  });
-
-  // ========================================
-  // DATA FILTERING AND SORTING
-  // ========================================
-  
-  const filteredAndSortedData = useMemo(() => {
-    let filtered = databaseServices.filter(service => {
-      // Filter by active status only (matching Angular component behavior)
-      if (!service.is_active) return false;
-      
-      // Filter by search term
-      if (tableState.searchTerm) {
-        const searchLower = tableState.searchTerm.toLowerCase();
-        const matchesSearch = 
-          service.name.toLowerCase().includes(searchLower) ||
-          service.label.toLowerCase().includes(searchLower) ||
-          service.description?.toLowerCase().includes(searchLower) ||
-          service.type.toLowerCase().includes(searchLower);
-        if (!matchesSearch) return false;
-      }
-      
-      // Filter by database type
-      if (tableState.typeFilter !== 'all' && service.type !== tableState.typeFilter) {
-        return false;
-      }
-      
-      // Filter by status
-      if (tableState.statusFilter !== 'all') {
-        const isActive = service.is_active && (service.connection_status === 'connected' || service.connection_status === 'testing');
-        if (tableState.statusFilter === 'active' && !isActive) return false;
-        if (tableState.statusFilter === 'inactive' && isActive) return false;
-      }
-      
-      return true;
-    });
-
-    // Sort data
-    if (tableState.sortBy) {
-      filtered.sort((a, b) => {
-        const aValue = a[tableState.sortBy!];
-        const bValue = b[tableState.sortBy!];
-        
-        let comparison = 0;
-        if (aValue < bValue) comparison = -1;
-        if (aValue > bValue) comparison = 1;
-        
-        return tableState.sortDirection === 'desc' ? -comparison : comparison;
-      });
-    }
-
-    return filtered;
-  }, [databaseServices, tableState]);
-
-  // ========================================
-  // VIRTUALIZATION SETUP
-  // ========================================
-  
-  const rowVirtualizer = useVirtualizer({
-    count: filteredAndSortedData.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 80, // Estimated row height in pixels
-    overscan: 10, // Number of items to render outside visible area
-  });
-
-  // ========================================
-  // TABLE COLUMN CONFIGURATION
-  // ========================================
-  
-  const columns: DatabaseServiceColumn[] = useMemo(() => [
-    {
-      key: 'name',
-      label: 'Name',
-      sortable: true,
-      width: 'w-1/6',
-      render: (service) => (
-        <div className="font-medium text-gray-900">
-          <Link 
-            href={`/adf-schema/databases/${service.name}`}
-            className="hover:text-blue-600 transition-colors duration-200"
-          >
-            {service.name}
-          </Link>
-        </div>
-      ),
-    },
-    {
-      key: 'label',
-      label: 'Label',
-      sortable: true,
-      width: 'w-1/5',
-      render: (service) => (
-        <div className="text-gray-900">{service.label}</div>
-      ),
-    },
-    {
-      key: 'description',
-      label: 'Description',
-      sortable: false,
-      width: 'w-1/4',
-      render: (service) => (
-        <div className="text-gray-600 truncate" title={service.description}>
-          {service.description || '—'}
-        </div>
-      ),
-    },
-    {
-      key: 'type',
-      label: 'Type',
-      sortable: true,
-      width: 'w-1/8',
-      render: (service) => (
-        <div className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 border">
-          {service.type.toUpperCase()}
-        </div>
-      ),
-    },
-    {
-      key: 'connection_status' as keyof DatabaseServiceRow,
-      label: 'Status',
-      sortable: true,
-      width: 'w-1/6',
-      render: (service) => (
-        <ConnectionStatus 
-          status={service.connection_status} 
-          lastTested={service.last_tested} 
-        />
-      ),
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      sortable: false,
-      width: 'w-1/8',
-      render: (service) => (
-        <ActionButton 
-          service={service} 
-          onNavigate={handleNavigateToService} 
-        />
-      ),
-    },
-  ], []);
-
-  // ========================================
-  // EVENT HANDLERS
-  // ========================================
-  
-  const handleNavigateToService = useCallback((serviceName: string) => {
-    router.push(`/adf-schema/databases/${serviceName}`);
-  }, [router]);
-
-  const handleSort = useCallback((column: keyof DatabaseServiceRow) => {
-    setTableState(prev => ({
-      ...prev,
-      sortBy: column,
-      sortDirection: prev.sortBy === column && prev.sortDirection === 'asc' ? 'desc' : 'asc',
-    }));
-  }, []);
-
-  const handleSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setTableState(prev => ({
-      ...prev,
-      searchTerm: event.target.value,
-    }));
-  }, []);
-
-  const handleTypeFilterChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-    setTableState(prev => ({
-      ...prev,
-      typeFilter: event.target.value as DatabaseType | 'all',
-    }));
-  }, []);
-
-  const handleStatusFilterChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-    setTableState(prev => ({
-      ...prev,
-      statusFilter: event.target.value as 'all' | 'active' | 'inactive',
-    }));
-  }, []);
-
-  const handleRefresh = useCallback(() => {
-    refetch();
-  }, [refetch]);
-
-  // ========================================
-  // RENDER METHODS
-  // ========================================
-  
-  const renderTableHeader = () => (
-    <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
-      <div className="flex items-center justify-between px-6 py-4">
-        <h2 className="text-lg font-semibold text-gray-900">Database Services</h2>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search services..."
-              value={tableState.searchTerm}
-              onChange={handleSearchChange}
-              className="pl-10 pr-4 py-2 w-64 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <select
-            value={tableState.typeFilter}
-            onChange={handleTypeFilterChange}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="all">All Types</option>
-            {serviceTypes.map(type => (
-              <option key={type} value={type}>
-                {type.toUpperCase()}
-              </option>
-            ))}
-          </select>
-          <select
-            value={tableState.statusFilter}
-            onChange={handleStatusFilterChange}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <button
-            onClick={handleRefresh}
-            disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? 'Loading...' : 'Refresh'}
-          </button>
-        </div>
-      </div>
-      
-      {/* Table Column Headers */}
-      <div className="flex items-center px-6 py-3 bg-gray-50 border-b border-gray-200">
-        {columns.map((column) => (
-          <div
-            key={column.key}
-            className={`${column.width} ${column.sortable ? 'cursor-pointer' : ''}`}
-            onClick={column.sortable ? () => handleSort(column.key as keyof DatabaseServiceRow) : undefined}
-          >
-            <div className="flex items-center space-x-1">
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {column.label}
-              </span>
-              {column.sortable && tableState.sortBy === column.key && (
-                <span className="text-gray-400">
-                  {tableState.sortDirection === 'asc' ? '↑' : '↓'}
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderTableRow = (service: DatabaseServiceRow, index: number) => (
-    <div
-      key={service.id}
-      className={`flex items-center px-6 py-4 border-b border-gray-100 hover:bg-gray-50 transition-colors duration-150 ${
-        index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-      }`}
-    >
-      {columns.map((column) => (
-        <div key={column.key} className={column.width}>
-          {column.render ? column.render(service) : (
-            <div className="text-sm text-gray-900">
-              {service[column.key as keyof DatabaseServiceRow] as React.ReactNode}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-
-  const renderEmptyState = () => (
-    <div className="flex flex-col items-center justify-center py-12">
-      <ExclamationTriangleIcon className="h-12 w-12 text-gray-400 mb-4" />
-      <h3 className="text-lg font-medium text-gray-900 mb-2">No database services found</h3>
-      <p className="text-gray-500 text-center max-w-md">
-        {tableState.searchTerm || tableState.typeFilter !== 'all' || tableState.statusFilter !== 'all'
-          ? 'No services match your current filters. Try adjusting your search criteria.'
-          : 'There are no active database services configured. Create a new service to get started.'
-        }
-      </p>
-    </div>
-  );
-
-  const renderErrorState = () => (
-    <div className="flex flex-col items-center justify-center py-12">
-      <XCircleIcon className="h-12 w-12 text-red-400 mb-4" />
-      <h3 className="text-lg font-medium text-gray-900 mb-2">Error loading database services</h3>
-      <p className="text-gray-500 text-center max-w-md mb-4">
-        {error instanceof Error ? error.message : 'An unexpected error occurred while loading the database services.'}
-      </p>
-      <button
-        onClick={handleRefresh}
-        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-      >
-        Try again
-      </button>
-    </div>
-  );
-
-  // ========================================
-  // MAIN RENDER
-  // ========================================
-  
-  return (
-    <div className="flex flex-col h-full bg-white border border-gray-200 rounded-lg shadow-sm">
-      {renderTableHeader()}
-      
-      <div className="flex-1 overflow-hidden">
-        {isError ? (
-          renderErrorState()
-        ) : filteredAndSortedData.length === 0 ? (
-          renderEmptyState()
-        ) : (
-          <div
-            ref={parentRef}
-            className="h-full overflow-auto"
-            style={{
-              contain: 'strict',
-            }}
-          >
-            <div
-              style={{
-                height: `${rowVirtualizer.getTotalSize()}px`,
-                width: '100%',
-                position: 'relative',
-              }}
-            >
-              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const service = filteredAndSortedData[virtualRow.index];
-                return (
-                  <div
-                    key={virtualRow.key}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: `${virtualRow.size}px`,
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
-                  >
-                    {renderTableRow(service, virtualRow.index)}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-      
-      {/* Footer with results count */}
-      <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-700">
-            Showing {filteredAndSortedData.length} of {databaseServices.length} database services
-          </p>
-          {isLoading && (
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              <span className="text-sm text-gray-500">Loading...</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
+}
 
 export default DatabaseTable;
