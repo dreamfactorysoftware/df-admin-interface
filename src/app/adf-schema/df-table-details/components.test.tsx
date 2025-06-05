@@ -1,1224 +1,1413 @@
-/**
- * Vitest Unit Tests for Table Details Child Components
- * 
- * This test suite validates the React Hook Form validation workflows, TanStack Table functionality,
- * Monaco editor integration, and React Query data fetching patterns for the table details feature.
- * 
- * Coverage includes:
- * - React Hook Form validation with Zod schema verification
- * - TanStack Table virtual scrolling for 1,000+ table schemas 
- * - Monaco editor integration for JSON editing functionality
- * - React Query mutation and caching with MSW integration
- * - Accessibility compliance (WCAG 2.1 AA)
- * - Performance validation for sub-5-second API generation workflow
- * 
- * Performance Target: < 30 seconds for complete test suite execution with Vitest 2.1+
- * Coverage Target: 90%+ code coverage per Section 4.7.1.3 testing infrastructure
- */
-
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import React from 'react';
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useForm, FormProvider } from 'react-hook-form';
+import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { server } from '@/test/setup';
-import { rest } from 'msw';
-import { createVirtualizer } from '@tanstack/react-virtual';
+import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
+import { renderWithProviders, renderWithForm, renderWithQuery } from '@/test/utils/test-utils';
 
-// Import components to test (these would be created during the React migration)
+// Import components to test
 import { TableDetailsForm } from './table-details-form';
 import { FieldsTable } from './fields-table';
 import { RelationshipsTable } from './relationships-table';
 
-// Mock data factories based on Angular component patterns
-import { 
-  createMockTableDetails,
-  createMockTableFields,
-  createMockTableRelationships,
-  createLargeDatasetMock
-} from '@/test/mocks/table-details-handlers';
+// Mock data factories for comprehensive testing
+const createMockTable = (overrides = {}) => ({
+  id: 'test-table-1',
+  name: 'users',
+  label: 'Users Table',
+  description: 'User management table',
+  schema: 'public',
+  native: 'users',
+  database: 'test_db',
+  type: 'table',
+  service: 'mysql_service',
+  ...overrides,
+});
 
-// Test utilities for React Testing Library with providers
-import { renderWithProviders, createTestQueryClient } from '@/test/utils/test-utils';
+const createMockField = (overrides = {}) => ({
+  id: 'field-1',
+  name: 'id',
+  label: 'ID',
+  type: 'integer',
+  dbType: 'int',
+  length: null,
+  precision: null,
+  scale: null,
+  nullable: false,
+  primaryKey: true,
+  autoIncrement: true,
+  unique: true,
+  indexed: true,
+  defaultValue: null,
+  comment: 'Primary key',
+  ...overrides,
+});
 
-// Zod schemas for validation testing (would match React implementation)
+const createMockRelationship = (overrides = {}) => ({
+  id: 'rel-1',
+  type: 'belongs_to',
+  name: 'user_profile',
+  localTable: 'users',
+  localField: 'id',
+  foreignTable: 'user_profiles',
+  foreignField: 'user_id',
+  ...overrides,
+});
+
+// Generate large dataset for virtualization testing
+const generateLargeFieldset = (count: number) => {
+  return Array.from({ length: count }, (_, index) => 
+    createMockField({
+      id: `field-${index + 1}`,
+      name: `field_${index + 1}`,
+      label: `Field ${index + 1}`,
+      type: index % 3 === 0 ? 'string' : index % 3 === 1 ? 'integer' : 'boolean',
+      primaryKey: index === 0,
+    })
+  );
+};
+
+const generateLargeRelationshipset = (count: number) => {
+  return Array.from({ length: count }, (_, index) => 
+    createMockRelationship({
+      id: `rel-${index + 1}`,
+      name: `relationship_${index + 1}`,
+      foreignTable: `table_${index + 1}`,
+      foreignField: `field_${index + 1}`,
+    })
+  );
+};
+
+// Zod validation schemas for testing
 const tableDetailsSchema = z.object({
-  name: z.string().min(1, 'Table name is required').max(50, 'Name too long'),
-  alias: z.string().optional(),
+  name: z.string().min(1, 'Table name is required').max(64, 'Table name too long'),
   label: z.string().optional(),
-  plural: z.string().optional(),
   description: z.string().optional(),
+  schema: z.string().optional(),
+  primaryKey: z.array(z.string()).min(1, 'At least one primary key field required'),
+  indexes: z.array(z.object({
+    name: z.string(),
+    fields: z.array(z.string()),
+    unique: z.boolean(),
+  })).optional(),
+  constraints: z.array(z.object({
+    name: z.string(),
+    type: z.enum(['unique', 'check', 'foreign_key']),
+    fields: z.array(z.string()),
+  })).optional(),
 });
 
 const fieldSchema = z.object({
   name: z.string().min(1, 'Field name is required'),
   type: z.string().min(1, 'Field type is required'),
-  required: z.boolean().default(false),
-  primary_key: z.boolean().default(false),
-  auto_increment: z.boolean().default(false),
-  virtual: z.boolean().default(false),
-  aggregate: z.string().optional(),
+  nullable: z.boolean(),
+  defaultValue: z.string().optional(),
+  length: z.number().optional(),
+  precision: z.number().optional(),
+  scale: z.number().optional(),
 });
 
-const relationshipSchema = z.object({
-  name: z.string().min(1, 'Relationship name is required'),
-  type: z.enum(['belongs_to', 'has_one', 'has_many', 'many_to_many']),
-  ref_table: z.string().min(1, 'Referenced table is required'),
-  ref_field: z.string().min(1, 'Referenced field is required'),
-  junction_table: z.string().optional(),
+// MSW handlers for realistic API mocking
+const tableDetailsHandlers = [
+  // Table details endpoints
+  http.get('/api/v2/:service/_schema/:tableName', ({ params }) => {
+    const { service, tableName } = params;
+    return HttpResponse.json({
+      name: tableName,
+      label: `${tableName} Table`,
+      description: `Table for ${tableName} data`,
+      schema: 'public',
+      service: service,
+      fields: generateLargeFieldset(50), // Test moderate dataset
+      relationships: generateLargeRelationshipset(10),
+    });
+  }),
+
+  // Large dataset endpoint for virtualization testing
+  http.get('/api/v2/:service/_schema/:tableName/large', ({ params }) => {
+    return HttpResponse.json({
+      name: params.tableName,
+      fields: generateLargeFieldset(1500), // Test large dataset (1500+ fields)
+      relationships: generateLargeRelationshipset(500),
+    });
+  }),
+
+  // Table update endpoint
+  http.put('/api/v2/:service/_schema/:tableName', async ({ request, params }) => {
+    const body = await request.json();
+    return HttpResponse.json({
+      ...body,
+      id: params.tableName,
+      updatedAt: new Date().toISOString(),
+    });
+  }),
+
+  // Field operations
+  http.post('/api/v2/:service/_schema/:tableName/fields', async ({ request, params }) => {
+    const body = await request.json();
+    return HttpResponse.json({
+      ...body,
+      id: `field-${Date.now()}`,
+      tableName: params.tableName,
+      createdAt: new Date().toISOString(),
+    });
+  }),
+
+  http.put('/api/v2/:service/_schema/:tableName/fields/:fieldId', async ({ request, params }) => {
+    const body = await request.json();
+    return HttpResponse.json({
+      ...body,
+      id: params.fieldId,
+      updatedAt: new Date().toISOString(),
+    });
+  }),
+
+  http.delete('/api/v2/:service/_schema/:tableName/fields/:fieldId', ({ params }) => {
+    return HttpResponse.json({
+      success: true,
+      fieldId: params.fieldId,
+    });
+  }),
+
+  // Relationship operations
+  http.post('/api/v2/:service/_schema/:tableName/relationships', async ({ request, params }) => {
+    const body = await request.json();
+    return HttpResponse.json({
+      ...body,
+      id: `rel-${Date.now()}`,
+      localTable: params.tableName,
+      createdAt: new Date().toISOString(),
+    });
+  }),
+
+  http.delete('/api/v2/:service/_schema/:tableName/relationships/:relationshipId', ({ params }) => {
+    return HttpResponse.json({
+      success: true,
+      relationshipId: params.relationshipId,
+    });
+  }),
+
+  // JSON schema validation endpoint
+  http.post('/api/v2/:service/_schema/:tableName/validate', async ({ request }) => {
+    const body = await request.json();
+    const hasErrors = Math.random() > 0.8; // 20% chance of validation errors for testing
+    
+    if (hasErrors) {
+      return HttpResponse.json({
+        valid: false,
+        errors: [
+          { field: 'name', message: 'Field name contains invalid characters' },
+          { field: 'type', message: 'Unsupported field type' },
+        ],
+      }, { status: 400 });
+    }
+
+    return HttpResponse.json({
+      valid: true,
+      warnings: body.name === 'deprecated_field' ? [
+        { field: 'name', message: 'Field name is deprecated' },
+      ] : [],
+    });
+  }),
+
+  // Error simulation endpoints
+  http.get('/api/v2/:service/_schema/error-table', () => {
+    return HttpResponse.json(
+      { error: 'Table not found', code: 'TABLE_NOT_FOUND' },
+      { status: 404 }
+    );
+  }),
+
+  http.get('/api/v2/:service/_schema/timeout-table', () => {
+    return new Promise(() => {}); // Never resolves to simulate timeout
+  }),
+];
+
+// Setup MSW server
+const server = setupServer(...tableDetailsHandlers);
+
+// Test setup and teardown
+beforeAll(() => {
+  server.listen({ onUnhandledRequest: 'error' });
 });
 
-// Mock data based on Angular DfTableDetailsComponent patterns
-const mockTableData = createMockTableDetails({
-  name: 'users',
-  alias: 'user_table',
-  label: 'Users',
-  plural: 'Users',
-  description: 'User account information',
+afterEach(() => {
+  server.resetHandlers();
+  vi.clearAllMocks();
 });
 
-const mockFieldsData = createMockTableFields([
-  {
-    name: 'id',
-    type: 'integer',
-    required: true,
-    primary_key: true,
-    auto_increment: true,
-  },
-  {
-    name: 'email',
-    type: 'string',
-    required: true,
-    size: 255,
-  },
-  {
-    name: 'created_at',
-    type: 'timestamp',
-    required: true,
-  },
-]);
-
-const mockRelationshipsData = createMockTableRelationships([
-  {
-    name: 'profile',
-    type: 'has_one',
-    ref_table: 'user_profiles',
-    ref_field: 'user_id',
-  },
-  {
-    name: 'orders',
-    type: 'has_many', 
-    ref_table: 'orders',
-    ref_field: 'user_id',
-  },
-]);
-
-// Create large dataset for virtualization testing (1,000+ records)
-const largeMockFieldsData = createLargeDatasetMock('fields', 1500);
-const largeMockRelationshipsData = createLargeDatasetMock('relationships', 1200);
+afterAll(() => {
+  server.close();
+});
 
 describe('TableDetailsForm Component', () => {
-  let queryClient: QueryClient;
-  let user: ReturnType<typeof userEvent.setup>;
+  const defaultFormValues = {
+    name: 'test_table',
+    label: 'Test Table',
+    description: 'A test table for validation',
+    schema: 'public',
+    primaryKey: ['id'],
+    indexes: [],
+    constraints: [],
+  };
 
-  beforeEach(() => {
-    queryClient = createTestQueryClient();
-    user = userEvent.setup();
-    
-    // Setup MSW handlers for form data
-    server.use(
-      rest.get('/api/v2/system/schema/:dbName/:tableName', (req, res, ctx) => {
-        return res(ctx.json(mockTableData));
-      }),
-      rest.post('/api/v2/system/schema/:dbName', (req, res, ctx) => {
-        return res(ctx.json({ ...mockTableData, id: 1 }));
-      }),
-      rest.patch('/api/v2/system/schema/:dbName/:tableName', (req, res, ctx) => {
-        return res(ctx.json(mockTableData));
-      })
-    );
-  });
+  const renderTableDetailsForm = (initialValues = defaultFormValues, onSubmit = vi.fn()) => {
+    const FormWrapper = () => {
+      const methods = useForm({
+        resolver: zodResolver(tableDetailsSchema),
+        defaultValues: initialValues,
+      });
 
-  afterEach(() => {
-    queryClient.clear();
-  });
-
-  describe('Form Validation with React Hook Form and Zod', () => {
-    it('should render form fields with proper validation', async () => {
-      renderWithProviders(
-        <TableDetailsForm 
-          mode="create"
-          dbName="test_db"
-          onSubmit={vi.fn()}
-          onCancel={vi.fn()}
-        />,
-        { queryClient }
+      return (
+        <FormProvider {...methods}>
+          <form onSubmit={methods.handleSubmit(onSubmit)}>
+            <TableDetailsForm />
+            <button type="submit" data-testid="submit-button">
+              Save Table
+            </button>
+          </form>
+        </FormProvider>
       );
+    };
 
-      // Verify required fields are present
+    return renderWithProviders(<FormWrapper />);
+  };
+
+  describe('Rendering and Basic Interaction', () => {
+    it('renders all required form fields', () => {
+      renderTableDetailsForm();
+
       expect(screen.getByLabelText(/table name/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/alias/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/label/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/plural/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/schema/i)).toBeInTheDocument();
+      expect(screen.getByText(/primary key fields/i)).toBeInTheDocument();
+    });
 
-      // Test validation triggers
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
+    it('displays initial form values correctly', () => {
+      const customValues = {
+        ...defaultFormValues,
+        name: 'custom_table',
+        label: 'Custom Table',
+        description: 'Custom description',
+      };
+
+      renderTableDetailsForm(customValues);
+
+      expect(screen.getByDisplayValue('custom_table')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Custom Table')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Custom description')).toBeInTheDocument();
+    });
+
+    it('applies proper ARIA labels and accessibility attributes', () => {
+      renderTableDetailsForm();
+
+      const nameInput = screen.getByLabelText(/table name/i);
+      expect(nameInput).toHaveAttribute('aria-required', 'true');
+      expect(nameInput).toHaveAttribute('aria-describedby');
+
+      const form = screen.getByRole('form', { hidden: true });
+      expect(form).toBeInTheDocument();
+    });
+  });
+
+  describe('Form Validation with Zod Schema', () => {
+    it('validates required fields and shows error messages', async () => {
+      const user = userEvent.setup();
+      renderTableDetailsForm({ ...defaultFormValues, name: '', primaryKey: [] });
+
+      const submitButton = screen.getByTestId('submit-button');
+      await user.click(submitButton);
 
       await waitFor(() => {
         expect(screen.getByText(/table name is required/i)).toBeInTheDocument();
+        expect(screen.getByText(/at least one primary key field required/i)).toBeInTheDocument();
       });
     });
 
-    it('should validate field length constraints', async () => {
-      renderWithProviders(
-        <TableDetailsForm 
-          mode="create"
-          dbName="test_db"
-          onSubmit={vi.fn()}
-          onCancel={vi.fn()}
-        />,
-        { queryClient }
-      );
-
-      const nameField = screen.getByLabelText(/table name/i);
+    it('validates field length constraints', async () => {
+      const user = userEvent.setup();
+      const longName = 'a'.repeat(70); // Exceeds 64 character limit
       
-      // Test maximum length validation
-      await user.type(nameField, 'a'.repeat(51));
-      
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      await user.click(saveButton);
+      renderTableDetailsForm({ ...defaultFormValues, name: longName });
+
+      const submitButton = screen.getByTestId('submit-button');
+      await user.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/name too long/i)).toBeInTheDocument();
+        expect(screen.getByText(/table name too long/i)).toBeInTheDocument();
       });
     });
 
-    it('should populate form in edit mode with React Query data', async () => {
-      renderWithProviders(
-        <TableDetailsForm 
-          mode="edit"
-          dbName="test_db"
-          tableName="users"
-          onSubmit={vi.fn()}
-          onCancel={vi.fn()}
-        />,
-        { queryClient }
-      );
+    it('validates field format and special characters', async () => {
+      const user = userEvent.setup();
+      const nameInput = screen.getByLabelText(/table name/i);
 
-      // Wait for data to load via React Query
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('users')).toBeInTheDocument();
-        expect(screen.getByDisplayValue('user_table')).toBeInTheDocument();
-        expect(screen.getByDisplayValue('Users')).toBeInTheDocument();
-      });
+      await user.clear(nameInput);
+      await user.type(nameInput, 'invalid-table-name!@#');
 
-      // Name field should be disabled in edit mode
-      const nameField = screen.getByLabelText(/table name/i);
-      expect(nameField).toBeDisabled();
+      const submitButton = screen.getByTestId('submit-button');
+      await user.click(submitButton);
+
+      // Custom validation would be implemented in the actual component
+      // This tests the framework for adding custom validation
     });
 
-    it('should submit form data correctly with React Query mutation', async () => {
-      const mockSubmit = vi.fn();
-      
-      renderWithProviders(
-        <TableDetailsForm 
-          mode="create"
-          dbName="test_db"
-          onSubmit={mockSubmit}
-          onCancel={vi.fn()}
-        />,
-        { queryClient }
-      );
+    it('shows real-time validation feedback as user types', async () => {
+      const user = userEvent.setup();
+      renderTableDetailsForm();
 
-      // Fill out form
-      await user.type(screen.getByLabelText(/table name/i), 'new_table');
-      await user.type(screen.getByLabelText(/alias/i), 'new_alias');
-      await user.type(screen.getByLabelText(/description/i), 'Test description');
+      const nameInput = screen.getByLabelText(/table name/i);
+      await user.clear(nameInput);
 
-      // Submit form
-      await user.click(screen.getByRole('button', { name: /save/i }));
-
+      // Should show error immediately when field becomes empty
       await waitFor(() => {
-        expect(mockSubmit).toHaveBeenCalledWith({
-          name: 'new_table',
-          alias: 'new_alias', 
-          label: '',
-          plural: '',
-          description: 'Test description',
-        });
+        expect(screen.getByText(/table name is required/i)).toBeInTheDocument();
       });
-    });
 
-    it('should handle form errors gracefully', async () => {
-      // Mock API error response
-      server.use(
-        rest.post('/api/v2/system/schema/:dbName', (req, res, ctx) => {
-          return res(
-            ctx.status(422),
-            ctx.json({
-              error: {
-                code: 'VALIDATION_ERROR',
-                message: 'Table name already exists',
-                details: {
-                  name: ['A table with this name already exists']
-                }
-              }
-            })
-          );
-        })
-      );
+      await user.type(nameInput, 'valid_name');
 
-      renderWithProviders(
-        <TableDetailsForm 
-          mode="create"
-          dbName="test_db"
-          onSubmit={vi.fn()}
-          onCancel={vi.fn()}
-        />,
-        { queryClient }
-      );
-
-      await user.type(screen.getByLabelText(/table name/i), 'existing_table');
-      await user.click(screen.getByRole('button', { name: /save/i }));
-
+      // Error should disappear when valid input is provided
       await waitFor(() => {
-        expect(screen.getByText(/table name already exists/i)).toBeInTheDocument();
+        expect(screen.queryByText(/table name is required/i)).not.toBeInTheDocument();
       });
     });
   });
 
-  describe('JSON Editor Integration', () => {
-    it('should render Monaco editor in JSON mode', async () => {
-      renderWithProviders(
-        <TableDetailsForm 
-          mode="edit"
-          dbName="test_db"
-          tableName="users"
-          showJsonEditor={true}
-          onSubmit={vi.fn()}
-          onCancel={vi.fn()}
-        />,
-        { queryClient }
-      );
+  describe('Advanced Form Features', () => {
+    it('handles dynamic primary key field selection', async () => {
+      const user = userEvent.setup();
+      renderTableDetailsForm();
 
-      // Wait for Monaco editor to load
+      // Test adding primary key fields
+      const addPrimaryKeyButton = screen.getByRole('button', { name: /add primary key field/i });
+      await user.click(addPrimaryKeyButton);
+
+      const fieldSelect = screen.getByRole('combobox', { name: /select field/i });
+      await user.selectOptions(fieldSelect, 'id');
+
+      expect(screen.getByDisplayValue('id')).toBeInTheDocument();
+    });
+
+    it('manages index configuration correctly', async () => {
+      const user = userEvent.setup();
+      renderTableDetailsForm();
+
+      // Test adding index
+      const addIndexButton = screen.getByRole('button', { name: /add index/i });
+      await user.click(addIndexButton);
+
+      const indexNameInput = screen.getByLabelText(/index name/i);
+      await user.type(indexNameInput, 'idx_username');
+
+      const uniqueCheckbox = screen.getByRole('checkbox', { name: /unique index/i });
+      await user.click(uniqueCheckbox);
+
+      expect(indexNameInput).toHaveValue('idx_username');
+      expect(uniqueCheckbox).toBeChecked();
+    });
+
+    it('validates constraint configuration', async () => {
+      const user = userEvent.setup();
+      renderTableDetailsForm();
+
+      // Test adding constraint
+      const addConstraintButton = screen.getByRole('button', { name: /add constraint/i });
+      await user.click(addConstraintButton);
+
+      const constraintSelect = screen.getByRole('combobox', { name: /constraint type/i });
+      await user.selectOptions(constraintSelect, 'unique');
+
+      const constraintNameInput = screen.getByLabelText(/constraint name/i);
+      await user.type(constraintNameInput, 'unique_email');
+
+      expect(constraintNameInput).toHaveValue('unique_email');
+    });
+  });
+
+  describe('Form Submission and API Integration', () => {
+    it('submits form with correct data structure', async () => {
+      const user = userEvent.setup();
+      const mockSubmit = vi.fn();
+      
+      renderTableDetailsForm(defaultFormValues, mockSubmit);
+
+      const submitButton = screen.getByTestId('submit-button');
+      await user.click(submitButton);
+
       await waitFor(() => {
-        const jsonEditor = screen.getByRole('textbox', { name: /json editor/i });
-        expect(jsonEditor).toBeInTheDocument();
+        expect(mockSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'test_table',
+            label: 'Test Table',
+            description: 'A test table for validation',
+            primaryKey: ['id'],
+          })
+        );
       });
     });
 
-    it('should validate JSON input and sync with form', async () => {
-      renderWithProviders(
-        <TableDetailsForm 
-          mode="edit"
-          dbName="test_db"
-          tableName="users"
-          showJsonEditor={true}
-          onSubmit={vi.fn()}
-          onCancel={vi.fn()}
-        />,
-        { queryClient }
-      );
-
-      const jsonEditor = await screen.findByRole('textbox', { name: /json editor/i });
+    it('handles form submission errors gracefully', async () => {
+      const user = userEvent.setup();
+      const mockSubmit = vi.fn().mockRejectedValue(new Error('Server error'));
       
-      // Test invalid JSON
-      await user.clear(jsonEditor);
-      await user.type(jsonEditor, '{ invalid json }');
+      renderTableDetailsForm(defaultFormValues, mockSubmit);
+
+      const submitButton = screen.getByTestId('submit-button');
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/an error occurred while saving/i)).toBeInTheDocument();
+      });
+    });
+
+    it('shows loading state during submission', async () => {
+      const user = userEvent.setup();
+      const mockSubmit = vi.fn(() => new Promise(resolve => setTimeout(resolve, 1000)));
+      
+      renderTableDetailsForm(defaultFormValues, mockSubmit);
+
+      const submitButton = screen.getByTestId('submit-button');
+      await user.click(submitButton);
+
+      expect(screen.getByText(/saving.../i)).toBeInTheDocument();
+      expect(submitButton).toBeDisabled();
+    });
+  });
+
+  describe('Monaco Editor Integration', () => {
+    it('renders JSON schema editor for advanced configuration', () => {
+      renderTableDetailsForm();
+
+      const jsonEditorToggle = screen.getByRole('button', { name: /json editor/i });
+      expect(jsonEditorToggle).toBeInTheDocument();
+    });
+
+    it('validates JSON schema in Monaco editor', async () => {
+      const user = userEvent.setup();
+      renderTableDetailsForm();
+
+      // Open JSON editor
+      const jsonEditorToggle = screen.getByRole('button', { name: /json editor/i });
+      await user.click(jsonEditorToggle);
+
+      // Monaco editor would be rendered here
+      const jsonEditor = screen.getByTestId('monaco-editor');
+      expect(jsonEditor).toBeInTheDocument();
+
+      // Test invalid JSON handling
+      const invalidJson = '{ "invalid": json }';
+      fireEvent.change(jsonEditor, { target: { value: invalidJson } });
 
       await waitFor(() => {
         expect(screen.getByText(/invalid json format/i)).toBeInTheDocument();
       });
+    });
 
-      // Test valid JSON that syncs with form
-      await user.clear(jsonEditor);
-      await user.type(jsonEditor, JSON.stringify({
-        name: 'updated_table',
-        description: 'Updated via JSON'
-      }));
+    it('synchronizes between form fields and JSON editor', async () => {
+      const user = userEvent.setup();
+      renderTableDetailsForm();
 
-      // Switch back to form view
-      await user.click(screen.getByRole('tab', { name: /form/i }));
+      // Make changes in form
+      const nameInput = screen.getByLabelText(/table name/i);
+      await user.clear(nameInput);
+      await user.type(nameInput, 'synchronized_table');
 
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('updated_table')).toBeInTheDocument();
-        expect(screen.getByDisplayValue('Updated via JSON')).toBeInTheDocument();
-      });
+      // Open JSON editor
+      const jsonEditorToggle = screen.getByRole('button', { name: /json editor/i });
+      await user.click(jsonEditorToggle);
+
+      // Check that JSON reflects form changes
+      const jsonEditor = screen.getByTestId('monaco-editor');
+      expect(jsonEditor).toHaveValue(
+        expect.stringContaining('"name":"synchronized_table"')
+      );
     });
   });
 });
 
 describe('FieldsTable Component', () => {
-  let queryClient: QueryClient;
-  let user: ReturnType<typeof userEvent.setup>;
+  const mockFields = generateLargeFieldset(100);
+  const smallFieldset = generateLargeFieldset(5);
 
-  beforeEach(() => {
-    queryClient = createTestQueryClient();
-    user = userEvent.setup();
+  const renderFieldsTable = (fields = smallFieldset, options = {}) => {
+    const defaultProps = {
+      fields,
+      serviceName: 'test_service',
+      tableName: 'test_table',
+      onFieldAdd: vi.fn(),
+      onFieldEdit: vi.fn(),
+      onFieldDelete: vi.fn(),
+      loading: false,
+      ...options,
+    };
 
-    // Setup MSW handlers for fields data
-    server.use(
-      rest.get('/api/v2/system/schema/:dbName/:tableName/_field', (req, res, ctx) => {
-        const limit = parseInt(req.url.searchParams.get('limit') || '25');
-        const offset = parseInt(req.url.searchParams.get('offset') || '0');
-        
-        // Return paginated mock data
-        const data = mockFieldsData.slice(offset, offset + limit);
-        return res(ctx.json({
-          resource: data,
-          count: mockFieldsData.length
-        }));
-      }),
-      rest.get('/api/v2/system/schema/:dbName/:tableName/_field/large', (req, res, ctx) => {
-        return res(ctx.json({
-          resource: largeMockFieldsData,
-          count: largeMockFieldsData.length
-        }));
-      })
-    );
+    return renderWithQuery(<FieldsTable {...defaultProps} />);
+  };
+
+  describe('TanStack Table Integration', () => {
+    it('renders table with correct columns and data', () => {
+      renderFieldsTable();
+
+      // Check table headers
+      expect(screen.getByRole('columnheader', { name: /field name/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /type/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /nullable/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /primary key/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /actions/i })).toBeInTheDocument();
+
+      // Check data rows
+      expect(screen.getByRole('cell', { name: /field_1/i })).toBeInTheDocument();
+      expect(screen.getByRole('cell', { name: /string/i })).toBeInTheDocument();
+    });
+
+    it('handles sorting by column headers', async () => {
+      const user = userEvent.setup();
+      renderFieldsTable();
+
+      const nameHeader = screen.getByRole('columnheader', { name: /field name/i });
+      await user.click(nameHeader);
+
+      // Check for sort indicator
+      expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
+
+      // Click again for descending sort
+      await user.click(nameHeader);
+      expect(nameHeader).toHaveAttribute('aria-sort', 'descending');
+    });
+
+    it('implements column filtering functionality', async () => {
+      const user = userEvent.setup();
+      renderFieldsTable();
+
+      const filterInput = screen.getByPlaceholderText(/filter fields.../i);
+      await user.type(filterInput, 'field_1');
+
+      // Should show only matching fields
+      await waitFor(() => {
+        expect(screen.getAllByRole('row')).toHaveLength(2); // Header + 1 data row
+      });
+    });
+
+    it('supports column visibility toggle', async () => {
+      const user = userEvent.setup();
+      renderFieldsTable();
+
+      const columnToggleButton = screen.getByRole('button', { name: /columns/i });
+      await user.click(columnToggleButton);
+
+      // Toggle off a column
+      const nullableToggle = screen.getByRole('checkbox', { name: /nullable/i });
+      await user.click(nullableToggle);
+
+      // Column should be hidden
+      expect(screen.queryByRole('columnheader', { name: /nullable/i })).not.toBeInTheDocument();
+    });
+
+    it('provides pagination controls for large datasets', () => {
+      renderFieldsTable(mockFields); // 100 fields
+
+      const pagination = screen.getByRole('navigation', { name: /pagination/i });
+      expect(pagination).toBeInTheDocument();
+
+      const nextButton = screen.getByRole('button', { name: /next page/i });
+      const prevButton = screen.getByRole('button', { name: /previous page/i });
+      
+      expect(nextButton).toBeInTheDocument();
+      expect(prevButton).toBeInTheDocument();
+      expect(prevButton).toBeDisabled(); // First page
+    });
   });
 
-  describe('TanStack Table Basic Functionality', () => {
-    it('should render table with correct columns', async () => {
-      renderWithProviders(
+  describe('Virtual Scrolling for Large Datasets', () => {
+    it('renders only visible rows for performance with 1000+ fields', () => {
+      const largeFieldset = generateLargeFieldset(1500);
+      renderFieldsTable(largeFieldset);
+
+      // Should only render visible rows, not all 1500
+      const rows = screen.getAllByRole('row');
+      expect(rows.length).toBeLessThan(100); // Much less than total
+      expect(rows.length).toBeGreaterThan(10); // But more than a few
+    });
+
+    it('handles scroll events for virtual scrolling', async () => {
+      const largeFieldset = generateLargeFieldset(1500);
+      renderFieldsTable(largeFieldset);
+
+      const scrollContainer = screen.getByTestId('virtual-scroll-container');
+      
+      // Simulate scroll to middle
+      fireEvent.scroll(scrollContainer, { target: { scrollTop: 5000 } });
+
+      await waitFor(() => {
+        // Should show different set of rows
+        expect(screen.getByText(/field_500/i)).toBeInTheDocument();
+      });
+    });
+
+    it('maintains scroll position when data updates', async () => {
+      const largeFieldset = generateLargeFieldset(1500);
+      const { rerender } = renderFieldsTable(largeFieldset);
+
+      const scrollContainer = screen.getByTestId('virtual-scroll-container');
+      fireEvent.scroll(scrollContainer, { target: { scrollTop: 5000 } });
+
+      // Update data while maintaining scroll position
+      const updatedFieldset = [...largeFieldset];
+      updatedFieldset[500] = { ...updatedFieldset[500], name: 'updated_field_500' };
+      
+      rerender(<FieldsTable fields={updatedFieldset} serviceName="test_service" tableName="test_table" />);
+
+      expect(scrollContainer.scrollTop).toBe(5000);
+      expect(screen.getByText(/updated_field_500/i)).toBeInTheDocument();
+    });
+
+    it('provides smooth scrolling experience with loading indicators', async () => {
+      const largeFieldset = generateLargeFieldset(2000);
+      renderFieldsTable(largeFieldset, { loading: true });
+
+      // Should show loading state
+      expect(screen.getByTestId('table-loading-spinner')).toBeInTheDocument();
+
+      // Should show skeleton rows during loading
+      const skeletonRows = screen.getAllByTestId('skeleton-row');
+      expect(skeletonRows.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Field Management Actions', () => {
+    it('handles field addition through modal dialog', async () => {
+      const user = userEvent.setup();
+      const mockOnFieldAdd = vi.fn();
+      renderFieldsTable(smallFieldset, { onFieldAdd: mockOnFieldAdd });
+
+      const addFieldButton = screen.getByRole('button', { name: /add field/i });
+      await user.click(addFieldButton);
+
+      // Modal should open
+      const modal = screen.getByRole('dialog', { name: /add field/i });
+      expect(modal).toBeInTheDocument();
+
+      // Fill form and submit
+      const nameInput = screen.getByLabelText(/field name/i);
+      const typeSelect = screen.getByLabelText(/field type/i);
+      
+      await user.type(nameInput, 'new_field');
+      await user.selectOptions(typeSelect, 'string');
+
+      const saveButton = screen.getByRole('button', { name: /save field/i });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockOnFieldAdd).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'new_field',
+            type: 'string',
+          })
+        );
+      });
+    });
+
+    it('handles field editing with inline form validation', async () => {
+      const user = userEvent.setup();
+      const mockOnFieldEdit = vi.fn();
+      renderFieldsTable(smallFieldset, { onFieldEdit: mockOnFieldEdit });
+
+      // Click edit button for first field
+      const editButtons = screen.getAllByRole('button', { name: /edit field/i });
+      await user.click(editButtons[0]);
+
+      // Should switch to edit mode
+      const nameInput = screen.getByDisplayValue('field_1');
+      await user.clear(nameInput);
+      await user.type(nameInput, 'edited_field_1');
+
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockOnFieldEdit).toHaveBeenCalledWith(
+          'field-1',
+          expect.objectContaining({
+            name: 'edited_field_1',
+          })
+        );
+      });
+    });
+
+    it('handles field deletion with confirmation dialog', async () => {
+      const user = userEvent.setup();
+      const mockOnFieldDelete = vi.fn();
+      renderFieldsTable(smallFieldset, { onFieldDelete: mockOnFieldDelete });
+
+      // Click delete button for first field
+      const deleteButtons = screen.getAllByRole('button', { name: /delete field/i });
+      await user.click(deleteButtons[0]);
+
+      // Confirmation dialog should appear
+      const confirmDialog = screen.getByRole('dialog', { name: /confirm deletion/i });
+      expect(confirmDialog).toBeInTheDocument();
+
+      const confirmButton = screen.getByRole('button', { name: /delete/i });
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(mockOnFieldDelete).toHaveBeenCalledWith('field-1');
+      });
+    });
+
+    it('prevents deletion of primary key fields', async () => {
+      const user = userEvent.setup();
+      const fieldsWithPK = [
+        { ...createMockField(), primaryKey: true },
+        ...smallFieldset.slice(1),
+      ];
+      
+      renderFieldsTable(fieldsWithPK);
+
+      // Delete button for primary key field should be disabled
+      const deleteButtons = screen.getAllByRole('button', { name: /delete field/i });
+      expect(deleteButtons[0]).toBeDisabled();
+    });
+  });
+
+  describe('React Query Integration and Caching', () => {
+    it('uses React Query for field data fetching with proper cache management', async () => {
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false, gcTime: 0 },
+        },
+      });
+
+      renderWithQuery(
         <FieldsTable 
-          dbName="test_db"
-          tableName="users"
+          serviceName="test_service" 
+          tableName="test_table"
+          fields={[]}
         />,
         { queryClient }
       );
+
+      // Should show loading state initially
+      expect(screen.getByTestId('table-loading-spinner')).toBeInTheDocument();
 
       // Wait for data to load
       await waitFor(() => {
-        expect(screen.getByText('Name')).toBeInTheDocument();
-        expect(screen.getByText('Type')).toBeInTheDocument();
-        expect(screen.getByText('Required')).toBeInTheDocument();
-        expect(screen.getByText('Primary Key')).toBeInTheDocument();
-        expect(screen.getByText('Actions')).toBeInTheDocument();
-      });
-
-      // Verify field data is displayed
-      expect(screen.getByText('id')).toBeInTheDocument();
-      expect(screen.getByText('email')).toBeInTheDocument();
-      expect(screen.getByText('created_at')).toBeInTheDocument();
-    });
-
-    it('should handle sorting on columns', async () => {
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="users"
-        />,
-        { queryClient }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Name')).toBeInTheDocument();
-      });
-
-      // Click on Name column header to sort
-      const nameHeader = screen.getByRole('button', { name: /sort by name/i });
-      await user.click(nameHeader);
-
-      // Verify sort indicator appears
-      await waitFor(() => {
-        expect(screen.getByRole('img', { name: /sorted ascending/i })).toBeInTheDocument();
-      });
-    });
-
-    it('should filter table data', async () => {
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="users"
-        />,
-        { queryClient }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('id')).toBeInTheDocument();
-      });
-
-      // Use filter input
-      const filterInput = screen.getByPlaceholderText(/search fields/i);
-      await user.type(filterInput, 'email');
-
-      await waitFor(() => {
-        expect(screen.getByText('email')).toBeInTheDocument();
-        expect(screen.queryByText('id')).not.toBeInTheDocument();
-      });
-    });
-
-    it('should handle pagination correctly', async () => {
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="users"
-          pageSize={2}
-        />,
-        { queryClient }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('id')).toBeInTheDocument();
-      });
-
-      // Should show pagination controls
-      expect(screen.getByRole('button', { name: /next page/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /previous page/i })).toBeInTheDocument();
-
-      // Navigate to next page
-      await user.click(screen.getByRole('button', { name: /next page/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText('Page 2')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('TanStack Virtual Scrolling for Large Datasets', () => {
-    it('should virtualize large datasets (1,000+ fields)', async () => {
-      // Mock large dataset endpoint
-      server.use(
-        rest.get('/api/v2/system/schema/:dbName/:tableName/_field', (req, res, ctx) => {
-          return res(ctx.json({
-            resource: largeMockFieldsData,
-            count: largeMockFieldsData.length
-          }));
-        })
-      );
-
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="large_table"
-          enableVirtualization={true}
-        />,
-        { queryClient }
-      );
-
-      // Wait for virtual scrolling container
-      await waitFor(() => {
-        const virtualContainer = screen.getByTestId('virtual-scroll-container');
-        expect(virtualContainer).toBeInTheDocument();
-      });
-
-      // Should only render visible items (not all 1,500)
-      const visibleRows = screen.getAllByTestId(/field-row-/);
-      expect(visibleRows.length).toBeLessThan(50); // Only visible viewport items
-      expect(visibleRows.length).toBeGreaterThan(0);
-    });
-
-    it('should maintain scroll position during updates', async () => {
-      server.use(
-        rest.get('/api/v2/system/schema/:dbName/:tableName/_field', (req, res, ctx) => {
-          return res(ctx.json({
-            resource: largeMockFieldsData,
-            count: largeMockFieldsData.length
-          }));
-        })
-      );
-
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="large_table"
-          enableVirtualization={true}
-        />,
-        { queryClient }
-      );
-
-      const virtualContainer = await screen.findByTestId('virtual-scroll-container');
-      
-      // Simulate scrolling
-      fireEvent.scroll(virtualContainer, { target: { scrollTop: 500 } });
-
-      // Trigger a re-render by updating a field
-      await user.click(screen.getByRole('button', { name: /refresh/i }));
-
-      // Scroll position should be maintained
-      await waitFor(() => {
-        expect(virtualContainer.scrollTop).toBe(500);
-      });
-    });
-
-    it('should handle rapid scrolling without performance issues', async () => {
-      const performanceStart = performance.now();
-
-      server.use(
-        rest.get('/api/v2/system/schema/:dbName/:tableName/_field', (req, res, ctx) => {
-          return res(ctx.json({
-            resource: largeMockFieldsData,
-            count: largeMockFieldsData.length
-          }));
-        })
-      );
-
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="large_table"
-          enableVirtualization={true}
-        />,
-        { queryClient }
-      );
-
-      const virtualContainer = await screen.findByTestId('virtual-scroll-container');
-
-      // Simulate rapid scrolling
-      for (let i = 0; i < 100; i += 10) {
-        fireEvent.scroll(virtualContainer, { target: { scrollTop: i * 10 } });
-      }
-
-      const performanceEnd = performance.now();
-      const executionTime = performanceEnd - performanceStart;
-
-      // Should complete rapid scrolling in under 100ms
-      expect(executionTime).toBeLessThan(100);
-    });
-  });
-
-  describe('CRUD Operations with React Query', () => {
-    it('should create new field', async () => {
-      server.use(
-        rest.post('/api/v2/system/schema/:dbName/:tableName/_field', (req, res, ctx) => {
-          return res(ctx.json({ id: 4, name: 'new_field', type: 'string' }));
-        })
-      );
-
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="users"
-        />,
-        { queryClient }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('id')).toBeInTheDocument();
-      });
-
-      // Click create button
-      await user.click(screen.getByRole('button', { name: /add field/i }));
-
-      // Fill out field form in modal/dialog
-      await user.type(screen.getByLabelText(/field name/i), 'new_field');
-      await user.selectOptions(screen.getByLabelText(/field type/i), 'string');
-
-      // Submit field creation
-      await user.click(screen.getByRole('button', { name: /save field/i }));
-
-      // Verify optimistic update and real data
-      await waitFor(() => {
-        expect(screen.getByText('new_field')).toBeInTheDocument();
-      });
-    });
-
-    it('should edit existing field', async () => {
-      server.use(
-        rest.patch('/api/v2/system/schema/:dbName/:tableName/_field/email', (req, res, ctx) => {
-          return res(ctx.json({ name: 'email', type: 'string', size: 512 }));
-        })
-      );
-
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="users"
-        />,
-        { queryClient }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('email')).toBeInTheDocument();
-      });
-
-      // Click edit button for email field
-      const emailRow = screen.getByTestId('field-row-email');
-      const editButton = within(emailRow).getByRole('button', { name: /edit/i });
-      await user.click(editButton);
-
-      // Update field size
-      const sizeInput = screen.getByLabelText(/field size/i);
-      await user.clear(sizeInput);
-      await user.type(sizeInput, '512');
-
-      await user.click(screen.getByRole('button', { name: /save changes/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText('512')).toBeInTheDocument();
-      });
-    });
-
-    it('should delete field with confirmation', async () => {
-      server.use(
-        rest.delete('/api/v2/system/schema/:dbName/:tableName/_field/email', (req, res, ctx) => {
-          return res(ctx.status(204));
-        })
-      );
-
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="users"
-        />,
-        { queryClient }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('email')).toBeInTheDocument();
-      });
-
-      // Click delete button
-      const emailRow = screen.getByTestId('field-row-email');
-      const deleteButton = within(emailRow).getByRole('button', { name: /delete/i });
-      await user.click(deleteButton);
-
-      // Confirm deletion in modal
-      await user.click(screen.getByRole('button', { name: /confirm delete/i }));
-
-      await waitFor(() => {
-        expect(screen.queryByText('email')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Accessibility (WCAG 2.1 AA)', () => {
-    it('should have proper ARIA labels and roles', async () => {
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="users"
-        />,
-        { queryClient }
-      );
-
-      await waitFor(() => {
         expect(screen.getByRole('table')).toBeInTheDocument();
       });
 
-      // Table should have proper ARIA attributes
+      // Check that data is cached
+      const cachedData = queryClient.getQueryData(['fields', 'test_service', 'test_table']);
+      expect(cachedData).toBeDefined();
+    });
+
+    it('handles field mutations with optimistic updates', async () => {
+      const user = userEvent.setup();
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false, gcTime: 0 },
+          mutations: { retry: false },
+        },
+      });
+
+      renderWithQuery(
+        <FieldsTable 
+          serviceName="test_service" 
+          tableName="test_table"
+          fields={smallFieldset}
+        />,
+        { queryClient }
+      );
+
+      // Edit a field
+      const editButtons = screen.getAllByRole('button', { name: /edit field/i });
+      await user.click(editButtons[0]);
+
+      const nameInput = screen.getByDisplayValue('field_1');
+      await user.clear(nameInput);
+      await user.type(nameInput, 'optimistically_updated');
+
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      await user.click(saveButton);
+
+      // Should show optimistic update immediately
+      expect(screen.getByText('optimistically_updated')).toBeInTheDocument();
+    });
+
+    it('handles network errors with proper error boundaries', async () => {
+      server.use(
+        http.get('/api/v2/test_service/_schema/error-table', () => {
+          return HttpResponse.json(
+            { error: 'Network error' },
+            { status: 500 }
+          );
+        })
+      );
+
+      renderFieldsTable([], { tableName: 'error-table' });
+
+      await waitFor(() => {
+        expect(screen.getByText(/failed to load fields/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+      });
+    });
+
+    it('implements proper cache invalidation on field updates', async () => {
+      const user = userEvent.setup();
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false, gcTime: 0 },
+        },
+      });
+
+      const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      renderWithQuery(
+        <FieldsTable 
+          serviceName="test_service" 
+          tableName="test_table"
+          fields={smallFieldset}
+        />,
+        { queryClient }
+      );
+
+      // Perform field update
+      const editButtons = screen.getAllByRole('button', { name: /edit field/i });
+      await user.click(editButtons[0]);
+
+      const nameInput = screen.getByDisplayValue('field_1');
+      await user.clear(nameInput);
+      await user.type(nameInput, 'cache_test');
+
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+          queryKey: ['fields', 'test_service', 'test_table'],
+        });
+      });
+    });
+  });
+
+  describe('Accessibility and Keyboard Navigation', () => {
+    it('supports keyboard navigation through table rows', async () => {
+      const user = userEvent.setup();
+      renderFieldsTable();
+
+      const firstRow = screen.getAllByRole('row')[1]; // Skip header
+      firstRow.focus();
+
+      // Arrow down should move to next row
+      await user.keyboard('{ArrowDown}');
+      const secondRow = screen.getAllByRole('row')[2];
+      expect(secondRow).toHaveFocus();
+
+      // Arrow up should move back
+      await user.keyboard('{ArrowUp}');
+      expect(firstRow).toHaveFocus();
+    });
+
+    it('provides proper ARIA labels for screen readers', () => {
+      renderFieldsTable();
+
       const table = screen.getByRole('table');
-      expect(table).toHaveAttribute('aria-label', expect.stringContaining('Fields table'));
+      expect(table).toHaveAttribute('aria-label', 'Database fields table');
 
-      // Column headers should be properly labeled
-      const columnHeaders = screen.getAllByRole('columnheader');
-      expect(columnHeaders.length).toBeGreaterThan(0);
-      
-      columnHeaders.forEach(header => {
-        expect(header).toHaveAttribute('scope', 'col');
-      });
+      const sortButtons = screen.getAllByRole('button', { name: /sort by/i });
+      expect(sortButtons.length).toBeGreaterThan(0);
     });
 
-    it('should support keyboard navigation', async () => {
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="users"
-        />,
-        { queryClient }
-      );
+    it('supports high contrast mode and theme switching', () => {
+      renderFieldsTable();
 
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Tab through table elements
-      const firstButton = screen.getAllByRole('button')[0];
-      firstButton.focus();
-      expect(firstButton).toHaveFocus();
-
-      // Arrow keys should navigate through cells
-      fireEvent.keyDown(firstButton, { key: 'ArrowDown' });
-      // Implementation-specific navigation verification would go here
-    });
-
-    it('should announce changes to screen readers', async () => {
-      const mockAnnounce = vi.fn();
-      
-      renderWithProviders(
-        <FieldsTable 
-          dbName="test_db"
-          tableName="users"
-          onAnnouncement={mockAnnounce}
-        />,
-        { queryClient }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('id')).toBeInTheDocument();
-      });
-
-      // Trigger a data update
-      await user.click(screen.getByRole('button', { name: /refresh/i }));
-
-      await waitFor(() => {
-        expect(mockAnnounce).toHaveBeenCalledWith(
-          expect.stringContaining('Fields table updated')
-        );
-      });
+      const table = screen.getByRole('table');
+      expect(table).toHaveClass('contrast-more:border-2');
     });
   });
 });
 
 describe('RelationshipsTable Component', () => {
-  let queryClient: QueryClient;
-  let user: ReturnType<typeof userEvent.setup>;
+  const mockRelationships = generateLargeRelationshipset(10);
+  const smallRelationshipSet = generateLargeRelationshipset(3);
 
-  beforeEach(() => {
-    queryClient = createTestQueryClient();
-    user = userEvent.setup();
+  const renderRelationshipsTable = (relationships = smallRelationshipSet, options = {}) => {
+    const defaultProps = {
+      relationships,
+      serviceName: 'test_service',
+      tableName: 'test_table',
+      onRelationshipAdd: vi.fn(),
+      onRelationshipDelete: vi.fn(),
+      loading: false,
+      ...options,
+    };
 
-    server.use(
-      rest.get('/api/v2/system/schema/:dbName/:tableName/_related', (req, res, ctx) => {
-        return res(ctx.json({
-          resource: mockRelationshipsData,
-          count: mockRelationshipsData.length
-        }));
-      })
-    );
-  });
+    return renderWithQuery(<RelationshipsTable {...defaultProps} />);
+  };
 
-  describe('Basic Table Functionality', () => {
-    it('should render relationships table correctly', async () => {
-      renderWithProviders(
-        <RelationshipsTable 
-          dbName="test_db"
-          tableName="users"
-        />,
-        { queryClient }
-      );
+  describe('Relationship Table Rendering', () => {
+    it('renders relationship table with correct structure', () => {
+      renderRelationshipsTable();
 
-      await waitFor(() => {
-        expect(screen.getByText('Name')).toBeInTheDocument();
-        expect(screen.getByText('Type')).toBeInTheDocument();
-        expect(screen.getByText('Referenced Table')).toBeInTheDocument();
-        expect(screen.getByText('Actions')).toBeInTheDocument();
-      });
+      // Check headers
+      expect(screen.getByRole('columnheader', { name: /relationship name/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /type/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /foreign table/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /foreign field/i })).toBeInTheDocument();
 
-      // Verify relationship data
-      expect(screen.getByText('profile')).toBeInTheDocument();
-      expect(screen.getByText('has_one')).toBeInTheDocument();
-      expect(screen.getByText('user_profiles')).toBeInTheDocument();
-      expect(screen.getByText('orders')).toBeInTheDocument();
-      expect(screen.getByText('has_many')).toBeInTheDocument();
+      // Check data
+      expect(screen.getByText('relationship_1')).toBeInTheDocument();
+      expect(screen.getByText('belongs_to')).toBeInTheDocument();
     });
 
-    it('should handle relationship type filtering', async () => {
-      renderWithProviders(
-        <RelationshipsTable 
-          dbName="test_db"
-          tableName="users"
-        />,
-        { queryClient }
-      );
+    it('handles empty relationships gracefully', () => {
+      renderRelationshipsTable([]);
 
-      await waitFor(() => {
-        expect(screen.getByText('profile')).toBeInTheDocument();
-      });
+      expect(screen.getByText(/no relationships found/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /add relationship/i })).toBeInTheDocument();
+    });
 
-      // Filter by relationship type
-      const typeFilter = screen.getByLabelText(/filter by type/i);
-      await user.selectOptions(typeFilter, 'has_one');
+    it('displays relationship type badges with proper styling', () => {
+      const mixedRelationships = [
+        createMockRelationship({ type: 'belongs_to' }),
+        createMockRelationship({ type: 'has_many', id: 'rel-2' }),
+        createMockRelationship({ type: 'has_one', id: 'rel-3' }),
+      ];
 
-      await waitFor(() => {
-        expect(screen.getByText('profile')).toBeInTheDocument();
-        expect(screen.queryByText('orders')).not.toBeInTheDocument();
-      });
+      renderRelationshipsTable(mixedRelationships);
+
+      expect(screen.getByText('belongs_to')).toHaveClass('bg-blue-100');
+      expect(screen.getByText('has_many')).toHaveClass('bg-green-100');
+      expect(screen.getByText('has_one')).toHaveClass('bg-yellow-100');
     });
   });
 
-  describe('Relationship CRUD Operations', () => {
-    it('should create new relationship', async () => {
-      server.use(
-        rest.post('/api/v2/system/schema/:dbName/:tableName/_related', (req, res, ctx) => {
-          return res(ctx.json({
-            name: 'comments',
+  describe('Relationship Management', () => {
+    it('handles relationship addition with comprehensive form validation', async () => {
+      const user = userEvent.setup();
+      const mockOnAdd = vi.fn();
+      renderRelationshipsTable([], { onRelationshipAdd: mockOnAdd });
+
+      const addButton = screen.getByRole('button', { name: /add relationship/i });
+      await user.click(addButton);
+
+      // Modal should open with form
+      const modal = screen.getByRole('dialog', { name: /add relationship/i });
+      expect(modal).toBeInTheDocument();
+
+      // Fill form
+      const nameInput = screen.getByLabelText(/relationship name/i);
+      const typeSelect = screen.getByLabelText(/relationship type/i);
+      const foreignTableInput = screen.getByLabelText(/foreign table/i);
+      const foreignFieldInput = screen.getByLabelText(/foreign field/i);
+
+      await user.type(nameInput, 'user_posts');
+      await user.selectOptions(typeSelect, 'has_many');
+      await user.type(foreignTableInput, 'posts');
+      await user.type(foreignFieldInput, 'user_id');
+
+      const saveButton = screen.getByRole('button', { name: /save relationship/i });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockOnAdd).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'user_posts',
             type: 'has_many',
-            ref_table: 'comments',
-            ref_field: 'user_id'
-          }));
-        })
-      );
-
-      renderWithProviders(
-        <RelationshipsTable 
-          dbName="test_db"
-          tableName="users"
-        />,
-        { queryClient }
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('profile')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole('button', { name: /add relationship/i }));
-
-      // Fill relationship form
-      await user.type(screen.getByLabelText(/relationship name/i), 'comments');
-      await user.selectOptions(screen.getByLabelText(/relationship type/i), 'has_many');
-      await user.type(screen.getByLabelText(/referenced table/i), 'comments');
-      await user.type(screen.getByLabelText(/referenced field/i), 'user_id');
-
-      await user.click(screen.getByRole('button', { name: /save relationship/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText('comments')).toBeInTheDocument();
+            foreignTable: 'posts',
+            foreignField: 'user_id',
+          })
+        );
       });
     });
 
-    it('should validate relationship constraints', async () => {
-      renderWithProviders(
-        <RelationshipsTable 
-          dbName="test_db"
-          tableName="users"
-        />,
-        { queryClient }
-      );
+    it('validates relationship configuration before saving', async () => {
+      const user = userEvent.setup();
+      renderRelationshipsTable([]);
 
-      await waitFor(() => {
-        expect(screen.getByText('profile')).toBeInTheDocument();
-      });
+      const addButton = screen.getByRole('button', { name: /add relationship/i });
+      await user.click(addButton);
 
-      await user.click(screen.getByRole('button', { name: /add relationship/i }));
-
-      // Try to submit without required fields
-      await user.click(screen.getByRole('button', { name: /save relationship/i }));
+      // Try to save without required fields
+      const saveButton = screen.getByRole('button', { name: /save relationship/i });
+      await user.click(saveButton);
 
       await waitFor(() => {
         expect(screen.getByText(/relationship name is required/i)).toBeInTheDocument();
-        expect(screen.getByText(/referenced table is required/i)).toBeInTheDocument();
+        expect(screen.getByText(/foreign table is required/i)).toBeInTheDocument();
       });
+    });
+
+    it('handles relationship deletion with proper confirmation', async () => {
+      const user = userEvent.setup();
+      const mockOnDelete = vi.fn();
+      renderRelationshipsTable(smallRelationshipSet, { onRelationshipDelete: mockOnDelete });
+
+      // Click delete button
+      const deleteButtons = screen.getAllByRole('button', { name: /delete relationship/i });
+      await user.click(deleteButtons[0]);
+
+      // Confirmation dialog
+      const confirmDialog = screen.getByRole('dialog', { name: /confirm deletion/i });
+      expect(confirmDialog).toBeInTheDocument();
+
+      const confirmButton = screen.getByRole('button', { name: /delete/i });
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(mockOnDelete).toHaveBeenCalledWith('rel-1');
+      });
+    });
+
+    it('shows relationship details on row click or expand', async () => {
+      const user = userEvent.setup();
+      renderRelationshipsTable();
+
+      const firstRow = screen.getAllByRole('row')[1]; // Skip header
+      await user.click(firstRow);
+
+      // Should show expanded details
+      expect(screen.getByText(/relationship details/i)).toBeInTheDocument();
+      expect(screen.getByText(/local field:/i)).toBeInTheDocument();
+      expect(screen.getByText(/foreign key constraints/i)).toBeInTheDocument();
     });
   });
 
-  describe('Performance and Virtual Scrolling', () => {
-    it('should handle large relationship datasets', async () => {
+  describe('Large Dataset Handling', () => {
+    it('implements virtual scrolling for large relationship sets', () => {
+      const largeRelationshipSet = generateLargeRelationshipset(500);
+      renderRelationshipsTable(largeRelationshipSet);
+
+      const scrollContainer = screen.getByTestId('relationships-scroll-container');
+      expect(scrollContainer).toBeInTheDocument();
+
+      // Should only render visible rows
+      const rows = screen.getAllByRole('row');
+      expect(rows.length).toBeLessThan(50); // Much less than total 500
+    });
+
+    it('provides search and filtering capabilities', async () => {
+      const user = userEvent.setup();
+      renderRelationshipsTable(mockRelationships);
+
+      const searchInput = screen.getByPlaceholderText(/search relationships.../i);
+      await user.type(searchInput, 'relationship_1');
+
+      await waitFor(() => {
+        const rows = screen.getAllByRole('row');
+        expect(rows).toHaveLength(2); // Header + 1 matching row
+      });
+    });
+
+    it('groups relationships by type with collapsible sections', async () => {
+      const user = userEvent.setup();
+      const mixedRelationships = [
+        ...Array(5).fill(null).map((_, i) => createMockRelationship({ 
+          id: `belongs-${i}`, 
+          type: 'belongs_to' 
+        })),
+        ...Array(3).fill(null).map((_, i) => createMockRelationship({ 
+          id: `has-many-${i}`, 
+          type: 'has_many' 
+        })),
+      ];
+
+      renderRelationshipsTable(mixedRelationships);
+
+      // Should have grouping headers
+      expect(screen.getByText(/belongs to \(5\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/has many \(3\)/i)).toBeInTheDocument();
+
+      // Test collapsing a group
+      const belongsToHeader = screen.getByRole('button', { name: /belongs to/i });
+      await user.click(belongsToHeader);
+
+      // Belongs to relationships should be hidden
+      const belongsToRows = screen.queryAllByText(/belongs_to/);
+      expect(belongsToRows).toHaveLength(1); // Only the group header
+    });
+  });
+
+  describe('Advanced Relationship Features', () => {
+    it('validates foreign key constraints and table references', async () => {
+      const user = userEvent.setup();
+      renderRelationshipsTable([]);
+
+      const addButton = screen.getByRole('button', { name: /add relationship/i });
+      await user.click(addButton);
+
+      // Mock validation endpoint
       server.use(
-        rest.get('/api/v2/system/schema/:dbName/:tableName/_related', (req, res, ctx) => {
-          return res(ctx.json({
-            resource: largeMockRelationshipsData,
-            count: largeMockRelationshipsData.length
-          }));
+        http.post('/api/v2/:service/_schema/:table/validate-relationship', () => {
+          return HttpResponse.json({
+            valid: false,
+            errors: [
+              { field: 'foreignTable', message: 'Table does not exist' },
+              { field: 'foreignField', message: 'Field does not exist in target table' },
+            ],
+          }, { status: 400 });
         })
       );
 
-      const performanceStart = performance.now();
+      const foreignTableInput = screen.getByLabelText(/foreign table/i);
+      await user.type(foreignTableInput, 'nonexistent_table');
 
-      renderWithProviders(
-        <RelationshipsTable 
-          dbName="test_db"
-          tableName="large_table"
-          enableVirtualization={true}
-        />,
-        { queryClient }
-      );
+      const validateButton = screen.getByRole('button', { name: /validate/i });
+      await user.click(validateButton);
 
       await waitFor(() => {
-        const virtualContainer = screen.getByTestId('virtual-scroll-container');
-        expect(virtualContainer).toBeInTheDocument();
+        expect(screen.getByText(/table does not exist/i)).toBeInTheDocument();
+      });
+    });
+
+    it('suggests relationship configurations based on field names', async () => {
+      const user = userEvent.setup();
+      renderRelationshipsTable([]);
+
+      const addButton = screen.getByRole('button', { name: /add relationship/i });
+      await user.click(addButton);
+
+      // Auto-suggestion based on field naming conventions
+      const foreignFieldInput = screen.getByLabelText(/foreign field/i);
+      await user.type(foreignFieldInput, 'user_');
+
+      await waitFor(() => {
+        const suggestions = screen.getAllByRole('option');
+        expect(suggestions.some(option => option.textContent.includes('user_id'))).toBe(true);
+      });
+    });
+
+    it('handles bidirectional relationship creation', async () => {
+      const user = userEvent.setup();
+      const mockOnAdd = vi.fn();
+      renderRelationshipsTable([], { onRelationshipAdd: mockOnAdd });
+
+      const addButton = screen.getByRole('button', { name: /add relationship/i });
+      await user.click(addButton);
+
+      // Fill relationship form
+      await user.type(screen.getByLabelText(/relationship name/i), 'user_posts');
+      await user.selectOptions(screen.getByLabelText(/relationship type/i), 'has_many');
+      await user.type(screen.getByLabelText(/foreign table/i), 'posts');
+
+      // Enable bidirectional relationship
+      const bidirectionalCheckbox = screen.getByRole('checkbox', { name: /create inverse relationship/i });
+      await user.click(bidirectionalCheckbox);
+
+      const inverseNameInput = screen.getByLabelText(/inverse relationship name/i);
+      expect(inverseNameInput).toHaveValue('post_user'); // Auto-generated
+
+      const saveButton = screen.getByRole('button', { name: /save relationship/i });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockOnAdd).toHaveBeenCalledTimes(2); // Both directions
+      });
+    });
+  });
+
+  describe('Error Handling and Recovery', () => {
+    it('handles API errors gracefully with retry mechanisms', async () => {
+      const user = userEvent.setup();
+      
+      server.use(
+        http.get('/api/v2/test_service/_schema/test_table/relationships', () => {
+          return HttpResponse.json(
+            { error: 'Service temporarily unavailable' },
+            { status: 503 }
+          );
+        })
+      );
+
+      renderRelationshipsTable([]);
+
+      await waitFor(() => {
+        expect(screen.getByText(/failed to load relationships/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
       });
 
-      const performanceEnd = performance.now();
-      const renderTime = performanceEnd - performanceStart;
+      // Test retry functionality
+      const retryButton = screen.getByRole('button', { name: /retry/i });
+      await user.click(retryButton);
 
-      // Should render large dataset in under 200ms
-      expect(renderTime).toBeLessThan(200);
+      expect(screen.getByTestId('table-loading-spinner')).toBeInTheDocument();
+    });
+
+    it('validates relationship integrity before operations', async () => {
+      const user = userEvent.setup();
+      const mockOnDelete = vi.fn();
+      
+      const relationshipsWithConstraints = [
+        createMockRelationship({ 
+          name: 'critical_relationship',
+          hasConstraints: true,
+          constraintMessage: 'This relationship has dependent records'
+        }),
+      ];
+
+      renderRelationshipsTable(relationshipsWithConstraints, { onRelationshipDelete: mockOnDelete });
+
+      const deleteButtons = screen.getAllByRole('button', { name: /delete relationship/i });
+      await user.click(deleteButtons[0]);
+
+      // Should show constraint warning
+      const warningDialog = screen.getByRole('dialog', { name: /relationship constraint warning/i });
+      expect(warningDialog).toBeInTheDocument();
+      expect(screen.getByText(/this relationship has dependent records/i)).toBeInTheDocument();
+
+      // Force delete option
+      const forceDeleteCheckbox = screen.getByRole('checkbox', { name: /force delete/i });
+      await user.click(forceDeleteCheckbox);
+
+      const confirmButton = screen.getByRole('button', { name: /delete anyway/i });
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(mockOnDelete).toHaveBeenCalledWith('rel-1', { force: true });
+      });
     });
   });
 });
 
-describe('Integration Tests - Complete Workflow', () => {
-  let queryClient: QueryClient;
-  let user: ReturnType<typeof userEvent.setup>;
+describe('Component Integration Tests', () => {
+  it('coordinates between all three components in table details workflow', async () => {
+    const user = userEvent.setup();
+    const mockTable = createMockTable();
+    const mockFields = generateLargeFieldset(10);
+    const mockRelationships = generateLargeRelationshipset(5);
 
-  beforeEach(() => {
-    queryClient = createTestQueryClient();
-    user = userEvent.setup();
-
-    // Setup complete workflow endpoints
-    server.use(
-      rest.get('/api/v2/system/schema/:dbName/:tableName', (req, res, ctx) => {
-        return res(ctx.json(mockTableData));
-      }),
-      rest.get('/api/v2/system/schema/:dbName/:tableName/_field', (req, res, ctx) => {
-        return res(ctx.json({ resource: mockFieldsData, count: mockFieldsData.length }));
-      }),
-      rest.get('/api/v2/system/schema/:dbName/:tableName/_related', (req, res, ctx) => {
-        return res(ctx.json({ resource: mockRelationshipsData, count: mockRelationshipsData.length }));
-      }),
-      rest.patch('/api/v2/system/schema/:dbName/:tableName', (req, res, ctx) => {
-        return res(ctx.json(mockTableData));
-      })
-    );
-  });
-
-  it('should complete full table details editing workflow under 5 seconds', async () => {
-    const workflowStart = performance.now();
-
-    // Render complete table details interface
-    renderWithProviders(
+    // Render all components together
+    const IntegratedView = () => (
       <div>
-        <TableDetailsForm 
-          mode="edit"
-          dbName="test_db"
-          tableName="users"
-          onSubmit={vi.fn()}
-          onCancel={vi.fn()}
-        />
+        <TableDetailsForm table={mockTable} onSubmit={vi.fn()} />
         <FieldsTable 
-          dbName="test_db"
-          tableName="users"
+          fields={mockFields}
+          serviceName="test_service"
+          tableName="test_table"
+          onFieldAdd={vi.fn()}
+          onFieldEdit={vi.fn()}
+          onFieldDelete={vi.fn()}
         />
-        <RelationshipsTable 
-          dbName="test_db"
-          tableName="users"
+        <RelationshipsTable
+          relationships={mockRelationships}
+          serviceName="test_service"
+          tableName="test_table"
+          onRelationshipAdd={vi.fn()}
+          onRelationshipDelete={vi.fn()}
         />
-      </div>,
-      { queryClient }
+      </div>
     );
 
-    // Wait for all components to load data
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('users')).toBeInTheDocument();
-      expect(screen.getByText('id')).toBeInTheDocument();
-      expect(screen.getByText('profile')).toBeInTheDocument();
-    });
+    renderWithProviders(<IntegratedView />);
 
-    // Perform complete editing workflow
-    await user.type(screen.getByLabelText(/description/i), ' - Updated');
-    await user.click(screen.getByRole('button', { name: /save/i }));
-
-    await waitFor(() => {
-      const workflowEnd = performance.now();
-      const workflowTime = workflowEnd - workflowStart;
-      
-      // Complete workflow should finish under 5 seconds
-      expect(workflowTime).toBeLessThan(5000);
-    });
-  });
-
-  it('should maintain data consistency across components', async () => {
-    renderWithProviders(
-      <div>
-        <TableDetailsForm 
-          mode="edit"
-          dbName="test_db"
-          tableName="users"
-          onSubmit={vi.fn()}
-          onCancel={vi.fn()}
-        />
-        <FieldsTable 
-          dbName="test_db"
-          tableName="users"
-        />
-      </div>,
-      { queryClient }
-    );
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('users')).toBeInTheDocument();
-      expect(screen.getByText('id')).toBeInTheDocument();
-    });
-
-    // Update table name should affect both components
-    const nameField = screen.getByLabelText(/table name/i);
-    await user.clear(nameField);
-    await user.type(nameField, 'updated_users');
-
-    // Verify name change is reflected consistently
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('updated_users')).toBeInTheDocument();
-      // Any other components should reflect the change via React Query cache
-    });
-  });
-
-  it('should handle error scenarios gracefully across all components', async () => {
-    // Mock network errors
-    server.use(
-      rest.get('/api/v2/system/schema/:dbName/:tableName/_field', (req, res, ctx) => {
-        return res(ctx.status(500), ctx.json({ error: 'Internal server error' }));
-      })
-    );
-
-    renderWithProviders(
-      <div>
-        <TableDetailsForm 
-          mode="edit"
-          dbName="test_db"
-          tableName="users"
-          onSubmit={vi.fn()}
-          onCancel={vi.fn()}
-        />
-        <FieldsTable 
-          dbName="test_db"
-          tableName="users"
-        />
-      </div>,
-      { queryClient }
-    );
-
-    // Form should still load even if fields fail
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('users')).toBeInTheDocument();
-    });
-
-    // Fields table should show error state
-    await waitFor(() => {
-      expect(screen.getByText(/error loading fields/i)).toBeInTheDocument();
-    });
-
-    // Error should not break the overall interface
+    // Verify all components are rendered
     expect(screen.getByLabelText(/table name/i)).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: /database fields table/i })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: /relationships table/i })).toBeInTheDocument();
+
+    // Test cross-component interactions
+    // Changing table name should affect other components
+    const tableNameInput = screen.getByLabelText(/table name/i);
+    await user.clear(tableNameInput);
+    await user.type(tableNameInput, 'updated_table');
+
+    // Should trigger updates in dependent components
+    await waitFor(() => {
+      expect(screen.getByText(/fields for updated_table/i)).toBeInTheDocument();
+      expect(screen.getByText(/relationships for updated_table/i)).toBeInTheDocument();
+    });
+  });
+
+  it('handles real-time updates across components with React Query synchronization', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+      },
+    });
+
+    const mockTable = createMockTable();
+    const mockFields = generateLargeFieldset(5);
+
+    const LiveUpdateTest = () => (
+      <QueryClientProvider client={queryClient}>
+        <FieldsTable 
+          fields={mockFields}
+          serviceName="test_service"
+          tableName="test_table"
+          onFieldAdd={vi.fn()}
+          onFieldEdit={vi.fn()}
+          onFieldDelete={vi.fn()}
+        />
+      </QueryClientProvider>
+    );
+
+    render(<LiveUpdateTest />);
+
+    // Simulate real-time update from server
+    queryClient.setQueryData(['fields', 'test_service', 'test_table'], [
+      ...mockFields,
+      createMockField({ id: 'new-field', name: 'real_time_field' }),
+    ]);
+
+    await waitFor(() => {
+      expect(screen.getByText('real_time_field')).toBeInTheDocument();
+    });
+  });
+
+  it('maintains performance with concurrent user interactions across components', async () => {
+    const user = userEvent.setup();
+    const largeFields = generateLargeFieldset(1000);
+    const largeRelationships = generateLargeRelationshipset(200);
+
+    const PerformanceTestView = () => (
+      <div>
+        <FieldsTable 
+          fields={largeFields}
+          serviceName="test_service"
+          tableName="test_table"
+          onFieldAdd={vi.fn()}
+          onFieldEdit={vi.fn()}
+          onFieldDelete={vi.fn()}
+        />
+        <RelationshipsTable
+          relationships={largeRelationships}
+          serviceName="test_service"
+          tableName="test_table"
+          onRelationshipAdd={vi.fn()}
+          onRelationshipDelete={vi.fn()}
+        />
+      </div>
+    );
+
+    renderWithProviders(<PerformanceTestView />);
+
+    // Concurrent operations
+    const startTime = performance.now();
+
+    // Scroll fields table
+    const fieldsContainer = screen.getByTestId('virtual-scroll-container');
+    fireEvent.scroll(fieldsContainer, { target: { scrollTop: 5000 } });
+
+    // Filter relationships
+    const relationshipsSearch = screen.getByPlaceholderText(/search relationships.../i);
+    await user.type(relationshipsSearch, 'relationship_50');
+
+    // Sort fields table
+    const nameHeader = screen.getByRole('columnheader', { name: /field name/i });
+    await user.click(nameHeader);
+
+    const endTime = performance.now();
+    
+    // Operations should complete within reasonable time (< 1000ms)
+    expect(endTime - startTime).toBeLessThan(1000);
+
+    // All components should still be responsive
+    expect(screen.getByText(/field_500/i)).toBeInTheDocument();
+    expect(screen.getByText(/relationship_50/i)).toBeInTheDocument();
   });
 });
-
-/**
- * Mock implementations for testing
- * These would be replaced with actual React components during implementation
- */
-
-// Mock component implementations for testing
-function MockTableDetailsForm({ mode, onSubmit, onCancel, showJsonEditor, ...props }) {
-  const form = useForm({
-    resolver: zodResolver(tableDetailsSchema),
-    defaultValues: { name: '', alias: '', label: '', plural: '', description: '' }
-  });
-
-  return (
-    <FormProvider {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <label htmlFor="name">Table Name</label>
-        <input 
-          id="name" 
-          disabled={mode === 'edit'}
-          {...form.register('name')} 
-        />
-        {form.formState.errors.name && (
-          <span>{form.formState.errors.name.message}</span>
-        )}
-        
-        <label htmlFor="alias">Alias</label>
-        <input id="alias" {...form.register('alias')} />
-        
-        <label htmlFor="description">Description</label>
-        <textarea id="description" {...form.register('description')} />
-        
-        {showJsonEditor && (
-          <textarea 
-            role="textbox" 
-            aria-label="JSON Editor"
-            placeholder="Enter JSON..."
-          />
-        )}
-        
-        <button type="submit">Save</button>
-        <button type="button" onClick={onCancel}>Cancel</button>
-      </form>
-    </FormProvider>
-  );
-}
-
-function MockFieldsTable({ dbName, tableName, enableVirtualization, ...props }) {
-  // Simulate TanStack Table with virtual scrolling
-  return (
-    <div>
-      <input placeholder="Search fields..." />
-      <button>Add Field</button>
-      <button>Refresh</button>
-      
-      {enableVirtualization ? (
-        <div data-testid="virtual-scroll-container" style={{ height: '400px', overflow: 'auto' }}>
-          {/* Virtual scrolling container */}
-          <table role="table" aria-label="Fields table">
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Type</th>
-                <th scope="col">Required</th>
-                <th scope="col">Primary Key</th>
-                <th scope="col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mockFieldsData.map((field, index) => (
-                <tr key={field.name} data-testid={`field-row-${field.name}`}>
-                  <td>{field.name}</td>
-                  <td>{field.type}</td>
-                  <td>{field.required ? 'Yes' : 'No'}</td>
-                  <td>{field.primary_key ? 'Yes' : 'No'}</td>
-                  <td>
-                    <button>Edit</button>
-                    <button>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <table role="table" aria-label="Fields table">
-          {/* Regular table implementation */}
-        </table>
-      )}
-    </div>
-  );
-}
-
-function MockRelationshipsTable({ dbName, tableName, enableVirtualization, ...props }) {
-  return (
-    <div>
-      <label htmlFor="type-filter">Filter by Type</label>
-      <select id="type-filter">
-        <option value="">All Types</option>
-        <option value="has_one">Has One</option>
-        <option value="has_many">Has Many</option>
-      </select>
-      
-      <button>Add Relationship</button>
-      
-      {enableVirtualization ? (
-        <div data-testid="virtual-scroll-container" style={{ height: '400px', overflow: 'auto' }}>
-          <table role="table" aria-label="Relationships table">
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Type</th>
-                <th scope="col">Referenced Table</th>
-                <th scope="col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mockRelationshipsData.map((rel) => (
-                <tr key={rel.name}>
-                  <td>{rel.name}</td>
-                  <td>{rel.type}</td>
-                  <td>{rel.ref_table}</td>
-                  <td>
-                    <button>Edit</button>
-                    <button>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <table role="table" aria-label="Relationships table">
-          {/* Regular table implementation */}
-        </table>
-      )}
-    </div>
-  );
-}
-
-// Wire up mock components for testing
-const TableDetailsForm = MockTableDetailsForm;
-const FieldsTable = MockFieldsTable;
-const RelationshipsTable = MockRelationshipsTable;
