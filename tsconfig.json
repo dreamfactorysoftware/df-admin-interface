@@ -1,123 +1,86 @@
 {
   "compilerOptions": {
-    /* Language and Environment */
+    /* Base Configuration */
     "target": "ES2023",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
-
-    /* Modules */
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": false,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-
-    /* JSX */
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "jsx": "preserve",
-    "jsxImportSource": "react",
+    "incremental": true,
+
+    /* React 19 & Server Components Configuration */
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+
+    /* Path Mapping for Next.js */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/app/*": ["./src/app/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/hooks/*": ["./src/hooks/*"],
+      "@/types/*": ["./src/types/*"],
+      "@/styles/*": ["./src/styles/*"],
+      "@/utils/*": ["./src/lib/utils/*"],
+      "@/config/*": ["./src/lib/config/*"]
+    },
 
     /* Strict Type-Checking Options */
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
-    "strictPropertyInitialization": false,
+    "strictPropertyInitialization": true,
     "noImplicitThis": true,
     "alwaysStrict": true,
     "noImplicitReturns": true,
-    "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true,
     "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
 
     /* Additional Checks */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitIndex": false,
+    "noPropertyAccessFromIndexSignature": false,
 
     /* Module Resolution Options */
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/components/*": ["./src/components/*"],
-      "@/lib/*": ["./src/lib/*"],
-      "@/hooks/*": ["./src/hooks/*"],
-      "@/types/*": ["./src/types/*"],
-      "@/styles/*": ["./src/styles/*"],
-      "@/app/*": ["./src/app/*"],
-      "@/middleware": ["./src/middleware"],
-      "@/test/*": ["./src/test/*"]
-    },
-    "rootDir": ".",
-    "typeRoots": ["./node_modules/@types"],
-
-    /* Source Map Options */
-    "sourceMap": true,
-    "inlineSourceMap": false,
-    "inlineSources": false,
-
-    /* Experimental Options */
-    "experimentalDecorators": false,
-    "emitDecoratorMetadata": false,
-
-    /* Advanced Options */
+    "allowImportingTsExtensions": false,
+    "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "useDefineForClassFields": true,
-    "verbatimModuleSyntax": false,
 
-    /* Performance and Caching */
-    "incremental": true,
-    "tsBuildInfoFile": ".next/cache/tsconfig.tsbuildinfo",
-    
-    /* Output Formatting */
+    /* Source Map Options for Development */
+    "sourceMap": true,
     "declaration": false,
     "declarationMap": false,
-    "outDir": ".next",
-    "removeComments": false,
-    "preserveConstEnums": true,
 
-    /* Interop Constraints */
-    "importsNotUsedAsValues": "remove",
-    "preserveValueImports": false,
-
-    /* Plugin Support */
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
+    /* Experimental Options for React 19 */
+    "useDefineForClassFields": true,
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    "src/**/*",
-    "vitest.config.ts",
-    "next.config.js",
-    "tailwind.config.ts",
-    "postcss.config.js"
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     ".next",
+    "out",
     "dist",
-    "build",
-    "coverage",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.spec.ts",
-    "**/*.spec.tsx",
-    "playwright-tests",
-    "e2e"
-  ],
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  }
+    "build"
+  ]
 }
