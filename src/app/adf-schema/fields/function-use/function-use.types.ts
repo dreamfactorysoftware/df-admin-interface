@@ -1,817 +1,859 @@
 /**
- * Database Function Usage Configuration Types for React/Next.js Implementation
+ * TypeScript type definitions for database function usage configuration
+ * Compatible with React Hook Form and Zod validation for DreamFactory Admin Interface
  * 
- * Comprehensive type definitions for database function usage workflows supporting:
- * - React Hook Form 7.57.0 with Zod schema validation
- * - Real-time validation under 100ms performance targets
- * - Type-safe configuration workflows for database function parameter management
- * - Component prop interfaces for React function usage form integration
- * - Dropdown option types for function selection and parameter configuration
- * - Validation rule types for function parameter constraints and usage patterns
+ * Defines interfaces for function usage entries, dropdown options, form validation schemas,
+ * and component props while maintaining compatibility with DreamFactory function usage API requirements.
  * 
- * Compatible with DreamFactory function usage API requirements and enterprise-scale
- * database function management with comprehensive error handling and validation.
- * 
- * @fileoverview Function usage type definitions for ADF Schema field management
+ * @fileoverview Function Usage Type Definitions
  * @version 1.0.0
  * @since 2024-12-19
  */
 
-import { z } from 'zod';
 import { ReactNode, ComponentType } from 'react';
-import { 
-  UseFormReturn, 
-  FieldPath, 
-  FieldValues, 
-  Control, 
-  RegisterOptions,
-  FieldError,
-  UseControllerProps,
-  FieldArrayWithId
-} from 'react-hook-form';
-import type { 
-  BaseComponent, 
-  ComponentVariant, 
-  ComponentSize,
-  FormFieldProps,
-  DropdownOption 
-} from '@/types/ui-components';
-import type { ApiResponse, ValidationResponse } from '@/types/api-responses';
-import type { 
-  DatabaseField, 
-  FieldDataType, 
-  SchemaValidationRule 
-} from '@/types/database-schema';
+import { z } from 'zod';
+import { UseFormReturn, FieldErrors, Control } from 'react-hook-form';
 
-// ============================================================================
-// CORE FUNCTION USAGE TYPES
-// ============================================================================
+// =============================================================================
+// Core Function Usage Interfaces
+// =============================================================================
 
 /**
- * Database function usage methods supported by DreamFactory API
- * Maps to HTTP methods for REST API endpoint generation
+ * Supported database function types that can be applied to fields
+ * Extends standard SQL functions with database-specific implementations
  */
-export type FunctionUseMethod = 
-  | 'SELECT'   // GET operations - data retrieval
-  | 'FILTER'   // GET with filtering - conditional data retrieval
-  | 'INSERT'   // POST operations - data creation
-  | 'UPDATE'   // PATCH operations - data modification
-  | 'DELETE'   // DELETE operations - data removal
-  | 'UPSERT';  // POST/PATCH hybrid - create or update
+export type DatabaseFunctionType =
+  | 'aggregate'
+  | 'string'
+  | 'numeric'
+  | 'date'
+  | 'logical'
+  | 'conversion'
+  | 'custom';
 
 /**
- * Database function parameter types for validation and UI rendering
- * Supports all standard SQL data types with appropriate validation
+ * Database function categories for organizing function selections
  */
-export type FunctionParameterType = 
+export type FunctionCategory =
+  | 'math'
+  | 'string'
+  | 'date'
+  | 'aggregate'
+  | 'conditional'
+  | 'conversion'
+  | 'validation'
+  | 'utility';
+
+/**
+ * Parameter data types supported by database functions
+ */
+export type FunctionParameterType =
   | 'string'
   | 'number'
-  | 'integer'
   | 'boolean'
   | 'date'
   | 'datetime'
-  | 'timestamp'
+  | 'time'
   | 'json'
-  | 'uuid'
   | 'binary'
-  | 'decimal'
-  | 'float'
-  | 'text'
-  | 'enum'
-  | 'array';
+  | 'any';
 
 /**
- * Function usage validation constraint levels
- * Determines validation strictness and error handling behavior
+ * Function execution context for determining when the function should be applied
  */
-export type ValidationLevel = 'strict' | 'warning' | 'loose' | 'disabled';
+export type FunctionExecutionContext =
+  | 'pre_process'
+  | 'post_process'
+  | 'validation'
+  | 'transform'
+  | 'filter'
+  | 'aggregate';
 
 /**
- * Core function usage entry interface
- * Represents a single database function configuration for field operations
+ * Database function definition with metadata and parameter specifications
  */
-export interface FunctionUsageEntry {
-  /** Unique identifier for this function usage entry */
-  id?: string;
-  /** Array of function usage methods this entry applies to */
-  use: FunctionUseMethod[];
-  /** Database function name or expression to execute */
-  function: string;
-  /** Function parameters with type validation */
-  parameters?: FunctionParameter[];
-  /** Validation rules for function execution */
-  validation?: FunctionValidationRule[];
-  /** Whether this function usage is active */
-  enabled?: boolean;
-  /** Custom validation message for errors */
-  errorMessage?: string;
-  /** Function description for documentation */
-  description?: string;
-  /** Creation timestamp */
-  createdAt?: string;
-  /** Last modification timestamp */
-  updatedAt?: string;
+export interface DatabaseFunction {
+  /** Unique identifier for the function */
+  id: string;
+  /** Display name for the function */
+  name: string;
+  /** Function category for organization */
+  category: FunctionCategory;
+  /** Function type classification */
+  type: DatabaseFunctionType;
+  /** Detailed description of function behavior */
+  description: string;
+  /** SQL syntax template for the function */
+  syntax: string;
+  /** Function parameter definitions */
+  parameters: FunctionParameter[];
+  /** Return type of the function */
+  returnType: FunctionParameterType;
+  /** Database compatibility matrix */
+  supportedDatabases: DatabaseDriver[];
+  /** Example usage patterns */
+  examples: FunctionExample[];
+  /** Whether the function is deprecated */
+  deprecated?: boolean;
+  /** Alternative function recommendations */
+  alternatives?: string[];
+  /** Performance characteristics */
+  performance?: FunctionPerformance;
 }
 
 /**
- * Database function parameter definition
- * Defines input parameters for function execution with type safety
+ * Database driver types supported by the application
+ */
+export type DatabaseDriver =
+  | 'mysql'
+  | 'postgresql'
+  | 'sqlserver'
+  | 'oracle'
+  | 'mongodb'
+  | 'snowflake'
+  | 'sqlite'
+  | 'mariadb';
+
+/**
+ * Function parameter definition with validation constraints
  */
 export interface FunctionParameter {
   /** Parameter name */
   name: string;
   /** Parameter data type */
   type: FunctionParameterType;
-  /** Whether parameter is required */
+  /** Whether the parameter is required */
   required: boolean;
-  /** Default value if parameter not provided */
-  defaultValue?: unknown;
-  /** Parameter validation pattern */
-  validation?: string;
-  /** Parameter description */
-  description?: string;
-  /** Enumerated values for enum type parameters */
-  enumValues?: string[];
+  /** Default value if parameter is optional */
+  defaultValue?: any;
+  /** Parameter description and usage notes */
+  description: string;
+  /** Validation constraints for the parameter */
+  validation?: ParameterValidation;
   /** Minimum value for numeric parameters */
-  minValue?: number;
+  min?: number;
   /** Maximum value for numeric parameters */
-  maxValue?: number;
+  max?: number;
+  /** Enumerated values for choice parameters */
+  options?: string[];
+  /** Regular expression pattern for string validation */
+  pattern?: string;
+}
+
+/**
+ * Parameter validation rules and constraints
+ */
+export interface ParameterValidation {
+  /** Minimum length for string parameters */
+  minLength?: number;
   /** Maximum length for string parameters */
   maxLength?: number;
-  /** Parameter format specification */
-  format?: string;
+  /** Regular expression for pattern validation */
+  regex?: string;
+  /** Custom validation function reference */
+  customValidator?: string;
+  /** Error message for validation failures */
+  errorMessage?: string;
 }
 
 /**
- * Function validation rule definition
- * Defines custom validation logic for function usage
+ * Function usage example with sample input and output
  */
-export interface FunctionValidationRule {
-  /** Rule identifier */
-  id: string;
-  /** Validation rule type */
-  type: 'required' | 'pattern' | 'range' | 'custom' | 'dependency';
-  /** Rule condition expression */
-  condition: string;
-  /** Error message when rule fails */
-  message: string;
-  /** Validation level for this rule */
-  level: ValidationLevel;
-  /** Whether rule is active */
-  enabled: boolean;
-  /** Dependencies on other parameters */
-  dependencies?: string[];
-}
-
-// ============================================================================
-// DROPDOWN OPTION TYPES
-// ============================================================================
-
-/**
- * Function usage dropdown option for UI selection
- * Provides user-friendly interface for function method selection
- */
-export interface FunctionUseDropdownOption extends DropdownOption<FunctionUseMethod> {
-  /** Display name for the function usage method */
-  name: string;
-  /** Function usage method value */
-  value: FunctionUseMethod;
-  /** HTTP method mapping for API generation */
-  httpMethod: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
-  /** Description of when to use this method */
+export interface FunctionExample {
+  /** Example title or use case */
+  title: string;
+  /** Example description */
   description: string;
-  /** Whether this option is available for current field type */
-  available: boolean;
-  /** Icon name for UI display */
-  icon?: string;
-  /** CSS class for styling */
-  className?: string;
+  /** Sample input parameters */
+  input: Record<string, any>;
+  /** Expected output value */
+  output: any;
+  /** SQL query example */
+  sqlExample: string;
 }
 
 /**
- * Function parameter type dropdown option
- * Used for parameter type selection in function configuration
+ * Function performance characteristics and recommendations
  */
-export interface ParameterTypeDropdownOption extends DropdownOption<FunctionParameterType> {
-  /** Display name for parameter type */
-  name: string;
-  /** Parameter type value */
-  value: FunctionParameterType;
-  /** Type category for grouping */
-  category: 'primitive' | 'composite' | 'special';
-  /** Default validation pattern */
-  defaultValidation?: string;
-  /** Compatible field data types */
-  compatibleTypes: FieldDataType[];
-  /** Example value for documentation */
-  example?: string;
+export interface FunctionPerformance {
+  /** Relative performance rating (1-5) */
+  rating: number;
+  /** Performance notes and recommendations */
+  notes: string;
+  /** Optimal use cases */
+  optimalFor: string[];
+  /** Performance warnings */
+  warnings?: string[];
+}
+
+// =============================================================================
+// Function Usage Configuration
+// =============================================================================
+
+/**
+ * Function usage entry representing applied function configuration
+ */
+export interface FunctionUsageEntry {
+  /** Unique identifier for the usage entry */
+  id: string;
+  /** Referenced function definition */
+  functionId: string;
+  /** Function display name */
+  functionName: string;
+  /** Target field name where function is applied */
+  fieldName: string;
+  /** Function execution context */
+  context: FunctionExecutionContext;
+  /** Parameter values for the function */
+  parameters: Record<string, any>;
+  /** Whether the function usage is active */
+  enabled: boolean;
+  /** Function usage priority/order */
+  order: number;
+  /** Additional configuration options */
+  options?: FunctionUsageOptions;
+  /** Validation status */
+  validation?: ValidationStatus;
+  /** Function usage metadata */
+  metadata?: FunctionUsageMetadata;
 }
 
 /**
- * Pre-defined function dropdown option
- * Common database functions available for selection
+ * Additional configuration options for function usage
  */
-export interface PredefinedFunctionOption extends DropdownOption<string> {
-  /** Function name */
-  name: string;
-  /** Function expression template */
+export interface FunctionUsageOptions {
+  /** Error handling strategy */
+  errorHandling: 'ignore' | 'skip' | 'fail' | 'default';
+  /** Default value on error */
+  defaultOnError?: any;
+  /** Cache function results */
+  cacheResults?: boolean;
+  /** Cache duration in seconds */
+  cacheDuration?: number;
+  /** Debug mode for function execution */
+  debug?: boolean;
+}
+
+/**
+ * Validation status for function usage entry
+ */
+export interface ValidationStatus {
+  /** Whether the configuration is valid */
+  isValid: boolean;
+  /** Validation error messages */
+  errors: string[];
+  /** Validation warnings */
+  warnings: string[];
+  /** Last validation timestamp */
+  lastValidated: string;
+}
+
+/**
+ * Metadata for function usage tracking and auditing
+ */
+export interface FunctionUsageMetadata {
+  /** Creation timestamp */
+  createdAt: string;
+  /** Last modification timestamp */
+  updatedAt: string;
+  /** User who created the entry */
+  createdBy?: string;
+  /** User who last modified the entry */
+  updatedBy?: string;
+  /** Usage statistics */
+  usage?: UsageStatistics;
+}
+
+/**
+ * Usage statistics for function performance monitoring
+ */
+export interface UsageStatistics {
+  /** Total execution count */
+  executionCount: number;
+  /** Average execution time in milliseconds */
+  averageExecutionTime: number;
+  /** Error count */
+  errorCount: number;
+  /** Last execution timestamp */
+  lastExecuted?: string;
+}
+
+// =============================================================================
+// Dropdown and Selection Options
+// =============================================================================
+
+/**
+ * Function selection option for dropdown components
+ */
+export interface FunctionSelectOption {
+  /** Function identifier */
   value: string;
-  /** Function category */
-  category: 'string' | 'numeric' | 'date' | 'aggregate' | 'custom';
+  /** Display label */
+  label: string;
   /** Function description */
   description: string;
-  /** Required parameters */
-  parameters: Omit<FunctionParameter, 'name'>[];
-  /** Supported database types */
-  supportedDatabases: string[];
-  /** Example usage */
-  example: string;
-  /** Performance impact level */
+  /** Function category */
+  category: FunctionCategory;
+  /** Icon component for visual representation */
+  icon?: ComponentType<{ className?: string }>;
+  /** Whether the option is disabled */
+  disabled?: boolean;
+  /** Additional metadata */
+  metadata?: {
+    returnType: FunctionParameterType;
+    parameterCount: number;
+    supportedDatabases: DatabaseDriver[];
+  };
+}
+
+/**
+ * Function category option for category filtering
+ */
+export interface CategorySelectOption {
+  /** Category identifier */
+  value: FunctionCategory;
+  /** Display label */
+  label: string;
+  /** Category description */
+  description: string;
+  /** Function count in category */
+  functionCount: number;
+  /** Category color for UI theming */
+  color?: string;
+}
+
+/**
+ * Parameter type option for parameter configuration
+ */
+export interface ParameterTypeOption {
+  /** Parameter type identifier */
+  value: FunctionParameterType;
+  /** Display label */
+  label: string;
+  /** Type description */
+  description: string;
+  /** Default validation rules */
+  defaultValidation?: ParameterValidation;
+}
+
+/**
+ * Execution context option for context selection
+ */
+export interface ExecutionContextOption {
+  /** Context identifier */
+  value: FunctionExecutionContext;
+  /** Display label */
+  label: string;
+  /** Context description */
+  description: string;
+  /** Performance impact indicator */
   performanceImpact: 'low' | 'medium' | 'high';
 }
 
-// ============================================================================
-// ZOD VALIDATION SCHEMAS
-// ============================================================================
+// =============================================================================
+// Form Data and Validation Schemas
+// =============================================================================
+
+/**
+ * Function usage form data structure for React Hook Form
+ */
+export interface FunctionUsageFormData {
+  /** Selected function identifier */
+  functionId: string;
+  /** Target field name */
+  fieldName: string;
+  /** Execution context */
+  context: FunctionExecutionContext;
+  /** Function parameters as key-value pairs */
+  parameters: Record<string, any>;
+  /** Function usage options */
+  options: FunctionUsageOptions;
+  /** Whether the function is enabled */
+  enabled: boolean;
+  /** Function execution order */
+  order: number;
+}
+
+/**
+ * Zod schema for function usage form validation
+ * Provides runtime type checking and validation for form submissions
+ */
+export const functionUsageFormSchema = z.object({
+  functionId: z
+    .string()
+    .min(1, 'Function selection is required')
+    .refine((val) => val.length > 0, 'Please select a valid function'),
+  
+  fieldName: z
+    .string()
+    .min(1, 'Field name is required')
+    .max(255, 'Field name must be less than 255 characters')
+    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Field name must be a valid identifier'),
+  
+  context: z.nativeEnum({
+    pre_process: 'pre_process',
+    post_process: 'post_process',
+    validation: 'validation',
+    transform: 'transform',
+    filter: 'filter',
+    aggregate: 'aggregate'
+  } as const),
+  
+  parameters: z
+    .record(z.any())
+    .refine((params) => {
+      // Custom validation logic for parameters based on function definition
+      return Object.keys(params).length >= 0;
+    }, 'Invalid parameter configuration'),
+  
+  options: z.object({
+    errorHandling: z.enum(['ignore', 'skip', 'fail', 'default']),
+    defaultOnError: z.any().optional(),
+    cacheResults: z.boolean().optional(),
+    cacheDuration: z.number().min(0).max(86400).optional(), // Max 24 hours
+    debug: z.boolean().optional()
+  }),
+  
+  enabled: z.boolean(),
+  
+  order: z
+    .number()
+    .int()
+    .min(0)
+    .max(999)
+});
+
+/**
+ * Inferred TypeScript type from Zod schema
+ */
+export type FunctionUsageFormSchema = z.infer<typeof functionUsageFormSchema>;
 
 /**
  * Zod schema for function parameter validation
- * Ensures type safety and runtime validation for function parameters
  */
 export const functionParameterSchema = z.object({
-  name: z.string()
-    .min(1, 'Parameter name is required')
-    .max(100, 'Parameter name must be less than 100 characters')
-    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Parameter name must be a valid identifier'),
-  type: z.enum([
-    'string', 'number', 'integer', 'boolean', 'date', 'datetime', 
-    'timestamp', 'json', 'uuid', 'binary', 'decimal', 'float', 
-    'text', 'enum', 'array'
-  ]),
-  required: z.boolean().default(false),
-  defaultValue: z.unknown().optional(),
-  validation: z.string().optional(),
-  description: z.string().max(500, 'Description must be less than 500 characters').optional(),
-  enumValues: z.array(z.string()).optional(),
-  minValue: z.number().optional(),
-  maxValue: z.number().optional(),
-  maxLength: z.number().min(1).max(65535).optional(),
-  format: z.string().optional()
-}).refine((data) => {
-  // Enum type must have enum values
-  if (data.type === 'enum') {
-    return data.enumValues && data.enumValues.length > 0;
-  }
-  return true;
-}, {
-  message: 'Enum type parameters must define enumValues',
-  path: ['enumValues']
-}).refine((data) => {
-  // Numeric types can have min/max validation
-  if (['number', 'integer', 'decimal', 'float'].includes(data.type)) {
-    if (data.minValue !== undefined && data.maxValue !== undefined) {
-      return data.minValue <= data.maxValue;
-    }
-  }
-  return true;
-}, {
-  message: 'Minimum value must be less than or equal to maximum value',
-  path: ['maxValue']
+  name: z.string().min(1, 'Parameter name is required'),
+  value: z.any(),
+  type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'time', 'json', 'binary', 'any']),
+  required: z.boolean(),
+  validation: z.object({
+    minLength: z.number().optional(),
+    maxLength: z.number().optional(),
+    regex: z.string().optional(),
+    customValidator: z.string().optional(),
+    errorMessage: z.string().optional()
+  }).optional()
 });
 
 /**
- * Zod schema for function validation rule
- * Validates custom validation rules for function execution
+ * Validation schema for function search and filtering
  */
-export const functionValidationRuleSchema = z.object({
-  id: z.string().min(1, 'Rule ID is required'),
-  type: z.enum(['required', 'pattern', 'range', 'custom', 'dependency']),
-  condition: z.string().min(1, 'Validation condition is required'),
-  message: z.string().min(1, 'Error message is required').max(200),
-  level: z.enum(['strict', 'warning', 'loose', 'disabled']).default('strict'),
-  enabled: z.boolean().default(true),
-  dependencies: z.array(z.string()).optional()
+export const functionSearchSchema = z.object({
+  searchTerm: z.string().optional(),
+  category: z.enum(['math', 'string', 'date', 'aggregate', 'conditional', 'conversion', 'validation', 'utility']).optional(),
+  supportedDatabase: z.enum(['mysql', 'postgresql', 'sqlserver', 'oracle', 'mongodb', 'snowflake', 'sqlite', 'mariadb']).optional(),
+  returnType: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'time', 'json', 'binary', 'any']).optional()
 });
 
-/**
- * Zod schema for function usage entry validation
- * Comprehensive validation for function usage configuration
- */
-export const functionUsageEntrySchema = z.object({
-  id: z.string().optional(),
-  use: z.array(z.enum(['SELECT', 'FILTER', 'INSERT', 'UPDATE', 'DELETE', 'UPSERT']))
-    .min(1, 'At least one usage method must be selected')
-    .max(6, 'Cannot select more than 6 usage methods'),
-  function: z.string()
-    .min(1, 'Function name or expression is required')
-    .max(1000, 'Function expression must be less than 1000 characters')
-    .refine((val) => {
-      // Basic SQL injection protection
-      const dangerousPatterns = [
-        /;\s*(drop|delete|truncate|alter)\s+/i,
-        /union\s+select/i,
-        /--/,
-        /\/\*/
-      ];
-      return !dangerousPatterns.some(pattern => pattern.test(val));
-    }, {
-      message: 'Function expression contains potentially dangerous SQL patterns'
-    }),
-  parameters: z.array(functionParameterSchema).optional(),
-  validation: z.array(functionValidationRuleSchema).optional(),
-  enabled: z.boolean().default(true),
-  errorMessage: z.string().max(500, 'Error message must be less than 500 characters').optional(),
-  description: z.string().max(1000, 'Description must be less than 1000 characters').optional(),
-  createdAt: z.string().datetime().optional(),
-  updatedAt: z.string().datetime().optional()
-}).refine((data) => {
-  // Validate that parameters referenced in validation rules exist
-  if (data.parameters && data.validation) {
-    const parameterNames = data.parameters.map(p => p.name);
-    const referencedParams = data.validation.flatMap(v => v.dependencies || []);
-    return referencedParams.every(param => parameterNames.includes(param));
-  }
-  return true;
-}, {
-  message: 'Validation rules reference non-existent parameters',
-  path: ['validation']
-});
+export type FunctionSearchSchema = z.infer<typeof functionSearchSchema>;
+
+// =============================================================================
+// Component Props and UI Interfaces
+// =============================================================================
 
 /**
- * Zod schema for function usage array validation
- * Validates complete function usage configuration for a database field
+ * Base component props following established UI patterns
  */
-export const functionUsageArraySchema = z.array(functionUsageEntrySchema)
-  .max(20, 'Cannot define more than 20 function usage entries per field')
-  .refine((entries) => {
-    // Check for duplicate function usage methods within the same function
-    const usageGroups = new Map<string, Set<FunctionUseMethod>>();
-    
-    for (const entry of entries) {
-      const key = entry.function;
-      if (!usageGroups.has(key)) {
-        usageGroups.set(key, new Set());
-      }
-      
-      const existingMethods = usageGroups.get(key)!;
-      for (const method of entry.use) {
-        if (existingMethods.has(method)) {
-          return false;
-        }
-        existingMethods.add(method);
-      }
-    }
-    return true;
-  }, {
-    message: 'Duplicate function usage methods detected for the same function'
-  });
-
-// ============================================================================
-// FORM INTEGRATION TYPES
-// ============================================================================
-
-/**
- * React Hook Form field array item type for function usage
- * Integrates with React Hook Form's useFieldArray hook
- */
-export type FunctionUsageFieldArray = FieldArrayWithId<
-  { dbFunction: FunctionUsageEntry[] },
-  'dbFunction',
-  'id'
->;
-
-/**
- * Function usage form data structure
- * Complete form data including function usage array and metadata
- */
-export interface FunctionUsageFormData {
-  /** Array of function usage entries */
-  dbFunction: FunctionUsageEntry[];
-  /** Field ID this function usage applies to */
-  fieldId?: string;
-  /** Form validation state */
-  isValid?: boolean;
-  /** Form dirty state */
-  isDirty?: boolean;
-  /** Last validation timestamp */
-  lastValidated?: string;
+export interface BaseComponentProps {
+  /** Unique component identifier */
+  id?: string;
+  /** CSS class names */
+  className?: string;
+  /** Component children */
+  children?: ReactNode;
+  /** Component variant */
+  variant?: ComponentVariant;
+  /** Component size */
+  size?: ComponentSize;
+  /** Disabled state */
+  disabled?: boolean;
+  /** Loading state */
+  loading?: boolean;
+  /** Test identifier */
+  'data-testid'?: string;
 }
 
 /**
- * Function usage form configuration
- * Configuration options for React Hook Form initialization
+ * Component variant types
  */
-export interface FunctionUsageFormConfig {
-  /** Form identifier */
-  formId: string;
-  /** Default function usage entries */
-  defaultValues?: Partial<FunctionUsageFormData>;
-  /** Validation schema */
-  schema: typeof functionUsageArraySchema;
-  /** Real-time validation enabled */
-  realtimeValidation: boolean;
-  /** Validation debounce delay (ms) */
-  validationDelay: number;
-  /** Maximum function usage entries allowed */
-  maxEntries: number;
-  /** Available dropdown options */
-  dropdownOptions: {
-    functionUse: FunctionUseDropdownOption[];
-    parameterTypes: ParameterTypeDropdownOption[];
-    predefinedFunctions: PredefinedFunctionOption[];
+export type ComponentVariant =
+  | 'primary'
+  | 'secondary'
+  | 'success'
+  | 'warning'
+  | 'error'
+  | 'ghost'
+  | 'outline';
+
+/**
+ * Component size types
+ */
+export type ComponentSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+
+/**
+ * Function usage form component props
+ */
+export interface FunctionUsageFormProps extends BaseComponentProps {
+  /** Initial form data */
+  initialData?: Partial<FunctionUsageFormData>;
+  /** Available functions for selection */
+  availableFunctions: DatabaseFunction[];
+  /** Target field information */
+  fieldInfo: {
+    name: string;
+    type: string;
+    nullable: boolean;
   };
-}
-
-/**
- * Function usage form context
- * React context for sharing form state across components
- */
-export interface FunctionUsageFormContext {
-  /** React Hook Form instance */
-  form: UseFormReturn<FunctionUsageFormData>;
-  /** Form configuration */
-  config: FunctionUsageFormConfig;
   /** Form submission handler */
-  onSubmit: (data: FunctionUsageFormData) => Promise<void> | void;
-  /** Form reset handler */
-  onReset: () => void;
-  /** Add new function usage entry */
-  addEntry: () => void;
-  /** Remove function usage entry */
-  removeEntry: (index: number) => void;
-  /** Validate function expression */
-  validateFunction: (expression: string) => Promise<ValidationResponse>;
-  /** Get available functions for field type */
-  getAvailableFunctions: (fieldType: FieldDataType) => PredefinedFunctionOption[];
-}
-
-// ============================================================================
-// COMPONENT PROP INTERFACES
-// ============================================================================
-
-/**
- * Function usage component base props
- * Common props for all function usage related components
- */
-export interface FunctionUsageBaseProps extends BaseComponent {
-  /** Field data for context */
-  field?: DatabaseField;
-  /** Whether component is read-only */
-  readonly?: boolean;
-  /** Show accordion wrapper */
-  showAccordion?: boolean;
-  /** Compact display mode */
-  compact?: boolean;
+  onSubmit: (data: FunctionUsageFormData) => Promise<void>;
+  /** Form cancellation handler */
+  onCancel?: () => void;
+  /** Form validation handler */
+  onValidate?: (data: Partial<FunctionUsageFormData>) => Promise<ValidationStatus>;
+  /** Read-only mode */
+  readOnly?: boolean;
   /** Show advanced options */
-  showAdvanced?: boolean;
+  showAdvancedOptions?: boolean;
 }
 
 /**
- * Function usage table component props
- * Props for the main function usage table component
+ * Function selector component props
  */
-export interface FunctionUsageTableProps extends FunctionUsageBaseProps {
-  /** Form control for function usage array */
-  control: Control<FunctionUsageFormData>;
-  /** Field name for the function usage array */
-  name: FieldPath<FunctionUsageFormData>;
-  /** Available dropdown options */
-  options: {
-    functionUse: FunctionUseDropdownOption[];
-    parameterTypes: ParameterTypeDropdownOption[];
-    predefinedFunctions: PredefinedFunctionOption[];
+export interface FunctionSelectorProps extends BaseComponentProps {
+  /** Available functions */
+  functions: DatabaseFunction[];
+  /** Selected function ID */
+  value?: string;
+  /** Selection change handler */
+  onChange: (functionId: string) => void;
+  /** Function search and filtering */
+  searchable?: boolean;
+  /** Category filtering */
+  showCategories?: boolean;
+  /** Database compatibility filtering */
+  filterByDatabase?: DatabaseDriver;
+  /** Placeholder text */
+  placeholder?: string;
+  /** Error state */
+  error?: string;
+}
+
+/**
+ * Function parameter editor component props
+ */
+export interface FunctionParameterEditorProps extends BaseComponentProps {
+  /** Function definition */
+  functionDef: DatabaseFunction;
+  /** Current parameter values */
+  values: Record<string, any>;
+  /** Parameter change handler */
+  onChange: (parameters: Record<string, any>) => void;
+  /** Parameter validation errors */
+  errors?: FieldErrors<Record<string, any>>;
+  /** Form control for React Hook Form integration */
+  control?: Control<any>;
+  /** Show parameter descriptions */
+  showDescriptions?: boolean;
+}
+
+/**
+ * Function usage list component props
+ */
+export interface FunctionUsageListProps extends BaseComponentProps {
+  /** List of function usage entries */
+  usageEntries: FunctionUsageEntry[];
+  /** Function definitions lookup */
+  functionDefinitions: Record<string, DatabaseFunction>;
+  /** Entry selection handler */
+  onSelectEntry?: (entry: FunctionUsageEntry) => void;
+  /** Entry edit handler */
+  onEditEntry?: (entry: FunctionUsageEntry) => void;
+  /** Entry delete handler */
+  onDeleteEntry?: (entryId: string) => void;
+  /** Entry reorder handler */
+  onReorderEntries?: (entries: FunctionUsageEntry[]) => void;
+  /** Show usage statistics */
+  showStatistics?: boolean;
+  /** Allow drag and drop reordering */
+  enableReordering?: boolean;
+}
+
+/**
+ * Function preview component props
+ */
+export interface FunctionPreviewProps extends BaseComponentProps {
+  /** Function definition */
+  functionDef: DatabaseFunction;
+  /** Parameter values for preview */
+  parameters: Record<string, any>;
+  /** Sample input data */
+  sampleData?: any;
+  /** Preview execution handler */
+  onExecutePreview?: (params: Record<string, any>) => Promise<any>;
+  /** Show SQL syntax */
+  showSyntax?: boolean;
+  /** Show examples */
+  showExamples?: boolean;
+}
+
+// =============================================================================
+// API Response and Request Types
+// =============================================================================
+
+/**
+ * API response wrapper for function usage operations
+ */
+export interface FunctionUsageApiResponse<T = any> {
+  /** Operation success status */
+  success: boolean;
+  /** Response data */
+  data?: T;
+  /** Error message if operation failed */
+  error?: string;
+  /** Additional metadata */
+  metadata?: {
+    timestamp: string;
+    requestId: string;
+    version: string;
   };
-  /** Custom validation function */
-  customValidation?: (entry: FunctionUsageEntry) => string | undefined;
-  /** Callback when entry is added */
-  onEntryAdd?: (entry: FunctionUsageEntry) => void;
-  /** Callback when entry is removed */
-  onEntryRemove?: (index: number, entry: FunctionUsageEntry) => void;
-  /** Callback when entry is validated */
-  onEntryValidate?: (index: number, isValid: boolean) => void;
 }
 
 /**
- * Function usage entry form props
- * Props for individual function usage entry form
+ * Function usage list API response
  */
-export interface FunctionUsageEntryFormProps extends FunctionUsageBaseProps {
-  /** Entry index in the array */
-  index: number;
-  /** Form control */
-  control: Control<FunctionUsageFormData>;
-  /** Available options for dropdowns */
-  options: FunctionUsageFormConfig['dropdownOptions'];
-  /** Remove entry handler */
-  onRemove: () => void;
-  /** Move entry up handler */
-  onMoveUp?: () => void;
-  /** Move entry down handler */
-  onMoveDown?: () => void;
-  /** Duplicate entry handler */
-  onDuplicate?: () => void;
-  /** Show reorder controls */
-  showReorderControls?: boolean;
-}
-
-/**
- * Function parameter form props
- * Props for function parameter configuration form
- */
-export interface FunctionParameterFormProps extends BaseComponent {
-  /** Function entry index */
-  entryIndex: number;
-  /** Parameter index */
-  parameterIndex: number;
-  /** Form control */
-  control: Control<FunctionUsageFormData>;
-  /** Available parameter type options */
-  parameterTypes: ParameterTypeDropdownOption[];
-  /** Remove parameter handler */
-  onRemove: () => void;
-}
-
-/**
- * Function validation rule form props
- * Props for validation rule configuration form
- */
-export interface FunctionValidationRuleFormProps extends BaseComponent {
-  /** Function entry index */
-  entryIndex: number;
-  /** Validation rule index */
-  ruleIndex: number;
-  /** Form control */
-  control: Control<FunctionUsageFormData>;
-  /** Available parameters for dependency selection */
-  availableParameters: string[];
-  /** Remove rule handler */
-  onRemove: () => void;
-}
-
-// ============================================================================
-// API INTEGRATION TYPES
-// ============================================================================
-
-/**
- * Function usage API request payload
- * Request structure for saving function usage configuration
- */
-export interface FunctionUsageApiRequest {
-  /** Field ID */
-  fieldId: string;
-  /** Service name */
-  serviceName: string;
-  /** Schema name */
-  schemaName?: string;
-  /** Table name */
-  tableName: string;
+export interface FunctionUsageListResponse extends FunctionUsageApiResponse<{
   /** Function usage entries */
-  functionUsage: FunctionUsageEntry[];
-}
+  entries: FunctionUsageEntry[];
+  /** Total count */
+  total: number;
+  /** Pagination info */
+  pagination?: {
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
+}> {}
 
 /**
- * Function usage API response
- * Response structure from function usage operations
+ * Available functions API response
  */
-export interface FunctionUsageApiResponse extends ApiResponse<FunctionUsageEntry[]> {
-  /** Validation results */
-  validation?: {
-    /** Overall validation status */
-    isValid: boolean;
-    /** Entry-specific validation results */
-    entries: Array<{
-      index: number;
-      isValid: boolean;
-      errors: string[];
-      warnings: string[];
-    }>;
-  };
-  /** Performance metrics */
-  performance?: {
-    /** Validation duration (ms) */
-    validationDuration: number;
-    /** Estimated runtime impact */
-    runtimeImpact: 'low' | 'medium' | 'high';
-  };
+export interface AvailableFunctionsResponse extends FunctionUsageApiResponse<{
+  /** Available functions */
+  functions: DatabaseFunction[];
+  /** Functions grouped by category */
+  categories: Record<FunctionCategory, DatabaseFunction[]>;
+}> {}
+
+/**
+ * Function usage creation/update request
+ */
+export interface FunctionUsageRequest {
+  /** Function usage configuration */
+  usage: Omit<FunctionUsageEntry, 'id' | 'validation' | 'metadata'>;
+  /** Validation options */
+  validateOnly?: boolean;
 }
 
 /**
- * Function validation API request
- * Request for validating function expressions
+ * Function validation request
  */
 export interface FunctionValidationRequest {
-  /** Function expression to validate */
-  expression: string;
-  /** Target database service */
-  serviceName: string;
-  /** Field context for validation */
+  /** Function ID to validate */
+  functionId: string;
+  /** Parameter values */
+  parameters: Record<string, any>;
+  /** Target field context */
   fieldContext: {
-    tableName: string;
-    fieldName: string;
-    fieldType: FieldDataType;
+    name: string;
+    type: string;
+    nullable: boolean;
   };
-  /** Function parameters */
-  parameters?: FunctionParameter[];
 }
 
 /**
- * Function validation API response
- * Response from function expression validation
+ * Function validation response
  */
-export interface FunctionValidationApiResponse extends ValidationResponse {
-  /** Suggested corrections */
-  suggestions?: string[];
-  /** Performance implications */
-  performance?: {
-    estimatedExecutionTime: number;
-    indexUsage: 'optimal' | 'suboptimal' | 'none';
-    recommendations: string[];
-  };
-  /** Compatible usage methods */
-  compatibleMethods?: FunctionUseMethod[];
+export interface FunctionValidationResponse extends FunctionUsageApiResponse<ValidationStatus> {}
+
+// =============================================================================
+// Hook Return Types
+// =============================================================================
+
+/**
+ * Function usage form hook return type
+ */
+export interface UseFunctionUsageFormReturn {
+  /** React Hook Form instance */
+  form: UseFormReturn<FunctionUsageFormData>;
+  /** Form submission handler */
+  handleSubmit: (data: FunctionUsageFormData) => Promise<void>;
+  /** Form reset handler */
+  resetForm: () => void;
+  /** Validation status */
+  validation: ValidationStatus | null;
+  /** Loading state */
+  isLoading: boolean;
+  /** Available functions */
+  availableFunctions: DatabaseFunction[];
+  /** Selected function definition */
+  selectedFunction: DatabaseFunction | null;
 }
 
-// ============================================================================
-// DEFAULT VALUES AND CONSTANTS
-// ============================================================================
+/**
+ * Function usage management hook return type
+ */
+export interface UseFunctionUsageReturn {
+  /** Function usage entries */
+  entries: FunctionUsageEntry[];
+  /** Loading state */
+  isLoading: boolean;
+  /** Error state */
+  error: string | null;
+  /** Add new function usage */
+  addUsage: (usage: Omit<FunctionUsageEntry, 'id'>) => Promise<void>;
+  /** Update existing function usage */
+  updateUsage: (id: string, usage: Partial<FunctionUsageEntry>) => Promise<void>;
+  /** Delete function usage */
+  deleteUsage: (id: string) => Promise<void>;
+  /** Reorder function usage entries */
+  reorderUsage: (entries: FunctionUsageEntry[]) => Promise<void>;
+  /** Validate function usage */
+  validateUsage: (usage: FunctionUsageEntry) => Promise<ValidationStatus>;
+  /** Refresh entries */
+  refresh: () => Promise<void>;
+}
+
+// =============================================================================
+// Utility Types
+// =============================================================================
 
 /**
- * Default function usage dropdown options
- * Standard options available for all database types
+ * Function usage filter criteria
  */
-export const DEFAULT_FUNCTION_USE_OPTIONS: FunctionUseDropdownOption[] = [
-  {
-    name: 'SELECT (GET)',
-    value: 'SELECT',
-    httpMethod: 'GET',
-    description: 'Apply function during data retrieval operations',
-    available: true,
-    icon: 'eye',
-    className: 'text-blue-600'
-  },
-  {
-    name: 'FILTER (GET)',
-    value: 'FILTER',
-    httpMethod: 'GET',
-    description: 'Use function for filtering conditions in queries',
-    available: true,
-    icon: 'filter',
-    className: 'text-green-600'
-  },
-  {
-    name: 'INSERT (POST)',
-    value: 'INSERT',
-    httpMethod: 'POST',
-    description: 'Execute function during record creation',
-    available: true,
-    icon: 'plus',
-    className: 'text-purple-600'
-  },
-  {
-    name: 'UPDATE (PATCH)',
-    value: 'UPDATE',
-    httpMethod: 'PATCH',
-    description: 'Apply function during record updates',
-    available: true,
-    icon: 'edit',
-    className: 'text-orange-600'
-  }
-];
+export interface FunctionUsageFilter {
+  /** Filter by field name */
+  fieldName?: string;
+  /** Filter by function category */
+  category?: FunctionCategory;
+  /** Filter by execution context */
+  context?: FunctionExecutionContext;
+  /** Filter by enabled status */
+  enabled?: boolean;
+  /** Search term for function names */
+  searchTerm?: string;
+}
 
 /**
- * Default parameter type options
- * Available parameter types for function configuration
+ * Function usage sort criteria
  */
-export const DEFAULT_PARAMETER_TYPE_OPTIONS: ParameterTypeDropdownOption[] = [
-  {
-    name: 'String',
-    value: 'string',
-    category: 'primitive',
-    defaultValidation: '^.+$',
-    compatibleTypes: ['varchar', 'char', 'text', 'string'],
-    example: 'example text'
-  },
-  {
-    name: 'Number',
-    value: 'number',
-    category: 'primitive',
-    defaultValidation: '^[0-9]+(\\.[0-9]+)?$',
-    compatibleTypes: ['int', 'float', 'double', 'decimal', 'numeric'],
-    example: '123.45'
-  },
-  {
-    name: 'Integer',
-    value: 'integer',
-    category: 'primitive',
-    defaultValidation: '^[0-9]+$',
-    compatibleTypes: ['int', 'bigint', 'smallint', 'tinyint'],
-    example: '42'
-  },
-  {
-    name: 'Boolean',
-    value: 'boolean',
-    category: 'primitive',
-    compatibleTypes: ['boolean', 'bit', 'tinyint'],
-    example: 'true'
-  },
-  {
-    name: 'Date',
-    value: 'date',
-    category: 'primitive',
-    defaultValidation: '^\\d{4}-\\d{2}-\\d{2}$',
-    compatibleTypes: ['date'],
-    example: '2024-12-19'
-  },
-  {
-    name: 'DateTime',
-    value: 'datetime',
-    category: 'primitive',
-    defaultValidation: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}',
-    compatibleTypes: ['datetime', 'timestamp'],
-    example: '2024-12-19T10:30:00'
-  },
-  {
-    name: 'JSON',
-    value: 'json',
-    category: 'composite',
-    compatibleTypes: ['json', 'jsonb', 'text'],
-    example: '{"key": "value"}'
-  },
-  {
-    name: 'UUID',
-    value: 'uuid',
-    category: 'special',
-    defaultValidation: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-    compatibleTypes: ['uuid', 'char', 'varchar'],
-    example: '123e4567-e89b-12d3-a456-426614174000'
-  }
-];
+export interface FunctionUsageSort {
+  /** Sort field */
+  field: keyof FunctionUsageEntry;
+  /** Sort direction */
+  direction: 'asc' | 'desc';
+}
 
 /**
- * Default validation configuration
- * Standard validation settings for function usage forms
+ * Function usage pagination
  */
-export const DEFAULT_VALIDATION_CONFIG = {
-  debounceMs: 50,
-  maxEntries: 20,
-  maxParametersPerFunction: 10,
-  maxValidationRulesPerFunction: 5,
-  performanceThresholds: {
-    validationTimeout: 5000,
-    maxFunctionLength: 1000,
-    maxParameterLength: 100
-  }
-} as const;
+export interface FunctionUsagePagination {
+  /** Current page (1-based) */
+  page: number;
+  /** Items per page */
+  pageSize: number;
+  /** Total items */
+  total: number;
+}
 
-// ============================================================================
-// TYPE EXPORTS
-// ============================================================================
-
-export type {
-  // Core types
-  FunctionUsageEntry,
-  FunctionParameter,
-  FunctionValidationRule,
-  FunctionUseMethod,
-  FunctionParameterType,
-  ValidationLevel,
-  
-  // Dropdown types
-  FunctionUseDropdownOption,
-  ParameterTypeDropdownOption,
-  PredefinedFunctionOption,
-  
-  // Form types
-  FunctionUsageFieldArray,
-  FunctionUsageFormData,
-  FunctionUsageFormConfig,
-  FunctionUsageFormContext,
-  
-  // Component prop types
-  FunctionUsageBaseProps,
-  FunctionUsageTableProps,
-  FunctionUsageEntryFormProps,
-  FunctionParameterFormProps,
-  FunctionValidationRuleFormProps,
-  
-  // API types
-  FunctionUsageApiRequest,
-  FunctionUsageApiResponse,
-  FunctionValidationRequest,
-  FunctionValidationApiResponse
+/**
+ * Type guard for function usage entry
+ */
+export const isFunctionUsageEntry = (obj: any): obj is FunctionUsageEntry => {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof obj.id === 'string' &&
+    typeof obj.functionId === 'string' &&
+    typeof obj.fieldName === 'string' &&
+    typeof obj.context === 'string' &&
+    typeof obj.parameters === 'object' &&
+    typeof obj.enabled === 'boolean' &&
+    typeof obj.order === 'number'
+  );
 };
 
-// Schema exports
-export {
-  functionParameterSchema,
-  functionValidationRuleSchema,
-  functionUsageEntrySchema,
-  functionUsageArraySchema
+/**
+ * Type guard for database function
+ */
+export const isDatabaseFunction = (obj: any): obj is DatabaseFunction => {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof obj.id === 'string' &&
+    typeof obj.name === 'string' &&
+    typeof obj.category === 'string' &&
+    typeof obj.type === 'string' &&
+    Array.isArray(obj.parameters) &&
+    Array.isArray(obj.supportedDatabases)
+  );
 };
 
-// Default exports
-export {
-  DEFAULT_FUNCTION_USE_OPTIONS,
-  DEFAULT_PARAMETER_TYPE_OPTIONS,
-  DEFAULT_VALIDATION_CONFIG
+// =============================================================================
+// Default Values and Constants
+// =============================================================================
+
+/**
+ * Default function usage options
+ */
+export const DEFAULT_FUNCTION_OPTIONS: FunctionUsageOptions = {
+  errorHandling: 'fail',
+  cacheResults: false,
+  debug: false
+};
+
+/**
+ * Default form data for new function usage
+ */
+export const DEFAULT_FUNCTION_USAGE_FORM: Partial<FunctionUsageFormData> = {
+  context: 'pre_process',
+  parameters: {},
+  options: DEFAULT_FUNCTION_OPTIONS,
+  enabled: true,
+  order: 0
+};
+
+/**
+ * Function category labels for UI display
+ */
+export const FUNCTION_CATEGORY_LABELS: Record<FunctionCategory, string> = {
+  math: 'Mathematical Functions',
+  string: 'String Functions',
+  date: 'Date & Time Functions',
+  aggregate: 'Aggregate Functions',
+  conditional: 'Conditional Functions',
+  conversion: 'Type Conversion Functions',
+  validation: 'Validation Functions',
+  utility: 'Utility Functions'
+};
+
+/**
+ * Execution context labels for UI display
+ */
+export const EXECUTION_CONTEXT_LABELS: Record<FunctionExecutionContext, string> = {
+  pre_process: 'Pre-Processing',
+  post_process: 'Post-Processing',
+  validation: 'Validation',
+  transform: 'Data Transformation',
+  filter: 'Filtering',
+  aggregate: 'Aggregation'
 };
