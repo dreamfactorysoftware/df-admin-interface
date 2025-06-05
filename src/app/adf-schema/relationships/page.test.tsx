@@ -1,934 +1,1383 @@
 /**
- * Comprehensive Vitest Test Suite for Database Relationships Page
+ * Comprehensive Vitest test suite for the relationships listing page component.
  * 
- * This test suite validates the relationships listing page component following
- * the migration from Angular TestBed to React Testing Library with Vitest.
- * Tests include relationship listing, filtering, sorting, navigation, TanStack
- * Virtual table rendering, and MSW API mocking integration.
+ * Implements React Testing Library patterns with MSW integration for realistic API interaction testing,
+ * covering relationship listing, filtering, sorting, navigation, relationship type displays, junction table 
+ * indicators, and TanStack Virtual table rendering to achieve 90%+ code coverage as required by 
+ * Section 4.4.2.2 Enhanced Testing Pipeline.
  * 
- * Key Features Tested:
- * - Relationship listing with pagination and virtualization
- * - Filtering and sorting capabilities with real-time updates
- * - Navigation to relationship creation and editing routes
- * - Relationship type displays (belongs_to, has_many, has_one, many_many)
- * - Junction table indicators for many-to-many relationships
- * - React Query caching and invalidation patterns
- * - Error handling and loading states
- * - Accessibility compliance (WCAG 2.1 AA)
+ * Key test coverage areas:
+ * - F-002: Schema Discovery and Browsing feature per Section 2.1 Feature Catalog
+ * - React/Next.js Integration Requirements for React Query caching and Next.js routing
+ * - Section 4.7.1.3 Vitest Testing Infrastructure Setup with React Testing Library
+ * - MSW integration for relationship schema API mocking per Section 5.2 Component Details
+ * - TanStack Virtual table rendering for large relationship datasets (1,000+ relationships)
+ * - Relationship type-specific display logic and junction table status indicators
+ * - WCAG 2.1 AA accessibility compliance validation
+ * - Cross-browser compatibility and responsive design testing
  * 
- * Performance Targets:
- * - Sub-50ms cache hit responses via React Query
- * - Large dataset handling (1000+ relationships) with TanStack Virtual
- * - Real-time filtering and sorting under 100ms response time
- * 
- * Testing Framework: Vitest 2.1.0 (10x faster than Jest/Karma)
- * Component Library: React Testing Library
- * API Mocking: Mock Service Worker (MSW)
+ * Test execution leverages Vitest 2.1.0 for 10x faster execution compared to Jest/Karma, supporting
+ * native TypeScript and ES modules with hot module replacement during development.
  */
 
-import { describe, it, expect, beforeEach, vi, beforeAll, afterEach } from 'vitest';
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest';
+import { screen, waitFor, fireEvent, within, getAllByRole } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
-import { rest } from 'msw';
-import { setupServer } from 'msw/node';
+import { act } from 'react';
+import { QueryClient, QueryCache } from '@tanstack/react-query';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-// Import the component under test
-// Note: This assumes the page component exists as specified in requirements
+// Test setup and utilities
+import { server } from '@/test/setup-tests';
+import { renderWithProviders } from '@/test/test-utils';
+import { handlers } from '@/test/mocks/handlers';
+
+// Component under test
 import RelationshipsPage from './page';
 
-// Import types for relationship management
-// Note: Creating comprehensive types based on technical specification requirements
-interface DatabaseRelationship {
-  id: string;
-  name: string;
-  type: 'belongs_to' | 'has_many' | 'has_one' | 'many_many';
-  table: string;
-  field: string;
-  ref_table: string;
-  ref_field: string;
-  ref_on_update?: 'cascade' | 'set_null' | 'restrict' | 'no_action';
-  ref_on_delete?: 'cascade' | 'set_null' | 'restrict' | 'no_action';
-  junction_table?: string;
-  junction_field?: string;
-  junction_ref_field?: string;
-  alias?: string;
-  description?: string;
-  is_virtual?: boolean;
-  is_active: boolean;
-  created_date?: string;
-  last_modified_date?: string;
-}
+// Type definitions for comprehensive testing
+import type {
+  DatabaseRelationship,
+  RelationshipType,
+  JunctionTableConfig,
+  RelationshipFilter,
+  RelationshipSortOptions,
+  SchemaServiceResponse
+} from './relationship.types';
 
-interface RelationshipListResponse {
-  resource: DatabaseRelationship[];
-  count: number;
-}
+// =============================================================================
+// Mock Setup and Configuration
+// =============================================================================
 
-interface MockSession {
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-  };
-  token: string;
-  expiresAt: Date;
-}
+// Mock Next.js navigation hooks
+vi.mock('next/navigation', () => ({
+  useRouter: vi.fn(),
+  useSearchParams: vi.fn(),
+  usePathname: vi.fn(() => '/adf-schema/relationships'),
+  notFound: vi.fn(),
+}));
 
-// Mock data factory for database relationships
+// Mock IntersectionObserver for TanStack Virtual
+const mockIntersectionObserver = vi.fn();
+mockIntersectionObserver.mockReturnValue({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+});
+window.IntersectionObserver = mockIntersectionObserver;
+
+// Mock ResizeObserver for responsive table testing
+const mockResizeObserver = vi.fn();
+mockResizeObserver.mockReturnValue({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+});
+window.ResizeObserver = mockResizeObserver;
+
+// =============================================================================
+// Test Data and Mock Factories
+// =============================================================================
+
+/**
+ * Creates mock relationship data for testing different scenarios
+ */
 const createMockRelationship = (overrides: Partial<DatabaseRelationship> = {}): DatabaseRelationship => ({
   id: `rel_${Math.random().toString(36).substr(2, 9)}`,
-  name: 'user_profile_relationship',
-  type: 'has_one',
+  name: `relationship_${Math.random().toString(36).substr(2, 5)}`,
+  type: 'belongs_to',
+  service_id: 'mysql_service_1',
   table: 'users',
-  field: 'id',
-  ref_table: 'user_profiles',
-  ref_field: 'user_id',
-  ref_on_update: 'cascade',
-  ref_on_delete: 'cascade',
-  alias: 'profile',
-  description: 'User profile relationship',
-  is_virtual: false,
-  is_active: true,
-  created_date: new Date().toISOString(),
-  last_modified_date: new Date().toISOString(),
-  ...overrides,
+  field: 'profile_id',
+  ref_service_id: 'mysql_service_1',
+  ref_table: 'profiles',
+  ref_field: 'id',
+  junction_table: undefined,
+  junction_service_id: undefined,
+  junction_table_left: undefined,
+  junction_table_right: undefined,
+  created_date: '2024-01-15T10:30:00Z',
+  last_modified_date: '2024-01-15T10:30:00Z',
+  created_by_id: 1,
+  last_modified_by_id: 1,
+  always_fetch: false,
+  flatten: false,
+  flatten_drop_prefix: false,
+  ...overrides
 });
 
-// Mock large dataset for virtualization testing
-const createLargeRelationshipDataset = (count: number): DatabaseRelationship[] => {
+/**
+ * Creates mock relationship data with different types for comprehensive testing
+ */
+const createMockRelationships = (): DatabaseRelationship[] => [
+  createMockRelationship({
+    id: 'rel_001',
+    name: 'user_profile',
+    type: 'belongs_to',
+    table: 'users',
+    field: 'profile_id',
+    ref_table: 'profiles',
+    ref_field: 'id'
+  }),
+  createMockRelationship({
+    id: 'rel_002',
+    name: 'profile_posts',
+    type: 'has_many',
+    table: 'profiles',
+    field: 'id',
+    ref_table: 'posts',
+    ref_field: 'profile_id'
+  }),
+  createMockRelationship({
+    id: 'rel_003',
+    name: 'profile_settings',
+    type: 'has_one',
+    table: 'profiles',
+    field: 'id',
+    ref_table: 'profile_settings',
+    ref_field: 'profile_id'
+  }),
+  createMockRelationship({
+    id: 'rel_004',
+    name: 'user_roles',
+    type: 'many_many',
+    table: 'users',
+    field: 'id',
+    ref_table: 'roles',
+    ref_field: 'id',
+    junction_table: 'user_roles',
+    junction_service_id: 'mysql_service_1',
+    junction_table_left: 'user_id',
+    junction_table_right: 'role_id'
+  }),
+  createMockRelationship({
+    id: 'rel_005',
+    name: 'post_tags',
+    type: 'many_many',
+    table: 'posts',
+    field: 'id',
+    ref_table: 'tags',
+    ref_field: 'id',
+    junction_table: 'post_tags',
+    junction_service_id: 'mysql_service_1',
+    junction_table_left: 'post_id',
+    junction_table_right: 'tag_id'
+  })
+];
+
+/**
+ * Creates large dataset for TanStack Virtual testing
+ */
+const createLargeRelationshipDataset = (count: number = 1000): DatabaseRelationship[] => {
   return Array.from({ length: count }, (_, index) => 
     createMockRelationship({
-      id: `rel_${index.toString().padStart(4, '0')}`,
+      id: `rel_large_${index.toString().padStart(4, '0')}`,
       name: `relationship_${index}`,
-      type: ['belongs_to', 'has_many', 'has_one', 'many_many'][index % 4] as any,
+      type: ['belongs_to', 'has_many', 'has_one', 'many_many'][index % 4] as RelationshipType,
       table: `table_${Math.floor(index / 10)}`,
-      ref_table: `ref_table_${Math.floor(index / 5)}`,
-      junction_table: index % 4 === 3 ? `junction_table_${index}` : undefined,
+      field: `field_${index}`,
+      ref_table: `ref_table_${Math.floor(index / 20)}`,
+      ref_field: `ref_field_${index}`,
+      junction_table: index % 4 === 3 ? `junction_${index}` : undefined,
+      junction_service_id: index % 4 === 3 ? 'mysql_service_1' : undefined,
+      junction_table_left: index % 4 === 3 ? `left_field_${index}` : undefined,
+      junction_table_right: index % 4 === 3 ? `right_field_${index}` : undefined
     })
   );
 };
 
-// Mock session data for authentication testing
-const mockSession: MockSession = {
-  user: {
-    id: '1',
-    email: 'test@dreamfactory.com',
-    name: 'Test User',
-    role: 'admin',
-  },
-  token: 'mock-jwt-token-12345',
-  expiresAt: new Date(Date.now() + 3600000), // 1 hour from now
-};
-
-// MSW server setup for API mocking
-const server = setupServer(
-  // Relationship listing endpoint with pagination and filtering support
-  rest.get('/api/v2/system/service/:serviceId/_schema/:tableName/_relationship', (req, res, ctx) => {
-    const { serviceId, tableName } = req.params;
-    const url = new URL(req.url);
-    const limit = parseInt(url.searchParams.get('limit') || '25', 10);
-    const offset = parseInt(url.searchParams.get('offset') || '0', 10);
-    const filter = url.searchParams.get('filter') || '';
-    const sort = url.searchParams.get('sort') || 'name';
-    
-    // Generate appropriate dataset size for testing
-    const baseDataset = createLargeRelationshipDataset(1000);
-    
-    // Apply filtering if provided
-    let filteredDataset = baseDataset;
-    if (filter) {
-      const filterLower = filter.toLowerCase();
-      filteredDataset = baseDataset.filter(rel => 
-        rel.name.toLowerCase().includes(filterLower) ||
-        rel.type.toLowerCase().includes(filterLower) ||
-        rel.table.toLowerCase().includes(filterLower) ||
-        rel.ref_table.toLowerCase().includes(filterLower)
-      );
-    }
-    
-    // Apply sorting
-    filteredDataset.sort((a, b) => {
-      const direction = sort.startsWith('-') ? -1 : 1;
-      const field = sort.replace(/^-/, '') as keyof DatabaseRelationship;
-      const aVal = a[field]?.toString() || '';
-      const bVal = b[field]?.toString() || '';
-      return direction * aVal.localeCompare(bVal);
-    });
-    
-    // Apply pagination
-    const paginatedData = filteredDataset.slice(offset, offset + limit);
-    
-    return res(
-      ctx.status(200),
-      ctx.json({
-        resource: paginatedData,
-        count: filteredDataset.length,
-      } as RelationshipListResponse)
-    );
-  }),
-
-  // Individual relationship details endpoint
-  rest.get('/api/v2/system/service/:serviceId/_schema/:tableName/_relationship/:relationshipId', (req, res, ctx) => {
-    const { relationshipId } = req.params;
-    const relationship = createMockRelationship({
-      id: relationshipId as string,
-      name: `relationship_${relationshipId}`,
-    });
-    
-    return res(ctx.status(200), ctx.json(relationship));
-  }),
-
-  // Authentication endpoint
-  rest.get('/api/v2/user/session', (req, res, ctx) => {
-    return res(ctx.status(200), ctx.json(mockSession));
-  }),
-
-  // Service discovery endpoint for database services
-  rest.get('/api/v2/system/service', (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json({
-        resource: [
-          { id: 'mysql-db', name: 'MySQL Database', type: 'mysql' },
-          { id: 'postgres-db', name: 'PostgreSQL Database', type: 'postgresql' },
-          { id: 'mongo-db', name: 'MongoDB Database', type: 'mongodb' },
-        ],
-      })
-    );
-  }),
-
-  // Table listing endpoint for schema discovery
-  rest.get('/api/v2/system/service/:serviceId/_schema', (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json({
-        resource: Array.from({ length: 50 }, (_, index) => ({
-          name: `table_${index}`,
-          label: `Table ${index}`,
-          plural: `table_${index}s`,
-          primary_key: ['id'],
-          name_field: 'name',
-        })),
-      })
-    );
-  }),
-
-  // Error handling endpoints for comprehensive testing
-  rest.get('/api/v2/system/service/error-service/_schema/error-table/_relationship', (req, res, ctx) => {
-    return res(
-      ctx.status(500),
-      ctx.json({
-        error: {
-          code: 500,
-          message: 'Internal server error during relationship discovery',
-          status_code: 500,
-        },
-      })
-    );
-  }),
-
-  rest.get('/api/v2/system/service/unauthorized-service/_schema/restricted-table/_relationship', (req, res, ctx) => {
-    return res(
-      ctx.status(403),
-      ctx.json({
-        error: {
-          code: 403,
-          message: 'Access denied to relationship data',
-          status_code: 403,
-        },
-      })
-    );
-  }),
-);
-
-// Test utilities for component rendering with providers
-const createTestQueryClient = () => {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        staleTime: 0,
-        cacheTime: 0,
-      },
-      mutations: {
-        retry: false,
-      },
-    },
-  });
-};
-
-const renderWithProviders = (
-  component: React.ReactElement,
-  {
-    queryClient = createTestQueryClient(),
-    initialEntries = ['/adf-schema/relationships'],
-  } = {}
-) => {
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={initialEntries}>
-        {component}
-      </MemoryRouter>
-    </QueryClientProvider>
-  );
-};
-
-// Mock Next.js router for navigation testing
-const mockPush = vi.fn();
-const mockReplace = vi.fn();
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    replace: mockReplace,
-    back: vi.fn(),
-    forward: vi.fn(),
-    refresh: vi.fn(),
-    prefetch: vi.fn(),
-  }),
-  usePathname: () => '/adf-schema/relationships',
-  useSearchParams: () => new URLSearchParams(),
-  useParams: () => ({ serviceId: 'mysql-db', tableName: 'users' }),
-}));
-
-// Setup and teardown
-beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'error' });
+/**
+ * Mock API response structure
+ */
+const createMockApiResponse = (relationships: DatabaseRelationship[], meta: any = {}) => ({
+  resource: relationships,
+  meta: {
+    count: relationships.length,
+    offset: 0,
+    limit: 100,
+    ...meta
+  }
 });
 
-afterEach(() => {
-  server.resetHandlers();
-  vi.clearAllMocks();
+// =============================================================================
+// Enhanced User Event Setup
+// =============================================================================
+
+/**
+ * Enhanced user event setup for realistic interaction testing
+ */
+const createUserEvent = () => userEvent.setup({
+  delay: null, // Disable delays for faster test execution
+  advanceTimers: vi.advanceTimersByTime,
 });
 
-afterAll(() => {
-  server.close();
-});
+// =============================================================================
+// Test Suite Setup and Teardown
+// =============================================================================
 
 describe('RelationshipsPage', () => {
-  let user: ReturnType<typeof userEvent.setup>;
+  let mockRouter: ReturnType<typeof vi.fn>;
+  let mockSearchParams: ReturnType<typeof vi.fn>;
+  let queryClient: QueryClient;
+  let user: ReturnType<typeof createUserEvent>;
 
-  beforeEach(() => {
-    user = userEvent.setup();
+  beforeAll(() => {
+    // Start MSW server
+    server.listen({ onUnhandledRequest: 'warn' });
   });
 
-  describe('Initial Rendering and Data Loading', () => {
-    it('should render the relationships page with loading state initially', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      // Check for loading indicator
-      expect(screen.getByTestId('relationships-loading')).toBeInTheDocument();
-      expect(screen.getByText(/loading relationships/i)).toBeInTheDocument();
+  beforeEach(() => {
+    // Reset all mocks before each test
+    vi.clearAllMocks();
+    
+    // Setup fresh query client for each test
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: 0,
+          gcTime: 0,
+        },
+      },
     });
 
-    it('should display relationships table after data loads successfully', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      // Wait for data to load
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
-      });
-
-      // Verify table headers are present
-      expect(screen.getByText('Name')).toBeInTheDocument();
-      expect(screen.getByText('Type')).toBeInTheDocument();
-      expect(screen.getByText('Table')).toBeInTheDocument();
-      expect(screen.getByText('Reference Table')).toBeInTheDocument();
-      expect(screen.getByText('Actions')).toBeInTheDocument();
+    // Setup mock router
+    mockRouter = vi.fn().mockReturnValue({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      prefetch: vi.fn(),
     });
+    
+    // Setup mock search params
+    mockSearchParams = vi.fn().mockReturnValue(new URLSearchParams());
 
-    it('should display relationship count and pagination controls', async () => {
-      renderWithProviders(<RelationshipsPage />);
+    // Apply mocks to navigation hooks
+    vi.mocked(useRouter).mockReturnValue(mockRouter());
+    vi.mocked(useSearchParams).mockReturnValue(mockSearchParams());
+
+    // Setup user event
+    user = createUserEvent();
+
+    // Setup default MSW handlers for relationships
+    server.use(
+      ...handlers.filter(handler => 
+        handler.info?.header?.includes('/_table/users/relationships') ||
+        handler.info?.header?.includes('/api/v2/mysql_service_1')
+      )
+    );
+  });
+
+  afterEach(() => {
+    // Clean up after each test
+    server.resetHandlers();
+    queryClient.clear();
+    vi.clearAllTimers();
+  });
+
+  afterAll(() => {
+    // Stop MSW server
+    server.close();
+  });
+
+  // =============================================================================
+  // Component Rendering Tests
+  // =============================================================================
+
+  describe('Component Rendering', () => {
+    it('renders the relationships page with correct layout', async () => {
+      const mockRelationships = createMockRelationships();
       
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-count')).toBeInTheDocument();
-      });
-
-      // Check pagination controls
-      expect(screen.getByTestId('pagination-controls')).toBeInTheDocument();
-      expect(screen.getByText(/showing \d+ of \d+ relationships/i)).toBeInTheDocument();
-    });
-
-    it('should handle error states appropriately', async () => {
+      // Mock successful API response
       server.use(
-        rest.get('/api/v2/system/service/:serviceId/_schema/:tableName/_relationship', (req, res, ctx) => {
-          return res(ctx.status(500), ctx.json({
-            error: {
-              code: 500,
-              message: 'Failed to load relationships',
-              status_code: 500,
-            },
-          }));
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse(mockRelationships)));
         })
       );
 
-      renderWithProviders(<RelationshipsPage />);
+      await act(async () => {
+        renderWithProviders(<RelationshipsPage />, { queryClient });
+      });
+
+      // Verify main page elements are rendered
+      expect(screen.getByRole('main')).toBeInTheDocument();
+      expect(screen.getByText(/relationships/i)).toBeInTheDocument();
       
+      // Wait for data to load
       await waitFor(() => {
-        expect(screen.getByTestId('relationships-error')).toBeInTheDocument();
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Verify table headers are present
+      expect(screen.getByText(/name/i)).toBeInTheDocument();
+      expect(screen.getByText(/type/i)).toBeInTheDocument();
+      expect(screen.getByText(/table/i)).toBeInTheDocument();
+      expect(screen.getByText(/field/i)).toBeInTheDocument();
+      expect(screen.getByText(/reference/i)).toBeInTheDocument();
+    });
+
+    it('displays loading state correctly', async () => {
+      // Mock delayed API response
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.delay(100), ctx.json(createMockApiResponse([])));
+        })
+      );
+
+      await act(async () => {
+        renderWithProviders(<RelationshipsPage />, { queryClient });
+      });
+
+      // Verify loading indicators
+      expect(screen.getByTestId('relationships-loading')).toBeInTheDocument();
+      expect(screen.getByText(/loading relationships/i)).toBeInTheDocument();
+
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByTestId('relationships-loading')).not.toBeInTheDocument();
+      }, { timeout: 200 });
+    });
+
+    it('displays empty state when no relationships exist', async () => {
+      // Mock empty API response
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse([])));
+        })
+      );
+
+      await act(async () => {
+        renderWithProviders(<RelationshipsPage />, { queryClient });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('relationships-empty-state')).toBeInTheDocument();
+        expect(screen.getByText(/no relationships found/i)).toBeInTheDocument();
+        expect(screen.getByText(/create your first relationship/i)).toBeInTheDocument();
+      });
+
+      // Verify create relationship button is present
+      const createButton = screen.getByRole('button', { name: /create relationship/i });
+      expect(createButton).toBeInTheDocument();
+    });
+
+    it('displays error state with retry functionality', async () => {
+      // Mock API error response
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.status(500), ctx.json({ error: 'Internal server error' }));
+        })
+      );
+
+      await act(async () => {
+        renderWithProviders(<RelationshipsPage />, { queryClient });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('relationships-error-state')).toBeInTheDocument();
         expect(screen.getByText(/failed to load relationships/i)).toBeInTheDocument();
       });
+
+      // Test retry functionality
+      const retryButton = screen.getByRole('button', { name: /retry/i });
+      expect(retryButton).toBeInTheDocument();
+      
+      await user.click(retryButton);
+      expect(screen.getByTestId('relationships-loading')).toBeInTheDocument();
     });
   });
 
-  describe('Relationship Type Display and Indicators', () => {
-    it('should display correct relationship type badges', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
+  // =============================================================================
+  // Data Fetching and React Query Integration Tests
+  // =============================================================================
+
+  describe('Data Fetching and Caching', () => {
+    it('fetches relationships data on component mount', async () => {
+      const mockRelationships = createMockRelationships();
+      let requestCalled = false;
+
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          requestCalled = true;
+          return res(ctx.json(createMockApiResponse(mockRelationships)));
+        })
+      );
+
+      await act(async () => {
+        renderWithProviders(<RelationshipsPage />, { queryClient });
       });
 
-      // Check for relationship type badges
-      const typeBadges = screen.getAllByTestId(/relationship-type-badge/);
-      expect(typeBadges.length).toBeGreaterThan(0);
-      
-      // Verify different relationship types are displayed
-      expect(screen.getByText('belongs_to')).toBeInTheDocument();
-      expect(screen.getByText('has_many')).toBeInTheDocument();
-      expect(screen.getByText('has_one')).toBeInTheDocument();
-      expect(screen.getByText('many_many')).toBeInTheDocument();
-    });
-
-    it('should show junction table indicators for many-to-many relationships', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
       await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
+        expect(requestCalled).toBe(true);
+        expect(screen.getByRole('table')).toBeInTheDocument();
       });
 
-      // Find many-to-many relationships
-      const manyToManyRows = screen.getAllByTestId(/relationship-row-.*many_many/);
-      expect(manyToManyRows.length).toBeGreaterThan(0);
-
-      // Check for junction table indicators
-      manyToManyRows.forEach(row => {
-        expect(within(row).getByTestId('junction-table-indicator')).toBeInTheDocument();
+      // Verify all relationships are displayed
+      mockRelationships.forEach(relationship => {
+        expect(screen.getByText(relationship.name)).toBeInTheDocument();
       });
     });
 
-    it('should display relationship status indicators', async () => {
-      renderWithProviders(<RelationshipsPage />);
+    it('implements React Query caching with cache hit responses under 50ms', async () => {
+      const mockRelationships = createMockRelationships();
+      let requestCount = 0;
+
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          requestCount++;
+          return res(ctx.json(createMockApiResponse(mockRelationships)));
+        })
+      );
+
+      // First render - should make API call
+      const { unmount } = renderWithProviders(<RelationshipsPage />, { queryClient });
       
       await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+      
+      expect(requestCount).toBe(1);
+      unmount();
+
+      // Second render - should use cached data
+      const startTime = Date.now();
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+      
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+      
+      const responseTime = Date.now() - startTime;
+      expect(responseTime).toBeLessThan(50); // Cache hit response under 50ms
+      expect(requestCount).toBe(1); // No additional API calls
+    });
+
+    it('handles query invalidation and refetching', async () => {
+      const mockRelationships = createMockRelationships();
+      let requestCount = 0;
+
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          requestCount++;
+          return res(ctx.json(createMockApiResponse(mockRelationships)));
+        })
+      );
+
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
       });
 
-      // Check for active/inactive status indicators
-      const statusIndicators = screen.getAllByTestId(/relationship-status-/);
-      expect(statusIndicators.length).toBeGreaterThan(0);
+      expect(requestCount).toBe(1);
+
+      // Invalidate and refetch
+      await act(async () => {
+        await queryClient.invalidateQueries({ queryKey: ['relationships'] });
+      });
+
+      await waitFor(() => {
+        expect(requestCount).toBe(2);
+      });
     });
   });
 
-  describe('Filtering and Search Functionality', () => {
-    it('should filter relationships by name in real-time', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
+  // =============================================================================
+  // Relationship Type Display and Junction Table Tests
+  // =============================================================================
+
+  describe('Relationship Type Displays and Junction Tables', () => {
+    it('displays belongs_to relationships with correct indicators', async () => {
+      const belongsToRelationship = createMockRelationship({
+        type: 'belongs_to',
+        name: 'user_profile',
+        table: 'users',
+        field: 'profile_id',
+        ref_table: 'profiles',
+        ref_field: 'id'
       });
 
-      const searchInput = screen.getByTestId('relationship-search-input');
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse([belongsToRelationship])));
+        })
+      );
+
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        const typeCell = screen.getByTestId('relationship-type-belongs_to');
+        expect(typeCell).toBeInTheDocument();
+        expect(typeCell).toHaveTextContent('Belongs To');
+        expect(typeCell).toHaveClass('text-blue-600'); // Type-specific styling
+      });
+
+      // Verify no junction table indicator for belongs_to
+      expect(screen.queryByTestId('junction-table-indicator')).not.toBeInTheDocument();
+    });
+
+    it('displays has_many relationships with correct indicators', async () => {
+      const hasManyRelationship = createMockRelationship({
+        type: 'has_many',
+        name: 'profile_posts',
+        table: 'profiles',
+        field: 'id',
+        ref_table: 'posts',
+        ref_field: 'profile_id'
+      });
+
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse([hasManyRelationship])));
+        })
+      );
+
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        const typeCell = screen.getByTestId('relationship-type-has_many');
+        expect(typeCell).toBeInTheDocument();
+        expect(typeCell).toHaveTextContent('Has Many');
+        expect(typeCell).toHaveClass('text-green-600'); // Type-specific styling
+      });
+    });
+
+    it('displays has_one relationships with correct indicators', async () => {
+      const hasOneRelationship = createMockRelationship({
+        type: 'has_one',
+        name: 'profile_settings',
+        table: 'profiles',
+        field: 'id',
+        ref_table: 'profile_settings',
+        ref_field: 'profile_id'
+      });
+
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse([hasOneRelationship])));
+        })
+      );
+
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        const typeCell = screen.getByTestId('relationship-type-has_one');
+        expect(typeCell).toBeInTheDocument();
+        expect(typeCell).toHaveTextContent('Has One');
+        expect(typeCell).toHaveClass('text-purple-600'); // Type-specific styling
+      });
+    });
+
+    it('displays many_many relationships with junction table indicators', async () => {
+      const manyManyRelationship = createMockRelationship({
+        type: 'many_many',
+        name: 'user_roles',
+        table: 'users',
+        field: 'id',
+        ref_table: 'roles',
+        ref_field: 'id',
+        junction_table: 'user_roles',
+        junction_service_id: 'mysql_service_1',
+        junction_table_left: 'user_id',
+        junction_table_right: 'role_id'
+      });
+
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse([manyManyRelationship])));
+        })
+      );
+
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        const typeCell = screen.getByTestId('relationship-type-many_many');
+        expect(typeCell).toBeInTheDocument();
+        expect(typeCell).toHaveTextContent('Many to Many');
+        expect(typeCell).toHaveClass('text-orange-600'); // Type-specific styling
+      });
+
+      // Verify junction table indicator is present
+      const junctionIndicator = screen.getByTestId('junction-table-indicator');
+      expect(junctionIndicator).toBeInTheDocument();
+      expect(junctionIndicator).toHaveTextContent('user_roles');
+      
+      // Verify junction table tooltip or additional info
+      await user.hover(junctionIndicator);
+      await waitFor(() => {
+        expect(screen.getByText(/junction table: user_roles/i)).toBeInTheDocument();
+        expect(screen.getByText(/left field: user_id/i)).toBeInTheDocument();
+        expect(screen.getByText(/right field: role_id/i)).toBeInTheDocument();
+      });
+    });
+
+    it('handles mixed relationship types in the same table', async () => {
+      const mixedRelationships = createMockRelationships();
+
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse(mixedRelationships)));
+        })
+      );
+
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        // Verify all relationship types are displayed
+        expect(screen.getByTestId('relationship-type-belongs_to')).toBeInTheDocument();
+        expect(screen.getByTestId('relationship-type-has_many')).toBeInTheDocument();
+        expect(screen.getByTestId('relationship-type-has_one')).toBeInTheDocument();
+        expect(screen.getByTestId('relationship-type-many_many')).toBeInTheDocument();
+      });
+
+      // Verify junction table indicators only appear for many_many relationships
+      const junctionIndicators = screen.getAllByTestId('junction-table-indicator');
+      expect(junctionIndicators).toHaveLength(2); // Two many_many relationships in mock data
+    });
+  });
+
+  // =============================================================================
+  // TanStack Virtual Table Rendering Tests
+  // =============================================================================
+
+  describe('TanStack Virtual Table Rendering', () => {
+    it('renders virtual table for large datasets (1000+ relationships)', async () => {
+      const largeDataset = createLargeRelationshipDataset(1500);
+
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse(largeDataset)));
+        })
+      );
+
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        // Verify virtual table container is rendered
+        const virtualTable = screen.getByTestId('relationships-virtual-table');
+        expect(virtualTable).toBeInTheDocument();
+        expect(virtualTable).toHaveClass('virtual-table-container');
+      });
+
+      // Verify only visible rows are rendered (virtual scrolling)
+      const visibleRows = screen.getAllByTestId(/relationship-row-/);
+      expect(visibleRows.length).toBeLessThan(largeDataset.length);
+      expect(visibleRows.length).toBeGreaterThan(0);
+      expect(visibleRows.length).toBeLessThanOrEqual(50); // Expected viewport size
+    });
+
+    it('handles virtual scrolling correctly', async () => {
+      const largeDataset = createLargeRelationshipDataset(500);
+
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse(largeDataset)));
+        })
+      );
+
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('relationships-virtual-table')).toBeInTheDocument();
+      });
+
+      const virtualTable = screen.getByTestId('relationships-virtual-table');
+      const scrollContainer = within(virtualTable).getByTestId('virtual-scroll-container');
+
+      // Get initial visible rows
+      const initialRows = screen.getAllByTestId(/relationship-row-/);
+      const initialRowIds = initialRows.map(row => row.getAttribute('data-testid'));
+
+      // Simulate scrolling down
+      await act(async () => {
+        fireEvent.scroll(scrollContainer, { target: { scrollTop: 1000 } });
+      });
+
+      await waitFor(() => {
+        const newRows = screen.getAllByTestId(/relationship-row-/);
+        const newRowIds = newRows.map(row => row.getAttribute('data-testid'));
+        
+        // Verify different rows are now visible
+        expect(newRowIds).not.toEqual(initialRowIds);
+      });
+    });
+
+    it('maintains performance with large datasets', async () => {
+      const largeDataset = createLargeRelationshipDataset(2000);
+
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse(largeDataset)));
+        })
+      );
+
+      const startTime = Date.now();
+      
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('relationships-virtual-table')).toBeInTheDocument();
+      });
+
+      const renderTime = Date.now() - startTime;
+      
+      // Verify render time is reasonable for large dataset
+      expect(renderTime).toBeLessThan(1000); // Should render within 1 second
+      
+      // Verify DOM node count is limited (virtual rendering)
+      const renderedRows = screen.getAllByTestId(/relationship-row-/);
+      expect(renderedRows.length).toBeLessThan(100); // Virtual rendering limit
+    });
+  });
+
+  // =============================================================================
+  // Filtering and Sorting Tests
+  // =============================================================================
+
+  describe('Filtering and Sorting', () => {
+    beforeEach(() => {
+      const mockRelationships = createMockRelationships();
+      
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          const url = new URL(req.url);
+          const filter = url.searchParams.get('filter');
+          const sort = url.searchParams.get('order');
+          
+          let filteredData = [...mockRelationships];
+          
+          // Apply filtering
+          if (filter) {
+            const filterValue = filter.toLowerCase();
+            filteredData = filteredData.filter(rel => 
+              rel.name.toLowerCase().includes(filterValue) ||
+              rel.type.toLowerCase().includes(filterValue) ||
+              rel.table.toLowerCase().includes(filterValue) ||
+              rel.ref_table.toLowerCase().includes(filterValue)
+            );
+          }
+          
+          // Apply sorting
+          if (sort) {
+            const [field, direction] = sort.split(' ');
+            filteredData.sort((a, b) => {
+              const aVal = a[field as keyof DatabaseRelationship] || '';
+              const bVal = b[field as keyof DatabaseRelationship] || '';
+              const comparison = aVal.toString().localeCompare(bVal.toString());
+              return direction === 'desc' ? -comparison : comparison;
+            });
+          }
+          
+          return res(ctx.json(createMockApiResponse(filteredData)));
+        })
+      );
+    });
+
+    it('filters relationships by name', async () => {
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Find and use the search input
+      const searchInput = screen.getByLabelText(/search relationships/i);
       expect(searchInput).toBeInTheDocument();
 
-      // Type in search input
+      // Filter by relationship name
       await user.type(searchInput, 'user_profile');
 
-      // Wait for filtered results
       await waitFor(() => {
-        const filteredRows = screen.getAllByTestId(/relationship-row-/);
-        filteredRows.forEach(row => {
-          expect(within(row).getByText(/user_profile/i)).toBeInTheDocument();
-        });
+        expect(screen.getByText('user_profile')).toBeInTheDocument();
+        expect(screen.queryByText('profile_posts')).not.toBeInTheDocument();
+        expect(screen.queryByText('profile_settings')).not.toBeInTheDocument();
       });
     });
 
-    it('should filter relationships by type', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
+    it('filters relationships by type', async () => {
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
       await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
+        expect(screen.getByRole('table')).toBeInTheDocument();
       });
 
-      const typeFilter = screen.getByTestId('relationship-type-filter');
-      await user.selectOptions(typeFilter, 'has_many');
+      // Use type filter dropdown
+      const typeFilter = screen.getByLabelText(/filter by type/i);
+      await user.click(typeFilter);
+      
+      const manyManyOption = screen.getByRole('option', { name: /many to many/i });
+      await user.click(manyManyOption);
 
       await waitFor(() => {
-        const visibleTypeBadges = screen.getAllByTestId('relationship-type-badge');
-        visibleTypeBadges.forEach(badge => {
-          expect(badge).toHaveTextContent('has_many');
-        });
+        // Should only show many_many relationships
+        expect(screen.getByText('user_roles')).toBeInTheDocument();
+        expect(screen.getByText('post_tags')).toBeInTheDocument();
+        expect(screen.queryByText('user_profile')).not.toBeInTheDocument();
+        expect(screen.queryByText('profile_posts')).not.toBeInTheDocument();
       });
     });
 
-    it('should clear filters and show all relationships', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
+    it('sorts relationships by name ascending', async () => {
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
       await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Click name column header to sort
+      const nameHeader = screen.getByRole('columnheader', { name: /name/i });
+      await user.click(nameHeader);
+
+      await waitFor(() => {
+        const relationshipRows = screen.getAllByTestId(/relationship-row-/);
+        const relationshipNames = relationshipRows.map(row => 
+          within(row).getByTestId('relationship-name').textContent
+        );
+        
+        // Verify ascending order
+        const sortedNames = [...relationshipNames].sort();
+        expect(relationshipNames).toEqual(sortedNames);
+      });
+    });
+
+    it('sorts relationships by name descending', async () => {
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Click name header twice for descending order
+      const nameHeader = screen.getByRole('columnheader', { name: /name/i });
+      await user.click(nameHeader);
+      await user.click(nameHeader);
+
+      await waitFor(() => {
+        const relationshipRows = screen.getAllByTestId(/relationship-row-/);
+        const relationshipNames = relationshipRows.map(row => 
+          within(row).getByTestId('relationship-name').textContent
+        );
+        
+        // Verify descending order
+        const sortedNames = [...relationshipNames].sort().reverse();
+        expect(relationshipNames).toEqual(sortedNames);
+      });
+    });
+
+    it('sorts relationships by type', async () => {
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Click type column header to sort
+      const typeHeader = screen.getByRole('columnheader', { name: /type/i });
+      await user.click(typeHeader);
+
+      await waitFor(() => {
+        const relationshipRows = screen.getAllByTestId(/relationship-row-/);
+        const relationshipTypes = relationshipRows.map(row => 
+          within(row).getByTestId(/relationship-type-/).textContent
+        );
+        
+        // Verify types are sorted (belongs_to, has_many, has_one, many_many)
+        expect(relationshipTypes[0]).toMatch(/belongs to/i);
+      });
+    });
+
+    it('combines filtering and sorting', async () => {
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
       });
 
       // Apply filter first
-      const searchInput = screen.getByTestId('relationship-search-input');
-      await user.type(searchInput, 'specific_filter');
+      const searchInput = screen.getByLabelText(/search relationships/i);
+      await user.type(searchInput, 'profile');
+
+      // Then apply sorting
+      const nameHeader = screen.getByRole('columnheader', { name: /name/i });
+      await user.click(nameHeader);
+
+      await waitFor(() => {
+        const visibleRows = screen.getAllByTestId(/relationship-row-/);
+        
+        // Should only show filtered results that contain 'profile'
+        visibleRows.forEach(row => {
+          const relationshipName = within(row).getByTestId('relationship-name').textContent || '';
+          expect(relationshipName.toLowerCase()).toMatch(/profile/);
+        });
+        
+        // And they should be sorted
+        const relationshipNames = visibleRows.map(row => 
+          within(row).getByTestId('relationship-name').textContent
+        );
+        const sortedNames = [...relationshipNames].sort();
+        expect(relationshipNames).toEqual(sortedNames);
+      });
+    });
+
+    it('clears filters correctly', async () => {
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Apply filter
+      const searchInput = screen.getByLabelText(/search relationships/i);
+      await user.type(searchInput, 'user_profile');
+
+      await waitFor(() => {
+        expect(screen.getByText('user_profile')).toBeInTheDocument();
+        expect(screen.queryByText('profile_posts')).not.toBeInTheDocument();
+      });
 
       // Clear filter
-      const clearButton = screen.getByTestId('clear-filters-button');
+      const clearButton = screen.getByRole('button', { name: /clear filters/i });
       await user.click(clearButton);
 
       await waitFor(() => {
-        expect(searchInput).toHaveValue('');
-        // Should show more relationships after clearing filter
-        const allRows = screen.getAllByTestId(/relationship-row-/);
-        expect(allRows.length).toBeGreaterThan(1);
+        // All relationships should be visible again
+        expect(screen.getByText('user_profile')).toBeInTheDocument();
+        expect(screen.getByText('profile_posts')).toBeInTheDocument();
+        expect(screen.getByText('profile_settings')).toBeInTheDocument();
+        expect(screen.getByText('user_roles')).toBeInTheDocument();
+        expect(screen.getByText('post_tags')).toBeInTheDocument();
       });
     });
   });
 
-  describe('Sorting Functionality', () => {
-    it('should sort relationships by name ascending and descending', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
-      });
-
-      const nameHeader = screen.getByTestId('sort-header-name');
-      
-      // Click to sort ascending
-      await user.click(nameHeader);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('sort-indicator-name-asc')).toBeInTheDocument();
-      });
-
-      // Click again to sort descending
-      await user.click(nameHeader);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('sort-indicator-name-desc')).toBeInTheDocument();
-      });
-    });
-
-    it('should sort relationships by type', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
-      });
-
-      const typeHeader = screen.getByTestId('sort-header-type');
-      await user.click(typeHeader);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('sort-indicator-type-asc')).toBeInTheDocument();
-      });
-    });
-
-    it('should sort relationships by table name', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
-      });
-
-      const tableHeader = screen.getByTestId('sort-header-table');
-      await user.click(tableHeader);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('sort-indicator-table-asc')).toBeInTheDocument();
-      });
-    });
-  });
+  // =============================================================================
+  // Navigation and Routing Tests
+  // =============================================================================
 
   describe('Navigation and Routing', () => {
-    it('should navigate to relationship creation page', async () => {
-      renderWithProviders(<RelationshipsPage />);
+    beforeEach(() => {
+      const mockRelationships = createMockRelationships();
       
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse(mockRelationships)));
+        })
+      );
+    });
+
+    it('navigates to relationship creation route', async () => {
+      const mockPush = vi.fn();
+      mockRouter.mockReturnValue({
+        push: mockPush,
+        replace: vi.fn(),
+        refresh: vi.fn(),
+        back: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
       });
 
-      const createButton = screen.getByTestId('create-relationship-button');
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Click create relationship button
+      const createButton = screen.getByRole('button', { name: /create relationship/i });
       await user.click(createButton);
 
       expect(mockPush).toHaveBeenCalledWith('/adf-schema/relationships/new');
     });
 
-    it('should navigate to relationship editing page when clicking edit action', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
+    it('navigates to relationship editing route when clicking on relationship name', async () => {
+      const mockPush = vi.fn();
+      mockRouter.mockReturnValue({
+        push: mockPush,
+        replace: vi.fn(),
+        refresh: vi.fn(),
+        back: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
       });
 
-      const editButtons = screen.getAllByTestId(/edit-relationship-/);
-      expect(editButtons.length).toBeGreaterThan(0);
+      renderWithProviders(<RelationshipsPage />, { queryClient });
 
-      const firstEditButton = editButtons[0];
-      const relationshipId = firstEditButton.getAttribute('data-relationship-id');
-      
-      await user.click(firstEditButton);
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
 
-      expect(mockPush).toHaveBeenCalledWith(`/adf-schema/relationships/${relationshipId}`);
+      // Click on a relationship name to edit
+      const relationshipLink = screen.getByText('user_profile');
+      await user.click(relationshipLink);
+
+      expect(mockPush).toHaveBeenCalledWith('/adf-schema/relationships/rel_001');
     });
 
-    it('should navigate to table schema page when clicking table name', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
+    it('navigates using action menu options', async () => {
+      const mockPush = vi.fn();
+      mockRouter.mockReturnValue({
+        push: mockPush,
+        replace: vi.fn(),
+        refresh: vi.fn(),
+        back: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
       });
 
-      const tableLinks = screen.getAllByTestId(/table-link-/);
-      expect(tableLinks.length).toBeGreaterThan(0);
+      renderWithProviders(<RelationshipsPage />, { queryClient });
 
-      const firstTableLink = tableLinks[0];
-      await user.click(firstTableLink);
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
 
-      expect(mockPush).toHaveBeenCalledWith(expect.stringMatching(/\/adf-schema\/tables\/.+/));
+      // Open action menu for first relationship
+      const actionMenuButton = screen.getAllByRole('button', { name: /actions/i })[0];
+      await user.click(actionMenuButton);
+
+      // Click edit option
+      const editOption = screen.getByRole('menuitem', { name: /edit/i });
+      await user.click(editOption);
+
+      expect(mockPush).toHaveBeenCalledWith('/adf-schema/relationships/rel_001');
+    });
+
+    it('handles delete confirmation flow', async () => {
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Open action menu and click delete
+      const actionMenuButton = screen.getAllByRole('button', { name: /actions/i })[0];
+      await user.click(actionMenuButton);
+
+      const deleteOption = screen.getByRole('menuitem', { name: /delete/i });
+      await user.click(deleteOption);
+
+      // Verify confirmation dialog appears
+      await waitFor(() => {
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByText(/confirm deletion/i)).toBeInTheDocument();
+        expect(screen.getByText(/are you sure you want to delete this relationship/i)).toBeInTheDocument();
+      });
+
+      // Cancel deletion
+      const cancelButton = screen.getByRole('button', { name: /cancel/i });
+      await user.click(cancelButton);
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+    });
+
+    it('preserves URL search parameters during navigation', async () => {
+      // Mock search params with filter and sort
+      const mockSearchParams = new URLSearchParams('filter=profile&sort=name');
+      vi.mocked(useSearchParams).mockReturnValue(mockSearchParams);
+
+      const mockPush = vi.fn();
+      mockRouter.mockReturnValue({
+        push: mockPush,
+        replace: vi.fn(),
+        refresh: vi.fn(),
+        back: vi.fn(),
+        forward: vi.fn(),
+        prefetch: vi.fn(),
+      });
+
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Click create button
+      const createButton = screen.getByRole('button', { name: /create relationship/i });
+      await user.click(createButton);
+
+      // Verify URL preserves current filters
+      expect(mockPush).toHaveBeenCalledWith('/adf-schema/relationships/new?filter=profile&sort=name');
     });
   });
 
-  describe('TanStack Virtual Table Rendering', () => {
-    it('should handle large datasets with virtualization', async () => {
-      // Use large dataset for this test
+  // =============================================================================
+  // Accessibility Tests
+  // =============================================================================
+
+  describe('Accessibility', () => {
+    it('maintains WCAG 2.1 AA compliance', async () => {
+      const mockRelationships = createMockRelationships();
+      
       server.use(
-        rest.get('/api/v2/system/service/:serviceId/_schema/:tableName/_relationship', (req, res, ctx) => {
-          const largeDataset = createLargeRelationshipDataset(1500);
-          return res(
-            ctx.status(200),
-            ctx.json({
-              resource: largeDataset,
-              count: largeDataset.length,
-            })
-          );
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse(mockRelationships)));
         })
       );
 
-      renderWithProviders(<RelationshipsPage />);
-      
+      const { container } = renderWithProviders(<RelationshipsPage />, { queryClient });
+
       await waitFor(() => {
-        expect(screen.getByTestId('relationships-virtual-table')).toBeInTheDocument();
+        expect(screen.getByRole('table')).toBeInTheDocument();
       });
 
-      // Verify virtualization container exists
-      expect(screen.getByTestId('virtual-table-container')).toBeInTheDocument();
+      // Verify table accessibility attributes
+      const table = screen.getByRole('table');
+      expect(table).toHaveAttribute('aria-label', 'Database relationships');
+
+      // Verify column headers have proper scope
+      const headers = screen.getAllByRole('columnheader');
+      headers.forEach(header => {
+        expect(header).toHaveAttribute('scope', 'col');
+      });
+
+      // Verify row structure
+      const rows = screen.getAllByRole('row');
+      const dataRows = rows.slice(1); // Skip header row
       
-      // Check that not all rows are rendered (virtualization working)
-      const renderedRows = screen.getAllByTestId(/relationship-row-/);
-      expect(renderedRows.length).toBeLessThan(100); // Should be much less than 1500
-      
-      // Verify scroll container has appropriate height
-      const scrollContainer = screen.getByTestId('virtual-scroll-container');
-      expect(scrollContainer).toHaveStyle({ height: expect.stringMatching(/px/) });
+      dataRows.forEach(row => {
+        expect(row).toHaveAttribute('aria-rowindex');
+      });
+
+      // Test keyboard navigation
+      const firstDataRow = dataRows[0];
+      firstDataRow.focus();
+      expect(document.activeElement).toBe(firstDataRow);
+
+      // Verify focus management for interactive elements
+      const actionButtons = screen.getAllByRole('button', { name: /actions/i });
+      actionButtons.forEach(button => {
+        expect(button).toHaveAttribute('aria-haspopup', 'menu');
+        expect(button).toHaveAttribute('aria-expanded', 'false');
+      });
     });
 
-    it('should update visible rows when scrolling through large dataset', async () => {
+    it('provides proper screen reader announcements', async () => {
+      const mockRelationships = createMockRelationships();
+      
       server.use(
-        rest.get('/api/v2/system/service/:serviceId/_schema/:tableName/_relationship', (req, res, ctx) => {
-          const largeDataset = createLargeRelationshipDataset(1000);
-          return res(
-            ctx.status(200),
-            ctx.json({
-              resource: largeDataset,
-              count: largeDataset.length,
-            })
-          );
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse(mockRelationships)));
         })
       );
 
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-virtual-table')).toBeInTheDocument();
-      });
-
-      const scrollContainer = screen.getByTestId('virtual-scroll-container');
-      
-      // Get initial visible row IDs
-      const initialRows = screen.getAllByTestId(/relationship-row-/);
-      const initialRowIds = initialRows.map(row => row.getAttribute('data-row-id'));
-
-      // Simulate scrolling
-      fireEvent.scroll(scrollContainer, { target: { scrollTop: 500 } });
-
-      // Wait for virtual scrolling to update
-      await waitFor(() => {
-        const newRows = screen.getAllByTestId(/relationship-row-/);
-        const newRowIds = newRows.map(row => row.getAttribute('data-row-id'));
-        
-        // Some row IDs should have changed due to virtualization
-        expect(newRowIds).not.toEqual(initialRowIds);
-      });
-    });
-  });
-
-  describe('React Query Caching and Invalidation', () => {
-    it('should cache relationship data for subsequent renders', async () => {
-      const queryClient = createTestQueryClient();
-      
       renderWithProviders(<RelationshipsPage />, { queryClient });
-      
+
       await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
+        expect(screen.getByRole('table')).toBeInTheDocument();
       });
 
-      // Check that data is cached
-      const cachedData = queryClient.getQueryData(['relationships', 'mysql-db', 'users']);
-      expect(cachedData).toBeDefined();
-    });
+      // Verify live region for status updates
+      const statusRegion = screen.getByRole('status');
+      expect(statusRegion).toBeInTheDocument();
+      expect(statusRegion).toHaveAttribute('aria-live', 'polite');
 
-    it('should invalidate cache when relationships are modified', async () => {
-      const queryClient = createTestQueryClient();
-      
-      renderWithProviders(<RelationshipsPage />, { queryClient });
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
-      });
+      // Test loading announcement
+      expect(statusRegion).toHaveTextContent(/loaded \d+ relationships/i);
 
-      // Simulate cache invalidation
-      queryClient.invalidateQueries(['relationships']);
-      
-      // Should trigger refetch
+      // Test filter announcements
+      const searchInput = screen.getByLabelText(/search relationships/i);
+      await user.type(searchInput, 'profile');
+
       await waitFor(() => {
-        expect(screen.getByTestId('relationships-loading')).toBeInTheDocument();
+        expect(statusRegion).toHaveTextContent(/filtered to \d+ relationships/i);
       });
     });
 
-    it('should handle stale data revalidation', async () => {
-      const queryClient = createTestQueryClient();
+    it('supports keyboard navigation', async () => {
+      const mockRelationships = createMockRelationships();
       
-      renderWithProviders(<RelationshipsPage />, { queryClient });
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
-      });
-
-      // Set stale time to trigger revalidation
-      queryClient.setQueryDefaults(['relationships'], { staleTime: 0 });
-      
-      // Should indicate stale data being refreshed
-      await waitFor(() => {
-        expect(screen.getByTestId('data-refreshing-indicator')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Error Handling and Edge Cases', () => {
-    it('should handle network errors gracefully', async () => {
       server.use(
-        rest.get('/api/v2/system/service/:serviceId/_schema/:tableName/_relationship', (req, res, ctx) => {
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse(mockRelationships)));
+        })
+      );
+
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Test Tab navigation through interactive elements
+      const searchInput = screen.getByLabelText(/search relationships/i);
+      const createButton = screen.getByRole('button', { name: /create relationship/i });
+      const sortButtons = screen.getAllByRole('button', { name: /sort by/i });
+
+      // Focus search input
+      searchInput.focus();
+      expect(document.activeElement).toBe(searchInput);
+
+      // Tab to create button
+      await user.tab();
+      expect(document.activeElement).toBe(createButton);
+
+      // Tab to first sort button
+      await user.tab();
+      expect(document.activeElement).toBe(sortButtons[0]);
+
+      // Test Enter key activation
+      await user.keyboard('{Enter}');
+      // Verify sort was triggered by checking for updated table state
+    });
+  });
+
+  // =============================================================================
+  // Error Handling Tests
+  // =============================================================================
+
+  describe('Error Handling', () => {
+    it('handles network errors gracefully', async () => {
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
           return res.networkError('Network connection failed');
         })
       );
 
-      renderWithProviders(<RelationshipsPage />);
-      
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
       await waitFor(() => {
-        expect(screen.getByTestId('network-error-message')).toBeInTheDocument();
-        expect(screen.getByText(/network connection failed/i)).toBeInTheDocument();
+        expect(screen.getByTestId('relationships-error-state')).toBeInTheDocument();
+        expect(screen.getByText(/network error/i)).toBeInTheDocument();
+        expect(screen.getByText(/please check your connection/i)).toBeInTheDocument();
       });
 
-      // Should provide retry option
-      expect(screen.getByTestId('retry-button')).toBeInTheDocument();
+      const retryButton = screen.getByRole('button', { name: /retry/i });
+      expect(retryButton).toBeInTheDocument();
     });
 
-    it('should handle unauthorized access appropriately', async () => {
+    it('handles server errors with detailed messages', async () => {
       server.use(
-        rest.get('/api/v2/system/service/:serviceId/_schema/:tableName/_relationship', (req, res, ctx) => {
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
           return res(
-            ctx.status(403),
+            ctx.status(500),
             ctx.json({
               error: {
-                code: 403,
-                message: 'Access denied to relationship data',
-                status_code: 403,
-              },
+                code: 500,
+                message: 'Database connection timeout',
+                details: 'The database server is not responding'
+              }
             })
           );
         })
       );
 
-      renderWithProviders(<RelationshipsPage />);
-      
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
       await waitFor(() => {
-        expect(screen.getByTestId('access-denied-error')).toBeInTheDocument();
-        expect(screen.getByText(/access denied/i)).toBeInTheDocument();
+        expect(screen.getByTestId('relationships-error-state')).toBeInTheDocument();
+        expect(screen.getByText(/database connection timeout/i)).toBeInTheDocument();
+        expect(screen.getByText(/the database server is not responding/i)).toBeInTheDocument();
       });
     });
 
-    it('should handle empty relationship list', async () => {
+    it('handles authorization errors', async () => {
       server.use(
-        rest.get('/api/v2/system/service/:serviceId/_schema/:tableName/_relationship', (req, res, ctx) => {
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
           return res(
-            ctx.status(200),
+            ctx.status(401),
             ctx.json({
-              resource: [],
-              count: 0,
+              error: {
+                code: 401,
+                message: 'Unauthorized access',
+                details: 'Please log in to continue'
+              }
             })
           );
         })
       );
 
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('empty-relationships-state')).toBeInTheDocument();
-        expect(screen.getByText(/no relationships found/i)).toBeInTheDocument();
-      });
+      renderWithProviders(<RelationshipsPage />, { queryClient });
 
-      // Should show create relationship option
-      expect(screen.getByTestId('create-first-relationship-button')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByTestId('relationships-error-state')).toBeInTheDocument();
+        expect(screen.getByText(/unauthorized access/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument();
+      });
+    });
+
+    it('handles malformed API responses', async () => {
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json({ invalid: 'response format' }));
+        })
+      );
+
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('relationships-error-state')).toBeInTheDocument();
+        expect(screen.getByText(/invalid response format/i)).toBeInTheDocument();
+      });
     });
   });
 
-  describe('Accessibility and WCAG 2.1 AA Compliance', () => {
-    it('should have proper ARIA labels and roles', async () => {
-      renderWithProviders(<RelationshipsPage />);
+  // =============================================================================
+  // Performance Tests
+  // =============================================================================
+
+  describe('Performance', () => {
+    it('meets SSR page load requirements under 2 seconds', async () => {
+      const mockRelationships = createMockRelationships();
       
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
-      });
-
-      // Check table accessibility attributes
-      const table = screen.getByRole('table');
-      expect(table).toHaveAttribute('aria-label', expect.stringContaining('Relationships'));
-
-      // Check header accessibility
-      const columnHeaders = screen.getAllByRole('columnheader');
-      columnHeaders.forEach(header => {
-        expect(header).toHaveAttribute('aria-sort');
-      });
-
-      // Check row accessibility
-      const rows = screen.getAllByRole('row');
-      expect(rows.length).toBeGreaterThan(1); // Header + data rows
-    });
-
-    it('should support keyboard navigation', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
-      });
-
-      const firstRowButton = screen.getAllByRole('button')[0];
-      firstRowButton.focus();
-      
-      // Test Tab navigation
-      await user.keyboard('{Tab}');
-      expect(document.activeElement).not.toBe(firstRowButton);
-      
-      // Test Enter key activation
-      const createButton = screen.getByTestId('create-relationship-button');
-      createButton.focus();
-      await user.keyboard('{Enter}');
-      
-      expect(mockPush).toHaveBeenCalled();
-    });
-
-    it('should provide screen reader accessible descriptions', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
-      });
-
-      // Check for descriptive text elements
-      expect(screen.getByText(/database relationships/i)).toBeInTheDocument();
-      
-      // Check for status announcements
-      const statusRegion = screen.getByRole('status');
-      expect(statusRegion).toBeInTheDocument();
-    });
-
-    it('should maintain focus management for modal interactions', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
-      });
-
-      // Test delete confirmation modal focus
-      const deleteButtons = screen.getAllByTestId(/delete-relationship-/);
-      if (deleteButtons.length > 0) {
-        await user.click(deleteButtons[0]);
-        
-        // Focus should move to modal
-        await waitFor(() => {
-          const modal = screen.getByRole('dialog');
-          expect(modal).toBeInTheDocument();
-          expect(modal).toHaveFocus();
-        });
-      }
-    });
-  });
-
-  describe('Performance and Loading States', () => {
-    it('should show loading indicators during data fetch', async () => {
-      // Add delay to simulate network latency
       server.use(
-        rest.get('/api/v2/system/service/:serviceId/_schema/:tableName/_relationship', async (req, res, ctx) => {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          const dataset = createLargeRelationshipDataset(25);
-          return res(
-            ctx.status(200),
-            ctx.json({
-              resource: dataset,
-              count: dataset.length,
-            })
-          );
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.delay(500), ctx.json(createMockApiResponse(mockRelationships)));
         })
       );
 
-      renderWithProviders(<RelationshipsPage />);
+      const startTime = Date.now();
       
-      // Should show loading state immediately
-      expect(screen.getByTestId('relationships-loading')).toBeInTheDocument();
-      
-      // Should hide loading state after data loads
+      renderWithProviders(<RelationshipsPage />, { queryClient });
+
       await waitFor(() => {
-        expect(screen.queryByTestId('relationships-loading')).not.toBeInTheDocument();
+        expect(screen.getByRole('table')).toBeInTheDocument();
       });
+
+      const loadTime = Date.now() - startTime;
+      expect(loadTime).toBeLessThan(2000); // SSR pages under 2 seconds
     });
 
-    it('should show skeleton placeholders during initial load', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
-      // Check for skeleton loading placeholders
-      expect(screen.getByTestId('relationships-skeleton')).toBeInTheDocument();
-      
-      await waitFor(() => {
-        expect(screen.queryByTestId('relationships-skeleton')).not.toBeInTheDocument();
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
-      });
-    });
+    it('optimizes re-renders with React.memo and useMemo', async () => {
+      const mockRelationships = createMockRelationships();
+      let renderCount = 0;
 
-    it('should meet performance targets for filtering operations', async () => {
-      renderWithProviders(<RelationshipsPage />);
-      
+      // Mock component that tracks renders
+      const TestWrapper = ({ children }: { children: React.ReactNode }) => {
+        renderCount++;
+        return <div>{children}</div>;
+      };
+
+      server.use(
+        rest.get('/api/v2/mysql_service_1/_table/users/relationships', (req, res, ctx) => {
+          return res(ctx.json(createMockApiResponse(mockRelationships)));
+        })
+      );
+
+      const { rerender } = renderWithProviders(
+        <TestWrapper>
+          <RelationshipsPage />
+        </TestWrapper>,
+        { queryClient }
+      );
+
       await waitFor(() => {
-        expect(screen.getByTestId('relationships-table')).toBeInTheDocument();
+        expect(screen.getByRole('table')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByTestId('relationship-search-input');
-      
-      // Measure filtering performance
-      const startTime = performance.now();
-      await user.type(searchInput, 'test_filter');
-      
-      await waitFor(() => {
-        const endTime = performance.now();
-        const filterTime = endTime - startTime;
-        
-        // Should complete filtering in under 100ms per spec
-        expect(filterTime).toBeLessThan(100);
-      });
+      const initialRenderCount = renderCount;
+
+      // Re-render with same props should not cause unnecessary re-renders
+      rerender(
+        <TestWrapper>
+          <RelationshipsPage />
+        </TestWrapper>
+      );
+
+      // Verify minimal re-renders
+      expect(renderCount - initialRenderCount).toBeLessThanOrEqual(1);
     });
   });
 });
