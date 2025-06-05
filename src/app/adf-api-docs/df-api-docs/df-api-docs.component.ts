@@ -108,12 +108,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   healthError: string | null = null;
   serviceName: string | null = null;
   showUnhealthyErrorDetails = false;
-  private static SUPPORTED_SERVICE_TYPE_GROUPS = [
-    'Database',
-    'File',
-    'User',
-    'System',
-  ];
+  private static SUPPORTED_SERVICE_TYPE_GROUPS = ['Database', 'File'];
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -279,7 +274,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
           if (!Object.prototype.hasOwnProperty.call(methods, method)) {
             continue;
           }
-
           if (method.toLowerCase() === 'get') {
             const operation = methods[method];
             const parameters: Array<{
@@ -289,21 +283,12 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
             }> = operation.parameters || [];
 
             const hasPathParameters = path.includes('{');
+
             const hasRequiredQueryParameters = parameters.some(
               param => param && param.in === 'query' && param.required === true
             );
 
-            const isSystemServiceRelatedPath =
-              (path.includes('/admin') || path.includes('/service_report')) &&
-              this.apiDocJson.info.group === 'System';
-
-            const isNonRootAdmin = !this.userDataService.userData?.isRootAdmin;
-
-            if (
-              !hasPathParameters &&
-              !hasRequiredQueryParameters &&
-              !(isNonRootAdmin && isSystemServiceRelatedPath)
-            ) {
+            if (!hasPathParameters && !hasRequiredQueryParameters) {
               endpointsToValidate.push(path);
             }
           }
