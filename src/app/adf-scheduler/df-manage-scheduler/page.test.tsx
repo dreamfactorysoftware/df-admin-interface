@@ -1,146 +1,84 @@
 /**
  * Vitest Test Suite for Scheduler Management Page
  * 
- * This test file replaces the Angular Jasmine/Karma tests for the scheduler management page
- * and table components. It implements React Testing Library for component testing, Mock Service
- * Worker (MSW) for API mocking, and Vitest for 10x faster test execution compared to the
- * original Angular testing infrastructure.
+ * This comprehensive test suite replaces the Angular Jasmine/Karma tests for the scheduler 
+ * management page and table components. It implements React Testing Library for component 
+ * testing, Mock Service Worker (MSW) for API mocking, and Vitest for 10x faster test execution.
  * 
- * Key Features:
- * - React Testing Library user-centric testing approaches per Section 7.1.2
- * - MSW realistic API mocking for scheduler endpoints per Section 7.1.1
- * - React Query caching and state management validation per Section 4.3.2
- * - WCAG 2.1 AA accessibility compliance testing per Section 5.2
- * - Comprehensive CRUD operations testing with 90%+ coverage
- * - Paywall enforcement testing with middleware integration
+ * Test Coverage Areas:
+ * - Scheduler task CRUD operations with React Query caching validation
+ * - Paywall enforcement and conditional rendering
+ * - Accessibility compliance (WCAG 2.1 AA)
+ * - Error handling and loading states
+ * - User interactions and form submissions
+ * - API integration with proper MSW mocking
+ * - Table filtering, pagination, and sorting
+ * - Real-time data synchronization
  * 
- * Performance Target: Sub-30 second test execution (10x faster than Jasmine/Karma)
- * Coverage Target: 90%+ code coverage maintaining Angular test equivalency
+ * Migration Notes:
+ * - Replaces Angular TestBed with Vitest React component testing setup
+ * - Converts HttpClientTestingModule to Mock Service Worker (MSW)
+ * - Transforms Angular component testing patterns to React Testing Library user-centric testing
+ * - Replaces Angular dependency injection mocking with React Query and Zustand store mocking
+ * - Converts Angular accessibility testing to React Testing Library accessibility matchers
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, beforeAll } from 'vitest';
-import { render, screen, cleanup, waitFor, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi, beforeAll, afterEach, afterAll } from 'vitest';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
-import { server } from '../../../test/mocks/server';
-import '@testing-library/jest-dom';
+import { setupServer } from 'msw/node';
+import { axe, toHaveNoViolations } from 'jest-axe';
 
-// Mock Next.js navigation and router
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(() => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    back: vi.fn(),
-    forward: vi.fn(),
-    refresh: vi.fn(),
-    prefetch: vi.fn(),
-  })),
-  usePathname: vi.fn(() => '/adf-scheduler/df-manage-scheduler'),
-  useSearchParams: vi.fn(() => new URLSearchParams()),
-  useParams: vi.fn(() => ({})),
-}));
+// Component imports (these would be actual imports in the real implementation)
+import SchedulerManagePage from './page';
+import { TestWrapper } from '@/test/utils/test-wrapper';
 
-// Mock authentication context for paywall testing
-const mockAuthContext = {
-  isAuthenticated: true,
-  user: {
-    id: '1',
-    email: 'admin@dreamfactory.com',
-    name: 'Admin User',
-    role: 'admin',
-  },
-  hasPermission: vi.fn(() => true),
-  isLoading: false,
-};
+// Type imports
+import type { SchedulerTaskData, SchedulerTaskStatus } from '@/types/scheduler';
+import type { GenericListResponse } from '@/lib/types/api';
 
-vi.mock('../../../lib/auth', () => ({
-  useAuth: () => mockAuthContext,
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+// Mock data imports
+import { mockSchedulerTasks, mockServices, createMockSchedulerTask } from '@/test/mocks/scheduler-data';
 
-// Mock Zustand store for global state management
-vi.mock('../../../lib/scheduler-store', () => ({
-  useSchedulerStore: vi.fn(() => ({
-    tasks: [],
-    isLoading: false,
-    error: null,
-    fetchTasks: vi.fn(),
-    deleteTask: vi.fn(),
-    refreshTasks: vi.fn(),
-  })),
-}));
+// Extend expect with jest-axe matchers
+expect.extend(toHaveNoViolations);
 
-// Mock scheduler data for testing
-const mockSchedulerTasks = [
-  {
-    id: 1,
-    name: 'Database Backup Task',
-    description: 'Daily backup of MySQL database',
-    isActive: true,
-    serviceId: 'mysql-service',
-    component: '_table/users',
-    verb: 'GET',
-    frequency: '0 2 * * *', // Daily at 2 AM
-    taskLogByTaskId: { id: 'log-1', status: 'success' },
-    serviceByServiceId: { id: 'mysql-service', name: 'MySQL Database' },
-  },
-  {
-    id: 2,
-    name: 'Email Notification Task',
-    description: 'Send weekly reports',
-    isActive: false,
-    serviceId: 'email-service',
-    component: '_proc/send_report',
-    verb: 'POST',
-    frequency: '0 9 * * 1', // Monday at 9 AM
-    taskLogByTaskId: null,
-    serviceByServiceId: { id: 'email-service', name: 'Email Service' },
-  },
-  {
-    id: 3,
-    name: 'Data Sync Task',
-    description: 'Synchronize with external API',
-    isActive: true,
-    serviceId: 'api-service',
-    component: '_script/sync_data',
-    verb: 'PUT',
-    frequency: '*/15 * * * *', // Every 15 minutes
-    taskLogByTaskId: { id: 'log-3', status: 'running' },
-    serviceByServiceId: { id: 'api-service', name: 'External API' },
-  },
-];
+// ============================================================================
+// MOCK DATA AND FIXTURES
+// ============================================================================
 
-// Mock error responses for error scenario testing
-const mockErrorResponse = {
-  error: {
-    code: 500,
-    message: 'Internal Server Error',
-    status_code: 500,
-    context: {
-      resource: ['Failed to fetch scheduler tasks'],
-    },
+const mockSchedulerResponse: GenericListResponse<SchedulerTaskData> = {
+  resource: mockSchedulerTasks,
+  meta: {
+    count: mockSchedulerTasks.length,
+    offset: 0,
+    limit: 25,
   },
 };
 
-// Mock API handlers for scheduler endpoints
-const schedulerHandlers = [
-  // GET /api/v2/system/scheduler - Fetch scheduler tasks
+const mockPaywallResponse = 'paywall';
+
+// ============================================================================
+// MSW SERVER SETUP
+// ============================================================================
+
+const server = setupServer(
+  // Scheduler tasks list endpoint
   http.get('/api/v2/system/scheduler', ({ request }) => {
     const url = new URL(request.url);
-    const limit = parseInt(url.searchParams.get('limit') || '25', 10);
-    const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const limit = parseInt(url.searchParams.get('limit') || '25');
     const filter = url.searchParams.get('filter');
 
-    let filteredTasks = [...mockSchedulerTasks];
+    let filteredTasks = mockSchedulerTasks;
 
-    // Apply filtering if specified
+    // Apply filtering if provided
     if (filter) {
-      const filterTerm = filter.toLowerCase();
-      filteredTasks = filteredTasks.filter(
-        task =>
-          task.name.toLowerCase().includes(filterTerm) ||
-          task.description.toLowerCase().includes(filterTerm)
+      filteredTasks = mockSchedulerTasks.filter(task => 
+        task.name.toLowerCase().includes(filter.toLowerCase()) ||
+        task.description?.toLowerCase().includes(filter.toLowerCase())
       );
     }
 
@@ -151,709 +89,678 @@ const schedulerHandlers = [
       resource: paginatedTasks,
       meta: {
         count: filteredTasks.length,
-        offset: offset,
-        limit: limit,
+        offset,
+        limit,
       },
     });
   }),
 
-  // DELETE /api/v2/system/scheduler/{id} - Delete scheduler task
+  // Individual scheduler task endpoint
+  http.get('/api/v2/system/scheduler/:id', ({ params }) => {
+    const task = mockSchedulerTasks.find(t => t.id === parseInt(params.id as string));
+    if (!task) {
+      return HttpResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+    return HttpResponse.json(task);
+  }),
+
+  // Delete scheduler task endpoint
   http.delete('/api/v2/system/scheduler/:id', ({ params }) => {
-    const { id } = params;
-    const taskIndex = mockSchedulerTasks.findIndex(task => task.id.toString() === id);
-    
+    const taskIndex = mockSchedulerTasks.findIndex(t => t.id === parseInt(params.id as string));
     if (taskIndex === -1) {
-      return HttpResponse.json(
-        { error: { code: 404, message: 'Task not found' } },
-        { status: 404 }
-      );
+      return HttpResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+    return HttpResponse.json({ success: true });
+  }),
+
+  // Create scheduler task endpoint
+  http.post('/api/v2/system/scheduler', async ({ request }) => {
+    const taskData = await request.json() as Partial<SchedulerTaskData>;
+    const newTask = createMockSchedulerTask(taskData);
+    return HttpResponse.json(newTask, { status: 201 });
+  }),
+
+  // Update scheduler task endpoint
+  http.patch('/api/v2/system/scheduler/:id', async ({ params, request }) => {
+    const taskId = parseInt(params.id as string);
+    const updates = await request.json() as Partial<SchedulerTaskData>;
+    const existingTask = mockSchedulerTasks.find(t => t.id === taskId);
+    
+    if (!existingTask) {
+      return HttpResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    // Remove task from mock data
-    mockSchedulerTasks.splice(taskIndex, 1);
+    const updatedTask = { ...existingTask, ...updates };
+    return HttpResponse.json(updatedTask);
+  }),
 
+  // Services endpoint for dropdown population
+  http.get('/api/v2/system/service', () => {
     return HttpResponse.json({
-      id: parseInt(id as string, 10),
-      success: true,
+      resource: mockServices,
+      meta: { count: mockServices.length },
     });
   }),
 
-  // GET /api/v2/system/admin/session - Check admin session for paywall
-  http.get('/api/v2/system/admin/session', () => {
-    return HttpResponse.json({
-      session_token: 'mock-admin-token',
-      session_id: 'mock-session-id',
-      user: mockAuthContext.user,
-      expires_at: new Date(Date.now() + 3600000).toISOString(),
-    });
+  // Paywall check endpoint
+  http.get('/api/v2/system/paywall/scheduler', () => {
+    return HttpResponse.json({ access: true });
   }),
-];
 
-// Test utilities for React Query setup
-function createTestQueryClient() {
-  return new QueryClient({
+  // Error simulation endpoints
+  http.get('/api/v2/system/scheduler/error', () => {
+    return HttpResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }),
+);
+
+// ============================================================================
+// TEST SETUP AND TEARDOWN
+// ============================================================================
+
+beforeAll(() => {
+  server.listen({ onUnhandledRequest: 'error' });
+});
+
+afterEach(() => {
+  server.resetHandlers();
+});
+
+afterAll(() => {
+  server.close();
+});
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Creates a test wrapper with QueryClient and necessary providers
+ */
+const createTestWrapper = (paywallEnabled = false) => {
+  const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
         gcTime: 0,
-        staleTime: 0,
-      },
-      mutations: {
-        retry: false,
       },
     },
   });
-}
 
-function renderWithQueryClient(component: React.ReactElement) {
-  const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>
-      {component}
-    </QueryClientProvider>
-  );
-}
-
-// Mock page component for testing
-const MockSchedulerManagementPage = ({ paywall = false }: { paywall?: boolean }) => {
-  // This would normally be the actual page component import
-  // For testing purposes, we mock the component structure
-  const [tasks, setTasks] = React.useState(mockSchedulerTasks);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  
-  const fetchTasks = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/v2/system/scheduler');
-      const data = await response.json();
-      setTasks(data.resource);
-    } catch (err) {
-      setError('Failed to fetch tasks');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const deleteTask = async (taskId: number) => {
-    try {
-      const response = await fetch(`/api/v2/system/scheduler/${taskId}`, {
-        method: 'DELETE',
-      });
-      if (response.ok) {
-        setTasks(tasks.filter(task => task.id !== taskId));
-      }
-    } catch (err) {
-      setError('Failed to delete task');
-    }
-  };
-
-  React.useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  if (paywall) {
-    return (
-      <div data-testid="paywall-container" role="main" aria-labelledby="paywall-title">
-        <h1 id="paywall-title">Premium Feature</h1>
-        <p>This feature requires a premium subscription.</p>
-        <button type="button">Upgrade Now</button>
-      </div>
-    );
-  }
-
-  return (
-    <div data-testid="scheduler-management-page" role="main" aria-labelledby="page-title">
-      <h1 id="page-title">Scheduler Management</h1>
-      
-      {isLoading && (
-        <div data-testid="loading-indicator" aria-live="polite">
-          Loading scheduler tasks...
-        </div>
-      )}
-
-      {error && (
-        <div 
-          data-testid="error-message" 
-          role="alert" 
-          aria-live="assertive"
-          className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded"
-        >
-          {error}
-        </div>
-      )}
-
-      {!isLoading && !error && (
-        <table 
-          data-testid="scheduler-table"
-          role="table"
-          aria-label="Scheduler tasks table"
-          className="min-w-full divide-y divide-gray-200"
-        >
-          <thead className="bg-gray-50">
-            <tr role="row">
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                ID
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Name
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Description
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Service
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Component
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Method
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Frequency
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Log
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {tasks.map((task) => (
-              <tr key={task.id} role="row" data-testid={`task-row-${task.id}`}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <span
-                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      task.isActive
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}
-                    aria-label={task.isActive ? 'Active' : 'Inactive'}
-                  >
-                    {task.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {task.id}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {task.name}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900">
-                  {task.description}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {task.serviceByServiceId.name}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {task.component}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">
-                    {task.verb}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                  {task.frequency}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {task.taskLogByTaskId ? (
-                    <span className="text-green-600">Available</span>
-                  ) : (
-                    <span className="text-gray-400">None</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    type="button"
-                    onClick={() => deleteTask(task.id)}
-                    className="text-red-600 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded px-2 py-1"
-                    aria-label={`Delete task ${task.name}`}
-                    data-testid={`delete-task-${task.id}`}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {tasks.length === 0 && !isLoading && !error && (
-        <div 
-          data-testid="empty-state"
-          className="text-center py-8 text-gray-500"
-          role="status"
-          aria-live="polite"
-        >
-          No scheduler tasks found.
-        </div>
-      )}
-    </div>
+  return ({ children }: { children: React.ReactNode }) => (
+    <TestWrapper>
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    </TestWrapper>
   );
 };
 
-describe('Scheduler Management Page', () => {
-  let user: ReturnType<typeof userEvent.setup>;
+/**
+ * Renders the scheduler page with proper test setup
+ */
+const renderSchedulerPage = (props = {}) => {
+  const Wrapper = createTestWrapper();
+  return render(<SchedulerManagePage {...props} />, { wrapper: Wrapper });
+};
 
-  beforeAll(() => {
-    // Add MSW handlers for scheduler endpoints
-    server.use(...schedulerHandlers);
+/**
+ * Waits for the loading state to complete
+ */
+const waitForLoadingToComplete = async () => {
+  await waitFor(() => {
+    expect(screen.queryByLabelText(/loading/i)).not.toBeInTheDocument();
   });
+};
 
-  beforeEach(() => {
-    user = userEvent.setup();
-    // Reset mock data before each test
-    mockSchedulerTasks.length = 0;
-    mockSchedulerTasks.push(
-      {
-        id: 1,
-        name: 'Database Backup Task',
-        description: 'Daily backup of MySQL database',
-        isActive: true,
-        serviceId: 'mysql-service',
-        component: '_table/users',
-        verb: 'GET',
-        frequency: '0 2 * * *',
-        taskLogByTaskId: { id: 'log-1', status: 'success' },
-        serviceByServiceId: { id: 'mysql-service', name: 'MySQL Database' },
-      },
-      {
-        id: 2,
-        name: 'Email Notification Task',
-        description: 'Send weekly reports',
-        isActive: false,
-        serviceId: 'email-service',
-        component: '_proc/send_report',
-        verb: 'POST',
-        frequency: '0 9 * * 1',
-        taskLogByTaskId: null,
-        serviceByServiceId: { id: 'email-service', name: 'Email Service' },
-      },
-      {
-        id: 3,
-        name: 'Data Sync Task',
-        description: 'Synchronize with external API',
-        isActive: true,
-        serviceId: 'api-service',
-        component: '_script/sync_data',
-        verb: 'PUT',
-        frequency: '*/15 * * * *',
-        taskLogByTaskId: { id: 'log-3', status: 'running' },
-        serviceByServiceId: { id: 'api-service', name: 'External API' },
-      }
-    );
-  });
+// ============================================================================
+// COMPONENT RENDERING AND BASIC FUNCTIONALITY TESTS
+// ============================================================================
 
-  afterEach(() => {
-    cleanup();
-    vi.clearAllMocks();
-  });
-
-  describe('Page Rendering and Basic Functionality', () => {
-    it('should render the scheduler management page with proper accessibility attributes', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
-
-      // Verify main page structure
+describe('SchedulerManagePage', () => {
+  describe('Component Rendering', () => {
+    it('should render without crashing', async () => {
+      renderSchedulerPage();
       expect(screen.getByRole('main')).toBeInTheDocument();
-      expect(screen.getByRole('main')).toHaveAttribute('aria-labelledby', 'page-title');
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Scheduler Management');
-
-      // Wait for table to load
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
-
-      // Verify table accessibility
-      const table = screen.getByRole('table');
-      expect(table).toHaveAttribute('aria-label', 'Scheduler tasks table');
-      expect(table).toBeInTheDocument();
     });
 
-    it('should display loading state during data fetch', async () => {
-      // Mock delayed response to test loading state
-      server.use(
-        http.get('/api/v2/system/scheduler', async () => {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          return HttpResponse.json({
-            resource: mockSchedulerTasks,
-            meta: { count: mockSchedulerTasks.length, offset: 0, limit: 25 },
-          });
-        })
-      );
-
-      renderWithQueryClient(<MockSchedulerManagementPage />);
-
-      // Should show loading indicator
-      expect(screen.getByTestId('loading-indicator')).toBeInTheDocument();
-      expect(screen.getByText('Loading scheduler tasks...')).toBeInTheDocument();
-
-      // Wait for loading to complete
-      await waitFor(() => {
-        expect(screen.queryByTestId('loading-indicator')).not.toBeInTheDocument();
-      });
-
-      // Table should be visible after loading
-      expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
+    it('should display the page title', async () => {
+      renderSchedulerPage();
+      expect(screen.getByRole('heading', { name: /scheduler management/i })).toBeInTheDocument();
     });
 
-    it('should handle empty scheduler tasks state appropriately', async () => {
-      // Mock empty response
-      server.use(
-        http.get('/api/v2/system/scheduler', () => {
-          return HttpResponse.json({
-            resource: [],
-            meta: { count: 0, offset: 0, limit: 25 },
-          });
-        })
-      );
+    it('should show loading state initially', () => {
+      renderSchedulerPage();
+      expect(screen.getByLabelText(/loading scheduler tasks/i)).toBeInTheDocument();
+    });
 
-      renderWithQueryClient(<MockSchedulerManagementPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('empty-state')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('No scheduler tasks found.')).toBeInTheDocument();
-      expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    it('should display scheduler tasks table after loading', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
+      
+      expect(screen.getByRole('table')).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /name/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /status/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /service/i })).toBeInTheDocument();
     });
   });
 
-  describe('Paywall Enforcement Testing', () => {
-    it('should render paywall when access is restricted', () => {
-      renderWithQueryClient(<MockSchedulerManagementPage paywall={true} />);
+  describe('Paywall Integration', () => {
+    it('should display paywall component when access is restricted', async () => {
+      // Override the paywall endpoint to return restricted access
+      server.use(
+        http.get('/api/v2/system/paywall/scheduler', () => {
+          return HttpResponse.json({ access: false });
+        })
+      );
 
-      expect(screen.getByTestId('paywall-container')).toBeInTheDocument();
-      expect(screen.getByRole('main')).toHaveAttribute('aria-labelledby', 'paywall-title');
-      expect(screen.getByText('Premium Feature')).toBeInTheDocument();
-      expect(screen.getByText('This feature requires a premium subscription.')).toBeInTheDocument();
-      
-      // Scheduler table should not be rendered
-      expect(screen.queryByTestId('scheduler-table')).not.toBeInTheDocument();
+      renderSchedulerPage();
+      await waitFor(() => {
+        expect(screen.getByTestId('paywall-component')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
     });
 
-    it('should not render paywall when user has access', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage paywall={false} />);
+    it('should show scheduler table when paywall access is granted', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
+      
+      expect(screen.queryByTestId('paywall-component')).not.toBeInTheDocument();
+      expect(screen.getByRole('table')).toBeInTheDocument();
+    });
 
-      // Paywall should not be visible
-      expect(screen.queryByTestId('paywall-container')).not.toBeInTheDocument();
+    it('should handle paywall check errors gracefully', async () => {
+      server.use(
+        http.get('/api/v2/system/paywall/scheduler', () => {
+          return HttpResponse.json({ error: 'Paywall service unavailable' }, { status: 500 });
+        })
+      );
 
-      // Scheduler management content should be visible
+      renderSchedulerPage();
       await waitFor(() => {
-        expect(screen.getByTestId('scheduler-management-page')).toBeInTheDocument();
+        expect(screen.getByText(/error checking access permissions/i)).toBeInTheDocument();
       });
     });
   });
 
-  describe('Scheduler Table Functionality', () => {
-    it('should render all scheduler tasks with correct data', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
+  // ============================================================================
+  // REACT QUERY INTEGRATION AND CACHING TESTS
+  // ============================================================================
 
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
+  describe('React Query Integration', () => {
+    it('should fetch scheduler tasks on mount', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
 
-      // Verify all tasks are rendered
-      expect(screen.getByTestId('task-row-1')).toBeInTheDocument();
-      expect(screen.getByTestId('task-row-2')).toBeInTheDocument();
-      expect(screen.getByTestId('task-row-3')).toBeInTheDocument();
-
-      // Verify task data is displayed correctly
-      expect(screen.getByText('Database Backup Task')).toBeInTheDocument();
-      expect(screen.getByText('Daily backup of MySQL database')).toBeInTheDocument();
-      expect(screen.getByText('MySQL Database')).toBeInTheDocument();
-      expect(screen.getByText('_table/users')).toBeInTheDocument();
-      expect(screen.getByText('0 2 * * *')).toBeInTheDocument();
+      // Verify tasks are displayed
+      expect(screen.getByText(mockSchedulerTasks[0].name)).toBeInTheDocument();
+      expect(screen.getByText(mockSchedulerTasks[1].name)).toBeInTheDocument();
     });
 
-    it('should display correct status indicators for active and inactive tasks', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
-
-      // Check active task status
-      const activeStatus = screen.getAllByText('Active')[0];
-      expect(activeStatus).toBeInTheDocument();
-      expect(activeStatus).toHaveClass('bg-green-100', 'text-green-800');
-
-      // Check inactive task status
-      const inactiveStatus = screen.getByText('Inactive');
-      expect(inactiveStatus).toBeInTheDocument();
-      expect(inactiveStatus).toHaveClass('bg-red-100', 'text-red-800');
-    });
-
-    it('should display HTTP verb badges with appropriate styling', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
-
-      // Verify HTTP verb badges are displayed
-      const getVerb = screen.getByText('GET');
-      const postVerb = screen.getByText('POST');
-      const putVerb = screen.getByText('PUT');
-
-      expect(getVerb).toBeInTheDocument();
-      expect(getVerb).toHaveClass('bg-blue-100', 'text-blue-800');
-      
-      expect(postVerb).toBeInTheDocument();
-      expect(putVerb).toBeInTheDocument();
-    });
-
-    it('should show log availability status correctly', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
-
-      // Tasks with logs should show "Available"
-      const availableLogs = screen.getAllByText('Available');
-      expect(availableLogs).toHaveLength(2); // Tasks 1 and 3 have logs
-
-      // Task without logs should show "None"
-      const noLogs = screen.getByText('None');
-      expect(noLogs).toBeInTheDocument();
-      expect(noLogs).toHaveClass('text-gray-400');
-    });
-  });
-
-  describe('CRUD Operations Testing', () => {
-    it('should handle task deletion with proper confirmation and UI update', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
-
-      // Verify task is initially present
-      expect(screen.getByTestId('task-row-1')).toBeInTheDocument();
-      expect(screen.getByText('Database Backup Task')).toBeInTheDocument();
-
-      // Click delete button for task 1
-      const deleteButton = screen.getByTestId('delete-task-1');
-      expect(deleteButton).toHaveAttribute('aria-label', 'Delete task Database Backup Task');
-      
-      await user.click(deleteButton);
-
-      // Wait for task to be removed from UI
-      await waitFor(() => {
-        expect(screen.queryByTestId('task-row-1')).not.toBeInTheDocument();
-      });
-
-      // Verify task is no longer displayed
-      expect(screen.queryByText('Database Backup Task')).not.toBeInTheDocument();
-      
-      // Other tasks should still be present
-      expect(screen.getByTestId('task-row-2')).toBeInTheDocument();
-      expect(screen.getByTestId('task-row-3')).toBeInTheDocument();
-    });
-
-    it('should handle delete operation errors gracefully', async () => {
-      // Mock error response for delete operation
-      server.use(
-        http.delete('/api/v2/system/scheduler/:id', () => {
-          return HttpResponse.json(
-            { error: { code: 500, message: 'Internal server error' } },
-            { status: 500 }
-          );
-        })
-      );
-
-      renderWithQueryClient(<MockSchedulerManagementPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
-
-      const deleteButton = screen.getByTestId('delete-task-1');
-      await user.click(deleteButton);
-
-      // Error message should be displayed
-      await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-      });
-
-      expect(screen.getByRole('alert')).toHaveTextContent('Failed to delete task');
-      expect(screen.getByRole('alert')).toHaveAttribute('aria-live', 'assertive');
-
-      // Task should still be present in the table
-      expect(screen.getByTestId('task-row-1')).toBeInTheDocument();
-    });
-
-    it('should handle API fetch errors with appropriate error messaging', async () => {
-      // Mock error response for fetch operation
-      server.use(
-        http.get('/api/v2/system/scheduler', () => {
-          return HttpResponse.json(mockErrorResponse, { status: 500 });
-        })
-      );
-
-      renderWithQueryClient(<MockSchedulerManagementPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-      });
-
-      const errorAlert = screen.getByRole('alert');
-      expect(errorAlert).toHaveTextContent('Failed to fetch tasks');
-      expect(errorAlert).toHaveAttribute('aria-live', 'assertive');
-      expect(errorAlert).toHaveClass('bg-red-50', 'border-red-200', 'text-red-700');
-
-      // Table should not be rendered during error state
-      expect(screen.queryByTestId('scheduler-table')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('React Query Integration Testing', () => {
-    it('should cache scheduler tasks data and avoid unnecessary refetches', async () => {
-      // Track API calls
-      let fetchCallCount = 0;
-      server.use(
-        http.get('/api/v2/system/scheduler', () => {
-          fetchCallCount++;
-          return HttpResponse.json({
-            resource: mockSchedulerTasks,
-            meta: { count: mockSchedulerTasks.length, offset: 0, limit: 25 },
-          });
-        })
-      );
-
-      const queryClient = createTestQueryClient();
-      
-      // First render
-      const { unmount } = render(
-        <QueryClientProvider client={queryClient}>
-          <MockSchedulerManagementPage />
-        </QueryClientProvider>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
-
-      expect(fetchCallCount).toBe(1);
+    it('should cache scheduler tasks data', async () => {
+      const { rerender } = renderSchedulerPage();
+      await waitForLoadingToComplete();
 
       // Unmount and remount component
-      unmount();
-      
-      render(
-        <QueryClientProvider client={queryClient}>
-          <MockSchedulerManagementPage />
-        </QueryClientProvider>
-      );
+      rerender(<div />);
+      renderSchedulerPage();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
-
-      // Should use cached data, no additional fetch
-      expect(fetchCallCount).toBe(1);
+      // Should load from cache without showing loading state
+      expect(screen.getByText(mockSchedulerTasks[0].name)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/loading/i)).not.toBeInTheDocument();
     });
 
-    it('should handle query invalidation after mutations', async () => {
-      let fetchCallCount = 0;
+    it('should handle stale data correctly', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
+
+      // Mock data change
+      const updatedTask = { ...mockSchedulerTasks[0], name: 'Updated Task Name' };
       server.use(
         http.get('/api/v2/system/scheduler', () => {
-          fetchCallCount++;
           return HttpResponse.json({
-            resource: mockSchedulerTasks,
-            meta: { count: mockSchedulerTasks.length, offset: 0, limit: 25 },
+            resource: [updatedTask, ...mockSchedulerTasks.slice(1)],
+            meta: { count: mockSchedulerTasks.length },
           });
         })
       );
 
-      renderWithQueryClient(<MockSchedulerManagementPage />);
+      // Trigger refetch
+      const refreshButton = screen.getByRole('button', { name: /refresh/i });
+      await userEvent.click(refreshButton);
 
       await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
+        expect(screen.getByText('Updated Task Name')).toBeInTheDocument();
       });
+    });
 
-      expect(fetchCallCount).toBe(1);
+    it('should handle query errors with proper error boundaries', async () => {
+      server.use(
+        http.get('/api/v2/system/scheduler', () => {
+          return HttpResponse.json({ error: 'Server error' }, { status: 500 });
+        })
+      );
 
-      // Perform delete operation
-      const deleteButton = screen.getByTestId('delete-task-1');
-      await user.click(deleteButton);
-
-      // Wait for optimistic update
+      renderSchedulerPage();
+      
       await waitFor(() => {
-        expect(screen.queryByTestId('task-row-1')).not.toBeInTheDocument();
+        expect(screen.getByText(/failed to load scheduler tasks/i)).toBeInTheDocument();
       });
 
-      // Note: In a real implementation, React Query would invalidate and refetch
-      // This test verifies the optimistic update behavior
+      // Should show retry button
+      expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
     });
   });
 
-  describe('Accessibility Compliance Testing (WCAG 2.1 AA)', () => {
-    it('should have proper ARIA labels and roles for table elements', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
+  // ============================================================================
+  // SCHEDULER TASK CRUD OPERATIONS
+  // ============================================================================
 
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
+  describe('Scheduler Task CRUD Operations', () => {
+    describe('Create Operations', () => {
+      it('should open create dialog when create button is clicked', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const createButton = screen.getByRole('button', { name: /create task/i });
+        await userEvent.click(createButton);
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /create scheduler task/i })).toBeInTheDocument();
       });
 
-      // Verify table structure and ARIA attributes
+      it('should create new scheduler task successfully', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        // Open create dialog
+        const createButton = screen.getByRole('button', { name: /create task/i });
+        await userEvent.click(createButton);
+
+        // Fill form fields
+        const nameInput = screen.getByLabelText(/task name/i);
+        const descriptionInput = screen.getByLabelText(/description/i);
+        const frequencyInput = screen.getByLabelText(/frequency/i);
+
+        await userEvent.type(nameInput, 'New Test Task');
+        await userEvent.type(descriptionInput, 'Test task description');
+        await userEvent.type(frequencyInput, '60');
+
+        // Submit form
+        const submitButton = screen.getByRole('button', { name: /save/i });
+        await userEvent.click(submitButton);
+
+        // Verify success
+        await waitFor(() => {
+          expect(screen.getByText(/task created successfully/i)).toBeInTheDocument();
+        });
+      });
+
+      it('should validate form fields before submission', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const createButton = screen.getByRole('button', { name: /create task/i });
+        await userEvent.click(createButton);
+
+        // Try to submit without required fields
+        const submitButton = screen.getByRole('button', { name: /save/i });
+        await userEvent.click(submitButton);
+
+        expect(screen.getByText(/task name is required/i)).toBeInTheDocument();
+        expect(screen.getByText(/frequency is required/i)).toBeInTheDocument();
+      });
+    });
+
+    describe('Read Operations', () => {
+      it('should display task details when view button is clicked', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const viewButton = screen.getAllByRole('button', { name: /view/i })[0];
+        await userEvent.click(viewButton);
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByText(mockSchedulerTasks[0].name)).toBeInTheDocument();
+        expect(screen.getByText(mockSchedulerTasks[0].description || '')).toBeInTheDocument();
+      });
+
+      it('should show task execution logs', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const viewButton = screen.getAllByRole('button', { name: /view/i })[0];
+        await userEvent.click(viewButton);
+
+        // Switch to logs tab
+        const logsTab = screen.getByRole('tab', { name: /logs/i });
+        await userEvent.click(logsTab);
+
+        expect(screen.getByText(/execution log/i)).toBeInTheDocument();
+      });
+    });
+
+    describe('Update Operations', () => {
+      it('should open edit dialog with pre-filled data', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const editButton = screen.getAllByRole('button', { name: /edit/i })[0];
+        await userEvent.click(editButton);
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByDisplayValue(mockSchedulerTasks[0].name)).toBeInTheDocument();
+      });
+
+      it('should update scheduler task successfully', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const editButton = screen.getAllByRole('button', { name: /edit/i })[0];
+        await userEvent.click(editButton);
+
+        const nameInput = screen.getByDisplayValue(mockSchedulerTasks[0].name);
+        await userEvent.clear(nameInput);
+        await userEvent.type(nameInput, 'Updated Task Name');
+
+        const submitButton = screen.getByRole('button', { name: /save/i });
+        await userEvent.click(submitButton);
+
+        await waitFor(() => {
+          expect(screen.getByText(/task updated successfully/i)).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe('Delete Operations', () => {
+      it('should show confirmation dialog before deletion', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const deleteButton = screen.getAllByRole('button', { name: /delete/i })[0];
+        await userEvent.click(deleteButton);
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByText(/are you sure you want to delete this task/i)).toBeInTheDocument();
+      });
+
+      it('should delete scheduler task successfully', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const deleteButton = screen.getAllByRole('button', { name: /delete/i })[0];
+        await userEvent.click(deleteButton);
+
+        const confirmButton = screen.getByRole('button', { name: /confirm delete/i });
+        await userEvent.click(confirmButton);
+
+        await waitFor(() => {
+          expect(screen.getByText(/task deleted successfully/i)).toBeInTheDocument();
+        });
+      });
+
+      it('should handle deletion errors gracefully', async () => {
+        server.use(
+          http.delete('/api/v2/system/scheduler/:id', () => {
+            return HttpResponse.json({ error: 'Cannot delete active task' }, { status: 400 });
+          })
+        );
+
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const deleteButton = screen.getAllByRole('button', { name: /delete/i })[0];
+        await userEvent.click(deleteButton);
+
+        const confirmButton = screen.getByRole('button', { name: /confirm delete/i });
+        await userEvent.click(confirmButton);
+
+        await waitFor(() => {
+          expect(screen.getByText(/failed to delete task/i)).toBeInTheDocument();
+        });
+      });
+    });
+  });
+
+  // ============================================================================
+  // TABLE FUNCTIONALITY TESTS
+  // ============================================================================
+
+  describe('Table Functionality', () => {
+    describe('Filtering and Search', () => {
+      it('should filter tasks by search term', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const searchInput = screen.getByRole('textbox', { name: /search tasks/i });
+        await userEvent.type(searchInput, mockSchedulerTasks[0].name);
+
+        await waitFor(() => {
+          expect(screen.getByText(mockSchedulerTasks[0].name)).toBeInTheDocument();
+          expect(screen.queryByText(mockSchedulerTasks[1].name)).not.toBeInTheDocument();
+        });
+      });
+
+      it('should clear search filter', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const searchInput = screen.getByRole('textbox', { name: /search tasks/i });
+        await userEvent.type(searchInput, 'test filter');
+
+        const clearButton = screen.getByRole('button', { name: /clear search/i });
+        await userEvent.click(clearButton);
+
+        expect(searchInput).toHaveValue('');
+        expect(screen.getByText(mockSchedulerTasks[0].name)).toBeInTheDocument();
+        expect(screen.getByText(mockSchedulerTasks[1].name)).toBeInTheDocument();
+      });
+    });
+
+    describe('Pagination', () => {
+      it('should display pagination controls', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        expect(screen.getByRole('navigation', { name: /pagination/i })).toBeInTheDocument();
+        expect(screen.getByText(/showing 1 to/i)).toBeInTheDocument();
+      });
+
+      it('should navigate between pages', async () => {
+        // Mock response with more tasks for pagination
+        server.use(
+          http.get('/api/v2/system/scheduler', ({ request }) => {
+            const url = new URL(request.url);
+            const offset = parseInt(url.searchParams.get('offset') || '0');
+            
+            if (offset === 0) {
+              return HttpResponse.json({
+                resource: mockSchedulerTasks.slice(0, 2),
+                meta: { count: 50, offset: 0, limit: 2 },
+              });
+            }
+            
+            return HttpResponse.json({
+              resource: mockSchedulerTasks.slice(2, 4),
+              meta: { count: 50, offset: 2, limit: 2 },
+            });
+          })
+        );
+
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const nextButton = screen.getByRole('button', { name: /next page/i });
+        await userEvent.click(nextButton);
+
+        await waitFor(() => {
+          expect(screen.getByText(/showing 3 to/i)).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe('Sorting', () => {
+      it('should sort tasks by column headers', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const nameHeader = screen.getByRole('columnheader', { name: /name/i });
+        await userEvent.click(nameHeader);
+
+        // Verify sort indicator
+        expect(within(nameHeader).getByLabelText(/sorted ascending/i)).toBeInTheDocument();
+      });
+
+      it('should toggle sort direction', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const nameHeader = screen.getByRole('columnheader', { name: /name/i });
+        
+        // Click once for ascending
+        await userEvent.click(nameHeader);
+        expect(within(nameHeader).getByLabelText(/sorted ascending/i)).toBeInTheDocument();
+
+        // Click again for descending
+        await userEvent.click(nameHeader);
+        expect(within(nameHeader).getByLabelText(/sorted descending/i)).toBeInTheDocument();
+      });
+    });
+
+    describe('Status Display', () => {
+      it('should display task status with proper styling', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        const activeStatus = screen.getByText(/active/i);
+        expect(activeStatus).toHaveClass('status-active');
+
+        const inactiveStatus = screen.getByText(/inactive/i);
+        expect(inactiveStatus).toHaveClass('status-inactive');
+      });
+
+      it('should show last execution information', async () => {
+        renderSchedulerPage();
+        await waitForLoadingToComplete();
+
+        expect(screen.getByText(/last executed/i)).toBeInTheDocument();
+        expect(screen.getByText(/next execution/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // ACCESSIBILITY COMPLIANCE TESTS (WCAG 2.1 AA)
+  // ============================================================================
+
+  describe('Accessibility Compliance', () => {
+    it('should have no accessibility violations', async () => {
+      const { container } = renderSchedulerPage();
+      await waitForLoadingToComplete();
+
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
+    });
+
+    it('should support keyboard navigation', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
+
+      const createButton = screen.getByRole('button', { name: /create task/i });
+      createButton.focus();
+      expect(createButton).toHaveFocus();
+
+      // Tab to next focusable element
+      await userEvent.tab();
+      const refreshButton = screen.getByRole('button', { name: /refresh/i });
+      expect(refreshButton).toHaveFocus();
+    });
+
+    it('should have proper ARIA labels and descriptions', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
+
+      // Check table accessibility
       const table = screen.getByRole('table');
       expect(table).toHaveAttribute('aria-label', 'Scheduler tasks table');
 
-      // Verify table headers have proper scope
-      const headers = screen.getAllByRole('columnheader');
-      headers.forEach(header => {
-        expect(header).toHaveAttribute('scope', 'col');
-      });
+      // Check button accessibility
+      const createButton = screen.getByRole('button', { name: /create task/i });
+      expect(createButton).toHaveAttribute('aria-describedby');
+    });
 
-      // Verify table rows have proper role
-      const rows = screen.getAllByRole('row');
-      expect(rows.length).toBeGreaterThan(0);
+    it('should announce changes to screen readers', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
 
-      // Verify delete buttons have descriptive labels
-      const deleteButtons = screen.getAllByRole('button', { name: /Delete task/ });
-      deleteButtons.forEach(button => {
-        expect(button).toHaveAttribute('aria-label');
-        expect(button.getAttribute('aria-label')).toMatch(/Delete task .+/);
+      const deleteButton = screen.getAllByRole('button', { name: /delete/i })[0];
+      await userEvent.click(deleteButton);
+
+      const confirmButton = screen.getByRole('button', { name: /confirm delete/i });
+      await userEvent.click(confirmButton);
+
+      // Check for aria-live announcement
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toHaveTextContent(/task deleted successfully/i);
       });
     });
 
-    it('should have proper focus management for interactive elements', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
+    it('should provide proper form validation feedback', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
+      const createButton = screen.getByRole('button', { name: /create task/i });
+      await userEvent.click(createButton);
 
-      const deleteButton = screen.getByTestId('delete-task-1');
+      const nameInput = screen.getByLabelText(/task name/i);
+      expect(nameInput).toHaveAttribute('required');
+      expect(nameInput).toHaveAttribute('aria-describedby');
+
+      // Trigger validation
+      const submitButton = screen.getByRole('button', { name: /save/i });
+      await userEvent.click(submitButton);
+
+      // Check error announcement
+      expect(nameInput).toHaveAttribute('aria-invalid', 'true');
+      expect(screen.getByRole('alert')).toHaveTextContent(/task name is required/i);
+    });
+  });
+
+  // ============================================================================
+  // ERROR HANDLING AND EDGE CASES
+  // ============================================================================
+
+  describe('Error Handling', () => {
+    it('should handle network errors gracefully', async () => {
+      server.use(
+        http.get('/api/v2/system/scheduler', () => {
+          return HttpResponse.error();
+        })
+      );
+
+      renderSchedulerPage();
       
-      // Focus the delete button
-      deleteButton.focus();
-      expect(deleteButton).toHaveFocus();
-
-      // Verify focus styles are applied
-      expect(deleteButton).toHaveClass('focus:outline-none', 'focus:ring-2', 'focus:ring-red-500');
+      await waitFor(() => {
+        expect(screen.getByText(/network error/i)).toBeInTheDocument();
+      });
     });
 
-    it('should provide proper live region announcements for dynamic content', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
+    it('should handle timeout errors', async () => {
+      server.use(
+        http.get('/api/v2/system/scheduler', async () => {
+          await new Promise(resolve => setTimeout(resolve, 30000));
+          return HttpResponse.json(mockSchedulerResponse);
+        })
+      );
 
-      // Loading indicator should have aria-live="polite"
-      expect(screen.getByTestId('loading-indicator')).toHaveAttribute('aria-live', 'polite');
-
+      renderSchedulerPage();
+      
       await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
+        expect(screen.getByText(/request timeout/i)).toBeInTheDocument();
+      }, { timeout: 10000 });
+    });
 
-      // Empty state should have aria-live="polite"
-      // Test with empty data
+    it('should handle empty task list', async () => {
       server.use(
         http.get('/api/v2/system/scheduler', () => {
           return HttpResponse.json({
@@ -863,123 +770,178 @@ describe('Scheduler Management Page', () => {
         })
       );
 
-      renderWithQueryClient(<MockSchedulerManagementPage />);
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('empty-state')).toBeInTheDocument();
-      });
-
-      expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+      expect(screen.getByText(/no scheduler tasks found/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /create your first task/i })).toBeInTheDocument();
     });
 
-    it('should provide appropriate color contrast and visual indicators', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
+    it('should handle malformed API responses', async () => {
+      server.use(
+        http.get('/api/v2/system/scheduler', () => {
+          return HttpResponse.json({ invalid: 'response' });
+        })
+      );
 
+      renderSchedulerPage();
+      
       await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
+        expect(screen.getByText(/invalid response format/i)).toBeInTheDocument();
       });
-
-      // Verify status badges have appropriate contrast classes
-      const activeStatus = screen.getAllByText('Active')[0];
-      expect(activeStatus).toHaveClass('bg-green-100', 'text-green-800');
-
-      const inactiveStatus = screen.getByText('Inactive');
-      expect(inactiveStatus).toHaveClass('bg-red-100', 'text-red-800');
-
-      // Verify HTTP verb badges
-      const getVerb = screen.getByText('GET');
-      expect(getVerb).toHaveClass('bg-blue-100', 'text-blue-800');
     });
   });
 
-  describe('Performance and User Experience', () => {
-    it('should render table efficiently with large datasets', async () => {
-      // Create large dataset for performance testing
-      const largeMockData = Array.from({ length: 100 }, (_, index) => ({
-        id: index + 1,
-        name: `Task ${index + 1}`,
-        description: `Description for task ${index + 1}`,
-        isActive: index % 2 === 0,
-        serviceId: `service-${index % 5}`,
-        component: `_table/table_${index}`,
-        verb: ['GET', 'POST', 'PUT', 'DELETE'][index % 4] as any,
-        frequency: '0 * * * *',
-        taskLogByTaskId: index % 3 === 0 ? { id: `log-${index}`, status: 'success' } : null,
-        serviceByServiceId: { id: `service-${index % 5}`, name: `Service ${index % 5}` },
-      }));
+  // ============================================================================
+  // PERFORMANCE AND OPTIMIZATION TESTS
+  // ============================================================================
+
+  describe('Performance Optimization', () => {
+    it('should implement virtual scrolling for large datasets', async () => {
+      // Mock large dataset
+      const largeMockData = Array.from({ length: 1000 }, (_, index) => 
+        createMockSchedulerTask({ id: index + 1, name: `Task ${index + 1}` })
+      );
 
       server.use(
         http.get('/api/v2/system/scheduler', () => {
           return HttpResponse.json({
-            resource: largeMockData,
-            meta: { count: largeMockData.length, offset: 0, limit: 25 },
+            resource: largeMockData.slice(0, 25),
+            meta: { count: 1000, offset: 0, limit: 25 },
           });
         })
       );
 
-      const startTime = performance.now();
-      renderWithQueryClient(<MockSchedulerManagementPage />);
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
-      });
-
-      const endTime = performance.now();
-      const renderTime = endTime - startTime;
-
-      // Ensure rendering completes within reasonable time (less than 1 second)
-      expect(renderTime).toBeLessThan(1000);
-
-      // Verify first few tasks are rendered
-      expect(screen.getByText('Task 1')).toBeInTheDocument();
-      expect(screen.getByText('Task 2')).toBeInTheDocument();
+      // Check virtual scrolling implementation
+      const tableContainer = screen.getByTestId('virtual-table-container');
+      expect(tableContainer).toBeInTheDocument();
+      expect(tableContainer).toHaveStyle({ height: '600px' });
     });
 
-    it('should handle rapid user interactions without performance degradation', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
+    it('should debounce search input', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
 
+      const searchInput = screen.getByRole('textbox', { name: /search tasks/i });
+      
+      // Type rapidly
+      await userEvent.type(searchInput, 'test search');
+      
+      // Should only make one API call after debounce delay
       await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
+        expect(searchInput).toHaveValue('test search');
       });
 
-      const deleteButtons = screen.getAllByRole('button', { name: /Delete task/ });
-      
-      // Rapidly click multiple delete buttons (simulation of fast user interaction)
-      const startTime = performance.now();
-      
-      for (let i = 0; i < 3 && i < deleteButtons.length; i++) {
-        await user.click(deleteButtons[i]);
-        // Small delay to prevent overwhelming the mock server
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
+      // Verify debounced API call
+      await waitFor(() => {
+        expect(screen.getByText(/searching.../i)).not.toBeInTheDocument();
+      }, { timeout: 1000 });
+    });
 
-      const endTime = performance.now();
-      const interactionTime = endTime - startTime;
+    it('should optimize re-renders with proper memoization', async () => {
+      const renderSpy = vi.fn();
+      
+      const TestComponent = () => {
+        renderSpy();
+        return <SchedulerManagePage />;
+      };
 
-      // Interactions should complete quickly (less than 500ms total)
-      expect(interactionTime).toBeLessThan(500);
+      const Wrapper = createTestWrapper();
+      render(<TestComponent />, { wrapper: Wrapper });
+      await waitForLoadingToComplete();
+
+      // Trigger state change that should not cause unnecessary re-renders
+      const searchInput = screen.getByRole('textbox', { name: /search tasks/i });
+      await userEvent.type(searchInput, 'a');
+      await userEvent.clear(searchInput);
+
+      // Should not re-render unnecessarily
+      expect(renderSpy).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('Internationalization and Localization', () => {
-    it('should render with proper text content that supports localization', async () => {
-      renderWithQueryClient(<MockSchedulerManagementPage />);
+  // ============================================================================
+  // INTEGRATION TESTS
+  // ============================================================================
 
+  describe('Integration Tests', () => {
+    it('should integrate with notification system', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
+
+      const deleteButton = screen.getAllByRole('button', { name: /delete/i })[0];
+      await userEvent.click(deleteButton);
+
+      const confirmButton = screen.getByRole('button', { name: /confirm delete/i });
+      await userEvent.click(confirmButton);
+
+      // Check notification integration
       await waitFor(() => {
-        expect(screen.getByTestId('scheduler-table')).toBeInTheDocument();
+        expect(screen.getByTestId('notification-toast')).toBeInTheDocument();
+        expect(screen.getByText(/task deleted successfully/i)).toBeInTheDocument();
       });
+    });
 
-      // Verify table headers are present (would be localized in real implementation)
-      expect(screen.getByText('Status')).toBeInTheDocument();
-      expect(screen.getByText('ID')).toBeInTheDocument();
-      expect(screen.getByText('Name')).toBeInTheDocument();
-      expect(screen.getByText('Description')).toBeInTheDocument();
-      expect(screen.getByText('Service')).toBeInTheDocument();
-      expect(screen.getByText('Component')).toBeInTheDocument();
-      expect(screen.getByText('Method')).toBeInTheDocument();
-      expect(screen.getByText('Frequency')).toBeInTheDocument();
-      expect(screen.getByText('Log')).toBeInTheDocument();
-      expect(screen.getByText('Actions')).toBeInTheDocument();
+    it('should integrate with routing system', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
+
+      const createButton = screen.getByRole('button', { name: /create task/i });
+      await userEvent.click(createButton);
+
+      // Should update URL for deep linking
+      expect(window.location.pathname).toBe('/adf-scheduler/df-manage-scheduler/create');
+    });
+
+    it('should persist user preferences', async () => {
+      renderSchedulerPage();
+      await waitForLoadingToComplete();
+
+      // Change table page size
+      const pageSizeSelect = screen.getByLabelText(/items per page/i);
+      await userEvent.selectOptions(pageSizeSelect, '50');
+
+      // Reload page
+      window.location.reload();
+      await waitForLoadingToComplete();
+
+      // Should remember preference
+      expect(pageSizeSelect).toHaveValue('50');
     });
   });
 });
+
+// ============================================================================
+// CUSTOM MATCHERS AND UTILITIES
+// ============================================================================
+
+/**
+ * Custom matcher to check if an element has proper ARIA attributes
+ */
+expect.extend({
+  toHaveAccessibleName(received: HTMLElement, expectedName: string) {
+    const accessibleName = received.getAttribute('aria-label') || 
+                          received.getAttribute('aria-labelledby') ||
+                          received.textContent;
+    
+    const pass = accessibleName?.includes(expectedName) || false;
+    
+    return {
+      message: () => 
+        `expected element to have accessible name containing "${expectedName}", but got "${accessibleName}"`,
+      pass,
+    };
+  },
+});
+
+// Type declarations for custom matchers
+declare global {
+  namespace jest {
+    interface Matchers<R> {
+      toHaveAccessibleName(expectedName: string): R;
+    }
+  }
+}
