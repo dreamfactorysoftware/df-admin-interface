@@ -1,65 +1,123 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // React 19 compiler optimizations and Partial Prerendering
+  // React 19 stable optimizations and experimental features
   experimental: {
-    reactCompiler: true,        // Automatic React optimizations
-    ppr: true,                  // Partial Prerendering for enhanced performance
+    reactCompiler: true,       // Automatic React optimizations for enhanced performance
+    ppr: true,                 // Partial Prerendering for hybrid SSR/SSG capabilities
     turbo: {
+      // Turbopack configuration for 700% faster builds
       rules: {
-        '*.svg': ['@svgr/webpack'], // SVG as React components
+        // SVG handling for icon components
+        '*.svg': ['@svgr/webpack'],
+        // CSS module handling with Tailwind CSS integration
+        '*.module.css': {
+          loaders: ['css-loader'],
+          as: '*.css',
+        },
       },
     },
   },
-
-  // Standalone deployment with custom base path for DreamFactory integration
+  
+  // SSR-first deployment with standalone capability
   output: 'standalone',
-  distDir: '.next',
+  distDir: 'dist',
   basePath: '/dreamfactory/dist',
   
-  // Enhanced asset optimization for performance
-  images: {
-    formats: ['image/webp', 'image/avif'], // Modern image formats
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    domains: ['localhost', 'api.dreamfactory.com'],
-    unoptimized: false, // Enable optimization for SSR
-  },
-
-  // Server-only runtime configuration for sensitive data
+  // Server runtime configuration for server-only settings
+  // These variables are not exposed to the client and only available in middleware/API routes
   serverRuntimeConfig: {
-    // Internal API endpoints not exposed to client
+    // Internal API URL for server-side requests
     internalApiUrl: process.env.INTERNAL_API_URL,
-    jwtSecret: process.env.JWT_SECRET,
-    csrfSecret: process.env.CSRF_SECRET,
-    sessionSecret: process.env.SESSION_SECRET,
-    encryptionKey: process.env.ENCRYPTION_KEY,
-    databaseUrl: process.env.DATABASE_URL,
+    // Server secret for JWT token validation
     serverSecret: process.env.SERVER_SECRET,
+    // Database connection string for server operations
+    databaseConnectionString: process.env.DATABASE_URL,
+    // CSRF secret for token generation
+    csrfSecret: process.env.CSRF_SECRET,
+    // JWT secret for authentication
+    jwtSecret: process.env.JWT_SECRET,
   },
-
+  
   // Public runtime configuration for client-accessible variables
+  // These are available on both client and server
   publicRuntimeConfig: {
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:80',
-    dfApiKey: process.env.NEXT_PUBLIC_DF_API_KEY || '',
+    // Public API URL for client-side requests
+    apiUrl: process.env.NEXT_PUBLIC_API_URL,
+    // Application version for debugging and monitoring
+    version: process.env.NEXT_PUBLIC_VERSION,
+    // Base path for routing and asset serving
     basePath: process.env.NEXT_PUBLIC_BASE_PATH || '/dreamfactory/dist',
-    version: process.env.NEXT_PUBLIC_VERSION || '1.0.0',
-    nodeEnv: process.env.NODE_ENV || 'development',
+    // Environment indicator for conditional logic
+    environment: process.env.NODE_ENV,
   },
-
-  // Compiler optimizations for production builds
+  
+  // Enhanced asset optimization for SSR deployment
+  images: {
+    // Modern image formats for optimal performance
+    formats: ['image/webp', 'image/avif'],
+    // Responsive device sizes for optimal image delivery
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    // Image sizes for different layout contexts
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    // Allowed domains for external images
+    domains: ['localhost', 'api.dreamfactory.com'],
+    // Enable optimization for SSR while maintaining CDN compatibility
+    unoptimized: false,
+    // Quality setting for optimized images
+    quality: 85,
+  },
+  
+  // Performance optimizations with SSR support
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production' ? {
-      exclude: ['error', 'warn'], // Keep error and warning logs
-    } : false,
+    // Remove console statements in production for cleaner output
+    removeConsole: process.env.NODE_ENV === 'production',
   },
-
-  // Enhanced security headers configuration
+  
+  // Enhanced security headers with CSP nonce support
   async headers() {
     return [
       {
         // Apply security headers to all routes
         source: '/(.*)',
         headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' assets.calendly.com",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: assets.calendly.com",
+              "font-src 'self' data:",
+              "connect-src 'self' api.dreamfactory.com ws: wss:",
+              "frame-src calendly.com",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors 'none'",
+              "block-all-mixed-content",
+              "upgrade-insecure-requests"
+            ].join('; '),
+          },
+          {
+            key: 'Permissions-Policy',
+            value: [
+              'camera=()',
+              'microphone=()',
+              'geolocation=()',
+              'interest-cohort=()',
+              'payment=()',
+              'usb=()',
+              'magnetometer=()',
+              'gyroscope=()',
+              'accelerometer=()',
+              'fullscreen=(self)',
+              'picture-in-picture=()'
+            ].join(', '),
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains; preload',
+          },
           {
             key: 'X-Frame-Options',
             value: 'DENY',
@@ -77,29 +135,14 @@ const nextConfig = {
             value: 'strict-origin-when-cross-origin',
           },
           {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=31536000; includeSubDomains; preload',
-          },
-          {
-            key: 'Permissions-Policy',
-            value: [
-              'camera=()',
-              'microphone=()',
-              'geolocation=()',
-              'interest-cohort=()',
-              'payment=()',
-              'usb=()',
-              'magnetometer=()',
-              'gyroscope=()',
-              'accelerometer=()',
-              'fullscreen=(self)',
-            ].join(', '),
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
           },
         ],
       },
       {
-        // Long-term caching for static assets
-        source: '/_next/static/(.*)',
+        // Cache static assets for optimal performance
+        source: '/dist/static/(.*)',
         headers: [
           {
             key: 'Cache-Control',
@@ -108,158 +151,120 @@ const nextConfig = {
         ],
       },
       {
-        // Optimized caching for images
-        source: '/_next/image(.*)',
+        // Cache API responses with shorter duration
+        source: '/api/(.*)',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=86400', // 24 hours
+            value: 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400',
           },
         ],
       },
     ];
   },
-
-  // API route rewrites for DreamFactory compatibility
+  
+  // API route rewrites to maintain compatibility with existing DreamFactory API integration patterns
   async rewrites() {
     return [
       {
-        // Proxy DreamFactory API calls through Next.js
-        source: '/api/v2/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:80'}/api/v2/:path*`,
+        // Preserve Next.js API routes
+        source: '/api/:path*',
+        destination: '/api/:path*',
       },
       {
-        // System API endpoints
+        // Proxy DreamFactory system API calls for seamless integration
         source: '/system/api/v2/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:80'}/system/api/v2/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:80'}/api/v2/system/:path*`,
       },
       {
-        // File service endpoints
-        source: '/api/files/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:80'}/api/files/:path*`,
+        // Proxy DreamFactory service API calls
+        source: '/service/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:80'}/api/v2/:path*`,
       },
     ];
   },
-
-  // Webpack optimization for enhanced build performance
-  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    // Optimize bundle splitting
-    config.optimization = {
-      ...config.optimization,
-      splitChunks: {
-        cacheGroups: {
-          default: false,
-          vendors: false,
-          // Vendor chunk for third-party libraries
-          vendor: {
-            name: 'vendor',
-            chunks: 'all',
-            test: /node_modules/,
-            priority: 20,
-          },
-          // Common chunk for shared code
-          common: {
-            name: 'common',
-            minChunks: 2,
-            priority: 10,
-            reuseExistingChunk: true,
-            enforce: true,
-          },
-        },
-      },
-    };
-
-    // Add support for importing SVGs as React components
-    config.module.rules.push({
-      test: /\.svg$/,
-      use: ['@svgr/webpack'],
-    });
-
-    // Optimize ACE editor builds
-    config.module.rules.push({
-      test: /ace-builds/,
-      use: {
-        loader: 'file-loader',
-        options: {
-          publicPath: '/_next/static/ace/',
-          outputPath: 'static/ace/',
-        },
-      },
-    });
-
-    return config;
-  },
-
-  // Environment configuration for different deployment scenarios
-  env: {
-    CUSTOM_KEY: 'dreamfactory-admin-interface',
-    BUILD_TIME: new Date().toISOString(),
-  },
-
-  // TypeScript configuration
-  typescript: {
-    // Type checking is handled by separate tsc process
-    ignoreBuildErrors: false,
-  },
-
-  // ESLint configuration
-  eslint: {
-    // ESLint checking is handled by separate process
-    ignoreDuringBuilds: false,
-  },
-
-  // Development server configuration
-  devIndicators: {
-    buildActivity: true,
-    buildActivityPosition: 'bottom-right',
-  },
-
-  // Internationalization support (prepared for future use)
-  i18n: {
-    locales: ['en'],
-    defaultLocale: 'en',
-    localeDetection: false, // Disable automatic locale detection
-  },
-
-  // Redirects configuration for legacy URLs
+  
+  // Redirect configuration for proper routing
   async redirects() {
     return [
       {
-        source: '/admin',
-        destination: '/home',
-        permanent: true,
-      },
-      {
+        // Redirect root to admin interface when accessed directly
         source: '/',
-        destination: '/home',
+        destination: '/dreamfactory/dist',
+        basePath: false,
         permanent: false,
       },
     ];
   },
-
-  // Performance monitoring configuration
-  analyticsId: process.env.NEXT_PUBLIC_ANALYTICS_ID,
-
-  // Power optimizations for build performance
-  poweredByHeader: false, // Remove X-Powered-By header
-  reactStrictMode: true,  // Enable React strict mode
-  swcMinify: true,        // Use SWC for minification
-
-  // Experimental features for enhanced performance
-  modularizeImports: {
-    '@fortawesome/react-fontawesome': {
-      transform: '@fortawesome/react-fontawesome/{{member}}',
-    },
-    '@fortawesome/free-solid-svg-icons': {
-      transform: '@fortawesome/free-solid-svg-icons/{{member}}',
-    },
-    '@fortawesome/free-regular-svg-icons': {
-      transform: '@fortawesome/free-regular-svg-icons/{{member}}',
-    },
-    '@fortawesome/free-brands-svg-icons': {
-      transform: '@fortawesome/free-brands-svg-icons/{{member}}',
-    },
+  
+  // Environment variable validation for enhanced security
+  env: {
+    // Validate that required public environment variables are present
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_VERSION: process.env.NEXT_PUBLIC_VERSION,
+    NEXT_PUBLIC_BASE_PATH: process.env.NEXT_PUBLIC_BASE_PATH,
   },
+  
+  // Webpack configuration for additional optimizations
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    // Add custom webpack plugins and loaders if needed
+    if (!isServer) {
+      // Client-side bundle optimizations
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+    
+    // Add support for SVG imports as React components
+    config.module.rules.push({
+      test: /\.svg$/,
+      use: ['@svgr/webpack'],
+    });
+    
+    return config;
+  },
+  
+  // TypeScript configuration for enhanced type checking
+  typescript: {
+    // Enable strict type checking in development
+    ignoreBuildErrors: false,
+  },
+  
+  // ESLint configuration for code quality
+  eslint: {
+    // Enforce ESLint rules during build
+    ignoreDuringBuilds: false,
+    // Apply ESLint to all pages and API routes
+    dirs: ['src/app', 'src/components', 'src/lib', 'src/hooks'],
+  },
+  
+  // Production optimizations
+  productionBrowserSourceMaps: false,
+  
+  // Bundle analyzer configuration for monitoring bundle size
+  ...(process.env.ANALYZE === 'true' && {
+    bundleAnalyzer: {
+      enabled: true,
+      openAnalyzer: true,
+    },
+  }),
 };
+
+// Validate required environment variables at build time
+const requiredEnvVars = [
+  'NEXT_PUBLIC_API_URL',
+];
+
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  throw new Error(
+    `Missing required environment variables: ${missingEnvVars.join(', ')}\n` +
+    'Please ensure all required environment variables are set before building the application.'
+  );
+}
 
 module.exports = nextConfig;
