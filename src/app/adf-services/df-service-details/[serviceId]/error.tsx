@@ -1,412 +1,588 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+/**
+ * Error boundary component for the service editing page
+ * 
+ * Handles and displays user-friendly error messages when service modification workflows fail.
+ * Provides retry mechanisms, navigation options, and proper error logging for editing operations.
+ * Implements React 19 error boundary patterns with fallback UI and recovery actions for common
+ * failure scenarios including network errors, validation failures, authentication issues, and
+ * service not found errors.
+ * 
+ * Features:
+ * - React 19 error boundary implementation with Next.js app router integration
+ * - Contextual recovery actions based on error types and service editing workflows
+ * - Comprehensive error logging and monitoring integration for debugging and system health
+ * - Tailwind CSS styling with dark mode support and WCAG 2.1 AA accessibility compliance
+ * - Dynamic route parameter validation with proper serviceId handling and fallback navigation
+ * - Integration with error handling hook for centralized error management
+ * 
+ * @fileoverview Service editing error boundary for DreamFactory Admin Interface
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
+ */
+
+import { useEffect, useMemo } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { 
   AlertTriangle, 
   RefreshCw, 
   ArrowLeft, 
+  Home, 
   Database, 
   Shield, 
   Wifi, 
-  FileX,
-  Bug,
   Settings,
-  Home
+  AlertCircle,
+  HelpCircle,
+  ChevronRight
 } from 'lucide-react';
+import { useErrorHandler } from '@/hooks/use-error-handler';
+import { useLogger } from '@/hooks/use-logger';
+import {
+  ErrorType,
+  ErrorSeverity,
+  ErrorCategory,
+  RecoveryAction
+} from '@/types/error';
 
 /**
- * Error boundary component for the service editing page that handles and displays 
- * user-friendly error messages when service modification workflows fail.
- * 
- * Implements React 19 error boundary patterns with fallback UI and recovery actions
- * for common failure scenarios like network errors, validation failures, 
- * authentication issues, and service not found errors.
- * 
- * Features:
- * - Dynamic route error handling with serviceId parameter validation
- * - Context-aware error messaging based on error type
- * - Retry mechanisms with exponential backoff
- * - Navigation options and recovery actions
- * - Accessibility compliant error display (WCAG 2.1 AA)
- * - Error logging integration for monitoring
- * - Dark mode support with Tailwind CSS
+ * Props interface for the service editing error boundary
  */
-export default function ServiceEditError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string; statusCode?: number };
+interface ServiceEditingErrorProps {
+  /** The error object that was caught */
+  error: Error & { digest?: string };
+  /** Function to retry the failed operation */
   reset: () => void;
-}) {
+}
+
+/**
+ * Error classification for service editing context
+ */
+interface ServiceEditingErrorInfo {
+  type: ErrorType;
+  severity: ErrorSeverity;
+  category: ErrorCategory;
+  title: string;
+  message: string;
+  icon: React.ComponentType<{ className?: string }>;
+  recoveryActions: RecoveryAction[];
+  contextualHelp?: string;
+}
+
+/**
+ * Service editing error boundary component
+ * 
+ * Provides comprehensive error handling for the service editing page with contextual
+ * recovery actions, user-friendly error messages, and proper accessibility support.
+ * Integrates with the centralized error handling system and logging infrastructure.
+ */
+export default function ServiceEditingError({
+  error,
+  reset
+}: ServiceEditingErrorProps) {
   const router = useRouter();
-  const params = useParams();
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [errorLogged, setErrorLogged] = useState(false);
+  const pathname = usePathname();
+  const { handleError, recoverFromError } = useErrorHandler();
+  const logger = useLogger();
 
-  const serviceId = params?.serviceId as string;
-  const maxRetries = 3;
+  // Extract serviceId from pathname for context-specific error handling
+  const serviceId = useMemo(() => {
+    const pathSegments = pathname.split('/');
+    const serviceIndex = pathSegments.findIndex(segment => segment === 'df-service-details');
+    return serviceIndex !== -1 && pathSegments[serviceIndex + 1] ? pathSegments[serviceIndex + 1] : null;
+  }, [pathname]);
 
-  // Error type detection based on error properties
-  const getErrorType = () => {
-    const message = error.message?.toLowerCase() || '';
-    const statusCode = error.statusCode;
+  /**
+   * Classify the error and provide appropriate context for service editing
+   */
+  const errorInfo = useMemo((): ServiceEditingErrorInfo => {
+    const errorMessage = error.message || '';
+    const errorDigest = error.digest || '';
 
-    if (statusCode === 404 || message.includes('not found') || message.includes('service not found')) {
-      return 'NOT_FOUND';
-    }
-    if (statusCode === 401 || message.includes('unauthorized') || message.includes('authentication')) {
-      return 'AUTHENTICATION';
-    }
-    if (statusCode === 403 || message.includes('forbidden') || message.includes('access denied')) {
-      return 'AUTHORIZATION';
-    }
-    if (statusCode === 422 || message.includes('validation') || message.includes('invalid')) {
-      return 'VALIDATION';
-    }
-    if (message.includes('network') || message.includes('fetch') || message.includes('connection')) {
-      return 'NETWORK';
-    }
-    if (statusCode && statusCode >= 500) {
-      return 'SERVER';
-    }
-    return 'UNKNOWN';
-  };
-
-  const errorType = getErrorType();
-
-  // Log error for monitoring and debugging
-  useEffect(() => {
-    if (!errorLogged) {
-      // Error logging implementation would integrate with logging service
-      console.error('Service editing error:', {
-        error: error.message,
-        stack: error.stack,
-        digest: error.digest,
-        statusCode: error.statusCode,
-        serviceId,
-        errorType,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        url: window.location.href
-      });
-      
-      // Mark as logged to prevent duplicate logging
-      setErrorLogged(true);
-
-      // TODO: Integrate with actual logging service
-      // logError({
-      //   message: error.message,
-      //   stack: error.stack,
-      //   context: {
-      //     serviceId,
-      //     errorType,
-      //     retryCount,
-      //     digest: error.digest
-      //   }
-      // });
-    }
-  }, [error, errorLogged, serviceId, errorType, retryCount]);
-
-  // Error-specific configuration
-  const getErrorConfig = () => {
-    switch (errorType) {
-      case 'NOT_FOUND':
-        return {
-          icon: FileX,
-          title: 'Service Not Found',
-          message: serviceId 
-            ? `The database service "${serviceId}" could not be found. It may have been deleted or you may not have access to it.`
-            : 'The requested database service could not be found.',
-          primaryAction: {
-            label: 'Go to Services',
-            action: () => router.push('/adf-services'),
-            icon: Database
+    // Service not found error
+    if (errorMessage.includes('not found') || errorMessage.includes('404') || errorDigest.includes('NOTFOUND')) {
+      return {
+        type: ErrorType.CLIENT,
+        severity: ErrorSeverity.MEDIUM,
+        category: ErrorCategory.APPLICATION,
+        title: 'Service Not Found',
+        message: `The database service ${serviceId ? `"${serviceId}"` : 'you requested'} could not be found. It may have been deleted or you may not have permission to access it.`,
+        icon: Database,
+        recoveryActions: [
+          {
+            type: 'navigate',
+            label: 'Browse Services',
+            primary: true,
+            accessibility: {
+              ariaLabel: 'Navigate to database services list',
+              keyboardShortcut: 'Enter',
+            },
           },
-          secondaryAction: {
-            label: 'Back to Dashboard',
-            action: () => router.push('/'),
-            icon: Home
+          {
+            type: 'retry',
+            label: 'Retry Loading',
+            primary: false,
+            accessibility: {
+              ariaLabel: 'Retry loading the service',
+              keyboardShortcut: 'R',
+            },
           },
-          canRetry: false,
-          severity: 'warning'
-        };
+        ],
+        contextualHelp: 'If you believe this service should exist, check with your administrator or try refreshing your browser.',
+      };
+    }
 
-      case 'AUTHENTICATION':
-        return {
-          icon: Shield,
-          title: 'Authentication Required',
-          message: 'Your session has expired or you need to log in to access this service.',
-          primaryAction: {
-            label: 'Log In',
-            action: () => router.push('/login?redirect=' + encodeURIComponent(window.location.pathname)),
-            icon: Shield
+    // Authentication error
+    if (errorMessage.includes('unauthorized') || errorMessage.includes('401') || errorDigest.includes('UNAUTHENTICATED')) {
+      return {
+        type: ErrorType.AUTHENTICATION,
+        severity: ErrorSeverity.HIGH,
+        category: ErrorCategory.SECURITY,
+        title: 'Authentication Required',
+        message: 'Your session has expired or you are not authorized to edit this service. Please log in again to continue.',
+        icon: Shield,
+        recoveryActions: [
+          {
+            type: 'login',
+            label: 'Login',
+            primary: true,
+            accessibility: {
+              ariaLabel: 'Navigate to login page',
+              keyboardShortcut: 'Enter',
+            },
           },
-          secondaryAction: {
-            label: 'Go to Dashboard',
-            action: () => router.push('/'),
-            icon: Home
+          {
+            type: 'refresh',
+            label: 'Refresh Page',
+            primary: false,
+            accessibility: {
+              ariaLabel: 'Refresh the current page',
+              keyboardShortcut: 'F5',
+            },
           },
-          canRetry: false,
-          severity: 'error'
-        };
+        ],
+        contextualHelp: 'Your authentication session may have expired while editing the service.',
+      };
+    }
 
-      case 'AUTHORIZATION':
-        return {
-          icon: Shield,
-          title: 'Access Denied',
-          message: 'You do not have permission to edit this database service. Please contact your administrator if you believe this is an error.',
-          primaryAction: {
-            label: 'Go to Services',
-            action: () => router.push('/adf-services'),
-            icon: Database
+    // Authorization/Permission error
+    if (errorMessage.includes('forbidden') || errorMessage.includes('403') || errorDigest.includes('FORBIDDEN')) {
+      return {
+        type: ErrorType.AUTHORIZATION,
+        severity: ErrorSeverity.MEDIUM,
+        category: ErrorCategory.SECURITY,
+        title: 'Access Denied',
+        message: 'You do not have permission to edit this database service. Contact your administrator if you need access.',
+        icon: Shield,
+        recoveryActions: [
+          {
+            type: 'navigate',
+            label: 'Back to Services',
+            primary: true,
+            accessibility: {
+              ariaLabel: 'Navigate back to services list',
+              keyboardShortcut: 'Enter',
+            },
           },
-          secondaryAction: {
+          {
+            type: 'contact',
             label: 'Contact Support',
-            action: () => window.open('/help/contact', '_blank'),
-            icon: Settings
+            primary: false,
+            accessibility: {
+              ariaLabel: 'Contact technical support',
+            },
           },
-          canRetry: false,
-          severity: 'error'
-        };
+        ],
+        contextualHelp: 'Service editing may require special permissions in your organization.',
+      };
+    }
 
-      case 'VALIDATION':
-        return {
-          icon: AlertTriangle,
-          title: 'Validation Error',
-          message: 'There was a problem with the service configuration. Please check your settings and try again.',
-          primaryAction: {
-            label: 'Retry',
-            action: handleRetry,
-            icon: RefreshCw
+    // Network connectivity error
+    if (errorMessage.includes('fetch') || errorMessage.includes('network') || !navigator.onLine) {
+      return {
+        type: ErrorType.NETWORK,
+        severity: ErrorSeverity.HIGH,
+        category: ErrorCategory.INFRASTRUCTURE,
+        title: 'Connection Problem',
+        message: 'Unable to connect to the server. Please check your internet connection and try again.',
+        icon: Wifi,
+        recoveryActions: [
+          {
+            type: 'retry',
+            label: 'Try Again',
+            primary: true,
+            accessibility: {
+              ariaLabel: 'Retry the failed operation',
+              keyboardShortcut: 'Enter',
+            },
           },
-          secondaryAction: {
-            label: 'Go Back',
-            action: () => router.back(),
-            icon: ArrowLeft
+          {
+            type: 'refresh',
+            label: 'Refresh Page',
+            primary: false,
+            accessibility: {
+              ariaLabel: 'Refresh the current page',
+              keyboardShortcut: 'F5',
+            },
           },
-          canRetry: true,
-          severity: 'warning'
-        };
+        ],
+        contextualHelp: 'Check your internet connection and ensure the DreamFactory server is accessible.',
+      };
+    }
 
-      case 'NETWORK':
-        return {
-          icon: Wifi,
-          title: 'Connection Error',
-          message: 'Unable to connect to the server. Please check your internet connection and try again.',
-          primaryAction: {
-            label: 'Retry',
-            action: handleRetry,
-            icon: RefreshCw
+    // Service configuration/validation error
+    if (errorMessage.includes('validation') || errorMessage.includes('invalid') || errorDigest.includes('VALIDATION')) {
+      return {
+        type: ErrorType.VALIDATION,
+        severity: ErrorSeverity.LOW,
+        category: ErrorCategory.USER_INPUT,
+        title: 'Configuration Error',
+        message: 'There was a problem with the service configuration. Please check your settings and try again.',
+        icon: Settings,
+        recoveryActions: [
+          {
+            type: 'retry',
+            label: 'Try Again',
+            primary: true,
+            accessibility: {
+              ariaLabel: 'Retry with current configuration',
+              keyboardShortcut: 'Enter',
+            },
           },
-          secondaryAction: {
-            label: 'Go Back',
-            action: () => router.back(),
-            icon: ArrowLeft
+          {
+            type: 'navigate',
+            label: 'Start Over',
+            primary: false,
+            accessibility: {
+              ariaLabel: 'Start service configuration from beginning',
+            },
           },
-          canRetry: true,
-          severity: 'error'
-        };
+        ],
+        contextualHelp: 'Review your database connection parameters and ensure all required fields are completed.',
+      };
+    }
 
-      case 'SERVER':
-        return {
-          icon: Bug,
-          title: 'Server Error',
-          message: 'An unexpected server error occurred while processing your request. Our team has been notified.',
-          primaryAction: {
-            label: 'Retry',
-            action: handleRetry,
-            icon: RefreshCw
+    // Server error
+    if (errorMessage.includes('500') || errorMessage.includes('server') || errorDigest.includes('INTERNAL_ERROR')) {
+      return {
+        type: ErrorType.SERVER,
+        severity: ErrorSeverity.HIGH,
+        category: ErrorCategory.INFRASTRUCTURE,
+        title: 'Server Error',
+        message: 'The server encountered an error while processing your request. Our team has been notified.',
+        icon: AlertTriangle,
+        recoveryActions: [
+          {
+            type: 'retry',
+            label: 'Try Again',
+            primary: true,
+            accessibility: {
+              ariaLabel: 'Retry the service editing operation',
+              keyboardShortcut: 'Enter',
+            },
           },
-          secondaryAction: {
-            label: 'Go to Services',
-            action: () => router.push('/adf-services'),
-            icon: Database
+          {
+            type: 'navigate',
+            label: 'Back to Services',
+            primary: false,
+            accessibility: {
+              ariaLabel: 'Navigate back to services list',
+            },
           },
-          canRetry: true,
-          severity: 'error'
-        };
+        ],
+        contextualHelp: 'Server errors are usually temporary. Please try again in a few moments.',
+      };
+    }
 
-      default:
-        return {
-          icon: AlertTriangle,
-          title: 'Something Went Wrong',
-          message: 'An unexpected error occurred while editing the service. Please try again or contact support if the problem persists.',
-          primaryAction: {
-            label: 'Retry',
-            action: handleRetry,
-            icon: RefreshCw
+    // Generic/Unknown error
+    return {
+      type: ErrorType.SYSTEM,
+      severity: ErrorSeverity.CRITICAL,
+      category: ErrorCategory.APPLICATION,
+      title: 'Unexpected Error',
+      message: 'An unexpected error occurred while editing the service. Please try again or contact support if the problem persists.',
+      icon: AlertCircle,
+      recoveryActions: [
+        {
+          type: 'retry',
+          label: 'Try Again',
+          primary: true,
+          accessibility: {
+            ariaLabel: 'Retry the failed operation',
+            keyboardShortcut: 'Enter',
           },
-          secondaryAction: {
-            label: 'Go Back',
-            action: () => router.back(),
-            icon: ArrowLeft
+        },
+        {
+          type: 'refresh',
+          label: 'Refresh Page',
+          primary: false,
+          accessibility: {
+            ariaLabel: 'Refresh the current page',
+            keyboardShortcut: 'F5',
           },
-          canRetry: true,
-          severity: 'error'
-        };
+        },
+        {
+          type: 'navigate',
+          label: 'Back to Services',
+          primary: false,
+          accessibility: {
+            ariaLabel: 'Navigate back to services list',
+          },
+        },
+      ],
+      contextualHelp: 'If this error continues to occur, please contact technical support with the error details.',
+    };
+  }, [error, serviceId]);
+
+  /**
+   * Log error on mount with service editing context
+   */
+  useEffect(() => {
+    const logError = async () => {
+      try {
+        await handleError(error, {
+          component: 'ServiceEditingError',
+          route: pathname,
+          serviceId,
+          operation: 'service-editing',
+        });
+      } catch (logError) {
+        console.error('Failed to log service editing error:', logError);
+      }
+    };
+
+    logError();
+  }, [error, handleError, pathname, serviceId]);
+
+  /**
+   * Handle recovery action execution
+   */
+  const handleRecoveryAction = async (action: RecoveryAction) => {
+    try {
+      logger.info('Service editing error recovery action initiated', {
+        action: action.type,
+        errorType: errorInfo.type,
+        serviceId,
+      });
+
+      switch (action.type) {
+        case 'retry':
+          // Reset the error boundary to retry the operation
+          reset();
+          break;
+
+        case 'refresh':
+          // Refresh the entire page
+          window.location.reload();
+          break;
+
+        case 'login':
+          // Navigate to login page
+          router.push('/login');
+          break;
+
+        case 'navigate':
+          // Navigate back to services list
+          router.push('/adf-services');
+          break;
+
+        case 'contact':
+          // Open support contact
+          window.open('mailto:support@dreamfactory.com?subject=Service%20Editing%20Error', '_blank');
+          break;
+
+        case 'dismiss':
+          // Navigate back to services (same as navigate for this context)
+          router.push('/adf-services');
+          break;
+
+        default:
+          console.warn('Unknown recovery action:', action.type);
+      }
+
+      // Track recovery action for metrics
+      await recoverFromError(`service-editing-${Date.now()}`, action);
+    } catch (recoveryError) {
+      logger.error('Service editing error recovery failed', recoveryError, {
+        originalError: error.message,
+        actionType: action.type,
+        serviceId,
+      });
     }
   };
 
-  // Handle retry with exponential backoff
-  async function handleRetry() {
-    if (retryCount >= maxRetries) {
-      return;
+  /**
+   * Handle keyboard navigation for accessibility
+   */
+  const handleKeyDown = (event: React.KeyboardEvent, action: RecoveryAction) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleRecoveryAction(action);
     }
+  };
 
-    setIsRetrying(true);
-    setRetryCount(prev => prev + 1);
-
-    try {
-      // Exponential backoff: 1s, 2s, 4s
-      const delay = Math.pow(2, retryCount) * 1000;
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      reset();
-    } catch (retryError) {
-      console.error('Retry failed:', retryError);
-    } finally {
-      setIsRetrying(false);
-    }
-  }
-
-  const config = getErrorConfig();
-  const IconComponent = config.icon;
+  const IconComponent = errorInfo.icon;
 
   return (
     <div 
-      className="min-h-[600px] flex items-center justify-center p-6"
-      data-testid="service-edit-error"
-      role="alert"
-      aria-live="assertive"
+      className="min-h-[600px] flex items-center justify-center p-6 bg-gray-50 dark:bg-gray-900"
+      data-testid="service-editing-error"
     >
-      <div className="max-w-md w-full text-center space-y-6">
-        {/* Error Icon */}
-        <div className="flex justify-center">
-          <div className={`
-            p-3 rounded-full
-            ${config.severity === 'error' 
-              ? 'bg-red-100 dark:bg-red-900/20' 
-              : 'bg-amber-100 dark:bg-amber-900/20'
-            }
-          `}>
-            <IconComponent 
-              className={`
-                h-8 w-8
-                ${config.severity === 'error' 
-                  ? 'text-red-600 dark:text-red-400' 
-                  : 'text-amber-600 dark:text-amber-400'
-                }
-              `}
-              aria-hidden="true"
-            />
+      <div className="max-w-2xl w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+        {/* Error Header */}
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center space-x-4">
+            <div className="flex-shrink-0">
+              <IconComponent 
+                className={`h-12 w-12 ${
+                  errorInfo.severity === ErrorSeverity.CRITICAL ? 'text-red-500' :
+                  errorInfo.severity === ErrorSeverity.HIGH ? 'text-red-400' :
+                  errorInfo.severity === ErrorSeverity.MEDIUM ? 'text-yellow-500' :
+                  'text-blue-500'
+                }`}
+                aria-hidden="true"
+              />
+            </div>
+            <div className="flex-1">
+              <h1 
+                className="text-2xl font-bold text-gray-900 dark:text-white"
+                id="error-title"
+              >
+                {errorInfo.title}
+              </h1>
+              {serviceId && (
+                <div className="flex items-center mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  <Database className="h-4 w-4 mr-1" aria-hidden="true" />
+                  <span>Service: {serviceId}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Error Title */}
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-          {config.title}
-        </h1>
-
-        {/* Error Message */}
-        <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
-          {config.message}
-        </p>
-
-        {/* Service ID Context */}
-        {serviceId && errorType !== 'NOT_FOUND' && (
-          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 text-xs">
-            <span className="text-gray-500 dark:text-gray-400">Service ID: </span>
-            <span className="font-mono text-gray-700 dark:text-gray-300">{serviceId}</span>
-          </div>
-        )}
-
-        {/* Error Details for Development */}
-        {process.env.NODE_ENV === 'development' && (
-          <details className="text-left bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
-            <summary className="text-xs text-gray-500 dark:text-gray-400 cursor-pointer">
-              Debug Information
-            </summary>
-            <pre className="text-xs text-gray-600 dark:text-gray-400 mt-2 whitespace-pre-wrap font-mono">
-              {error.stack || error.message}
-            </pre>
-            {error.digest && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                Error ID: {error.digest}
-              </p>
-            )}
-          </details>
-        )}
-
-        {/* Retry Count Display */}
-        {config.canRetry && retryCount > 0 && (
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            Retry attempt {retryCount} of {maxRetries}
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="space-y-3">
-          {/* Primary Action */}
-          <button
-            onClick={config.primaryAction.action}
-            disabled={isRetrying || (config.canRetry && retryCount >= maxRetries)}
-            className={`
-              w-full inline-flex items-center justify-center px-4 py-3 rounded-lg text-sm font-medium
-              transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2
-              disabled:opacity-50 disabled:cursor-not-allowed
-              ${config.severity === 'error'
-                ? 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500'
-                : 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500'
-              }
-              dark:bg-opacity-90 dark:hover:bg-opacity-100
-            `}
-            aria-describedby={isRetrying ? 'retry-status' : undefined}
+        {/* Error Content */}
+        <div className="p-6 space-y-6">
+          {/* Error Message */}
+          <div
+            role="alert"
+            aria-labelledby="error-title"
+            aria-describedby="error-description"
           >
-            {isRetrying ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
-                Retrying...
-              </>
-            ) : (
-              <>
-                <config.primaryAction.icon className="h-4 w-4 mr-2" aria-hidden="true" />
-                {config.primaryAction.label}
-              </>
-            )}
-          </button>
+            <p 
+              id="error-description"
+              className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed"
+            >
+              {errorInfo.message}
+            </p>
+          </div>
 
-          {/* Secondary Action */}
-          <button
-            onClick={config.secondaryAction.action}
-            disabled={isRetrying}
-            className="
-              w-full inline-flex items-center justify-center px-4 py-3 rounded-lg text-sm font-medium
-              bg-gray-100 hover:bg-gray-200 text-gray-700 transition-all duration-200
-              focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500
-              disabled:opacity-50 disabled:cursor-not-allowed
-              dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300
-            "
-          >
-            <config.secondaryAction.icon className="h-4 w-4 mr-2" aria-hidden="true" />
-            {config.secondaryAction.label}
-          </button>
+          {/* Contextual Help */}
+          {errorInfo.contextualHelp && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="flex items-start space-x-3">
+                <HelpCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                <div>
+                  <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                    Helpful Information
+                  </h3>
+                  <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                    {errorInfo.contextualHelp}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Recovery Actions */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              What would you like to do?
+            </h2>
+            
+            <div className="grid gap-3">
+              {errorInfo.recoveryActions.map((action, index) => (
+                <button
+                  key={action.type}
+                  onClick={() => handleRecoveryAction(action)}
+                  onKeyDown={(event) => handleKeyDown(event, action)}
+                  className={`w-full flex items-center justify-between p-4 rounded-lg border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 ${
+                    action.primary
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 focus:ring-blue-500'
+                      : 'bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                  }`}
+                  aria-label={action.accessibility?.ariaLabel}
+                  title={action.accessibility?.keyboardShortcut ? `Keyboard shortcut: ${action.accessibility.keyboardShortcut}` : undefined}
+                >
+                  <div className="flex items-center space-x-3">
+                    {action.type === 'retry' && <RefreshCw className="h-5 w-5" aria-hidden="true" />}
+                    {action.type === 'refresh' && <RefreshCw className="h-5 w-5" aria-hidden="true" />}
+                    {action.type === 'navigate' && <ArrowLeft className="h-5 w-5" aria-hidden="true" />}
+                    {action.type === 'login' && <Shield className="h-5 w-5" aria-hidden="true" />}
+                    {action.type === 'contact' && <HelpCircle className="h-5 w-5" aria-hidden="true" />}
+                    {action.type === 'dismiss' && <Home className="h-5 w-5" aria-hidden="true" />}
+                    
+                    <div className="text-left">
+                      <div className="font-medium">{action.label}</div>
+                      {action.accessibility?.keyboardShortcut && (
+                        <div className={`text-sm ${action.primary ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                          Press {action.accessibility.keyboardShortcut}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Technical Details (Development Mode) */}
+          {process.env.NODE_ENV === 'development' && (
+            <details className="mt-6">
+              <summary className="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+                Technical Details (Development Mode)
+              </summary>
+              <div className="mt-3 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                <div className="space-y-2 text-sm font-mono">
+                  <div>
+                    <span className="font-semibold text-gray-600 dark:text-gray-400">Error Type:</span>{' '}
+                    <span className="text-gray-800 dark:text-gray-200">{errorInfo.type}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-gray-600 dark:text-gray-400">Severity:</span>{' '}
+                    <span className="text-gray-800 dark:text-gray-200">{errorInfo.severity}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-gray-600 dark:text-gray-400">Category:</span>{' '}
+                    <span className="text-gray-800 dark:text-gray-200">{errorInfo.category}</span>
+                  </div>
+                  {error.digest && (
+                    <div>
+                      <span className="font-semibold text-gray-600 dark:text-gray-400">Digest:</span>{' '}
+                      <span className="text-gray-800 dark:text-gray-200">{error.digest}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-semibold text-gray-600 dark:text-gray-400">Message:</span>{' '}
+                    <span className="text-gray-800 dark:text-gray-200">{error.message}</span>
+                  </div>
+                  {serviceId && (
+                    <div>
+                      <span className="font-semibold text-gray-600 dark:text-gray-400">Service ID:</span>{' '}
+                      <span className="text-gray-800 dark:text-gray-200">{serviceId}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-semibold text-gray-600 dark:text-gray-400">Pathname:</span>{' '}
+                    <span className="text-gray-800 dark:text-gray-200">{pathname}</span>
+                  </div>
+                </div>
+              </div>
+            </details>
+          )}
         </div>
-
-        {/* Retry Status for Screen Readers */}
-        {isRetrying && (
-          <div id="retry-status" className="sr-only">
-            Retrying operation, please wait...
-          </div>
-        )}
-
-        {/* Max Retries Reached Message */}
-        {config.canRetry && retryCount >= maxRetries && (
-          <div className="text-xs text-red-600 dark:text-red-400">
-            Maximum retry attempts reached. Please try again later or contact support.
-          </div>
-        )}
       </div>
     </div>
   );
