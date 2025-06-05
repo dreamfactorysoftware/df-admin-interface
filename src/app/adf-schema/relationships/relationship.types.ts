@@ -1,229 +1,175 @@
 /**
- * Database Relationship Management Types for React/Next.js Migration
- * 
  * Comprehensive TypeScript type definitions for database relationship management
- * adapted for React patterns. Provides type safety for relationship schemas,
- * form data structures, junction table configurations, and validation rules
- * compatible with React Hook Form, Zod validation, and API responses while
- * maintaining compatibility with DreamFactory relationship schema requirements.
+ * adapted for React patterns. Provides type-safe configuration workflows,
+ * React Hook Form compatibility, and Zod validation integration.
  * 
- * @fileoverview Relationship management types for React/Next.js refactor
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * Maintains compatibility with DreamFactory relationship schema requirements
+ * while leveraging React 19 and Next.js 15.1+ capabilities.
+ * 
+ * @fileoverview Database relationship type definitions for React/Next.js application
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
 import { z } from 'zod';
-import { ColumnDef } from '@tanstack/react-table';
-import { UseFormReturn, FieldValues, Path } from 'react-hook-form';
 import type { 
-  ApiResponse, 
-  ApiListResponse, 
-  ApiCreateResponse, 
-  ApiUpdateResponse,
-  ApiDeleteResponse,
-  PaginationMeta,
-  ValidationError,
-  KeyValuePair
-} from '../../../types/api';
-import type { 
-  DatabaseService,
-  DatabaseTable,
-  DatabaseField,
-  RelationshipType as BaseRelationshipType,
-  TableRelationship as BaseTableRelationship
-} from '../../../types/database';
-import type { 
-  BaseComponent,
-  ComponentVariant,
-  ComponentSize,
-  FormFieldProps,
-  SelectOption,
-  TableConfiguration
-} from '../../../types/ui';
+  ControllerRenderProps, 
+  FieldPath, 
+  FieldValues, 
+  UseFormReturn,
+  FieldError,
+  FieldErrorsImpl,
+  Merge
+} from 'react-hook-form';
+import type { ColumnDef } from '@tanstack/react-table';
+import type { VirtualItem } from '@tanstack/react-virtual';
 
-// =============================================================================
+// Re-export relevant types from dependencies for convenience
+import type { BaseApiResponse, PaginatedResponse } from '../../../types/api';
+import type { SchemaTable, SchemaField } from '../../../types/schema';
+import type { BaseComponent, TableColumn } from '../../../types/ui';
+
+// ============================================================================
 // CORE RELATIONSHIP TYPES
-// =============================================================================
+// ============================================================================
 
 /**
  * Database relationship types supported by DreamFactory
- * Extended for React component compatibility
+ * Based on existing Angular component functionality
  */
-export type RelationshipType = 'belongs_to' | 'has_many' | 'has_one' | 'many_many';
+export type RelationshipType = 
+  | 'belongs_to'   // Child record belongs to parent record (many-to-one)
+  | 'has_many'     // Parent record has many child records (one-to-many)
+  | 'has_one'      // Parent record has one child record (one-to-one)
+  | 'many_many';   // Many-to-many with junction table
 
 /**
- * Relationship configuration status for form state management
+ * Relationship type configuration metadata
+ * Provides UI display information and validation rules
  */
-export type RelationshipStatus = 'active' | 'inactive' | 'configuring' | 'validating' | 'error';
+export interface RelationshipTypeConfig {
+  value: RelationshipType;
+  label: string;
+  description: string;
+  requiresJunctionTable: boolean;
+  supportedCardinalities: string[];
+  icon?: string;
+}
 
 /**
- * Junction table configuration requirement levels
+ * Junction table configuration for many-to-many relationships
+ * Enables proper foreign key linking through intermediate table
  */
-export type JunctionRequirement = 'required' | 'optional' | 'disabled' | 'auto';
+export interface JunctionTableConfig {
+  /** Junction service ID (must be database service) */
+  serviceId: number;
+  /** Junction service name for display */
+  serviceName: string;
+  /** Junction table name */
+  tableName: string;
+  /** Field in junction table linking to source table */
+  sourceField: string;
+  /** Field in junction table linking to reference table */
+  referenceField: string;
+  /** Additional junction table metadata */
+  metadata?: {
+    primaryKey?: string[];
+    additionalFields?: string[];
+    constraints?: string[];
+  };
+}
+
+// ============================================================================
+// RELATIONSHIP SCHEMA DEFINITIONS
+// ============================================================================
 
 /**
- * Relationship validation states for real-time feedback
- */
-export type ValidationState = 'valid' | 'invalid' | 'pending' | 'unchecked';
-
-// =============================================================================
-// RELATIONSHIP SCHEMA INTERFACES
-// =============================================================================
-
-/**
- * Core relationship configuration compatible with DreamFactory API
- * Enhanced for React Hook Form and Zod validation integration
+ * Core relationship configuration matching DreamFactory schema requirements
+ * Extends existing Angular form structure with enhanced type safety
  */
 export interface RelationshipSchema {
-  /** Unique relationship identifier (auto-generated) */
-  id?: string | number;
-  
-  /** Relationship name (required, used in API endpoints) */
+  /** Relationship identifier (generated from table_field pattern) */
+  id?: string;
+  /** Relationship name (auto-generated, typically table_field format) */
   name: string;
-  
-  /** Optional alias for relationship display */
+  /** User-friendly alias for the relationship */
   alias?: string;
-  
-  /** Human-readable label for UI display */
+  /** Display label for UI components */
   label?: string;
-  
-  /** Description explaining the relationship purpose */
+  /** Optional description explaining the relationship purpose */
   description?: string;
-  
-  /** Relationship type determining configuration requirements */
+  /** Whether to always fetch related data (performance consideration) */
+  alwaysFetch: boolean;
+  /** Relationship type determining behavior and requirements */
   type: RelationshipType;
+  /** Virtual relationship flag (always true for DreamFactory) */
+  isVirtual: boolean;
   
-  /** Whether relationship data is always fetched with parent */
-  always_fetch: boolean;
+  // Source table configuration
+  /** Source table field creating the relationship */
+  field: string;
+  /** Source table name (derived from context) */
+  sourceTable?: string;
+  /** Source service ID (derived from context) */
+  sourceServiceId?: number;
   
-  /** Virtual relationship flag (DreamFactory specific) */
-  is_virtual: boolean;
+  // Reference table configuration
+  /** Target service ID for the relationship */
+  refServiceId: number;
+  /** Target service name for display purposes */
+  refServiceName?: string;
+  /** Target table name */
+  refTable: string;
+  /** Target field in the referenced table */
+  refField: string;
   
-  /** Flatten relationship data in response */
-  flatten: boolean;
+  // Junction table configuration (for many_many relationships)
+  /** Junction table configuration (required for many_many) */
+  junctionTable?: JunctionTableConfig;
   
-  /** Drop prefix when flattening */
-  flatten_drop_prefix: boolean;
-  
-  // Local table configuration
-  /** Local field name that establishes the relationship */
-  local_field: string;
-  
-  // Foreign table configuration
-  /** Foreign service ID containing the related table */
-  foreign_service_id: number | string;
-  
-  /** Foreign service name (derived from service ID) */
-  foreign_service_name?: string;
-  
-  /** Foreign table name */
-  foreign_table: string;
-  
-  /** Foreign field name that completes the relationship */
-  foreign_field: string;
-  
-  // Junction table configuration (many-to-many only)
-  /** Junction service ID (required for many_many) */
-  junction_service_id?: number | string;
-  
-  /** Junction service name (derived from service ID) */
-  junction_service_name?: string;
-  
-  /** Junction table name */
-  junction_table?: string;
-  
-  /** Local field in junction table */
-  junction_local_field?: string;
-  
-  /** Foreign field in junction table */
-  junction_foreign_field?: string;
-  
-  // Referential integrity actions
-  /** Action on foreign key update */
-  on_update?: 'cascade' | 'restrict' | 'set_null' | 'set_default' | 'no_action';
-  
-  /** Action on foreign key delete */
-  on_delete?: 'cascade' | 'restrict' | 'set_null' | 'set_default' | 'no_action';
-  
-  // Metadata
-  /** Relationship creation timestamp */
-  created_at?: string;
-  
+  // Metadata and state
+  /** Creation timestamp */
+  createdAt?: string;
   /** Last modification timestamp */
-  updated_at?: string;
-  
-  /** Current validation state */
-  validation_state?: ValidationState;
-  
-  /** Validation error messages */
-  validation_errors?: ValidationError[];
+  updatedAt?: string;
+  /** Relationship validation status */
+  isValid?: boolean;
+  /** Relationship active status */
+  isActive?: boolean;
 }
 
 /**
- * Relationship discovery configuration for automatic detection
+ * Relationship listing item for table display
+ * Optimized for TanStack Table virtualization
  */
-export interface RelationshipDiscoveryConfig {
-  /** Service name to analyze */
-  service_name: string;
+export interface RelationshipListItem {
+  id: string;
+  name: string;
+  alias?: string;
+  label?: string;
+  type: RelationshipType;
+  sourceField: string;
+  targetTable: string;
+  targetField: string;
+  isVirtual: boolean;
+  alwaysFetch: boolean;
+  junctionTable?: string;
+  createdAt?: string;
+  updatedAt?: string;
   
-  /** Table name to analyze */
-  table_name: string;
-  
-  /** Discovery methods to use */
-  discovery_methods: Array<'foreign_keys' | 'naming_convention' | 'manual'>;
-  
-  /** Include virtual relationships */
-  include_virtual: boolean;
-  
-  /** Maximum relationships to discover */
-  max_relationships: number;
-  
-  /** Discovery timeout in milliseconds */
-  timeout_ms: number;
-  
-  /** Use cached discovery results */
-  use_cache: boolean;
-  
-  /** Cache TTL in seconds */
-  cache_ttl: number;
+  // Display helpers
+  typeLabel: string;
+  relationshipPath: string;
+  hasJunctionTable: boolean;
 }
 
-/**
- * Relationship discovery result
- */
-export interface RelationshipDiscoveryResult {
-  /** Service name analyzed */
-  service_name: string;
-  
-  /** Table name analyzed */
-  table_name: string;
-  
-  /** Discovered relationships */
-  relationships: RelationshipSchema[];
-  
-  /** Discovery timestamp */
-  discovered_at: string;
-  
-  /** Discovery method used */
-  discovery_method: 'foreign_keys' | 'naming_convention' | 'manual';
-  
-  /** Discovery duration in milliseconds */
-  discovery_duration_ms: number;
-  
-  /** Discovery warnings */
-  warnings?: string[];
-  
-  /** Discovery errors */
-  errors?: string[];
-}
-
-// =============================================================================
-// REACT HOOK FORM INTEGRATION
-// =============================================================================
+// ============================================================================
+// FORM DATA STRUCTURES
+// ============================================================================
 
 /**
  * React Hook Form compatible relationship form data
- * Optimized for real-time validation under 100ms
+ * Provides strict typing for form state management
  */
 export interface RelationshipFormData {
   // Basic information
@@ -231,717 +177,643 @@ export interface RelationshipFormData {
   alias: string;
   label: string;
   description: string;
-  
-  // Configuration
+  alwaysFetch: boolean;
   type: RelationshipType;
-  always_fetch: boolean;
-  is_virtual: boolean;
-  flatten: boolean;
-  flatten_drop_prefix: boolean;
+  isVirtual: boolean;
   
-  // Local relationship
-  local_field: string;
+  // Source configuration
+  field: string;
   
-  // Foreign relationship
-  foreign_service_id: string | number;
-  foreign_table: string;
-  foreign_field: string;
+  // Reference configuration
+  refServiceId: number;
+  refTable: string;
+  refField: string;
   
-  // Junction table (conditional)
-  junction_service_id: string | number | null;
-  junction_table: string | null;
-  junction_local_field: string | null;
-  junction_foreign_field: string | null;
-  
-  // Integrity actions
-  on_update: 'cascade' | 'restrict' | 'set_null' | 'set_default' | 'no_action';
-  on_delete: 'cascade' | 'restrict' | 'set_null' | 'set_default' | 'no_action';
+  // Junction configuration (for many_many)
+  junctionServiceId?: number;
+  junctionTable?: string;
+  junctionField?: string;
+  junctionRefField?: string;
 }
 
 /**
- * React Hook Form configuration for relationship forms
+ * Form field validation error types
+ * Enhanced with relationship-specific validation messages
  */
-export type RelationshipFormReturn = UseFormReturn<RelationshipFormData>;
+export interface RelationshipFormErrors {
+  name?: FieldError;
+  alias?: FieldError;
+  label?: FieldError;
+  description?: FieldError;
+  type?: FieldError;
+  field?: FieldError;
+  refServiceId?: FieldError;
+  refTable?: FieldError;
+  refField?: FieldError;
+  junctionServiceId?: FieldError;
+  junctionTable?: FieldError;
+  junctionField?: FieldError;
+  junctionRefField?: FieldError;
+  // Global form errors
+  root?: FieldError;
+}
 
 /**
- * Form field paths for type-safe field access
+ * Form state management interface
+ * Integrates with React Hook Form for optimal performance
  */
-export type RelationshipFormField = Path<RelationshipFormData>;
+export interface RelationshipFormState {
+  data: RelationshipFormData;
+  errors: RelationshipFormErrors;
+  isDirty: boolean;
+  isValid: boolean;
+  isSubmitting: boolean;
+  isLoading: boolean;
+  
+  // Dynamic field states
+  isJunctionEnabled: boolean;
+  availableFields: BasicOption[];
+  availableServices: ServiceOption[];
+  availableTables: BasicOption[];
+  availableRefFields: BasicOption[];
+  availableJunctionTables: BasicOption[];
+  availableJunctionFields: BasicOption[];
+}
+
+// ============================================================================
+// DROPDOWN AND SELECTION TYPES
+// ============================================================================
 
 /**
- * Form validation modes for different use cases
+ * Basic option interface for form dropdowns
+ * Compatible with existing Angular component patterns
  */
-export type FormValidationMode = 'onChange' | 'onBlur' | 'onSubmit' | 'onTouched' | 'all';
+export interface BasicOption {
+  label: string;
+  value: string | number;
+  name?: string;
+  disabled?: boolean;
+  description?: string;
+}
 
 /**
- * Form submission states for UI feedback
+ * Enhanced service option with additional metadata
+ * Supports service type and connection status display
  */
-export type FormSubmissionState = 'idle' | 'submitting' | 'success' | 'error';
+export interface ServiceOption extends BasicOption {
+  value: number;
+  name: string;
+  type: string;
+  group: string;
+  isActive: boolean;
+  connectionStatus?: 'connected' | 'disconnected' | 'testing';
+  icon?: string;
+}
 
-// =============================================================================
+/**
+ * Table option with schema information
+ * Enables informed table selection with metadata
+ */
+export interface TableOption extends BasicOption {
+  value: string;
+  serviceName: string;
+  schemaName?: string;
+  fieldCount: number;
+  hasRelationships: boolean;
+  tableType: 'table' | 'view';
+}
+
+/**
+ * Field option with type and constraint information
+ * Supports intelligent field selection and validation
+ */
+export interface FieldOption extends BasicOption {
+  value: string;
+  dataType: string;
+  isRequired: boolean;
+  isPrimaryKey: boolean;
+  isForeignKey: boolean;
+  maxLength?: number;
+  defaultValue?: any;
+}
+
+// ============================================================================
 // ZOD VALIDATION SCHEMAS
-// =============================================================================
+// ============================================================================
 
 /**
- * Base validation schema for relationship types
+ * Base relationship validation schema
+ * Provides runtime type checking with compile-time inference
  */
-export const relationshipTypeSchema = z.enum(['belongs_to', 'has_many', 'has_one', 'many_many'], {
-  required_error: 'Relationship type is required',
-  invalid_type_error: 'Invalid relationship type'
-});
-
-/**
- * Integrity action validation schema
- */
-export const integrityActionSchema = z.enum([
-  'cascade', 'restrict', 'set_null', 'set_default', 'no_action'
-], {
-  required_error: 'Integrity action is required',
-  invalid_type_error: 'Invalid integrity action'
-});
-
-/**
- * Comprehensive relationship form validation schema
- * Implements conditional validation based on relationship type
- */
-export const relationshipFormSchema = z.object({
-  // Basic information with enhanced validation
+export const RelationshipBaseSchema = z.object({
   name: z.string()
     .min(1, 'Relationship name is required')
     .max(64, 'Relationship name must be 64 characters or less')
-    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Name must start with a letter and contain only letters, numbers, and underscores'),
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Name must start with letter and contain only letters, numbers, and underscores'),
   
   alias: z.string()
     .max(64, 'Alias must be 64 characters or less')
-    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Alias must start with a letter and contain only letters, numbers, and underscores')
     .optional()
     .or(z.literal('')),
   
   label: z.string()
-    .max(255, 'Label must be 255 characters or less')
+    .max(128, 'Label must be 128 characters or less')
     .optional()
     .or(z.literal('')),
   
   description: z.string()
-    .max(1000, 'Description must be 1000 characters or less')
+    .max(512, 'Description must be 512 characters or less')
     .optional()
     .or(z.literal('')),
   
-  // Configuration flags
-  type: relationshipTypeSchema,
-  always_fetch: z.boolean().default(false),
-  is_virtual: z.boolean().default(true),
-  flatten: z.boolean().default(false),
-  flatten_drop_prefix: z.boolean().default(false),
+  alwaysFetch: z.boolean().default(false),
   
-  // Local field (required for all types)
-  local_field: z.string()
-    .min(1, 'Local field is required')
-    .max(64, 'Local field name must be 64 characters or less'),
+  type: z.enum(['belongs_to', 'has_many', 'has_one', 'many_many'], {
+    required_error: 'Relationship type is required',
+    invalid_type_error: 'Invalid relationship type'
+  }),
   
-  // Foreign relationship (required for all types)
-  foreign_service_id: z.union([z.string(), z.number()])
-    .refine(val => val !== null && val !== '', 'Foreign service is required'),
+  isVirtual: z.boolean().default(true),
   
-  foreign_table: z.string()
-    .min(1, 'Foreign table is required')
-    .max(64, 'Foreign table name must be 64 characters or less'),
+  field: z.string()
+    .min(1, 'Source field is required')
+    .max(64, 'Field name must be 64 characters or less'),
   
-  foreign_field: z.string()
-    .min(1, 'Foreign field is required')
-    .max(64, 'Foreign field name must be 64 characters or less'),
+  refServiceId: z.number()
+    .int('Service ID must be an integer')
+    .positive('Service ID must be positive'),
   
-  // Junction table fields (conditional)
-  junction_service_id: z.union([z.string(), z.number(), z.null()]).optional(),
-  junction_table: z.string().max(64).nullable().optional(),
-  junction_local_field: z.string().max(64).nullable().optional(),
-  junction_foreign_field: z.string().max(64).nullable().optional(),
+  refTable: z.string()
+    .min(1, 'Reference table is required')
+    .max(64, 'Table name must be 64 characters or less'),
   
-  // Integrity actions
-  on_update: integrityActionSchema.default('restrict'),
-  on_delete: integrityActionSchema.default('restrict')
-})
-.refine((data) => {
-  // Many-to-many relationships require junction table configuration
+  refField: z.string()
+    .min(1, 'Reference field is required')
+    .max(64, 'Field name must be 64 characters or less'),
+});
+
+/**
+ * Junction table validation schema for many-to-many relationships
+ * Conditionally required based on relationship type
+ */
+export const JunctionTableSchema = z.object({
+  junctionServiceId: z.number()
+    .int('Junction service ID must be an integer')
+    .positive('Junction service ID must be positive'),
+  
+  junctionTable: z.string()
+    .min(1, 'Junction table is required')
+    .max(64, 'Junction table name must be 64 characters or less'),
+  
+  junctionField: z.string()
+    .min(1, 'Junction field is required')
+    .max(64, 'Junction field name must be 64 characters or less'),
+  
+  junctionRefField: z.string()
+    .min(1, 'Junction reference field is required')
+    .max(64, 'Junction reference field name must be 64 characters or less'),
+});
+
+/**
+ * Complete relationship form validation schema
+ * Implements conditional validation based on relationship type
+ */
+export const RelationshipFormSchema = RelationshipBaseSchema.extend({
+  junctionServiceId: z.number().optional(),
+  junctionTable: z.string().optional(),
+  junctionField: z.string().optional(),
+  junctionRefField: z.string().optional(),
+}).superRefine((data, ctx) => {
+  // Validate junction table requirements for many_many relationships
   if (data.type === 'many_many') {
-    return !!(
-      data.junction_service_id &&
-      data.junction_table &&
-      data.junction_local_field &&
-      data.junction_foreign_field
-    );
+    const junctionResult = JunctionTableSchema.safeParse({
+      junctionServiceId: data.junctionServiceId,
+      junctionTable: data.junctionTable,
+      junctionField: data.junctionField,
+      junctionRefField: data.junctionRefField,
+    });
+    
+    if (!junctionResult.success) {
+      junctionResult.error.issues.forEach(issue => {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: issue.path,
+          message: issue.message,
+        });
+      });
+    }
   }
-  return true;
-}, {
-  message: 'Junction table configuration is required for many-to-many relationships',
-  path: ['junction_service_id']
-})
-.refine((data) => {
-  // Non many-to-many relationships should not have junction configuration
-  if (data.type !== 'many_many') {
-    return !(
-      data.junction_service_id ||
-      data.junction_table ||
-      data.junction_local_field ||
-      data.junction_foreign_field
-    );
+  
+  // Validate that source and reference fields are different
+  if (data.field === data.refField && data.refTable) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['refField'],
+      message: 'Reference field must be different from source field',
+    });
   }
-  return true;
-}, {
-  message: 'Junction table configuration is only applicable to many-to-many relationships',
-  path: ['type']
 });
 
 /**
- * Schema for relationship discovery configuration
+ * Relationship query parameters schema for API requests
+ * Supports filtering, sorting, and pagination
  */
-export const relationshipDiscoveryConfigSchema = z.object({
-  service_name: z.string().min(1, 'Service name is required'),
-  table_name: z.string().min(1, 'Table name is required'),
-  discovery_methods: z.array(z.enum(['foreign_keys', 'naming_convention', 'manual']))
-    .min(1, 'At least one discovery method is required'),
-  include_virtual: z.boolean().default(true),
-  max_relationships: z.number().min(1).max(1000).default(100),
-  timeout_ms: z.number().min(1000).max(60000).default(30000),
-  use_cache: z.boolean().default(true),
-  cache_ttl: z.number().min(60).max(3600).default(300)
+export const RelationshipQuerySchema = z.object({
+  serviceName: z.string().min(1, 'Service name is required'),
+  tableName: z.string().min(1, 'Table name is required'),
+  
+  // Filtering
+  filter: z.string().optional(),
+  type: z.enum(['belongs_to', 'has_many', 'has_one', 'many_many']).optional(),
+  
+  // Sorting
+  sortBy: z.enum(['name', 'type', 'createdAt', 'updatedAt']).default('name'),
+  sortOrder: z.enum(['asc', 'desc']).default('asc'),
+  
+  // Pagination
+  page: z.number().int().min(1).default(1),
+  limit: z.number().int().min(1).max(100).default(25),
+  
+  // Virtual scrolling
+  offset: z.number().int().min(0).optional(),
+  virtual: z.boolean().default(false),
 });
 
-// =============================================================================
-// API INTEGRATION TYPES
-// =============================================================================
+// ============================================================================
+// API RESPONSE TYPES
+// ============================================================================
 
 /**
- * Relationship API endpoints configuration
+ * Relationship API response from DreamFactory
+ * Maintains compatibility with existing backend response format
  */
-export interface RelationshipApiEndpoints {
-  /** List relationships for a table */
-  list: string;
-  /** Create new relationship */
-  create: string;
-  /** Get relationship by ID */
-  get: string;
-  /** Update relationship */
-  update: string;
-  /** Delete relationship */
-  delete: string;
-  /** Discover relationships */
-  discover: string;
-  /** Validate relationship configuration */
-  validate: string;
+export interface RelationshipApiResponse extends BaseApiResponse {
+  resource: RelationshipSchema[];
+  meta?: {
+    count: number;
+    totalCount?: number;
+    hasMore?: boolean;
+  };
 }
 
 /**
- * Relationship list API response
+ * Individual relationship response for create/update operations
+ * Includes validation status and metadata
  */
-export type RelationshipListResponse = ApiListResponse<RelationshipSchema>;
-
-/**
- * Relationship create API response
- */
-export type RelationshipCreateResponse = ApiCreateResponse;
-
-/**
- * Relationship update API response
- */
-export type RelationshipUpdateResponse = ApiUpdateResponse;
-
-/**
- * Relationship delete API response
- */
-export type RelationshipDeleteResponse = ApiDeleteResponse;
-
-/**
- * Relationship discovery API response
- */
-export type RelationshipDiscoveryResponse = ApiResponse<RelationshipDiscoveryResult>;
-
-/**
- * Relationship validation API response
- */
-export interface RelationshipValidationResponse {
-  valid: boolean;
-  errors?: ValidationError[];
-  warnings?: string[];
-  suggestions?: string[];
+export interface RelationshipResponse extends BaseApiResponse {
+  resource: RelationshipSchema;
+  validation?: {
+    isValid: boolean;
+    errors?: string[];
+    warnings?: string[];
+  };
 }
 
 /**
- * API request options for relationship operations
+ * Relationship deletion response
+ * Confirms successful removal and cleanup
  */
-export interface RelationshipApiOptions {
-  /** Service name */
-  service_name: string;
-  /** Table name */
-  table_name: string;
-  /** Include related metadata */
-  include_metadata?: boolean;
-  /** Validate configuration */
-  validate?: boolean;
-  /** Cache TTL for results */
-  cache_ttl?: number;
+export interface RelationshipDeleteResponse extends BaseApiResponse {
+  deleted: boolean;
+  relationshipName: string;
+  cascadeDeleted?: string[];
 }
 
-// =============================================================================
-// NEXT.JS ROUTING TYPES
-// =============================================================================
+/**
+ * Paginated relationship listing response
+ * Optimized for TanStack Virtual table rendering
+ */
+export interface RelationshipListResponse extends PaginatedResponse {
+  resource: RelationshipListItem[];
+  virtualScrolling?: {
+    totalEstimatedSize: number;
+    itemSize: number;
+    overscan: number;
+  };
+}
+
+// ============================================================================
+// NAVIGATION AND ROUTING TYPES
+// ============================================================================
 
 /**
- * Next.js page parameters for relationship routes
+ * Next.js route parameters for relationship management
+ * Supports type-safe navigation and parameter extraction
  */
-export interface RelationshipPageParams {
-  /** Service name parameter */
-  service: string;
-  /** Table name parameter */
-  table: string;
-  /** Relationship ID (for edit/view) */
+export interface RelationshipRouteParams {
+  serviceName: string;
+  tableName: string;
   relationshipId?: string;
 }
 
 /**
- * Next.js search parameters for relationship listing
+ * Search parameters for relationship filtering and sorting
+ * Compatible with Next.js searchParams API
  */
 export interface RelationshipSearchParams {
-  /** Filter by relationship type */
+  filter?: string;
   type?: RelationshipType;
-  /** Search query */
-  search?: string;
-  /** Sort field */
   sort?: string;
-  /** Sort direction */
   order?: 'asc' | 'desc';
-  /** Page number */
   page?: string;
-  /** Items per page */
   limit?: string;
-  /** Filter by foreign service */
-  foreign_service?: string;
-  /** Filter by virtual relationships */
-  virtual_only?: string;
 }
 
 /**
- * Dynamic route generation helpers
+ * Navigation context for relationship management
+ * Provides breadcrumb and navigation state
  */
-export interface RelationshipRoutes {
-  /** List relationships for a table */
-  list: (service: string, table: string) => string;
-  /** Create new relationship */
-  create: (service: string, table: string) => string;
-  /** Edit relationship */
-  edit: (service: string, table: string, relationshipId: string) => string;
-  /** View relationship details */
-  view: (service: string, table: string, relationshipId: string) => string;
+export interface RelationshipNavigationContext {
+  serviceName: string;
+  tableName: string;
+  relationshipId?: string;
+  mode: 'list' | 'create' | 'edit' | 'view';
+  
+  // Breadcrumb information
+  breadcrumbs: Array<{
+    label: string;
+    href: string;
+    isActive: boolean;
+  }>;
+  
+  // Navigation actions
+  canEdit: boolean;
+  canDelete: boolean;
+  canCreate: boolean;
 }
 
-// =============================================================================
-// TANSTACK TABLE INTEGRATION
-// =============================================================================
+// ============================================================================
+// TABLE AND UI COMPONENT TYPES
+// ============================================================================
 
 /**
- * Table column definitions for relationship listing
+ * TanStack Table column configuration for relationship listing
+ * Supports virtualization and custom cell rendering
  */
-export interface RelationshipTableColumn {
-  /** Column identifier */
-  id: string;
-  /** Column header */
+export interface RelationshipTableColumn extends ColumnDef<RelationshipListItem> {
+  id: keyof RelationshipListItem | 'actions';
   header: string;
-  /** Column accessor function */
-  accessorKey?: keyof RelationshipSchema;
-  /** Custom cell renderer */
-  cell?: (info: any) => React.ReactNode;
-  /** Column sorting */
-  enableSorting?: boolean;
-  /** Column filtering */
-  enableColumnFilter?: boolean;
-  /** Column width */
   size?: number;
-  /** Column minimum width */
   minSize?: number;
-  /** Column maximum width */
   maxSize?: number;
+  enableSorting?: boolean;
+  enableFiltering?: boolean;
+  enableResizing?: boolean;
 }
 
 /**
- * TanStack Table configuration for relationship listing
+ * Virtual scrolling configuration for large relationship datasets
+ * Optimized for 1000+ relationships per table
  */
-export interface RelationshipTableConfig extends TableConfiguration {
-  /** Table columns */
-  columns: ColumnDef<RelationshipSchema>[];
-  /** Virtual scrolling configuration */
-  virtualization?: {
-    enabled: boolean;
-    itemSize: number;
-    overscan: number;
-  };
-  /** Pagination configuration */
-  pagination?: {
+export interface RelationshipVirtualConfig {
+  enabled: boolean;
+  itemHeight: number;
+  overscan: number;
+  scrollMargin: number;
+  estimatedItemHeight: number;
+  measureElement?: (element: Element) => number;
+}
+
+/**
+ * Relationship table state management
+ * Integrates with TanStack Table and Virtual for optimal performance
+ */
+export interface RelationshipTableState {
+  data: RelationshipListItem[];
+  loading: boolean;
+  error?: string;
+  
+  // Filtering and sorting
+  filters: Record<string, any>;
+  sorting: Array<{ id: string; desc: boolean }>;
+  
+  // Pagination and virtualization
+  pagination: {
+    pageIndex: number;
     pageSize: number;
-    pageSizeOptions: number[];
-    showSizeSelector: boolean;
+    pageCount: number;
+    totalItems: number;
   };
-  /** Filtering configuration */
-  filtering?: {
-    enabled: boolean;
-    globalFilter: boolean;
-    columnFilters: boolean;
-  };
-  /** Sorting configuration */
-  sorting?: {
-    enabled: boolean;
-    multiSort: boolean;
-    defaultSort?: Array<{
-      id: string;
-      desc: boolean;
-    }>;
-  };
+  
+  virtualItems?: VirtualItem[];
+  
+  // Selection state
+  selectedRows: Set<string>;
+  
+  // UI state
+  columnVisibility: Record<string, boolean>;
+  columnSizing: Record<string, number>;
 }
-
-/**
- * Table row selection state
- */
-export interface RelationshipTableSelection {
-  /** Selected row IDs */
-  selectedRows: Record<string, boolean>;
-  /** Select all state */
-  isAllSelected: boolean;
-  /** Partially selected state */
-  isPartiallySelected: boolean;
-  /** Selection handlers */
-  toggleRow: (rowId: string) => void;
-  toggleAll: () => void;
-  clearSelection: () => void;
-  getSelectedData: () => RelationshipSchema[];
-}
-
-// =============================================================================
-// COMPONENT PROP INTERFACES
-// =============================================================================
 
 /**
  * Relationship form component props
+ * Provides type-safe prop interface for React components
  */
 export interface RelationshipFormProps extends BaseComponent {
-  /** Current relationship data (for editing) */
-  relationship?: RelationshipSchema;
-  /** Service options for dropdowns */
-  serviceOptions: SelectOption[];
-  /** Available local fields */
-  localFields: SelectOption[];
-  /** Form submission handler */
+  mode: 'create' | 'edit';
+  initialData?: Partial<RelationshipFormData>;
+  serviceName: string;
+  tableName: string;
   onSubmit: (data: RelationshipFormData) => Promise<void>;
-  /** Form cancellation handler */
   onCancel: () => void;
-  /** Validation mode */
-  validationMode?: FormValidationMode;
-  /** Show advanced options */
-  showAdvanced?: boolean;
-  /** Read-only mode */
-  readOnly?: boolean;
+  
+  // Form configuration
+  enableJunctionTable?: boolean;
+  availableServices?: ServiceOption[];
+  availableFields?: FieldOption[];
+  
+  // Validation configuration
+  validationMode?: 'onChange' | 'onBlur' | 'onSubmit';
+  revalidateMode?: 'onChange' | 'onBlur';
 }
 
 /**
- * Relationship table component props
+ * Relationship list component props
+ * Supports filtering, sorting, and navigation
  */
-export interface RelationshipTableProps extends BaseComponent {
-  /** Relationships to display */
-  relationships: RelationshipSchema[];
-  /** Loading state */
+export interface RelationshipListProps extends BaseComponent {
+  serviceName: string;
+  tableName: string;
+  relationships: RelationshipListItem[];
   loading?: boolean;
-  /** Error state */
   error?: string;
-  /** Table configuration */
-  config?: Partial<RelationshipTableConfig>;
-  /** Row click handler */
-  onRowClick?: (relationship: RelationshipSchema) => void;
-  /** Bulk action handlers */
-  onBulkDelete?: (relationships: RelationshipSchema[]) => Promise<void>;
-  /** Pagination state */
-  pagination?: PaginationMeta;
-  /** Page change handler */
-  onPageChange?: (page: number) => void;
+  
+  // Table configuration
+  enableVirtualization?: boolean;
+  enableFiltering?: boolean;
+  enableSorting?: boolean;
+  enableSelection?: boolean;
+  
+  // Event handlers
+  onCreateNew?: () => void;
+  onEdit?: (relationshipId: string) => void;
+  onDelete?: (relationshipId: string) => void;
+  onSelectionChange?: (selectedIds: string[]) => void;
+  
+  // Pagination
+  pagination?: {
+    currentPage: number;
+    pageSize: number;
+    totalItems: number;
+    onPageChange: (page: number) => void;
+  };
 }
 
-/**
- * Relationship type selector props
- */
-export interface RelationshipTypeSelectorProps extends FormFieldProps {
-  /** Current relationship type */
-  value: RelationshipType;
-  /** Type change handler */
-  onChange: (type: RelationshipType) => void;
-  /** Show descriptions */
-  showDescriptions?: boolean;
-  /** Disabled types */
-  disabledTypes?: RelationshipType[];
-}
-
-/**
- * Junction table configurator props
- */
-export interface JunctionTableConfigProps extends BaseComponent {
-  /** Form control */
-  form: RelationshipFormReturn;
-  /** Available services */
-  services: SelectOption[];
-  /** Enabled state */
-  enabled: boolean;
-  /** Required state */
-  required: boolean;
-}
-
-// =============================================================================
-// HOOK INTERFACES
-// =============================================================================
+// ============================================================================
+// HOOK AND STATE MANAGEMENT TYPES
+// ============================================================================
 
 /**
  * Relationship management hook return type
+ * Provides comprehensive relationship CRUD operations
  */
-export interface UseRelationshipManagement {
-  /** Current relationships */
-  relationships: RelationshipSchema[];
-  /** Loading state */
+export interface UseRelationshipManagementReturn {
+  // Data state
+  relationships: RelationshipListItem[];
+  currentRelationship?: RelationshipSchema;
   loading: boolean;
-  /** Error state */
-  error: string | null;
-  /** Create relationship */
-  createRelationship: (data: RelationshipFormData) => Promise<RelationshipCreateResponse>;
-  /** Update relationship */
-  updateRelationship: (id: string, data: Partial<RelationshipFormData>) => Promise<RelationshipUpdateResponse>;
-  /** Delete relationship */
-  deleteRelationship: (id: string) => Promise<RelationshipDeleteResponse>;
-  /** Discover relationships */
-  discoverRelationships: (config: RelationshipDiscoveryConfig) => Promise<RelationshipDiscoveryResult>;
-  /** Validate relationship */
-  validateRelationship: (data: RelationshipFormData) => Promise<RelationshipValidationResponse>;
-  /** Refresh relationships */
-  refresh: () => Promise<void>;
+  error?: string;
+  
+  // CRUD operations
+  createRelationship: (data: RelationshipFormData) => Promise<RelationshipSchema>;
+  updateRelationship: (id: string, data: Partial<RelationshipFormData>) => Promise<RelationshipSchema>;
+  deleteRelationship: (id: string) => Promise<void>;
+  getRelationship: (id: string) => Promise<RelationshipSchema>;
+  
+  // List operations
+  refreshRelationships: () => Promise<void>;
+  filterRelationships: (filter: string) => void;
+  sortRelationships: (field: keyof RelationshipListItem, order: 'asc' | 'desc') => void;
+  
+  // Validation operations
+  validateRelationship: (data: RelationshipFormData) => Promise<boolean>;
+  testJunctionTable: (config: JunctionTableConfig) => Promise<boolean>;
 }
 
 /**
- * Relationship validation hook return type
+ * Relationship form validation hook return type
+ * Provides real-time validation under 100ms requirement
  */
-export interface UseRelationshipValidation {
-  /** Validation state */
-  validationState: ValidationState;
-  /** Validation errors */
-  errors: ValidationError[];
-  /** Validation warnings */
+export interface UseRelationshipValidationReturn {
+  // Validation state
+  isValid: boolean;
+  errors: RelationshipFormErrors;
   warnings: string[];
-  /** Validate field */
-  validateField: (field: RelationshipFormField, value: any) => Promise<ValidationError[]>;
-  /** Validate form */
-  validateForm: (data: RelationshipFormData) => Promise<RelationshipValidationResponse>;
-  /** Clear validation */
-  clearValidation: () => void;
+  
+  // Validation functions
+  validateField: (field: keyof RelationshipFormData, value: any) => Promise<FieldError | undefined>;
+  validateForm: (data: RelationshipFormData) => Promise<RelationshipFormErrors>;
+  clearErrors: () => void;
+  
+  // Async validation
+  validateRelationshipName: (name: string) => Promise<boolean>;
+  validateFieldExists: (serviceName: string, tableName: string, fieldName: string) => Promise<boolean>;
+  validateJunctionConfig: (config: Partial<JunctionTableConfig>) => Promise<boolean>;
 }
 
-// =============================================================================
-// UTILITY TYPES
-// =============================================================================
+// ============================================================================
+// EXPORT UTILITIES AND TYPE GUARDS
+// ============================================================================
 
 /**
- * Extract relationship type from union
+ * Type guard to check if a relationship requires junction table
  */
-export type ExtractRelationshipType<T extends RelationshipType> = T;
+export const requiresJunctionTable = (type: RelationshipType): boolean => {
+  return type === 'many_many';
+};
 
 /**
- * Junction table requirement based on relationship type
+ * Type guard to validate relationship schema
  */
-export type JunctionRequirementForType<T extends RelationshipType> = 
-  T extends 'many_many' ? 'required' : 'disabled';
+export const isValidRelationshipSchema = (data: any): data is RelationshipSchema => {
+  return RelationshipBaseSchema.safeParse(data).success;
+};
 
 /**
- * Form fields required for relationship type
+ * Type guard to validate form data
  */
-export type RequiredFieldsForType<T extends RelationshipType> = 
-  T extends 'many_many' 
-    ? RelationshipFormField[]
-    : Exclude<RelationshipFormField, 'junction_service_id' | 'junction_table' | 'junction_local_field' | 'junction_foreign_field'>[];
+export const isValidRelationshipFormData = (data: any): data is RelationshipFormData => {
+  return RelationshipFormSchema.safeParse(data).success;
+};
 
 /**
- * Relationship configuration validation rules
+ * Default relationship type configurations
+ * Provides metadata for UI components and validation
  */
-export interface RelationshipValidationRules {
-  /** Required fields validation */
-  requiredFields: RelationshipFormField[];
-  /** Custom validation functions */
-  customValidations: Array<{
-    field: RelationshipFormField;
-    validator: (value: any, formData: RelationshipFormData) => Promise<boolean>;
-    message: string;
-  }>;
-  /** Cross-field validation rules */
-  crossFieldValidations: Array<{
-    fields: RelationshipFormField[];
-    validator: (formData: RelationshipFormData) => Promise<boolean>;
-    message: string;
-  }>;
-}
-
-// =============================================================================
-// CONSTANTS AND DEFAULTS
-// =============================================================================
+export const RELATIONSHIP_TYPE_CONFIGS: Record<RelationshipType, RelationshipTypeConfig> = {
+  belongs_to: {
+    value: 'belongs_to',
+    label: 'Belongs To',
+    description: 'Child record belongs to parent record (many-to-one)',
+    requiresJunctionTable: false,
+    supportedCardinalities: ['many-to-one'],
+    icon: 'arrow-up-right',
+  },
+  has_many: {
+    value: 'has_many',
+    label: 'Has Many',
+    description: 'Parent record has many child records (one-to-many)',
+    requiresJunctionTable: false,
+    supportedCardinalities: ['one-to-many'],
+    icon: 'arrow-down-right',
+  },
+  has_one: {
+    value: 'has_one',
+    label: 'Has One',
+    description: 'Parent record has one child record (one-to-one)',
+    requiresJunctionTable: false,
+    supportedCardinalities: ['one-to-one'],
+    icon: 'arrow-right',
+  },
+  many_many: {
+    value: 'many_many',
+    label: 'Many To Many',
+    description: 'Many-to-many relationship through junction table',
+    requiresJunctionTable: true,
+    supportedCardinalities: ['many-to-many'],
+    icon: 'arrows-right-left',
+  },
+};
 
 /**
- * Default relationship form data
+ * Default form values for relationship creation
  */
-export const DEFAULT_RELATIONSHIP_FORM_DATA: RelationshipFormData = {
-  name: '',
+export const DEFAULT_RELATIONSHIP_FORM_DATA: Partial<RelationshipFormData> = {
+  alwaysFetch: false,
+  isVirtual: true,
   alias: '',
   label: '',
   description: '',
-  type: 'belongs_to',
-  always_fetch: false,
-  is_virtual: true,
-  flatten: false,
-  flatten_drop_prefix: false,
-  local_field: '',
-  foreign_service_id: '',
-  foreign_table: '',
-  foreign_field: '',
-  junction_service_id: null,
-  junction_table: null,
-  junction_local_field: null,
-  junction_foreign_field: null,
-  on_update: 'restrict',
-  on_delete: 'restrict'
 };
 
-/**
- * Relationship type options for UI components
- */
-export const RELATIONSHIP_TYPE_OPTIONS: Array<SelectOption & { description: string }> = [
-  {
-    value: 'belongs_to',
-    label: 'Belongs To',
-    description: 'This table belongs to another table (many-to-one relationship)'
-  },
-  {
-    value: 'has_many',
-    label: 'Has Many',
-    description: 'This table has many records in another table (one-to-many relationship)'
-  },
-  {
-    value: 'has_one',
-    label: 'Has One',
-    description: 'This table has one record in another table (one-to-one relationship)'
-  },
-  {
-    value: 'many_many',
-    label: 'Many to Many',
-    description: 'This table has a many-to-many relationship through a junction table'
-  }
-];
-
-/**
- * Integrity action options for UI components
- */
-export const INTEGRITY_ACTION_OPTIONS: SelectOption[] = [
-  { value: 'cascade', label: 'Cascade' },
-  { value: 'restrict', label: 'Restrict' },
-  { value: 'set_null', label: 'Set NULL' },
-  { value: 'set_default', label: 'Set Default' },
-  { value: 'no_action', label: 'No Action' }
-];
-
-/**
- * Default table configuration for relationship listing
- */
-export const DEFAULT_RELATIONSHIP_TABLE_CONFIG: RelationshipTableConfig = {
-  columns: [], // Will be populated by the component
-  virtualization: {
-    enabled: true,
-    itemSize: 50,
-    overscan: 10
-  },
-  pagination: {
-    pageSize: 25,
-    pageSizeOptions: [10, 25, 50, 100],
-    showSizeSelector: true
-  },
-  filtering: {
-    enabled: true,
-    globalFilter: true,
-    columnFilters: true
-  },
-  sorting: {
-    enabled: true,
-    multiSort: false,
-    defaultSort: [{ id: 'name', desc: false }]
-  }
-};
-
-// =============================================================================
-// TYPE EXPORTS
-// =============================================================================
-
+// Type exports for external consumption
 export type {
   // Core types
   RelationshipType,
-  RelationshipStatus,
-  JunctionRequirement,
-  ValidationState,
-  
-  // Schema types
   RelationshipSchema,
-  RelationshipDiscoveryConfig,
-  RelationshipDiscoveryResult,
+  RelationshipListItem,
   
   // Form types
   RelationshipFormData,
-  RelationshipFormReturn,
-  RelationshipFormField,
-  FormValidationMode,
-  FormSubmissionState,
+  RelationshipFormErrors,
+  RelationshipFormState,
   
   // API types
-  RelationshipApiEndpoints,
+  RelationshipApiResponse,
+  RelationshipResponse,
   RelationshipListResponse,
-  RelationshipCreateResponse,
-  RelationshipUpdateResponse,
-  RelationshipDeleteResponse,
-  RelationshipDiscoveryResponse,
-  RelationshipValidationResponse,
-  RelationshipApiOptions,
   
-  // Routing types
-  RelationshipPageParams,
-  RelationshipSearchParams,
-  RelationshipRoutes,
-  
-  // Table types
-  RelationshipTableColumn,
-  RelationshipTableConfig,
-  RelationshipTableSelection,
-  
-  // Component types
+  // UI types
   RelationshipFormProps,
-  RelationshipTableProps,
-  RelationshipTypeSelectorProps,
-  JunctionTableConfigProps,
+  RelationshipListProps,
+  RelationshipTableState,
+  
+  // Navigation types
+  RelationshipRouteParams,
+  RelationshipSearchParams,
+  RelationshipNavigationContext,
   
   // Hook types
-  UseRelationshipManagement,
-  UseRelationshipValidation,
-  
-  // Utility types
-  ExtractRelationshipType,
-  JunctionRequirementForType,
-  RequiredFieldsForType,
-  RelationshipValidationRules
-};
-
-export {
-  // Validation schemas
-  relationshipTypeSchema,
-  integrityActionSchema,
-  relationshipFormSchema,
-  relationshipDiscoveryConfigSchema,
-  
-  // Constants
-  DEFAULT_RELATIONSHIP_FORM_DATA,
-  RELATIONSHIP_TYPE_OPTIONS,
-  INTEGRITY_ACTION_OPTIONS,
-  DEFAULT_RELATIONSHIP_TABLE_CONFIG
+  UseRelationshipManagementReturn,
+  UseRelationshipValidationReturn,
 };
