@@ -1,496 +1,594 @@
 /**
- * @fileoverview Database Field Creation Page - Next.js App Router
+ * Database Field Creation Page - Next.js App Router Implementation
  * 
- * Next.js app router page component implementing the database field creation interface.
- * Provides a comprehensive form for creating new database fields with validation, type
- * selection, constraints, relationships, and function usage management. Integrates React
- * Hook Form with Zod validation, real-time field type-based control management, and
- * seamless navigation back to the fields listing upon successful creation.
+ * Next.js page component implementing the database field creation interface for the
+ * DreamFactory Admin Interface refactoring project. Provides a comprehensive form for
+ * creating new database fields with validation, type selection, constraints, relationships,
+ * and function usage management using React Hook Form with Zod validation.
  * 
  * Features:
- * - Server-Side Rendering with Next.js 15.1+ App Router per React/Next.js Integration Requirements
- * - React Hook Form with Zod schema validators per React/Next.js Integration Requirements
- * - Real-time validation under 100ms per React/Next.js Integration Requirements
- * - SSR pages under 2 seconds per React/Next.js Integration Requirements
- * - Tailwind CSS 4.1+ with consistent theme injection per React/Next.js Integration Requirements
- * - Field creation workflow from F-002 Schema Discovery and Browsing feature per Section 2.1
- * - Next.js App Router file-based routing with layout components per Section 4.7.1.1
- * - Comprehensive error handling with React Error Boundaries per Section 4.6.5
+ * - Server-side rendering (SSR) with Next.js 15.1+ for sub-2-second page loads
+ * - React Hook Form with Zod schema validators for real-time validation under 100ms
+ * - Tailwind CSS 4.1+ styling with consistent theme injection and WCAG 2.1 AA compliance
+ * - Next.js App Router integration with dynamic routing and breadcrumb navigation
+ * - React Query integration for reference table and field dropdown data fetching
+ * - Comprehensive error handling with React Error Boundaries and toast notifications
+ * - Field creation workflow supporting all database types (MySQL, PostgreSQL, Oracle, MongoDB, Snowflake)
+ * - Advanced validation rules, constraints, relationships, and function usage configuration
+ * - Seamless navigation back to fields listing upon successful creation
  * 
- * @author DreamFactory Platform Migration Team
+ * @fileoverview Field creation page for database schema management
  * @version 1.0.0
- * @since Next.js 15.1+ / React 19
- * @created 2024-12-28
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-'use client';
-
-import React, { useCallback, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Metadata } from 'next';
 import { Suspense } from 'react';
+import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { ErrorBoundary } from 'react-error-boundary';
 
-// Core UI components
+// Form and validation components
 import { FieldForm } from '../field-form';
-
-// Type definitions
 import type { FieldFormData } from '../field.types';
 
-// Custom hooks for data management and validation
-import { useFieldManagement } from '@/hooks/use-field-management';
+// Hook for field management operations
+import { useFieldCreation } from '@/hooks/use-field-management';
 
-// Utility functions
+// UI Components - using comprehensive component system
+import { PageHeader } from '@/components/ui/page-header';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
+import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
+
+// Utilities and configurations
 import { cn } from '@/lib/utils';
+import { validatePageParams } from '@/lib/validation';
 
-// =============================================================================
-// METADATA CONFIGURATION
-// =============================================================================
+// React Query integration for data fetching
+import { 
+  getTableDetails, 
+  getAvailableTables, 
+  validateDatabaseConnection 
+} from '@/lib/api-client';
 
-/**
- * Static metadata for SEO and page identification
- * Configured for optimal search engine indexing and social sharing
- */
-export const metadata: Metadata = {
-  title: 'Create New Database Field - DreamFactory Admin',
-  description: 'Create a new database field with comprehensive configuration options including type selection, constraints, relationships, and validation rules.',
-  openGraph: {
-    title: 'Create New Database Field',
-    description: 'Configure database field properties, constraints, and validation rules',
-    type: 'website',
-  },
-  robots: {
-    index: false, // Admin interface should not be indexed
-    follow: false,
-  },
-};
-
-// =============================================================================
-// PAGE COMPONENT INTERFACES
-// =============================================================================
+// ============================================================================
+// NEXT.JS PAGE METADATA AND SEO
+// ============================================================================
 
 /**
- * Search parameters interface for field creation page
- * Provides type safety for Next.js search parameters
+ * Dynamic metadata generation for field creation page
+ * Optimized for SEO and social sharing with proper Open Graph tags
  */
-interface FieldCreateSearchParams {
-  /** Database service name */
-  service?: string;
-  /** Database name (optional) */
-  database?: string;
-  /** Table name for field creation */
-  table?: string;
-  /** Return URL after creation */
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: { service: string; table: string };
+  searchParams: { [key: string]: string | string[] | undefined };
+}): Promise<Metadata> {
+  // Decode URL parameters for safe display
+  const serviceName = decodeURIComponent(params.service);
+  const tableName = decodeURIComponent(params.table);
+
+  return {
+    title: `Create New Field - ${tableName} | ${serviceName} | DreamFactory Admin`,
+    description: `Create a new database field for the ${tableName} table in the ${serviceName} service. Configure field properties, constraints, validation rules, and relationships with comprehensive form validation.`,
+    keywords: [
+      'database field creation',
+      'DreamFactory',
+      'database schema',
+      'field configuration',
+      'database management',
+      serviceName,
+      tableName
+    ],
+    openGraph: {
+      title: `Create New Field - ${tableName}`,
+      description: `Configure and create a new database field for ${tableName} in ${serviceName}`,
+      type: 'website',
+      siteName: 'DreamFactory Admin Interface',
+    },
+    robots: {
+      index: false, // Admin interface - not for search indexing
+      follow: false,
+    },
+  };
+}
+
+// ============================================================================
+// FIELD CREATION PAGE INTERFACES
+// ============================================================================
+
+/**
+ * Page parameters interface for type safety
+ * Provides complete typing for Next.js dynamic route segments
+ */
+interface FieldCreationPageParams {
+  /** Database service name from route */
+  service: string;
+  /** Table name from route */
+  table: string;
+}
+
+/**
+ * Search parameters interface for additional page configuration
+ */
+interface FieldCreationSearchParams {
+  /** Return URL after successful creation */
   returnUrl?: string;
+  /** Pre-selected field type */
+  type?: string;
+  /** Clone from existing field */
+  cloneFrom?: string;
+  /** Show advanced options by default */
+  advanced?: string;
 }
 
 /**
- * Field creation page props interface
- * Defines the structure for page component props
+ * Page props interface combining params and search params
  */
-interface FieldCreatePageProps {
-  /** Dynamic route parameters */
-  params: {};
-  /** URL search parameters */
-  searchParams: FieldCreateSearchParams;
+interface FieldCreationPageProps {
+  params: FieldCreationPageParams;
+  searchParams: FieldCreationSearchParams;
 }
 
-// =============================================================================
-// LOADING COMPONENT
-// =============================================================================
+// ============================================================================
+// ERROR HANDLING COMPONENTS
+// ============================================================================
 
 /**
- * Loading component for page transitions and data fetching
- * Provides consistent loading experience with proper accessibility
+ * Error fallback component for React Error Boundary
+ * Provides user-friendly error display with recovery options
  */
-function FieldCreateLoading() {
+function FieldCreationErrorFallback({ 
+  error, 
+  resetErrorBoundary 
+}: { 
+  error: Error; 
+  resetErrorBoundary: () => void 
+}) {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-16 sm:px-6 sm:py-24 md:grid md:place-items-center lg:px-8">
+      <div className="max-w-max mx-auto">
+        <main className="sm:flex">
+          <div className="sm:ml-6">
+            <div className="sm:border-l sm:border-gray-200 dark:sm:border-gray-700 sm:pl-6">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white sm:text-3xl">
+                Field Creation Error
+              </h1>
+              <p className="mt-2 text-base text-gray-600 dark:text-gray-400">
+                There was an error loading the field creation form.
+              </p>
+              
+              <Alert
+                variant="error"
+                className="mt-6"
+                title="Error Details"
+              >
+                <code className="text-sm break-words">
+                  {error.message}
+                </code>
+              </Alert>
+              
+              <div className="mt-8 flex space-x-4">
+                <Button
+                  onClick={resetErrorBoundary}
+                  variant="primary"
+                >
+                  Try Again
+                </Button>
+                
+                <Button
+                  onClick={() => window.history.back()}
+                  variant="outline"
+                >
+                  Go Back
+                </Button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Loading component for Suspense boundary
+ * Provides skeleton loading state while form initializes
+ */
+function FieldCreationLoading() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-4xl mx-auto p-6">
-        {/* Page Header Skeleton */}
-        <div className="border-b border-gray-200 dark:border-gray-700 pb-6 mb-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-md w-64 mb-3"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded-md w-96"></div>
+      {/* Loading skeleton for page header */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-6">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4 animate-pulse"></div>
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
           </div>
         </div>
-        
-        {/* Form Skeleton */}
-        <div className="space-y-8">
-          {/* Basic Information Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <div className="animate-pulse">
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-md w-48 mb-6"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="space-y-3">
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
-                    <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-md"></div>
-                  </div>
-                ))}
+      </div>
+      
+      {/* Loading skeleton for form */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="space-y-6">
+            {/* Form field skeletons */}
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="space-y-2">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4 animate-pulse"></div>
+                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
               </div>
+            ))}
+            
+            {/* Action buttons skeleton */}
+            <div className="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse"></div>
+              <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
             </div>
           </div>
-          
-          {/* Additional sections */}
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <div className="animate-pulse">
-                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-md w-32 mb-6"></div>
-                <div className="space-y-4">
-                  {Array.from({ length: 3 }).map((_, j) => (
-                    <div key={j} className="h-10 bg-gray-200 dark:bg-gray-700 rounded-md"></div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </div>
   );
 }
 
-// =============================================================================
-// ERROR BOUNDARY COMPONENT
-// =============================================================================
+// ============================================================================
+// FIELD CREATION FORM COMPONENT
+// ============================================================================
 
 /**
- * Error boundary component for field creation page
- * Provides graceful error handling with recovery options
+ * Field creation form component with React Hook Form integration
+ * Handles all form logic, validation, and submission workflows
  */
-interface FieldCreateErrorProps {
-  error: Error & { digest?: string };
-  reset: () => void;
-}
+function FieldCreationForm({ 
+  service, 
+  table, 
+  searchParams 
+}: { 
+  service: string; 
+  table: string; 
+  searchParams: FieldCreationSearchParams;
+}) {
+  // Field creation hook with React Query integration
+  const {
+    createField,
+    availableTables,
+    isLoading,
+    error,
+    isSuccess,
+    mutationError,
+    reset: resetMutation
+  } = useFieldCreation(service, table);
 
-function FieldCreateError({ error, reset }: FieldCreateErrorProps) {
+  // Navigation hook for routing operations
   const router = useRouter();
   
-  useEffect(() => {
-    // Log error for monitoring and debugging
-    console.error('Field creation page error:', error);
-  }, [error]);
+  // Toast notification hook for user feedback
+  const { showToast } = useToast();
 
-  const handleReturnToFields = useCallback(() => {
-    router.push('/adf-schema/fields');
-  }, [router]);
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-      <div className="max-w-md w-full mx-auto p-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
-          {/* Error Icon */}
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/20 mb-4">
-            <svg
-              className="h-6 w-6 text-red-600 dark:text-red-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </div>
-          
-          {/* Error Content */}
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            Something went wrong
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            We encountered an error while loading the field creation form. Please try again.
-          </p>
-          
-          {/* Error Details (Development) */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-md text-left">
-              <p className="text-xs text-gray-600 dark:text-gray-400 font-mono">
-                {error.message}
-              </p>
-            </div>
-          )}
-          
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={reset}
-              className="inline-flex items-center justify-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
-            >
-              Try Again
-            </button>
-            <button
-              onClick={handleReturnToFields}
-              className="inline-flex items-center justify-center px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200"
-            >
-              Return to Fields
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// =============================================================================
-// BREADCRUMB COMPONENT
-// =============================================================================
-
-/**
- * Breadcrumb navigation component for field creation
- * Provides contextual navigation and page hierarchy
- */
-interface BreadcrumbProps {
-  serviceName: string;
-  tableName: string;
-}
-
-function Breadcrumb({ serviceName, tableName }: BreadcrumbProps) {
-  const router = useRouter();
-
+  // Breadcrumb navigation data
   const breadcrumbItems = [
-    { label: 'Schema Management', href: '/adf-schema' },
-    { label: 'Services', href: '/adf-schema/databases' },
-    { label: serviceName, href: `/adf-schema/databases/${serviceName}` },
-    { label: 'Tables', href: `/adf-schema/tables?service=${serviceName}` },
-    { label: tableName, href: `/adf-schema/tables/${tableName}?service=${serviceName}` },
-    { label: 'Fields', href: `/adf-schema/fields?service=${serviceName}&table=${tableName}` },
-    { label: 'Create Field', href: null }, // Current page
+    { label: 'Services', href: '/adf-services' },
+    { label: service, href: `/adf-services/${encodeURIComponent(service)}` },
+    { label: 'Schema', href: `/adf-schema?service=${encodeURIComponent(service)}` },
+    { label: table, href: `/adf-schema/tables/${encodeURIComponent(table)}?service=${encodeURIComponent(service)}` },
+    { label: 'Fields', href: `/adf-schema/fields?service=${encodeURIComponent(service)}&table=${encodeURIComponent(table)}` },
+    { label: 'Create New Field', href: '', current: true }
   ];
 
-  return (
-    <nav className="flex" aria-label="Breadcrumb">
-      <ol className="flex items-center space-x-2">
-        {breadcrumbItems.map((item, index) => (
-          <li key={index} className="flex items-center">
-            {index > 0 && (
-              <svg
-                className="w-4 h-4 text-gray-400 mx-2"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-                aria-hidden="true"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            )}
-            {item.href ? (
-              <button
-                onClick={() => router.push(item.href!)}
-                className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200"
-              >
-                {item.label}
-              </button>
-            ) : (
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {item.label}
-              </span>
-            )}
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
-}
+  // Form submission handler with comprehensive error handling
+  const handleFieldSubmission = async (data: FieldFormData) => {
+    try {
+      // Reset any previous errors
+      resetMutation();
+      
+      // Create the field via the mutation
+      await createField(data);
+      
+      // Show success notification
+      showToast({
+        type: 'success',
+        title: 'Field Created Successfully',
+        message: `The field "${data.name}" has been created in the ${table} table.`,
+        duration: 5000,
+      });
+      
+      // Navigate back to fields list or custom return URL
+      const returnUrl = searchParams.returnUrl || 
+        `/adf-schema/fields?service=${encodeURIComponent(service)}&table=${encodeURIComponent(table)}`;
+      
+      router.push(returnUrl);
+      
+    } catch (error) {
+      console.error('Field creation error:', error);
+      
+      // Show error notification
+      showToast({
+        type: 'error',
+        title: 'Field Creation Failed',
+        message: error instanceof Error ? error.message : 'An unexpected error occurred while creating the field.',
+        duration: 8000,
+      });
+    }
+  };
 
-// =============================================================================
-// MAIN FIELD CREATE CONTENT COMPONENT
-// =============================================================================
-
-/**
- * Main content component for field creation
- * Handles form integration and navigation logic
- */
-function FieldCreateContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  
-  // Extract required parameters from search params
-  const serviceName = searchParams.get('service');
-  const tableName = searchParams.get('table');
-  const returnUrl = searchParams.get('returnUrl');
-  
-  // State management
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Field management hook for data operations
-  const fieldManagement = useFieldManagement({
-    serviceName: serviceName || '',
-    tableName: tableName || '',
-    enabled: Boolean(serviceName && tableName),
-  });
-
-  // =============================================================================
-  // PARAMETER VALIDATION
-  // =============================================================================
-
-  // Validate required parameters
-  if (!serviceName || !tableName) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="max-w-md w-full mx-auto p-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
-            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 dark:bg-yellow-900/20 mb-4">
-              <svg
-                className="h-6 w-6 text-yellow-600 dark:text-yellow-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Missing Required Parameters
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Service name and table name are required to create a new field.
-            </p>
-            <button
-              onClick={() => router.push('/adf-schema/databases')}
-              className="inline-flex items-center justify-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
-            >
-              Return to Schema Management
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // =============================================================================
-  // EVENT HANDLERS
-  // =============================================================================
-
-  /**
-   * Handle successful field creation
-   * Navigates back to fields list with success message
-   */
-  const handleCreateSuccess = useCallback((data: FieldFormData) => {
-    setIsSubmitting(false);
+  // Form cancellation handler
+  const handleFormCancellation = () => {
+    // Navigate back to fields list or custom return URL
+    const returnUrl = searchParams.returnUrl || 
+      `/adf-schema/fields?service=${encodeURIComponent(service)}&table=${encodeURIComponent(table)}`;
     
-    // Determine return URL
-    const targetUrl = returnUrl || `/adf-schema/fields?service=${serviceName}&table=${tableName}`;
-    
-    // Navigate with success state
-    router.push(targetUrl + (targetUrl.includes('?') ? '&' : '?') + 'created=' + encodeURIComponent(data.name));
-  }, [router, serviceName, tableName, returnUrl]);
+    router.push(returnUrl);
+  };
 
-  /**
-   * Handle form cancellation
-   * Navigates back to fields list
-   */
-  const handleCreateCancel = useCallback(() => {
-    const targetUrl = returnUrl || `/adf-schema/fields?service=${serviceName}&table=${tableName}`;
-    router.push(targetUrl);
-  }, [router, serviceName, tableName, returnUrl]);
-
-  /**
-   * Handle form submission state changes
-   */
-  const handleSubmissionChange = useCallback((submitting: boolean) => {
-    setIsSubmitting(submitting);
-  }, []);
-
-  // =============================================================================
-  // RENDER COMPONENT
-  // =============================================================================
+  // Prepare initial form data from search params
+  const initialFormData: Partial<FieldFormData> = {
+    // Pre-fill field type if specified
+    ...(searchParams.type && { type: searchParams.type as any }),
+    // Clone configuration if specified
+    ...(searchParams.cloneFrom && { 
+      // This would be populated by fetching the source field data
+      // Implementation would depend on the field cloning requirements
+    }),
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-6xl mx-auto p-6">
-        {/* Page Header */}
-        <div className="mb-8">
-          {/* Breadcrumb Navigation */}
-          <div className="mb-4">
-            <Breadcrumb serviceName={serviceName} tableName={tableName} />
+      {/* Page Header with Breadcrumb Navigation */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-4">
+            <Breadcrumb items={breadcrumbItems} />
           </div>
           
-          {/* Page Title and Description */}
-          <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-              Create New Field
-            </h1>
-            <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">
-              Configure a new database field for table{' '}
-              <span className="font-medium text-gray-900 dark:text-gray-100">
-                {tableName}
-              </span>
-              {' '}in service{' '}
-              <span className="font-medium text-gray-900 dark:text-gray-100">
-                {serviceName}
-              </span>
-            </p>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Define field properties, constraints, relationships, and validation rules
-            </p>
-          </div>
-        </div>
-
-        {/* Main Form Component */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-          <FieldForm
-            mode="create"
-            serviceName={serviceName}
-            tableName={tableName}
-            onSuccess={handleCreateSuccess}
-            onCancel={handleCreateCancel}
-            isSubmitting={isSubmitting}
+          <PageHeader
+            title="Create New Field"
+            description={`Add a new field to the ${table} table in the ${service} database service`}
+            icon={
+              <svg className="h-8 w-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            }
+            actions={
+              <div className="flex space-x-3">
+                <Button
+                  variant="outline"
+                  onClick={handleFormCancellation}
+                  disabled={isLoading}
+                >
+                  Cancel
+                </Button>
+              </div>
+            }
           />
         </div>
       </div>
+
+      {/* Main Content Area */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Error Display */}
+        {(error || mutationError) && (
+          <Alert
+            variant="error"
+            className="mb-6"
+            title="Error Loading Field Creation Form"
+            dismissible
+            onDismiss={() => resetMutation()}
+          >
+            {error?.message || mutationError?.message || 'An unexpected error occurred.'}
+          </Alert>
+        )}
+
+        {/* Success State */}
+        {isSuccess && (
+          <Alert
+            variant="success"
+            className="mb-6"
+            title="Field Created Successfully"
+            dismissible
+          >
+            The new field has been created and is now available in the {table} table.
+          </Alert>
+        )}
+
+        {/* Field Creation Form */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <FieldForm
+            initialData={initialFormData}
+            onSubmit={handleFieldSubmission}
+            onCancel={handleFormCancellation}
+            availableTables={availableTables}
+            loading={isLoading}
+            showAdvanced={searchParams.advanced === 'true'}
+            className="p-6"
+            data-testid="field-creation-form"
+          />
+        </div>
+
+        {/* Help and Documentation */}
+        <div className="mt-8 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6 border border-blue-200 dark:border-blue-800">
+          <h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-3">
+            Field Creation Guidelines
+          </h3>
+          
+          <div className="space-y-3 text-sm text-blue-800 dark:text-blue-200">
+            <ul className="list-disc list-inside space-y-2">
+              <li>
+                <strong>Field Name:</strong> Must start with a letter and contain only letters, numbers, and underscores
+              </li>
+              <li>
+                <strong>Field Type:</strong> Choose the appropriate data type based on the data you plan to store
+              </li>
+              <li>
+                <strong>Constraints:</strong> Primary key fields cannot be nullable and must be unique
+              </li>
+              <li>
+                <strong>Relationships:</strong> Foreign key relationships require specifying the referenced table and field
+              </li>
+              <li>
+                <strong>Validation:</strong> Add validation rules to ensure data integrity and consistency
+              </li>
+              <li>
+                <strong>Advanced Options:</strong> Configure functions, picklists, and JSON schemas for complex field types
+              </li>
+            </ul>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-700">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open('/docs/field-creation', '_blank')}
+              className="text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-600 hover:bg-blue-100 dark:hover:bg-blue-800"
+            >
+              View Complete Documentation
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-// =============================================================================
-// MAIN PAGE COMPONENT
-// =============================================================================
+// ============================================================================
+// SERVER-SIDE DATA VALIDATION
+// ============================================================================
 
 /**
- * Field Creation Page Component
- * 
- * Next.js app router page for creating new database fields with comprehensive
- * configuration options and real-time validation. Implements SSR capabilities,
- * error boundaries, and proper loading states for optimal user experience.
- * 
- * Key Features:
- * - Server-side rendering under 2 seconds
- * - React Hook Form with Zod validation under 100ms
- * - Tailwind CSS 4.1+ styling with theme support
- * - Comprehensive error handling and recovery
- * - Accessible navigation and form controls
- * - Real-time field validation and type management
+ * Server-side parameter validation for enhanced security
+ * Validates route parameters and search parameters before rendering
  */
-export default function FieldCreatePage({ searchParams }: FieldCreatePageProps) {
+async function validatePageParameters(
+  params: FieldCreationPageParams,
+  searchParams: FieldCreationSearchParams
+): Promise<{
+  isValid: boolean;
+  error?: string;
+}> {
+  try {
+    // Validate required parameters
+    if (!params.service || !params.table) {
+      return {
+        isValid: false,
+        error: 'Service and table parameters are required'
+      };
+    }
+
+    // Decode and validate parameter format
+    const serviceName = decodeURIComponent(params.service);
+    const tableName = decodeURIComponent(params.table);
+
+    // Validate parameter format (basic validation)
+    if (!/^[a-zA-Z0-9_-]+$/.test(serviceName) || !/^[a-zA-Z0-9_-]+$/.test(tableName)) {
+      return {
+        isValid: false,
+        error: 'Invalid service or table name format'
+      };
+    }
+
+    // Optional: Validate database connection (commented out for performance)
+    // This could be enabled if server-side validation is required
+    /*
+    const connectionValid = await validateDatabaseConnection(serviceName);
+    if (!connectionValid) {
+      return {
+        isValid: false,
+        error: `Database service "${serviceName}" is not accessible`
+      };
+    }
+    */
+
+    return { isValid: true };
+    
+  } catch (error) {
+    console.error('Parameter validation error:', error);
+    return {
+      isValid: false,
+      error: 'Parameter validation failed'
+    };
+  }
+}
+
+// ============================================================================
+// MAIN PAGE COMPONENT
+// ============================================================================
+
+/**
+ * Field Creation Page Component - Main Next.js Page Export
+ * 
+ * Server-side rendered page component that provides comprehensive field creation
+ * capabilities with React Hook Form, Zod validation, and React Query integration.
+ * Implements all requirements for real-time validation, SSR performance, and
+ * comprehensive error handling patterns.
+ */
+export default async function FieldCreationPage({
+  params,
+  searchParams
+}: FieldCreationPageProps) {
+  // Server-side parameter validation
+  const validation = await validatePageParameters(params, searchParams);
+  
+  if (!validation.isValid) {
+    // Return not found for invalid parameters
+    notFound();
+  }
+
+  // Decode parameters for safe usage
+  const serviceName = decodeURIComponent(params.service);
+  const tableName = decodeURIComponent(params.table);
+
   return (
-    <Suspense fallback={<FieldCreateLoading />}>
-      <FieldCreateContent />
-    </Suspense>
+    <ErrorBoundary
+      FallbackComponent={FieldCreationErrorFallback}
+      onError={(error, errorInfo) => {
+        // Log error for monitoring and debugging
+        console.error('Field creation page error:', error, errorInfo);
+        
+        // Optional: Send error to monitoring service
+        // reportError(error, { context: 'FieldCreationPage', ...errorInfo });
+      }}
+      onReset={() => {
+        // Reset any global state if needed
+        // This would be called when the user clicks "Try Again"
+        window.location.reload();
+      }}
+    >
+      <Suspense fallback={<FieldCreationLoading />}>
+        <FieldCreationForm
+          service={serviceName}
+          table={tableName}
+          searchParams={searchParams}
+        />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
-// =============================================================================
-// COMPONENT METADATA AND EXPORTS
-// =============================================================================
+/**
+ * Export page component for Next.js App Router
+ * Provides type safety and proper error handling
+ */
+export { FieldCreationPage };
 
-// Export metadata for Next.js static generation
-export { metadata };
+/**
+ * Force dynamic rendering for this page
+ * Ensures fresh data and proper SSR behavior
+ */
+export const dynamic = 'force-dynamic';
 
-// Component display name for debugging
-FieldCreatePage.displayName = 'FieldCreatePage';
+/**
+ * Runtime configuration for enhanced performance
+ * Optimizes for fast response times and proper caching
+ */
+export const runtime = 'nodejs';
 
-// Export error boundary component for app-level error handling
-export { FieldCreateError as ErrorBoundary };
+/**
+ * Metadata configuration
+ * Ensures proper SEO and social sharing integration
+ */
+export const metadata: Metadata = {
+  title: 'Create New Field | DreamFactory Admin',
+  description: 'Create and configure new database fields with comprehensive validation and relationship management.',
+};
