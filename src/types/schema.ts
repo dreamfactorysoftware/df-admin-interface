@@ -1,32 +1,22 @@
 /**
- * Database Schema Discovery Types for React/Next.js Implementation
- * 
- * Comprehensive schema introspection types supporting:
- * - Hierarchical tree visualization with virtual scrolling (1000+ tables)
- * - React Query-powered caching and synchronization
- * - Zod validation schemas for type safety
- * - Progressive loading for large datasets
- * - Relationship mapping with React component composition
- * 
- * Migrated from Angular RxJS-based implementation to React Query patterns
- * with enhanced performance optimization for enterprise-scale databases.
+ * Database schema discovery types for React/Next.js application
+ * Supports schema introspection, virtual scrolling, and React Query caching
+ * Optimized for databases with 1000+ tables
  */
 
 import { z } from 'zod';
-import type { ReactNode } from 'react';
-import type { UseQueryResult } from '@tanstack/react-query';
-import type { VirtualItem } from '@tanstack/react-virtual';
 
-// =============================================================================
+// ============================================================================
 // CORE SCHEMA DISCOVERY TYPES
-// =============================================================================
+// ============================================================================
 
 /**
- * Database schema discovery metadata with React Query integration
- * Supports progressive loading and virtual scrolling for 1000+ tables
+ * Main schema data structure containing all database metadata
+ * Optimized for React Query caching and virtual scrolling
  */
-export interface SchemaDiscoveryData {
+export interface SchemaData {
   serviceName: string;
+  serviceId: number;
   databaseName: string;
   schemaName?: string;
   tables: SchemaTable[];
@@ -34,666 +24,240 @@ export interface SchemaDiscoveryData {
   procedures?: StoredProcedure[];
   functions?: DatabaseFunction[];
   sequences?: Sequence[];
-  
-  // Performance optimization metadata
+  lastDiscovered: string;
   totalTables: number;
   totalFields: number;
-  lastDiscovered: string;
-  discoveryDuration?: number;
+  totalRelationships: number;
   
-  // Virtual scrolling state
-  virtualItems?: VirtualItem[];
-  estimatedSize?: number;
-  overscan?: number;
+  // Virtual scrolling metadata
+  virtualScrollingEnabled: boolean;
+  pageSize: number;
+  estimatedRowHeight: number;
   
-  // React Query cache metadata
-  cacheKey: string[];
-  staleTime: number;
-  refetchInterval?: number;
+  // Progressive loading state
+  loadingState: SchemaLoadingState;
+  progressiveData?: ProgressiveSchemaData;
 }
 
 /**
- * Enhanced table metadata with React component composition support
- * Optimized for hierarchical tree visualization and performance
+ * Schema loading state for progressive data fetching
+ */
+export interface SchemaLoadingState {
+  isLoading: boolean;
+  isError: boolean;
+  error?: string;
+  loadedTables: number;
+  totalTables: number;
+  currentPage: number;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+}
+
+/**
+ * Progressive loading data structure for large schemas
+ */
+export interface ProgressiveSchemaData {
+  chunks: SchemaChunk[];
+  chunkSize: number;
+  totalChunks: number;
+  loadedChunks: number;
+  lastLoadTime: string;
+}
+
+/**
+ * Schema data chunk for progressive loading
+ */
+export interface SchemaChunk {
+  chunkId: number;
+  startIndex: number;
+  endIndex: number;
+  tables: SchemaTable[];
+  loadedAt: string;
+  isStale: boolean;
+}
+
+/**
+ * Enhanced table definition with React component integration
  */
 export interface SchemaTable {
   // Core table metadata
+  id: string;
   name: string;
-  label?: string;
+  label: string;
   description?: string;
   schema?: string;
   alias?: string;
+  plural?: string;
+  isView: boolean;
   
-  // Table structure
+  // Field and relationship data
   fields: SchemaField[];
   primaryKey: string[];
   foreignKeys: ForeignKey[];
   indexes: TableIndex[];
   constraints: TableConstraint[];
   triggers?: Trigger[];
+  related: TableRelated[];
   
-  // Table statistics and metadata
+  // Table metadata
+  nameField?: string;
   rowCount?: number;
   estimatedSize?: string;
   lastModified?: string;
   collation?: string;
   engine?: string;
-  isView: boolean;
-  
-  // React component state management
-  expanded?: boolean;
-  selected?: boolean;
-  loading?: boolean;
-  error?: string;
-  
-  // API generation configuration
-  apiEnabled?: boolean;
-  endpointGenerated?: boolean;
   access?: number;
   
-  // Virtual scrolling optimization
+  // Virtual scrolling properties
   virtualIndex?: number;
-  measureElement?: HTMLElement | null;
+  virtualHeight?: number;
+  isVisible?: boolean;
   
-  // React Query integration
-  queryKey: string[];
-  lastFetched?: string;
-  isCached?: boolean;
+  // UI state for hierarchical tree
+  expanded: boolean;
+  selected: boolean;
+  level: number;
+  hasChildren: boolean;
+  isLoading: boolean;
+  
+  // API generation state
+  apiEnabled: boolean;
+  generatedEndpoints?: string[];
+  
+  // React Query cache keys
+  cacheKey: string;
+  lastCacheUpdate: string;
 }
 
 /**
- * Enhanced field metadata with Zod validation integration
- * Supports comprehensive type safety and runtime validation
+ * Enhanced field definition with validation and UI metadata
  */
 export interface SchemaField {
   // Core field metadata
+  id: string;
   name: string;
-  label?: string;
+  label: string;
   description?: string;
   alias?: string;
   
-  // Type system integration
+  // Data type information
   type: FieldType;
   dbType: string;
-  zodSchema?: z.ZodSchema<any>;
-  reactHookFormValidation?: Record<string, any>;
-  
-  // Field constraints and metadata
   length?: number;
   precision?: number;
   scale?: number;
-  default?: any;
+  defaultValue?: any;
   
-  // Boolean flags
+  // Field constraints
   isNullable: boolean;
+  allowNull: boolean;
   isPrimaryKey: boolean;
   isForeignKey: boolean;
   isUnique: boolean;
+  isIndex: boolean;
   isAutoIncrement: boolean;
+  isComputed?: boolean;
   isVirtual: boolean;
   isAggregate: boolean;
-  isIndex: boolean;
   required: boolean;
-  allowNull: boolean;
   fixedLength: boolean;
   supportsMultibyte: boolean;
   
-  // Foreign key relationships
+  // Relationship metadata
   refTable?: string;
   refField?: string;
   refOnUpdate?: ReferentialAction;
   refOnDelete?: ReferentialAction;
-  refServiceId?: number;
   
   // Validation and constraints
   validation?: FieldValidation;
   constraints?: FieldConstraint[];
   picklist?: string[];
   
-  // Database functions and computed fields
-  dbFunction?: DatabaseFunctionUse[];
-  native?: any[];
-  
-  // UI metadata and formatting
+  // UI metadata
   format?: FieldFormat;
-  hidden?: boolean;
-  readonly?: boolean;
+  hidden: boolean;
   
-  // React component integration
-  componentProps?: Record<string, any>;
-  renderComponent?: ReactNode;
-}
-
-/**
- * Progressive loading configuration for large schema datasets
- * Optimizes performance for databases with 1000+ tables
- */
-export interface ProgressiveLoadingConfig {
-  enabled: boolean;
-  pageSize: number;
-  totalItems: number;
-  currentPage: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-  isLoading: boolean;
-  isFetching: boolean;
-  
-  // Virtual scrolling integration
-  startIndex: number;
-  endIndex: number;
-  overscanStartIndex: number;
-  overscanEndIndex: number;
-  
-  // React Query optimization
-  prefetchNext: boolean;
-  staleTime: number;
-  cacheTime: number;
-  keepPreviousData: boolean;
-}
-
-/**
- * Hierarchical tree node for schema visualization
- * Supports nested expansion and virtual scrolling
- */
-export interface SchemaTreeNode {
-  id: string;
-  type: 'database' | 'schema' | 'table' | 'view' | 'field' | 'relation';
-  name: string;
-  label?: string;
-  level: number;
-  hasChildren: boolean;
-  children?: SchemaTreeNode[];
-  
-  // Tree state management
-  expanded: boolean;
-  selected: boolean;
-  disabled: boolean;
-  loading: boolean;
-  
-  // Virtual scrolling data
-  virtualIndex: number;
-  estimatedHeight: number;
-  actualHeight?: number;
-  
-  // Associated data
-  tableData?: SchemaTable;
-  fieldData?: SchemaField;
-  relationData?: TableRelationship;
-  
-  // Component props
-  icon?: ReactNode;
-  actions?: TreeNodeAction[];
-  contextMenu?: TreeContextMenu;
-}
-
-/**
- * Tree node action for interactive operations
- */
-export interface TreeNodeAction {
-  id: string;
-  label: string;
-  icon?: ReactNode;
-  disabled?: boolean;
-  hidden?: boolean;
-  onClick: (node: SchemaTreeNode) => void;
-  tooltip?: string;
-}
-
-/**
- * Context menu configuration for tree nodes
- */
-export interface TreeContextMenu {
-  items: ContextMenuItem[];
-  position?: { x: number; y: number };
-  visible: boolean;
-}
-
-export interface ContextMenuItem {
-  id: string;
-  label: string;
-  icon?: ReactNode;
-  disabled?: boolean;
-  separator?: boolean;
-  children?: ContextMenuItem[];
-  onClick?: (node: SchemaTreeNode) => void;
-}
-
-// =============================================================================
-// FIELD TYPE SYSTEM WITH ZOD INTEGRATION
-// =============================================================================
-
-/**
- * Enhanced field type enum with comprehensive database support
- */
-export enum FieldType {
-  // Numeric types
-  INTEGER = 'integer',
-  BIGINT = 'bigint',
-  SMALLINT = 'smallint',
-  TINYINT = 'tinyint',
-  DECIMAL = 'decimal',
-  NUMERIC = 'numeric',
-  FLOAT = 'float',
-  DOUBLE = 'double',
-  REAL = 'real',
-  
-  // String types
-  STRING = 'string',
-  CHAR = 'char',
-  VARCHAR = 'varchar',
-  TEXT = 'text',
-  LONGTEXT = 'longtext',
-  MEDIUMTEXT = 'mediumtext',
-  TINYTEXT = 'tinytext',
-  
-  // Boolean type
-  BOOLEAN = 'boolean',
-  BIT = 'bit',
-  
-  // Date and time types
-  DATE = 'date',
-  DATETIME = 'datetime',
-  TIMESTAMP = 'timestamp',
-  TIME = 'time',
-  YEAR = 'year',
-  
-  // Binary types
-  BINARY = 'binary',
-  VARBINARY = 'varbinary',
-  BLOB = 'blob',
-  LONGBLOB = 'longblob',
-  MEDIUMBLOB = 'mediumblob',
-  TINYBLOB = 'tinyblob',
-  
-  // Structured types
-  JSON = 'json',
-  XML = 'xml',
-  ARRAY = 'array',
-  OBJECT = 'object',
-  
-  // Special types
-  UUID = 'uuid',
-  ENUM = 'enum',
-  SET = 'set',
-  GEOMETRY = 'geometry',
-  POINT = 'point',
-  POLYGON = 'polygon',
-  
-  // MongoDB specific
-  OBJECTID = 'objectid',
-  
-  // Unknown/custom
-  UNKNOWN = 'unknown'
-}
-
-/**
- * Zod schema factory for database field types
- * Provides runtime validation with compile-time type inference
- */
-export const createFieldZodSchema = (field: SchemaField): z.ZodSchema<any> => {
-  let schema: z.ZodSchema<any>;
-  
-  switch (field.type) {
-    case FieldType.INTEGER:
-    case FieldType.BIGINT:
-    case FieldType.SMALLINT:
-    case FieldType.TINYINT:
-      schema = z.number().int();
-      break;
-    case FieldType.DECIMAL:
-    case FieldType.NUMERIC:
-    case FieldType.FLOAT:
-    case FieldType.DOUBLE:
-      schema = z.number();
-      break;
-    case FieldType.STRING:
-    case FieldType.VARCHAR:
-    case FieldType.CHAR:
-      schema = z.string();
-      if (field.length) {
-        schema = schema.max(field.length);
-      }
-      break;
-    case FieldType.TEXT:
-    case FieldType.LONGTEXT:
-      schema = z.string();
-      break;
-    case FieldType.BOOLEAN:
-      schema = z.boolean();
-      break;
-    case FieldType.DATE:
-      schema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-      break;
-    case FieldType.DATETIME:
-    case FieldType.TIMESTAMP:
-      schema = z.string().datetime();
-      break;
-    case FieldType.JSON:
-      schema = z.record(z.any());
-      break;
-    case FieldType.ARRAY:
-      schema = z.array(z.any());
-      break;
-    case FieldType.UUID:
-      schema = z.string().uuid();
-      break;
-    case FieldType.ENUM:
-      if (field.picklist && field.picklist.length > 0) {
-        schema = z.enum(field.picklist as [string, ...string[]]);
-      } else {
-        schema = z.string();
-      }
-      break;
-    default:
-      schema = z.any();
-  }
-  
-  // Apply nullable/required constraints
-  if (!field.required || field.allowNull) {
-    schema = schema.nullable().optional();
-  }
-  
-  // Apply custom validation rules
-  if (field.validation) {
-    if (field.validation.minLength !== undefined) {
-      schema = schema.refine(
-        (val) => !val || val.toString().length >= field.validation!.minLength!,
-        { message: `Minimum length is ${field.validation.minLength}` }
-      );
-    }
-    if (field.validation.maxLength !== undefined) {
-      schema = schema.refine(
-        (val) => !val || val.toString().length <= field.validation!.maxLength!,
-        { message: `Maximum length is ${field.validation.maxLength}` }
-      );
-    }
-    if (field.validation.pattern) {
-      schema = schema.refine(
-        (val) => !val || new RegExp(field.validation!.pattern!).test(val.toString()),
-        { message: field.validation.customMessage || 'Invalid format' }
-      );
-    }
-  }
-  
-  return schema;
-};
-
-// =============================================================================
-// RELATIONSHIP MAPPING AND FOREIGN KEYS
-// =============================================================================
-
-/**
- * Enhanced table relationships with React component integration
- */
-export interface TableRelationship {
-  // Core relationship metadata
-  alias: string;
-  name: string;
-  label?: string;
-  description?: string;
-  type: RelationshipType;
-  
-  // Field mapping
-  field: string;
-  isVirtual: boolean;
-  
-  // Reference information
-  refServiceId: number;
-  refTable: string;
-  refField: string;
-  refOnUpdate?: ReferentialAction;
-  refOnDelete?: ReferentialAction;
-  
-  // Junction table (for many-to-many)
-  junctionServiceId?: number;
-  junctionTable?: string;
-  junctionField?: string;
-  junctionRefField?: string;
-  
-  // Fetch behavior
-  alwaysFetch: boolean;
-  flatten: boolean;
-  flattenDropPrefix: boolean;
-  
-  // Performance optimization
-  lazyLoad?: boolean;
-  prefetch?: boolean;
-  batchSize?: number;
-  
-  // React component integration
-  renderComponent?: ReactNode;
-  componentProps?: Record<string, any>;
+  // Database functions
+  dbFunction?: DbFunctionUse[];
   
   // Native database metadata
   native?: any[];
+  value?: any[];
 }
 
 /**
- * Relationship type enumeration
+ * Database function usage information
  */
-export enum RelationshipType {
-  BELONGS_TO = 'belongs_to',
-  HAS_ONE = 'has_one',
-  HAS_MANY = 'has_many',
-  MANY_TO_MANY = 'many_many',
-  POLYMORPHIC = 'polymorphic'
+export interface DbFunctionUse {
+  use: string[];
+  function: string;
 }
 
 /**
- * Foreign key constraint with enhanced metadata
+ * Enhanced field type enumeration
  */
-export interface ForeignKey {
-  name: string;
-  field: string;
-  referencedTable: string;
-  referencedField: string;
-  referencedServiceId?: number;
-  onDelete?: ReferentialAction;
-  onUpdate?: ReferentialAction;
-  deferrable?: boolean;
-  initiallyDeferred?: boolean;
-  
-  // Validation and display
-  displayFormat?: string;
-  lookupQuery?: string;
-  cascadeDelete?: boolean;
-  
-  // React component props
-  renderAsLink?: boolean;
-  linkComponent?: ReactNode;
-}
+export type FieldType = 
+  | 'integer'
+  | 'bigint'
+  | 'decimal'
+  | 'float'
+  | 'double'
+  | 'string'
+  | 'text'
+  | 'boolean'
+  | 'date'
+  | 'datetime'
+  | 'timestamp'
+  | 'time'
+  | 'binary'
+  | 'json'
+  | 'xml'
+  | 'uuid'
+  | 'enum'
+  | 'set'
+  | 'blob'
+  | 'clob'
+  | 'geometry'
+  | 'point'
+  | 'linestring'
+  | 'polygon';
 
 /**
- * Referential action enumeration
- */
-export enum ReferentialAction {
-  NO_ACTION = 'NO ACTION',
-  RESTRICT = 'RESTRICT',
-  CASCADE = 'CASCADE',
-  SET_NULL = 'SET NULL',
-  SET_DEFAULT = 'SET DEFAULT'
-}
-
-// =============================================================================
-// INDEXES AND CONSTRAINTS
-// =============================================================================
-
-/**
- * Table index definition with performance metadata
- */
-export interface TableIndex {
-  name: string;
-  fields: string[];
-  unique: boolean;
-  type: IndexType;
-  method?: IndexMethod;
-  condition?: string;
-  
-  // Performance metrics
-  selectivity?: number;
-  cardinality?: number;
-  size?: string;
-  
-  // Database-specific options
-  fillFactor?: number;
-  compression?: boolean;
-  partial?: boolean;
-  
-  // Usage statistics
-  scans?: number;
-  seeks?: number;
-  lookups?: number;
-  lastUsed?: string;
-}
-
-/**
- * Index type enumeration
- */
-export enum IndexType {
-  BTREE = 'btree',
-  HASH = 'hash',
-  GIST = 'gist',
-  GIN = 'gin',
-  BRIN = 'brin',
-  SPGIST = 'spgist',
-  CLUSTERED = 'clustered',
-  NONCLUSTERED = 'nonclustered',
-  COLUMNSTORE = 'columnstore',
-  SPATIAL = 'spatial',
-  FULLTEXT = 'fulltext'
-}
-
-/**
- * Index method enumeration
- */
-export enum IndexMethod {
-  BTREE = 'btree',
-  HASH = 'hash',
-  GIST = 'gist',
-  GIN = 'gin',
-  BRIN = 'brin',
-  SPGIST = 'spgist'
-}
-
-/**
- * Table constraint definition
- */
-export interface TableConstraint {
-  name: string;
-  type: ConstraintType;
-  definition: string;
-  fields: string[];
-  
-  // Constraint-specific options
-  checkExpression?: string;
-  deferrable?: boolean;
-  initiallyDeferred?: boolean;
-  
-  // Validation metadata
-  validated?: boolean;
-  enabled?: boolean;
-  trusted?: boolean;
-}
-
-/**
- * Constraint type enumeration
- */
-export enum ConstraintType {
-  PRIMARY_KEY = 'PRIMARY KEY',
-  FOREIGN_KEY = 'FOREIGN KEY',
-  UNIQUE = 'UNIQUE',
-  CHECK = 'CHECK',
-  NOT_NULL = 'NOT NULL',
-  DEFAULT = 'DEFAULT',
-  EXCLUSION = 'EXCLUSION'
-}
-
-// =============================================================================
-// FIELD VALIDATION AND FORMATTING
-// =============================================================================
-
-/**
- * Enhanced field validation with Zod integration
+ * Field validation configuration
  */
 export interface FieldValidation {
-  // Basic validation rules
   required?: boolean;
   minLength?: number;
   maxLength?: number;
   pattern?: string;
   min?: number;
   max?: number;
-  
-  // Advanced validation
   enum?: string[];
-  format?: ValidationFormat;
+  format?: string;
   customValidator?: string;
-  customMessage?: string;
   
-  // Async validation
-  asyncValidator?: string;
-  asyncValidatorEndpoint?: string;
+  // Validation messages
+  messages?: ValidationMessages;
+  
+  // Real-time validation settings
+  validateOnChange?: boolean;
+  validateOnBlur?: boolean;
   debounceMs?: number;
-  
-  // Conditional validation
-  dependsOn?: string[];
-  conditionalRules?: ConditionalValidationRule[];
-  
-  // Zod schema reference
-  zodSchema?: z.ZodSchema<any>;
-  zodTransform?: (value: any) => any;
 }
 
 /**
- * Validation format enumeration
+ * Validation error messages
  */
-export enum ValidationFormat {
-  EMAIL = 'email',
-  URL = 'url',
-  URI = 'uri',
-  UUID = 'uuid',
-  DATE = 'date',
-  DATETIME = 'date-time',
-  TIME = 'time',
-  IPV4 = 'ipv4',
-  IPV6 = 'ipv6',
-  HOSTNAME = 'hostname',
-  REGEX = 'regex',
-  BASE64 = 'base64',
-  JSON = 'json',
-  XML = 'xml'
-}
-
-/**
- * Conditional validation rule
- */
-export interface ConditionalValidationRule {
-  field: string;
-  operator: ComparisonOperator;
-  value: any;
-  validation: Partial<FieldValidation>;
-}
-
-/**
- * Comparison operator enumeration
- */
-export enum ComparisonOperator {
-  EQUALS = 'equals',
-  NOT_EQUALS = 'notEquals',
-  GREATER_THAN = 'greaterThan',
-  LESS_THAN = 'lessThan',
-  GREATER_THAN_OR_EQUAL = 'greaterThanOrEqual',
-  LESS_THAN_OR_EQUAL = 'lessThanOrEqual',
-  CONTAINS = 'contains',
-  NOT_CONTAINS = 'notContains',
-  STARTS_WITH = 'startsWith',
-  ENDS_WITH = 'endsWith',
-  IN = 'in',
-  NOT_IN = 'notIn',
-  IS_NULL = 'isNull',
-  IS_NOT_NULL = 'isNotNull',
-  IS_EMPTY = 'isEmpty',
-  IS_NOT_EMPTY = 'isNotEmpty'
+export interface ValidationMessages {
+  required?: string;
+  minLength?: string;
+  maxLength?: string;
+  pattern?: string;
+  min?: string;
+  max?: string;
+  format?: string;
+  custom?: string;
 }
 
 /**
@@ -704,118 +268,163 @@ export interface FieldConstraint {
   definition: string;
   name?: string;
   message?: string;
-  enabled?: boolean;
+  fields?: string[];
 }
 
 /**
- * Field formatting configuration
+ * Database constraint types
+ */
+export type ConstraintType = 
+  | 'check'
+  | 'unique'
+  | 'foreign_key'
+  | 'primary_key'
+  | 'default'
+  | 'not_null'
+  | 'exclude'
+  | 'partial';
+
+/**
+ * Field formatting configuration for UI display
  */
 export interface FieldFormat {
-  // Display formatting
   mask?: string;
   placeholder?: string;
   prefix?: string;
   suffix?: string;
-  
-  // Text transformation
-  transform?: TextTransform;
-  
-  // Number formatting
-  currency?: CurrencyConfig;
-  number?: NumberConfig;
-  
-  // Date formatting
-  date?: DateConfig;
-  
-  // Boolean formatting
-  boolean?: BooleanConfig;
-  
-  // Custom formatting
-  customFormatter?: string;
-  customParser?: string;
+  uppercase?: boolean;
+  lowercase?: boolean;
+  capitalize?: boolean;
+  dateFormat?: string;
+  currencyCode?: string;
+  thousandsSeparator?: string;
+  decimalSeparator?: string;
 }
 
 /**
- * Text transformation enumeration
+ * Foreign key relationship definition
  */
-export enum TextTransform {
-  UPPERCASE = 'uppercase',
-  LOWERCASE = 'lowercase',
-  CAPITALIZE = 'capitalize',
-  CAMEL_CASE = 'camelCase',
-  PASCAL_CASE = 'pascalCase',
-  KEBAB_CASE = 'kebabCase',
-  SNAKE_CASE = 'snakeCase',
-  TITLE_CASE = 'titleCase'
+export interface ForeignKey {
+  name: string;
+  field: string;
+  referencedTable: string;
+  referencedField: string;
+  onDelete?: ReferentialAction;
+  onUpdate?: ReferentialAction;
+  deferrable?: boolean;
+  initiallyDeferred?: boolean;
 }
 
 /**
- * Currency formatting configuration
+ * Referential action types
  */
-export interface CurrencyConfig {
-  currency: string;
-  locale?: string;
-  minimumFractionDigits?: number;
-  maximumFractionDigits?: number;
-  currencyDisplay?: 'symbol' | 'code' | 'name';
-  currencySign?: 'standard' | 'accounting';
+export type ReferentialAction = 
+  | 'NO ACTION'
+  | 'RESTRICT'
+  | 'CASCADE'
+  | 'SET NULL'
+  | 'SET DEFAULT';
+
+/**
+ * Table index definition
+ */
+export interface TableIndex {
+  name: string;
+  fields: string[];
+  unique: boolean;
+  type?: IndexType;
+  method?: string;
+  condition?: string;
+  partial?: boolean;
+  clustered?: boolean;
+  fillFactor?: number;
 }
 
 /**
- * Number formatting configuration
+ * Database index types
  */
-export interface NumberConfig {
-  locale?: string;
-  minimumIntegerDigits?: number;
-  minimumFractionDigits?: number;
-  maximumFractionDigits?: number;
-  minimumSignificantDigits?: number;
-  maximumSignificantDigits?: number;
-  useGrouping?: boolean;
-  notation?: 'standard' | 'scientific' | 'engineering' | 'compact';
-  compactDisplay?: 'short' | 'long';
-  signDisplay?: 'auto' | 'never' | 'always' | 'exceptZero';
+export type IndexType = 
+  | 'btree'
+  | 'hash'
+  | 'gist'
+  | 'gin'
+  | 'brin'
+  | 'spgist'
+  | 'bitmap'
+  | 'clustered'
+  | 'nonclustered';
+
+/**
+ * Table constraint definition
+ */
+export interface TableConstraint {
+  name: string;
+  type: ConstraintType;
+  definition: string;
+  fields: string[];
+  condition?: string;
+  deferrable?: boolean;
+  initiallyDeferred?: boolean;
 }
 
 /**
- * Date formatting configuration
+ * Enhanced table relationship with React composition patterns
  */
-export interface DateConfig {
-  format: string;
-  locale?: string;
-  timezone?: string;
+export interface TableRelated {
+  // Core relationship metadata
+  id: string;
+  alias: string;
+  name: string;
+  label: string;
+  description?: string;
+  native?: any[];
   
-  // Constraints
-  minDate?: string;
-  maxDate?: string;
-  excludeDates?: string[];
-  includeDates?: string[];
+  // Relationship configuration
+  type: RelationshipType;
+  field: string;
+  isVirtual: boolean;
   
-  // Display options
-  showTime?: boolean;
-  showTimezone?: boolean;
-  relative?: boolean;
+  // Reference configuration
+  refServiceId: number;
+  refTable: string;
+  refField: string;
+  refOnUpdate?: ReferentialAction;
+  refOnDelete?: ReferentialAction;
   
-  // Input constraints
-  allowPast?: boolean;
-  allowFuture?: boolean;
-  businessDaysOnly?: boolean;
+  // Junction table configuration (for many-to-many)
+  junctionServiceId?: number;
+  junctionTable?: string;
+  junctionField?: string;
+  junctionRefField?: string;
+  
+  // Fetch behavior
+  alwaysFetch: boolean;
+  flatten: boolean;
+  flattenDropPrefix: boolean;
+  
+  // UI state
+  expanded?: boolean;
+  loading?: boolean;
+  
+  // React Query cache information
+  cacheKey?: string;
+  lastFetched?: string;
 }
 
 /**
- * Boolean formatting configuration
+ * Relationship types
  */
-export interface BooleanConfig {
-  trueLabel?: string;
-  falseLabel?: string;
-  nullLabel?: string;
-  style?: 'checkbox' | 'switch' | 'radio' | 'button' | 'text';
-  variant?: 'default' | 'success' | 'warning' | 'error';
-}
+export type RelationshipType = 
+  | 'belongs_to'
+  | 'has_many'
+  | 'has_one'
+  | 'many_many'
+  | 'polymorphic'
+  | 'through';
 
-// =============================================================================
-// DATABASE OBJECTS (VIEWS, PROCEDURES, FUNCTIONS)
-// =============================================================================
+// ============================================================================
+// SCHEMA VIEWS AND PROCEDURES
+// ============================================================================
 
 /**
  * Database view definition
@@ -827,39 +436,13 @@ export interface SchemaView {
   definition: string;
   fields: SchemaField[];
   updatable: boolean;
-  checkOption?: CheckOption;
+  checkOption?: 'CASCADED' | 'LOCAL' | 'NONE';
+  securityType?: 'DEFINER' | 'INVOKER';
+  algorithm?: 'MERGE' | 'TEMPTABLE' | 'UNDEFINED';
   
-  // View metadata
-  schemaName?: string;
-  catalogName?: string;
-  definer?: string;
-  sqlSecurity?: SqlSecurity;
-  
-  // React component state
+  // UI state
   expanded?: boolean;
   selected?: boolean;
-  loading?: boolean;
-  
-  // Performance metadata
-  rowCount?: number;
-  queryComplexity?: number;
-}
-
-/**
- * Check option enumeration for views
- */
-export enum CheckOption {
-  NONE = 'NONE',
-  LOCAL = 'LOCAL',
-  CASCADED = 'CASCADED'
-}
-
-/**
- * SQL security enumeration
- */
-export enum SqlSecurity {
-  DEFINER = 'DEFINER',
-  INVOKER = 'INVOKER'
 }
 
 /**
@@ -872,18 +455,10 @@ export interface StoredProcedure {
   parameters: ProcedureParameter[];
   returnType?: string;
   definition: string;
-  language?: ProgrammingLanguage;
-  
-  // Procedure metadata
-  schemaName?: string;
-  definer?: string;
-  sqlSecurity?: SqlSecurity;
-  isDeterministic?: boolean;
-  sqlDataAccess?: SqlDataAccess;
-  
-  // React component state
-  expanded?: boolean;
-  selected?: boolean;
+  language?: string;
+  securityType?: 'DEFINER' | 'INVOKER';
+  deterministic?: boolean;
+  sqlDataAccess?: 'CONTAINS SQL' | 'NO SQL' | 'READS SQL DATA' | 'MODIFIES SQL DATA';
 }
 
 /**
@@ -892,21 +467,9 @@ export interface StoredProcedure {
 export interface ProcedureParameter {
   name: string;
   type: string;
-  mode: ParameterMode;
-  defaultValue?: any;
-  isNullable?: boolean;
-  maxLength?: number;
-  precision?: number;
-  scale?: number;
-}
-
-/**
- * Parameter mode enumeration
- */
-export enum ParameterMode {
-  IN = 'IN',
-  OUT = 'OUT',
-  INOUT = 'INOUT'
+  mode: 'IN' | 'OUT' | 'INOUT';
+  defaultValue?: string;
+  description?: string;
 }
 
 /**
@@ -919,18 +482,12 @@ export interface DatabaseFunction {
   parameters: FunctionParameter[];
   returnType: string;
   definition: string;
-  language?: ProgrammingLanguage;
-  
-  // Function metadata
-  schemaName?: string;
-  definer?: string;
-  isDeterministic?: boolean;
-  isAggregate?: boolean;
-  sqlDataAccess?: SqlDataAccess;
-  
-  // React component state
-  expanded?: boolean;
-  selected?: boolean;
+  language?: string;
+  immutable?: boolean;
+  strict?: boolean;
+  securityDefiner?: boolean;
+  cost?: number;
+  rows?: number;
 }
 
 /**
@@ -939,34 +496,8 @@ export interface DatabaseFunction {
 export interface FunctionParameter {
   name: string;
   type: string;
-  defaultValue?: any;
-  isNullable?: boolean;
-  maxLength?: number;
-  precision?: number;
-  scale?: number;
-}
-
-/**
- * Programming language enumeration
- */
-export enum ProgrammingLanguage {
-  SQL = 'SQL',
-  PLSQL = 'PLSQL',
-  PLPGSQL = 'PLPGSQL',
-  JAVASCRIPT = 'JAVASCRIPT',
-  PYTHON = 'PYTHON',
-  JAVA = 'JAVA',
-  C = 'C'
-}
-
-/**
- * SQL data access enumeration
- */
-export enum SqlDataAccess {
-  NO_SQL = 'NO SQL',
-  CONTAINS_SQL = 'CONTAINS SQL',
-  READS_SQL_DATA = 'READS SQL DATA',
-  MODIFIES_SQL_DATA = 'MODIFIES SQL DATA'
+  defaultValue?: string;
+  description?: string;
 }
 
 /**
@@ -980,14 +511,9 @@ export interface Sequence {
   minValue?: number;
   maxValue?: number;
   startValue: number;
-  currentValue?: number;
   cache?: number;
   cycle?: boolean;
-  
-  // Sequence metadata
-  schemaName?: string;
   ownedBy?: string;
-  dataType?: string;
 }
 
 /**
@@ -995,156 +521,595 @@ export interface Sequence {
  */
 export interface Trigger {
   name: string;
-  label?: string;
-  description?: string;
-  timing: TriggerTiming;
+  timing: 'BEFORE' | 'AFTER' | 'INSTEAD OF';
   events: TriggerEvent[];
   definition: string;
-  
-  // Trigger metadata
-  tableName: string;
-  schemaName?: string;
-  orientation?: TriggerOrientation;
   condition?: string;
+  orientation?: 'ROW' | 'STATEMENT';
   enabled?: boolean;
 }
 
 /**
- * Trigger timing enumeration
+ * Trigger event types
  */
-export enum TriggerTiming {
-  BEFORE = 'BEFORE',
-  AFTER = 'AFTER',
-  INSTEAD_OF = 'INSTEAD OF'
-}
+export type TriggerEvent = 'INSERT' | 'UPDATE' | 'DELETE' | 'TRUNCATE';
+
+// ============================================================================
+// HIERARCHICAL TREE STRUCTURES
+// ============================================================================
 
 /**
- * Trigger event enumeration
+ * Tree node for hierarchical schema display
  */
-export enum TriggerEvent {
-  INSERT = 'INSERT',
-  UPDATE = 'UPDATE',
-  DELETE = 'DELETE',
-  TRUNCATE = 'TRUNCATE'
-}
-
-/**
- * Trigger orientation enumeration
- */
-export enum TriggerOrientation {
-  ROW = 'ROW',
-  STATEMENT = 'STATEMENT'
-}
-
-// =============================================================================
-// DATABASE FUNCTION USAGE
-// =============================================================================
-
-/**
- * Database function usage definition
- */
-export interface DatabaseFunctionUse {
-  use: string[];
-  function: string;
-  parameters?: Record<string, any>;
-  returnType?: string;
+export interface SchemaTreeNode {
+  id: string;
+  type: TreeNodeType;
+  name: string;
+  label: string;
   description?: string;
+  
+  // Tree structure
+  parentId?: string;
+  children: SchemaTreeNode[];
+  level: number;
+  index: number;
+  
+  // UI state
+  expanded: boolean;
+  selected: boolean;
+  isLoading: boolean;
+  hasChildren: boolean;
+  
+  // Virtual scrolling
+  virtualIndex?: number;
+  virtualHeight?: number;
+  isVisible?: boolean;
+  
+  // Data reference
+  data?: SchemaTable | SchemaView | StoredProcedure | DatabaseFunction;
+  
+  // React Query cache
+  cacheKey: string;
+  lastUpdated: string;
 }
 
-// =============================================================================
-// REACT QUERY INTEGRATION TYPES
-// =============================================================================
+/**
+ * Tree node types for schema hierarchy
+ */
+export type TreeNodeType = 
+  | 'database'
+  | 'schema'
+  | 'tables'
+  | 'table'
+  | 'views'
+  | 'view'
+  | 'procedures'
+  | 'procedure'
+  | 'functions'
+  | 'function'
+  | 'sequences'
+  | 'sequence'
+  | 'field'
+  | 'relationship'
+  | 'index'
+  | 'constraint';
 
 /**
- * Schema discovery query configuration
- * Optimized for React Query caching and synchronization
+ * Tree virtualization configuration
  */
-export interface SchemaQueryConfig {
-  // Query identification
-  serviceName: string;
-  database?: string;
-  schema?: string;
-  table?: string;
-  
-  // Caching configuration
-  staleTime: number;
-  cacheTime: number;
-  refetchInterval?: number;
-  refetchOnMount?: boolean;
-  refetchOnWindowFocus?: boolean;
-  refetchOnReconnect?: boolean;
-  
-  // Performance optimization
+export interface TreeVirtualizationConfig {
   enabled: boolean;
-  keepPreviousData: boolean;
-  suspense?: boolean;
-  useErrorBoundary?: boolean;
-  
-  // Progressive loading
-  pageSize?: number;
-  infiniteQuery?: boolean;
-  virtualScrolling?: boolean;
-  
-  // Retry configuration
-  retry?: number | boolean;
-  retryDelay?: number;
-  retryOnMount?: boolean;
+  estimatedRowHeight: number;
+  overscan: number;
+  scrollingDelay: number;
+  getItemSize: (index: number) => number;
+  debug?: boolean;
 }
 
 /**
- * Schema discovery query result with React Query integration
+ * Tree expansion state management
  */
-export interface SchemaQueryResult<T = SchemaDiscoveryData> extends UseQueryResult<T> {
-  // Additional schema-specific properties
-  totalTables?: number;
-  loadedTables?: number;
-  progress?: number;
+export interface TreeExpansionState {
+  expandedNodes: Set<string>;
+  selectedNodes: Set<string>;
+  focusedNode?: string;
   
-  // Virtual scrolling state
-  virtualItems?: VirtualItem[];
-  scrollElement?: HTMLElement | null;
-  
-  // Progressive loading actions
-  loadMore?: () => void;
-  loadPrevious?: () => void;
-  hasMore?: boolean;
-  hasPrevious?: boolean;
+  // Actions
+  expandNode: (nodeId: string) => void;
+  collapseNode: (nodeId: string) => void;
+  toggleNode: (nodeId: string) => void;
+  selectNode: (nodeId: string, multiSelect?: boolean) => void;
+  focusNode: (nodeId: string) => void;
+  expandAll: () => void;
+  collapseAll: () => void;
 }
 
+// ============================================================================
+// REACT QUERY INTEGRATION
+// ============================================================================
+
 /**
- * Schema cache management configuration
+ * React Query cache configuration for schema data
  */
 export interface SchemaCacheConfig {
-  // Cache keys
-  baseKey: string;
-  serviceKey: string;
-  tableKey?: string;
+  staleTime: number;
+  cacheTime: number;
+  refetchOnWindowFocus: boolean;
+  refetchOnMount: boolean;
+  refetchOnReconnect: boolean;
+  retry: number;
+  retryDelay: number;
   
-  // Cache invalidation
-  invalidateOnUpdate: boolean;
-  invalidateOnDelete: boolean;
-  invalidateRelated: boolean;
-  
-  // Background updates
-  backgroundRefetch: boolean;
-  backgroundRefetchInterval?: number;
-  
-  // Optimistic updates
-  optimisticUpdates: boolean;
-  rollbackOnError: boolean;
-  
-  // Cache size management
-  maxCacheSize?: number;
-  evictionPolicy?: 'lru' | 'lfu' | 'ttl';
+  // Progressive loading configuration
+  enableProgressiveLoading: boolean;
+  chunkSize: number;
+  maxConcurrentChunks: number;
+  prefetchThreshold: number;
 }
 
-// =============================================================================
-// LEGACY COMPATIBILITY TYPES
-// =============================================================================
+/**
+ * Schema query parameters for React Query
+ */
+export interface SchemaQueryParams {
+  serviceName: string;
+  serviceId: number;
+  includeViews?: boolean;
+  includeProcedures?: boolean;
+  includeFunctions?: boolean;
+  includeSequences?: boolean;
+  includeConstraints?: boolean;
+  includeIndexes?: boolean;
+  includeTriggers?: boolean;
+  
+  // Filtering
+  tableFilter?: string;
+  schemaFilter?: string;
+  typeFilter?: TreeNodeType[];
+  
+  // Pagination for progressive loading
+  page?: number;
+  pageSize?: number;
+  cursor?: string;
+}
 
 /**
- * Legacy Angular types for backward compatibility
- * @deprecated Use new React Query types instead
+ * Schema mutation parameters for updates
+ */
+export interface SchemaMutationParams {
+  serviceName: string;
+  action: SchemaMutationAction;
+  target: SchemaMutationTarget;
+  data: any;
+  
+  // Optimistic update configuration
+  optimistic?: boolean;
+  rollbackOnError?: boolean;
+}
+
+/**
+ * Schema mutation actions
+ */
+export type SchemaMutationAction = 
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'refresh'
+  | 'discover'
+  | 'cache_clear';
+
+/**
+ * Schema mutation targets
+ */
+export type SchemaMutationTarget = 
+  | 'table'
+  | 'field'
+  | 'relationship'
+  | 'index'
+  | 'constraint'
+  | 'view'
+  | 'procedure'
+  | 'function'
+  | 'sequence'
+  | 'schema';
+
+// ============================================================================
+// PERFORMANCE OPTIMIZATION TYPES
+// ============================================================================
+
+/**
+ * Virtual scrolling item data
+ */
+export interface VirtualScrollItem {
+  index: number;
+  key: string;
+  data: SchemaTable | SchemaView | StoredProcedure | DatabaseFunction;
+  height: number;
+  isVisible: boolean;
+  isLoaded: boolean;
+}
+
+/**
+ * Performance metrics for schema operations
+ */
+export interface SchemaPerformanceMetrics {
+  discoveryTime: number;
+  renderTime: number;
+  cacheHitRate: number;
+  totalTables: number;
+  loadedTables: number;
+  averageTableSize: number;
+  
+  // Virtual scrolling metrics
+  virtualItemsRendered: number;
+  virtualScrollPosition: number;
+  virtualScrollHeight: number;
+  
+  // Memory usage
+  estimatedMemoryUsage: number;
+  cacheSize: number;
+  
+  // Error tracking
+  errors: SchemaError[];
+  warnings: SchemaWarning[];
+}
+
+/**
+ * Schema error information
+ */
+export interface SchemaError {
+  type: SchemaErrorType;
+  message: string;
+  details?: string;
+  timestamp: string;
+  tableName?: string;
+  fieldName?: string;
+  recoverable: boolean;
+}
+
+/**
+ * Schema error types
+ */
+export type SchemaErrorType = 
+  | 'connection_failed'
+  | 'discovery_timeout'
+  | 'permission_denied'
+  | 'table_not_found'
+  | 'field_not_found'
+  | 'relationship_invalid'
+  | 'cache_error'
+  | 'validation_error'
+  | 'unknown_error';
+
+/**
+ * Schema warning information
+ */
+export interface SchemaWarning {
+  type: SchemaWarningType;
+  message: string;
+  timestamp: string;
+  tableName?: string;
+  fieldName?: string;
+  suggestion?: string;
+}
+
+/**
+ * Schema warning types
+ */
+export type SchemaWarningType = 
+  | 'large_table'
+  | 'missing_primary_key'
+  | 'unused_index'
+  | 'circular_reference'
+  | 'performance_concern'
+  | 'compatibility_issue';
+
+// ============================================================================
+// ZOD VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Zod schema for field validation configuration
+ */
+export const FieldValidationSchema = z.object({
+  required: z.boolean().optional(),
+  minLength: z.number().min(0).optional(),
+  maxLength: z.number().min(1).optional(),
+  pattern: z.string().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  enum: z.array(z.string()).optional(),
+  format: z.string().optional(),
+  customValidator: z.string().optional(),
+  messages: z.object({
+    required: z.string().optional(),
+    minLength: z.string().optional(),
+    maxLength: z.string().optional(),
+    pattern: z.string().optional(),
+    min: z.string().optional(),
+    max: z.string().optional(),
+    format: z.string().optional(),
+    custom: z.string().optional(),
+  }).optional(),
+  validateOnChange: z.boolean().optional(),
+  validateOnBlur: z.boolean().optional(),
+  debounceMs: z.number().min(0).optional(),
+});
+
+/**
+ * Zod schema for schema field definition
+ */
+export const SchemaFieldSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().optional(),
+  alias: z.string().optional(),
+  type: z.enum(['integer', 'bigint', 'decimal', 'float', 'double', 'string', 'text', 'boolean', 'date', 'datetime', 'timestamp', 'time', 'binary', 'json', 'xml', 'uuid', 'enum', 'set', 'blob', 'clob', 'geometry', 'point', 'linestring', 'polygon']),
+  dbType: z.string(),
+  length: z.number().optional(),
+  precision: z.number().optional(),
+  scale: z.number().optional(),
+  defaultValue: z.any().optional(),
+  isNullable: z.boolean(),
+  allowNull: z.boolean(),
+  isPrimaryKey: z.boolean(),
+  isForeignKey: z.boolean(),
+  isUnique: z.boolean(),
+  isIndex: z.boolean(),
+  isAutoIncrement: z.boolean(),
+  isComputed: z.boolean().optional(),
+  isVirtual: z.boolean(),
+  isAggregate: z.boolean(),
+  required: z.boolean(),
+  fixedLength: z.boolean(),
+  supportsMultibyte: z.boolean(),
+  refTable: z.string().optional(),
+  refField: z.string().optional(),
+  refOnUpdate: z.enum(['NO ACTION', 'RESTRICT', 'CASCADE', 'SET NULL', 'SET DEFAULT']).optional(),
+  refOnDelete: z.enum(['NO ACTION', 'RESTRICT', 'CASCADE', 'SET NULL', 'SET DEFAULT']).optional(),
+  validation: FieldValidationSchema.optional(),
+  constraints: z.array(z.object({
+    type: z.enum(['check', 'unique', 'foreign_key', 'primary_key', 'default', 'not_null', 'exclude', 'partial']),
+    definition: z.string(),
+    name: z.string().optional(),
+    message: z.string().optional(),
+    fields: z.array(z.string()).optional(),
+  })).optional(),
+  picklist: z.array(z.string()).optional(),
+  format: z.object({
+    mask: z.string().optional(),
+    placeholder: z.string().optional(),
+    prefix: z.string().optional(),
+    suffix: z.string().optional(),
+    uppercase: z.boolean().optional(),
+    lowercase: z.boolean().optional(),
+    capitalize: z.boolean().optional(),
+    dateFormat: z.string().optional(),
+    currencyCode: z.string().optional(),
+    thousandsSeparator: z.string().optional(),
+    decimalSeparator: z.string().optional(),
+  }).optional(),
+  hidden: z.boolean(),
+  dbFunction: z.array(z.object({
+    use: z.array(z.string()),
+    function: z.string(),
+  })).optional(),
+  native: z.array(z.any()).optional(),
+  value: z.array(z.any()).optional(),
+});
+
+/**
+ * Zod schema for schema table definition
+ */
+export const SchemaTableSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().optional(),
+  schema: z.string().optional(),
+  alias: z.string().optional(),
+  plural: z.string().optional(),
+  isView: z.boolean(),
+  fields: z.array(SchemaFieldSchema),
+  primaryKey: z.array(z.string()),
+  foreignKeys: z.array(z.object({
+    name: z.string(),
+    field: z.string(),
+    referencedTable: z.string(),
+    referencedField: z.string(),
+    onDelete: z.enum(['NO ACTION', 'RESTRICT', 'CASCADE', 'SET NULL', 'SET DEFAULT']).optional(),
+    onUpdate: z.enum(['NO ACTION', 'RESTRICT', 'CASCADE', 'SET NULL', 'SET DEFAULT']).optional(),
+    deferrable: z.boolean().optional(),
+    initiallyDeferred: z.boolean().optional(),
+  })),
+  indexes: z.array(z.object({
+    name: z.string(),
+    fields: z.array(z.string()),
+    unique: z.boolean(),
+    type: z.enum(['btree', 'hash', 'gist', 'gin', 'brin', 'spgist', 'bitmap', 'clustered', 'nonclustered']).optional(),
+    method: z.string().optional(),
+    condition: z.string().optional(),
+    partial: z.boolean().optional(),
+    clustered: z.boolean().optional(),
+    fillFactor: z.number().optional(),
+  })),
+  constraints: z.array(z.object({
+    name: z.string(),
+    type: z.enum(['check', 'unique', 'foreign_key', 'primary_key', 'default', 'not_null', 'exclude', 'partial']),
+    definition: z.string(),
+    fields: z.array(z.string()),
+    condition: z.string().optional(),
+    deferrable: z.boolean().optional(),
+    initiallyDeferred: z.boolean().optional(),
+  })),
+  triggers: z.array(z.object({
+    name: z.string(),
+    timing: z.enum(['BEFORE', 'AFTER', 'INSTEAD OF']),
+    events: z.array(z.enum(['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'])),
+    definition: z.string(),
+    condition: z.string().optional(),
+    orientation: z.enum(['ROW', 'STATEMENT']).optional(),
+    enabled: z.boolean().optional(),
+  })).optional(),
+  related: z.array(z.object({
+    id: z.string(),
+    alias: z.string(),
+    name: z.string(),
+    label: z.string(),
+    description: z.string().optional(),
+    native: z.array(z.any()).optional(),
+    type: z.enum(['belongs_to', 'has_many', 'has_one', 'many_many', 'polymorphic', 'through']),
+    field: z.string(),
+    isVirtual: z.boolean(),
+    refServiceId: z.number(),
+    refTable: z.string(),
+    refField: z.string(),
+    refOnUpdate: z.enum(['NO ACTION', 'RESTRICT', 'CASCADE', 'SET NULL', 'SET DEFAULT']).optional(),
+    refOnDelete: z.enum(['NO ACTION', 'RESTRICT', 'CASCADE', 'SET NULL', 'SET DEFAULT']).optional(),
+    junctionServiceId: z.number().optional(),
+    junctionTable: z.string().optional(),
+    junctionField: z.string().optional(),
+    junctionRefField: z.string().optional(),
+    alwaysFetch: z.boolean(),
+    flatten: z.boolean(),
+    flattenDropPrefix: z.boolean(),
+    expanded: z.boolean().optional(),
+    loading: z.boolean().optional(),
+    cacheKey: z.string().optional(),
+    lastFetched: z.string().optional(),
+  })),
+  nameField: z.string().optional(),
+  rowCount: z.number().optional(),
+  estimatedSize: z.string().optional(),
+  lastModified: z.string().optional(),
+  collation: z.string().optional(),
+  engine: z.string().optional(),
+  access: z.number().optional(),
+  virtualIndex: z.number().optional(),
+  virtualHeight: z.number().optional(),
+  isVisible: z.boolean().optional(),
+  expanded: z.boolean(),
+  selected: z.boolean(),
+  level: z.number(),
+  hasChildren: z.boolean(),
+  isLoading: z.boolean(),
+  apiEnabled: z.boolean(),
+  generatedEndpoints: z.array(z.string()).optional(),
+  cacheKey: z.string(),
+  lastCacheUpdate: z.string(),
+});
+
+/**
+ * Zod schema for complete schema data structure
+ */
+export const SchemaDataSchema = z.object({
+  serviceName: z.string().min(1),
+  serviceId: z.number(),
+  databaseName: z.string().min(1),
+  schemaName: z.string().optional(),
+  tables: z.array(SchemaTableSchema),
+  views: z.array(z.object({
+    name: z.string(),
+    label: z.string().optional(),
+    description: z.string().optional(),
+    definition: z.string(),
+    fields: z.array(SchemaFieldSchema),
+    updatable: z.boolean(),
+    checkOption: z.enum(['CASCADED', 'LOCAL', 'NONE']).optional(),
+    securityType: z.enum(['DEFINER', 'INVOKER']).optional(),
+    algorithm: z.enum(['MERGE', 'TEMPTABLE', 'UNDEFINED']).optional(),
+    expanded: z.boolean().optional(),
+    selected: z.boolean().optional(),
+  })),
+  procedures: z.array(z.object({
+    name: z.string(),
+    label: z.string().optional(),
+    description: z.string().optional(),
+    parameters: z.array(z.object({
+      name: z.string(),
+      type: z.string(),
+      mode: z.enum(['IN', 'OUT', 'INOUT']),
+      defaultValue: z.string().optional(),
+      description: z.string().optional(),
+    })),
+    returnType: z.string().optional(),
+    definition: z.string(),
+    language: z.string().optional(),
+    securityType: z.enum(['DEFINER', 'INVOKER']).optional(),
+    deterministic: z.boolean().optional(),
+    sqlDataAccess: z.enum(['CONTAINS SQL', 'NO SQL', 'READS SQL DATA', 'MODIFIES SQL DATA']).optional(),
+  })).optional(),
+  functions: z.array(z.object({
+    name: z.string(),
+    label: z.string().optional(),
+    description: z.string().optional(),
+    parameters: z.array(z.object({
+      name: z.string(),
+      type: z.string(),
+      defaultValue: z.string().optional(),
+      description: z.string().optional(),
+    })),
+    returnType: z.string(),
+    definition: z.string(),
+    language: z.string().optional(),
+    immutable: z.boolean().optional(),
+    strict: z.boolean().optional(),
+    securityDefiner: z.boolean().optional(),
+    cost: z.number().optional(),
+    rows: z.number().optional(),
+  })).optional(),
+  sequences: z.array(z.object({
+    name: z.string(),
+    label: z.string().optional(),
+    description: z.string().optional(),
+    increment: z.number(),
+    minValue: z.number().optional(),
+    maxValue: z.number().optional(),
+    startValue: z.number(),
+    cache: z.number().optional(),
+    cycle: z.boolean().optional(),
+    ownedBy: z.string().optional(),
+  })).optional(),
+  lastDiscovered: z.string(),
+  totalTables: z.number(),
+  totalFields: z.number(),
+  totalRelationships: z.number(),
+  virtualScrollingEnabled: z.boolean(),
+  pageSize: z.number(),
+  estimatedRowHeight: z.number(),
+  loadingState: z.object({
+    isLoading: z.boolean(),
+    isError: z.boolean(),
+    error: z.string().optional(),
+    loadedTables: z.number(),
+    totalTables: z.number(),
+    currentPage: z.number(),
+    hasNextPage: z.boolean(),
+    isFetchingNextPage: z.boolean(),
+  }),
+  progressiveData: z.object({
+    chunks: z.array(z.object({
+      chunkId: z.number(),
+      startIndex: z.number(),
+      endIndex: z.number(),
+      tables: z.array(SchemaTableSchema),
+      loadedAt: z.string(),
+      isStale: z.boolean(),
+    })),
+    chunkSize: z.number(),
+    totalChunks: z.number(),
+    loadedChunks: z.number(),
+    lastLoadTime: z.string(),
+  }).optional(),
+});
+
+// ============================================================================
+// LEGACY COMPATIBILITY TYPES
+// ============================================================================
+
+/**
+ * Legacy database row data for compatibility with existing Angular code
+ * @deprecated Use SchemaTable instead
  */
 export type DatabaseRowData = {
   id: number;
@@ -1155,6 +1120,7 @@ export type DatabaseRowData = {
 };
 
 /**
+ * Legacy database table row data for compatibility
  * @deprecated Use SchemaTable instead
  */
 export type DatabaseTableRowData = {
@@ -1164,7 +1130,8 @@ export type DatabaseTableRowData = {
 };
 
 /**
- * @deprecated Use TableRelationship instead
+ * Legacy table related type for compatibility
+ * @deprecated Use TableRelated instead
  */
 export type TableRelatedType = {
   alias: string;
@@ -1189,112 +1156,76 @@ export type TableRelatedType = {
   flattenDropPrefix: boolean;
 };
 
-// =============================================================================
-// UTILITY TYPES AND HELPERS
-// =============================================================================
+// ============================================================================
+// UTILITY TYPES
+// ============================================================================
 
 /**
- * Utility type for creating schema query keys
+ * Extract field types that are numeric
  */
-export type SchemaQueryKey = readonly [
-  'schema',
-  {
-    service: string;
-    database?: string;
-    schema?: string;
-    table?: string;
-    type?: 'tables' | 'views' | 'procedures' | 'functions';
-  }
-];
+export type NumericFieldType = Extract<FieldType, 'integer' | 'bigint' | 'decimal' | 'float' | 'double'>;
 
 /**
- * Schema discovery status enumeration
+ * Extract field types that are textual
  */
-export enum SchemaDiscoveryStatus {
-  IDLE = 'idle',
-  LOADING = 'loading',
-  SUCCESS = 'success',
-  ERROR = 'error',
-  REFRESHING = 'refreshing'
-}
+export type TextFieldType = Extract<FieldType, 'string' | 'text' | 'json' | 'xml'>;
 
 /**
- * Schema tree filter configuration
+ * Extract field types that are date/time related
  */
-export interface SchemaTreeFilter {
-  searchTerm?: string;
-  objectTypes?: ('table' | 'view' | 'procedure' | 'function')[];
-  hasData?: boolean;
-  hasRelationships?: boolean;
-  isAPIEnabled?: boolean;
-  customFilter?: (node: SchemaTreeNode) => boolean;
-}
+export type DateTimeFieldType = Extract<FieldType, 'date' | 'datetime' | 'timestamp' | 'time'>;
 
 /**
- * Schema export configuration
+ * Extract field types that are binary
  */
-export interface SchemaExportConfig {
-  format: 'json' | 'sql' | 'csv' | 'xlsx';
-  includeData?: boolean;
-  includeSchema?: boolean;
-  includeRelationships?: boolean;
-  includeIndexes?: boolean;
-  includeConstraints?: boolean;
-  includeTriggers?: boolean;
-  tables?: string[];
-  compression?: boolean;
-}
+export type BinaryFieldType = Extract<FieldType, 'binary' | 'blob'>;
 
 /**
- * Schema comparison result
+ * Extract field types that are geometric
  */
-export interface SchemaComparison {
-  source: SchemaDiscoveryData;
-  target: SchemaDiscoveryData;
-  differences: SchemaDifference[];
-  summary: SchemaComparisonSummary;
-}
+export type GeometricFieldType = Extract<FieldType, 'geometry' | 'point' | 'linestring' | 'polygon'>;
 
 /**
- * Schema difference definition
+ * Utility type for partial schema table updates
  */
-export interface SchemaDifference {
-  type: 'table' | 'field' | 'index' | 'constraint' | 'relationship';
-  action: 'added' | 'removed' | 'modified';
-  path: string[];
-  source?: any;
-  target?: any;
-  description: string;
-}
+export type PartialSchemaTable = Partial<Omit<SchemaTable, 'id' | 'name'>> & Pick<SchemaTable, 'id' | 'name'>;
 
 /**
- * Schema comparison summary
+ * Utility type for partial schema field updates
  */
-export interface SchemaComparisonSummary {
-  tablesAdded: number;
-  tablesRemoved: number;
-  tablesModified: number;
-  fieldsAdded: number;
-  fieldsRemoved: number;
-  fieldsModified: number;
-  constraintsAdded: number;
-  constraintsRemoved: number;
-  indexesAdded: number;
-  indexesRemoved: number;
-}
+export type PartialSchemaField = Partial<Omit<SchemaField, 'id' | 'name'>> & Pick<SchemaField, 'id' | 'name'>;
 
-// =============================================================================
-// EXPORT ALL TYPES
-// =============================================================================
+/**
+ * Type guard to check if field type is numeric
+ */
+export const isNumericField = (type: FieldType): type is NumericFieldType => {
+  return ['integer', 'bigint', 'decimal', 'float', 'double'].includes(type);
+};
 
-export * from './api';
-export * from './database';
+/**
+ * Type guard to check if field type is textual
+ */
+export const isTextField = (type: FieldType): type is TextFieldType => {
+  return ['string', 'text', 'json', 'xml'].includes(type);
+};
 
-// Re-export commonly used types for convenience
-export type {
-  UseQueryResult,
-  VirtualItem
-} from '@tanstack/react-query';
+/**
+ * Type guard to check if field type is date/time
+ */
+export const isDateTimeField = (type: FieldType): type is DateTimeFieldType => {
+  return ['date', 'datetime', 'timestamp', 'time'].includes(type);
+};
 
-export type { ReactNode } from 'react';
-export { z } from 'zod';
+/**
+ * Type guard to check if field type is binary
+ */
+export const isBinaryField = (type: FieldType): type is BinaryFieldType => {
+  return ['binary', 'blob'].includes(type);
+};
+
+/**
+ * Type guard to check if field type is geometric
+ */
+export const isGeometricField = (type: FieldType): type is GeometricFieldType => {
+  return ['geometry', 'point', 'linestring', 'polygon'].includes(type);
+};
