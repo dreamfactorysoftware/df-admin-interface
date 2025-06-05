@@ -1,869 +1,993 @@
-/**
- * Vitest Unit Tests for Table Details Page Component
- * 
- * This test suite provides comprehensive coverage for the table details page component,
- * implementing the migration from Angular/Jest to Vitest and React Testing Library per
- * Section 4.7.1.3 Vitest Testing Infrastructure Setup.
- * 
- * Key Testing Areas:
- * - React Hook Form validation with Zod schema verification
- * - Component rendering and user interaction patterns  
- * - Next.js routing and navigation behavior
- * - Mock Service Worker API integration testing
- * - Accessibility compliance (WCAG 2.1 AA)
- * - Performance validation for large datasets (1000+ tables)
- * 
- * Performance Targets:
- * - Test execution: <30 seconds for complete unit test suite
- * - API response mocking: <50ms cache hit responses
- * - Form validation: <100ms real-time validation
- * 
- * Compliance:
- * - Vitest 2.1+ for 10x faster test execution per Section 7.1.1
- * - Mock Service Worker for realistic API mocking per Section 5.2
- * - React Testing Library integration per Section 7.1.2
- */
-
-import { describe, it, expect, beforeEach, afterEach, vi, type MockedFunction } from 'vitest';
-import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
-import { userEvent } from '@testing-library/user-event';
-import { useRouter, useSearchParams, useParams } from 'next/navigation';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/mocks/server';
-import { rest } from 'msw';
+import { 
+  renderWithProviders, 
+  createMockRouter,
+  accessibilityUtils,
+  headlessUIUtils,
+  testUtils
+} from '../../../test/utils/test-utils';
+import TableDetailsPage from './page';
+import { TableDetailsType, TableField, TableRelated } from '../../../types/schema';
 
-// Mock Next.js navigation hooks before importing components
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
-  useSearchParams: vi.fn(),
-  useParams: vi.fn(),
-  usePathname: vi.fn(() => '/adf-schema/df-table-details'),
+// Mock the ACE editor component to avoid issues with external dependencies
+vi.mock('../../../components/ui/ace-editor', () => ({
+  default: ({ value, onChange, testId }: any) => (
+    <textarea
+      data-testid={testId || 'ace-editor'}
+      value={value}
+      onChange={(e) => onChange?.(e.target.value)}
+      placeholder="JSON Editor"
+    />
+  ),
 }));
 
-// Mock React Query for server state management testing
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: vi.fn(),
-  useMutation: vi.fn(),
-  useQueryClient: vi.fn(),
-  QueryClient: vi.fn(),
-  QueryClientProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
+// Mock Next.js params and searchParams
+const mockParams = { service: 'testdb' };
+const mockSearchParams = new URLSearchParams();
 
-// Component imports (these will be created by other team members)
-// Using dynamic imports to handle components that don't exist yet
-const TableDetailsPage = vi.fn(() => (
-  <div data-testid="table-details-page">
-    <div data-testid="page-header">Table Details</div>
-    <div data-testid="tab-container">
-      <button data-testid="metadata-tab" role="tab">Metadata</button>
-      <button data-testid="fields-tab" role="tab">Fields</button>
-      <button data-testid="relationships-tab" role="tab">Relationships</button>
-    </div>
-    <div data-testid="tab-content">
-      <div data-testid="metadata-form">
-        <input data-testid="table-name" name="name" />
-        <input data-testid="table-alias" name="alias" />
-        <input data-testid="table-label" name="label" />
-        <textarea data-testid="table-description" name="description" />
-        <button data-testid="save-button">Save Changes</button>
-        <button data-testid="cancel-button">Cancel</button>
-      </div>
-    </div>
-  </div>
-));
+// Mock table data for testing
+const mockTableFields: TableField[] = [
+  {
+    name: 'id',
+    alias: null,
+    label: 'ID',
+    description: 'Primary key',
+    native: [],
+    type: 'id',
+    dbType: 'int',
+    length: null,
+    precision: null,
+    scale: null,
+    default: null,
+    required: true,
+    allowNull: false,
+    fixedLength: false,
+    supportsMultibyte: false,
+    autoIncrement: true,
+    isPrimaryKey: true,
+    isUnique: true,
+    isIndex: false,
+    isForeignKey: false,
+    refTable: null,
+    refField: null,
+    refOnUpdate: null,
+    refOnDelete: null,
+    picklist: null,
+    validation: null,
+    dbFunction: null,
+    isVirtual: false,
+    isAggregate: false,
+  },
+  {
+    name: 'name',
+    alias: null,
+    label: 'Name',
+    description: 'User name',
+    native: [],
+    type: 'string',
+    dbType: 'varchar',
+    length: 255,
+    precision: null,
+    scale: null,
+    default: null,
+    required: true,
+    allowNull: false,
+    fixedLength: false,
+    supportsMultibyte: true,
+    autoIncrement: false,
+    isPrimaryKey: false,
+    isUnique: false,
+    isIndex: false,
+    isForeignKey: false,
+    refTable: null,
+    refField: null,
+    refOnUpdate: null,
+    refOnDelete: null,
+    picklist: null,
+    validation: null,
+    dbFunction: null,
+    isVirtual: false,
+    isAggregate: false,
+  },
+];
 
-// Mock handlers for table details API endpoints
-const mockTableDetailsHandlers = [
-  // GET table details
-  rest.get('/api/v2/:service/_schema/:table', (req, res, ctx) => {
-    const { service, table } = req.params;
-    return res(
-      ctx.status(200),
-      ctx.json({
-        resource: [
-          {
-            name: 'users',
-            alias: 'app_users',
-            label: 'Application Users',
-            plural: 'Users',
-            description: 'User account management table',
-            is_view: false,
-            primary_key: 'id',
-            name_field: 'name',
-            field: [
-              {
-                name: 'id',
-                type: 'integer',
-                db_type: 'int(11)',
-                is_primary_key: true,
-                auto_increment: true,
-                allow_null: false,
-              },
-              {
-                name: 'email',
-                type: 'string',
-                db_type: 'varchar(255)',
-                is_unique: true,
-                allow_null: false,
-                validation: { format: 'email' },
-              },
-              {
-                name: 'name',
-                type: 'string',
-                db_type: 'varchar(100)',
-                allow_null: false,
-              },
-            ],
-            related: [
-              {
-                type: 'has_many',
-                field: 'id',
-                ref_table: 'user_profiles',
-                ref_field: 'user_id',
-                always_fetch: false,
-              },
-            ],
-          },
-        ],
-      })
+const mockTableRelated: TableRelated[] = [
+  {
+    name: 'user_roles',
+    alias: null,
+    label: 'User Roles',
+    description: 'Associated user roles',
+    native: [],
+    type: 'has_many',
+    field: 'user_id',
+    isVirtual: false,
+    refServiceID: 1,
+    refTable: 'user_roles',
+    refField: 'user_id',
+    refOnUpdate: 'CASCADE',
+    refOnDelete: 'CASCADE',
+    junctionServiceID: null,
+    junctionTable: null,
+    junctionField: null,
+    junctionRefField: null,
+    alwaysFetch: false,
+    flatten: false,
+    flattenDropPrefix: false,
+  },
+];
+
+const mockTableData: TableDetailsType = {
+  name: 'users',
+  alias: 'user',
+  label: 'Users',
+  description: 'User accounts table',
+  native: [],
+  plural: 'Users',
+  isView: false,
+  primaryKey: ['id'],
+  nameField: 'name',
+  field: mockTableFields,
+  related: mockTableRelated,
+  constraints: {},
+  access: 7, // Full CRUD access
+};
+
+// MSW handlers for API endpoints
+const tableDetailsHandlers = [
+  // Get table details for edit mode
+  http.get('/api/v2/testdb/_schema/users', () => {
+    return HttpResponse.json({
+      resource: [mockTableData],
+    });
+  }),
+
+  // Create new table
+  http.post('/api/v2/testdb/_schema', async ({ request }) => {
+    const body = await request.json() as { resource: TableDetailsType[] };
+    const newTable = body.resource[0];
+    return HttpResponse.json({
+      resource: [{ ...newTable, id: 'new-table-id' }],
+    });
+  }),
+
+  // Update existing table
+  http.patch('/api/v2/testdb/_schema/users', async ({ request }) => {
+    const body = await request.json() as Partial<TableDetailsType>;
+    return HttpResponse.json({
+      resource: [{ ...mockTableData, ...body }],
+    });
+  }),
+
+  // Error scenarios
+  http.post('/api/v2/testdb/_schema/error', () => {
+    return HttpResponse.json(
+      { error: 'Table creation failed' },
+      { status: 400 }
     );
   }),
 
-  // PUT table details update
-  rest.put('/api/v2/:service/_schema/:table', async (req, res, ctx) => {
-    const requestBody = await req.json();
-    return res(
-      ctx.status(200),
-      ctx.json({
-        resource: [
-          {
-            ...requestBody.resource[0],
-            name: requestBody.resource[0].name,
-            alias: requestBody.resource[0].alias,
-            label: requestBody.resource[0].label,
-            description: requestBody.resource[0].description,
-          },
-        ],
-      })
-    );
-  }),
-
-  // Error responses for testing error handling
-  rest.get('/api/v2/test-service/_schema/non-existent', (req, res, ctx) => {
-    return res(
-      ctx.status(404),
-      ctx.json({
-        error: {
-          code: 404,
-          message: 'Table not found',
-          context: 'The requested table does not exist',
-        },
-      })
+  http.patch('/api/v2/testdb/_schema/users/error', () => {
+    return HttpResponse.json(
+      { error: 'Table update failed' },
+      { status: 400 }
     );
   }),
 ];
 
-// Mock data for testing
-const mockTableData = {
-  name: 'users',
-  alias: 'app_users',
-  label: 'Application Users',
-  plural: 'Users',
-  description: 'User account management table',
-  is_view: false,
-  primary_key: 'id',
-  name_field: 'name',
-  field: [
-    {
-      name: 'id',
-      type: 'integer',
-      db_type: 'int(11)',
-      is_primary_key: true,
-      auto_increment: true,
-      allow_null: false,
-    },
-    {
-      name: 'email',
-      type: 'string',
-      db_type: 'varchar(255)',
-      is_unique: true,
-      allow_null: false,
-      validation: { format: 'email' },
-    },
-  ],
-  related: [
-    {
-      type: 'has_many',
-      field: 'id',
-      ref_table: 'user_profiles',
-      ref_field: 'user_id',
-      always_fetch: false,
-    },
-  ],
-};
-
-// Custom render function with providers
-const renderWithProviders = (ui: React.ReactElement, options = {}) => {
-  const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
-    return (
-      <div data-testid="test-providers">
-        {children}
-      </div>
-    );
-  };
-
-  return render(ui, { wrapper: AllTheProviders, ...options });
-};
-
-describe('TableDetailsPage Component', () => {
-  // Mock router functions
-  const mockPush = vi.fn();
-  const mockReplace = vi.fn();
-  const mockBack = vi.fn();
-  const mockRefresh = vi.fn();
+describe('TableDetailsPage', () => {
+  let mockRouter: ReturnType<typeof createMockRouter>;
+  let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
-    // Reset all mocks before each test
+    // Setup MSW handlers
+    server.use(...tableDetailsHandlers);
+    
+    // Create mock router
+    mockRouter = createMockRouter();
+    
+    // Setup user events
+    user = userEvent.setup();
+    
+    // Reset all mocks
     vi.clearAllMocks();
-
-    // Setup Next.js navigation mocks
-    (useRouter as MockedFunction<typeof useRouter>).mockReturnValue({
-      push: mockPush,
-      replace: mockReplace,
-      back: mockBack,
-      forward: vi.fn(),
-      refresh: mockRefresh,
-      prefetch: vi.fn(),
-    });
-
-    (useParams as MockedFunction<typeof useParams>).mockReturnValue({
-      service: 'test-service',
-      table: 'users',
-    });
-
-    (useSearchParams as MockedFunction<typeof useSearchParams>).mockReturnValue(
-      new URLSearchParams('tab=metadata')
-    );
-
-    // Add MSW handlers for this test suite
-    server.use(...mockTableDetailsHandlers);
   });
 
   afterEach(() => {
-    // Clean up after each test
     server.resetHandlers();
   });
 
   describe('Component Rendering', () => {
-    it('should render the table details page with all main sections', async () => {
-      renderWithProviders(<TableDetailsPage />);
-
-      // Verify main page structure
-      expect(screen.getByTestId('table-details-page')).toBeInTheDocument();
-      expect(screen.getByTestId('page-header')).toBeInTheDocument();
-      expect(screen.getByText('Table Details')).toBeInTheDocument();
-
-      // Verify tab navigation is present
-      expect(screen.getByTestId('tab-container')).toBeInTheDocument();
-      expect(screen.getByTestId('metadata-tab')).toBeInTheDocument();
-      expect(screen.getByTestId('fields-tab')).toBeInTheDocument();
-      expect(screen.getByTestId('relationships-tab')).toBeInTheDocument();
-
-      // Verify tab content area
-      expect(screen.getByTestId('tab-content')).toBeInTheDocument();
-    });
-
-    it('should display loading state while fetching table data', async () => {
-      // Mock loading state
-      const LoadingComponent = () => (
-        <div data-testid="loading-indicator">Loading table details...</div>
+    it('should render create mode correctly', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: {
+            router: mockRouter,
+            pathname: '/adf-schema/df-table-details',
+            searchParams: new URLSearchParams('mode=create'),
+          },
+        }
       );
 
-      renderWithProviders(<LoadingComponent />);
-      expect(screen.getByTestId('loading-indicator')).toBeInTheDocument();
+      // Check if form fields are rendered
+      expect(screen.getByLabelText(/table name/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/alias/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/label/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/plural/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
+
+      // Check create mode specific elements
+      expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+
+      // Verify tab navigation
+      expect(screen.getByRole('tab', { name: /table/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /json/i })).toBeInTheDocument();
+
+      // Should not show fields and relationships tables in create mode
+      expect(screen.queryByText(/fields/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/relationships/i)).not.toBeInTheDocument();
     });
 
-    it('should handle error states gracefully', async () => {
-      // Mock error response
-      server.use(
-        rest.get('/api/v2/:service/_schema/:table', (req, res, ctx) => {
-          return res(
-            ctx.status(500),
-            ctx.json({
-              error: {
-                code: 500,
-                message: 'Internal server error',
-                context: 'Database connection failed',
-              },
-            })
-          );
-        })
+    it('should render edit mode correctly', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={{ ...mockParams, table: 'users' }} 
+          searchParams={{ mode: 'edit' }} 
+        />,
+        {
+          providerOptions: {
+            router: mockRouter,
+            pathname: '/adf-schema/df-table-details/users',
+            searchParams: new URLSearchParams('mode=edit'),
+          },
+        }
       );
 
-      const ErrorComponent = () => (
-        <div data-testid="error-message">
-          Error loading table details: Database connection failed
-        </div>
-      );
+      // Wait for data to load
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('users')).toBeInTheDocument();
+      });
 
-      renderWithProviders(<ErrorComponent />);
-      expect(screen.getByTestId('error-message')).toBeInTheDocument();
+      // Check if form is populated with existing data
+      expect(screen.getByDisplayValue('users')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('user')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Users')).toBeInTheDocument();
+
+      // Check edit mode specific elements
+      expect(screen.getByRole('button', { name: /update/i })).toBeInTheDocument();
+
+      // Should show fields and relationships sections in edit mode
+      await waitFor(() => {
+        expect(screen.getByText(/fields/i)).toBeInTheDocument();
+        expect(screen.getByText(/relationships/i)).toBeInTheDocument();
+      });
+
+      // Table name should be disabled in edit mode
+      const nameInput = screen.getByDisplayValue('users');
+      expect(nameInput).toBeDisabled();
     });
 
-    it('should render with correct accessibility attributes', () => {
-      renderWithProviders(<TableDetailsPage />);
+    it('should render with dark theme correctly', () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: {
+            theme: 'dark',
+          },
+        }
+      );
 
-      // Verify tab accessibility
-      const metadataTab = screen.getByTestId('metadata-tab');
-      expect(metadataTab).toHaveAttribute('role', 'tab');
+      const themeProvider = screen.getByTestId('theme-provider');
+      expect(themeProvider).toHaveClass('dark');
+    });
+  });
 
-      // Verify headings structure for screen readers
-      expect(screen.getByTestId('page-header')).toBeInTheDocument();
+  describe('Form Validation', () => {
+    it('should validate required table name field', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      
+      // Try to submit without entering table name
+      await user.click(saveButton);
+
+      // Should show validation error
+      await waitFor(() => {
+        expect(screen.getByText(/table name is required/i)).toBeInTheDocument();
+      });
+
+      // Should not trigger API call
+      expect(mockRouter.push).not.toHaveBeenCalled();
+    });
+
+    it('should validate table name format', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      const nameInput = screen.getByLabelText(/table name/i);
+      const saveButton = screen.getByRole('button', { name: /save/i });
+
+      // Enter invalid table name (with spaces)
+      await user.type(nameInput, 'invalid table name');
+      await user.click(saveButton);
+
+      // Should show format validation error
+      await waitFor(() => {
+        expect(screen.getByText(/invalid table name format/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should accept valid form data', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      // Fill out valid form data
+      await user.type(screen.getByLabelText(/table name/i), 'new_table');
+      await user.type(screen.getByLabelText(/alias/i), 'newTable');
+      await user.type(screen.getByLabelText(/label/i), 'New Table');
+      await user.type(screen.getByLabelText(/plural/i), 'New Tables');
+      await user.type(screen.getByLabelText(/description/i), 'A new table for testing');
+
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      await user.click(saveButton);
+
+      // Should not show validation errors
+      expect(screen.queryByText(/required/i)).not.toBeInTheDocument();
+
+      // Should trigger API call and navigation
+      await waitFor(() => {
+        expect(mockRouter.push).toHaveBeenCalledWith(
+          expect.stringContaining('/adf-schema/new_table')
+        );
+      });
     });
   });
 
   describe('Tab Navigation', () => {
-    it('should switch between tabs correctly', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
+    it('should switch between Table and JSON tabs', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
 
-      // Initial tab should be metadata
-      expect(screen.getByTestId('metadata-form')).toBeInTheDocument();
+      const tableTab = screen.getByRole('tab', { name: /table/i });
+      const jsonTab = screen.getByRole('tab', { name: /json/i });
 
-      // Click on fields tab
-      await user.click(screen.getByTestId('fields-tab'));
+      // Initially on Table tab
+      expect(tableTab).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByLabelText(/table name/i)).toBeVisible();
+
+      // Switch to JSON tab
+      await user.click(jsonTab);
+
+      expect(jsonTab).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByTestId('ace-editor')).toBeVisible();
+
+      // Switch back to Table tab
+      await user.click(tableTab);
+
+      expect(tableTab).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByLabelText(/table name/i)).toBeVisible();
+    });
+
+    it('should test tab navigation with keyboard', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      const tableTab = screen.getByRole('tab', { name: /table/i });
+      const jsonTab = screen.getByRole('tab', { name: /json/i });
+
+      // Test keyboard navigation
+      tableTab.focus();
+      await user.keyboard('{ArrowRight}');
       
-      // Verify URL parameter would be updated (mocked)
+      expect(document.activeElement).toBe(jsonTab);
+
+      await user.keyboard('{Enter}');
+      expect(jsonTab).toHaveAttribute('aria-selected', 'true');
+    });
+  });
+
+  describe('API Interactions', () => {
+    it('should create new table successfully', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      // Fill out form
+      await user.type(screen.getByLabelText(/table name/i), 'new_table');
+      await user.type(screen.getByLabelText(/label/i), 'New Table');
+
+      // Submit form
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      await user.click(saveButton);
+
+      // Should show loading state
+      expect(screen.getByRole('button', { name: /saving/i })).toBeInTheDocument();
+
+      // Should navigate to new table on success
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith(
-          expect.stringContaining('tab=fields')
+        expect(mockRouter.push).toHaveBeenCalledWith(
+          '/adf-schema/df-table-details/new_table?mode=edit'
         );
       });
     });
 
-    it('should maintain tab state during navigation', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      // Switch to relationships tab
-      await user.click(screen.getByTestId('relationships-tab'));
-      
-      // Verify tab state persistence
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.stringContaining('tab=relationships')
+    it('should update existing table successfully', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={{ ...mockParams, table: 'users' }} 
+          searchParams={{ mode: 'edit' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
       );
-    });
 
-    it('should handle keyboard navigation for tabs', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      const metadataTab = screen.getByTestId('metadata-tab');
-      const fieldsTab = screen.getByTestId('fields-tab');
-
-      // Focus on first tab
-      metadataTab.focus();
-      expect(metadataTab).toHaveFocus();
-
-      // Navigate with arrow keys
-      await user.keyboard('{ArrowRight}');
-      expect(fieldsTab).toHaveFocus();
-
-      // Activate with Enter key
-      await user.keyboard('{Enter}');
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.stringContaining('tab=fields')
-      );
-    });
-  });
-
-  describe('Form Validation and Interaction', () => {
-    it('should validate table name field with proper error messages', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      const tableNameInput = screen.getByTestId('table-name');
-      const saveButton = screen.getByTestId('save-button');
-
-      // Clear the input to trigger validation
-      await user.clear(tableNameInput);
-      await user.click(saveButton);
-
-      // Wait for validation error (would be shown by React Hook Form)
+      // Wait for data to load
       await waitFor(() => {
-        // This would be the actual validation error from React Hook Form + Zod
-        const errorMessage = screen.queryByText(/table name is required/i);
-        if (errorMessage) {
-          expect(errorMessage).toBeInTheDocument();
-        }
+        expect(screen.getByDisplayValue('users')).toBeInTheDocument();
       });
-    });
 
-    it('should validate table alias format correctly', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
+      // Update form data
+      const labelInput = screen.getByDisplayValue('Users');
+      await user.clear(labelInput);
+      await user.type(labelInput, 'Updated Users');
 
-      const aliasInput = screen.getByTestId('table-alias');
-      
-      // Enter invalid alias (spaces not allowed)
-      await user.type(aliasInput, 'invalid alias name');
-      await user.tab(); // Trigger blur validation
+      // Submit form
+      const updateButton = screen.getByRole('button', { name: /update/i });
+      await user.click(updateButton);
 
-      // Wait for validation to complete
+      // Should navigate back on success
       await waitFor(() => {
-        // This would trigger Zod validation for alias format
-        const errorMessage = screen.queryByText(/alias must not contain spaces/i);
-        if (errorMessage) {
-          expect(errorMessage).toBeInTheDocument();
-        }
-      });
-    });
-
-    it('should handle form submission with valid data', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      // Fill in valid form data
-      await user.type(screen.getByTestId('table-name'), 'test_table');
-      await user.type(screen.getByTestId('table-alias'), 'test_alias');
-      await user.type(screen.getByTestId('table-label'), 'Test Table');
-      await user.type(screen.getByTestId('table-description'), 'A test table');
-
-      // Submit the form
-      await user.click(screen.getByTestId('save-button'));
-
-      // Verify API call would be made (mocked)
-      await waitFor(() => {
-        // Check if success message or navigation occurred
-        expect(mockRefresh).toHaveBeenCalled();
-      });
-    });
-
-    it('should reset form when cancel button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      const tableNameInput = screen.getByTestId('table-name');
-      const cancelButton = screen.getByTestId('cancel-button');
-
-      // Make changes to the form
-      await user.clear(tableNameInput);
-      await user.type(tableNameInput, 'modified_name');
-
-      // Click cancel
-      await user.click(cancelButton);
-
-      // Verify form reset or navigation back
-      await waitFor(() => {
-        expect(mockBack).toHaveBeenCalled();
-      });
-    });
-
-    it('should show unsaved changes warning when navigating away', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      // Make changes to trigger dirty state
-      await user.type(screen.getByTestId('table-name'), 'modified');
-
-      // Attempt to navigate to different tab
-      await user.click(screen.getByTestId('fields-tab'));
-
-      // Should show confirmation dialog (mocked behavior)
-      await waitFor(() => {
-        // In actual implementation, this would show a confirmation dialog
-        const confirmDialog = screen.queryByText(/unsaved changes/i);
-        if (confirmDialog) {
-          expect(confirmDialog).toBeInTheDocument();
-        }
-      });
-    });
-  });
-
-  describe('API Integration with MSW', () => {
-    it('should load table data from API on component mount', async () => {
-      renderWithProviders(<TableDetailsPage />);
-
-      // Wait for API call to complete
-      await waitFor(() => {
-        // Verify that table data would be populated
-        const nameInput = screen.getByTestId('table-name');
-        // In actual implementation, this would be populated from API
-        expect(nameInput).toBeInTheDocument();
+        expect(mockRouter.back).toHaveBeenCalled();
       });
     });
 
     it('should handle API errors gracefully', async () => {
-      // Use error handler from MSW
-      (useParams as MockedFunction<typeof useParams>).mockReturnValue({
-        service: 'test-service',
-        table: 'non-existent',
-      });
-
-      const ErrorHandlingComponent = () => (
-        <div data-testid="api-error">Table not found</div>
+      // Mock error response
+      server.use(
+        http.post('/api/v2/testdb/_schema', () => {
+          return HttpResponse.json(
+            { error: 'Table creation failed' },
+            { status: 400 }
+          );
+        })
       );
 
-      renderWithProviders(<ErrorHandlingComponent />);
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
 
+      // Fill out form
+      await user.type(screen.getByLabelText(/table name/i), 'error_table');
+
+      // Submit form
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      await user.click(saveButton);
+
+      // Should show error message
       await waitFor(() => {
-        expect(screen.getByTestId('api-error')).toBeInTheDocument();
+        expect(screen.getByText(/table creation failed/i)).toBeInTheDocument();
       });
+
+      // Should not navigate
+      expect(mockRouter.push).not.toHaveBeenCalled();
     });
+  });
 
-    it('should update table data via API when form is submitted', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
+  describe('JSON Editor', () => {
+    it('should sync form data with JSON editor', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
 
-      // Mock successful API response
-      const updatedData = { ...mockTableData, label: 'Updated Label' };
+      // Fill out form
+      await user.type(screen.getByLabelText(/table name/i), 'test_table');
+      await user.type(screen.getByLabelText(/label/i), 'Test Table');
+
+      // Switch to JSON tab
+      const jsonTab = screen.getByRole('tab', { name: /json/i });
+      await user.click(jsonTab);
+
+      // Check if JSON reflects form data
+      const jsonEditor = screen.getByTestId('ace-editor');
+      const jsonValue = JSON.parse(jsonEditor.textContent || '{}');
       
-      // Fill and submit form
-      const labelInput = screen.getByTestId('table-label');
-      await user.clear(labelInput);
-      await user.type(labelInput, 'Updated Label');
-      await user.click(screen.getByTestId('save-button'));
+      expect(jsonValue.name).toBe('test_table');
+      expect(jsonValue.label).toBe('Test Table');
+    });
 
-      // Verify API update call
+    it('should validate JSON syntax', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      // Switch to JSON tab
+      const jsonTab = screen.getByRole('tab', { name: /json/i });
+      await user.click(jsonTab);
+
+      // Enter invalid JSON
+      const jsonEditor = screen.getByTestId('ace-editor');
+      await user.clear(jsonEditor);
+      await user.type(jsonEditor, '{ invalid json }');
+
+      // Try to save
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      await user.click(saveButton);
+
+      // Should show JSON validation error
       await waitFor(() => {
-        // In actual implementation, this would trigger the PUT request
-        expect(mockRefresh).toHaveBeenCalled();
+        expect(screen.getByText(/invalid json format/i)).toBeInTheDocument();
       });
     });
 
-    it('should implement optimistic updates for better UX', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
+    it('should save from JSON editor successfully', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
 
-      // Simulate optimistic update
-      await user.type(screen.getByTestId('table-label'), 'New Label');
-      await user.click(screen.getByTestId('save-button'));
+      // Switch to JSON tab
+      const jsonTab = screen.getByRole('tab', { name: /json/i });
+      await user.click(jsonTab);
 
-      // Should immediately show updated value before API confirms
+      // Enter valid JSON
+      const jsonEditor = screen.getByTestId('ace-editor');
+      const validTableJson = JSON.stringify({
+        name: 'json_table',
+        label: 'JSON Table',
+        description: 'Created from JSON',
+        field: [
+          {
+            name: 'id',
+            type: 'id',
+            required: true,
+            isPrimaryKey: true,
+          },
+        ],
+      }, null, 2);
+
+      await user.clear(jsonEditor);
+      await user.type(jsonEditor, validTableJson);
+
+      // Save from JSON
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      await user.click(saveButton);
+
+      // Should navigate successfully
       await waitFor(() => {
-        const input = screen.getByTestId('table-label');
-        expect(input).toHaveValue('New Label');
+        expect(mockRouter.push).toHaveBeenCalled();
       });
     });
   });
 
-  describe('Next.js Router Integration', () => {
-    it('should extract parameters from URL correctly', () => {
-      renderWithProviders(<TableDetailsPage />);
+  describe('Navigation', () => {
+    it('should navigate back when cancel is clicked', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
 
-      // Verify useParams was called and returned correct values
-      expect(useParams).toHaveBeenCalled();
+      const cancelButton = screen.getByRole('button', { name: /cancel/i });
+      await user.click(cancelButton);
+
+      expect(mockRouter.back).toHaveBeenCalled();
+    });
+
+    it('should navigate to table list when breadcrumb is clicked', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      const breadcrumbLink = screen.getByRole('link', { name: /tables/i });
+      await user.click(breadcrumbLink);
+
+      expect(mockRouter.push).toHaveBeenCalledWith('/adf-schema/tables');
+    });
+
+    it('should prevent navigation with unsaved changes', async () => {
+      const mockBeforeUnload = vi.spyOn(window, 'addEventListener');
       
-      // In actual implementation, these params would be used to fetch data
-      const params = (useParams as MockedFunction<typeof useParams>).mock.results[0]?.value;
-      expect(params).toEqual({
-        service: 'test-service',
-        table: 'users',
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      // Make changes to form
+      await user.type(screen.getByLabelText(/table name/i), 'unsaved_table');
+
+      // Check if beforeunload listener is added
+      expect(mockBeforeUnload).toHaveBeenCalledWith(
+        'beforeunload',
+        expect.any(Function)
+      );
+
+      mockBeforeUnload.mockRestore();
+    });
+  });
+
+  describe('Accessibility', () => {
+    it('should meet WCAG 2.1 AA compliance standards', async () => {
+      const { container } = renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      // Check form labels
+      const formInputs = screen.getAllByRole('textbox');
+      formInputs.forEach((input) => {
+        expect(accessibilityUtils.hasAriaLabel(input)).toBe(true);
       });
+
+      // Check button accessibility
+      const buttons = screen.getAllByRole('button');
+      buttons.forEach((button) => {
+        expect(accessibilityUtils.isKeyboardAccessible(button)).toBe(true);
+      });
+
+      // Test keyboard navigation
+      const focusableElements = accessibilityUtils.getFocusableElements(container);
+      expect(focusableElements.length).toBeGreaterThan(0);
+
+      const navigationResult = await accessibilityUtils.testKeyboardNavigation(
+        container,
+        user
+      );
+      expect(navigationResult.success).toBe(true);
     });
 
-    it('should handle navigation back to table list', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
+    it('should have proper ARIA roles and labels', () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
 
-      // Simulate breadcrumb navigation
-      const backButton = screen.getByTestId('cancel-button');
-      await user.click(backButton);
+      // Check form has proper role
+      const form = screen.getByRole('form');
+      expect(form).toHaveAttribute('aria-labelledby');
 
-      await waitFor(() => {
-        expect(mockBack).toHaveBeenCalled();
+      // Check tabs have proper ARIA attributes
+      const tabList = screen.getByRole('tablist');
+      expect(tabList).toBeInTheDocument();
+
+      const tabs = screen.getAllByRole('tab');
+      tabs.forEach((tab) => {
+        expect(tab).toHaveAttribute('aria-controls');
+        expect(tab).toHaveAttribute('aria-selected');
       });
+
+      // Check required fields are marked
+      const nameInput = screen.getByLabelText(/table name/i);
+      expect(nameInput).toHaveAttribute('aria-required', 'true');
     });
 
-    it('should update URL when tab changes', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
+    it('should announce form validation errors to screen readers', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
 
-      await user.click(screen.getByTestId('fields-tab'));
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      await user.click(saveButton);
 
+      // Error should be associated with input via aria-describedby
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith(
-          expect.stringContaining('tab=fields')
+        const nameInput = screen.getByLabelText(/table name/i);
+        const errorId = nameInput.getAttribute('aria-describedby');
+        expect(errorId).toBeTruthy();
+        
+        const errorElement = screen.getByText(/table name is required/i);
+        expect(errorElement).toHaveAttribute('id', errorId);
+      });
+    });
+  });
+
+  describe('Performance', () => {
+    it('should render within performance thresholds', async () => {
+      const startTime = performance.now();
+      
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      // Component should render quickly
+      await waitFor(() => {
+        expect(screen.getByLabelText(/table name/i)).toBeInTheDocument();
+      });
+
+      const endTime = performance.now();
+      const renderTime = endTime - startTime;
+
+      // Should render within 100ms per React/Next.js Integration Requirements
+      expect(renderTime).toBeLessThan(100);
+    });
+
+    it('should handle large datasets efficiently', async () => {
+      // Create large mock dataset
+      const largeTableData = {
+        ...mockTableData,
+        field: Array.from({ length: 100 }, (_, index) => ({
+          ...mockTableFields[0],
+          name: `field_${index}`,
+          label: `Field ${index}`,
+        })),
+      };
+
+      server.use(
+        http.get('/api/v2/testdb/_schema/large_table', () => {
+          return HttpResponse.json({
+            resource: [largeTableData],
+          });
+        })
+      );
+
+      const startTime = performance.now();
+
+      renderWithProviders(
+        <TableDetailsPage 
+          params={{ ...mockParams, table: 'large_table' }} 
+          searchParams={{ mode: 'edit' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      // Wait for data to load
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('large_table')).toBeInTheDocument();
+      });
+
+      const endTime = performance.now();
+      const loadTime = endTime - startTime;
+
+      // Should load large datasets within reasonable time
+      expect(loadTime).toBeLessThan(2000);
+    });
+  });
+
+  describe('Error Boundaries', () => {
+    it('should handle component errors gracefully', () => {
+      // Create a component that throws an error
+      const ThrowingComponent = () => {
+        throw new Error('Test error');
+      };
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation();
+
+      renderWithProviders(
+        <ThrowingComponent />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      // Should display error boundary UI
+      expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('Data Persistence', () => {
+    it('should preserve form data when switching tabs', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      // Fill out form
+      await user.type(screen.getByLabelText(/table name/i), 'persistent_table');
+      await user.type(screen.getByLabelText(/label/i), 'Persistent Table');
+
+      // Switch to JSON tab and back
+      await user.click(screen.getByRole('tab', { name: /json/i }));
+      await user.click(screen.getByRole('tab', { name: /table/i }));
+
+      // Data should be preserved
+      expect(screen.getByDisplayValue('persistent_table')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Persistent Table')).toBeInTheDocument();
+    });
+
+    it('should warn about unsaved changes', async () => {
+      const mockLocalStorage = testUtils.mockLocalStorage();
+
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      // Make changes
+      await user.type(screen.getByLabelText(/table name/i), 'unsaved_table');
+
+      // Should store draft data
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+        'table-draft',
+        expect.stringContaining('unsaved_table')
+      );
+    });
+  });
+
+  describe('Integration Tests', () => {
+    it('should complete full create workflow', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={mockParams} 
+          searchParams={{ mode: 'create' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
+        }
+      );
+
+      // Fill out complete form
+      await user.type(screen.getByLabelText(/table name/i), 'integration_test');
+      await user.type(screen.getByLabelText(/alias/i), 'integrationTest');
+      await user.type(screen.getByLabelText(/label/i), 'Integration Test');
+      await user.type(screen.getByLabelText(/plural/i), 'Integration Tests');
+      await user.type(screen.getByLabelText(/description/i), 'Table for integration testing');
+
+      // Submit form
+      await user.click(screen.getByRole('button', { name: /save/i }));
+
+      // Should navigate to edit mode for the new table
+      await waitFor(() => {
+        expect(mockRouter.push).toHaveBeenCalledWith(
+          expect.stringContaining('/adf-schema/integration_test')
         );
       });
     });
 
-    it('should handle browser navigation events', () => {
-      renderWithProviders(<TableDetailsPage />);
-
-      // Test popstate handling for browser back/forward
-      act(() => {
-        window.dispatchEvent(new PopStateEvent('popstate'));
-      });
-
-      // Component should handle browser navigation gracefully
-      expect(screen.getByTestId('table-details-page')).toBeInTheDocument();
-    });
-  });
-
-  describe('Performance Optimization', () => {
-    it('should render efficiently with large datasets', async () => {
-      const startTime = performance.now();
-      
-      renderWithProviders(<TableDetailsPage />);
-      
-      const endTime = performance.now();
-      const renderTime = endTime - startTime;
-
-      // Verify render time is under performance target
-      expect(renderTime).toBeLessThan(100); // 100ms target for component render
-    });
-
-    it('should implement virtual scrolling for large field lists', () => {
-      // Test virtual scrolling implementation when fields tab is active
-      renderWithProviders(<TableDetailsPage />);
-
-      // In actual implementation, this would test TanStack Virtual
-      const tabContent = screen.getByTestId('tab-content');
-      expect(tabContent).toBeInTheDocument();
-    });
-
-    it('should cache form state during tab switches', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      // Make changes in metadata tab
-      await user.type(screen.getByTestId('table-label'), 'Cached Value');
-
-      // Switch to fields tab
-      await user.click(screen.getByTestId('fields-tab'));
-
-      // Switch back to metadata tab
-      await user.click(screen.getByTestId('metadata-tab'));
-
-      // Verify form state was preserved
-      await waitFor(() => {
-        const labelInput = screen.getByTestId('table-label');
-        expect(labelInput).toHaveValue('Cached Value');
-      });
-    });
-  });
-
-  describe('Accessibility Compliance', () => {
-    it('should provide proper ARIA labels for all interactive elements', () => {
-      renderWithProviders(<TableDetailsPage />);
-
-      // Verify tab accessibility
-      const tabs = screen.getAllByRole('tab');
-      tabs.forEach(tab => {
-        expect(tab).toHaveAttribute('role', 'tab');
-      });
-    });
-
-    it('should support keyboard navigation throughout the interface', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      // Test tab order
-      await user.tab();
-      expect(screen.getByTestId('metadata-tab')).toHaveFocus();
-
-      await user.tab();
-      expect(screen.getByTestId('fields-tab')).toHaveFocus();
-    });
-
-    it('should announce form validation errors to screen readers', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      // Trigger validation error
-      await user.clear(screen.getByTestId('table-name'));
-      await user.tab();
-
-      // Verify error would be announced (aria-live regions)
-      await waitFor(() => {
-        const errorMessage = screen.queryByRole('alert');
-        if (errorMessage) {
-          expect(errorMessage).toBeInTheDocument();
+    it('should complete full edit workflow', async () => {
+      renderWithProviders(
+        <TableDetailsPage 
+          params={{ ...mockParams, table: 'users' }} 
+          searchParams={{ mode: 'edit' }} 
+        />,
+        {
+          providerOptions: { router: mockRouter },
         }
-      });
-    });
-
-    it('should maintain focus management during tab transitions', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      const fieldsTab = screen.getByTestId('fields-tab');
-      await user.click(fieldsTab);
-
-      // Focus should remain on the activated tab
-      expect(fieldsTab).toHaveFocus();
-    });
-  });
-
-  describe('Error Boundary Integration', () => {
-    it('should catch and display component errors gracefully', () => {
-      const ErrorBoundaryComponent = () => {
-        throw new Error('Test error');
-      };
-
-      // Mock error boundary behavior
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
-      expect(() => {
-        renderWithProviders(<ErrorBoundaryComponent />);
-      }).toThrow('Test error');
-
-      consoleSpy.mockRestore();
-    });
-
-    it('should provide error recovery options', () => {
-      const ErrorRecoveryComponent = () => (
-        <div data-testid="error-boundary">
-          <div>Something went wrong</div>
-          <button data-testid="retry-button">Retry</button>
-        </div>
       );
 
-      renderWithProviders(<ErrorRecoveryComponent />);
-      
-      expect(screen.getByTestId('error-boundary')).toBeInTheDocument();
-      expect(screen.getByTestId('retry-button')).toBeInTheDocument();
-    });
-  });
-
-  describe('Integration with React Query', () => {
-    it('should implement proper cache invalidation strategies', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      // Submit form to trigger cache invalidation
-      await user.click(screen.getByTestId('save-button'));
-
-      // Verify cache would be invalidated (mocked)
+      // Wait for data to load
       await waitFor(() => {
-        expect(mockRefresh).toHaveBeenCalled();
+        expect(screen.getByDisplayValue('users')).toBeInTheDocument();
       });
-    });
 
-    it('should handle mutation loading states', async () => {
-      const user = userEvent.setup();
-      
-      const LoadingComponent = () => (
-        <div data-testid="mutation-loading">Saving...</div>
-      );
+      // Update description
+      const descInput = screen.getByDisplayValue('User accounts table');
+      await user.clear(descInput);
+      await user.type(descInput, 'Updated user accounts table');
 
-      renderWithProviders(<LoadingComponent />);
-      expect(screen.getByTestId('mutation-loading')).toBeInTheDocument();
-    });
+      // Submit update
+      await user.click(screen.getByRole('button', { name: /update/i }));
 
-    it('should implement optimistic updates with rollback on error', async () => {
-      // Mock failed API call
-      server.use(
-        rest.put('/api/v2/:service/_schema/:table', (req, res, ctx) => {
-          return res(ctx.status(500), ctx.json({ error: 'Save failed' }));
-        })
-      );
-
-      const user = userEvent.setup();
-      renderWithProviders(<TableDetailsPage />);
-
-      // Make optimistic update
-      await user.type(screen.getByTestId('table-label'), 'Optimistic Update');
-      await user.click(screen.getByTestId('save-button'));
-
-      // Should show optimistic update initially, then rollback on error
+      // Should navigate back
       await waitFor(() => {
-        // In actual implementation, this would show error and rollback
-        const errorMessage = screen.queryByText(/save failed/i);
-        if (errorMessage) {
-          expect(errorMessage).toBeInTheDocument();
-        }
+        expect(mockRouter.back).toHaveBeenCalled();
       });
     });
-  });
-});
-
-/**
- * Integration Tests for Complete User Workflows
- * 
- * These tests validate end-to-end scenarios that users would experience
- * when managing table details through the interface.
- */
-describe('Table Details Page Integration Tests', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    server.use(...mockTableDetailsHandlers);
-
-    (useRouter as MockedFunction<typeof useRouter>).mockReturnValue({
-      push: vi.fn(),
-      replace: vi.fn(),
-      back: vi.fn(),
-      forward: vi.fn(),
-      refresh: vi.fn(),
-      prefetch: vi.fn(),
-    });
-
-    (useParams as MockedFunction<typeof useParams>).mockReturnValue({
-      service: 'test-service',
-      table: 'users',
-    });
-  });
-
-  it('should complete full table metadata editing workflow', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<TableDetailsPage />);
-
-    // 1. Load page and verify initial state
-    expect(screen.getByTestId('table-details-page')).toBeInTheDocument();
-
-    // 2. Edit table metadata
-    const labelInput = screen.getByTestId('table-label');
-    await user.clear(labelInput);
-    await user.type(labelInput, 'Updated Table Label');
-
-    const descriptionTextarea = screen.getByTestId('table-description');
-    await user.clear(descriptionTextarea);
-    await user.type(descriptionTextarea, 'Updated table description');
-
-    // 3. Save changes
-    await user.click(screen.getByTestId('save-button'));
-
-    // 4. Verify successful save (mocked)
-    await waitFor(() => {
-      // In actual implementation, this would show success message
-      expect(screen.getByTestId('table-details-page')).toBeInTheDocument();
-    });
-  });
-
-  it('should handle navigation between different table sections', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<TableDetailsPage />);
-
-    // Start in metadata tab
-    expect(screen.getByTestId('metadata-form')).toBeInTheDocument();
-
-    // Navigate to fields tab
-    await user.click(screen.getByTestId('fields-tab'));
-    
-    // Navigate to relationships tab
-    await user.click(screen.getByTestId('relationships-tab'));
-
-    // Navigate back to metadata
-    await user.click(screen.getByTestId('metadata-tab'));
-    
-    expect(screen.getByTestId('metadata-form')).toBeInTheDocument();
-  });
-
-  it('should maintain form state across tab navigation', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<TableDetailsPage />);
-
-    // Make changes in metadata tab
-    await user.type(screen.getByTestId('table-label'), 'Test Label');
-
-    // Switch to fields tab
-    await user.click(screen.getByTestId('fields-tab'));
-
-    // Switch back to metadata
-    await user.click(screen.getByTestId('metadata-tab'));
-
-    // Verify changes are preserved
-    const labelInput = screen.getByTestId('table-label');
-    expect(labelInput).toHaveValue('Test Label');
   });
 });
