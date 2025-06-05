@@ -1,356 +1,166 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery } from '@tanstack/react-query';
-import { ChevronDownIcon } from '@heroicons/react/24/outline';
-import { Listbox, Transition } from '@headlessui/react';
-import { Switch } from '@headlessui/react';
+import { useRouter, useParams } from 'next/navigation';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Fragment } from 'react';
-
-import { RelationshipFormData, RelationshipType, Service, TableField } from './relationship.types';
-import { useSchemaDiscovery } from '@/hooks/use-schema-discovery';
-import { useRelationshipValidation } from '@/hooks/use-relationship-validation';
+import { Dialog, Transition, Switch, Listbox } from '@headlessui/react';
+import { ChevronUpDownIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
-// Zod schema for comprehensive form validation with real-time feedback under 100ms
-const relationshipSchema = z.object({
-  name: z.string().optional(),
-  alias: z.string().optional(),
-  label: z.string().optional(),
-  description: z.string().optional(),
-  alwaysFetch: z.boolean().default(false),
-  type: z.enum(['belongs_to', 'has_many', 'has_one', 'many_many'] as const, {
-    required_error: 'Relationship type is required',
-  }),
-  isVirtual: z.boolean().default(true),
-  field: z.string({
-    required_error: 'Field is required',
-  }).min(1, 'Field is required'),
-  refServiceId: z.number({
-    required_error: 'Reference service is required',
-  }).min(1, 'Reference service is required'),
-  refTable: z.string({
-    required_error: 'Reference table is required',
-  }).min(1, 'Reference table is required'),
-  refField: z.string({
-    required_error: 'Reference field is required',
-  }).min(1, 'Reference field is required'),
-  // Junction table fields - conditionally required for many_many relationships
-  junctionServiceId: z.number().optional(),
-  junctionTable: z.string().optional(),
-  junctionField: z.string().optional(),
-  junctionRefField: z.string().optional(),
-}).superRefine((data, ctx) => {
-  // Conditional validation for many-to-many relationships
-  if (data.type === 'many_many') {
-    if (!data.junctionServiceId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Junction service is required for many-to-many relationships',
-        path: ['junctionServiceId'],
-      });
-    }
-    if (!data.junctionTable) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Junction table is required for many-to-many relationships',
-        path: ['junctionTable'],
-      });
-    }
-    if (!data.junctionField) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Junction field is required for many-to-many relationships',
-        path: ['junctionField'],
-      });
-    }
-    if (!data.junctionRefField) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Junction reference field is required for many-to-many relationships',
-        path: ['junctionRefField'],
-      });
-    }
-  }
-});
-
+// Type definitions based on the Angular component structure
 interface BasicOption {
   label: string;
   value: string | number;
   name?: string;
 }
 
-interface RelationshipFormProps {
-  mode: 'create' | 'edit';
-  dbName: string;
-  tableName: string;
-  relationshipData?: Partial<RelationshipFormData>;
-  fieldOptions: BasicOption[];
-  serviceOptions: BasicOption[];
-  onSubmit: (data: RelationshipFormData) => Promise<void>;
-  onCancel: () => void;
-  isSubmitting?: boolean;
+interface TableField {
+  name: string;
+  label: string;
+  type: string;
+  required?: boolean;
 }
 
-export default function RelationshipForm({
-  mode,
-  dbName,
-  tableName,
-  relationshipData,
-  fieldOptions,
-  serviceOptions,
-  onSubmit,
-  onCancel,
-  isSubmitting = false,
-}: RelationshipFormProps) {
-  // Initialize React Hook Form with Zod validation for real-time validation under 100ms
-  const {
-    control,
-    handleSubmit,
-    watch,
-    setValue,
-    reset,
-    formState: { errors, isValid, isDirty },
-    clearErrors,
-  } = useForm<RelationshipFormData>({
-    resolver: zodResolver(relationshipSchema),
-    mode: 'onChange', // Real-time validation
-    defaultValues: {
-      name: '',
-      alias: '',
-      label: '',
-      description: '',
-      alwaysFetch: false,
-      type: undefined,
-      isVirtual: true,
-      field: '',
-      refServiceId: undefined,
-      refTable: '',
-      refField: '',
-      junctionServiceId: undefined,
-      junctionTable: '',
-      junctionField: '',
-      junctionRefField: '',
-      ...relationshipData,
-    },
-  });
+interface Service {
+  id: number;
+  name: string;
+  label: string;
+  type: string;
+}
 
-  // Custom hooks for schema discovery and validation
-  const { getTableOptions, getFieldOptions } = useSchemaDiscovery();
-  const { validateRelationshipConfiguration } = useRelationshipValidation();
+interface RelationshipData {
+  name?: string;
+  alias?: string;
+  label?: string;
+  description?: string;
+  alwaysFetch: boolean;
+  type: 'belongs_to' | 'has_many' | 'has_one' | 'many_many';
+  isVirtual: boolean;
+  field: string;
+  refServiceId: number;
+  refTable: string;
+  refField: string;
+  junctionServiceId?: number | null;
+  junctionTable?: string | null;
+  junctionField?: string | null;
+  junctionRefField?: string | null;
+}
 
-  // Watch form values for dynamic behavior
-  const watchedType = watch('type');
-  const watchedRefServiceId = watch('refServiceId');
-  const watchedRefTable = watch('refTable');
-  const watchedJunctionServiceId = watch('junctionServiceId');
-  const watchedJunctionTable = watch('junctionTable');
+// Zod validation schema with dynamic validation based on relationship type
+const createRelationshipSchema = (relationshipType?: string) => z.object({
+  name: z.string().optional(),
+  alias: z.string().optional(),
+  label: z.string().optional(),
+  description: z.string().optional(),
+  alwaysFetch: z.boolean().default(false),
+  type: z.enum(['belongs_to', 'has_many', 'has_one', 'many_many'], {
+    required_error: 'Relationship type is required',
+  }),
+  isVirtual: z.boolean().default(true),
+  field: z.string().min(1, 'Field is required'),
+  refServiceId: z.number().min(1, 'Reference service is required'),
+  refTable: z.string().min(1, 'Reference table is required'),
+  refField: z.string().min(1, 'Reference field is required'),
+  junctionServiceId: relationshipType === 'many_many' 
+    ? z.number().min(1, 'Junction service is required for many-to-many relationships')
+    : z.number().optional().nullable(),
+  junctionTable: relationshipType === 'many_many' 
+    ? z.string().min(1, 'Junction table is required for many-to-many relationships')
+    : z.string().optional().nullable(),
+  junctionField: relationshipType === 'many_many' 
+    ? z.string().min(1, 'Junction field is required for many-to-many relationships')
+    : z.string().optional().nullable(),
+  junctionRefField: relationshipType === 'many_many' 
+    ? z.string().min(1, 'Junction reference field is required for many-to-many relationships')
+    : z.string().optional().nullable(),
+});
 
-  // Relationship type options
-  const typeOptions: BasicOption[] = [
-    { label: 'Belongs To', value: 'belongs_to' },
-    { label: 'Has Many', value: 'has_many' },
-    { label: 'Has One', value: 'has_one' },
-    { label: 'Many To Many', value: 'many_many' },
-  ];
+// Type inference from schema
+type RelationshipFormData = z.infer<ReturnType<typeof createRelationshipSchema>>;
 
-  // Get service name helper function
-  const getServiceName = (serviceId: number): string | undefined => {
-    const service = serviceOptions.find(item => item.value === serviceId);
-    return service?.name;
-  };
+// Relationship type options
+const RELATIONSHIP_TYPE_OPTIONS: BasicOption[] = [
+  { label: 'Belongs To', value: 'belongs_to' },
+  { label: 'Has Many', value: 'has_many' },
+  { label: 'Has One', value: 'has_one' },
+  { label: 'Many To Many', value: 'many_many' },
+];
 
-  // React Query for reference table options with intelligent caching
-  const {
-    data: referenceTableOptions = [],
-    isLoading: isLoadingRefTables,
-    error: refTablesError,
-  } = useQuery({
-    queryKey: ['tables', watchedRefServiceId],
-    queryFn: () => getTableOptions(getServiceName(watchedRefServiceId!)),
-    enabled: !!watchedRefServiceId,
-    staleTime: 300000, // 5 minutes
-    cacheTime: 900000, // 15 minutes
-  });
+// Custom Select component using Headless UI
+interface SelectProps {
+  value: string | number | null;
+  onChange: (value: any) => void;
+  options: BasicOption[];
+  placeholder?: string;
+  error?: string;
+  disabled?: boolean;
+  required?: boolean;
+}
 
-  // React Query for reference field options
-  const {
-    data: referenceFieldOptions = [],
-    isLoading: isLoadingRefFields,
-    error: refFieldsError,
-  } = useQuery({
-    queryKey: ['fields', watchedRefServiceId, watchedRefTable],
-    queryFn: () => getFieldOptions(getServiceName(watchedRefServiceId!), watchedRefTable),
-    enabled: !!(watchedRefServiceId && watchedRefTable),
-    staleTime: 300000,
-    cacheTime: 900000,
-  });
+const Select: React.FC<SelectProps> = ({ 
+  value, 
+  onChange, 
+  options, 
+  placeholder = 'Select an option', 
+  error, 
+  disabled = false,
+  required = false
+}) => {
+  const selectedOption = options.find(option => option.value === value);
 
-  // React Query for junction table options
-  const {
-    data: junctionTableOptions = [],
-    isLoading: isLoadingJunctionTables,
-    error: junctionTablesError,
-  } = useQuery({
-    queryKey: ['tables', watchedJunctionServiceId],
-    queryFn: () => getTableOptions(getServiceName(watchedJunctionServiceId!)),
-    enabled: !!(watchedJunctionServiceId && watchedType === 'many_many'),
-    staleTime: 300000,
-    cacheTime: 900000,
-  });
-
-  // React Query for junction field options
-  const {
-    data: junctionFieldOptions = [],
-    isLoading: isLoadingJunctionFields,
-    error: junctionFieldsError,
-  } = useQuery({
-    queryKey: ['fields', watchedJunctionServiceId, watchedJunctionTable],
-    queryFn: () => getFieldOptions(getServiceName(watchedJunctionServiceId!), watchedJunctionTable),
-    enabled: !!(watchedJunctionServiceId && watchedJunctionTable && watchedType === 'many_many'),
-    staleTime: 300000,
-    cacheTime: 900000,
-  });
-
-  // Effect to handle cascade resets when reference service changes
-  useEffect(() => {
-    if (watchedRefServiceId) {
-      setValue('refTable', '');
-      setValue('refField', '');
-      clearErrors(['refTable', 'refField']);
-    }
-  }, [watchedRefServiceId, setValue, clearErrors]);
-
-  // Effect to handle cascade resets when reference table changes
-  useEffect(() => {
-    if (watchedRefTable) {
-      setValue('refField', '');
-      clearErrors(['refField']);
-    }
-  }, [watchedRefTable, setValue, clearErrors]);
-
-  // Effect to handle cascade resets when junction service changes
-  useEffect(() => {
-    if (watchedJunctionServiceId && watchedType === 'many_many') {
-      setValue('junctionTable', '');
-      setValue('junctionField', '');
-      setValue('junctionRefField', '');
-      clearErrors(['junctionTable', 'junctionField', 'junctionRefField']);
-    }
-  }, [watchedJunctionServiceId, watchedType, setValue, clearErrors]);
-
-  // Effect to handle cascade resets when junction table changes
-  useEffect(() => {
-    if (watchedJunctionTable && watchedType === 'many_many') {
-      setValue('junctionField', '');
-      setValue('junctionRefField', '');
-      clearErrors(['junctionField', 'junctionRefField']);
-    }
-  }, [watchedJunctionTable, watchedType, setValue, clearErrors]);
-
-  // Determine if junction fields should be enabled based on relationship type
-  const isJunctionEnabled = watchedType === 'many_many';
-
-  // Memoized validation state for performance optimization
-  const validationState = useMemo(() => {
-    return validateRelationshipConfiguration({
-      type: watchedType,
-      field: watch('field'),
-      refServiceId: watchedRefServiceId,
-      refTable: watchedRefTable,
-      refField: watch('refField'),
-      junctionServiceId: watchedJunctionServiceId,
-      junctionTable: watchedJunctionTable,
-      junctionField: watch('junctionField'),
-      junctionRefField: watch('junctionRefField'),
-    });
-  }, [
-    watchedType,
-    watch('field'),
-    watchedRefServiceId,
-    watchedRefTable,
-    watch('refField'),
-    watchedJunctionServiceId,
-    watchedJunctionTable,
-    watch('junctionField'),
-    watch('junctionRefField'),
-    validateRelationshipConfiguration,
-  ]);
-
-  const handleFormSubmit = async (data: RelationshipFormData) => {
-    try {
-      await onSubmit(data);
-    } catch (error) {
-      console.error('Failed to submit relationship form:', error);
-    }
-  };
-
-  // Custom Select component using Headless UI for consistent styling
-  const Select = ({ 
-    options, 
-    value, 
-    onChange, 
-    placeholder, 
-    disabled = false, 
-    loading = false,
-    error 
-  }: {
-    options: BasicOption[];
-    value: string | number | undefined;
-    onChange: (value: any) => void;
-    placeholder: string;
-    disabled?: boolean;
-    loading?: boolean;
-    error?: string;
-  }) => (
+  return (
     <div className="relative">
-      <Listbox value={value} onChange={onChange} disabled={disabled || loading}>
+      <Listbox value={value} onChange={onChange} disabled={disabled}>
         <div className="relative">
-          <Listbox.Button
+          <Listbox.Button 
             className={cn(
-              'relative w-full cursor-default rounded-lg py-2 pl-3 pr-10 text-left',
-              'border border-gray-300 bg-white shadow-sm',
-              'focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500',
-              'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500',
-              'dark:border-gray-600 dark:bg-gray-800 dark:text-white',
-              error && 'border-red-500 focus:border-red-500 focus:ring-red-500',
-              loading && 'animate-pulse'
+              "relative w-full cursor-default rounded-md border bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 sm:text-sm",
+              error ? "border-error-500" : "border-gray-300",
+              disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-white"
             )}
           >
-            <span className={cn('block truncate', !value && 'text-gray-500')}>
-              {loading ? 'Loading...' : (
-                options.find(opt => opt.value === value)?.label || placeholder
-              )}
+            <span className="block truncate">
+              {selectedOption ? selectedOption.label : placeholder}
             </span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <ChevronDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
             </span>
           </Listbox.Button>
+
           <Transition
             as={Fragment}
             leave="transition ease-in duration-100"
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-800 sm:text-sm">
+            <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
               {options.map((option) => (
                 <Listbox.Option
                   key={option.value}
                   className={({ active }) =>
                     cn(
-                      'relative cursor-default select-none py-2 pl-3 pr-9',
-                      active ? 'bg-primary-100 text-primary-900 dark:bg-primary-900 dark:text-primary-100' : 'text-gray-900 dark:text-gray-100'
+                      "relative cursor-default select-none py-2 pl-10 pr-4",
+                      active ? "bg-primary-100 text-primary-900" : "text-gray-900"
                     )
                   }
                   value={option.value}
                 >
                   {({ selected }) => (
-                    <span className={cn('block truncate', selected ? 'font-medium' : 'font-normal')}>
-                      {option.label}
-                    </span>
+                    <>
+                      <span className={cn("block truncate", selected ? "font-medium" : "font-normal")}>
+                        {option.label}
+                      </span>
+                      {selected ? (
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-600">
+                          <CheckIcon className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                      ) : null}
+                    </>
                   )}
                 </Listbox.Option>
               ))}
@@ -359,211 +169,501 @@ export default function RelationshipForm({
         </div>
       </Listbox>
       {error && (
-        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="mt-1 text-sm text-error-600">{error}</p>
       )}
     </div>
   );
+};
 
-  // Custom Input component for text fields
-  const Input = ({ 
-    value, 
-    onChange, 
-    placeholder, 
-    disabled = false,
-    error 
-  }: {
-    value: string;
-    onChange: (value: string) => void;
-    placeholder: string;
-    disabled?: boolean;
-    error?: string;
-  }) => (
-    <div>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
+// Custom Input component
+interface InputProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  error?: string;
+  disabled?: boolean;
+  required?: boolean;
+  type?: 'text' | 'email' | 'password';
+}
+
+const Input: React.FC<InputProps> = ({
+  value,
+  onChange,
+  placeholder,
+  error,
+  disabled = false,
+  required = false,
+  type = 'text'
+}) => (
+  <div>
+    <input
+      type={type}
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      disabled={disabled}
+      required={required}
+      className={cn(
+        "block w-full rounded-md border shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm",
+        error ? "border-error-500" : "border-gray-300",
+        disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-white",
+        "px-3 py-2"
+      )}
+    />
+    {error && (
+      <p className="mt-1 text-sm text-error-600">{error}</p>
+    )}
+  </div>
+);
+
+// Custom Toggle component using Headless UI
+interface ToggleProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}
+
+const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label, disabled = false }) => (
+  <div className="flex items-center">
+    <Switch
+      checked={checked}
+      onChange={onChange}
+      disabled={disabled}
+      className={cn(
+        checked ? 'bg-primary-600' : 'bg-gray-200',
+        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+        'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
+      )}
+    >
+      <span
+        aria-hidden="true"
         className={cn(
-          'block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900',
-          'placeholder-gray-500 shadow-sm',
-          'focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500',
-          'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500',
-          'dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400',
-          error && 'border-red-500 focus:border-red-500 focus:ring-red-500'
+          checked ? 'translate-x-5' : 'translate-x-0',
+          'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
         )}
       />
-      {error && (
-        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
-      )}
-    </div>
-  );
+    </Switch>
+    <span className="ml-3 text-sm font-medium text-gray-700">{label}</span>
+  </div>
+);
 
-  // Custom Toggle component using Headless UI Switch
-  const Toggle = ({ 
-    checked, 
-    onChange, 
-    disabled = false,
-    label 
-  }: {
-    checked: boolean;
-    onChange: (checked: boolean) => void;
-    disabled?: boolean;
-    label: string;
-  }) => (
-    <div className="flex items-center">
-      <Switch
-        checked={checked}
-        onChange={onChange}
-        disabled={disabled}
-        className={cn(
-          'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          checked ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-600'
-        )}
-      >
-        <span
-          className={cn(
-            'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-            checked ? 'translate-x-6' : 'translate-x-1'
-          )}
-        />
-      </Switch>
-      <span className="ml-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-        {label}
-      </span>
-    </div>
-  );
+// Mock API functions (replace with actual API calls)
+const mockApiClient = {
+  get: async (url: string) => {
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Mock data based on URL patterns
+    if (url.includes('/_schema') && !url.includes('/_schema/')) {
+      // Mock table list
+      return {
+        resource: [
+          { name: 'users', label: 'Users' },
+          { name: 'orders', label: 'Orders' },
+          { name: 'products', label: 'Products' },
+          { name: 'categories', label: 'Categories' },
+        ]
+      };
+    } else if (url.includes('/_schema/')) {
+      // Mock field list
+      return {
+        field: [
+          { name: 'id', label: 'ID', type: 'integer' },
+          { name: 'name', label: 'Name', type: 'string' },
+          { name: 'email', label: 'Email', type: 'string' },
+          { name: 'created_at', label: 'Created At', type: 'datetime' },
+        ]
+      };
+    } else if (url.includes('/system/service')) {
+      // Mock services list
+      return {
+        resource: [
+          { id: 1, name: 'db', label: 'MySQL Database', type: 'mysql' },
+          { id: 2, name: 'pg_db', label: 'PostgreSQL Database', type: 'pgsql' },
+          { id: 3, name: 'mongo_db', label: 'MongoDB Database', type: 'mongodb' },
+        ]
+      };
+    }
+    return { resource: [] };
+  },
+  
+  post: async (url: string, data: any) => {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return { success: true, id: Math.random() };
+  },
+  
+  patch: async (url: string, data: any) => {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return { success: true };
+  }
+};
+
+// Main RelationshipForm component
+interface RelationshipFormProps {
+  mode: 'create' | 'edit';
+  initialData?: Partial<RelationshipData>;
+  onCancel: () => void;
+  onSuccess: () => void;
+}
+
+const RelationshipForm: React.FC<RelationshipFormProps> = ({
+  mode,
+  initialData,
+  onCancel,
+  onSuccess
+}) => {
+  const router = useRouter();
+  const params = useParams();
+  const { name: dbName, id: tableName } = params as { name: string; id: string };
+
+  // State for dropdown options
+  const [serviceOptions, setServiceOptions] = useState<BasicOption[]>([]);
+  const [fieldOptions, setFieldOptions] = useState<BasicOption[]>([]);
+  const [referenceTableOptions, setReferenceTableOptions] = useState<BasicOption[]>([]);
+  const [referenceFieldOptions, setReferenceFieldOptions] = useState<BasicOption[]>([]);
+  const [junctionTableOptions, setJunctionTableOptions] = useState<BasicOption[]>([]);
+  const [junctionFieldOptions, setJunctionFieldOptions] = useState<BasicOption[]>([]);
+
+  // Initialize form with dynamic schema
+  const {
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors, isSubmitting }
+  } = useForm<RelationshipFormData>({
+    resolver: zodResolver(createRelationshipSchema(watch('type'))),
+    defaultValues: {
+      alwaysFetch: false,
+      isVirtual: true,
+      ...initialData
+    }
+  });
+
+  // Watch form values for dynamic behavior
+  const watchedType = watch('type');
+  const watchedRefServiceId = watch('refServiceId');
+  const watchedRefTable = watch('refTable');
+  const watchedJunctionServiceId = watch('junctionServiceId');
+  const watchedJunctionTable = watch('junctionTable');
+
+  // Load initial data
+  const { data: servicesData } = useQuery({
+    queryKey: ['services'],
+    queryFn: () => mockApiClient.get('/system/service'),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const { data: fieldsData } = useQuery({
+    queryKey: ['table-fields', dbName, tableName],
+    queryFn: () => mockApiClient.get(`${dbName}/_schema/${tableName}`),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Dynamic queries for reference tables and fields
+  const { data: referenceTablesData } = useQuery({
+    queryKey: ['reference-tables', watchedRefServiceId],
+    queryFn: () => {
+      if (!watchedRefServiceId) return null;
+      const serviceName = getServiceName(watchedRefServiceId);
+      return mockApiClient.get(`${serviceName}/_schema`);
+    },
+    enabled: !!watchedRefServiceId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: referenceFieldsData } = useQuery({
+    queryKey: ['reference-fields', watchedRefServiceId, watchedRefTable],
+    queryFn: () => {
+      if (!watchedRefServiceId || !watchedRefTable) return null;
+      const serviceName = getServiceName(watchedRefServiceId);
+      return mockApiClient.get(`${serviceName}/_schema/${watchedRefTable}`);
+    },
+    enabled: !!watchedRefServiceId && !!watchedRefTable,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Dynamic queries for junction tables and fields
+  const { data: junctionTablesData } = useQuery({
+    queryKey: ['junction-tables', watchedJunctionServiceId],
+    queryFn: () => {
+      if (!watchedJunctionServiceId) return null;
+      const serviceName = getServiceName(watchedJunctionServiceId);
+      return mockApiClient.get(`${serviceName}/_schema`);
+    },
+    enabled: !!watchedJunctionServiceId && watchedType === 'many_many',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: junctionFieldsData } = useQuery({
+    queryKey: ['junction-fields', watchedJunctionServiceId, watchedJunctionTable],
+    queryFn: () => {
+      if (!watchedJunctionServiceId || !watchedJunctionTable) return null;
+      const serviceName = getServiceName(watchedJunctionServiceId);
+      return mockApiClient.get(`${serviceName}/_schema/${watchedJunctionTable}`);
+    },
+    enabled: !!watchedJunctionServiceId && !!watchedJunctionTable && watchedType === 'many_many',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Helper function to get service name by ID
+  const getServiceName = useCallback((serviceId: number): string => {
+    const service = serviceOptions.find(option => option.value === serviceId);
+    return service?.name || '';
+  }, [serviceOptions]);
+
+  // Update options when data changes
+  useEffect(() => {
+    if (servicesData?.resource) {
+      const options = servicesData.resource.map((service: Service) => ({
+        label: mode === 'edit' ? service.type : service.label,
+        value: service.id,
+        name: service.name,
+      }));
+      setServiceOptions(options);
+    }
+  }, [servicesData, mode]);
+
+  useEffect(() => {
+    if (fieldsData?.field) {
+      const options = fieldsData.field.map((field: TableField) => ({
+        label: field.label,
+        value: field.name,
+      }));
+      setFieldOptions(options);
+    }
+  }, [fieldsData]);
+
+  useEffect(() => {
+    if (referenceTablesData?.resource) {
+      const options = referenceTablesData.resource.map((table: any) => ({
+        label: table.name,
+        value: table.name,
+      }));
+      setReferenceTableOptions(options);
+    }
+  }, [referenceTablesData]);
+
+  useEffect(() => {
+    if (referenceFieldsData?.field) {
+      const options = referenceFieldsData.field.map((field: any) => ({
+        label: field.label,
+        value: field.name,
+      }));
+      setReferenceFieldOptions(options);
+    }
+  }, [referenceFieldsData]);
+
+  useEffect(() => {
+    if (junctionTablesData?.resource) {
+      const options = junctionTablesData.resource.map((table: any) => ({
+        label: table.name,
+        value: table.name,
+      }));
+      setJunctionTableOptions(options);
+    }
+  }, [junctionTablesData]);
+
+  useEffect(() => {
+    if (junctionFieldsData?.field) {
+      const options = junctionFieldsData.field.map((field: any) => ({
+        label: field.label,
+        value: field.name,
+      }));
+      setJunctionFieldOptions(options);
+    }
+  }, [junctionFieldsData]);
+
+  // Reset dependent fields when parent fields change
+  useEffect(() => {
+    setValue('refTable', '');
+    setValue('refField', '');
+  }, [watchedRefServiceId, setValue]);
+
+  useEffect(() => {
+    setValue('refField', '');
+  }, [watchedRefTable, setValue]);
+
+  useEffect(() => {
+    setValue('junctionTable', '');
+    setValue('junctionField', '');
+    setValue('junctionRefField', '');
+  }, [watchedJunctionServiceId, setValue]);
+
+  useEffect(() => {
+    setValue('junctionField', '');
+    setValue('junctionRefField', '');
+  }, [watchedJunctionTable, setValue]);
+
+  // Handle relationship type changes (enable/disable junction fields)
+  useEffect(() => {
+    if (watchedType !== 'many_many') {
+      setValue('junctionServiceId', null);
+      setValue('junctionTable', null);
+      setValue('junctionField', null);
+      setValue('junctionRefField', null);
+    }
+  }, [watchedType, setValue]);
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: async (data: RelationshipFormData) => {
+      const payload = { resource: [data] };
+      
+      if (mode === 'create') {
+        return mockApiClient.post(`${dbName}/_schema/${tableName}/_related`, payload);
+      } else {
+        return mockApiClient.patch(`${dbName}/_schema/${tableName}/_related`, payload);
+      }
+    },
+    onSuccess: () => {
+      toast.success(
+        mode === 'create' 
+          ? 'Relationship created successfully' 
+          : 'Relationship updated successfully'
+      );
+      onSuccess();
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'An error occurred while saving the relationship');
+    },
+  });
+
+  // Form submission handler
+  const onSubmit = (data: RelationshipFormData) => {
+    saveMutation.mutate(data);
+  };
+
+  // Check if junction fields should be disabled
+  const isJunctionDisabled = watchedType !== 'many_many';
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {mode === 'create' ? 'Create Relationship' : 'Edit Relationship'}
-        </h2>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Configure the database relationship between tables and services
+    <div className="max-w-4xl mx-auto p-6 bg-white">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">
+          {mode === 'create' ? 'Create' : 'Edit'} Relationship
+        </h1>
+        <p className="mt-1 text-sm text-gray-600">
+          Configure database table relationships for API generation
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="p-6 space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Basic Information Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Name
-              <span className="text-xs text-gray-500 ml-1">(auto-generated)</span>
-            </label>
+        <div className="bg-gray-50 rounded-lg p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h2>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Name
+                <span className="text-gray-500 text-xs ml-1">(Auto-generated)</span>
+              </label>
+              <Controller
+                name="name"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    value={field.value || ''}
+                    onChange={field.onChange}
+                    placeholder="Auto-generated relationship name"
+                    disabled={true}
+                    error={errors.name?.message}
+                  />
+                )}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Alias
+              </label>
+              <Controller
+                name="alias"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    value={field.value || ''}
+                    onChange={field.onChange}
+                    placeholder="Relationship alias"
+                    error={errors.alias?.message}
+                  />
+                )}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Label
+              </label>
+              <Controller
+                name="label"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    value={field.value || ''}
+                    onChange={field.onChange}
+                    placeholder="Display label"
+                    error={errors.label?.message}
+                  />
+                )}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <Controller
+                name="description"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    value={field.value || ''}
+                    onChange={field.onChange}
+                    placeholder="Relationship description"
+                    error={errors.description?.message}
+                  />
+                )}
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-4">
             <Controller
-              name="name"
+              name="alwaysFetch"
               control={control}
               render={({ field }) => (
-                <Input
-                  value={field.value || ''}
+                <Toggle
+                  checked={field.value}
                   onChange={field.onChange}
-                  placeholder="Relationship name"
+                  label="Always Fetch Related Records"
+                />
+              )}
+            />
+
+            <Controller
+              name="isVirtual"
+              control={control}
+              render={({ field }) => (
+                <Toggle
+                  checked={field.value}
+                  onChange={field.onChange}
+                  label="Virtual Relationship"
                   disabled={true}
-                  error={errors.name?.message}
-                />
-              )}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Alias
-            </label>
-            <Controller
-              name="alias"
-              control={control}
-              render={({ field }) => (
-                <Input
-                  value={field.value || ''}
-                  onChange={field.onChange}
-                  placeholder="Relationship alias"
-                  error={errors.alias?.message}
-                />
-              )}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Label
-            </label>
-            <Controller
-              name="label"
-              control={control}
-              render={({ field }) => (
-                <Input
-                  value={field.value || ''}
-                  onChange={field.onChange}
-                  placeholder="Display label"
-                  error={errors.label?.message}
-                />
-              )}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Description
-            </label>
-            <Controller
-              name="description"
-              control={control}
-              render={({ field }) => (
-                <Input
-                  value={field.value || ''}
-                  onChange={field.onChange}
-                  placeholder="Relationship description"
-                  error={errors.description?.message}
                 />
               )}
             />
           </div>
         </div>
 
-        {/* Configuration Section */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-            Relationship Configuration
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Toggle Options */}
-            <div className="space-y-4">
-              <Controller
-                name="alwaysFetch"
-                control={control}
-                render={({ field }) => (
-                  <Toggle
-                    checked={field.value}
-                    onChange={field.onChange}
-                    label="Always Fetch Related Data"
-                  />
-                )}
-              />
-
-              <Controller
-                name="isVirtual"
-                control={control}
-                render={({ field }) => (
-                  <Toggle
-                    checked={field.value}
-                    onChange={field.onChange}
-                    disabled={true}
-                    label="Virtual Relationship"
-                  />
-                )}
-              />
-            </div>
-
-            {/* Relationship Type */}
+        {/* Relationship Configuration Section */}
+        <div className="bg-gray-50 rounded-lg p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Relationship Configuration</h2>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Relationship Type <span className="text-red-500">*</span>
               </label>
               <Controller
@@ -571,27 +671,19 @@ export default function RelationshipForm({
                 control={control}
                 render={({ field }) => (
                   <Select
-                    options={typeOptions}
                     value={field.value}
                     onChange={field.onChange}
+                    options={RELATIONSHIP_TYPE_OPTIONS}
                     placeholder="Select relationship type"
                     error={errors.type?.message}
+                    required
                   />
                 )}
               />
             </div>
-          </div>
-        </div>
 
-        {/* Primary Relationship Configuration */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-            Primary Relationship
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Local Field <span className="text-red-500">*</span>
               </label>
               <Controller
@@ -599,18 +691,25 @@ export default function RelationshipForm({
                 control={control}
                 render={({ field }) => (
                   <Select
-                    options={fieldOptions}
                     value={field.value}
                     onChange={field.onChange}
-                    placeholder="Select field"
+                    options={fieldOptions}
+                    placeholder="Select local field"
                     error={errors.field?.message}
+                    required
                   />
                 )}
               />
             </div>
+          </div>
+        </div>
 
+        {/* Reference Configuration Section */}
+        <div className="bg-gray-50 rounded-lg p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Reference Configuration</h2>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Reference Service <span className="text-red-500">*</span>
               </label>
               <Controller
@@ -618,18 +717,19 @@ export default function RelationshipForm({
                 control={control}
                 render={({ field }) => (
                   <Select
-                    options={serviceOptions}
                     value={field.value}
                     onChange={field.onChange}
-                    placeholder="Select service"
+                    options={serviceOptions}
+                    placeholder="Select reference service"
                     error={errors.refServiceId?.message}
+                    required
                   />
                 )}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Reference Table <span className="text-red-500">*</span>
               </label>
               <Controller
@@ -637,20 +737,20 @@ export default function RelationshipForm({
                 control={control}
                 render={({ field }) => (
                   <Select
-                    options={referenceTableOptions}
                     value={field.value}
                     onChange={field.onChange}
-                    placeholder="Select table"
+                    options={referenceTableOptions}
+                    placeholder="Select reference table"
+                    error={errors.refTable?.message}
+                    required
                     disabled={!watchedRefServiceId}
-                    loading={isLoadingRefTables}
-                    error={errors.refTable?.message || (refTablesError ? 'Failed to load tables' : undefined)}
                   />
                 )}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Reference Field <span className="text-red-500">*</span>
               </label>
               <Controller
@@ -658,13 +758,13 @@ export default function RelationshipForm({
                 control={control}
                 render={({ field }) => (
                   <Select
-                    options={referenceFieldOptions}
                     value={field.value}
                     onChange={field.onChange}
-                    placeholder="Select field"
+                    options={referenceFieldOptions}
+                    placeholder="Select reference field"
+                    error={errors.refField?.message}
+                    required
                     disabled={!watchedRefTable}
-                    loading={isLoadingRefFields}
-                    error={errors.refField?.message || (refFieldsError ? 'Failed to load fields' : undefined)}
                   />
                 )}
               />
@@ -672,152 +772,134 @@ export default function RelationshipForm({
           </div>
         </div>
 
-        {/* Junction Table Configuration for Many-to-Many */}
-        {isJunctionEnabled && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-              Junction Table Configuration
-              <span className="text-sm text-gray-500 ml-2">(Required for Many-to-Many relationships)</span>
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Junction Service <span className="text-red-500">*</span>
-                </label>
-                <Controller
-                  name="junctionServiceId"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      options={serviceOptions}
-                      value={field.value}
-                      onChange={field.onChange}
-                      placeholder="Select service"
-                      error={errors.junctionServiceId?.message}
-                    />
-                  )}
-                />
-              </div>
+        {/* Junction Table Configuration Section (for many-to-many) */}
+        <div className={cn(
+          "bg-gray-50 rounded-lg p-6 transition-opacity duration-200",
+          isJunctionDisabled ? "opacity-50" : "opacity-100"
+        )}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium text-gray-900">Junction Table Configuration</h2>
+            {isJunctionDisabled && (
+              <span className="text-sm text-gray-500 bg-gray-200 px-2 py-1 rounded">
+                Available for Many-to-Many relationships only
+              </span>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Junction Service {watchedType === 'many_many' && <span className="text-red-500">*</span>}
+              </label>
+              <Controller
+                name="junctionServiceId"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={serviceOptions}
+                    placeholder="Select junction service"
+                    error={errors.junctionServiceId?.message}
+                    disabled={isJunctionDisabled}
+                    required={watchedType === 'many_many'}
+                  />
+                )}
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Junction Table <span className="text-red-500">*</span>
-                </label>
-                <Controller
-                  name="junctionTable"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      options={junctionTableOptions}
-                      value={field.value}
-                      onChange={field.onChange}
-                      placeholder="Select table"
-                      disabled={!watchedJunctionServiceId}
-                      loading={isLoadingJunctionTables}
-                      error={errors.junctionTable?.message || (junctionTablesError ? 'Failed to load tables' : undefined)}
-                    />
-                  )}
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Junction Table {watchedType === 'many_many' && <span className="text-red-500">*</span>}
+              </label>
+              <Controller
+                name="junctionTable"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={junctionTableOptions}
+                    placeholder="Select junction table"
+                    error={errors.junctionTable?.message}
+                    disabled={isJunctionDisabled || !watchedJunctionServiceId}
+                    required={watchedType === 'many_many'}
+                  />
+                )}
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Junction Field <span className="text-red-500">*</span>
-                </label>
-                <Controller
-                  name="junctionField"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      options={junctionFieldOptions}
-                      value={field.value}
-                      onChange={field.onChange}
-                      placeholder="Select field"
-                      disabled={!watchedJunctionTable}
-                      loading={isLoadingJunctionFields}
-                      error={errors.junctionField?.message || (junctionFieldsError ? 'Failed to load fields' : undefined)}
-                    />
-                  )}
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Junction Field {watchedType === 'many_many' && <span className="text-red-500">*</span>}
+              </label>
+              <Controller
+                name="junctionField"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={junctionFieldOptions}
+                    placeholder="Select junction field"
+                    error={errors.junctionField?.message}
+                    disabled={isJunctionDisabled || !watchedJunctionTable}
+                    required={watchedType === 'many_many'}
+                  />
+                )}
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Junction Reference Field <span className="text-red-500">*</span>
-                </label>
-                <Controller
-                  name="junctionRefField"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      options={junctionFieldOptions}
-                      value={field.value}
-                      onChange={field.onChange}
-                      placeholder="Select field"
-                      disabled={!watchedJunctionTable}
-                      loading={isLoadingJunctionFields}
-                      error={errors.junctionRefField?.message}
-                    />
-                  )}
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Junction Reference Field {watchedType === 'many_many' && <span className="text-red-500">*</span>}
+              </label>
+              <Controller
+                name="junctionRefField"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={junctionFieldOptions}
+                    placeholder="Select junction reference field"
+                    error={errors.junctionRefField?.message}
+                    disabled={isJunctionDisabled || !watchedJunctionTable}
+                    required={watchedType === 'many_many'}
+                  />
+                )}
+              />
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Validation Status */}
-        {validationState && !validationState.isValid && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                  Configuration Issues
-                </h3>
-                <ul className="mt-2 text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
-                  {validationState.issues.map((issue, index) => (
-                    <li key={index}>{issue}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Form Actions */}
-        <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
           <button
             type="button"
             onClick={onCancel}
             disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             type="submit"
-            disabled={!isValid || isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isSubmitting}
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
-            {isSubmitting ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                {mode === 'create' ? 'Creating...' : 'Updating...'}
-              </>
-            ) : (
-              mode === 'create' ? 'Create Relationship' : 'Update Relationship'
+            {isSubmitting && (
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
             )}
+            {mode === 'create' ? 'Create Relationship' : 'Update Relationship'}
           </button>
         </div>
       </form>
     </div>
   );
-}
+};
+
+export default RelationshipForm;
