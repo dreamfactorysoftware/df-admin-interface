@@ -1,1102 +1,1410 @@
 /**
- * Table Management Types for React/Next.js DreamFactory Admin Interface
+ * Table Management Component Types for React/Next.js Architecture
  * 
- * Comprehensive type definitions for table schema management components adapted for
- * React patterns. Defines interfaces for table schemas, table metadata, and form
- * schemas compatible with React Hook Form, Zod validation, and TanStack Table
- * while maintaining compatibility with DreamFactory API responses.
+ * Comprehensive type definitions for table schema management components
+ * adapted for React patterns while maintaining DreamFactory API compatibility.
+ * Supports React Hook Form, Zod validation, TanStack Table, and virtual scrolling
+ * for handling large datasets (1000+ tables).
  * 
- * Features:
- * - TanStack Table integration with virtual scrolling for 1000+ tables
- * - React Hook Form compatibility with real-time validation under 100ms
- * - React Query mutation and query types for optimistic updates
- * - Zod validation schemas for type-safe configuration workflows
- * - Next.js routing parameter types for dynamic navigation
- * - Performance optimizations for large dataset handling
- * 
- * @fileoverview Table management type definitions for React migration
+ * @fileoverview Table management types with React Query integration
  * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
 import { z } from 'zod';
-import { 
+import type { 
+  UseQueryOptions, 
+  UseMutationOptions, 
+  QueryKey 
+} from '@tanstack/react-query';
+import type { 
   ColumnDef, 
   SortingState, 
-  ColumnFiltersState, 
+  ColumnFiltersState,
   VisibilityState,
-  PaginationState,
-  RowSelectionState,
-  Table as TanStackTable,
   Row,
-  Cell,
-  Header,
-  AccessorKeyColumnDef,
-  DisplayColumnDef
+  Table as TanStackTable
 } from '@tanstack/react-table';
-import { VirtualItem } from '@tanstack/react-virtual';
-import { UseMutationResult, UseQueryResult, QueryKey } from '@tanstack/react-query';
-import { UseFormReturn, FieldValues, Control } from 'react-hook-form';
+import type { VirtualItem } from '@tanstack/react-virtual';
+import type { UseFormReturn, FieldErrors } from 'react-hook-form';
 
-// Import base types
-import type { 
-  ApiResponse, 
-  ApiError, 
-  PaginatedResponse,
-  ApiRequestOptions,
-  CacheConfig,
-  LoadingState,
-  BoundaryError,
-  MutationConfig,
-  QueryConfig,
-  SWRConfig
-} from '../../../types/api';
-
+// Re-export types from core modules for convenience
 import type {
-  DatabaseTable,
-  DatabaseField,
-  DatabaseIndex,
-  DatabaseForeignKey,
-  DatabaseConstraint,
-  DatabaseSchema,
+  ApiResponse,
+  ApiListResponse,
+  ApiResourceResponse,
+  PaginationMeta,
+  ApiRequestOptions
+} from '../../../types/api';
+import type {
+  SchemaTable,
+  SchemaField,
   TableRelationship,
-  SchemaDiscoveryConfig,
-  PaginatedSchemaDiscovery,
-  DatabaseServiceConfig
+  TableIndex,
+  TableConstraint,
+  FieldType,
+  RelationshipType,
+  ReferentialAction
+} from '../../../types/schema';
+import type {
+  DatabaseConfig,
+  DatabaseService,
+  ConnectionTestResult
 } from '../../../types/database';
 
-import type {
-  BaseComponent,
-  ComponentVariant,
-  ComponentSize,
-  FormFieldComponent,
-  SelectOption,
-  AccessibilityProps,
-  FocusManagement
-} from '../../../types/ui';
-
-// =============================================================================
-// NEXT.JS ROUTING PARAMETER TYPES
-// =============================================================================
+// ============================================================================
+// CORE TABLE MANAGEMENT TYPES
+// ============================================================================
 
 /**
- * Dynamic route parameters for table navigation
- * Supports Next.js App Router file-based routing patterns
+ * Enhanced table metadata for React components
+ * Extends SchemaTable with React-specific properties and UI state
  */
-export interface TableRouteParams {
-  /** Database service name */
-  service: string;
-  /** Table name */
-  tableId?: string;
-  /** Field ID for field details */
-  fieldId?: string;
-  /** Relationship ID for relationship management */
-  relationshipId?: string;
-}
-
-/**
- * Search parameters for table filtering and pagination
- */
-export interface TableSearchParams {
-  /** Current page number */
-  page?: string;
-  /** Items per page */
-  limit?: string;
-  /** Search query */
-  search?: string;
-  /** Sort field */
-  sort?: string;
-  /** Sort direction */
-  direction?: 'asc' | 'desc';
-  /** Filter parameters */
-  filter?: string;
-  /** Table type filter */
-  type?: 'table' | 'view' | 'materialized_view';
-  /** Schema filter */
-  schema?: string;
-}
-
-/**
- * Zod schema for route parameter validation
- */
-export const tableRouteParamsSchema = z.object({
-  service: z.string().min(1, 'Service name is required').max(64),
-  tableId: z.string().min(1).max(64).optional(),
-  fieldId: z.string().min(1).max(64).optional(),
-  relationshipId: z.string().min(1).max(64).optional()
-});
-
-/**
- * Zod schema for search parameter validation
- */
-export const tableSearchParamsSchema = z.object({
-  page: z.string().regex(/^\d+$/).transform(Number).optional(),
-  limit: z.string().regex(/^\d+$/).transform(Number).optional(),
-  search: z.string().max(255).optional(),
-  sort: z.string().max(64).optional(),
-  direction: z.enum(['asc', 'desc']).optional(),
-  filter: z.string().max(1000).optional(),
-  type: z.enum(['table', 'view', 'materialized_view']).optional(),
-  schema: z.string().max(64).optional()
-});
-
-// =============================================================================
-// TABLE SCHEMA AND METADATA TYPES
-// =============================================================================
-
-/**
- * Enhanced table metadata with React-specific properties
- */
-export interface TableMetadata extends DatabaseTable {
-  /** Table display configuration */
-  display: {
-    /** Show in table list */
-    visible: boolean;
-    /** Table icon */
-    icon?: string;
-    /** Color theme */
-    color?: string;
-    /** Custom description */
-    description?: string;
-    /** Table tags */
-    tags?: string[];
-  };
-  
-  /** API generation status */
-  api_status: {
-    /** APIs have been generated */
-    generated: boolean;
-    /** Generation timestamp */
-    generated_at?: string;
-    /** Available endpoints */
-    endpoints?: string[];
-    /** Generation errors */
-    errors?: string[];
-  };
-  
-  /** Performance metrics */
-  performance: {
-    /** Query performance rating */
-    rating?: 'excellent' | 'good' | 'fair' | 'poor';
-    /** Average query time (ms) */
-    avg_query_time?: number;
-    /** Index efficiency score */
-    index_score?: number;
-    /** Recommendations */
-    recommendations?: string[];
-  };
-  
-  /** Security configuration */
-  security: {
-    /** Access control enabled */
-    access_control: boolean;
-    /** Required roles */
-    required_roles?: string[];
-    /** Field-level permissions */
-    field_permissions?: Record<string, string[]>;
-    /** Data masking rules */
-    masking_rules?: Record<string, string>;
-  };
-}
-
-/**
- * Table list item for optimized rendering in TanStack Table
- */
-export interface TableListItem {
-  /** Table identifier */
+export interface TableMetadata extends Omit<SchemaTable, 'fields' | 'related'> {
+  // Core table information
   id: string;
-  /** Table name */
   name: string;
-  /** Display label */
   label: string;
-  /** Table description */
   description?: string;
-  /** Table type */
-  type: 'table' | 'view' | 'materialized_view';
-  /** Schema name */
   schema?: string;
-  /** Field count */
-  field_count: number;
-  /** Primary key fields */
-  primary_keys: string[];
-  /** Has foreign keys */
-  has_foreign_keys: boolean;
-  /** Row count estimate */
-  row_count?: number;
-  /** Table size in bytes */
-  size_bytes?: number;
-  /** API generation status */
-  api_generated: boolean;
-  /** Last modified timestamp */
-  last_modified: string;
-  /** Performance rating */
-  performance_rating?: 'excellent' | 'good' | 'fair' | 'poor';
-  /** Access control enabled */
-  access_controlled: boolean;
-}
-
-/**
- * Table field configuration for form management
- */
-export interface TableFieldConfig extends DatabaseField {
-  /** Field display configuration */
-  display: {
-    /** Show in table views */
-    visible: boolean;
-    /** Display order */
-    order: number;
-    /** Column width */
-    width?: number;
-    /** Custom label */
-    custom_label?: string;
-    /** Help text */
-    help_text?: string;
-  };
+  alias?: string;
+  plural?: string;
+  isView: boolean;
   
-  /** Form configuration */
-  form: {
-    /** Show in forms */
-    show_in_form: boolean;
-    /** Form field type */
-    field_type: 'text' | 'textarea' | 'select' | 'checkbox' | 'radio' | 'date' | 'datetime' | 'number' | 'email' | 'url' | 'password';
-    /** Form validation rules */
-    validation_rules?: Record<string, unknown>;
-    /** Form field options for select types */
-    options?: SelectOption[];
-    /** Default value */
-    default_value?: unknown;
-  };
+  // Enhanced field definitions with React compatibility
+  fields: TableFieldDefinition[];
   
-  /** API configuration */
-  api: {
-    /** Include in API responses */
-    include_in_response: boolean;
-    /** Allow filtering */
-    filterable: boolean;
-    /** Allow sorting */
-    sortable: boolean;
-    /** Allow searching */
-    searchable: boolean;
-    /** API field name override */
-    api_name?: string;
-  };
-}
-
-// =============================================================================
-// TANSTACK TABLE CONFIGURATION TYPES
-// =============================================================================
-
-/**
- * Table column definition extending TanStack Table ColumnDef
- */
-export interface TableColumnDef<TData = TableListItem> extends ColumnDef<TData> {
-  /** Column unique identifier */
-  id: string;
-  /** Column header label */
-  header: string;
-  /** Accessor key for data */
-  accessorKey?: keyof TData;
-  /** Custom cell renderer */
-  cell?: (info: { getValue: () => unknown; row: Row<TData> }) => React.ReactNode;
-  /** Column width configuration */
-  size?: number;
-  /** Minimum column width */
-  minSize?: number;
-  /** Maximum column width */
-  maxSize?: number;
-  /** Enable sorting */
-  enableSorting?: boolean;
-  /** Enable filtering */
-  enableColumnFilter?: boolean;
-  /** Enable hiding */
-  enableHiding?: boolean;
-  /** Enable resizing */
-  enableResizing?: boolean;
-  /** Meta information */
-  meta?: {
-    /** Column description */
-    description?: string;
-    /** Data type */
-    dataType?: string;
-    /** Filter type */
-    filterType?: 'text' | 'select' | 'date' | 'number' | 'boolean';
-    /** Filter options for select type */
-    filterOptions?: SelectOption[];
-  };
-}
-
-/**
- * Table configuration for TanStack Table initialization
- */
-export interface TableConfig<TData = TableListItem> {
-  /** Table columns */
-  columns: TableColumnDef<TData>[];
-  /** Initial data */
-  data: TData[];
-  /** Enable sorting */
-  enableSorting?: boolean;
-  /** Enable filtering */
-  enableColumnFilters?: boolean;
-  /** Enable global filtering */
-  enableGlobalFilter?: boolean;
-  /** Enable column hiding */
-  enableHiding?: boolean;
-  /** Enable row selection */
-  enableRowSelection?: boolean;
-  /** Enable column resizing */
-  enableColumnResizing?: boolean;
-  /** Enable pagination */
-  enablePagination?: boolean;
-  /** Manual pagination control */
-  manualPagination?: boolean;
-  /** Manual sorting control */
-  manualSorting?: boolean;
-  /** Manual filtering control */
-  manualFiltering?: boolean;
-  /** Page count for manual pagination */
-  pageCount?: number;
-  /** Row count for virtual scrolling */
+  // Enhanced relationship definitions
+  relationships: TableRelationshipDefinition[];
+  
+  // Indexes and constraints
+  indexes: TableIndex[];
+  constraints: TableConstraint[];
+  
+  // Table metadata
+  primaryKey: string[];
+  nameField?: string;
   rowCount?: number;
-  /** Default page size */
-  defaultPageSize?: number;
-  /** Page size options */
-  pageSizeOptions?: number[];
-  /** Get row ID function */
-  getRowId?: (row: TData) => string;
+  estimatedSize?: string;
+  lastModified?: string;
+  collation?: string;
+  engine?: string;
+  access: number;
+  
+  // Virtual scrolling properties
+  virtualIndex?: number;
+  virtualHeight?: number;
+  isVisible?: boolean;
+  
+  // UI state for hierarchical display
+  expanded: boolean;
+  selected: boolean;
+  level: number;
+  hasChildren: boolean;
+  isLoading: boolean;
+  
+  // API generation configuration
+  apiEnabled: boolean;
+  generatedEndpoints?: string[];
+  
+  // React Query cache management
+  cacheKey: string;
+  lastCacheUpdate: string;
+  staleTime?: number;
+  
+  // Performance metrics
+  performanceMetrics?: TablePerformanceMetrics;
 }
 
 /**
- * Table state management interface
+ * Enhanced field definition with React Hook Form compatibility
  */
-export interface TableState {
-  /** Sorting state */
-  sorting: SortingState;
-  /** Column filters state */
-  columnFilters: ColumnFiltersState;
-  /** Global filter state */
-  globalFilter: string;
-  /** Column visibility state */
-  columnVisibility: VisibilityState;
-  /** Pagination state */
-  pagination: PaginationState;
-  /** Row selection state */
-  rowSelection: RowSelectionState;
-  /** Loading state */
-  loading: boolean;
-  /** Error state */
-  error?: BoundaryError;
+export interface TableFieldDefinition extends Omit<SchemaField, 'validation'> {
+  // Core field properties
+  id: string;
+  name: string;
+  label: string;
+  description?: string;
+  alias?: string;
+  
+  // Data type information
+  type: FieldType;
+  dbType: string;
+  length?: number;
+  precision?: number;
+  scale?: number;
+  defaultValue?: any;
+  
+  // Field constraints and properties
+  required: boolean;
+  allowNull: boolean;
+  isPrimaryKey: boolean;
+  isForeignKey: boolean;
+  isUnique: boolean;
+  isIndex: boolean;
+  isAutoIncrement: boolean;
+  isVirtual: boolean;
+  isAggregate: boolean;
+  fixedLength: boolean;
+  supportsMultibyte: boolean;
+  
+  // Foreign key relationships
+  refTable?: string;
+  refField?: string;
+  refOnUpdate?: ReferentialAction;
+  refOnDelete?: ReferentialAction;
+  
+  // Enhanced validation with React Hook Form and Zod
+  validation?: FieldValidationConfig;
+  
+  // UI configuration
+  picklist?: string[];
+  hidden: boolean;
+  readonly: boolean;
+  
+  // Form field configuration
+  formConfig?: FormFieldConfig;
+  
+  // Database functions
+  dbFunction?: DbFunctionConfig[];
+  
+  // Native database metadata
+  native?: any[];
 }
 
 /**
- * Virtual scrolling configuration for large datasets
+ * Enhanced relationship definition with React patterns
  */
-export interface VirtualScrollConfig {
-  /** Enable virtual scrolling */
-  enabled: boolean;
-  /** Estimated row height */
-  estimateSize: () => number;
-  /** Overscan count */
-  overscan?: number;
-  /** Scroll margin */
-  scrollMargin?: number;
-  /** Initial scroll offset */
-  initialOffset?: number;
-  /** Scroll padding start */
-  paddingStart?: number;
-  /** Scroll padding end */
-  paddingEnd?: number;
+export interface TableRelationshipDefinition extends Omit<TableRelationship, 'type'> {
+  // Core relationship metadata
+  id: string;
+  alias: string;
+  name: string;
+  label: string;
+  description?: string;
+  
+  // Relationship configuration
+  type: RelationshipType;
+  field: string;
+  isVirtual: boolean;
+  
+  // Reference configuration
+  refServiceId: number;
+  refTable: string;
+  refField: string;
+  refOnUpdate?: ReferentialAction;
+  refOnDelete?: ReferentialAction;
+  
+  // Junction table for many-to-many relationships
+  junctionServiceId?: number;
+  junctionTable?: string;
+  junctionField?: string;
+  junctionRefField?: string;
+  
+  // Fetch behavior
+  alwaysFetch: boolean;
+  flatten: boolean;
+  flattenDropPrefix: boolean;
+  
+  // UI state for React components
+  expanded?: boolean;
+  loading?: boolean;
+  selected?: boolean;
+  
+  // React Query integration
+  cacheKey?: string;
+  lastFetched?: string;
+  
+  // Validation for relationship configuration
+  validation?: RelationshipValidationConfig;
+}
+
+// ============================================================================
+// REACT HOOK FORM INTEGRATION TYPES
+// ============================================================================
+
+/**
+ * Form data structure for table creation and editing
+ * Compatible with React Hook Form and Zod validation
+ */
+export interface TableFormData {
+  // Basic table information
+  name: string;
+  label: string;
+  description?: string;
+  alias?: string;
+  plural?: string;
+  
+  // Table configuration
+  isView: boolean;
+  nameField?: string;
+  access: number;
+  
+  // Field definitions
+  fields: TableFieldFormData[];
+  
+  // Relationship definitions
+  relationships: TableRelationshipFormData[];
+  
+  // Index configurations
+  indexes: TableIndexFormData[];
+  
+  // Constraint definitions
+  constraints: TableConstraintFormData[];
+  
+  // API generation settings
+  apiEnabled: boolean;
+  generateEndpoints?: string[];
+  
+  // Advanced settings
+  advancedSettings?: TableAdvancedSettings;
 }
 
 /**
- * Enhanced virtual item with table-specific properties
+ * Form data for individual field configuration
  */
-export interface TableVirtualItem extends VirtualItem {
-  /** Row data */
-  data: TableListItem;
-  /** Row state */
-  state: {
-    /** Selected state */
-    selected: boolean;
-    /** Expanded state */
-    expanded: boolean;
-    /** Loading state */
-    loading: boolean;
+export interface TableFieldFormData {
+  // Basic field information
+  name: string;
+  label: string;
+  description?: string;
+  alias?: string;
+  
+  // Data type configuration
+  type: FieldType;
+  dbType?: string;
+  length?: number;
+  precision?: number;
+  scale?: number;
+  defaultValue?: any;
+  
+  // Field properties
+  required: boolean;
+  allowNull: boolean;
+  isPrimaryKey: boolean;
+  isForeignKey: boolean;
+  isUnique: boolean;
+  isIndex: boolean;
+  isAutoIncrement: boolean;
+  isVirtual: boolean;
+  
+  // Foreign key configuration
+  refTable?: string;
+  refField?: string;
+  refOnUpdate?: ReferentialAction;
+  refOnDelete?: ReferentialAction;
+  
+  // Validation rules
+  validation?: FieldValidationFormData;
+  
+  // UI configuration
+  picklist?: string[];
+  hidden: boolean;
+  readonly: boolean;
+  
+  // Form-specific metadata
+  isNew?: boolean;
+  isModified?: boolean;
+  originalName?: string;
+}
+
+/**
+ * Form data for relationship configuration
+ */
+export interface TableRelationshipFormData {
+  // Basic relationship information
+  alias: string;
+  name: string;
+  label: string;
+  description?: string;
+  
+  // Relationship type and configuration
+  type: RelationshipType;
+  field: string;
+  isVirtual: boolean;
+  
+  // Reference configuration
+  refServiceId: number;
+  refTable: string;
+  refField: string;
+  refOnUpdate?: ReferentialAction;
+  refOnDelete?: ReferentialAction;
+  
+  // Junction table configuration
+  junctionServiceId?: number;
+  junctionTable?: string;
+  junctionField?: string;
+  junctionRefField?: string;
+  
+  // Fetch behavior
+  alwaysFetch: boolean;
+  flatten: boolean;
+  flattenDropPrefix: boolean;
+  
+  // Form-specific metadata
+  isNew?: boolean;
+  isModified?: boolean;
+  originalAlias?: string;
+}
+
+/**
+ * Form data for index configuration
+ */
+export interface TableIndexFormData {
+  name: string;
+  fields: string[];
+  unique: boolean;
+  type?: string;
+  method?: string;
+  condition?: string;
+  
+  // Form-specific metadata
+  isNew?: boolean;
+  isModified?: boolean;
+  originalName?: string;
+}
+
+/**
+ * Form data for constraint configuration
+ */
+export interface TableConstraintFormData {
+  name: string;
+  type: string;
+  definition: string;
+  fields: string[];
+  condition?: string;
+  
+  // Form-specific metadata
+  isNew?: boolean;
+  isModified?: boolean;
+  originalName?: string;
+}
+
+/**
+ * Advanced table settings for expert users
+ */
+export interface TableAdvancedSettings {
+  collation?: string;
+  engine?: string;
+  rowFormat?: string;
+  autoIncrement?: number;
+  avgRowLength?: number;
+  maxRows?: number;
+  minRows?: number;
+  tablespace?: string;
+  comment?: string;
+  
+  // Performance settings
+  enableCaching?: boolean;
+  cacheTimeout?: number;
+  optimizeForReads?: boolean;
+  
+  // Security settings
+  enableAuditLog?: boolean;
+  enableEncryption?: boolean;
+  encryptionKey?: string;
+}
+
+// ============================================================================
+// ZOD VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Comprehensive validation configuration for fields
+ * Integrates with React Hook Form for real-time validation under 100ms
+ */
+export interface FieldValidationConfig {
+  // Basic validation rules
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  min?: number;
+  max?: number;
+  enum?: string[];
+  
+  // Advanced validation
+  format?: string;
+  customValidator?: string;
+  asyncValidator?: string;
+  
+  // Validation timing
+  validateOnChange?: boolean;
+  validateOnBlur?: boolean;
+  debounceMs?: number;
+  
+  // Error messages
+  messages?: {
+    required?: string;
+    minLength?: string;
+    maxLength?: string;
+    pattern?: string;
+    min?: string;
+    max?: string;
+    format?: string;
+    custom?: string;
   };
-}
-
-// =============================================================================
-// REACT QUERY INTEGRATION TYPES
-// =============================================================================
-
-/**
- * React Query key factory for table-related queries
- */
-export const tableQueryKeys = {
-  /** All table queries */
-  all: ['tables'] as const,
   
-  /** Service-specific table lists */
-  lists: () => [...tableQueryKeys.all, 'list'] as const,
-  
-  /** Table list for specific service */
-  list: (service: string, params?: TableSearchParams) => 
-    [...tableQueryKeys.lists(), service, params] as const,
-  
-  /** Table detail queries */
-  details: () => [...tableQueryKeys.all, 'detail'] as const,
-  
-  /** Specific table detail */
-  detail: (service: string, tableName: string) => 
-    [...tableQueryKeys.details(), service, tableName] as const,
-  
-  /** Table schema queries */
-  schemas: () => [...tableQueryKeys.all, 'schema'] as const,
-  
-  /** Specific table schema */
-  schema: (service: string, tableName: string) => 
-    [...tableQueryKeys.schemas(), service, tableName] as const,
-  
-  /** Table relationships */
-  relationships: (service: string, tableName: string) => 
-    [...tableQueryKeys.all, 'relationships', service, tableName] as const,
-  
-  /** Table field configurations */
-  fieldConfigs: (service: string, tableName: string) => 
-    [...tableQueryKeys.all, 'fieldConfigs', service, tableName] as const
-};
-
-/**
- * Query configuration for table list fetching
- */
-export interface TableListQueryConfig extends QueryConfig<PaginatedResponse<TableListItem>> {
-  /** Service name */
-  service: string;
-  /** Search parameters */
-  params?: TableSearchParams;
-  /** Virtual scrolling configuration */
-  virtual?: VirtualScrollConfig;
-  /** Enable infinite query */
-  infinite?: boolean;
+  // Conditional validation
+  conditional?: {
+    field: string;
+    value: any;
+    operator: 'equals' | 'not_equals' | 'in' | 'not_in' | 'greater' | 'less';
+  }[];
 }
 
 /**
- * Query result for table list
+ * Form data for field validation configuration
  */
-export type TableListQueryResult = UseQueryResult<PaginatedResponse<TableListItem>, BoundaryError>;
-
-/**
- * Query configuration for table detail fetching
- */
-export interface TableDetailQueryConfig extends QueryConfig<TableMetadata> {
-  /** Service name */
-  service: string;
-  /** Table name */
-  tableName: string;
-  /** Include performance metrics */
-  includeMetrics?: boolean;
-  /** Include security configuration */
-  includeSecurity?: boolean;
+export interface FieldValidationFormData {
+  required: boolean;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  min?: number;
+  max?: number;
+  format?: 'email' | 'url' | 'phone' | 'date' | 'custom';
+  customPattern?: string;
+  customMessage?: string;
 }
 
 /**
- * Query result for table detail
+ * Validation configuration for relationships
  */
-export type TableDetailQueryResult = UseQueryResult<TableMetadata, BoundaryError>;
-
-/**
- * Mutation configuration for table operations
- */
-export interface TableMutationConfig<TData = unknown, TVariables = unknown> 
-  extends MutationConfig<TData, BoundaryError, TVariables> {
-  /** Service name */
-  service: string;
-  /** Table name */
-  tableName?: string;
-  /** Optimistic update function */
-  optimisticUpdate?: (variables: TVariables) => Partial<TData>;
-  /** Cache invalidation patterns */
-  invalidateQueries?: QueryKey[];
+export interface RelationshipValidationConfig {
+  requiredRefTable: boolean;
+  requiredRefField: boolean;
+  validateTableExists: boolean;
+  validateFieldExists: boolean;
+  preventCircularReference: boolean;
+  maxDepth?: number;
 }
 
 /**
- * Table creation mutation variables
+ * Zod schema for table name validation
+ * Ensures valid SQL identifiers and naming conventions
  */
-export interface CreateTableVariables {
-  /** Service name */
-  service: string;
-  /** Table configuration */
-  table: Omit<TableMetadata, 'name'> & { name: string };
-}
+export const TableNameSchema = z.string()
+  .min(1, 'Table name is required')
+  .max(64, 'Table name must be 64 characters or less')
+  .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Table name must start with letter and contain only letters, numbers, and underscores')
+  .refine((name) => !SQL_RESERVED_WORDS.includes(name.toUpperCase()), 'Table name cannot be a reserved SQL word');
 
 /**
- * Table update mutation variables
+ * Zod schema for field name validation
  */
-export interface UpdateTableVariables {
-  /** Service name */
-  service: string;
-  /** Table name */
-  tableName: string;
-  /** Table updates */
-  updates: Partial<TableMetadata>;
-}
+export const FieldNameSchema = z.string()
+  .min(1, 'Field name is required')
+  .max(64, 'Field name must be 64 characters or less')
+  .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with letter and contain only letters, numbers, and underscores')
+  .refine((name) => !SQL_RESERVED_WORDS.includes(name.toUpperCase()), 'Field name cannot be a reserved SQL word');
 
 /**
- * Table deletion mutation variables
+ * Zod schema for field validation
  */
-export interface DeleteTableVariables {
-  /** Service name */
-  service: string;
-  /** Table name */
-  tableName: string;
-  /** Force deletion */
-  force?: boolean;
-}
-
-/**
- * API generation mutation variables
- */
-export interface GenerateTableAPIVariables {
-  /** Service name */
-  service: string;
-  /** Table names */
-  tableNames: string[];
-  /** API configuration */
-  config: {
-    /** HTTP methods to generate */
-    methods: ('GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE')[];
-    /** Enable pagination */
-    pagination: boolean;
-    /** Enable filtering */
-    filtering: boolean;
-    /** Enable sorting */
-    sorting: boolean;
-    /** Security rules */
-    security?: Record<string, unknown>;
-  };
-}
-
-/**
- * Mutation results for table operations
- */
-export type CreateTableMutation = UseMutationResult<TableMetadata, BoundaryError, CreateTableVariables>;
-export type UpdateTableMutation = UseMutationResult<TableMetadata, BoundaryError, UpdateTableVariables>;
-export type DeleteTableMutation = UseMutationResult<void, BoundaryError, DeleteTableVariables>;
-export type GenerateAPITableMutation = UseMutationResult<{ endpoints: string[] }, BoundaryError, GenerateTableAPIVariables>;
-
-// =============================================================================
-// FORM SCHEMAS AND VALIDATION TYPES
-// =============================================================================
-
-/**
- * Table filtering form schema
- */
-export interface TableFilterForm {
-  /** Search query */
-  search: string;
-  /** Table type filter */
-  type: 'all' | 'table' | 'view' | 'materialized_view';
-  /** Schema filter */
-  schema: string;
-  /** Has primary key filter */
-  hasPrimaryKey: boolean;
-  /** Has foreign keys filter */
-  hasForeignKeys: boolean;
-  /** API generation status filter */
-  apiGenerated: 'all' | 'generated' | 'not_generated';
-  /** Performance rating filter */
-  performanceRating: 'all' | 'excellent' | 'good' | 'fair' | 'poor';
-  /** Date range filter */
-  dateRange: {
-    start?: Date;
-    end?: Date;
-  };
-}
-
-/**
- * Zod schema for table filtering validation
- */
-export const tableFilterFormSchema = z.object({
-  search: z.string().max(255).default(''),
-  type: z.enum(['all', 'table', 'view', 'materialized_view']).default('all'),
-  schema: z.string().max(64).default(''),
-  hasPrimaryKey: z.boolean().default(false),
-  hasForeignKeys: z.boolean().default(false),
-  apiGenerated: z.enum(['all', 'generated', 'not_generated']).default('all'),
-  performanceRating: z.enum(['all', 'excellent', 'good', 'fair', 'poor']).default('all'),
-  dateRange: z.object({
-    start: z.date().optional(),
-    end: z.date().optional()
-  }).default({})
+export const FieldValidationSchema = z.object({
+  required: z.boolean().default(false),
+  minLength: z.number().min(0).optional(),
+  maxLength: z.number().min(1).max(65535).optional(),
+  pattern: z.string().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  format: z.enum(['email', 'url', 'phone', 'date', 'custom']).optional(),
+  customPattern: z.string().optional(),
+  customMessage: z.string().optional(),
 }).refine((data) => {
-  // Validate date range
-  if (data.dateRange.start && data.dateRange.end) {
-    return data.dateRange.start <= data.dateRange.end;
+  if (data.minLength !== undefined && data.maxLength !== undefined) {
+    return data.minLength <= data.maxLength;
   }
   return true;
 }, {
-  message: "Start date must be before end date",
-  path: ['dateRange', 'start']
+  message: 'Minimum length must be less than or equal to maximum length',
+  path: ['minLength']
+}).refine((data) => {
+  if (data.min !== undefined && data.max !== undefined) {
+    return data.min <= data.max;
+  }
+  return true;
+}, {
+  message: 'Minimum value must be less than or equal to maximum value',
+  path: ['min']
 });
 
 /**
- * Table configuration form schema
+ * Zod schema for complete table form validation
  */
-export interface TableConfigForm {
-  /** Table basic information */
-  basic: {
-    name: string;
-    label: string;
-    description: string;
-    type: 'table' | 'view' | 'materialized_view';
-    schema?: string;
+export const TableFormSchema = z.object({
+  name: TableNameSchema,
+  label: z.string().min(1, 'Label is required').max(255, 'Label must be 255 characters or less'),
+  description: z.string().max(1000, 'Description must be 1000 characters or less').optional(),
+  alias: z.string().max(64, 'Alias must be 64 characters or less').optional(),
+  plural: z.string().max(64, 'Plural name must be 64 characters or less').optional(),
+  isView: z.boolean().default(false),
+  nameField: FieldNameSchema.optional(),
+  access: z.number().min(0).max(7).default(7),
+  fields: z.array(z.object({
+    name: FieldNameSchema,
+    label: z.string().min(1, 'Field label is required').max(255),
+    description: z.string().max(1000).optional(),
+    alias: z.string().max(64).optional(),
+    type: z.enum(['integer', 'bigint', 'decimal', 'float', 'double', 'string', 'text', 'boolean', 'date', 'datetime', 'timestamp', 'time', 'binary', 'json', 'xml', 'uuid', 'enum', 'set', 'blob', 'clob']),
+    dbType: z.string().optional(),
+    length: z.number().min(1).max(65535).optional(),
+    precision: z.number().min(1).max(65).optional(),
+    scale: z.number().min(0).max(30).optional(),
+    defaultValue: z.any().optional(),
+    required: z.boolean().default(false),
+    allowNull: z.boolean().default(true),
+    isPrimaryKey: z.boolean().default(false),
+    isForeignKey: z.boolean().default(false),
+    isUnique: z.boolean().default(false),
+    isIndex: z.boolean().default(false),
+    isAutoIncrement: z.boolean().default(false),
+    isVirtual: z.boolean().default(false),
+    refTable: z.string().optional(),
+    refField: z.string().optional(),
+    refOnUpdate: z.enum(['NO ACTION', 'RESTRICT', 'CASCADE', 'SET NULL', 'SET DEFAULT']).optional(),
+    refOnDelete: z.enum(['NO ACTION', 'RESTRICT', 'CASCADE', 'SET NULL', 'SET DEFAULT']).optional(),
+    validation: FieldValidationSchema.optional(),
+    picklist: z.array(z.string()).optional(),
+    hidden: z.boolean().default(false),
+    readonly: z.boolean().default(false),
+  })).min(1, 'Table must have at least one field'),
+  relationships: z.array(z.object({
+    alias: z.string().min(1, 'Relationship alias is required').max(64),
+    name: z.string().min(1, 'Relationship name is required').max(64),
+    label: z.string().min(1, 'Relationship label is required').max(255),
+    description: z.string().max(1000).optional(),
+    type: z.enum(['belongs_to', 'has_many', 'has_one', 'many_many']),
+    field: FieldNameSchema,
+    isVirtual: z.boolean().default(false),
+    refServiceId: z.number().min(1),
+    refTable: z.string().min(1, 'Referenced table is required'),
+    refField: FieldNameSchema,
+    refOnUpdate: z.enum(['NO ACTION', 'RESTRICT', 'CASCADE', 'SET NULL', 'SET DEFAULT']).optional(),
+    refOnDelete: z.enum(['NO ACTION', 'RESTRICT', 'CASCADE', 'SET NULL', 'SET DEFAULT']).optional(),
+    junctionServiceId: z.number().optional(),
+    junctionTable: z.string().optional(),
+    junctionField: z.string().optional(),
+    junctionRefField: z.string().optional(),
+    alwaysFetch: z.boolean().default(false),
+    flatten: z.boolean().default(false),
+    flattenDropPrefix: z.boolean().default(false),
+  })).optional(),
+  indexes: z.array(z.object({
+    name: z.string().min(1, 'Index name is required').max(64),
+    fields: z.array(FieldNameSchema).min(1, 'Index must have at least one field'),
+    unique: z.boolean().default(false),
+    type: z.string().optional(),
+    method: z.string().optional(),
+    condition: z.string().optional(),
+  })).optional(),
+  constraints: z.array(z.object({
+    name: z.string().min(1, 'Constraint name is required').max(64),
+    type: z.enum(['check', 'unique', 'foreign_key', 'primary_key', 'default', 'not_null']),
+    definition: z.string().min(1, 'Constraint definition is required'),
+    fields: z.array(FieldNameSchema).min(1, 'Constraint must apply to at least one field'),
+    condition: z.string().optional(),
+  })).optional(),
+  apiEnabled: z.boolean().default(true),
+  generateEndpoints: z.array(z.string()).optional(),
+  advancedSettings: z.object({
+    collation: z.string().optional(),
+    engine: z.string().optional(),
+    rowFormat: z.string().optional(),
+    autoIncrement: z.number().min(1).optional(),
+    avgRowLength: z.number().min(1).optional(),
+    maxRows: z.number().min(1).optional(),
+    minRows: z.number().min(0).optional(),
+    tablespace: z.string().optional(),
+    comment: z.string().max(2048).optional(),
+    enableCaching: z.boolean().default(false),
+    cacheTimeout: z.number().min(60).max(86400).optional(),
+    optimizeForReads: z.boolean().default(false),
+    enableAuditLog: z.boolean().default(false),
+    enableEncryption: z.boolean().default(false),
+    encryptionKey: z.string().optional(),
+  }).optional(),
+}).refine((data) => {
+  // Ensure primary key fields are marked as required
+  const primaryKeyFields = data.fields.filter(field => field.isPrimaryKey);
+  const allPrimaryKeysRequired = primaryKeyFields.every(field => field.required);
+  return allPrimaryKeysRequired;
+}, {
+  message: 'Primary key fields must be required',
+  path: ['fields']
+}).refine((data) => {
+  // Ensure foreign key fields reference valid tables and fields
+  const foreignKeyFields = data.fields.filter(field => field.isForeignKey);
+  const validForeignKeys = foreignKeyFields.every(field => field.refTable && field.refField);
+  return validForeignKeys;
+}, {
+  message: 'Foreign key fields must specify referenced table and field',
+  path: ['fields']
+});
+
+// ============================================================================
+// TANSTACK TABLE INTEGRATION TYPES
+// ============================================================================
+
+/**
+ * Column definition for TanStack Table with virtual scrolling support
+ * Optimized for handling large datasets (1000+ tables)
+ */
+export interface TableColumnDefinition<T = TableMetadata> extends ColumnDef<T> {
+  // Enhanced column metadata
+  id: string;
+  accessorKey?: keyof T;
+  header: string | ((props: any) => React.ReactNode);
+  cell?: (props: any) => React.ReactNode;
+  
+  // Column configuration
+  enableSorting?: boolean;
+  enableColumnFilter?: boolean;
+  enableGlobalFilter?: boolean;
+  enableHiding?: boolean;
+  enablePinning?: boolean;
+  enableResizing?: boolean;
+  
+  // Virtual scrolling properties
+  size?: number;
+  minSize?: number;
+  maxSize?: number;
+  
+  // Column metadata for UI
+  description?: string;
+  tooltip?: string;
+  dataType?: 'string' | 'number' | 'boolean' | 'date' | 'object';
+  
+  // Filtering configuration
+  filterFn?: string | ((row: Row<T>, columnId: string, filterValue: any) => boolean);
+  filterOptions?: {
+    placeholder?: string;
+    options?: Array<{ label: string; value: any }>;
+    multiSelect?: boolean;
   };
   
-  /** Display configuration */
-  display: {
-    visible: boolean;
-    icon: string;
-    color: string;
-    tags: string[];
+  // Sorting configuration
+  sortingFn?: string | ((rowA: Row<T>, rowB: Row<T>, columnId: string) => number);
+  invertSorting?: boolean;
+  
+  // Cell formatting
+  format?: {
+    type: 'currency' | 'number' | 'percentage' | 'date' | 'datetime' | 'boolean' | 'custom';
+    options?: any;
+    customFormatter?: (value: any) => string;
   };
   
-  /** API configuration */
-  api: {
-    generateApis: boolean;
-    methods: ('GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE')[];
-    enablePagination: boolean;
-    enableFiltering: boolean;
-    enableSorting: boolean;
+  // Aggregation for grouped data
+  aggregationFn?: string | ((leafValues: any[]) => any);
+  aggregatedCell?: (props: any) => React.ReactNode;
+  
+  // Column visibility rules
+  visibilityRules?: {
+    breakpoint?: 'sm' | 'md' | 'lg' | 'xl';
+    condition?: (data: T[]) => boolean;
+  };
+}
+
+/**
+ * Table configuration for TanStack Table with React Query integration
+ */
+export interface TableConfiguration<T = TableMetadata> {
+  // Column definitions
+  columns: TableColumnDefinition<T>[];
+  
+  // Data configuration
+  data: T[];
+  enableRowSelection?: boolean;
+  enableMultiRowSelection?: boolean;
+  enableSubRowSelection?: boolean;
+  
+  // Sorting configuration
+  enableSorting?: boolean;
+  enableMultiSort?: boolean;
+  enableSortingRemoval?: boolean;
+  maxMultiSortColCount?: number;
+  sortDescFirst?: boolean;
+  
+  // Filtering configuration
+  enableFilters?: boolean;
+  enableColumnFilters?: boolean;
+  enableGlobalFilter?: boolean;
+  enableFacetedValues?: boolean;
+  globalFilterFn?: string;
+  
+  // Pagination configuration
+  enablePagination?: boolean;
+  autoResetPageIndex?: boolean;
+  
+  // Virtual scrolling configuration
+  enableVirtualization?: boolean;
+  virtualizationOptions?: {
+    estimateSize: number;
+    overscan?: number;
+    paddingStart?: number;
+    paddingEnd?: number;
   };
   
-  /** Security configuration */
-  security: {
-    enableAccessControl: boolean;
-    requiredRoles: string[];
-    fieldPermissions: Record<string, string[]>;
-  };
+  // Group by configuration
+  enableGrouping?: boolean;
+  enableExpanding?: boolean;
+  enablePinning?: boolean;
   
-  /** Performance configuration */
-  performance: {
-    enableIndexing: boolean;
-    indexFields: string[];
-    cacheConfiguration: {
-      enabled: boolean;
-      ttl: number;
+  // Column resizing
+  enableColumnResizing?: boolean;
+  columnResizeMode?: 'onChange' | 'onEnd';
+  
+  // Table state management
+  initialState?: {
+    sorting?: SortingState;
+    columnFilters?: ColumnFiltersState;
+    columnVisibility?: VisibilityState;
+    pagination?: {
+      pageIndex: number;
+      pageSize: number;
     };
   };
-}
-
-/**
- * Zod schema for table configuration validation
- */
-export const tableConfigFormSchema = z.object({
-  basic: z.object({
-    name: z.string()
-      .min(1, 'Table name is required')
-      .max(64, 'Table name must be 64 characters or less')
-      .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Table name must start with a letter and contain only letters, numbers, and underscores'),
-    label: z.string()
-      .min(1, 'Table label is required')
-      .max(128, 'Table label must be 128 characters or less'),
-    description: z.string()
-      .max(1000, 'Description must be 1000 characters or less')
-      .default(''),
-    type: z.enum(['table', 'view', 'materialized_view']).default('table'),
-    schema: z.string().max(64).optional()
-  }),
   
-  display: z.object({
-    visible: z.boolean().default(true),
-    icon: z.string().max(50).default('table'),
-    color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Color must be a valid hex color').default('#3B82F6'),
-    tags: z.array(z.string().max(50)).max(10, 'Maximum 10 tags allowed').default([])
-  }),
+  // Callbacks
+  onSortingChange?: (sorting: SortingState) => void;
+  onColumnFiltersChange?: (filters: ColumnFiltersState) => void;
+  onColumnVisibilityChange?: (visibility: VisibilityState) => void;
+  onRowSelectionChange?: (selection: any) => void;
+  onGlobalFilterChange?: (filter: string) => void;
   
-  api: z.object({
-    generateApis: z.boolean().default(true),
-    methods: z.array(z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])).min(1, 'At least one HTTP method must be selected').default(['GET']),
-    enablePagination: z.boolean().default(true),
-    enableFiltering: z.boolean().default(true),
-    enableSorting: z.boolean().default(true)
-  }),
+  // Performance optimizations
+  getRowId?: (row: T) => string;
+  getSubRows?: (row: T) => T[];
+  debugTable?: boolean;
+  debugHeaders?: boolean;
+  debugColumns?: boolean;
+}
+
+/**
+ * Virtual scrolling item configuration for large datasets
+ */
+export interface VirtualTableItem {
+  index: number;
+  size: number;
+  start: number;
+  end: number;
+  item: VirtualItem;
+  data: TableMetadata;
+  isVisible: boolean;
+  isLoaded: boolean;
+}
+
+/**
+ * Table filtering and search configuration
+ */
+export interface TableFilterConfig {
+  // Global search
+  globalFilter: string;
+  globalFilterPlaceholder?: string;
+  globalFilterDebounceMs?: number;
   
-  security: z.object({
-    enableAccessControl: z.boolean().default(false),
-    requiredRoles: z.array(z.string().max(64)).max(20, 'Maximum 20 roles allowed').default([]),
-    fieldPermissions: z.record(z.array(z.string())).default({})
-  }),
+  // Column filters
+  columnFilters: ColumnFiltersState;
+  enableColumnFilters: boolean;
   
-  performance: z.object({
-    enableIndexing: z.boolean().default(true),
-    indexFields: z.array(z.string().max(64)).max(50, 'Maximum 50 index fields allowed').default([]),
-    cacheConfiguration: z.object({
-      enabled: z.boolean().default(false),
-      ttl: z.number().min(60).max(86400).default(300) // 1 minute to 24 hours
-    })
-  })
-});
-
-// =============================================================================
-// COMPONENT PROPS AND INTERFACES
-// =============================================================================
-
-/**
- * Table list component props
- */
-export interface TableListProps extends BaseComponent {
-  /** Service name */
-  service: string;
-  /** Initial filter values */
-  initialFilters?: Partial<TableFilterForm>;
-  /** Enable virtual scrolling */
-  virtualScrolling?: boolean;
-  /** Enable row selection */
-  enableSelection?: boolean;
-  /** Selection change handler */
-  onSelectionChange?: (selectedTables: string[]) => void;
-  /** Table row click handler */
-  onTableClick?: (tableName: string) => void;
-  /** Refresh handler */
-  onRefresh?: () => void;
-  /** Error handler */
-  onError?: (error: BoundaryError) => void;
+  // Advanced filters
+  advancedFilters?: {
+    tableType?: 'table' | 'view' | 'all';
+    hasData?: boolean;
+    hasPrimaryKey?: boolean;
+    hasRelationships?: boolean;
+    createdAfter?: Date;
+    modifiedAfter?: Date;
+    sizeRange?: {
+      min?: number;
+      max?: number;
+    };
+  };
+  
+  // Filter persistence
+  persistFilters?: boolean;
+  filterStorageKey?: string;
+  
+  // Filter validation
+  validateFilters?: boolean;
+  filterSchema?: z.ZodSchema;
 }
 
 /**
- * Table detail component props
+ * Table sorting configuration with performance optimizations
  */
-export interface TableDetailProps extends BaseComponent {
-  /** Service name */
-  service: string;
-  /** Table name */
-  tableName: string;
-  /** Show performance metrics */
-  showMetrics?: boolean;
-  /** Show security configuration */
-  showSecurity?: boolean;
-  /** Enable editing */
-  enableEditing?: boolean;
-  /** Save handler */
-  onSave?: (updates: Partial<TableMetadata>) => Promise<void>;
-  /** Delete handler */
-  onDelete?: () => Promise<void>;
-  /** Error handler */
-  onError?: (error: BoundaryError) => void;
+export interface TableSortConfig {
+  // Current sorting state
+  sorting: SortingState;
+  
+  // Sorting options
+  enableMultiSort: boolean;
+  maxSortColumns: number;
+  sortDescFirst: boolean;
+  enableSortingRemoval: boolean;
+  
+  // Performance optimizations
+  sortingDebounceMs?: number;
+  enableServerSideSorting?: boolean;
+  
+  // Custom sorting functions
+  customSortFns?: Record<string, (a: any, b: any) => number>;
+  
+  // Sort persistence
+  persistSorting?: boolean;
+  sortStorageKey?: string;
 }
 
-/**
- * Table filter component props
- */
-export interface TableFilterProps extends BaseComponent {
-  /** Current filter values */
-  filters: TableFilterForm;
-  /** Filter change handler */
-  onFiltersChange: (filters: TableFilterForm) => void;
-  /** Available schemas for filtering */
-  availableSchemas?: string[];
-  /** Show advanced filters */
-  showAdvanced?: boolean;
-  /** Reset handler */
-  onReset?: () => void;
-}
+// ============================================================================
+// REACT QUERY INTEGRATION TYPES
+// ============================================================================
 
 /**
- * Table configuration component props
+ * React Query options for table data fetching
+ * Optimized for cache hit responses under 50ms
  */
-export interface TableConfigProps extends BaseComponent {
-  /** Service name */
-  service: string;
-  /** Table name for editing (undefined for creation) */
-  tableName?: string;
-  /** Initial configuration values */
-  initialConfig?: Partial<TableConfigForm>;
-  /** Save handler */
-  onSave: (config: TableConfigForm) => Promise<void>;
-  /** Cancel handler */
-  onCancel: () => void;
-  /** Available field options */
-  availableFields?: DatabaseField[];
-  /** Available roles for security configuration */
-  availableRoles?: string[];
-}
-
-/**
- * API generation wizard component props
- */
-export interface ApiGenerationWizardProps extends BaseComponent {
-  /** Service name */
-  service: string;
-  /** Selected table names */
-  selectedTables: string[];
-  /** Generation handler */
-  onGenerate: (config: GenerateTableAPIVariables['config']) => Promise<void>;
-  /** Cancel handler */
-  onCancel: () => void;
-  /** Step change handler */
-  onStepChange?: (step: number) => void;
-  /** Initial step */
-  initialStep?: number;
-}
-
-// =============================================================================
-// HOOK INTERFACES AND TYPES
-// =============================================================================
-
-/**
- * Table list hook configuration
- */
-export interface UseTableListConfig {
-  /** Service name */
-  service: string;
-  /** Initial filters */
-  initialFilters?: Partial<TableFilterForm>;
-  /** Enable infinite loading */
-  infinite?: boolean;
-  /** Virtual scrolling configuration */
-  virtualConfig?: VirtualScrollConfig;
-  /** Refetch interval */
+export interface TableQueryOptions<T = TableMetadata[]> extends UseQueryOptions<T> {
+  // Cache configuration
+  staleTime?: number; // Default: 5 minutes
+  cacheTime?: number; // Default: 10 minutes
+  
+  // Refetch configuration
+  refetchOnWindowFocus?: boolean;
+  refetchOnMount?: boolean;
+  refetchOnReconnect?: boolean;
   refetchInterval?: number;
+  
+  // Error handling
+  retry?: boolean | number | ((failureCount: number, error: any) => boolean);
+  retryDelay?: number | ((retryAttempt: number) => number);
+  
+  // Background updates
+  keepPreviousData?: boolean;
+  
+  // Suspense and error boundaries
+  suspense?: boolean;
+  useErrorBoundary?: boolean;
+  
+  // Query dependencies
+  enabled?: boolean;
+  
+  // Performance optimizations
+  structuralSharing?: boolean;
+  notifyOnChangeProps?: Array<keyof UseQueryOptions>;
 }
 
 /**
- * Table list hook return type
+ * React Query mutation options for table operations
+ * Supports optimistic updates and rollback on error
  */
-export interface UseTableListReturn {
-  /** Table list query result */
-  query: TableListQueryResult;
-  /** Current filters */
-  filters: TableFilterForm;
-  /** Filter update function */
-  updateFilters: (filters: Partial<TableFilterForm>) => void;
-  /** Reset filters function */
-  resetFilters: () => void;
-  /** Refresh function */
-  refresh: () => void;
-  /** Loading state */
-  isLoading: boolean;
-  /** Error state */
-  error?: BoundaryError;
-  /** Has more data for infinite loading */
-  hasNextPage?: boolean;
-  /** Fetch next page function */
-  fetchNextPage?: () => void;
+export interface TableMutationOptions<TData = any, TVariables = any> extends UseMutationOptions<TData, Error, TVariables> {
+  // Optimistic updates
+  onMutate?: (variables: TVariables) => Promise<any> | any;
+  
+  // Success handling
+  onSuccess?: (data: TData, variables: TVariables, context: any) => Promise<any> | any;
+  
+  // Error handling with rollback
+  onError?: (error: Error, variables: TVariables, context: any) => Promise<any> | any;
+  
+  // Cleanup
+  onSettled?: (data: TData | undefined, error: Error | null, variables: TVariables, context: any) => Promise<any> | any;
+  
+  // Cache invalidation
+  invalidateQueries?: QueryKey[];
+  updateQueries?: Array<{
+    queryKey: QueryKey;
+    updater: (oldData: any) => any;
+  }>;
+  
+  // Retry configuration
+  retry?: boolean | number | ((failureCount: number, error: Error) => boolean);
+  retryDelay?: number | ((retryAttempt: number) => number);
+  
+  // Loading states
+  throwOnError?: boolean;
+  useErrorBoundary?: boolean;
 }
 
 /**
- * Table detail hook configuration
+ * Query key factory for table-related operations
+ * Provides consistent cache key generation
  */
-export interface UseTableDetailConfig {
-  /** Service name */
+export interface TableQueryKeys {
+  all: () => readonly ['tables'];
+  lists: () => readonly ['tables', 'list'];
+  list: (serviceId: string, filters?: TableFilterConfig) => readonly ['tables', 'list', string, TableFilterConfig?];
+  details: () => readonly ['tables', 'detail'];
+  detail: (serviceId: string, tableName: string) => readonly ['tables', 'detail', string, string];
+  fields: (serviceId: string, tableName: string) => readonly ['tables', 'fields', string, string];
+  relationships: (serviceId: string, tableName: string) => readonly ['tables', 'relationships', string, string];
+  indexes: (serviceId: string, tableName: string) => readonly ['tables', 'indexes', string, string];
+  constraints: (serviceId: string, tableName: string) => readonly ['tables', 'constraints', string, string];
+  schema: (serviceId: string) => readonly ['tables', 'schema', string];
+  performance: (serviceId: string, tableName: string) => readonly ['tables', 'performance', string, string];
+}
+
+/**
+ * Table data fetching parameters for React Query
+ */
+export interface TableQueryParams {
+  // Service identification
+  serviceId: string;
+  serviceName?: string;
+  
+  // Filtering and search
+  search?: string;
+  filters?: TableFilterConfig['advancedFilters'];
+  
+  // Pagination for progressive loading
+  page?: number;
+  pageSize?: number;
+  offset?: number;
+  limit?: number;
+  
+  // Sorting
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  
+  // Data inclusion
+  includeFields?: boolean;
+  includeRelationships?: boolean;
+  includeIndexes?: boolean;
+  includeConstraints?: boolean;
+  includeStats?: boolean;
+  
+  // Performance options
+  enableVirtualization?: boolean;
+  prefetchRelated?: boolean;
+  
+  // Cache control
+  forceRefresh?: boolean;
+  backgroundRefresh?: boolean;
+}
+
+/**
+ * Table mutation parameters for CRUD operations
+ */
+export interface TableMutationParams {
+  // Operation type
+  action: 'create' | 'update' | 'delete' | 'duplicate' | 'refresh';
+  
+  // Target identification
+  serviceId: string;
+  tableName?: string;
+  
+  // Operation data
+  data?: TableFormData;
+  
+  // Operation options
+  options?: {
+    validateSchema?: boolean;
+    createBackup?: boolean;
+    skipConstraintChecks?: boolean;
+    cascadeDeletes?: boolean;
+    optimistic?: boolean;
+    rollbackOnError?: boolean;
+  };
+  
+  // Batch operations
+  batch?: boolean;
+  batchSize?: number;
+  
+  // Conflict resolution
+  conflictResolution?: 'fail' | 'skip' | 'overwrite' | 'merge';
+}
+
+// ============================================================================
+// FORM FIELD CONFIGURATION TYPES
+// ============================================================================
+
+/**
+ * Form field configuration for React Hook Form integration
+ */
+export interface FormFieldConfig {
+  // Field component type
+  component: 'input' | 'textarea' | 'select' | 'checkbox' | 'radio' | 'date' | 'number' | 'password' | 'custom';
+  
+  // Field properties
+  placeholder?: string;
+  helpText?: string;
+  label?: string;
+  required?: boolean;
+  disabled?: boolean;
+  readonly?: boolean;
+  
+  // Input constraints
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  pattern?: string;
+  
+  // Select/radio options
+  options?: Array<{
+    label: string;
+    value: any;
+    disabled?: boolean;
+    description?: string;
+  }>;
+  
+  // Multi-select configuration
+  multiple?: boolean;
+  searchable?: boolean;
+  clearable?: boolean;
+  
+  // Conditional rendering
+  showWhen?: {
+    field: string;
+    value: any;
+    operator?: 'equals' | 'not_equals' | 'in' | 'not_in';
+  };
+  
+  // Custom validation
+  customValidation?: (value: any, formData: any) => string | boolean;
+  
+  // Field dependencies
+  dependsOn?: string[];
+  updates?: string[];
+  
+  // UI customization
+  className?: string;
+  style?: React.CSSProperties;
+  icon?: string;
+  prefix?: string;
+  suffix?: string;
+  
+  // Accessibility
+  ariaLabel?: string;
+  ariaDescription?: string;
+  tabIndex?: number;
+}
+
+/**
+ * Database function configuration for field calculations
+ */
+export interface DbFunctionConfig {
+  use: string[];
+  function: string;
+  parameters?: Record<string, any>;
+  description?: string;
+  returnType?: FieldType;
+}
+
+// ============================================================================
+// NEXT.JS ROUTING TYPES
+// ============================================================================
+
+/**
+ * Next.js route parameters for table navigation
+ * Supports dynamic routing with type safety
+ */
+export interface TableRouteParams {
+  // Service identification
   service: string;
-  /** Table name */
-  tableName: string;
-  /** Include performance metrics */
-  includeMetrics?: boolean;
-  /** Include security configuration */
-  includeSecurity?: boolean;
+  serviceId?: string;
+  
+  // Table identification
+  table?: string;
+  tableId?: string;
+  
+  // Schema identification
+  schema?: string;
+  database?: string;
+  
+  // Operation modes
+  mode?: 'view' | 'edit' | 'create' | 'delete';
+  
+  // Sub-routes
+  section?: 'fields' | 'relationships' | 'indexes' | 'constraints' | 'data' | 'api';
 }
 
 /**
- * Table detail hook return type
+ * Next.js search parameters for table filtering and state
  */
-export interface UseTableDetailReturn {
-  /** Table detail query result */
-  query: TableDetailQueryResult;
-  /** Update mutation */
-  updateMutation: UpdateTableMutation;
-  /** Delete mutation */
-  deleteMutation: DeleteTableMutation;
-  /** Update function */
-  update: (updates: Partial<TableMetadata>) => Promise<void>;
-  /** Delete function */
-  delete: (force?: boolean) => Promise<void>;
-  /** Refresh function */
-  refresh: () => void;
-  /** Loading state */
-  isLoading: boolean;
-  /** Error state */
-  error?: BoundaryError;
+export interface TableSearchParams {
+  // Filtering
+  search?: string;
+  type?: 'table' | 'view';
+  hasData?: 'true' | 'false';
+  
+  // Pagination
+  page?: string;
+  pageSize?: string;
+  
+  // Sorting
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  
+  // View options
+  view?: 'list' | 'grid' | 'tree';
+  columns?: string;
+  
+  // Advanced filters
+  filters?: string; // JSON-encoded filter object
+  
+  // UI state
+  sidebar?: 'open' | 'closed';
+  details?: 'open' | 'closed';
 }
 
 /**
- * Table mutations hook return type
+ * Navigation helpers for table routes
  */
-export interface UseTableMutationsReturn {
-  /** Create table mutation */
-  createMutation: CreateTableMutation;
-  /** Update table mutation */
-  updateMutation: UpdateTableMutation;
-  /** Delete table mutation */
-  deleteMutation: DeleteTableMutation;
-  /** Generate API mutation */
-  generateApiMutation: GenerateAPITableMutation;
-  /** Create table function */
-  createTable: (variables: CreateTableVariables) => Promise<TableMetadata>;
-  /** Update table function */
-  updateTable: (variables: UpdateTableVariables) => Promise<TableMetadata>;
-  /** Delete table function */
-  deleteTable: (variables: DeleteTableVariables) => Promise<void>;
-  /** Generate APIs function */
-  generateApis: (variables: GenerateTableAPIVariables) => Promise<{ endpoints: string[] }>;
-  /** Loading states */
-  isLoading: {
-    create: boolean;
-    update: boolean;
-    delete: boolean;
-    generateApi: boolean;
-  };
-  /** Error states */
-  errors: {
-    create?: BoundaryError;
-    update?: BoundaryError;
-    delete?: BoundaryError;
-    generateApi?: BoundaryError;
-  };
+export interface TableNavigationHelpers {
+  // Route builders
+  buildTableListRoute: (params: Pick<TableRouteParams, 'service'>) => string;
+  buildTableDetailRoute: (params: Pick<TableRouteParams, 'service' | 'table'>) => string;
+  buildTableEditRoute: (params: Pick<TableRouteParams, 'service' | 'table'>) => string;
+  buildTableCreateRoute: (params: Pick<TableRouteParams, 'service'>) => string;
+  buildFieldDetailRoute: (params: Pick<TableRouteParams, 'service' | 'table'> & { field: string }) => string;
+  
+  // Navigation functions
+  navigateToTable: (params: TableRouteParams) => void;
+  navigateToField: (params: TableRouteParams & { field: string }) => void;
+  navigateBack: () => void;
+  
+  // URL parameter helpers
+  parseRouteParams: (params: any) => TableRouteParams;
+  parseSearchParams: (searchParams: URLSearchParams) => TableSearchParams;
+  buildSearchParams: (params: TableSearchParams) => URLSearchParams;
 }
 
-// =============================================================================
-// PERFORMANCE AND OPTIMIZATION TYPES
-// =============================================================================
+// ============================================================================
+// PERFORMANCE AND METRICS TYPES
+// ============================================================================
 
 /**
- * Table performance metrics
+ * Performance metrics for table operations
  */
 export interface TablePerformanceMetrics {
-  /** Query performance */
-  queryPerformance: {
-    /** Average response time (ms) */
-    avgResponseTime: number;
-    /** 95th percentile response time (ms) */
-    p95ResponseTime: number;
-    /** Query success rate */
-    successRate: number;
-    /** Total queries executed */
-    totalQueries: number;
-  };
+  // Query performance
+  queryTime: number;
+  cacheHitRate: number;
   
-  /** Index utilization */
-  indexUtilization: {
-    /** Index efficiency score (0-100) */
-    efficiencyScore: number;
-    /** Missing index recommendations */
-    recommendations: string[];
-    /** Index usage statistics */
-    usageStats: Record<string, number>;
-  };
+  // Rendering performance
+  renderTime: number;
+  virtualItemsRendered: number;
+  totalItems: number;
   
-  /** Cache performance */
-  cachePerformance: {
-    /** Cache hit rate */
-    hitRate: number;
-    /** Cache miss rate */
-    missRate: number;
-    /** Average cache lookup time (ms) */
-    avgLookupTime: number;
+  // Memory usage
+  estimatedMemoryUsage: number;
+  cacheSize: number;
+  
+  // User interaction metrics
+  scrollPosition: number;
+  selectedRows: number;
+  appliedFilters: number;
+  
+  // Data metrics
+  tableCount: number;
+  fieldCount: number;
+  relationshipCount: number;
+  
+  // Error tracking
+  errors: Array<{
+    type: string;
+    message: string;
+    timestamp: Date;
+    recoverable: boolean;
+  }>;
+  
+  // Timing metrics
+  timestamps: {
+    fetchStart: Date;
+    fetchEnd: Date;
+    renderStart: Date;
+    renderEnd: Date;
+    lastInteraction: Date;
   };
 }
+
+// ============================================================================
+// UTILITY TYPES AND CONSTANTS
+// ============================================================================
 
 /**
- * Table optimization recommendations
+ * SQL reserved words to prevent naming conflicts
  */
-export interface TableOptimizationRecommendations {
-  /** Performance recommendations */
+export const SQL_RESERVED_WORDS = [
+  'SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER',
+  'TABLE', 'INDEX', 'VIEW', 'PROCEDURE', 'FUNCTION', 'TRIGGER', 'DATABASE', 'SCHEMA',
+  'PRIMARY', 'FOREIGN', 'KEY', 'UNIQUE', 'NOT', 'NULL', 'DEFAULT', 'CHECK', 'CONSTRAINT',
+  'REFERENCES', 'CASCADE', 'RESTRICT', 'SET', 'ACTION', 'ON', 'MATCH', 'FULL', 'PARTIAL',
+  'SIMPLE', 'DEFERRABLE', 'INITIALLY', 'DEFERRED', 'IMMEDIATE', 'COMMIT', 'ROLLBACK',
+  'SAVEPOINT', 'RELEASE', 'START', 'TRANSACTION', 'BEGIN', 'END', 'DECLARE', 'CURSOR',
+  'FETCH', 'CLOSE', 'OPEN', 'PREPARE', 'EXECUTE', 'DEALLOCATE', 'DESCRIBE', 'EXPLAIN',
+  'ANALYZE', 'UNION', 'INTERSECT', 'EXCEPT', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'FULL',
+  'OUTER', 'CROSS', 'NATURAL', 'USING', 'GROUP', 'ORDER', 'BY', 'HAVING', 'DISTINCT',
+  'ALL', 'ANY', 'SOME', 'EXISTS', 'IN', 'BETWEEN', 'LIKE', 'ILIKE', 'SIMILAR', 'REGEXP',
+  'CASE', 'WHEN', 'THEN', 'ELSE', 'CAST', 'EXTRACT', 'INTERVAL', 'CURRENT_DATE',
+  'CURRENT_TIME', 'CURRENT_TIMESTAMP', 'LOCALTIME', 'LOCALTIMESTAMP', 'TRUE', 'FALSE',
+  'UNKNOWN', 'AND', 'OR', 'AS', 'ASC', 'DESC', 'LIMIT', 'OFFSET', 'GRANT', 'REVOKE'
+] as const;
+
+/**
+ * Default table configuration values
+ */
+export const DEFAULT_TABLE_CONFIG = {
+  pageSize: 50,
+  virtualScrolling: {
+    estimateSize: 50,
+    overscan: 10,
+  },
+  caching: {
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+  },
+  validation: {
+    debounceMs: 300,
+    validateOnChange: true,
+    validateOnBlur: true,
+  },
   performance: {
-    /** Priority level */
-    priority: 'high' | 'medium' | 'low';
-    /** Recommendation text */
-    recommendation: string;
-    /** Expected impact */
-    impact: string;
-    /** Implementation effort */
-    effort: 'low' | 'medium' | 'high';
-  }[];
-  
-  /** Security recommendations */
-  security: {
-    /** Priority level */
-    priority: 'high' | 'medium' | 'low';
-    /** Recommendation text */
-    recommendation: string;
-    /** Risk level */
-    risk: 'high' | 'medium' | 'low';
-  }[];
-  
-  /** API design recommendations */
-  api: {
-    /** Priority level */
-    priority: 'high' | 'medium' | 'low';
-    /** Recommendation text */
-    recommendation: string;
-    /** Best practice category */
-    category: 'REST' | 'GraphQL' | 'Performance' | 'Security';
-  }[];
-}
+    maxVisibleItems: 1000,
+    prefetchThreshold: 100,
+    maxCacheSize: 100 * 1024 * 1024, // 100MB
+  },
+} as const;
 
-// =============================================================================
-// EXPORTS
-// =============================================================================
+/**
+ * Type utility for extracting form data from table metadata
+ */
+export type ExtractFormData<T> = T extends TableMetadata
+  ? TableFormData
+  : T extends TableFieldDefinition
+  ? TableFieldFormData
+  : T extends TableRelationshipDefinition
+  ? TableRelationshipFormData
+  : never;
 
+/**
+ * Type utility for React Hook Form integration
+ */
+export type TableFormReturn = UseFormReturn<TableFormData>;
+
+/**
+ * Type utility for form errors
+ */
+export type TableFormErrors = FieldErrors<TableFormData>;
+
+/**
+ * Type utility for TanStack Table instance
+ */
+export type TableInstance = TanStackTable<TableMetadata>;
+
+/**
+ * Type guard to check if a field is a primary key
+ */
+export const isPrimaryKeyField = (field: TableFieldDefinition): boolean => {
+  return field.isPrimaryKey;
+};
+
+/**
+ * Type guard to check if a field is a foreign key
+ */
+export const isForeignKeyField = (field: TableFieldDefinition): boolean => {
+  return field.isForeignKey && !!field.refTable && !!field.refField;
+};
+
+/**
+ * Type guard to check if a relationship is many-to-many
+ */
+export const isManyToManyRelationship = (relationship: TableRelationshipDefinition): boolean => {
+  return relationship.type === 'many_many' && !!relationship.junctionTable;
+};
+
+/**
+ * Utility function to create table query keys
+ */
+export const createTableQueryKeys = (): TableQueryKeys => ({
+  all: () => ['tables'] as const,
+  lists: () => ['tables', 'list'] as const,
+  list: (serviceId: string, filters?: TableFilterConfig) => ['tables', 'list', serviceId, filters] as const,
+  details: () => ['tables', 'detail'] as const,
+  detail: (serviceId: string, tableName: string) => ['tables', 'detail', serviceId, tableName] as const,
+  fields: (serviceId: string, tableName: string) => ['tables', 'fields', serviceId, tableName] as const,
+  relationships: (serviceId: string, tableName: string) => ['tables', 'relationships', serviceId, tableName] as const,
+  indexes: (serviceId: string, tableName: string) => ['tables', 'indexes', serviceId, tableName] as const,
+  constraints: (serviceId: string, tableName: string) => ['tables', 'constraints', serviceId, tableName] as const,
+  schema: (serviceId: string) => ['tables', 'schema', serviceId] as const,
+  performance: (serviceId: string, tableName: string) => ['tables', 'performance', serviceId, tableName] as const,
+});
+
+// ============================================================================
+// EXPORT CONVENIENCE TYPES
+// ============================================================================
+
+// Export all types for convenient importing
 export type {
-  // Routing types
-  TableRouteParams,
-  TableSearchParams,
-  
-  // Table metadata types
+  // Core types
   TableMetadata,
-  TableListItem,
-  TableFieldConfig,
-  
-  // TanStack Table types
-  TableColumnDef,
-  TableConfig,
-  TableState,
-  VirtualScrollConfig,
-  TableVirtualItem,
-  
-  // React Query types
-  TableListQueryConfig,
-  TableListQueryResult,
-  TableDetailQueryConfig,
-  TableDetailQueryResult,
-  TableMutationConfig,
-  CreateTableVariables,
-  UpdateTableVariables,
-  DeleteTableVariables,
-  GenerateTableAPIVariables,
-  CreateTableMutation,
-  UpdateTableMutation,
-  DeleteTableMutation,
-  GenerateAPITableMutation,
+  TableFieldDefinition,
+  TableRelationshipDefinition,
   
   // Form types
-  TableFilterForm,
-  TableConfigForm,
+  TableFormData,
+  TableFieldFormData,
+  TableRelationshipFormData,
+  TableFormReturn,
+  TableFormErrors,
   
-  // Component props
-  TableListProps,
-  TableDetailProps,
-  TableFilterProps,
-  TableConfigProps,
-  ApiGenerationWizardProps,
+  // Validation types
+  FieldValidationConfig,
+  FieldValidationFormData,
+  RelationshipValidationConfig,
   
-  // Hook types
-  UseTableListConfig,
-  UseTableListReturn,
-  UseTableDetailConfig,
-  UseTableDetailReturn,
-  UseTableMutationsReturn,
+  // TanStack Table types
+  TableColumnDefinition,
+  TableConfiguration,
+  VirtualTableItem,
+  TableFilterConfig,
+  TableSortConfig,
+  TableInstance,
+  
+  // React Query types
+  TableQueryOptions,
+  TableMutationOptions,
+  TableQueryKeys,
+  TableQueryParams,
+  TableMutationParams,
+  
+  // Form field types
+  FormFieldConfig,
+  DbFunctionConfig,
+  
+  // Navigation types
+  TableRouteParams,
+  TableSearchParams,
+  TableNavigationHelpers,
   
   // Performance types
   TablePerformanceMetrics,
-  TableOptimizationRecommendations
+  
+  // Utility types
+  ExtractFormData,
 };
 
+// Export schemas for validation
 export {
-  // Query key factory
-  tableQueryKeys,
-  
-  // Validation schemas
-  tableRouteParamsSchema,
-  tableSearchParamsSchema,
-  tableFilterFormSchema,
-  tableConfigFormSchema
+  TableNameSchema,
+  FieldNameSchema,
+  FieldValidationSchema,
+  TableFormSchema,
+};
+
+// Export constants
+export {
+  SQL_RESERVED_WORDS,
+  DEFAULT_TABLE_CONFIG,
+  createTableQueryKeys,
+};
+
+// Export utility functions
+export {
+  isPrimaryKeyField,
+  isForeignKeyField,
+  isManyToManyRelationship,
 };
