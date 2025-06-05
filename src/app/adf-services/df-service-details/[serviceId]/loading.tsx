@@ -1,374 +1,489 @@
 /**
- * Loading Component for Service Editing Page
+ * Loading state component for service editing page
  * 
- * This component provides loading state for the database service editing page,
- * displaying animated skeleton placeholders while service data loads and the 
- * editing wizard initializes. Implements Next.js app router loading patterns
- * with WCAG 2.1 AA accessibility compliance and dark mode support.
- * 
- * @component ServiceEditingLoading
- * @description Displays context-appropriate loading states for service editing including:
- * - Service data fetching from API
- * - Form pre-population and validation setup  
- * - Connection testing preparation
- * - Component initialization phases
+ * Next.js App Router loading component that provides animated skeleton placeholders
+ * while existing service data loads and the editing wizard initializes.
  * 
  * Features:
- * - Tailwind CSS skeleton animations with shimmer effects
- * - WCAG 2.1 AA compliant with proper ARIA labels and reduced motion support
- * - Dark mode theme integration following design system tokens
- * - Optimized for React 19 performance characteristics
- * - Service editing context-specific loading indicators
+ * - WCAG 2.1 AA accessibility compliance with proper ARIA labels
+ * - Dark mode theme integration with consistent styling
+ * - Tailwind CSS 4.1+ animations with shimmer effects
+ * - Context-appropriate loading states for service editing workflow
+ * - Performance optimized for React 19 with sub-100ms render time
+ * - Progressive loading indicators for different phases
  * 
- * @version 1.0.0
- * @framework Next.js 15.1+ App Router
- * @styling Tailwind CSS 4.1+
- * @accessibility WCAG 2.1 AA
+ * @see Section 7.5.1 Core Application Layout Structure - segment-level loading
+ * @see React/Next.js Integration Requirements - performance standards
+ * @see Section 7.7 Visual Design Considerations - accessibility compliance
+ * @see Section 5.2 Database Service Management Component - theming
  */
-
-'use client';
 
 import React from 'react';
+import { LoadingSkeleton, SkeletonText, SkeletonButton, SkeletonCard } from '@/components/layout/loading/loading-skeleton';
 
 /**
- * Next.js App Router loading component for service editing page.
+ * Service editing loading component
  * 
- * Implements segment-level loading patterns as specified in Section 7.5.1
- * Core Application Layout Structure requirements for dynamic routes.
- * 
- * Performance Requirements:
- * - Render time under 100ms per React/Next.js Integration Requirements
- * - Smooth animations respecting prefers-reduced-motion
- * - Dark mode theme integration
- * 
- * @returns {JSX.Element} Loading skeleton component with service editing context
+ * Displays appropriate loading placeholders for the service editing page including:
+ * - Page header with breadcrumbs and actions
+ * - Service metadata form sections
+ * - Configuration wizard steps
+ * - Connection testing area
+ * - Security configuration panels
  */
-export default function ServiceEditingLoading(): JSX.Element {
+export default function ServiceEditingLoading() {
   return (
     <div 
-      className="space-y-8 p-6 max-w-7xl mx-auto animate-in fade-in duration-200"
-      data-testid="service-editing-loading"
+      className="space-y-8 animate-fade-in"
       role="status"
       aria-label="Loading service editing interface"
       aria-live="polite"
-      aria-atomic="true"
+      data-testid="service-editing-loading"
     >
-      {/* Screen reader announcement */}
-      <span className="sr-only">
-        Loading service configuration. Please wait while we fetch your service details and prepare the editing interface.
-      </span>
+      {/* Skip link for accessibility */}
+      <a 
+        href="#main-content" 
+        className="skip-link focus:not-sr-only"
+        aria-label="Skip to main content when loaded"
+      >
+        Skip to service editing form
+      </a>
 
       {/* Page Header Loading */}
-      <header className="space-y-4">
-        <div className="flex items-center justify-between">
-          {/* Back button skeleton */}
-          <div className="flex items-center space-x-3">
-            <div 
-              className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"
-              aria-label="Loading back button"
-            />
-            <div className="space-y-2">
-              {/* Title skeleton */}
-              <div 
-                className="h-8 bg-gray-200 dark:bg-gray-700 rounded-md w-64 animate-pulse"
-                aria-label="Loading service title"
-              />
-              {/* Subtitle skeleton */}
-              <div 
-                className="h-5 bg-gray-200 dark:bg-gray-700 rounded-md w-80 animate-pulse"
-                aria-label="Loading service description"
-              />
-            </div>
-          </div>
-          
-          {/* Action buttons skeleton */}
-          <div className="flex items-center space-x-3">
-            <div 
-              className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"
-              aria-label="Loading action button"
-            />
-            <div 
-              className="h-10 w-32 bg-primary-200 dark:bg-primary-700 rounded-md animate-pulse"
-              aria-label="Loading primary action button"
-            />
-          </div>
-        </div>
-
-        {/* Breadcrumb loading */}
-        <nav 
-          className="flex items-center space-x-2 text-sm"
-          aria-label="Loading breadcrumb navigation"
-        >
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse" />
-          <span className="text-gray-400 dark:text-gray-600">/</span>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse" />
-          <span className="text-gray-400 dark:text-gray-600">/</span>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
-        </nav>
-      </header>
-
-      {/* Service Status Card Loading */}
-      <section 
-        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm"
-        aria-label="Loading service status information"
+      <div 
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        data-testid="page-header-loading"
+        aria-label="Loading page header"
       >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            {/* Status icon skeleton */}
-            <div 
-              className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"
-              aria-label="Loading service status icon"
-            />
-            <div className="space-y-1">
-              <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse" />
-            </div>
-          </div>
-          
-          {/* Connection test button skeleton */}
-          <div 
-            className="h-9 w-28 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"
-            aria-label="Loading connection test button"
+        {/* Breadcrumbs Loading */}
+        <div className="flex items-center space-x-2 mb-2 sm:mb-0">
+          <SkeletonText 
+            lines={1} 
+            lineWidth="120px" 
+            lineHeight="sm"
+            className="h-4"
+            aria-label="Loading breadcrumb navigation"
+          />
+          <div className="text-gray-400 dark:text-gray-600" aria-hidden="true">/</div>
+          <SkeletonText 
+            lines={1} 
+            lineWidth="80px" 
+            lineHeight="sm"
+            className="h-4"
+            aria-label="Loading current page"
           />
         </div>
 
-        {/* Connection details grid */}
-        <div 
-          className="grid grid-cols-1 md:grid-cols-3 gap-4"
-          aria-label="Loading connection details"
-        >
-          {Array.from({ length: 6 }).map((_, index) => (
-            <div key={index} className="space-y-2">
-              <div 
-                className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse"
-                aria-label={`Loading connection detail ${index + 1} label`}
-              />
-              <div 
-                className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-full animate-pulse"
-                aria-label={`Loading connection detail ${index + 1} value`}
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Service Configuration Form Loading */}
-      <section 
-        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm"
-        aria-label="Loading service configuration form"
-      >
-        {/* Form header */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        {/* Page Title and Actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="space-y-2">
-            <div 
-              className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse"
-              aria-label="Loading form title"
+            <LoadingSkeleton
+              variant="text"
+              skeletonProps={{
+                lines: 1,
+                lineWidth: "240px",
+                lineHeight: "lg"
+              }}
+              className="h-8"
+              aria-label="Loading service name"
             />
-            <div 
-              className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-80 animate-pulse"
-              aria-label="Loading form description"
+            <SkeletonText 
+              lines={1} 
+              lineWidth="180px" 
+              lineHeight="sm"
+              className="h-5"
+              aria-label="Loading service description"
             />
           </div>
-        </div>
-
-        {/* Form content */}
-        <div className="p-6 space-y-6">
-          {/* Service identification section */}
-          <fieldset 
-            className="space-y-4"
-            aria-label="Loading service identification section"
-          >
-            <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="space-y-2">
-                  <div 
-                    className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse"
-                    aria-label={`Loading field ${index + 1} label`}
-                  />
-                  <div 
-                    className="h-11 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md animate-pulse"
-                    aria-label={`Loading field ${index + 1} input`}
-                  />
-                </div>
-              ))}
-            </div>
-          </fieldset>
-
-          {/* Database connection section */}
-          <fieldset 
-            className="space-y-4"
-            aria-label="Loading database connection section"
-          >
-            <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-40 animate-pulse" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="space-y-2">
-                  <div 
-                    className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-28 animate-pulse"
-                    aria-label={`Loading connection field ${index + 1} label`}
-                  />
-                  <div 
-                    className="h-11 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md animate-pulse"
-                    aria-label={`Loading connection field ${index + 1} input`}
-                  />
-                </div>
-              ))}
-            </div>
-          </fieldset>
-
-          {/* Advanced options section */}
-          <fieldset 
-            className="space-y-4"
-            aria-label="Loading advanced options section"
-          >
-            <div className="flex items-center space-x-2">
-              <div 
-                className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-                aria-label="Loading expand icon"
-              />
-              <div 
-                className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-36 animate-pulse"
-                aria-label="Loading advanced options title"
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="space-y-2">
-                  <div 
-                    className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"
-                    aria-label={`Loading advanced field ${index + 1} label`}
-                  />
-                  <div 
-                    className="h-11 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md animate-pulse"
-                    aria-label={`Loading advanced field ${index + 1} input`}
-                  />
-                </div>
-              ))}
-            </div>
-          </fieldset>
-        </div>
-
-        {/* Form footer with action buttons */}
-        <div 
-          className="px-6 py-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 rounded-b-lg"
-          aria-label="Loading form actions"
-        >
-          <div className="flex items-center justify-between">
-            <div 
-              className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"
+          
+          {/* Action Buttons */}
+          <div className="flex items-center space-x-3">
+            <SkeletonButton 
+              className="h-10 w-24"
+              aria-label="Loading save button"
+            />
+            <SkeletonButton 
+              className="h-10 w-20"
               aria-label="Loading cancel button"
             />
-            <div className="flex items-center space-x-3">
-              <div 
-                className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"
-                aria-label="Loading test connection button"
-              />
-              <div 
-                className="h-10 w-28 bg-primary-200 dark:bg-primary-700 rounded-md animate-pulse"
-                aria-label="Loading save button"
-              />
-            </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* Schema Preview Section Loading */}
-      <section 
-        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm"
-        aria-label="Loading schema preview section"
+      {/* Service Status Banner Loading */}
+      <div 
+        className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
+        data-testid="status-banner-loading"
+        aria-label="Loading service status"
       >
-        {/* Schema header */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <div 
-                className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-40 animate-pulse"
-                aria-label="Loading schema title"
-              />
-              <div 
-                className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-64 animate-pulse"
-                aria-label="Loading schema description"
-              />
-            </div>
-            <div 
-              className="h-9 w-28 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"
-              aria-label="Loading refresh schema button"
-            />
-          </div>
+        <div className="flex items-center space-x-3">
+          <div className="w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse" aria-hidden="true" />
+          <SkeletonText 
+            lines={1} 
+            lineWidth="160px" 
+            lineHeight="sm"
+            aria-label="Loading connection status"
+          />
         </div>
+      </div>
 
-        {/* Schema content */}
-        <div 
-          className="p-6 space-y-4"
-          aria-label="Loading schema content"
-        >
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div 
-              key={index} 
-              className="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-700 rounded-md"
-            >
-              <div 
-                className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-                aria-label={`Loading schema item ${index + 1} icon`}
-              />
-              <div className="flex-1 space-y-1">
-                <div 
-                  className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"
-                  aria-label={`Loading schema item ${index + 1} name`}
-                />
-                <div 
-                  className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse"
-                  aria-label={`Loading schema item ${index + 1} description`}
+      {/* Main Content Grid */}
+      <div 
+        className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+        id="main-content"
+        data-testid="main-content-loading"
+      >
+        {/* Service Configuration Form - Left Column */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* Basic Information Section */}
+          <SkeletonCard
+            variant="default"
+            includeImage={false}
+            includeActions={false}
+            className="p-6"
+            data-testid="basic-info-loading"
+            aria-label="Loading basic service information form"
+          >
+            <div className="space-y-6">
+              {/* Section Header */}
+              <div className="border-b border-gray-200 dark:border-gray-700 pb-3">
+                <SkeletonText 
+                  lines={1} 
+                  lineWidth="180px" 
+                  lineHeight="lg"
+                  className="h-6 font-medium"
+                  aria-label="Loading section title"
                 />
               </div>
-              <div 
-                className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-                aria-label={`Loading schema item ${index + 1} type`}
+
+              {/* Form Fields Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Service Name Field */}
+                <div className="space-y-2">
+                  <SkeletonText 
+                    lines={1} 
+                    lineWidth="100px" 
+                    lineHeight="sm"
+                    className="h-4"
+                    aria-label="Loading field label"
+                  />
+                  <div className="h-11 bg-gray-100 dark:bg-gray-700 rounded-md animate-pulse" aria-hidden="true" />
+                </div>
+
+                {/* Service Label Field */}
+                <div className="space-y-2">
+                  <SkeletonText 
+                    lines={1} 
+                    lineWidth="80px" 
+                    lineHeight="sm"
+                    className="h-4"
+                    aria-label="Loading field label"
+                  />
+                  <div className="h-11 bg-gray-100 dark:bg-gray-700 rounded-md animate-pulse" aria-hidden="true" />
+                </div>
+
+                {/* Description Field - Full Width */}
+                <div className="md:col-span-2 space-y-2">
+                  <SkeletonText 
+                    lines={1} 
+                    lineWidth="90px" 
+                    lineHeight="sm"
+                    className="h-4"
+                    aria-label="Loading field label"
+                  />
+                  <div className="h-20 bg-gray-100 dark:bg-gray-700 rounded-md animate-pulse" aria-hidden="true" />
+                </div>
+              </div>
+            </div>
+          </SkeletonCard>
+
+          {/* Connection Configuration Section */}
+          <SkeletonCard
+            variant="default"
+            includeImage={false}
+            includeActions={false}
+            className="p-6"
+            data-testid="connection-config-loading"
+            aria-label="Loading database connection configuration"
+          >
+            <div className="space-y-6">
+              {/* Section Header */}
+              <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-3">
+                <SkeletonText 
+                  lines={1} 
+                  lineWidth="200px" 
+                  lineHeight="lg"
+                  className="h-6"
+                  aria-label="Loading connection section title"
+                />
+                <SkeletonButton 
+                  className="h-9 w-28"
+                  aria-label="Loading test connection button"
+                />
+              </div>
+
+              {/* Connection Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Database Type */}
+                <div className="space-y-2">
+                  <SkeletonText 
+                    lines={1} 
+                    lineWidth="110px" 
+                    lineHeight="sm"
+                    className="h-4"
+                    aria-label="Loading database type field"
+                  />
+                  <div className="h-11 bg-gray-100 dark:bg-gray-700 rounded-md animate-pulse" aria-hidden="true" />
+                </div>
+
+                {/* Host Field */}
+                <div className="space-y-2">
+                  <SkeletonText 
+                    lines={1} 
+                    lineWidth="60px" 
+                    lineHeight="sm"
+                    className="h-4"
+                    aria-label="Loading host field"
+                  />
+                  <div className="h-11 bg-gray-100 dark:bg-gray-700 rounded-md animate-pulse" aria-hidden="true" />
+                </div>
+
+                {/* Port Field */}
+                <div className="space-y-2">
+                  <SkeletonText 
+                    lines={1} 
+                    lineWidth="50px" 
+                    lineHeight="sm"
+                    className="h-4"
+                    aria-label="Loading port field"
+                  />
+                  <div className="h-11 bg-gray-100 dark:bg-gray-700 rounded-md animate-pulse" aria-hidden="true" />
+                </div>
+
+                {/* Database Name */}
+                <div className="space-y-2">
+                  <SkeletonText 
+                    lines={1} 
+                    lineWidth="120px" 
+                    lineHeight="sm"
+                    className="h-4"
+                    aria-label="Loading database name field"
+                  />
+                  <div className="h-11 bg-gray-100 dark:bg-gray-700 rounded-md animate-pulse" aria-hidden="true" />
+                </div>
+              </div>
+
+              {/* Authentication Section */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <SkeletonText 
+                  lines={1} 
+                  lineWidth="130px" 
+                  lineHeight="md"
+                  className="h-5 mb-4"
+                  aria-label="Loading authentication section"
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <SkeletonText 
+                      lines={1} 
+                      lineWidth="80px" 
+                      lineHeight="sm"
+                      className="h-4"
+                      aria-label="Loading username field"
+                    />
+                    <div className="h-11 bg-gray-100 dark:bg-gray-700 rounded-md animate-pulse" aria-hidden="true" />
+                  </div>
+                  <div className="space-y-2">
+                    <SkeletonText 
+                      lines={1} 
+                      lineWidth="70px" 
+                      lineHeight="sm"
+                      className="h-4"
+                      aria-label="Loading password field"
+                    />
+                    <div className="h-11 bg-gray-100 dark:bg-gray-700 rounded-md animate-pulse" aria-hidden="true" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </SkeletonCard>
+
+          {/* Advanced Options Section */}
+          <SkeletonCard
+            variant="default"
+            includeImage={false}
+            includeActions={false}
+            className="p-6"
+            data-testid="advanced-options-loading"
+            aria-label="Loading advanced configuration options"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <SkeletonText 
+                  lines={1} 
+                  lineWidth="160px" 
+                  lineHeight="lg"
+                  className="h-6"
+                  aria-label="Loading advanced options title"
+                />
+                <div className="w-6 h-6 bg-gray-300 dark:bg-gray-600 rounded animate-pulse" aria-hidden="true" />
+              </div>
+              
+              {/* Collapsed state indication */}
+              <SkeletonText 
+                lines={2} 
+                lineWidth={["100%", "80%"]} 
+                lineHeight="sm"
+                spacing="tight"
+                aria-label="Loading advanced options description"
               />
             </div>
-          ))}
+          </SkeletonCard>
         </div>
-      </section>
 
-      {/* Loading completion indicator for screen readers */}
+        {/* Right Sidebar */}
+        <div className="space-y-6">
+          
+          {/* Connection Status Card */}
+          <SkeletonCard
+            variant="compact"
+            includeImage={false}
+            includeActions={false}
+            className="p-4"
+            data-testid="connection-status-loading"
+            aria-label="Loading connection status information"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse" aria-hidden="true" />
+                <SkeletonText 
+                  lines={1} 
+                  lineWidth="140px" 
+                  lineHeight="sm"
+                  className="h-4"
+                  aria-label="Loading connection status text"
+                />
+              </div>
+              <SkeletonText 
+                lines={2} 
+                lineWidth={["100%", "75%"]} 
+                lineHeight="sm"
+                spacing="tight"
+                aria-label="Loading status details"
+              />
+            </div>
+          </SkeletonCard>
+
+          {/* Quick Actions Card */}
+          <SkeletonCard
+            variant="compact"
+            includeImage={false}
+            includeActions={false}
+            className="p-4"
+            data-testid="quick-actions-loading"
+            aria-label="Loading quick actions panel"
+          >
+            <div className="space-y-4">
+              <SkeletonText 
+                lines={1} 
+                lineWidth="100px" 
+                lineHeight="md"
+                className="h-5"
+                aria-label="Loading quick actions title"
+              />
+              <div className="space-y-2">
+                <SkeletonButton className="w-full h-9" aria-label="Loading action button" />
+                <SkeletonButton className="w-full h-9" aria-label="Loading action button" />
+                <SkeletonButton className="w-full h-9" aria-label="Loading action button" />
+              </div>
+            </div>
+          </SkeletonCard>
+
+          {/* Help Documentation Card */}
+          <SkeletonCard
+            variant="compact"
+            includeImage={false}
+            includeActions={false}
+            className="p-4"
+            data-testid="help-docs-loading"
+            aria-label="Loading help documentation"
+          >
+            <div className="space-y-3">
+              <SkeletonText 
+                lines={1} 
+                lineWidth="90px" 
+                lineHeight="md"
+                className="h-5"
+                aria-label="Loading help section title"
+              />
+              <SkeletonText 
+                lines={3} 
+                lineWidth={["100%", "90%", "85%"]} 
+                lineHeight="sm"
+                spacing="tight"
+                aria-label="Loading help content"
+              />
+              <SkeletonButton 
+                className="w-full h-8 mt-3"
+                aria-label="Loading documentation link"
+              />
+            </div>
+          </SkeletonCard>
+        </div>
+      </div>
+
+      {/* Loading Progress Indicator */}
+      <div 
+        className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4 max-w-sm"
+        data-testid="loading-progress"
+        aria-label="Service data loading progress"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="flex items-center space-x-3">
+          <div className="flex-shrink-0">
+            <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              Loading service data...
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Retrieving configuration and connection details
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Screen Reader Announcements */}
       <div 
         className="sr-only" 
-        aria-live="polite"
+        aria-live="polite" 
         aria-atomic="true"
+        data-testid="screen-reader-status"
       >
-        Service editing interface is loading. Form fields and connection details will appear shortly.
+        Loading service editing interface. Please wait while we retrieve the service configuration, 
+        connection details, and prepare the editing form. This may take a few moments.
       </div>
+
+      {/* Reduced Motion Alternative */}
+      <style jsx>{`
+        @media (prefers-reduced-motion: reduce) {
+          .animate-pulse,
+          .animate-spin,
+          .animate-fade-in {
+            animation: none !important;
+          }
+          
+          [data-testid="service-editing-loading"] * {
+            transition: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
 
-/**
- * CSS Animation Classes Used:
- * 
- * - animate-pulse: Tailwind's built-in pulse animation for skeleton loading
- * - animate-in: Custom entrance animation for the entire component
- * - fade-in: Smooth fade-in transition respecting motion preferences
- * - duration-200: 200ms transition duration for performance optimization
- * 
- * Accessibility Features:
- * 
- * - role="status": Indicates loading region to screen readers
- * - aria-live="polite": Announces loading state changes without interrupting
- * - aria-atomic="true": Ensures complete loading messages are announced
- * - aria-label: Descriptive labels for each loading skeleton element
- * - sr-only: Screen reader only announcements for context
- * 
- * Dark Mode Support:
- * 
- * - Uses dark: prefix for Tailwind dark mode classes
- * - Implements design tokens from globals.css
- * - Maintains contrast ratios per WCAG 2.1 AA requirements
- * 
- * Performance Optimizations:
- * 
- * - Minimal DOM elements with efficient class combinations
- * - CSS-only animations avoiding JavaScript overhead
- * - Proper component boundaries for React 19 optimization
- * - Responsive design with mobile-first approach
- */
+// Add display name for better debugging
+ServiceEditingLoading.displayName = 'ServiceEditingLoading';
