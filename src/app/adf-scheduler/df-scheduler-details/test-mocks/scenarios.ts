@@ -1,886 +1,1179 @@
 /**
- * Comprehensive Mock Scenarios for Scheduler Testing
+ * @fileoverview Extended mock scenarios for comprehensive scheduler testing
+ * @description Covers error states, loading states, edge cases, and complex workflow situations
  * 
- * This module provides extensive mock scenarios for testing scheduler components
- * under various conditions including error states, loading states, edge cases,
- * and performance scenarios. All scenarios are designed to integrate with
- * Mock Service Worker (MSW) for realistic API simulation during development
- * and testing.
+ * @version 1.0.0 - React 19/Next.js 15.1 Implementation
+ * @license MIT
+ * @author DreamFactory Team
  * 
  * Features:
- * - Network failure and API error scenarios matching DreamFactory Core API formats
- * - Loading state mocks with realistic delays for testing UI components
- * - Edge case scenarios for empty states and concurrent modifications
- * - Large dataset scenarios for performance testing (1000+ tasks)
- * - Authentication and permission error scenarios for security testing
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * - Comprehensive error state mock scenarios including network failures and API validation errors
+ * - Loading state mock data with realistic delays for testing spinner and skeleton components
+ * - Edge case scenarios including empty task lists, deleted services, and concurrent modifications
+ * - Large dataset mocks for testing pagination, virtual scrolling, and performance optimization (1000+ tasks)
+ * - Authentication failure and permission error scenarios for security testing coverage
+ * - MSW handler integration for realistic API simulation
+ * - React Query cache testing patterns and optimistic update scenarios
+ * - Zod validation error scenarios for form testing
+ * - Real-time synchronization conflict scenarios
  */
 
-import type { Service } from '../../../types/service';
-import type { SchedulerTaskData, CreateSchedulePayload, UpdateSchedulePayload } from '../../../types/scheduler';
-import type { ApiErrorResponse, ApiListResponse, ApiSuccessResponse, HttpStatusCode } from '../../../types/api-response';
-import { mockServices, mockSchedulerTaskData } from './mocks';
+import type { 
+  ApiResponse, 
+  ApiListResponse, 
+  ApiResourceResponse,
+  ApiErrorResponse,
+  PaginationMeta,
+  HttpStatusCode 
+} from '../../../types/api'
+import type { 
+  ServiceWithMetadata,
+  SchedulerTaskDataWithMetadata 
+} from './mocks'
+import { 
+  mockServices, 
+  mockSchedulerTaskData,
+  createMockSchedulerTask,
+  createMockService,
+  createMockApiResponse 
+} from './mocks'
 
 // =============================================================================
 // ERROR STATE SCENARIOS
 // =============================================================================
 
 /**
- * Network failure scenarios for testing error handling
+ * Network failure scenarios simulating various connection issues
+ * Compatible with MSW error response patterns
  */
 export const networkErrorScenarios = {
   /**
-   * Simulates network timeout during scheduler task list fetch
+   * Complete network connectivity loss
+   * Simulates offline scenarios for PWA testing
    */
-  taskListNetworkTimeout: {
-    delay: 30000, // 30 second timeout
-    error: {
-      name: 'NetworkError',
-      message: 'Network request timed out',
-      code: 'NETWORK_TIMEOUT',
-      status_code: 0 as HttpStatusCode,
-      timestamp: new Date().toISOString(),
-    },
-  },
-
-  /**
-   * Simulates connection refused error
-   */
-  connectionRefused: {
-    delay: 100,
-    error: {
-      name: 'NetworkError',
-      message: 'Connection refused by server',
-      code: 'CONNECTION_REFUSED',
-      status_code: 0 as HttpStatusCode,
-      timestamp: new Date().toISOString(),
-    },
-  },
-
-  /**
-   * Simulates DNS resolution failure
-   */
-  dnsResolutionFailure: {
+  networkOffline: {
+    name: 'NETWORK_OFFLINE',
+    error: new Error('Failed to fetch'),
     delay: 5000,
-    error: {
-      name: 'NetworkError',
-      message: 'Failed to resolve DNS for dreamfactory.api',
-      code: 'DNS_RESOLUTION_FAILED',
-      status_code: 0 as HttpStatusCode,
-      timestamp: new Date().toISOString(),
-    },
+    retryable: true,
+    description: 'Network connection completely unavailable',
+    testCases: [
+      'Scheduler task list loading while offline',
+      'Task creation attempt without network',
+      'Task update synchronization failure',
+      'Service validation during network outage'
+    ]
   },
 
   /**
-   * Simulates SSL certificate error
+   * Request timeout scenarios
+   * Tests React Query timeout handling and retry logic
    */
-  sslCertificateError: {
-    delay: 2000,
-    error: {
-      name: 'SecurityError',
-      message: 'SSL certificate verification failed',
-      code: 'SSL_CERT_ERROR',
-      status_code: 0 as HttpStatusCode,
-      timestamp: new Date().toISOString(),
-    },
+  requestTimeout: {
+    name: 'REQUEST_TIMEOUT',
+    error: new Error('Request timeout'),
+    delay: 30000,
+    retryable: true,
+    description: 'API request exceeds configured timeout threshold',
+    testCases: [
+      'Large dataset loading timeout (1000+ tasks)',
+      'Complex task validation timeout',
+      'Service connection test timeout',
+      'Task execution log retrieval timeout'
+    ]
   },
-} as const;
+
+  /**
+   * DNS resolution failure
+   * Simulates infrastructure-level connectivity issues
+   */
+  dnsFailure: {
+    name: 'DNS_RESOLUTION_FAILED',
+    error: new Error('DNS resolution failed'),
+    delay: 10000,
+    retryable: false,
+    description: 'Domain name resolution failure',
+    testCases: [
+      'API endpoint unreachable',
+      'Service discovery failure',
+      'CDN resource loading failure'
+    ]
+  },
+
+  /**
+   * SSL/TLS certificate errors
+   * Tests security-related connectivity failures
+   */
+  sslError: {
+    name: 'SSL_CERTIFICATE_ERROR',
+    error: new Error('SSL certificate verification failed'),
+    delay: 2000,
+    retryable: false,
+    description: 'SSL/TLS certificate validation failure',
+    testCases: [
+      'Expired certificate handling',
+      'Self-signed certificate rejection',
+      'Certificate chain validation failure'
+    ]
+  }
+} as const
 
 /**
- * API validation error scenarios matching DreamFactory Core formats
+ * API validation error scenarios matching DreamFactory Core error formats
+ * Enhanced with field-level validation details for React Hook Form integration
  */
-export const apiErrorScenarios = {
+export const validationErrorScenarios = {
   /**
-   * Validation error for creating scheduler task with invalid data
+   * Missing required fields validation
+   * Tests Zod schema validation integration
    */
-  createTaskValidationError: {
-    status_code: 422 as HttpStatusCode,
+  missingRequiredFields: {
+    statusCode: 422 as HttpStatusCode,
     error: {
-      code: 'VALIDATION_FAILED',
-      message: 'The given data was invalid.',
+      code: 'VALIDATION_ERROR',
+      message: 'Validation failed for required fields',
       status_code: 422 as HttpStatusCode,
       context: {
-        error: [
-          {
-            field: 'name',
-            code: 'REQUIRED',
-            message: 'The name field is required.',
-            value: '',
-          },
-          {
-            field: 'frequency',
-            code: 'INVALID_TYPE',
-            message: 'The frequency must be a positive integer.',
-            value: -1,
-          },
-          {
-            field: 'serviceId',
-            code: 'INVALID_REFERENCE',
-            message: 'The selected service does not exist.',
-            value: 999,
-          },
-          {
-            field: 'payload',
-            code: 'INVALID_JSON',
-            message: 'The payload must be valid JSON when method is not GET.',
-            value: '{"invalid": json}',
-          },
-        ],
-      },
-      trace_id: 'trace-validation-001',
-      timestamp: new Date().toISOString(),
+        errors: {
+          name: ['Task name is required and cannot be empty'],
+          serviceId: ['Service selection is required'],
+          frequency: ['Execution frequency must be specified'],
+          component: ['Component path is required']
+        }
+      }
     },
-  } satisfies ApiErrorResponse,
+    description: 'Multiple required field validation failures',
+    testCases: [
+      'Empty form submission',
+      'Partial form completion',
+      'Field-by-field validation',
+      'Bulk validation on form blur'
+    ]
+  },
 
   /**
-   * Service not found error
+   * Invalid data format validation
+   * Tests JSON payload validation and type checking
    */
-  serviceNotFoundError: {
-    status_code: 404 as HttpStatusCode,
+  invalidDataFormat: {
+    statusCode: 422 as HttpStatusCode,
     error: {
-      code: 'SERVICE_NOT_FOUND',
-      message: 'Service with ID 999 not found.',
-      status_code: 404 as HttpStatusCode,
+      code: 'INVALID_FORMAT',
+      message: 'Invalid data format provided',
+      status_code: 422 as HttpStatusCode,
       context: {
-        details: {
-          serviceId: 999,
-          requested_at: new Date().toISOString(),
-        },
-      },
-      trace_id: 'trace-service-404',
-      timestamp: new Date().toISOString(),
+        errors: {
+          frequency: ['Frequency must be a positive integer between 1 and 525600'],
+          payload: ['JSON payload contains syntax errors at line 3, column 15'],
+          verbMask: ['Verb mask must be a valid bitmask value']
+        }
+      }
     },
-  } satisfies ApiErrorResponse,
+    description: 'Data type and format validation failures',
+    testCases: [
+      'Invalid JSON syntax in payload field',
+      'Out-of-range numeric values',
+      'Invalid enum selections',
+      'Malformed component paths'
+    ]
+  },
 
   /**
-   * Task not found error for update operations
+   * Business logic validation errors
+   * Tests complex validation rules and constraints
    */
-  taskNotFoundError: {
-    status_code: 404 as HttpStatusCode,
+  businessLogicViolation: {
+    statusCode: 409 as HttpStatusCode,
     error: {
-      code: 'TASK_NOT_FOUND',
-      message: 'Scheduler task with ID 999 not found.',
-      status_code: 404 as HttpStatusCode,
-      context: {
-        details: {
-          taskId: 999,
-          operation: 'UPDATE',
-          requested_at: new Date().toISOString(),
-        },
-      },
-      trace_id: 'trace-task-404',
-      timestamp: new Date().toISOString(),
-    },
-  } satisfies ApiErrorResponse,
-
-  /**
-   * Concurrent modification conflict error
-   */
-  concurrentModificationError: {
-    status_code: 409 as HttpStatusCode,
-    error: {
-      code: 'CONCURRENT_MODIFICATION',
-      message: 'The task has been modified by another user. Please refresh and try again.',
+      code: 'BUSINESS_RULE_VIOLATION',
+      message: 'Operation violates business logic constraints',
       status_code: 409 as HttpStatusCode,
       context: {
-        details: {
-          taskId: 15,
-          current_version: '2023-08-30T15:30:00.000000Z',
-          submitted_version: '2023-08-30T14:59:06.000000Z',
-          modified_by_user: 2,
-        },
-      },
-      trace_id: 'trace-conflict-001',
-      timestamp: new Date().toISOString(),
+        errors: {
+          name: ['Task name must be unique within the selected service'],
+          serviceId: ['Selected service is inactive and cannot execute tasks'],
+          frequency: ['Frequency too low - minimum interval is 5 minutes for this service type']
+        }
+      }
     },
-  } satisfies ApiErrorResponse,
+    description: 'Business rule and constraint violations',
+    testCases: [
+      'Duplicate task name validation',
+      'Service dependency validation',
+      'Resource availability checks',
+      'Permission level validation'
+    ]
+  },
 
   /**
-   * Rate limit exceeded error
+   * Data consistency validation errors
+   * Tests referential integrity and cross-field validation
    */
-  rateLimitExceededError: {
-    status_code: 429 as HttpStatusCode,
+  dataConsistencyError: {
+    statusCode: 422 as HttpStatusCode,
     error: {
-      code: 'RATE_LIMIT_EXCEEDED',
-      message: 'Too many requests. Please try again later.',
-      status_code: 429 as HttpStatusCode,
+      code: 'DATA_CONSISTENCY_ERROR',
+      message: 'Data consistency validation failed',
+      status_code: 422 as HttpStatusCode,
       context: {
-        details: {
-          limit: 100,
-          window: 3600,
-          retry_after: 300,
-        },
-      },
-      trace_id: 'trace-rate-limit-001',
-      timestamp: new Date().toISOString(),
+        errors: {
+          serviceId: ['Referenced service no longer exists or has been deleted'],
+          component: ['Component path is not valid for the selected service type'],
+          verbMask: ['HTTP verb combination not supported by target service']
+        }
+      }
     },
-  } satisfies ApiErrorResponse,
-
-  /**
-   * Database connection error
-   */
-  databaseConnectionError: {
-    status_code: 503 as HttpStatusCode,
-    error: {
-      code: 'DATABASE_CONNECTION_FAILED',
-      message: 'Unable to connect to the database. Please try again later.',
-      status_code: 503 as HttpStatusCode,
-      context: 'Database service temporarily unavailable',
-      trace_id: 'trace-db-503',
-      timestamp: new Date().toISOString(),
-    },
-  } satisfies ApiErrorResponse,
-} as const;
+    description: 'Cross-field and referential integrity validation',
+    testCases: [
+      'Orphaned service references',
+      'Invalid component-service combinations',
+      'Inconsistent permission settings',
+      'Circular dependency detection'
+    ]
+  }
+} as const
 
 /**
- * Authentication and authorization error scenarios
+ * Server error scenarios simulating backend failures
+ * Tests error boundary handling and recovery workflows
+ */
+export const serverErrorScenarios = {
+  /**
+   * Internal server error (500)
+   * Tests generic server failure handling
+   */
+  internalServerError: createMockApiResponse(null, {
+    error: true,
+    statusCode: 500
+  }),
+
+  /**
+   * Service unavailable (503)
+   * Tests maintenance mode and service degradation
+   */
+  serviceUnavailable: {
+    statusCode: 503 as HttpStatusCode,
+    error: {
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Scheduler service is temporarily unavailable due to maintenance',
+      status_code: 503 as HttpStatusCode,
+      context: {
+        maintenance: true,
+        estimatedRestoreTime: '2024-01-15T12:00:00.000Z',
+        retryAfter: 1800 // 30 minutes
+      }
+    },
+    description: 'Service maintenance and unavailability',
+    testCases: [
+      'Scheduled maintenance window handling',
+      'Service degradation graceful fallback',
+      'Retry-after header processing'
+    ]
+  },
+
+  /**
+   * Database connection failure
+   * Tests infrastructure dependency failures
+   */
+  databaseConnectionError: {
+    statusCode: 500 as HttpStatusCode,
+    error: {
+      code: 'DATABASE_CONNECTION_ERROR',
+      message: 'Unable to establish database connection for scheduler operations',
+      status_code: 500 as HttpStatusCode,
+      context: {
+        database: 'scheduler_db',
+        connectionPool: 'exhausted',
+        lastSuccessfulConnection: '2024-01-15T09:45:00.000Z'
+      }
+    },
+    description: 'Database connectivity and pool exhaustion',
+    testCases: [
+      'Connection pool exhaustion',
+      'Database server downtime',
+      'Transaction timeout failures'
+    ]
+  },
+
+  /**
+   * Memory/resource exhaustion
+   * Tests resource limitation handling
+   */
+  resourceExhaustion: {
+    statusCode: 507 as HttpStatusCode,
+    error: {
+      code: 'INSUFFICIENT_STORAGE',
+      message: 'Server has insufficient resources to complete the request',
+      status_code: 507 as HttpStatusCode,
+      context: {
+        resource: 'memory',
+        usage: '98%',
+        limit: '2GB',
+        recommendation: 'Reduce concurrent operations or increase server resources'
+      }
+    },
+    description: 'Server resource limitation scenarios',
+    testCases: [
+      'Memory exhaustion during large dataset operations',
+      'Disk space limitations',
+      'CPU throttling scenarios'
+    ]
+  }
+} as const
+
+// =============================================================================
+// AUTHENTICATION AND AUTHORIZATION ERROR SCENARIOS
+// =============================================================================
+
+/**
+ * Authentication failure scenarios for security testing
+ * Tests Next.js middleware integration and token validation
  */
 export const authErrorScenarios = {
   /**
-   * Session expired error
+   * Expired session token
+   * Tests token refresh and re-authentication workflows
    */
-  sessionExpiredError: {
-    status_code: 401 as HttpStatusCode,
+  expiredToken: {
+    statusCode: 401 as HttpStatusCode,
     error: {
-      code: 'SESSION_EXPIRED',
-      message: 'Your session has expired. Please log in again.',
+      code: 'TOKEN_EXPIRED',
+      message: 'Session token has expired and must be refreshed',
       status_code: 401 as HttpStatusCode,
       context: {
-        details: {
-          session_id: 'sess_expired_001',
-          expired_at: new Date(Date.now() - 3600000).toISOString(),
-        },
-      },
-      trace_id: 'trace-auth-401',
-      timestamp: new Date().toISOString(),
+        tokenType: 'session',
+        expiredAt: '2024-01-15T09:30:00.000Z',
+        refreshable: true,
+        redirectUrl: '/login'
+      }
     },
-  } satisfies ApiErrorResponse,
+    description: 'Session token expiration handling',
+    testCases: [
+      'Automatic token refresh attempts',
+      'Redirect to login workflow',
+      'Preserved navigation state',
+      'Form data recovery after re-auth'
+    ]
+  },
 
   /**
-   * Insufficient permissions error
+   * Invalid API key
+   * Tests API key validation and rotation scenarios
    */
-  insufficientPermissionsError: {
-    status_code: 403 as HttpStatusCode,
-    error: {
-      code: 'INSUFFICIENT_PERMISSIONS',
-      message: 'You do not have permission to perform this action.',
-      status_code: 403 as HttpStatusCode,
-      context: {
-        details: {
-          required_permission: 'scheduler:write',
-          user_permissions: ['scheduler:read', 'user:read'],
-          resource: 'scheduler_tasks',
-        },
-      },
-      trace_id: 'trace-auth-403',
-      timestamp: new Date().toISOString(),
-    },
-  } satisfies ApiErrorResponse,
-
-  /**
-   * Invalid API key error
-   */
-  invalidApiKeyError: {
-    status_code: 401 as HttpStatusCode,
+  invalidApiKey: {
+    statusCode: 401 as HttpStatusCode,
     error: {
       code: 'INVALID_API_KEY',
-      message: 'The provided API key is invalid or has been revoked.',
+      message: 'Provided API key is invalid or has been revoked',
       status_code: 401 as HttpStatusCode,
       context: {
-        details: {
-          api_key_hint: 'df_...xyz',
-          revoked_at: new Date().toISOString(),
-        },
-      },
-      trace_id: 'trace-api-key-401',
-      timestamp: new Date().toISOString(),
+        keyId: 'df_api_key_****1234',
+        revokedAt: '2024-01-14T15:20:00.000Z',
+        reason: 'security_violation'
+      }
     },
-  } satisfies ApiErrorResponse,
-} as const;
+    description: 'API key validation and revocation',
+    testCases: [
+      'Revoked API key handling',
+      'Malformed API key rejection',
+      'Rate-limited API key scenarios'
+    ]
+  },
+
+  /**
+   * Insufficient permissions
+   * Tests role-based access control enforcement
+   */
+  insufficientPermissions: {
+    statusCode: 403 as HttpStatusCode,
+    error: {
+      code: 'INSUFFICIENT_PERMISSIONS',
+      message: 'User does not have sufficient permissions to perform this action',
+      status_code: 403 as HttpStatusCode,
+      context: {
+        requiredPermission: 'scheduler.task.create',
+        userPermissions: ['scheduler.task.read', 'scheduler.task.update'],
+        role: 'scheduler_user',
+        suggestedAction: 'Contact administrator to request scheduler creation permissions'
+      }
+    },
+    description: 'Permission-based access control',
+    testCases: [
+      'Task creation permission denial',
+      'Service modification restrictions',
+      'Administrative function blocking',
+      'Read-only user limitations'
+    ]
+  },
+
+  /**
+   * Account locked/suspended
+   * Tests account status validation
+   */
+  accountLocked: {
+    statusCode: 403 as HttpStatusCode,
+    error: {
+      code: 'ACCOUNT_LOCKED',
+      message: 'User account has been locked due to security policy violation',
+      status_code: 403 as HttpStatusCode,
+      context: {
+        lockReason: 'multiple_failed_attempts',
+        lockedAt: '2024-01-15T08:45:00.000Z',
+        unlockAt: '2024-01-15T12:45:00.000Z',
+        supportContact: 'security@dreamfactory.com'
+      }
+    },
+    description: 'Account security and lockout handling',
+    testCases: [
+      'Failed login attempt handling',
+      'Security policy violation responses',
+      'Account recovery workflows'
+    ]
+  }
+} as const
 
 // =============================================================================
 // LOADING STATE SCENARIOS
 // =============================================================================
 
 /**
- * Loading scenarios with realistic delays for testing UI components
+ * Loading state scenarios with realistic delays
+ * Tests skeleton components, loading spinners, and progressive enhancement
  */
 export const loadingStateScenarios = {
   /**
-   * Fast loading scenario for optimal performance testing
+   * Initial page load with staggered data loading
+   * Tests progressive enhancement and skeleton UI
    */
-  fastLoading: {
-    delay: 150, // 150ms - under our performance target
-    showSpinner: false,
-    showSkeleton: true,
+  initialPageLoad: {
+    services: {
+      delay: 800,
+      description: 'Service list loading with cache warm-up',
+      phases: [
+        { phase: 'cache_check', duration: 100 },
+        { phase: 'network_request', duration: 500 },
+        { phase: 'data_transform', duration: 150 },
+        { phase: 'ui_hydration', duration: 50 }
+      ]
+    },
+    tasks: {
+      delay: 1200,
+      description: 'Scheduler tasks with pagination and filtering',
+      phases: [
+        { phase: 'permission_check', duration: 200 },
+        { phase: 'query_execution', duration: 700 },
+        { phase: 'relationship_loading', duration: 250 },
+        { phase: 'cache_population', duration: 50 }
+      ]
+    },
+    metadata: {
+      delay: 400,
+      description: 'User preferences and configuration loading',
+      phases: [
+        { phase: 'user_profile', duration: 200 },
+        { phase: 'preferences_sync', duration: 150 },
+        { phase: 'theme_application', duration: 50 }
+      ]
+    }
   },
 
   /**
-   * Normal loading scenario for typical network conditions
+   * Background refresh scenarios
+   * Tests stale-while-revalidate patterns and cache updates
    */
-  normalLoading: {
-    delay: 800, // 800ms - typical API response time
-    showSpinner: true,
-    showSkeleton: true,
-  },
-
-  /**
-   * Slow loading scenario for poor network conditions
-   */
-  slowLoading: {
-    delay: 3000, // 3 seconds - slow network
-    showSpinner: true,
-    showSkeleton: true,
-    showProgressIndicator: true,
-  },
-
-  /**
-   * Very slow loading scenario for timeout testing
-   */
-  verySlowLoading: {
-    delay: 8000, // 8 seconds - near timeout threshold
-    showSpinner: true,
-    showSkeleton: false,
-    showTimeoutWarning: true,
-  },
-
-  /**
-   * Intermittent loading with network hiccups
-   */
-  intermittentLoading: {
+  backgroundRefresh: {
+    staleDataPresent: true,
+    refreshDelay: 2000,
+    description: 'Background data refresh with stale data display',
+    cacheStrategy: 'stale-while-revalidate',
     phases: [
-      { delay: 500, progress: 25 },
-      { delay: 1500, progress: 50 },
-      { delay: 800, progress: 75 },
-      { delay: 400, progress: 100 },
-    ],
-    showProgressBar: true,
+      { phase: 'serve_stale', duration: 0 },
+      { phase: 'background_fetch', duration: 1500 },
+      { phase: 'cache_update', duration: 300 },
+      { phase: 'ui_update', duration: 200 }
+    ]
   },
-} as const;
+
+  /**
+   * Form submission with optimistic updates
+   * Tests loading states during mutations with rollback capability
+   */
+  formSubmission: {
+    optimisticUpdate: true,
+    delay: 1500,
+    description: 'Task creation with optimistic UI updates',
+    phases: [
+      { phase: 'optimistic_update', duration: 50 },
+      { phase: 'validation', duration: 200 },
+      { phase: 'server_processing', duration: 1000 },
+      { phase: 'cache_invalidation', duration: 150 },
+      { phase: 'confirmation', duration: 100 }
+    ],
+    rollbackScenario: {
+      enabled: true,
+      triggerAt: 'server_processing',
+      rollbackDuration: 300
+    }
+  },
+
+  /**
+   * Large dataset loading with progressive rendering
+   * Tests virtual scrolling and chunked data loading
+   */
+  largeDatasetLoad: {
+    totalItems: 1500,
+    chunkSize: 50,
+    initialLoadDelay: 600,
+    subsequentChunkDelay: 200,
+    description: 'Large scheduler task dataset with virtual scrolling',
+    phases: [
+      { phase: 'initial_chunk', duration: 600, items: 50 },
+      { phase: 'virtual_scroll_setup', duration: 100 },
+      { phase: 'progressive_loading', duration: 200, itemsPerChunk: 50 }
+    ],
+    virtualScrolling: {
+      enabled: true,
+      itemHeight: 64,
+      overscan: 10,
+      threshold: 0.8
+    }
+  }
+} as const
 
 // =============================================================================
 // EDGE CASE SCENARIOS
 // =============================================================================
 
 /**
- * Edge case scenarios for comprehensive testing
+ * Edge case scenarios covering unusual but valid conditions
+ * Tests application robustness and error recovery
  */
 export const edgeCaseScenarios = {
   /**
-   * Empty scheduler task list
+   * Empty state scenarios
+   * Tests no-data conditions and first-time user experiences
    */
-  emptyTaskList: {
-    resource: [] as SchedulerTaskData[],
-    meta: {
-      count: 0,
-      limit: 25,
-      offset: 0,
-      total: 0,
-      has_more: false,
+  emptyStates: {
+    noTasks: {
+      response: createMockApiResponse([], { list: true }),
+      description: 'No scheduler tasks exist for the user',
+      testCases: [
+        'First-time user onboarding',
+        'Empty search results',
+        'Filtered view with no matches',
+        'After bulk deletion operations'
+      ],
+      uiElements: [
+        'Empty state illustration',
+        'Create task call-to-action',
+        'Documentation links',
+        'Import/example options'
+      ]
     },
-  } satisfies ApiListResponse<SchedulerTaskData>,
 
-  /**
-   * Empty services list
-   */
-  emptyServicesList: {
-    resource: [] as Service[],
-    meta: {
-      count: 0,
-      limit: 25,
-      offset: 0,
-      total: 0,
-      has_more: false,
+    noServices: {
+      response: createMockApiResponse([], { list: true }),
+      description: 'No services available for task creation',
+      testCases: [
+        'Fresh installation state',
+        'All services deleted',
+        'Permission-filtered empty list',
+        'Service connection failures'
+      ],
+      uiElements: [
+        'Service creation guidance',
+        'Setup wizard launch',
+        'Documentation links',
+        'Support contact information'
+      ]
     },
-  } satisfies ApiListResponse<Service>,
+
+    noSearchResults: {
+      query: 'nonexistent-task-name',
+      response: createMockApiResponse([], { list: true }),
+      description: 'Search query returns no matching results',
+      testCases: [
+        'Typo in search terms',
+        'Overly specific filters',
+        'Case sensitivity issues',
+        'Special character handling'
+      ]
+    }
+  },
 
   /**
-   * Single task in list
+   * Deleted service scenarios
+   * Tests orphaned task handling and data integrity
    */
-  singleTaskList: {
-    resource: [mockSchedulerTaskData],
-    meta: {
-      count: 1,
-      limit: 25,
-      offset: 0,
-      total: 1,
-      has_more: false,
+  deletedServiceScenarios: {
+    orphanedTask: {
+      task: createMockSchedulerTask({
+        id: 999,
+        name: 'Orphaned Task',
+        serviceId: 9999, // Non-existent service ID
+        serviceByServiceId: null as any,
+        metadata: {
+          successCount: 0,
+          errorCount: 15,
+          avgExecutionTime: 0,
+          lastFailure: '2024-01-15T10:00:00.000Z'
+        }
+      }),
+      description: 'Task references deleted service',
+      testCases: [
+        'Service deletion cleanup verification',
+        'Orphaned task identification',
+        'Bulk cleanup operations',
+        'Data integrity validation'
+      ]
     },
-  } satisfies ApiListResponse<SchedulerTaskData>,
+
+    serviceDeletedDuringEdit: {
+      scenario: 'concurrent_deletion',
+      task: mockSchedulerTaskData,
+      error: {
+        code: 'SERVICE_NOT_FOUND',
+        message: 'Referenced service was deleted while editing task',
+        status_code: 404 as HttpStatusCode,
+        context: {
+          serviceId: 5,
+          deletedAt: '2024-01-15T10:30:00.000Z',
+          deletedBy: 'admin@example.com'
+        }
+      },
+      description: 'Service deleted during active task editing',
+      testCases: [
+        'Concurrent user deletion conflicts',
+        'Real-time data synchronization',
+        'Conflict resolution workflows'
+      ]
+    }
+  },
 
   /**
-   * Task with deleted service reference
+   * Concurrent modification scenarios
+   * Tests optimistic update conflicts and resolution
    */
-  taskWithDeletedService: {
-    ...mockSchedulerTaskData,
-    serviceId: 999,
-    serviceName: 'Deleted Service',
-    serviceByServiceId: {
-      id: 999,
-      name: 'deleted_service',
-      label: '[Deleted Service]',
-      description: 'This service has been deleted',
-      isActive: false,
-      type: 'unknown',
-      mutable: false,
-      deletable: false,
-      createdDate: '2023-08-01T00:00:00.000000Z',
-      lastModifiedDate: '2023-08-01T00:00:00.000000Z',
-      createdById: null,
-      lastModifiedById: null,
-      config: {},
-      serviceDocByServiceId: null,
+  concurrentModificationScenarios: {
+    optimisticUpdateConflict: {
+      localChanges: {
+        name: 'Updated Task Name (Local)',
+        description: 'Local changes made by current user',
+        frequency: 60,
+        lastModifiedDate: '2024-01-15T10:35:00.000Z'
+      },
+      serverChanges: {
+        name: 'Updated Task Name (Server)',
+        description: 'Concurrent changes made by another user',
+        frequency: 120,
+        lastModifiedDate: '2024-01-15T10:36:00.000Z'
+      },
+      conflict: {
+        code: 'CONCURRENT_MODIFICATION',
+        message: 'Task was modified by another user while you were editing',
+        status_code: 409 as HttpStatusCode,
+        context: {
+          lastKnownVersion: '2024-01-15T10:30:00.000Z',
+          currentVersion: '2024-01-15T10:36:00.000Z',
+          conflictingFields: ['name', 'description', 'frequency'],
+          otherUser: 'colleague@example.com'
+        }
+      },
+      description: 'Multiple users editing same task simultaneously',
+      resolutionOptions: [
+        'Keep local changes',
+        'Accept server changes',
+        'Merge changes manually',
+        'Create new task with local changes'
+      ]
     },
-  } satisfies SchedulerTaskData,
+
+    rapidSuccessiveUpdates: {
+      updates: [
+        { field: 'name', value: 'Rapid Update 1', timestamp: '2024-01-15T10:40:00.000Z' },
+        { field: 'frequency', value: 30, timestamp: '2024-01-15T10:40:01.000Z' },
+        { field: 'description', value: 'Rapid Update 2', timestamp: '2024-01-15T10:40:02.000Z' },
+        { field: 'isActive', value: false, timestamp: '2024-01-15T10:40:03.000Z' }
+      ],
+      description: 'Rapid successive updates testing debouncing and queuing',
+      testCases: [
+        'Debounced save operations',
+        'Update queuing and batching',
+        'Race condition prevention',
+        'State consistency maintenance'
+      ]
+    }
+  },
 
   /**
-   * Task with corrupted payload
+   * Data corruption and recovery scenarios
+   * Tests data integrity and error recovery mechanisms
    */
-  taskWithCorruptedPayload: {
-    ...mockSchedulerTaskData,
-    payload: '{"corrupted": json, "missing": quote}',
-    taskLogByTaskId: {
-      taskId: 15,
-      statusCode: 500,
-      content: 'JSON parsing error: Invalid JSON payload provided',
-      createdDate: new Date().toISOString(),
-      lastModifiedDate: new Date().toISOString(),
+  dataCorruptionScenarios: {
+    invalidTaskData: {
+      corruptedTask: {
+        ...mockSchedulerTaskData,
+        payload: '{"invalid": json syntax}', // Intentionally malformed JSON
+        verbMask: -1, // Invalid verb mask
+        frequency: 0, // Invalid frequency
+        serviceByServiceId: undefined as any // Missing required relationship
+      },
+      description: 'Task data corrupted or incomplete',
+      recoveryOptions: [
+        'Reset to last known good state',
+        'Attempt automatic data repair',
+        'Manual data correction workflow',
+        'Archive corrupted data and create new'
+      ]
     },
-  } satisfies SchedulerTaskData,
 
-  /**
-   * Task with extremely long content
-   */
-  taskWithLongContent: {
-    ...mockSchedulerTaskData,
-    description: 'A'.repeat(10000), // 10KB description
-    payload: JSON.stringify({ data: 'B'.repeat(50000) }), // 50KB payload
-    taskLogByTaskId: {
-      taskId: 15,
-      statusCode: 200,
-      content: 'C'.repeat(100000), // 100KB log content
-      createdDate: new Date().toISOString(),
-      lastModifiedDate: new Date().toISOString(),
-    },
-  } satisfies SchedulerTaskData,
-
-  /**
-   * Task with special characters in name and description
-   */
-  taskWithSpecialCharacters: {
-    ...mockSchedulerTaskData,
-    name: '特殊文字 & Émojis 🚀 <script>alert("xss")</script>',
-    description: 'Test with 中文, العربية, русский, and special chars: !@#$%^&*()[]{}|;:,.<>?',
-    component: 'table/special-chars & symbols',
-  } satisfies SchedulerTaskData,
-
-  /**
-   * Task with null/undefined fields
-   */
-  taskWithNullFields: {
-    ...mockSchedulerTaskData,
-    description: null,
-    payload: null,
-    lastModifiedById: null,
-    taskLogByTaskId: null,
-  } satisfies SchedulerTaskData,
-
-  /**
-   * Task scheduled far in the future
-   */
-  futureScheduledTask: {
-    ...mockSchedulerTaskData,
-    frequency: 999999999, // Very high frequency value
-    createdDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year in future
-  } satisfies SchedulerTaskData,
-
-  /**
-   * Task with minimum frequency
-   */
-  minimumFrequencyTask: {
-    ...mockSchedulerTaskData,
-    frequency: 1, // Minimum allowed frequency
-  } satisfies SchedulerTaskData,
-
-  /**
-   * Task with maximum frequency
-   */
-  maximumFrequencyTask: {
-    ...mockSchedulerTaskData,
-    frequency: 2147483647, // Maximum 32-bit integer
-  } satisfies SchedulerTaskData,
-} as const;
+    databaseConstraintViolation: {
+      error: {
+        code: 'CONSTRAINT_VIOLATION',
+        message: 'Database constraint violation during task operation',
+        status_code: 500 as HttpStatusCode,
+        context: {
+          constraint: 'unique_task_name_per_service',
+          table: 'scheduler_tasks',
+          conflictingValue: 'existing-task-name',
+          suggestion: 'Choose a different task name'
+        }
+      },
+      description: 'Database-level constraint and integrity violations'
+    }
+  }
+} as const
 
 // =============================================================================
 // LARGE DATASET SCENARIOS
 // =============================================================================
 
 /**
- * Generates large dataset scenarios for performance testing
+ * Large dataset scenarios for performance and scalability testing
+ * Tests virtual scrolling, pagination, and memory management
  */
 export const largeDatasetScenarios = {
   /**
-   * Generates a list of 1000+ scheduler tasks for pagination testing
+   * Generate 1000+ scheduler tasks for performance testing
+   * Tests virtual scrolling and memory optimization
    */
-  generateLargeTaskList: (count: number = 1000): ApiListResponse<SchedulerTaskData> => {
-    const tasks: SchedulerTaskData[] = [];
+  thousandTasks: (() => {
+    const tasks: SchedulerTaskDataWithMetadata[] = []
+    const services = mockServices.slice() // Copy to avoid mutation
     
-    for (let i = 1; i <= count; i++) {
-      const serviceIndex = (i - 1) % mockServices.length;
-      const service = mockServices[serviceIndex];
-      const frequency = Math.floor(Math.random() * 3600) + 60; // 1 minute to 1 hour
-      const isActive = Math.random() > 0.2; // 80% active
-      const hasError = Math.random() < 0.1; // 10% have errors
+    // Generate additional services for variety
+    for (let serviceIndex = 0; serviceIndex < 10; serviceIndex++) {
+      services.push(createMockService({
+        id: 100 + serviceIndex,
+        name: `bulk_service_${serviceIndex}`,
+        label: `Bulk Test Service ${serviceIndex}`,
+        type: serviceIndex % 2 === 0 ? 'database' : 'http',
+        isActive: serviceIndex % 3 !== 0 // Some inactive services
+      }))
+    }
+    
+    // Generate 1500 tasks across various services
+    for (let i = 0; i < 1500; i++) {
+      const service = services[i % services.length]
+      const baseDate = new Date('2024-01-01T00:00:00.000Z')
+      const createdDate = new Date(baseDate.getTime() + (i * 60000)) // 1 minute intervals
       
-      tasks.push({
-        id: i,
-        name: `scheduled_task_${i.toString().padStart(4, '0')}`,
-        description: `Automated task ${i} - ${hasError ? 'Failed' : 'Running'} every ${frequency} seconds`,
-        isActive,
+      tasks.push(createMockSchedulerTask({
+        id: 1000 + i,
+        name: `bulk_task_${i.toString().padStart(4, '0')}`,
+        description: `Bulk generated task ${i} for performance testing`,
         serviceId: service.id,
-        component: i % 5 === 0 ? '*' : `table_${(i % 10) + 1}`,
-        frequency,
-        payload: i % 3 === 0 ? null : JSON.stringify({
-          batch_size: Math.floor(Math.random() * 100) + 1,
-          retry_count: Math.floor(Math.random() * 5),
-          timeout: Math.floor(Math.random() * 30) + 10,
-        }),
-        createdDate: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
-        lastModifiedDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-        createdById: Math.floor(Math.random() * 5) + 1,
-        lastModifiedById: Math.random() > 0.3 ? Math.floor(Math.random() * 5) + 1 : null,
-        verb: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'][Math.floor(Math.random() * 5)],
-        verbMask: Math.pow(2, Math.floor(Math.random() * 5)),
-        taskLogByTaskId: hasError ? {
-          taskId: i,
-          statusCode: [400, 404, 500, 502, 503][Math.floor(Math.random() * 5)],
-          content: `Error executing task ${i}: ${['Connection timeout', 'Resource not found', 'Internal server error', 'Bad gateway', 'Service unavailable'][Math.floor(Math.random() * 5)]}`,
-          createdDate: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString(),
-          lastModifiedDate: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString(),
-        } : null,
+        component: i % 5 === 0 ? '*' : `table_${i % 10}`,
+        frequency: Math.floor(Math.random() * 1440) + 5, // 5 minutes to 24 hours
+        isActive: i % 7 !== 0, // Some inactive tasks
+        verbMask: Math.floor(Math.random() * 31) + 1, // Random verb combinations
+        createdDate: createdDate.toISOString(),
+        lastModifiedDate: new Date(createdDate.getTime() + Math.floor(Math.random() * 86400000)).toISOString(),
         serviceByServiceId: service,
-      });
+        metadata: {
+          successCount: Math.floor(Math.random() * 1000),
+          errorCount: Math.floor(Math.random() * 50),
+          avgExecutionTime: Math.floor(Math.random() * 5000) + 100,
+          lastSuccess: i % 3 === 0 ? new Date(Date.now() - Math.floor(Math.random() * 86400000)).toISOString() : undefined,
+          lastFailure: i % 5 === 0 ? new Date(Date.now() - Math.floor(Math.random() * 43200000)).toISOString() : undefined
+        },
+        _cacheMetadata: {
+          queryKey: ['scheduler', 'tasks', 1000 + i],
+          relatedKeys: [
+            ['scheduler', 'tasks'],
+            ['services', service.id],
+            ['scheduler', 'tasks', 'by-service', service.id]
+          ],
+          mutations: {
+            updating: false,
+            deleting: false,
+            executing: Math.random() < 0.05 // 5% chance of being in execution state
+          }
+        }
+      }))
     }
-
+    
     return {
-      resource: tasks,
-      meta: {
-        count: Math.min(count, 25), // Assuming 25 per page
-        limit: 25,
-        offset: 0,
-        total: count,
-        has_more: count > 25,
-        next_cursor: count > 25 ? 'cursor_25' : undefined,
+      tasks,
+      response: createMockApiResponse(tasks, { 
+        list: true, 
+        meta: {
+          count: tasks.length,
+          offset: 0,
+          limit: 50, // Standard page size
+          has_next: true,
+          has_previous: false,
+          page_count: Math.ceil(tasks.length / 50)
+        }
+      }),
+      description: 'Large dataset with 1500+ scheduler tasks',
+      performanceMetrics: {
+        expectedRenderTime: 16, // Target 16ms per frame (60 FPS)
+        memoryUsage: '< 100MB',
+        initialLoadTime: '< 2 seconds',
+        scrollingPerformance: '60 FPS'
       },
-    };
-  },
+      testCases: [
+        'Virtual scrolling performance',
+        'Memory usage optimization',
+        'Search and filter performance',
+        'Bulk operations handling',
+        'Cache invalidation impact',
+        'State management scaling'
+      ]
+    }
+  })(),
 
   /**
-   * Paginated response for large dataset
+   * Paginated loading scenarios
+   * Tests infinite scroll and page-based pagination
    */
-  generatePaginatedResponse: (
-    page: number = 1,
-    limit: number = 25,
-    totalCount: number = 1000
-  ): ApiListResponse<SchedulerTaskData> => {
-    const offset = (page - 1) * limit;
-    const fullDataset = largeDatasetScenarios.generateLargeTaskList(totalCount);
-    const paginatedData = fullDataset.resource.slice(offset, offset + limit);
-
-    return {
-      resource: paginatedData,
-      meta: {
-        count: paginatedData.length,
-        limit,
-        offset,
-        total: totalCount,
-        has_more: offset + limit < totalCount,
-        next_cursor: offset + limit < totalCount ? `cursor_${offset + limit}` : undefined,
-        prev_cursor: offset > 0 ? `cursor_${Math.max(0, offset - limit)}` : undefined,
-      },
-    };
-  },
-
-  /**
-   * Generates large service list for dropdown performance testing
-   */
-  generateLargeServiceList: (count: number = 500): ApiListResponse<Service> => {
-    const services: Service[] = [];
-    const serviceTypes = ['mysql', 'pgsql', 'mongodb', 'sqlite', 'rest', 'soap', 'file', 'email'];
-
-    for (let i = 1; i <= count; i++) {
-      const typeIndex = (i - 1) % serviceTypes.length;
-      const serviceType = serviceTypes[typeIndex];
+  paginatedLoading: {
+    pageSize: 50,
+    totalPages: 30,
+    totalItems: 1500,
+    
+    generatePage: (pageNumber: number, pageSize: number = 50) => {
+      const offset = pageNumber * pageSize
+      const tasks = largeDatasetScenarios.thousandTasks.tasks.slice(offset, offset + pageSize)
       
-      services.push({
-        id: i,
-        name: `service_${i.toString().padStart(3, '0')}`,
-        label: `Service ${i} (${serviceType.toUpperCase()})`,
-        description: `Auto-generated ${serviceType} service for performance testing`,
-        isActive: Math.random() > 0.1, // 90% active
-        type: serviceType,
-        mutable: true,
-        deletable: i > 10, // First 10 are not deletable
-        createdDate: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
-        lastModifiedDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-        createdById: Math.floor(Math.random() * 5) + 1,
-        lastModifiedById: Math.random() > 0.3 ? Math.floor(Math.random() * 5) + 1 : null,
-        config: {
-          database: serviceType.includes('sql') ? `database_${i}` : undefined,
-          host: serviceType.includes('sql') ? `host-${i}.example.com` : undefined,
-          port: serviceType.includes('sql') ? 3306 + (i % 100) : undefined,
-        },
-        serviceDocByServiceId: null,
-      });
+      return createMockApiResponse(tasks, {
+        list: true,
+        meta: {
+          count: largeDatasetScenarios.thousandTasks.tasks.length,
+          offset,
+          limit: pageSize,
+          has_next: offset + pageSize < largeDatasetScenarios.thousandTasks.tasks.length,
+          has_previous: pageNumber > 0,
+          page_count: Math.ceil(largeDatasetScenarios.thousandTasks.tasks.length / pageSize),
+          links: {
+            first: `/api/v2/scheduler?offset=0&limit=${pageSize}`,
+            last: `/api/v2/scheduler?offset=${Math.floor(largeDatasetScenarios.thousandTasks.tasks.length / pageSize) * pageSize}&limit=${pageSize}`,
+            next: offset + pageSize < largeDatasetScenarios.thousandTasks.tasks.length 
+              ? `/api/v2/scheduler?offset=${offset + pageSize}&limit=${pageSize}` 
+              : null,
+            previous: pageNumber > 0 
+              ? `/api/v2/scheduler?offset=${Math.max(0, offset - pageSize)}&limit=${pageSize}` 
+              : null
+          }
+        }
+      })
+    },
+
+    infiniteScrollScenario: {
+      initialLoad: 3, // Load first 3 pages initially
+      triggerThreshold: 0.8, // Load next page when 80% scrolled
+      description: 'Infinite scroll with progressive loading',
+      testCases: [
+        'Smooth infinite scrolling',
+        'Page boundary handling',
+        'Loading state management',
+        'Error recovery during scroll',
+        'Cache management for large datasets'
+      ]
     }
-
-    return {
-      resource: services,
-      meta: {
-        count: Math.min(count, 100), // Assuming 100 per page for services
-        limit: 100,
-        offset: 0,
-        total: count,
-        has_more: count > 100,
-      },
-    };
   },
-} as const;
+
+  /**
+   * Heavy filtering and search scenarios
+   * Tests performance with complex queries on large datasets
+   */
+  heavyFilteringScenarios: {
+    complexFilters: {
+      active: true,
+      serviceTypes: ['database', 'http'],
+      frequencyRange: { min: 60, max: 1440 },
+      dateRange: {
+        start: '2024-01-01T00:00:00.000Z',
+        end: '2024-01-15T23:59:59.000Z'
+      },
+      textSearch: 'bulk_task',
+      hasErrors: false
+    },
+
+    searchPerformance: {
+      queries: [
+        'bulk_task_0001', // Exact match
+        'bulk_task_00', // Prefix match
+        'task', // Broad match
+        'nonexistent', // No results
+        'bulk_task_0001 OR bulk_task_0002', // Complex query
+        'frequency:>60 AND service:database' // Field-specific search
+      ],
+      expectedResponseTimes: {
+        exact: '< 50ms',
+        prefix: '< 100ms',
+        broad: '< 200ms',
+        noResults: '< 30ms',
+        complex: '< 150ms',
+        fieldSpecific: '< 100ms'
+      }
+    }
+  }
+} as const
 
 // =============================================================================
-// CONCURRENT OPERATION SCENARIOS
+// REAL-TIME SCENARIOS
 // =============================================================================
 
 /**
- * Scenarios for testing concurrent user operations
+ * Real-time data synchronization scenarios
+ * Tests WebSocket updates, conflict resolution, and live data sync
  */
-export const concurrentOperationScenarios = {
+export const realTimeScenarios = {
   /**
-   * Simulates multiple users editing the same task
+   * Live task execution monitoring
+   * Tests real-time status updates and log streaming
    */
-  simultaneousEdits: {
-    originalTask: mockSchedulerTaskData,
-    user1Edit: {
-      ...mockSchedulerTaskData,
-      name: 'Updated by User 1',
-      lastModifiedDate: new Date(Date.now() - 1000).toISOString(),
-      lastModifiedById: 1,
-    } as SchedulerTaskData,
-    user2Edit: {
-      ...mockSchedulerTaskData,
-      description: 'Updated by User 2',
-      lastModifiedDate: new Date().toISOString(),
-      lastModifiedById: 2,
-    } as SchedulerTaskData,
-  },
-
-  /**
-   * Simulates task deletion while another user is editing
-   */
-  deleteWhileEditing: {
-    originalTask: mockSchedulerTaskData,
-    deletionTimestamp: new Date().toISOString(),
-    editAttempt: {
-      ...mockSchedulerTaskData,
-      name: 'Attempted edit after deletion',
-    } as UpdateSchedulePayload,
-  },
-
-  /**
-   * Simulates service modification affecting scheduled tasks
-   */
-  serviceModificationImpact: {
-    originalService: mockServices[1],
-    modifiedService: {
-      ...mockServices[1],
-      isActive: false,
-      lastModifiedDate: new Date().toISOString(),
-    } as Service,
-    affectedTasks: [
+  liveTaskExecution: {
+    taskId: 15,
+    executionSteps: [
       {
-        ...mockSchedulerTaskData,
-        serviceByServiceId: {
-          ...mockServices[1],
-          isActive: false,
-        },
+        step: 'initialized',
+        timestamp: '2024-01-15T10:45:00.000Z',
+        status: 'running',
+        message: 'Task execution initialized'
       },
-    ] as SchedulerTaskData[],
-  },
-} as const;
-
-// =============================================================================
-// PERFORMANCE STRESS TEST SCENARIOS
-// =============================================================================
-
-/**
- * Scenarios for performance and stress testing
- */
-export const performanceScenarios = {
-  /**
-   * Rapid succession of API calls
-   */
-  rapidFireRequests: {
-    requestCount: 100,
-    intervalMs: 10, // 10ms between requests
-    expectedFailureRate: 0.05, // 5% expected to fail due to rate limiting
-  },
-
-  /**
-   * Memory stress test with large payloads
-   */
-  largePayloadStress: {
-    payloadSizeKB: 1024, // 1MB payload
-    taskCount: 50,
-    generateLargePayload: (sizeKB: number) => ({
-      data: 'x'.repeat(sizeKB * 1024),
-      metadata: {
-        size: sizeKB,
-        generated: new Date().toISOString(),
+      {
+        step: 'service_connection',
+        timestamp: '2024-01-15T10:45:01.500Z',
+        status: 'running',
+        message: 'Connecting to service endpoint'
       },
-    }),
+      {
+        step: 'request_execution',
+        timestamp: '2024-01-15T10:45:03.200Z',
+        status: 'running',
+        message: 'Executing API request'
+      },
+      {
+        step: 'response_processing',
+        timestamp: '2024-01-15T10:45:05.800Z',
+        status: 'running',
+        message: 'Processing API response'
+      },
+      {
+        step: 'completed',
+        timestamp: '2024-01-15T10:45:06.100Z',
+        status: 'success',
+        message: 'Task execution completed successfully',
+        result: {
+          statusCode: 200,
+          responseTime: 6100,
+          recordsProcessed: 42
+        }
+      }
+    ],
+    description: 'Real-time task execution monitoring with live updates'
   },
 
   /**
-   * Virtual scrolling performance test
+   * Multi-user collaboration scenarios
+   * Tests concurrent editing and conflict resolution
    */
-  virtualScrollingTest: {
-    totalItems: 10000,
-    visibleItems: 20,
-    itemHeight: 50,
-    scrollSpeed: 100, // pixels per scroll event
-  },
-} as const;
+  multiUserCollaboration: {
+    users: [
+      { id: 1, name: 'Alice Admin', color: '#3B82F6' },
+      { id: 2, name: 'Bob Developer', color: '#10B981' },
+      { id: 3, name: 'Carol Manager', color: '#F59E0B' }
+    ],
+    
+    editingSessions: [
+      {
+        userId: 1,
+        taskId: 15,
+        startTime: '2024-01-15T10:40:00.000Z',
+        currentField: 'description',
+        changes: ['frequency', 'description'],
+        cursorPosition: { line: 2, column: 15 }
+      },
+      {
+        userId: 2,
+        taskId: 15,
+        startTime: '2024-01-15T10:41:30.000Z',
+        currentField: 'payload',
+        changes: ['payload'],
+        cursorPosition: { line: 8, column: 22 }
+      }
+    ],
+    
+    description: 'Multiple users editing same task with real-time collaboration'
+  }
+} as const
 
 // =============================================================================
-// WEBHOOK AND INTEGRATION SCENARIOS
+// PERFORMANCE BENCHMARK SCENARIOS
 // =============================================================================
 
 /**
- * Scenarios for testing external integrations and webhooks
+ * Performance benchmark scenarios for testing optimization
+ * Establishes performance baselines and regression testing
  */
-export const integrationScenarios = {
+export const performanceBenchmarkScenarios = {
   /**
-   * Webhook delivery failure scenarios
+   * Component rendering performance
    */
-  webhookFailures: {
-    timeoutFailure: {
-      statusCode: 0,
-      error: 'Webhook delivery timeout after 30 seconds',
-      retryCount: 3,
-      nextRetry: new Date(Date.now() + 300000).toISOString(), // 5 minutes
+  renderingBenchmarks: {
+    smallDataset: {
+      itemCount: 10,
+      expectedRenderTime: '< 50ms',
+      description: 'Small task list rendering performance'
     },
-    endpointNotFound: {
-      statusCode: 404,
-      error: 'Webhook endpoint not found',
-      url: 'https://example.com/webhook/not-found',
-      retryCount: 1,
+    mediumDataset: {
+      itemCount: 100,
+      expectedRenderTime: '< 200ms',
+      description: 'Medium task list rendering performance'
     },
-    authenticationFailure: {
-      statusCode: 401,
-      error: 'Webhook authentication failed',
-      url: 'https://example.com/webhook/protected',
-      headers: { 'X-Webhook-Signature': 'invalid' },
-      retryCount: 0, // No retry for auth failures
+    largeDataset: {
+      itemCount: 1000,
+      expectedRenderTime: '< 500ms',
+      description: 'Large task list with virtualization'
     },
+    massiveDataset: {
+      itemCount: 10000,
+      expectedRenderTime: '< 1000ms',
+      description: 'Massive dataset with aggressive virtualization'
+    }
   },
 
   /**
-   * Third-party service integration errors
+   * API response time benchmarks
    */
-  thirdPartyServiceErrors: {
-    externalApiUnavailable: {
-      service: 'external-api',
-      error: 'External API service is currently unavailable',
-      statusCode: 503,
-      retryAfter: 1800, // 30 minutes
+  apiResponseBenchmarks: {
+    taskList: {
+      cold: '< 2000ms', // First load without cache
+      warm: '< 500ms',  // Subsequent loads with cache
+      stale: '< 100ms'  // Stale data served immediately
     },
-    rateLimitExceeded: {
-      service: 'third-party-api',
-      error: 'Rate limit exceeded for third-party service',
-      statusCode: 429,
-      resetTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour
+    taskDetail: {
+      cold: '< 1000ms',
+      warm: '< 200ms',
+      stale: '< 50ms'
     },
-  },
-} as const;
+    taskCreation: {
+      optimistic: '< 50ms',  // Optimistic update
+      confirmed: '< 2000ms', // Server confirmation
+      rollback: '< 200ms'    // Rollback on error
+    }
+  }
+} as const
 
 // =============================================================================
-// EXPORT ALL SCENARIOS
+// EXPORTED SCENARIO COLLECTIONS
 // =============================================================================
 
 /**
- * Comprehensive collection of all test scenarios
+ * Complete error scenarios collection for MSW handlers
  */
-export const testScenarios = {
+export const errorScenarios = {
   network: networkErrorScenarios,
-  api: apiErrorScenarios,
-  auth: authErrorScenarios,
-  loading: loadingStateScenarios,
-  edgeCases: edgeCaseScenarios,
-  largeDatasets: largeDatasetScenarios,
-  concurrent: concurrentOperationScenarios,
-  performance: performanceScenarios,
-  integration: integrationScenarios,
-} as const;
+  validation: validationErrorScenarios,
+  server: serverErrorScenarios,
+  auth: authErrorScenarios
+} as const
 
 /**
- * Utility function to get scenario by category and name
+ * Complete edge case scenarios collection
  */
-export function getScenario<T extends keyof typeof testScenarios>(
-  category: T,
-  scenarioName: keyof typeof testScenarios[T]
-): typeof testScenarios[T][keyof typeof testScenarios[T]] {
-  return testScenarios[category][scenarioName];
-}
+export const edgeScenarios = {
+  empty: edgeCaseScenarios.emptyStates,
+  deleted: edgeCaseScenarios.deletedServiceScenarios,
+  concurrent: edgeCaseScenarios.concurrentModificationScenarios,
+  corruption: edgeCaseScenarios.dataCorruptionScenarios
+} as const
 
 /**
- * Utility function to get all scenarios for a specific category
+ * All loading state scenarios
  */
-export function getScenariosForCategory<T extends keyof typeof testScenarios>(
-  category: T
-): typeof testScenarios[T] {
-  return testScenarios[category];
-}
+export const loadingScenarios = loadingStateScenarios
 
 /**
- * Utility function to create a custom scenario with delay
+ * All large dataset testing scenarios
  */
-export function createDelayedScenario<T>(
-  data: T,
-  delay: number = 1000
-): { data: T; delay: number } {
-  return { data, delay };
-}
+export const datasetScenarios = largeDatasetScenarios
 
 /**
- * Type definitions for MSW handlers
+ * All real-time collaboration scenarios
  */
-export interface MockScenarioHandler {
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  path: string;
-  scenario: keyof typeof testScenarios[keyof typeof testScenarios];
-  delay?: number;
-  errorRate?: number; // 0-1, probability of returning error
-}
+export const collaborationScenarios = realTimeScenarios
 
 /**
- * Default export with commonly used scenarios
+ * All performance testing scenarios
+ */
+export const performanceScenarios = performanceBenchmarkScenarios
+
+/**
+ * Default export with all scenario categories
  */
 export default {
-  // Quick access to most common scenarios
-  emptyTaskList: edgeCaseScenarios.emptyTaskList,
-  singleTask: edgeCaseScenarios.singleTaskList,
-  largeTaskList: largeDatasetScenarios.generateLargeTaskList(),
-  networkTimeout: networkErrorScenarios.taskListNetworkTimeout,
-  validationError: apiErrorScenarios.createTaskValidationError,
-  sessionExpired: authErrorScenarios.sessionExpiredError,
-  normalLoading: loadingStateScenarios.normalLoading,
-  
-  // Utility functions
-  generateLargeTaskList: largeDatasetScenarios.generateLargeTaskList,
-  generatePaginatedResponse: largeDatasetScenarios.generatePaginatedResponse,
-  getScenario,
-  getScenariosForCategory,
-  createDelayedScenario,
-};
+  errors: errorScenarios,
+  loading: loadingScenarios,
+  edge: edgeScenarios,
+  datasets: datasetScenarios,
+  realtime: collaborationScenarios,
+  performance: performanceScenarios
+}
+
+/**
+ * Utility function to get specific scenario by name
+ * Enables dynamic scenario selection in tests
+ */
+export const getScenario = (category: string, scenario: string): any => {
+  const scenarios = {
+    error: errorScenarios,
+    loading: loadingScenarios,
+    edge: edgeScenarios,
+    dataset: datasetScenarios,
+    realtime: collaborationScenarios,
+    performance: performanceScenarios
+  } as const
+
+  return (scenarios as any)[category]?.[scenario]
+}
+
+/**
+ * Scenario validation helper for testing framework integration
+ */
+export const validateScenario = (scenario: any): boolean => {
+  return !!(scenario && (scenario.description || scenario.testCases || scenario.error))
+}
+
+/**
+ * @example
+ * // Import specific scenarios
+ * import { errorScenarios, loadingScenarios } from './scenarios'
+ * 
+ * // Use in MSW handlers
+ * rest.get('/api/v2/scheduler', (req, res, ctx) => {
+ *   const errorType = req.url.searchParams.get('error')
+ *   if (errorType === 'network') {
+ *     return res.networkError(errorScenarios.network.requestTimeout.error)
+ *   }
+ *   return res(ctx.json(datasetScenarios.thousandTasks.response))
+ * })
+ * 
+ * // Use in React Query tests
+ * const { result } = renderHook(() => useSchedulerTasks(), {
+ *   wrapper: createQueryWrapper(loadingScenarios.initialPageLoad)
+ * })
+ */
