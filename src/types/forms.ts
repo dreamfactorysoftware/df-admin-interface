@@ -1,910 +1,285 @@
 /**
- * Form Types and Interfaces for React Hook Form with Zod Validation
+ * React Hook Form Configuration Types with Zod Schema Validation
  * 
- * This module provides comprehensive type definitions for form management using React Hook Form 7.57.0
- * with Zod schema validation. It supports dynamic field generation, conditional logic, real-time
- * validation under 100ms, and full accessibility compliance.
+ * Comprehensive form management types supporting React Hook Form 7.57.0 with Zod schema
+ * validation, dynamic field generation, conditional logic, and form state management.
+ * Provides real-time validation under 100ms with accessibility compliance.
  * 
+ * @fileoverview Form types for React Hook Form + Zod integration with performance optimization
  * @version 1.0.0
- * @since 2024-12-19
  */
 
-import { ReactNode, ComponentType } from 'react';
+import { type ReactNode, type ComponentType, type ComponentProps } from 'react';
 import { 
-  UseFormProps, 
-  UseFormReturn, 
-  FieldValues, 
-  Path, 
-  PathValue,
-  FieldError,
-  RegisterOptions,
-  FieldPath
+  type UseFormRegister, 
+  type UseFormSetValue, 
+  type UseFormGetValues, 
+  type UseFormWatch, 
+  type UseFormTrigger,
+  type UseFormReset,
+  type UseFormClearErrors,
+  type UseFormSetError,
+  type UseFormHandleSubmit,
+  type UseFormReturn,
+  type FieldError,
+  type FieldErrors,
+  type FieldValues,
+  type Path,
+  type PathValue,
+  type RegisterOptions,
+  type SubmitHandler,
+  type SubmitErrorHandler,
+  type Control,
+  type Controller,
+  type ValidationRule,
+  type Validate
 } from 'react-hook-form';
-import { z, ZodSchema, ZodError } from 'zod';
-
-// =============================================================================
-// CORE FORM CONFIGURATION TYPES
-// =============================================================================
+import { type ZodSchema, type ZodType, type ZodError, type infer as ZodInfer } from 'zod';
+import { 
+  type FormComponentProps, 
+  type AccessibilityProps, 
+  type ThemeProps, 
+  type ValidationState,
+  type SizeVariant,
+  type ColorVariant,
+  type LabelPosition
+} from './ui';
 
 /**
- * Base configuration for React Hook Form initialization
- * Provides type-safe configuration with Zod schema integration
+ * Enhanced form field validation error interface
+ * Extends React Hook Form FieldError with additional context
  */
-export interface FormConfig<T extends FieldValues = FieldValues> extends UseFormProps<T> {
-  /** Zod schema for validation */
-  schema?: ZodSchema<T>;
-  /** Form identifier for tracking and testing */
-  formId: string;
-  /** Form title for accessibility and UI */
-  title?: string;
-  /** Form description for context */
+export interface FormFieldError extends FieldError {
+  /** Field name that caused the error */
+  field?: string;
+  /** Error severity level */
+  severity?: 'error' | 'warning' | 'info';
+  /** Error code for internationalization */
+  code?: string;
+  /** Additional error context */
+  context?: Record<string, any>;
+  /** Timestamp when error occurred */
+  timestamp?: Date;
+}
+
+/**
+ * Enhanced validation state with performance tracking
+ * Ensures real-time validation under 100ms requirement
+ */
+export interface EnhancedValidationState extends ValidationState {
+  /** Validation performance metrics */
+  validationTime?: number;
+  /** Is field being validated */
+  isValidating?: boolean;
+  /** Has field been validated */
+  hasBeenValidated?: boolean;
+  /** Last validation timestamp */
+  lastValidated?: Date;
+  /** Debounced validation timeout ID */
+  validationTimeoutId?: NodeJS.Timeout;
+}
+
+/**
+ * Form field configuration interface for dynamic form generation
+ * Supports database-driven form configurations
+ */
+export interface FormFieldConfig<TFieldValues extends FieldValues = FieldValues> {
+  /** Unique field identifier */
+  name: Path<TFieldValues>;
+  /** Field type for rendering */
+  type: FormFieldType;
+  /** Field label */
+  label: string;
+  /** Field description/help text */
   description?: string;
-  /** Real-time validation configuration */
-  realtimeValidation?: RealtimeValidationConfig;
-  /** Performance optimization settings */
-  performance?: FormPerformanceConfig;
-  /** Accessibility configuration */
-  accessibility?: FormAccessibilityConfig;
+  /** Placeholder text */
+  placeholder?: string;
+  /** Default value */
+  defaultValue?: PathValue<TFieldValues, Path<TFieldValues>>;
+  /** Field options for select/radio/checkbox fields */
+  options?: Array<FormFieldOption>;
+  /** Field validation rules */
+  validation?: FormFieldValidation<TFieldValues>;
+  /** Field visibility conditions */
+  conditions?: FormFieldCondition<TFieldValues>[];
+  /** Field UI properties */
+  ui?: FormFieldUIConfig;
+  /** Field accessibility properties */
+  accessibility?: AccessibilityProps;
+  /** Field data source for dynamic options */
+  dataSource?: FormFieldDataSource;
+  /** Field grouping information */
+  group?: string;
+  /** Field ordering priority */
+  order?: number;
+  /** Is field disabled */
+  disabled?: boolean | ((values: TFieldValues) => boolean);
+  /** Is field required */
+  required?: boolean | ((values: TFieldValues) => boolean);
+  /** Is field read-only */
+  readOnly?: boolean | ((values: TFieldValues) => boolean);
 }
 
 /**
- * Real-time validation configuration
- * Ensures validation responses under 100ms requirement
+ * Supported form field types for dynamic generation
  */
-export interface RealtimeValidationConfig {
-  /** Enable real-time validation (default: true) */
-  enabled: boolean;
-  /** Debounce delay in milliseconds (default: 50ms) */
-  debounceMs: number;
-  /** Validation mode for real-time updates */
-  mode: 'onChange' | 'onBlur' | 'onTouched' | 'all';
-  /** Re-validation mode for error correction */
-  reValidateMode: 'onChange' | 'onBlur' | 'onSubmit';
-  /** Show validation indicators during processing */
-  showValidationIndicators: boolean;
-}
-
-/**
- * Performance optimization configuration
- * Minimizes re-renders while maintaining reactivity
- */
-export interface FormPerformanceConfig {
-  /** Use uncontrolled components (default: true) */
-  uncontrolled: boolean;
-  /** Optimize for large forms (100+ fields) */
-  optimizeForLargeForms: boolean;
-  /** Enable field-level subscription optimization */
-  fieldLevelSubscription: boolean;
-  /** Lazy validation for non-critical fields */
-  lazyValidation: boolean;
-}
-
-/**
- * Accessibility configuration for WCAG 2.1 AA compliance
- */
-export interface FormAccessibilityConfig {
-  /** Enable screen reader support */
-  screenReaderSupport: boolean;
-  /** Announce validation errors */
-  announceValidationErrors: boolean;
-  /** Enable keyboard navigation */
-  keyboardNavigation: boolean;
-  /** ARIA live region for dynamic updates */
-  ariaLiveRegion: 'off' | 'polite' | 'assertive';
-  /** Focus management for form interactions */
-  focusManagement: FocusManagementConfig;
-}
-
-/**
- * Focus management configuration
- */
-export interface FocusManagementConfig {
-  /** Focus first error field on validation failure */
-  focusFirstError: boolean;
-  /** Focus next field on successful input */
-  focusNextOnSuccess: boolean;
-  /** Focus management for conditional fields */
-  focusConditionalFields: boolean;
-}
-
-// =============================================================================
-// FORM FIELD TYPES AND DEFINITIONS
-// =============================================================================
-
-/**
- * Comprehensive form field type enumeration
- * Supports all HTML5 input types plus custom DreamFactory-specific types
- */
-export type FormFieldType =
-  // Standard HTML5 input types
+export type FormFieldType = 
   | 'text'
-  | 'password'
   | 'email'
-  | 'url'
-  | 'tel'
-  | 'search'
+  | 'password'
   | 'number'
-  | 'range'
-  | 'date'
-  | 'datetime-local'
-  | 'time'
-  | 'month'
-  | 'week'
-  | 'color'
-  | 'file'
-  | 'hidden'
-  // Form control types
+  | 'tel'
+  | 'url'
+  | 'search'
   | 'textarea'
   | 'select'
   | 'multiselect'
-  | 'checkbox'
   | 'radio'
-  | 'switch'
+  | 'checkbox'
   | 'toggle'
-  // Advanced input types
-  | 'json'
-  | 'code'
-  | 'markdown'
-  | 'wysiwyg'
-  | 'tags'
-  | 'rating'
-  | 'slider'
-  | 'button-group'
-  // Database-specific types
-  | 'connection-string'
-  | 'database-type'
-  | 'table-selector'
-  | 'field-mapping'
-  | 'query-builder'
-  // Custom component types
+  | 'date'
+  | 'datetime'
+  | 'time'
+  | 'file'
+  | 'hidden'
   | 'custom';
 
 /**
- * Base form field configuration
- * Provides common properties for all field types
+ * Form field option interface for select/radio/checkbox fields
  */
-export interface BaseFormField {
-  /** Unique field identifier */
-  id: string;
-  /** Field name for form data binding */
-  name: string;
-  /** Field type determines rendering and validation */
-  type: FormFieldType;
-  /** Display label for the field */
-  label: string;
-  /** Placeholder text for input guidance */
-  placeholder?: string;
-  /** Help text or description */
-  description?: string;
-  /** Field is required for form submission */
-  required?: boolean;
-  /** Field is disabled (non-interactive) */
-  disabled?: boolean;
-  /** Field is read-only (display value only) */
-  readonly?: boolean;
-  /** Field is hidden from UI */
-  hidden?: boolean;
-  /** Default value for the field */
-  defaultValue?: any;
-  /** Field validation configuration */
-  validation?: FieldValidationConfig;
-  /** Conditional display logic */
-  conditional?: ConditionalLogic;
-  /** Field layout and styling configuration */
-  layout?: FieldLayoutConfig;
-  /** Accessibility configuration */
-  accessibility?: FieldAccessibilityConfig;
-  /** Performance optimization settings */
-  performance?: FieldPerformanceConfig;
-}
-
-/**
- * Enhanced form field with specific type configurations
- */
-export interface FormField extends BaseFormField {
-  /** Type-specific configuration */
-  config?: FieldTypeConfig;
-  /** Field-specific event handlers */
-  handlers?: FieldEventHandlers;
-  /** Integration with other form fields */
-  integration?: FieldIntegrationConfig;
-}
-
-/**
- * Field validation configuration using Zod schema patterns
- */
-export interface FieldValidationConfig {
-  /** Zod schema for field validation */
-  schema?: ZodSchema;
-  /** Custom validation rules */
-  rules?: RegisterOptions;
-  /** Validation timing configuration */
-  timing?: ValidationTimingConfig;
-  /** Error message customization */
-  errorMessages?: FieldErrorMessages;
-  /** Cross-field validation dependencies */
-  dependencies?: string[];
-  /** Validation transformation functions */
-  transforms?: FieldTransforms;
-}
-
-/**
- * Validation timing configuration for performance optimization
- */
-export interface ValidationTimingConfig {
-  /** Validate on field change (default: true) */
-  onChange: boolean;
-  /** Validate on field blur (default: true) */
-  onBlur: boolean;
-  /** Validate on form submission (default: true) */
-  onSubmit: boolean;
-  /** Debounce validation delay in milliseconds */
-  debounce: number;
-  /** Async validation support */
-  async: boolean;
-}
-
-/**
- * Custom error messages for comprehensive user feedback
- */
-export interface FieldErrorMessages {
-  /** Required field error message */
-  required?: string;
-  /** Invalid format error message */
-  invalid?: string;
-  /** Minimum length error message */
-  minLength?: string;
-  /** Maximum length error message */
-  maxLength?: string;
-  /** Pattern mismatch error message */
-  pattern?: string;
-  /** Custom validation error messages */
-  custom?: Record<string, string>;
-}
-
-/**
- * Field transformation functions for data processing
- */
-export interface FieldTransforms {
-  /** Transform input value before validation */
-  input?: (value: any) => any;
-  /** Transform output value before submission */
-  output?: (value: any) => any;
-  /** Format value for display */
-  display?: (value: any) => string;
-  /** Parse value from display format */
-  parse?: (value: string) => any;
-}
-
-// =============================================================================
-// CONDITIONAL LOGIC AND DYNAMIC FORMS
-// =============================================================================
-
-/**
- * Conditional logic for dynamic form behavior
- * Supports complex conditional field showing/hiding and validation
- */
-export interface ConditionalLogic {
-  /** Conditions that must be met */
-  conditions: FieldCondition[];
-  /** Logical operator for multiple conditions */
-  operator: 'AND' | 'OR';
-  /** Action to take when conditions are met */
-  action: ConditionalAction;
-  /** Action parameters */
-  actionParams?: Record<string, any>;
-}
-
-/**
- * Individual field condition for conditional logic
- */
-export interface FieldCondition {
-  /** Target field name */
-  field: string;
-  /** Comparison operator */
-  operator: ComparisonOperator;
-  /** Comparison value */
-  value: any;
-  /** Condition weight for complex logic */
-  weight?: number;
-}
-
-/**
- * Comparison operators for conditional logic
- */
-export type ComparisonOperator =
-  | 'equals'
-  | 'notEquals'
-  | 'contains'
-  | 'notContains'
-  | 'startsWith'
-  | 'endsWith'
-  | 'greaterThan'
-  | 'lessThan'
-  | 'greaterThanOrEqual'
-  | 'lessThanOrEqual'
-  | 'in'
-  | 'notIn'
-  | 'isEmpty'
-  | 'isNotEmpty'
-  | 'isNull'
-  | 'isNotNull'
-  | 'matches'
-  | 'doesNotMatch';
-
-/**
- * Actions that can be taken based on conditional logic
- */
-export type ConditionalAction =
-  | 'show'
-  | 'hide'
-  | 'enable'
-  | 'disable'
-  | 'require'
-  | 'optional'
-  | 'focus'
-  | 'clear'
-  | 'setValue'
-  | 'transform'
-  | 'validate'
-  | 'reset';
-
-// =============================================================================
-// FORM STATE MANAGEMENT
-// =============================================================================
-
-/**
- * Enhanced form state with React Hook Form integration
- */
-export interface FormState<T extends FieldValues = FieldValues> {
-  /** React Hook Form instance */
-  form: UseFormReturn<T>;
-  /** Current form values */
-  values: T;
-  /** Form validation errors */
-  errors: FieldErrors<T>;
-  /** Form submission state */
-  isSubmitting: boolean;
-  /** Form validation state */
-  isValidating: boolean;
-  /** Form has been submitted */
-  isSubmitted: boolean;
-  /** Form has been touched */
-  isDirty: boolean;
-  /** Form is valid */
-  isValid: boolean;
-  /** Loading state for async operations */
-  isLoading: boolean;
-  /** Form submission attempt count */
-  submitCount: number;
-  /** Field-level states */
-  fieldStates: FieldStates<T>;
-}
-
-/**
- * Field-level state tracking
- */
-export type FieldStates<T extends FieldValues> = {
-  [K in Path<T>]: FieldState;
-};
-
-/**
- * Individual field state
- */
-export interface FieldState {
-  /** Field has been touched */
-  isTouched: boolean;
-  /** Field has been modified */
-  isDirty: boolean;
-  /** Field is currently validating */
-  isValidating: boolean;
-  /** Field validation error */
-  error?: FieldError;
-  /** Field is disabled */
-  isDisabled: boolean;
-  /** Field is visible */
-  isVisible: boolean;
-  /** Field focus state */
-  isFocused: boolean;
-}
-
-/**
- * Form submission configuration and handlers
- */
-export interface FormSubmissionConfig<T extends FieldValues = FieldValues> {
-  /** Submission handler function */
-  onSubmit: (data: T) => void | Promise<void>;
-  /** Submission error handler */
-  onError?: (errors: FieldErrors<T>) => void;
-  /** Pre-submission validation */
-  onBeforeSubmit?: (data: T) => boolean | Promise<boolean>;
-  /** Post-submission success handler */
-  onSuccess?: (data: T) => void;
-  /** Form reset after successful submission */
-  resetOnSuccess?: boolean;
-  /** Submission configuration */
-  submission?: SubmissionOptions;
-}
-
-/**
- * Submission options for API integration
- */
-export interface SubmissionOptions {
-  /** HTTP method for submission */
-  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  /** API endpoint URL */
-  url: string;
-  /** Request headers */
-  headers?: Record<string, string>;
-  /** Request timeout in milliseconds */
-  timeout?: number;
-  /** Retry configuration */
-  retry?: RetryConfig;
-  /** Data transformation before submission */
-  transform?: DataTransformConfig;
-}
-
-/**
- * Retry configuration for failed submissions
- */
-export interface RetryConfig {
-  /** Maximum retry attempts */
-  maxAttempts: number;
-  /** Delay between retries in milliseconds */
-  delayMs: number;
-  /** Exponential backoff multiplier */
-  backoffMultiplier: number;
-  /** Conditions for retry */
-  retryOn?: (error: any) => boolean;
-}
-
-/**
- * Data transformation configuration
- */
-export interface DataTransformConfig {
-  /** Fields to include in submission */
-  include?: string[];
-  /** Fields to exclude from submission */
-  exclude?: string[];
-  /** Field name mapping */
-  fieldMapping?: Record<string, string>;
-  /** Custom transformation functions */
-  transforms?: Record<string, (value: any) => any>;
-  /** Flatten nested objects */
-  flatten?: boolean;
-  /** Remove empty values */
-  removeEmpty?: boolean;
-}
-
-// =============================================================================
-// FIELD TYPE-SPECIFIC CONFIGURATIONS
-// =============================================================================
-
-/**
- * Type-specific configuration for different field types
- */
-export type FieldTypeConfig =
-  | TextFieldConfig
-  | NumberFieldConfig
-  | SelectFieldConfig
-  | FileFieldConfig
-  | DateFieldConfig
-  | JsonFieldConfig
-  | DatabaseFieldConfig
-  | CustomFieldConfig;
-
-/**
- * Text field configuration
- */
-export interface TextFieldConfig {
-  /** Minimum length */
-  minLength?: number;
-  /** Maximum length */
-  maxLength?: number;
-  /** RegExp pattern for validation */
-  pattern?: string;
-  /** Text transformation */
-  transform?: TextTransform;
-  /** Auto-complete configuration */
-  autoComplete?: string;
-  /** Spell check enabled */
-  spellCheck?: boolean;
-}
-
-/**
- * Number field configuration
- */
-export interface NumberFieldConfig {
-  /** Minimum value */
-  min?: number;
-  /** Maximum value */
-  max?: number;
-  /** Step value for increments */
-  step?: number;
-  /** Number format configuration */
-  format?: NumberFormatConfig;
-  /** Allow decimal values */
-  allowDecimal?: boolean;
-  /** Thousand separator */
-  thousandSeparator?: string;
-  /** Decimal separator */
-  decimalSeparator?: string;
-}
-
-/**
- * Select field configuration
- */
-export interface SelectFieldConfig {
-  /** Available options */
-  options: SelectOption[];
-  /** Allow multiple selections */
-  multiple?: boolean;
-  /** Enable search/filter */
-  searchable?: boolean;
-  /** Allow clearing selection */
-  clearable?: boolean;
-  /** Allow creating new options */
-  creatable?: boolean;
-  /** Async option loading */
-  asyncOptions?: AsyncOptionsConfig;
-  /** Option grouping */
-  groupBy?: string;
-}
-
-/**
- * File field configuration
- */
-export interface FileFieldConfig {
-  /** Accepted file types */
-  accept?: string[];
-  /** Allow multiple files */
-  multiple?: boolean;
-  /** Maximum file size in bytes */
-  maxSize?: number;
-  /** Maximum number of files */
-  maxFiles?: number;
-  /** File upload endpoint */
-  uploadUrl?: string;
-  /** Preview configuration */
-  preview?: FilePreviewConfig;
-}
-
-/**
- * Date field configuration
- */
-export interface DateFieldConfig {
-  /** Date format string */
-  format?: string;
-  /** Minimum date */
-  minDate?: Date | string;
-  /** Maximum date */
-  maxDate?: Date | string;
-  /** Disabled dates */
-  disabledDates?: Date[] | string[];
-  /** Show time picker */
-  showTime?: boolean;
-  /** Timezone configuration */
-  timezone?: string;
-}
-
-/**
- * JSON field configuration
- */
-export interface JsonFieldConfig {
-  /** JSON schema for validation */
-  schema?: ZodSchema;
-  /** Pretty print JSON */
-  prettyPrint?: boolean;
-  /** Syntax highlighting */
-  syntaxHighlighting?: boolean;
-  /** Code editor theme */
-  theme?: string;
-  /** Auto-format on blur */
-  autoFormat?: boolean;
-}
-
-/**
- * Database-specific field configuration
- */
-export interface DatabaseFieldConfig {
-  /** Database connection for data loading */
-  connection?: string;
-  /** SQL query for options */
-  query?: string;
-  /** Cached data configuration */
-  cache?: CacheConfig;
-  /** Real-time data updates */
-  realtime?: boolean;
-}
-
-/**
- * Custom field configuration
- */
-export interface CustomFieldConfig {
-  /** Custom component type */
-  component: ComponentType<any>;
-  /** Component props */
-  props?: Record<string, any>;
-  /** Custom validation */
-  customValidation?: (value: any) => string | undefined;
-  /** Custom rendering */
-  render?: (field: FormField) => ReactNode;
-}
-
-// =============================================================================
-// UTILITY TYPES AND INTERFACES
-// =============================================================================
-
-/**
- * Select option interface
- */
-export interface SelectOption {
+export interface FormFieldOption {
   /** Option value */
   value: string | number | boolean;
-  /** Display label */
+  /** Option label */
   label: string;
   /** Option description */
   description?: string;
-  /** Option icon */
-  icon?: ComponentType<{ className?: string }>;
-  /** Option is disabled */
+  /** Is option disabled */
   disabled?: boolean;
-  /** Option group */
+  /** Option icon */
+  icon?: ReactNode;
+  /** Option grouping */
   group?: string;
-  /** Additional metadata */
-  metadata?: Record<string, any>;
 }
 
 /**
- * Async options configuration
+ * Form field validation configuration with Zod integration
  */
-export interface AsyncOptionsConfig {
-  /** Options loading function */
-  loadOptions: (inputValue: string) => Promise<SelectOption[]>;
-  /** Default options to show */
-  defaultOptions?: SelectOption[] | boolean;
-  /** Cache loaded options */
-  cacheOptions?: boolean;
-  /** Loading debounce delay */
-  loadingDebounce?: number;
+export interface FormFieldValidation<TFieldValues extends FieldValues = FieldValues> {
+  /** Zod schema for field validation */
+  schema?: ZodType<any>;
+  /** Custom validation function */
+  validate?: Validate<PathValue<TFieldValues, Path<TFieldValues>>, TFieldValues>;
+  /** Validation timing */
+  timing?: 'onChange' | 'onBlur' | 'onSubmit' | 'debounced';
+  /** Debounce delay in milliseconds (default: 300) */
+  debounceMs?: number;
+  /** Async validation function */
+  asyncValidate?: (value: any, formValues: TFieldValues) => Promise<string | boolean>;
+  /** Dependencies for validation */
+  dependencies?: Path<TFieldValues>[];
 }
 
 /**
- * File preview configuration
+ * Form field conditional display/behavior configuration
  */
-export interface FilePreviewConfig {
-  /** Show file preview */
-  enabled: boolean;
-  /** Preview size */
-  size?: 'sm' | 'md' | 'lg';
-  /** Allowed preview types */
-  types?: string[];
-  /** Preview thumbnail generation */
-  thumbnails?: boolean;
+export interface FormFieldCondition<TFieldValues extends FieldValues = FieldValues> {
+  /** Field to watch for condition */
+  field: Path<TFieldValues>;
+  /** Condition operator */
+  operator: 'equals' | 'notEquals' | 'in' | 'notIn' | 'greaterThan' | 'lessThan' | 'contains';
+  /** Expected value(s) */
+  value: any | any[];
+  /** Action to take when condition is met */
+  action: 'show' | 'hide' | 'enable' | 'disable' | 'require' | 'optional';
 }
 
 /**
- * Number format configuration
+ * Form field UI configuration
  */
-export interface NumberFormatConfig {
-  /** Locale for number formatting */
-  locale?: string;
-  /** Currency code for currency formatting */
-  currency?: string;
-  /** Minimum fraction digits */
-  minimumFractionDigits?: number;
-  /** Maximum fraction digits */
-  maximumFractionDigits?: number;
-  /** Use grouping separator */
-  useGrouping?: boolean;
+export interface FormFieldUIConfig extends ThemeProps {
+  /** Field width */
+  width?: 'full' | 'half' | 'third' | 'quarter' | number;
+  /** Label position */
+  labelPosition?: LabelPosition;
+  /** Hide label (screen reader only) */
+  hideLabel?: boolean;
+  /** Custom CSS classes */
+  className?: string;
+  /** Custom container CSS classes */
+  containerClassName?: string;
+  /** Custom label CSS classes */
+  labelClassName?: string;
+  /** Prefix content */
+  prefix?: ReactNode;
+  /** Suffix content */
+  suffix?: ReactNode;
+  /** Field icon */
+  icon?: ReactNode;
+  /** Custom component to render field */
+  component?: ComponentType<any>;
+  /** Additional props for custom component */
+  componentProps?: Record<string, any>;
 }
 
 /**
- * Cache configuration for data loading
+ * Form field data source for dynamic options
  */
-export interface CacheConfig {
-  /** Enable caching */
-  enabled: boolean;
-  /** Cache TTL in milliseconds */
-  ttl?: number;
-  /** Cache key generation */
-  keyGenerator?: (params: any) => string;
-  /** Cache storage type */
-  storage?: 'memory' | 'localStorage' | 'sessionStorage';
+export interface FormFieldDataSource {
+  /** Data source type */
+  type: 'static' | 'api' | 'function';
+  /** API endpoint for fetching options */
+  endpoint?: string;
+  /** Function to fetch options */
+  fetchFunction?: () => Promise<FormFieldOption[]>;
+  /** Static options array */
+  options?: FormFieldOption[];
+  /** Data transformation function */
+  transform?: (data: any) => FormFieldOption[];
+  /** Cache duration in milliseconds */
+  cacheDuration?: number;
+  /** Dependency fields that trigger refetch */
+  dependencies?: string[];
 }
 
 /**
- * Text transformation options
+ * Form schema configuration with Zod integration
  */
-export type TextTransform =
-  | 'none'
-  | 'uppercase'
-  | 'lowercase'
-  | 'capitalize'
-  | 'camelCase'
-  | 'pascalCase'
-  | 'kebabCase'
-  | 'snakeCase'
-  | 'trim'
-  | 'normalize';
-
-/**
- * Field layout configuration
- */
-export interface FieldLayoutConfig {
-  /** Grid column span */
-  span?: number;
-  /** Grid column offset */
-  offset?: number;
-  /** Field order in layout */
-  order?: number;
-  /** Responsive breakpoints */
-  responsive?: ResponsiveLayoutConfig;
-  /** Field grouping */
-  group?: string;
-  /** Field section */
-  section?: string;
-}
-
-/**
- * Responsive layout configuration
- */
-export interface ResponsiveLayoutConfig {
-  /** Small screens */
-  sm?: LayoutBreakpoint;
-  /** Medium screens */
-  md?: LayoutBreakpoint;
-  /** Large screens */
-  lg?: LayoutBreakpoint;
-  /** Extra large screens */
-  xl?: LayoutBreakpoint;
-}
-
-/**
- * Layout breakpoint configuration
- */
-export interface LayoutBreakpoint {
-  /** Column span */
-  span?: number;
-  /** Column offset */
-  offset?: number;
-  /** Field order */
-  order?: number;
-  /** Hide field at this breakpoint */
-  hidden?: boolean;
-}
-
-/**
- * Field accessibility configuration
- */
-export interface FieldAccessibilityConfig {
-  /** ARIA label */
-  ariaLabel?: string;
-  /** ARIA described by */
-  ariaDescribedBy?: string;
-  /** ARIA required */
-  ariaRequired?: boolean;
-  /** ARIA invalid */
-  ariaInvalid?: boolean;
-  /** Tab index */
-  tabIndex?: number;
-  /** Screen reader only text */
-  srOnly?: string;
-}
-
-/**
- * Field performance configuration
- */
-export interface FieldPerformanceConfig {
-  /** Lazy loading for expensive fields */
-  lazy?: boolean;
-  /** Virtual scrolling for large option lists */
-  virtual?: boolean;
-  /** Debounce input changes */
-  debounce?: number;
-  /** Memo field rendering */
-  memo?: boolean;
-}
-
-/**
- * Field event handlers
- */
-export interface FieldEventHandlers {
-  /** Value change handler */
-  onChange?: (value: any, name: string) => void;
-  /** Field blur handler */
-  onBlur?: (name: string) => void;
-  /** Field focus handler */
-  onFocus?: (name: string) => void;
-  /** Key press handler */
-  onKeyPress?: (event: KeyboardEvent, name: string) => void;
-  /** Custom event handlers */
-  custom?: Record<string, (event: any, name: string) => void>;
-}
-
-/**
- * Field integration configuration
- */
-export interface FieldIntegrationConfig {
-  /** Sync with other fields */
-  syncWith?: string[];
-  /** Watch other field changes */
-  watchFields?: string[];
-  /** Trigger validation of other fields */
-  triggerValidation?: string[];
-  /** Update dependent fields */
-  updateDependents?: FieldDependencyConfig[];
-}
-
-/**
- * Field dependency configuration
- */
-export interface FieldDependencyConfig {
-  /** Target field name */
-  field: string;
-  /** Update trigger */
-  trigger: DependencyTrigger;
-  /** Update function */
-  update: (sourceValue: any, targetValue: any) => any;
-}
-
-/**
- * Dependency trigger types
- */
-export type DependencyTrigger =
-  | 'onChange'
-  | 'onBlur'
-  | 'onFocus'
-  | 'onMount'
-  | 'onUnmount'
-  | 'conditional';
-
-// =============================================================================
-// FORM BUILDER AND DYNAMIC GENERATION
-// =============================================================================
-
-/**
- * Dynamic form schema for database-driven form generation
- */
-export interface DynamicFormSchema {
-  /** Schema identifier */
-  id: string;
-  /** Schema version */
-  version: string;
+export interface FormSchema<TFieldValues extends FieldValues = FieldValues> {
+  /** Zod schema for entire form */
+  schema: ZodSchema<TFieldValues>;
+  /** Field configurations */
+  fields: FormFieldConfig<TFieldValues>[];
   /** Form metadata */
-  metadata: FormMetadata;
-  /** Form fields */
-  fields: FormField[];
-  /** Form layout */
-  layout: FormLayoutConfig;
-  /** Form validation */
-  validation: FormValidationSchema;
-  /** Form submission */
-  submission: FormSubmissionConfig;
-  /** Form styling */
-  styling?: FormStylingConfig;
+  metadata?: FormMetadata;
+  /** Form layout configuration */
+  layout?: FormLayoutConfig;
+  /** Form submission configuration */
+  submission?: FormSubmissionConfig<TFieldValues>;
+  /** Form security configuration */
+  security?: FormSecurityConfig;
 }
 
 /**
- * Form metadata
+ * Form metadata interface
  */
 export interface FormMetadata {
   /** Form title */
-  title: string;
+  title?: string;
   /** Form description */
   description?: string;
+  /** Form version */
+  version?: string;
   /** Form category */
   category?: string;
   /** Form tags */
   tags?: string[];
-  /** Created date */
-  createdAt: string;
-  /** Last modified date */
-  modifiedAt: string;
-  /** Author information */
+  /** Form creation date */
+  createdAt?: Date;
+  /** Form last modified date */
+  updatedAt?: Date;
+  /** Form author */
   author?: string;
-  /** Form version */
-  version: string;
 }
 
 /**
@@ -912,471 +287,499 @@ export interface FormMetadata {
  */
 export interface FormLayoutConfig {
   /** Layout type */
-  type: FormLayoutType;
-  /** Number of columns */
+  type?: 'vertical' | 'horizontal' | 'grid' | 'wizard';
+  /** Grid columns for grid layout */
   columns?: number;
-  /** Gap between fields */
-  gap?: string;
-  /** Form sections */
+  /** Responsive breakpoints */
+  responsive?: {
+    mobile?: number;
+    tablet?: number;
+    desktop?: number;
+  };
+  /** Section grouping */
   sections?: FormSection[];
-  /** Responsive configuration */
-  responsive?: boolean;
+  /** Field spacing */
+  spacing?: 'compact' | 'normal' | 'relaxed';
 }
 
 /**
- * Form layout types
- */
-export type FormLayoutType =
-  | 'single-column'
-  | 'two-column'
-  | 'grid'
-  | 'tabs'
-  | 'accordion'
-  | 'wizard'
-  | 'inline'
-  | 'stack';
-
-/**
- * Form section configuration
+ * Form section for grouping fields
  */
 export interface FormSection {
   /** Section identifier */
   id: string;
   /** Section title */
-  title: string;
+  title?: string;
   /** Section description */
   description?: string;
   /** Fields in this section */
   fields: string[];
-  /** Section is collapsible */
-  collapsible?: boolean;
-  /** Section is collapsed by default */
-  collapsed?: boolean;
   /** Section order */
   order?: number;
-  /** Section conditional logic */
-  conditional?: ConditionalLogic;
+  /** Is section collapsible */
+  collapsible?: boolean;
+  /** Is section initially collapsed */
+  defaultCollapsed?: boolean;
+  /** Section visibility conditions */
+  conditions?: FormFieldCondition[];
 }
 
 /**
- * Form validation schema
+ * Form submission configuration
  */
-export interface FormValidationSchema {
-  /** Field validation rules */
-  fields: Record<string, FieldValidationConfig>;
-  /** Cross-field validation */
-  crossField?: CrossFieldValidation[];
-  /** Form-level validation */
-  form?: FormLevelValidation;
-  /** Validation groups */
-  groups?: ValidationGroup[];
-}
-
-/**
- * Cross-field validation
- */
-export interface CrossFieldValidation {
-  /** Validation identifier */
-  id: string;
-  /** Fields involved in validation */
-  fields: string[];
-  /** Validation function */
-  validator: (values: Record<string, any>) => string | undefined;
-  /** Error message */
-  message: string;
-  /** Validation trigger */
-  trigger: ValidationTrigger;
-}
-
-/**
- * Form-level validation
- */
-export interface FormLevelValidation {
-  /** Custom validation function */
-  validator: (values: FieldValues) => Record<string, string> | undefined;
-  /** Validation trigger */
-  trigger: ValidationTrigger;
-  /** Async validation support */
-  async?: boolean;
-}
-
-/**
- * Validation group configuration
- */
-export interface ValidationGroup {
-  /** Group identifier */
-  id: string;
-  /** Group name */
-  name: string;
-  /** Fields in this group */
-  fields: string[];
-  /** Group validation rules */
-  rules: FieldValidationConfig;
-  /** Group is required */
-  required: boolean;
-}
-
-/**
- * Validation trigger types
- */
-export type ValidationTrigger =
-  | 'onChange'
-  | 'onBlur'
-  | 'onSubmit'
-  | 'onMount'
-  | 'manual'
-  | 'debounced';
-
-/**
- * Form styling configuration
- */
-export interface FormStylingConfig {
-  /** Form theme */
-  theme?: FormTheme;
-  /** Component size */
-  size?: ComponentSize;
-  /** Color scheme */
-  colorScheme?: 'light' | 'dark' | 'auto';
-  /** Border style */
-  borders?: boolean;
-  /** Shadow effects */
-  shadows?: boolean;
-  /** Border radius */
-  rounded?: boolean;
-  /** Custom CSS classes */
-  className?: string;
-  /** Custom CSS styles */
-  style?: Record<string, string>;
-}
-
-/**
- * Form theme options
- */
-export type FormTheme =
-  | 'default'
-  | 'minimal'
-  | 'card'
-  | 'inline'
-  | 'floating'
-  | 'outline'
-  | 'filled'
-  | 'underline';
-
-/**
- * Component size options
- */
-export type ComponentSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-
-// =============================================================================
-// ERROR HANDLING AND MESSAGING
-// =============================================================================
-
-/**
- * Enhanced field errors with accessibility support
- */
-export type FieldErrors<T extends FieldValues> = {
-  [K in Path<T>]?: FieldError & {
-    /** Error accessibility configuration */
-    accessibility?: ErrorAccessibilityConfig;
-    /** Error display configuration */
-    display?: ErrorDisplayConfig;
-    /** Error recovery suggestions */
-    recovery?: ErrorRecoveryConfig;
+export interface FormSubmissionConfig<TFieldValues extends FieldValues = FieldValues> {
+  /** Submit URL */
+  url?: string;
+  /** HTTP method */
+  method?: 'POST' | 'PUT' | 'PATCH';
+  /** Transform data before submission */
+  transform?: (data: TFieldValues) => any;
+  /** Success callback */
+  onSuccess?: (data: TFieldValues, response: any) => void;
+  /** Error callback */
+  onError?: (errors: FieldErrors<TFieldValues>, data: TFieldValues) => void;
+  /** Loading state callback */
+  onLoading?: (isLoading: boolean) => void;
+  /** Enable optimistic updates */
+  optimistic?: boolean;
+  /** Retry configuration */
+  retry?: {
+    attempts: number;
+    delay: number;
+    backoff?: 'linear' | 'exponential';
   };
+}
+
+/**
+ * Form security configuration
+ */
+export interface FormSecurityConfig {
+  /** Enable CSRF protection */
+  csrfProtection?: boolean;
+  /** Sanitize inputs */
+  sanitizeInputs?: boolean;
+  /** Rate limiting */
+  rateLimit?: {
+    maxAttempts: number;
+    windowMs: number;
+  };
+  /** Content Security Policy */
+  csp?: string[];
+  /** Field encryption */
+  encryption?: {
+    fields: string[];
+    algorithm: string;
+  };
+}
+
+/**
+ * Enhanced React Hook Form instance with Zod integration
+ */
+export interface EnhancedFormInstance<TFieldValues extends FieldValues = FieldValues> 
+  extends UseFormReturn<TFieldValues> {
+  /** Zod schema for validation */
+  schema: ZodSchema<TFieldValues>;
+  /** Field configurations */
+  fieldConfigs: Map<Path<TFieldValues>, FormFieldConfig<TFieldValues>>;
+  /** Dynamic field generation */
+  generateField: (config: FormFieldConfig<TFieldValues>) => ReactNode;
+  /** Conditional field visibility */
+  isFieldVisible: (fieldName: Path<TFieldValues>) => boolean;
+  /** Field validation state */
+  getFieldValidationState: (fieldName: Path<TFieldValues>) => EnhancedValidationState;
+  /** Async validation trigger */
+  validateAsync: (fieldName?: Path<TFieldValues>) => Promise<boolean>;
+  /** Form submission with loading state */
+  submitAsync: SubmitHandler<TFieldValues>;
+  /** Reset form with new schema */
+  resetWithSchema: (schema: ZodSchema<TFieldValues>, defaultValues?: Partial<TFieldValues>) => void;
+}
+
+/**
+ * Form context interface for provider pattern
+ */
+export interface FormContextValue<TFieldValues extends FieldValues = FieldValues> {
+  /** Form instance */
+  form: EnhancedFormInstance<TFieldValues>;
+  /** Form schema */
+  schema: FormSchema<TFieldValues>;
+  /** Current form data */
+  data: TFieldValues;
+  /** Form submission state */
+  isSubmitting: boolean;
+  /** Form validation state */
+  isValid: boolean;
+  /** Form dirty state */
+  isDirty: boolean;
+  /** Form touched state */
+  isTouched: boolean;
+  /** Form errors */
+  errors: FieldErrors<TFieldValues>;
+  /** Performance metrics */
+  metrics: FormPerformanceMetrics;
+}
+
+/**
+ * Form performance metrics for monitoring
+ */
+export interface FormPerformanceMetrics {
+  /** Average validation time in milliseconds */
+  avgValidationTime: number;
+  /** Maximum validation time in milliseconds */
+  maxValidationTime: number;
+  /** Total validations performed */
+  totalValidations: number;
+  /** Validation errors encountered */
+  validationErrors: number;
+  /** Form render count */
+  renderCount: number;
+  /** First input time */
+  firstInputTime?: Date;
+  /** Last submission time */
+  lastSubmissionTime?: Date;
+}
+
+/**
+ * Dynamic form generator props
+ */
+export interface DynamicFormProps<TFieldValues extends FieldValues = FieldValues> {
+  /** Form schema */
+  schema: FormSchema<TFieldValues>;
+  /** Initial form values */
+  defaultValues?: Partial<TFieldValues>;
+  /** Form submission handler */
+  onSubmit: SubmitHandler<TFieldValues>;
+  /** Form error handler */
+  onError?: SubmitErrorHandler<TFieldValues>;
+  /** Loading state */
+  loading?: boolean;
+  /** Disabled state */
+  disabled?: boolean;
+  /** Form ID for accessibility */
+  id?: string;
+  /** Additional form props */
+  formProps?: ComponentProps<'form'>;
+  /** Custom field renderers */
+  fieldRenderers?: Partial<Record<FormFieldType, ComponentType<any>>>;
+  /** Form theme */
+  theme?: ThemeProps;
+  /** Performance monitoring callback */
+  onPerformanceUpdate?: (metrics: FormPerformanceMetrics) => void;
+}
+
+/**
+ * Form field component props interface
+ */
+export interface FormFieldProps<TFieldValues extends FieldValues = FieldValues> 
+  extends FormComponentProps, ThemeProps {
+  /** Field configuration */
+  config: FormFieldConfig<TFieldValues>;
+  /** Form register function */
+  register: UseFormRegister<TFieldValues>;
+  /** Form control */
+  control?: Control<TFieldValues>;
+  /** Field error */
+  error?: FormFieldError;
+  /** Field validation state */
+  validationState?: EnhancedValidationState;
+  /** Form watch function */
+  watch?: UseFormWatch<TFieldValues>;
+  /** Form setValue function */
+  setValue?: UseFormSetValue<TFieldValues>;
+  /** Form trigger function */
+  trigger?: UseFormTrigger<TFieldValues>;
+  /** Field value */
+  value?: PathValue<TFieldValues, Path<TFieldValues>>;
+  /** Change handler */
+  onChange?: (value: any) => void;
+  /** Blur handler */
+  onBlur?: () => void;
+  /** Focus handler */
+  onFocus?: () => void;
+}
+
+/**
+ * Form wizard configuration for multi-step forms
+ */
+export interface FormWizardConfig<TFieldValues extends FieldValues = FieldValues> {
+  /** Wizard steps */
+  steps: FormWizardStep<TFieldValues>[];
+  /** Current step index */
+  currentStep: number;
+  /** Navigation configuration */
+  navigation?: FormWizardNavigation;
+  /** Validation strategy */
+  validation?: 'onStepChange' | 'onSubmit' | 'realtime';
+  /** Progress tracking */
+  progress?: FormWizardProgress;
+}
+
+/**
+ * Form wizard step configuration
+ */
+export interface FormWizardStep<TFieldValues extends FieldValues = FieldValues> {
+  /** Step identifier */
+  id: string;
+  /** Step title */
+  title: string;
+  /** Step description */
+  description?: string;
+  /** Fields in this step */
+  fields: Path<TFieldValues>[];
+  /** Step validation schema */
+  schema?: ZodSchema<Partial<TFieldValues>>;
+  /** Step completion requirements */
+  completion?: FormStepCompletion<TFieldValues>;
+  /** Is step optional */
+  optional?: boolean;
+  /** Skip step conditions */
+  skipConditions?: FormFieldCondition<TFieldValues>[];
+}
+
+/**
+ * Form wizard navigation configuration
+ */
+export interface FormWizardNavigation {
+  /** Show navigation buttons */
+  showButtons?: boolean;
+  /** Show progress bar */
+  showProgress?: boolean;
+  /** Show step numbers */
+  showStepNumbers?: boolean;
+  /** Allow step clicking */
+  allowStepNavigation?: boolean;
+  /** Custom button labels */
+  buttonLabels?: {
+    previous?: string;
+    next?: string;
+    submit?: string;
+    cancel?: string;
+  };
+}
+
+/**
+ * Form wizard progress tracking
+ */
+export interface FormWizardProgress {
+  /** Progress calculation method */
+  method?: 'steps' | 'fields' | 'weighted';
+  /** Field weights for weighted progress */
+  fieldWeights?: Record<string, number>;
+  /** Show percentage */
+  showPercentage?: boolean;
+  /** Show remaining steps */
+  showRemaining?: boolean;
+}
+
+/**
+ * Form step completion requirements
+ */
+export interface FormStepCompletion<TFieldValues extends FieldValues = FieldValues> {
+  /** Required fields for completion */
+  requiredFields?: Path<TFieldValues>[];
+  /** Custom completion validator */
+  validator?: (values: Partial<TFieldValues>) => boolean | string;
+  /** Async completion validator */
+  asyncValidator?: (values: Partial<TFieldValues>) => Promise<boolean | string>;
+}
+
+/**
+ * Form validation hook return type
+ */
+export interface UseFormValidationReturn<TFieldValues extends FieldValues = FieldValues> {
+  /** Validate field */
+  validateField: (fieldName: Path<TFieldValues>, value?: any) => Promise<string | undefined>;
+  /** Validate form */
+  validateForm: (values: TFieldValues) => Promise<FieldErrors<TFieldValues>>;
+  /** Clear field error */
+  clearFieldError: (fieldName: Path<TFieldValues>) => void;
+  /** Set field error */
+  setFieldError: (fieldName: Path<TFieldValues>, error: string) => void;
+  /** Validation performance metrics */
+  validationMetrics: FormPerformanceMetrics;
+}
+
+/**
+ * Form data transformation utilities
+ */
+export interface FormDataTransformer<TInput = any, TOutput = any> {
+  /** Transform data before validation */
+  beforeValidation?: (data: TInput) => TInput;
+  /** Transform data after validation */
+  afterValidation?: (data: TInput) => TOutput;
+  /** Transform data before submission */
+  beforeSubmission?: (data: TOutput) => any;
+  /** Transform response data */
+  onResponse?: (response: any) => any;
+}
+
+/**
+ * Form accessibility configuration
+ */
+export interface FormAccessibilityConfig extends AccessibilityProps {
+  /** Form landmarks */
+  landmarks?: {
+    form?: string;
+    errors?: string;
+    submit?: string;
+  };
+  /** Error announcement */
+  errorAnnouncement?: {
+    strategy?: 'immediate' | 'polite' | 'assertive';
+    template?: string;
+  };
+  /** Focus management */
+  focusManagement?: {
+    autoFocusFirst?: boolean;
+    focusErrorOnSubmit?: boolean;
+    trapFocus?: boolean;
+  };
+  /** Screen reader optimizations */
+  screenReader?: {
+    announceProgress?: boolean;
+    announceValidation?: boolean;
+    announceNavigation?: boolean;
+  };
+}
+
+/**
+ * Type-safe form configuration builder
+ */
+export type FormConfigBuilder<TFieldValues extends FieldValues = FieldValues> = {
+  /** Add field to form */
+  field: <K extends Path<TFieldValues>>(
+    name: K,
+    config: Omit<FormFieldConfig<TFieldValues>, 'name'>
+  ) => FormConfigBuilder<TFieldValues>;
+  /** Set form schema */
+  schema: (schema: ZodSchema<TFieldValues>) => FormConfigBuilder<TFieldValues>;
+  /** Set form metadata */
+  metadata: (metadata: FormMetadata) => FormConfigBuilder<TFieldValues>;
+  /** Set form layout */
+  layout: (layout: FormLayoutConfig) => FormConfigBuilder<TFieldValues>;
+  /** Build final form schema */
+  build: () => FormSchema<TFieldValues>;
 };
 
 /**
- * Error accessibility configuration
+ * Database-specific form field types for DreamFactory
  */
-export interface ErrorAccessibilityConfig {
-  /** Announce error to screen readers */
-  announce?: boolean;
-  /** ARIA live region type */
-  liveRegion?: 'polite' | 'assertive';
-  /** Error role for screen readers */
-  role?: 'alert' | 'status';
-  /** Focus error field on display */
-  focusField?: boolean;
-}
+export type DatabaseFieldType = 
+  | 'varchar'
+  | 'text'
+  | 'integer'
+  | 'bigint'
+  | 'decimal'
+  | 'float'
+  | 'boolean'
+  | 'date'
+  | 'datetime'
+  | 'timestamp'
+  | 'json'
+  | 'binary'
+  | 'uuid';
 
 /**
- * Error display configuration
+ * Database connection form configuration
  */
-export interface ErrorDisplayConfig {
-  /** Error display position */
-  position?: 'top' | 'bottom' | 'inline' | 'tooltip';
-  /** Error animation */
-  animation?: 'fadeIn' | 'slideIn' | 'shake' | 'none';
-  /** Error icon */
-  icon?: boolean;
-  /** Error color theme */
-  colorTheme?: 'error' | 'warning' | 'info';
-}
-
-/**
- * Error recovery configuration
- */
-export interface ErrorRecoveryConfig {
-  /** Suggested fix action */
-  suggestion?: string;
-  /** Auto-fix function */
-  autoFix?: (value: any) => any;
-  /** Help documentation link */
-  helpLink?: string;
-  /** Contact support option */
-  supportContact?: boolean;
-}
-
-// =============================================================================
-// DATABASE-SPECIFIC FORM TYPES
-// =============================================================================
-
-/**
- * Database connection form schema
- * Specialized form for database service configuration
- */
-export interface DatabaseConnectionFormSchema extends DynamicFormSchema {
-  /** Database type-specific configuration */
-  databaseConfig: DatabaseTypeConfig;
+export interface DatabaseConnectionFormConfig {
+  /** Database type */
+  type: 'mysql' | 'postgresql' | 'mongodb' | 'oracle' | 'snowflake' | 'sqlite';
+  /** Connection fields specific to database type */
+  fields: DatabaseConnectionField[];
   /** Connection test configuration */
-  connectionTest: ConnectionTestConfig;
+  testConnection?: {
+    endpoint: string;
+    timeout: number;
+    retries: number;
+  };
   /** Advanced options */
-  advancedOptions: DatabaseAdvancedOptions;
+  advanced?: DatabaseAdvancedOptions;
 }
 
 /**
- * Database type configuration
+ * Database connection field configuration
  */
-export interface DatabaseTypeConfig {
-  /** Supported database types */
-  supportedTypes: DatabaseType[];
-  /** Type-specific field mappings */
-  typeFieldMappings: Record<DatabaseType, string[]>;
-  /** Default configurations per type */
-  defaultConfigs: Record<DatabaseType, Record<string, any>>;
-  /** Validation schemas per type */
-  validationSchemas: Record<DatabaseType, ZodSchema>;
+export interface DatabaseConnectionField extends FormFieldConfig {
+  /** Database-specific field properties */
+  database?: {
+    /** Field mapping to database parameter */
+    parameter: string;
+    /** Default value for database type */
+    defaultValue?: any;
+    /** Field dependencies */
+    dependsOn?: string[];
+    /** Validation against database constraints */
+    constraints?: DatabaseFieldConstraints;
+  };
 }
 
 /**
- * Database types supported by DreamFactory
+ * Database field constraints
  */
-export type DatabaseType =
-  | 'mysql'
-  | 'postgresql'
-  | 'sqlserver'
-  | 'oracle'
-  | 'mongodb'
-  | 'snowflake'
-  | 'sqlite'
-  | 'mariadb'
-  | 'cassandra'
-  | 'dynamodb';
-
-/**
- * Connection test configuration
- */
-export interface ConnectionTestConfig {
-  /** Enable connection testing */
-  enabled: boolean;
-  /** Test timeout in milliseconds */
-  timeout: number;
-  /** Test query to execute */
-  testQuery?: string;
-  /** Expected test result */
-  expectedResult?: any;
-  /** Auto-test on field changes */
-  autoTest: boolean;
-  /** Test result display */
-  displayResult: boolean;
+export interface DatabaseFieldConstraints {
+  /** Minimum value */
+  min?: number;
+  /** Maximum value */
+  max?: number;
+  /** Allowed values */
+  enum?: any[];
+  /** Pattern validation */
+  pattern?: RegExp;
+  /** Custom validation */
+  custom?: (value: any, context: any) => boolean | string;
 }
 
 /**
  * Database advanced options
  */
 export interface DatabaseAdvancedOptions {
-  /** SSL configuration fields */
-  sslFields: string[];
-  /** Connection pooling fields */
-  poolingFields: string[];
-  /** Security configuration fields */
-  securityFields: string[];
-  /** Performance tuning fields */
-  performanceFields: string[];
-  /** Custom options */
-  customFields: FormField[];
-}
-
-// =============================================================================
-// FORM HOOK INTEGRATION TYPES
-// =============================================================================
-
-/**
- * Enhanced form hook return type
- * Extends React Hook Form with additional functionality
- */
-export interface EnhancedFormReturn<T extends FieldValues = FieldValues>
-  extends UseFormReturn<T> {
-  /** Form configuration */
-  config: FormConfig<T>;
-  /** Form state helpers */
-  state: FormStateHelpers<T>;
-  /** Field management helpers */
-  fields: FieldHelpers<T>;
-  /** Validation helpers */
-  validation: ValidationHelpers<T>;
-  /** Submission helpers */
-  submission: SubmissionHelpers<T>;
-  /** Performance monitoring */
-  performance: PerformanceHelpers;
+  /** SSL configuration */
+  ssl?: boolean;
+  /** Connection pooling */
+  pooling?: {
+    min: number;
+    max: number;
+    idle: number;
+  };
+  /** Timeout settings */
+  timeout?: {
+    connection: number;
+    query: number;
+  };
+  /** Character set */
+  charset?: string;
+  /** Timezone */
+  timezone?: string;
 }
 
 /**
- * Form state helpers
- */
-export interface FormStateHelpers<T extends FieldValues> {
-  /** Check if form has any errors */
-  hasErrors: () => boolean;
-  /** Get all field values */
-  getAllValues: () => T;
-  /** Reset form to initial state */
-  resetForm: () => void;
-  /** Clear all errors */
-  clearErrors: () => void;
-  /** Check if form is ready for submission */
-  isSubmittable: () => boolean;
-}
-
-/**
- * Field management helpers
- */
-export interface FieldHelpers<T extends FieldValues> {
-  /** Get field configuration */
-  getFieldConfig: (name: FieldPath<T>) => FormField | undefined;
-  /** Set field value with validation */
-  setFieldValue: (name: FieldPath<T>, value: PathValue<T, FieldPath<T>>) => void;
-  /** Get field error */
-  getFieldError: (name: FieldPath<T>) => FieldError | undefined;
-  /** Clear field error */
-  clearFieldError: (name: FieldPath<T>) => void;
-  /** Focus field */
-  focusField: (name: FieldPath<T>) => void;
-  /** Check field visibility */
-  isFieldVisible: (name: FieldPath<T>) => boolean;
-}
-
-/**
- * Validation helpers
- */
-export interface ValidationHelpers<T extends FieldValues> {
-  /** Validate specific field */
-  validateField: (name: FieldPath<T>) => Promise<boolean>;
-  /** Validate form */
-  validateForm: () => Promise<boolean>;
-  /** Get validation errors */
-  getValidationErrors: () => FieldErrors<T>;
-  /** Check if validation is in progress */
-  isValidating: () => boolean;
-}
-
-/**
- * Submission helpers
- */
-export interface SubmissionHelpers<T extends FieldValues> {
-  /** Submit form with validation */
-  submitForm: () => Promise<void>;
-  /** Submit form without validation */
-  submitFormUnsafe: () => Promise<void>;
-  /** Check submission state */
-  isSubmitting: () => boolean;
-  /** Get submission errors */
-  getSubmissionErrors: () => any;
-}
-
-/**
- * Performance monitoring helpers
- */
-export interface PerformanceHelpers {
-  /** Get validation performance metrics */
-  getValidationMetrics: () => ValidationMetrics;
-  /** Get render performance metrics */
-  getRenderMetrics: () => RenderMetrics;
-  /** Reset performance metrics */
-  resetMetrics: () => void;
-}
-
-/**
- * Validation performance metrics
- */
-export interface ValidationMetrics {
-  /** Average validation time in milliseconds */
-  averageValidationTime: number;
-  /** Maximum validation time */
-  maxValidationTime: number;
-  /** Total validation count */
-  validationCount: number;
-  /** Failed validation count */
-  failedValidationCount: number;
-  /** Real-time validation compliance (< 100ms) */
-  realtimeCompliance: number;
-}
-
-/**
- * Render performance metrics
- */
-export interface RenderMetrics {
-  /** Total render count */
-  renderCount: number;
-  /** Average render time */
-  averageRenderTime: number;
-  /** Re-render triggers */
-  rerenderTriggers: string[];
-  /** Performance score (0-100) */
-  performanceScore: number;
-}
-
-// =============================================================================
-// EXPORT TYPES FOR LIBRARY INTEGRATION
-// =============================================================================
-
-/**
- * Main form configuration export
- * Primary interface for form creation and management
+ * Export all form-related types for external consumption
  */
 export type {
-  FormConfig as UseFormConfig,
-  FormField as FormFieldDefinition,
-  FormState as FormStateType,
-  EnhancedFormReturn as FormHook,
-  DynamicFormSchema as FormSchema,
-  DatabaseConnectionFormSchema as DatabaseFormSchema,
-};
-
-/**
- * Validation-specific exports
- */
-export type {
-  FieldValidationConfig as FieldValidation,
-  FormValidationSchema as FormValidation,
-  ValidationHelpers as FormValidationHelpers,
-  RealtimeValidationConfig as RealtimeValidation,
-};
-
-/**
- * Conditional logic exports
- */
-export type {
-  ConditionalLogic as FieldConditionalLogic,
-  FieldCondition as ConditionalRule,
-  ComparisonOperator as ConditionalOperator,
-  ConditionalAction as ConditionalActionType,
-};
-
-/**
- * Accessibility exports
- */
-export type {
-  FormAccessibilityConfig as FormAccessibility,
-  FieldAccessibilityConfig as FieldAccessibility,
-  ErrorAccessibilityConfig as ErrorAccessibility,
-};
+  UseFormRegister,
+  UseFormSetValue,
+  UseFormGetValues,
+  UseFormWatch,
+  UseFormTrigger,
+  UseFormReset,
+  UseFormClearErrors,
+  UseFormSetError,
+  UseFormHandleSubmit,
+  UseFormReturn,
+  FieldError,
+  FieldErrors,
+  FieldValues,
+  Path,
+  PathValue,
+  RegisterOptions,
+  SubmitHandler,
+  SubmitErrorHandler,
+  Control,
+  ValidationRule,
+  Validate,
+  ZodSchema,
+  ZodType,
+  ZodError,
+  ZodInfer
+} from './forms';
