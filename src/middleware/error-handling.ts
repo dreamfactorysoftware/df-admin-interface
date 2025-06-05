@@ -1,1533 +1,1027 @@
 /**
- * @fileoverview Error Handling Middleware for DreamFactory Admin Interface
+ * Error Handling Middleware for DreamFactory Admin Interface
  * 
- * Comprehensive error capture, processing, and recovery mechanisms replacing Angular 
- * error interceptor with edge-based error management and React Error Boundary integration.
- * 
- * This middleware provides:
- * - Global error handling with graceful degradation and enhanced user experience
- * - HTTP error response processing and transformation for all status codes
- * - React Error Boundary integration for client-side error capture
- * - Development mode enhanced error information and debugging capabilities
- * - Security compliance through audit logging and error sanitization
- * - Performance monitoring and error recovery with exponential backoff
- * - Edge runtime optimization for sub-100ms error processing
+ * Comprehensive error capture, processing, and recovery mechanisms providing
+ * graceful degradation and optimal user experience. Migrates Angular error
+ * interceptor logic to Next.js edge-based middleware with enhanced capabilities.
  * 
  * Key Features:
- * - Comprehensive HTTP status code handling (401, 403, 404, 500+)
- * - Audit trail generation for security compliance and monitoring
+ * - Next.js 15.1+ edge runtime compatibility with sub-100ms processing
+ * - HTTP error status code handling (401, 403, 404, 500+) with appropriate responses
+ * - React Error Boundary integration for client-side error capture
+ * - Security compliance with comprehensive audit logging and error tracking
  * - Exponential backoff retry mechanisms for transient failures
- * - Error boundary integration for React component error capture
- * - Context-aware error transformation and user-friendly messaging
- * - Performance tracking and error analytics integration
- * - Development vs production error handling differentiation
+ * - Development mode enhanced debugging with detailed error context
+ * - Integration with existing authentication flow and session management
+ * - MSW mock error response handling for development testing
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @requires Next.js 15.1+ Edge Runtime
- * @requires React 19+ Error Boundaries
+ * Performance Requirements:
+ * - Middleware processing under 100ms for error handling
+ * - Memory-efficient error context management
+ * - Optimized error logging for edge runtime constraints
+ * 
+ * Security Features:
+ * - Sanitized error responses to prevent information disclosure
+ * - Comprehensive audit logging for security events
+ * - Rate limiting integration for error-based attacks
+ * - CSRF and XSS protection in error responses
+ * 
+ * @fileoverview Next.js middleware for comprehensive error handling and recovery
+ * @version 1.0.0
+ * @since Next.js 15.1+ / React 19.0.0
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  MiddlewareRequest, 
-  MiddlewareResponse, 
+import type {
+  MiddlewareRequest,
+  MiddlewareResponseContext,
   MiddlewareError,
-  MiddlewareComponent,
-  MiddlewareStage,
-  AuditEvent,
-  AuditEventType,
-  SecurityHeaders,
-  PerformanceWarning,
-  PerformanceWarningType,
-  PerformanceWarningSeverity,
-  RecoveryAction,
-  RecoveryActionType,
-  RecoveryResult,
-  ComplianceImpact,
-  ComplianceSeverity,
-  MIDDLEWARE_DEFAULTS
+  MiddlewareLogContext,
+  AuditLogEntry,
+  TokenValidationContext,
+  SessionManagementContext,
+  MiddlewareMetrics,
+  SecurityHeaderConfig,
+  AuditEventType
 } from './types';
-import { 
-  createAuditLogEntry, 
-  logAuditEntry, 
-  getEnvironmentConfig, 
+import {
+  extractToken,
+  validateSessionToken,
   createErrorResponse,
-  getClientIP
+  createAuthRedirect,
+  applyHeaders,
+  SECURITY_HEADERS,
+  getClientIP,
+  isAPIRequest,
+  isStaticAsset,
+  requiresAuthentication,
+  createPerformanceMarker,
+  EdgeRateLimiter,
+  logAuditEntry,
+  logAuthEvent,
+  createAuditLogEntry,
+  getEnvironmentInfo,
+  isDevelopmentMode,
+  SessionInfo
 } from './utils';
 
 // ============================================================================
-// ERROR CLASSIFICATION AND TYPES
+// ERROR HANDLING CONFIGURATION
 // ============================================================================
 
 /**
- * HTTP error status codes with specific handling requirements
+ * Error handling configuration for different environments
+ * Provides environment-specific error handling behavior
  */
-export enum HttpErrorCode {
-  BAD_REQUEST = 400,
-  UNAUTHORIZED = 401,
-  FORBIDDEN = 403,
-  NOT_FOUND = 404,
-  METHOD_NOT_ALLOWED = 405,
-  CONFLICT = 409,
-  UNPROCESSABLE_ENTITY = 422,
-  TOO_MANY_REQUESTS = 429,
-  INTERNAL_SERVER_ERROR = 500,
-  BAD_GATEWAY = 502,
-  SERVICE_UNAVAILABLE = 503,
-  GATEWAY_TIMEOUT = 504
+interface ErrorHandlingConfig {
+  /** Enable detailed error logging */
+  enableDetailedLogging: boolean;
+  
+  /** Enable retry mechanisms */
+  enableRetryMechanisms: boolean;
+  
+  /** Maximum retry attempts for failed requests */
+  maxRetryAttempts: number;
+  
+  /** Base delay for exponential backoff in milliseconds */
+  baseRetryDelay: number;
+  
+  /** Maximum delay for exponential backoff in milliseconds */
+  maxRetryDelay: number;
+  
+  /** Enable development mode error details */
+  enableDevelopmentDetails: boolean;
+  
+  /** Enable security event logging */
+  enableSecurityLogging: boolean;
+  
+  /** Rate limit window for error-based attacks (ms) */
+  rateLimitWindow: number;
+  
+  /** Maximum errors per window before rate limiting */
+  maxErrorsPerWindow: number;
+  
+  /** Sanitize error messages in production */
+  sanitizeProductionErrors: boolean;
 }
 
 /**
- * Error categories for classification and handling
+ * Default error handling configuration
  */
-export enum ErrorCategory {
-  AUTHENTICATION = 'AUTHENTICATION',
-  AUTHORIZATION = 'AUTHORIZATION',
-  VALIDATION = 'VALIDATION',
-  NETWORK = 'NETWORK',
-  SERVER = 'SERVER',
-  CLIENT = 'CLIENT',
-  SECURITY = 'SECURITY',
-  PERFORMANCE = 'PERFORMANCE',
-  CONFIGURATION = 'CONFIGURATION',
-  UNKNOWN = 'UNKNOWN'
+const DEFAULT_ERROR_CONFIG: ErrorHandlingConfig = {
+  enableDetailedLogging: true,
+  enableRetryMechanisms: true,
+  maxRetryAttempts: 3,
+  baseRetryDelay: 1000, // 1 second
+  maxRetryDelay: 30000, // 30 seconds
+  enableDevelopmentDetails: isDevelopmentMode(),
+  enableSecurityLogging: true,
+  rateLimitWindow: 900000, // 15 minutes
+  maxErrorsPerWindow: 100,
+  sanitizeProductionErrors: true,
+};
+
+/**
+ * HTTP status code categories for error handling
+ */
+enum ErrorCategory {
+  CLIENT_ERROR = 'client_error',
+  SERVER_ERROR = 'server_error',
+  AUTHENTICATION_ERROR = 'authentication_error',
+  AUTHORIZATION_ERROR = 'authorization_error',
+  VALIDATION_ERROR = 'validation_error',
+  NETWORK_ERROR = 'network_error',
+  SYSTEM_ERROR = 'system_error',
 }
 
 /**
- * Error severity levels for response prioritization
+ * Error severity levels for logging and alerting
  */
-export enum ErrorSeverity {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  CRITICAL = 'CRITICAL'
+enum ErrorSeverity {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  CRITICAL = 'critical',
 }
 
 /**
- * Comprehensive error context for detailed error tracking
+ * Error recovery strategies for different error types
  */
-export interface ErrorContext {
-  // Request context
-  requestId: string;
-  requestPath: string;
-  requestMethod: string;
-  requestHeaders: Record<string, string>;
-  requestQuery: Record<string, string>;
-  requestBody?: string;
-  
-  // User context
-  userId?: number;
-  userEmail?: string;
-  sessionId?: string;
-  userRole?: string;
-  
-  // Error classification
-  errorCategory: ErrorCategory;
-  errorSeverity: ErrorSeverity;
-  middlewareComponent: MiddlewareComponent;
-  processingStage: MiddlewareStage;
-  
-  // Performance context
-  processingTimeMs: number;
-  timeoutOccurred: boolean;
-  memoryUsage?: number;
-  
-  // Network context
-  clientIP: string;
-  userAgent: string;
-  origin?: string;
-  referrer?: string;
-  
-  // Error details
-  originalError: Error | null;
-  stackTrace?: string;
-  errorCode?: string;
-  errorMessage: string;
-  internalMessage?: string;
-  
-  // Recovery context
-  recoverable: boolean;
-  retryCount: number;
-  maxRetries: number;
-  nextRetryIn?: number;
-  
-  // Audit context
-  auditRequired: boolean;
-  sensitiveDataInvolved: boolean;
-  complianceImpact?: ComplianceImpact;
-  
-  // Development context
-  isDevelopment: boolean;
-  debugInfo?: Record<string, unknown>;
+enum RecoveryStrategy {
+  RETRY = 'retry',
+  REDIRECT = 'redirect',
+  FALLBACK = 'fallback',
+  ABORT = 'abort',
 }
 
-/**
- * Error recovery strategy configuration
- */
-export interface RecoveryStrategy {
-  maxRetries: number;
-  baseDelay: number;
-  maxDelay: number;
-  exponentialBase: number;
-  jitterEnabled: boolean;
-  retryableErrors: HttpErrorCode[];
-  fallbackActions: RecoveryActionType[];
-}
+// ============================================================================
+// ERROR CLASSIFICATION AND HANDLING
+// ============================================================================
 
 /**
- * Error transformation rules for user-facing messages
+ * Comprehensive error classification system
+ * Maps HTTP status codes to error categories, severity, and recovery strategies
  */
-export interface ErrorTransformationRule {
-  errorPattern: string | RegExp;
-  userMessage: string;
+const ERROR_CLASSIFICATION = {
+  // Authentication Errors (401)
+  401: {
+    category: ErrorCategory.AUTHENTICATION_ERROR,
+    severity: ErrorSeverity.HIGH,
+    recovery: RecoveryStrategy.REDIRECT,
+    message: 'Authentication required',
+    action: 'redirect_to_login',
+    retryable: false,
+    logSecurity: true,
+  },
+  
+  // Authorization Errors (403)
+  403: {
+    category: ErrorCategory.AUTHORIZATION_ERROR,
+    severity: ErrorSeverity.HIGH,
+    recovery: RecoveryStrategy.ABORT,
+    message: 'Access denied',
+    action: 'show_access_denied',
+    retryable: false,
+    logSecurity: true,
+  },
+  
+  // Not Found Errors (404)
+  404: {
+    category: ErrorCategory.CLIENT_ERROR,
+    severity: ErrorSeverity.MEDIUM,
+    recovery: RecoveryStrategy.FALLBACK,
+    message: 'Resource not found',
+    action: 'show_not_found',
+    retryable: false,
+    logSecurity: false,
+  },
+  
+  // Validation Errors (400, 422)
+  400: {
+    category: ErrorCategory.VALIDATION_ERROR,
+    severity: ErrorSeverity.MEDIUM,
+    recovery: RecoveryStrategy.ABORT,
+    message: 'Invalid request',
+    action: 'show_validation_error',
+    retryable: false,
+    logSecurity: false,
+  },
+  
+  422: {
+    category: ErrorCategory.VALIDATION_ERROR,
+    severity: ErrorSeverity.MEDIUM,
+    recovery: RecoveryStrategy.ABORT,
+    message: 'Validation failed',
+    action: 'show_validation_error',
+    retryable: false,
+    logSecurity: false,
+  },
+  
+  // Rate Limiting (429)
+  429: {
+    category: ErrorCategory.CLIENT_ERROR,
+    severity: ErrorSeverity.MEDIUM,
+    recovery: RecoveryStrategy.RETRY,
+    message: 'Too many requests',
+    action: 'retry_with_backoff',
+    retryable: true,
+    logSecurity: true,
+  },
+  
+  // Server Errors (500+)
+  500: {
+    category: ErrorCategory.SERVER_ERROR,
+    severity: ErrorSeverity.CRITICAL,
+    recovery: RecoveryStrategy.RETRY,
+    message: 'Internal server error',
+    action: 'retry_with_backoff',
+    retryable: true,
+    logSecurity: true,
+  },
+  
+  502: {
+    category: ErrorCategory.SERVER_ERROR,
+    severity: ErrorSeverity.HIGH,
+    recovery: RecoveryStrategy.RETRY,
+    message: 'Bad gateway',
+    action: 'retry_with_backoff',
+    retryable: true,
+    logSecurity: false,
+  },
+  
+  503: {
+    category: ErrorCategory.SERVER_ERROR,
+    severity: ErrorSeverity.HIGH,
+    recovery: RecoveryStrategy.RETRY,
+    message: 'Service unavailable',
+    action: 'retry_with_backoff',
+    retryable: true,
+    logSecurity: false,
+  },
+  
+  504: {
+    category: ErrorCategory.SERVER_ERROR,
+    severity: ErrorSeverity.HIGH,
+    recovery: RecoveryStrategy.RETRY,
+    message: 'Gateway timeout',
+    action: 'retry_with_backoff',
+    retryable: true,
+    logSecurity: false,
+  },
+} as const;
+
+/**
+ * Enhanced error context for comprehensive error handling
+ * Includes all necessary information for error processing and recovery
+ */
+interface ErrorContext {
+  /** Original error information */
+  error: Error | any;
+  
+  /** HTTP status code */
   statusCode: number;
-  includeDetails: boolean;
-  logLevel: 'error' | 'warn' | 'info';
-  auditRequired: boolean;
+  
+  /** Request context */
+  request: {
+    method: string;
+    url: string;
+    headers: Record<string, string>;
+    userAgent: string;
+    clientIP: string;
+    timestamp: Date;
+  };
+  
+  /** User context if available */
+  user?: {
+    id?: number;
+    email?: string;
+    sessionId?: string;
+    roles?: string[];
+  };
+  
+  /** Error classification */
+  classification: typeof ERROR_CLASSIFICATION[keyof typeof ERROR_CLASSIFICATION];
+  
+  /** Retry context */
+  retry?: {
+    attempt: number;
+    maxAttempts: number;
+    nextRetryDelay: number;
+  };
+  
+  /** Development mode context */
+  development?: {
+    stack?: string;
+    originalError?: any;
+    debugInfo?: Record<string, any>;
+  };
+  
+  /** Performance metrics */
+  metrics: {
+    processingTime: number;
+    memoryUsage?: number;
+  };
 }
 
 // ============================================================================
-// DEFAULT CONFIGURATIONS
+// ERROR PROCESSING FUNCTIONS
 // ============================================================================
 
 /**
- * Default recovery strategy for different error types
+ * Creates enhanced error context from request and error information
+ * Provides comprehensive error analysis for proper handling
  */
-const DEFAULT_RECOVERY_STRATEGY: RecoveryStrategy = {
-  maxRetries: 3,
-  baseDelay: 1000, // 1 second
-  maxDelay: 10000, // 10 seconds
-  exponentialBase: 2,
-  jitterEnabled: true,
-  retryableErrors: [
-    HttpErrorCode.TOO_MANY_REQUESTS,
-    HttpErrorCode.INTERNAL_SERVER_ERROR,
-    HttpErrorCode.BAD_GATEWAY,
-    HttpErrorCode.SERVICE_UNAVAILABLE,
-    HttpErrorCode.GATEWAY_TIMEOUT
-  ],
-  fallbackActions: [
-    RecoveryActionType.RETRY_OPERATION,
-    RecoveryActionType.FALLBACK_TO_CACHE,
-    RecoveryActionType.LOG_AND_CONTINUE
-  ]
-};
-
-/**
- * Default error transformation rules for common scenarios
- */
-const DEFAULT_ERROR_TRANSFORMATIONS: ErrorTransformationRule[] = [
-  {
-    errorPattern: /token.*expired/i,
-    userMessage: 'Your session has expired. Please sign in again.',
-    statusCode: 401,
-    includeDetails: false,
-    logLevel: 'info',
-    auditRequired: true
-  },
-  {
-    errorPattern: /unauthorized|forbidden/i,
-    userMessage: 'You do not have permission to access this resource.',
-    statusCode: 403,
-    includeDetails: false,
-    logLevel: 'warn',
-    auditRequired: true
-  },
-  {
-    errorPattern: /not found/i,
-    userMessage: 'The requested resource was not found.',
-    statusCode: 404,
-    includeDetails: false,
-    logLevel: 'info',
-    auditRequired: false
-  },
-  {
-    errorPattern: /validation.*failed/i,
-    userMessage: 'Please check your input and try again.',
-    statusCode: 400,
-    includeDetails: true,
-    logLevel: 'info',
-    auditRequired: false
-  },
-  {
-    errorPattern: /network.*error/i,
-    userMessage: 'Network connection error. Please check your connection and try again.',
-    statusCode: 503,
-    includeDetails: false,
-    logLevel: 'error',
-    auditRequired: true
-  },
-  {
-    errorPattern: /server.*error|internal.*error/i,
-    userMessage: 'An unexpected error occurred. Please try again later.',
-    statusCode: 500,
-    includeDetails: false,
-    logLevel: 'error',
-    auditRequired: true
+function createErrorContext(
+  error: any,
+  request: NextRequest,
+  sessionInfo?: SessionInfo | null,
+  metrics?: { processingTime: number }
+): ErrorContext {
+  const statusCode = error?.status || error?.statusCode || 500;
+  const classification = ERROR_CLASSIFICATION[statusCode as keyof typeof ERROR_CLASSIFICATION] || 
+                        ERROR_CLASSIFICATION[500];
+  
+  const context: ErrorContext = {
+    error,
+    statusCode,
+    request: {
+      method: request.method,
+      url: request.url,
+      headers: Object.fromEntries(request.headers.entries()),
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      clientIP: getClientIP(request),
+      timestamp: new Date(),
+    },
+    classification,
+    metrics: {
+      processingTime: metrics?.processingTime || 0,
+    },
+  };
+  
+  // Add user context if available
+  if (sessionInfo) {
+    context.user = {
+      id: parseInt(sessionInfo.userId),
+      email: sessionInfo.email,
+      sessionId: sessionInfo.sessionId,
+      roles: sessionInfo.roles,
+    };
   }
-];
+  
+  // Add development mode context
+  if (isDevelopmentMode() && DEFAULT_ERROR_CONFIG.enableDevelopmentDetails) {
+    context.development = {
+      stack: error?.stack,
+      originalError: error,
+      debugInfo: {
+        timestamp: new Date().toISOString(),
+        nodeVersion: process.version,
+        environment: process.env.NODE_ENV,
+        requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      },
+    };
+  }
+  
+  return context;
+}
 
 /**
- * Security headers for error responses
+ * Sanitizes error messages for production environments
+ * Prevents sensitive information disclosure while maintaining useful feedback
  */
-const ERROR_RESPONSE_SECURITY_HEADERS: SecurityHeaders = {
-  'X-Frame-Options': 'DENY',
-  'X-Content-Type-Options': 'nosniff',
-  'X-XSS-Protection': '1; mode=block',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Content-Security-Policy': "default-src 'self'; frame-ancestors 'none';",
-  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
-  'X-DreamFactory-Version': process.env.DREAMFACTORY_VERSION || 'unknown',
-  'X-Request-ID': '',
-  'X-Processing-Time': '',
-  'X-Cache-Status': 'BYPASS'
-};
+function sanitizeErrorMessage(
+  error: any,
+  statusCode: number,
+  isProduction: boolean = !isDevelopmentMode()
+): string {
+  const classification = ERROR_CLASSIFICATION[statusCode as keyof typeof ERROR_CLASSIFICATION];
+  
+  if (!isProduction || !DEFAULT_ERROR_CONFIG.sanitizeProductionErrors) {
+    return error?.message || classification?.message || 'An unexpected error occurred';
+  }
+  
+  // In production, return generic messages for security
+  switch (statusCode) {
+    case 401:
+      return 'Authentication required. Please log in to continue.';
+    case 403:
+      return 'You do not have permission to access this resource.';
+    case 404:
+      return 'The requested resource was not found.';
+    case 429:
+      return 'Too many requests. Please try again later.';
+    case 500:
+    case 502:
+    case 503:
+    case 504:
+      return 'A server error occurred. Please try again later.';
+    default:
+      return classification?.message || 'An error occurred while processing your request.';
+  }
+}
+
+/**
+ * Calculates exponential backoff delay with jitter
+ * Provides progressive delay for retry mechanisms
+ */
+function calculateBackoffDelay(
+  attempt: number,
+  baseDelay: number = DEFAULT_ERROR_CONFIG.baseRetryDelay,
+  maxDelay: number = DEFAULT_ERROR_CONFIG.maxRetryDelay
+): number {
+  const exponentialDelay = baseDelay * Math.pow(2, attempt - 1);
+  const jitter = Math.random() * 0.1 * exponentialDelay; // 10% jitter
+  return Math.min(exponentialDelay + jitter, maxDelay);
+}
+
+/**
+ * Determines if an error should trigger a retry attempt
+ * Analyzes error type and context to make intelligent retry decisions
+ */
+function shouldRetryError(
+  errorContext: ErrorContext,
+  currentAttempt: number = 1
+): boolean {
+  const { classification } = errorContext;
+  const config = DEFAULT_ERROR_CONFIG;
+  
+  // Check if retries are enabled and error is retryable
+  if (!config.enableRetryMechanisms || !classification.retryable) {
+    return false;
+  }
+  
+  // Check if we haven't exceeded max attempts
+  if (currentAttempt >= config.maxRetryAttempts) {
+    return false;
+  }
+  
+  // Additional checks for specific error types
+  switch (errorContext.statusCode) {
+    case 429: // Rate limiting
+      return true;
+    case 500:
+    case 502:
+    case 503:
+    case 504:
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Creates comprehensive audit log entry for error events
+ * Ensures security compliance and monitoring requirements
+ */
+function createErrorAuditLog(
+  errorContext: ErrorContext,
+  action: string = 'error_occurred'
+): AuditLogEntry {
+  const { request, user, classification, statusCode } = errorContext;
+  
+  return {
+    id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: new Date(),
+    eventType: classification.logSecurity ? AuditEventType.SECURITY_VIOLATION : AuditEventType.SYSTEM_EVENT,
+    action,
+    result: 'failure',
+    user: user ? {
+      id: user.id,
+      email: user.email,
+      sessionId: user.sessionId,
+      ipAddress: request.clientIP,
+    } : {
+      ipAddress: request.clientIP,
+    },
+    resource: {
+      type: 'api_endpoint',
+      path: new URL(request.url).pathname,
+    },
+    details: {
+      statusCode,
+      errorCategory: classification.category,
+      errorSeverity: classification.severity,
+      method: request.method,
+      userAgent: request.userAgent,
+      timestamp: request.timestamp.toISOString(),
+      processingTime: errorContext.metrics.processingTime,
+    },
+    riskLevel: classification.severity === ErrorSeverity.CRITICAL ? 'critical' :
+              classification.severity === ErrorSeverity.HIGH ? 'high' :
+              classification.severity === ErrorSeverity.MEDIUM ? 'medium' : 'low',
+    compliance: {
+      gdpr: true, // Error logging for security compliance
+      sox: classification.logSecurity,
+    },
+  };
+}
 
 // ============================================================================
-// CORE ERROR HANDLING FUNCTIONS
+// ERROR RESPONSE BUILDERS
+// ============================================================================
+
+/**
+ * Creates standardized error response for API endpoints
+ * Provides consistent error format across the application
+ */
+function createAPIErrorResponse(
+  errorContext: ErrorContext,
+  headers?: Record<string, string>
+): NextResponse {
+  const { statusCode, classification } = errorContext;
+  const sanitizedMessage = sanitizeErrorMessage(
+    errorContext.error,
+    statusCode
+  );
+  
+  const errorResponse = {
+    error: {
+      code: statusCode,
+      message: sanitizedMessage,
+      type: classification.category,
+      timestamp: new Date().toISOString(),
+      requestId: errorContext.development?.debugInfo?.requestId,
+    },
+    ...(isDevelopmentMode() && errorContext.development ? {
+      debug: {
+        stack: errorContext.development.stack,
+        originalMessage: errorContext.error?.message,
+        debugInfo: errorContext.development.debugInfo,
+      },
+    } : {}),
+  };
+  
+  const response = NextResponse.json(errorResponse, { status: statusCode });
+  
+  // Apply security headers
+  applyHeaders(response, {
+    securityHeaders: true,
+    addHeaders: {
+      'X-Error-Type': classification.category,
+      'X-Error-Severity': classification.severity,
+      ...headers,
+    },
+  });
+  
+  return response;
+}
+
+/**
+ * Creates HTML error page response for browser requests
+ * Provides user-friendly error pages with recovery options
+ */
+function createHTMLErrorResponse(
+  errorContext: ErrorContext
+): NextResponse {
+  const { statusCode, classification } = errorContext;
+  const sanitizedMessage = sanitizeErrorMessage(
+    errorContext.error,
+    statusCode
+  );
+  
+  // Determine redirect URL based on error type
+  let redirectUrl = '/error';
+  
+  switch (statusCode) {
+    case 401:
+      redirectUrl = '/login';
+      break;
+    case 403:
+      redirectUrl = '/access-denied';
+      break;
+    case 404:
+      redirectUrl = '/not-found';
+      break;
+    default:
+      redirectUrl = '/error';
+  }
+  
+  // For authentication errors, preserve return URL
+  if (statusCode === 401) {
+    const url = new URL(errorContext.request.url);
+    const returnUrl = encodeURIComponent(url.pathname + url.search);
+    redirectUrl += `?returnUrl=${returnUrl}`;
+  }
+  
+  // Create redirect response with error context
+  const response = NextResponse.redirect(new URL(redirectUrl, errorContext.request.url));
+  
+  // Apply security headers and error context
+  applyHeaders(response, {
+    securityHeaders: true,
+    addHeaders: {
+      'X-Error-Type': classification.category,
+      'X-Error-Code': statusCode.toString(),
+      'X-Error-Message': encodeURIComponent(sanitizedMessage),
+    },
+  });
+  
+  return response;
+}
+
+/**
+ * Creates retry response with appropriate headers
+ * Supports exponential backoff for client-side retry mechanisms
+ */
+function createRetryResponse(
+  errorContext: ErrorContext,
+  retryAttempt: number
+): NextResponse {
+  const retryDelay = calculateBackoffDelay(retryAttempt);
+  const maxAttempts = DEFAULT_ERROR_CONFIG.maxRetryAttempts;
+  
+  const retryResponse = {
+    error: {
+      code: errorContext.statusCode,
+      message: sanitizeErrorMessage(errorContext.error, errorContext.statusCode),
+      retryable: true,
+      retryAfter: Math.ceil(retryDelay / 1000), // Convert to seconds
+      maxAttempts,
+      currentAttempt: retryAttempt,
+    },
+  };
+  
+  const response = NextResponse.json(retryResponse, { 
+    status: errorContext.statusCode 
+  });
+  
+  // Add retry headers
+  applyHeaders(response, {
+    securityHeaders: true,
+    addHeaders: {
+      'Retry-After': Math.ceil(retryDelay / 1000).toString(),
+      'X-Retry-Attempt': retryAttempt.toString(),
+      'X-Max-Retry-Attempts': maxAttempts.toString(),
+      'X-Error-Retryable': 'true',
+    },
+  });
+  
+  return response;
+}
+
+// ============================================================================
+// RATE LIMITING FOR ERROR-BASED ATTACKS
+// ============================================================================
+
+/**
+ * Implements rate limiting for error-based attacks
+ * Prevents abuse through excessive error generation
+ */
+function checkErrorRateLimit(
+  request: NextRequest,
+  statusCode: number
+): { allowed: boolean; remaining: number; resetTime: number } {
+  const clientIP = getClientIP(request);
+  const key = `error_rate_${clientIP}_${statusCode}`;
+  
+  return EdgeRateLimiter.check(
+    key,
+    DEFAULT_ERROR_CONFIG.maxErrorsPerWindow,
+    DEFAULT_ERROR_CONFIG.rateLimitWindow
+  );
+}
+
+/**
+ * Handles rate limit exceeded for error requests
+ * Provides appropriate response when error rate limit is exceeded
+ */
+function handleErrorRateLimitExceeded(
+  request: NextRequest,
+  statusCode: number
+): NextResponse {
+  const rateLimitInfo = checkErrorRateLimit(request, statusCode);
+  
+  const response = NextResponse.json({
+    error: {
+      code: 429,
+      message: 'Too many error requests. Please try again later.',
+      type: 'rate_limit_exceeded',
+      retryAfter: Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000),
+    },
+  }, { status: 429 });
+  
+  applyHeaders(response, {
+    securityHeaders: true,
+    addHeaders: {
+      'Retry-After': Math.ceil((rateLimitInfo.resetTime - Date.now()) / 1000).toString(),
+      'X-RateLimit-Limit': DEFAULT_ERROR_CONFIG.maxErrorsPerWindow.toString(),
+      'X-RateLimit-Remaining': '0',
+      'X-RateLimit-Reset': new Date(rateLimitInfo.resetTime).toISOString(),
+    },
+  });
+  
+  return response;
+}
+
+// ============================================================================
+// MAIN ERROR HANDLING MIDDLEWARE
 // ============================================================================
 
 /**
  * Main error handling middleware function
- * Processes all errors with comprehensive context and recovery
- * 
- * @param error - Error object or error context
- * @param request - Next.js request object
- * @param processingStage - Current middleware processing stage
- * @returns Promise resolving to error response
+ * Processes all errors and provides appropriate responses and recovery mechanisms
  */
-export async function handleMiddlewareError(
-  error: Error | MiddlewareError | unknown,
+export async function handleError(
+  error: any,
   request: NextRequest,
-  processingStage: MiddlewareStage = MiddlewareStage.ERROR_HANDLING
+  context?: {
+    sessionInfo?: SessionInfo | null;
+    metrics?: { processingTime: number };
+    retryAttempt?: number;
+  }
 ): Promise<NextResponse> {
-  const startTime = performance.now();
-  const requestId = generateRequestId();
+  const performanceMarker = createPerformanceMarker();
   
   try {
+    // Extract context information
+    const sessionInfo = context?.sessionInfo;
+    const retryAttempt = context?.retryAttempt || 1;
+    
     // Create comprehensive error context
-    const errorContext = await createErrorContext(
+    const errorContext = createErrorContext(
       error,
       request,
-      processingStage,
-      requestId,
-      startTime
+      sessionInfo,
+      context?.metrics
     );
     
-    // Log error for monitoring and debugging
-    await logError(errorContext);
-    
-    // Create audit event for security compliance
-    if (errorContext.auditRequired) {
-      await createAndLogAuditEvent(errorContext, request);
+    // Check rate limiting for error-based attacks
+    const rateLimitCheck = checkErrorRateLimit(request, errorContext.statusCode);
+    if (!rateLimitCheck.allowed) {
+      // Log security event for rate limit violation
+      const auditEntry = createErrorAuditLog(errorContext, 'error_rate_limit_exceeded');
+      logAuditEntry(auditEntry);
+      
+      return handleErrorRateLimitExceeded(request, errorContext.statusCode);
     }
     
-    // Apply error transformation rules
-    const transformedError = transformError(errorContext);
-    
-    // Create appropriate error response
-    const errorResponse = await createErrorResponse(
-      transformedError,
-      errorContext,
-      request
-    );
-    
-    // Add performance tracking
-    const processingTime = performance.now() - startTime;
-    addPerformanceHeaders(errorResponse, processingTime, requestId);
-    
-    // Check for performance warnings
-    if (processingTime > MIDDLEWARE_DEFAULTS.PERFORMANCE_WARNING_THRESHOLD) {
-      await logPerformanceWarning(processingTime, errorContext, requestId);
+    // Log comprehensive audit entry
+    if (DEFAULT_ERROR_CONFIG.enableSecurityLogging) {
+      const auditEntry = createErrorAuditLog(errorContext);
+      logAuditEntry(auditEntry);
     }
     
-    return errorResponse;
+    // Handle authentication errors with session cleanup
+    if (errorContext.statusCode === 401) {
+      // Log authentication failure
+      if (sessionInfo) {
+        logAuthEvent(request, 'auth_failure', sessionInfo, errorContext.error?.message);
+      }
+      
+      // Clear session and redirect to login
+      if (isAPIRequest(request)) {
+        return createAPIErrorResponse(errorContext);
+      } else {
+        return createAuthRedirect(request);
+      }
+    }
+    
+    // Handle authorization errors
+    if (errorContext.statusCode === 403) {
+      // Log access denied event
+      if (sessionInfo) {
+        logAuthEvent(request, 'access_denied', sessionInfo, 'Insufficient permissions');
+      }
+      
+      if (isAPIRequest(request)) {
+        return createAPIErrorResponse(errorContext);
+      } else {
+        return createHTMLErrorResponse(errorContext);
+      }
+    }
+    
+    // Handle retryable errors
+    if (shouldRetryError(errorContext, retryAttempt)) {
+      return createRetryResponse(errorContext, retryAttempt);
+    }
+    
+    // Handle validation and client errors
+    if (errorContext.statusCode >= 400 && errorContext.statusCode < 500) {
+      if (isAPIRequest(request)) {
+        return createAPIErrorResponse(errorContext);
+      } else {
+        return createHTMLErrorResponse(errorContext);
+      }
+    }
+    
+    // Handle server errors
+    if (errorContext.statusCode >= 500) {
+      // Log critical server errors
+      if (errorContext.classification.severity === ErrorSeverity.CRITICAL) {
+        console.error('Critical server error:', {
+          error: errorContext.error,
+          request: errorContext.request,
+          user: errorContext.user,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      
+      if (isAPIRequest(request)) {
+        return createAPIErrorResponse(errorContext);
+      } else {
+        return createHTMLErrorResponse(errorContext);
+      }
+    }
+    
+    // Default error handling
+    if (isAPIRequest(request)) {
+      return createAPIErrorResponse(errorContext);
+    } else {
+      return createHTMLErrorResponse(errorContext);
+    }
     
   } catch (handlingError) {
-    // Fallback error handling if primary error handling fails
-    console.error('Error handling middleware failed:', handlingError);
-    return createFallbackErrorResponse(request, requestId);
-  }
-}
-
-/**
- * Creates comprehensive error context from error object and request
- * 
- * @param error - Original error object
- * @param request - Next.js request object
- * @param processingStage - Current processing stage
- * @param requestId - Unique request identifier
- * @param startTime - Processing start time
- * @returns Promise resolving to error context
- */
-async function createErrorContext(
-  error: Error | MiddlewareError | unknown,
-  request: NextRequest,
-  processingStage: MiddlewareStage,
-  requestId: string,
-  startTime: number
-): Promise<ErrorContext> {
-  const config = getEnvironmentConfig();
-  const processingTime = performance.now() - startTime;
-  
-  // Extract error details
-  let originalError: Error | null = null;
-  let errorMessage = 'Unknown error occurred';
-  let errorCode: string | undefined;
-  let middlewareComponent = MiddlewareComponent.ERROR_HANDLING;
-  let stackTrace: string | undefined;
-  
-  if (error instanceof Error) {
-    originalError = error;
-    errorMessage = error.message;
-    stackTrace = error.stack;
+    // Fallback error handling if error processing itself fails
+    console.error('Error in error handling middleware:', handlingError);
     
-    // Check if it's a middleware error with additional context
-    if ('middlewareComponent' in error) {
-      middlewareComponent = (error as MiddlewareError).middlewareComponent;
-      errorCode = (error as MiddlewareError).code;
-    }
-  } else if (typeof error === 'string') {
-    errorMessage = error;
-  } else if (error && typeof error === 'object') {
-    errorMessage = (error as any).message || 'Object error';
-    errorCode = (error as any).code;
-  }
-  
-  // Classify error
-  const errorCategory = classifyError(errorMessage, errorCode);
-  const errorSeverity = determineErrorSeverity(errorCategory, errorCode);
-  
-  // Extract request context
-  const requestPath = request.nextUrl.pathname;
-  const requestMethod = request.method;
-  const requestHeaders = extractSafeHeaders(request.headers);
-  const requestQuery = Object.fromEntries(request.nextUrl.searchParams);
-  
-  // Extract user context (if available from middleware request)
-  let userId: number | undefined;
-  let userEmail: string | undefined;
-  let sessionId: string | undefined;
-  let userRole: string | undefined;
-  
-  if ('dreamfactory' in request) {
-    const dfRequest = request as MiddlewareRequest;
-    userId = dfRequest.dreamfactory.userId || undefined;
-    userEmail = dfRequest.dreamfactory.userEmail || undefined;
-    sessionId = dfRequest.dreamfactory.sessionId || undefined;
-    // Extract role from user context if available
-  }
-  
-  // Determine retry settings
-  const recoverable = isErrorRecoverable(errorCategory, errorCode);
-  const maxRetries = DEFAULT_RECOVERY_STRATEGY.maxRetries;
-  
-  // Security and compliance assessment
-  const auditRequired = requiresAudit(errorCategory, errorSeverity);
-  const sensitiveDataInvolved = checkSensitiveDataInvolvement(requestPath, errorMessage);
-  const complianceImpact = assessComplianceImpact(errorCategory, sensitiveDataInvolved);
-  
-  return {
-    requestId,
-    requestPath,
-    requestMethod,
-    requestHeaders,
-    requestQuery,
-    userId,
-    userEmail,
-    sessionId,
-    userRole,
-    errorCategory,
-    errorSeverity,
-    middlewareComponent,
-    processingStage,
-    processingTimeMs: processingTime,
-    timeoutOccurred: processingTime > MIDDLEWARE_DEFAULTS.MAX_PROCESSING_TIME,
-    clientIP: getClientIP(request),
-    userAgent: request.headers.get('user-agent') || 'Unknown',
-    origin: request.headers.get('origin') || undefined,
-    referrer: request.headers.get('referer') || undefined,
-    originalError,
-    stackTrace,
-    errorCode,
-    errorMessage,
-    internalMessage: config.isDevelopment ? errorMessage : undefined,
-    recoverable,
-    retryCount: 0,
-    maxRetries,
-    auditRequired,
-    sensitiveDataInvolved,
-    complianceImpact,
-    isDevelopment: config.isDevelopment,
-    debugInfo: config.isDevelopment ? {
-      stackTrace,
-      originalError: originalError?.toString(),
-      processingStage,
-      middlewareComponent
-    } : undefined
-  };
-}
-
-/**
- * Logs error with appropriate level and context
- * 
- * @param errorContext - Comprehensive error context
- */
-async function logError(errorContext: ErrorContext): Promise<void> {
-  const logData = {
-    timestamp: new Date().toISOString(),
-    requestId: errorContext.requestId,
-    level: getLogLevel(errorContext.errorSeverity),
-    category: 'middleware_error',
-    errorCategory: errorContext.errorCategory,
-    errorSeverity: errorContext.errorSeverity,
-    errorMessage: errorContext.errorMessage,
-    requestPath: errorContext.requestPath,
-    requestMethod: errorContext.requestMethod,
-    userId: errorContext.userId,
-    sessionId: errorContext.sessionId,
-    clientIP: errorContext.clientIP,
-    processingTimeMs: errorContext.processingTimeMs,
-    middlewareComponent: errorContext.middlewareComponent,
-    processingStage: errorContext.processingStage,
-    recoverable: errorContext.recoverable,
-    auditRequired: errorContext.auditRequired,
-    sensitiveDataInvolved: errorContext.sensitiveDataInvolved,
-    stackTrace: errorContext.isDevelopment ? errorContext.stackTrace : undefined,
-    debugInfo: errorContext.debugInfo
-  };
-  
-  // Use structured logging for production environments
-  if (errorContext.isDevelopment) {
-    console.error('[MIDDLEWARE ERROR]', JSON.stringify(logData, null, 2));
-  } else {
-    console.error(JSON.stringify(logData));
-  }
-  
-  // In production, you would also send to external logging service
-  // await sendToLoggingService(logData);
-}
-
-/**
- * Creates and logs audit event for security compliance
- * 
- * @param errorContext - Error context
- * @param request - Original request
- */
-async function createAndLogAuditEvent(
-  errorContext: ErrorContext,
-  request: NextRequest
-): Promise<void> {
-  const auditEvent: AuditEvent = {
-    eventId: generateEventId(),
-    eventType: getAuditEventType(errorContext.errorCategory),
-    eventSubtype: errorContext.errorCode || 'UNKNOWN_ERROR',
-    timestamp: new Date(),
-    duration: errorContext.processingTimeMs,
-    userId: errorContext.userId || null,
-    userEmail: errorContext.userEmail || null,
-    userRole: errorContext.userRole || null,
-    sessionId: errorContext.sessionId || null,
-    requestId: errorContext.requestId,
-    requestPath: errorContext.requestPath,
-    requestMethod: errorContext.requestMethod as any,
-    requestHeaders: errorContext.requestHeaders,
-    requestBody: null, // Don't log request body for security
-    responseStatus: getResponseStatusFromError(errorContext.errorCategory),
-    responseHeaders: {},
-    responseBody: null,
-    ipAddress: errorContext.clientIP,
-    userAgent: errorContext.userAgent,
-    referrer: errorContext.referrer || null,
-    geoLocation: null, // Would be populated by geo-location service
-    authenticationMethod: null,
-    permissionsChecked: [],
-    accessGranted: false,
-    denyReason: errorContext.errorMessage,
-    processingTime: errorContext.processingTimeMs,
-    cacheHit: false,
-    errorOccurred: true,
-    containsSensitiveData: errorContext.sensitiveDataInvolved,
-    dataClassification: errorContext.sensitiveDataInvolved ? 'CONFIDENTIAL' : 'INTERNAL',
-    metadata: {
-      errorCategory: errorContext.errorCategory,
-      errorSeverity: errorContext.errorSeverity,
-      middlewareComponent: errorContext.middlewareComponent,
-      processingStage: errorContext.processingStage,
-      recoverable: errorContext.recoverable,
-      complianceImpact: errorContext.complianceImpact
-    },
-    tags: [
-      'middleware_error',
-      errorContext.errorCategory.toLowerCase(),
-      errorContext.errorSeverity.toLowerCase()
-    ],
-    complianceFlags: errorContext.complianceImpact ? [{
-      regulation: 'SECURITY_AUDIT',
-      requirement: 'ERROR_LOGGING',
-      met: true,
-      evidence: 'Error logged with full context',
-      assessor: 'MIDDLEWARE',
-      assessedAt: new Date()
-    }] : [],
-    retentionPolicy: errorContext.complianceImpact?.severity === ComplianceSeverity.CRITICAL ? 
-      'LONG_TERM' : 'STANDARD',
-    correlationId: errorContext.requestId,
-    parentEventId: null,
-    relatedEventIds: []
-  };
-  
-  // Log the audit event
-  logAuditEntry(createAuditLogEntry(
-    request,
-    `MIDDLEWARE_ERROR_${errorContext.errorCategory}`,
-    false,
-    {
-      userId: errorContext.userId?.toString(),
-      sessionId: errorContext.sessionId,
-      error: errorContext.errorMessage,
-      metadata: auditEvent.metadata
-    }
-  ));
-}
-
-/**
- * Transforms error based on transformation rules
- * 
- * @param errorContext - Error context to transform
- * @returns Transformed error information
- */
-function transformError(errorContext: ErrorContext): {
-  userMessage: string;
-  statusCode: number;
-  includeDetails: boolean;
-  errorCode?: string;
-} {
-  // Find matching transformation rule
-  const matchingRule = DEFAULT_ERROR_TRANSFORMATIONS.find(rule => {
-    if (typeof rule.errorPattern === 'string') {
-      return errorContext.errorMessage.includes(rule.errorPattern);
-    } else {
-      return rule.errorPattern.test(errorContext.errorMessage);
-    }
-  });
-  
-  if (matchingRule) {
-    return {
-      userMessage: matchingRule.userMessage,
-      statusCode: matchingRule.statusCode,
-      includeDetails: matchingRule.includeDetails && errorContext.isDevelopment,
-      errorCode: errorContext.errorCode
-    };
-  }
-  
-  // Default transformation based on error category
-  return getDefaultTransformation(errorContext);
-}
-
-/**
- * Creates appropriate error response with context
- * 
- * @param transformedError - Transformed error information
- * @param errorContext - Original error context
- * @param request - Original request
- * @returns Promise resolving to error response
- */
-async function createErrorResponse(
-  transformedError: { userMessage: string; statusCode: number; includeDetails: boolean; errorCode?: string },
-  errorContext: ErrorContext,
-  request: NextRequest
-): Promise<NextResponse> {
-  const responseBody: any = {
-    error: transformedError.userMessage,
-    timestamp: new Date().toISOString(),
-    requestId: errorContext.requestId,
-    path: errorContext.requestPath
-  };
-  
-  // Include additional details in development mode
-  if (errorContext.isDevelopment && transformedError.includeDetails) {
-    responseBody.details = {
-      errorCode: transformedError.errorCode,
-      errorCategory: errorContext.errorCategory,
-      errorSeverity: errorContext.errorSeverity,
-      processingStage: errorContext.processingStage,
-      processingTimeMs: errorContext.processingTimeMs,
-      stackTrace: errorContext.stackTrace,
-      debugInfo: errorContext.debugInfo
-    };
-  }
-  
-  // Include error code for API clients
-  if (transformedError.errorCode) {
-    responseBody.code = transformedError.errorCode;
-  }
-  
-  // Include retry information for recoverable errors
-  if (errorContext.recoverable && errorContext.retryCount < errorContext.maxRetries) {
-    const nextRetryIn = calculateNextRetryDelay(errorContext.retryCount);
-    responseBody.retry = {
-      retryable: true,
-      retryCount: errorContext.retryCount,
-      maxRetries: errorContext.maxRetries,
-      nextRetryIn: nextRetryIn,
-      retryAfter: Math.ceil(nextRetryIn / 1000) // Retry-After header value in seconds
-    };
-  }
-  
-  // Create response with appropriate headers
-  const response = NextResponse.json(responseBody, { status: transformedError.statusCode });
-  
-  // Add security headers
-  addSecurityHeaders(response, errorContext.requestId);
-  
-  // Add retry headers for recoverable errors
-  if (errorContext.recoverable && responseBody.retry) {
-    response.headers.set('Retry-After', responseBody.retry.retryAfter.toString());
-  }
-  
-  // Add CORS headers for API requests
-  if (errorContext.requestPath.startsWith('/api/')) {
-    addCORSHeaders(response, request);
-  }
-  
-  return response;
-}
-
-/**
- * Adds performance tracking headers to response
- * 
- * @param response - Response object
- * @param processingTime - Processing time in milliseconds
- * @param requestId - Request identifier
- */
-function addPerformanceHeaders(
-  response: NextResponse,
-  processingTime: number,
-  requestId: string
-): void {
-  response.headers.set('X-Processing-Time', `${processingTime.toFixed(2)}ms`);
-  response.headers.set('X-Request-ID', requestId);
-  
-  // Add performance warnings if processing time is high
-  if (processingTime > MIDDLEWARE_DEFAULTS.PERFORMANCE_WARNING_THRESHOLD) {
-    response.headers.set('X-Performance-Warning', 'Processing time exceeded threshold');
-  }
-}
-
-/**
- * Logs performance warning for slow error handling
- * 
- * @param processingTime - Processing time in milliseconds
- * @param errorContext - Error context
- * @param requestId - Request identifier
- */
-async function logPerformanceWarning(
-  processingTime: number,
-  errorContext: ErrorContext,
-  requestId: string
-): Promise<void> {
-  const warning: PerformanceWarning = {
-    warningType: PerformanceWarningType.PROCESSING_TIME_EXCEEDED,
-    warningMessage: `Error handling processing time (${processingTime.toFixed(2)}ms) exceeded threshold (${MIDDLEWARE_DEFAULTS.PERFORMANCE_WARNING_THRESHOLD}ms)`,
-    threshold: MIDDLEWARE_DEFAULTS.PERFORMANCE_WARNING_THRESHOLD,
-    actualValue: processingTime,
-    severity: processingTime > 200 ? PerformanceWarningSeverity.ERROR : PerformanceWarningSeverity.WARNING,
-    timestamp: new Date(),
-    component: MiddlewareComponent.ERROR_HANDLING,
-    requestId,
-    userId: errorContext.userId || null,
-    suggestedActions: [
-      'Review error handling complexity',
-      'Optimize error logging operations',
-      'Consider caching error transformations',
-      'Monitor system resource usage'
-    ],
-    automaticMitigation: false,
-    mitigationApplied: false,
-    occurrenceCount: 1,
-    firstOccurrence: new Date(),
-    lastOccurrence: new Date()
-  };
-  
-  console.warn('[PERFORMANCE WARNING]', JSON.stringify(warning, null, 2));
-}
-
-/**
- * Creates fallback error response when primary error handling fails
- * 
- * @param request - Original request
- * @param requestId - Request identifier
- * @returns Fallback error response
- */
-function createFallbackErrorResponse(
-  request: NextRequest,
-  requestId: string
-): NextResponse {
-  const response = NextResponse.json(
-    {
-      error: 'An internal error occurred while processing your request',
-      timestamp: new Date().toISOString(),
-      requestId,
-      path: request.nextUrl.pathname
-    },
-    { status: 500 }
-  );
-  
-  // Add minimal security headers
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('X-Request-ID', requestId);
-  
-  return response;
-}
-
-// ============================================================================
-// ERROR RECOVERY AND RETRY MECHANISMS
-// ============================================================================
-
-/**
- * Calculates next retry delay using exponential backoff with jitter
- * 
- * @param retryCount - Current retry attempt number
- * @param strategy - Recovery strategy configuration
- * @returns Delay in milliseconds
- */
-export function calculateNextRetryDelay(
-  retryCount: number,
-  strategy: RecoveryStrategy = DEFAULT_RECOVERY_STRATEGY
-): number {
-  const exponentialDelay = strategy.baseDelay * Math.pow(strategy.exponentialBase, retryCount);
-  const cappedDelay = Math.min(exponentialDelay, strategy.maxDelay);
-  
-  if (strategy.jitterEnabled) {
-    // Add random jitter to prevent thundering herd
-    const jitter = Math.random() * 0.1 * cappedDelay; // 10% jitter
-    return Math.floor(cappedDelay + jitter);
-  }
-  
-  return cappedDelay;
-}
-
-/**
- * Determines if error is recoverable through retry
- * 
- * @param errorCategory - Error category
- * @param errorCode - Specific error code
- * @returns Boolean indicating if error is recoverable
- */
-function isErrorRecoverable(errorCategory: ErrorCategory, errorCode?: string): boolean {
-  // Network and server errors are generally recoverable
-  if (errorCategory === ErrorCategory.NETWORK || errorCategory === ErrorCategory.SERVER) {
-    return true;
-  }
-  
-  // Some authentication errors are recoverable (token refresh)
-  if (errorCategory === ErrorCategory.AUTHENTICATION && errorCode === 'TOKEN_EXPIRED') {
-    return true;
-  }
-  
-  // Performance errors might be recoverable
-  if (errorCategory === ErrorCategory.PERFORMANCE) {
-    return true;
-  }
-  
-  // Client, validation, and authorization errors are generally not recoverable
-  return false;
-}
-
-/**
- * Creates recovery actions for recoverable errors
- * 
- * @param errorContext - Error context
- * @returns Array of recovery actions
- */
-export function createRecoveryActions(errorContext: ErrorContext): RecoveryAction[] {
-  const actions: RecoveryAction[] = [];
-  
-  if (!errorContext.recoverable) {
-    return actions;
-  }
-  
-  // Add retry action if within retry limits
-  if (errorContext.retryCount < errorContext.maxRetries) {
-    actions.push({
-      action: RecoveryActionType.RETRY_OPERATION,
-      description: `Retry operation (attempt ${errorContext.retryCount + 1}/${errorContext.maxRetries})`,
-      executed: false,
-      executedAt: null,
-      result: null,
-      errorMessage: null
-    });
-  }
-  
-  // Add cache fallback for appropriate scenarios
-  if (errorContext.errorCategory === ErrorCategory.NETWORK || 
-      errorContext.errorCategory === ErrorCategory.SERVER) {
-    actions.push({
-      action: RecoveryActionType.FALLBACK_TO_CACHE,
-      description: 'Use cached data if available',
-      executed: false,
-      executedAt: null,
-      result: null,
-      errorMessage: null
-    });
-  }
-  
-  // Add authentication recovery for auth errors
-  if (errorContext.errorCategory === ErrorCategory.AUTHENTICATION) {
-    actions.push({
-      action: RecoveryActionType.REDIRECT_TO_LOGIN,
-      description: 'Redirect to login page for re-authentication',
-      executed: false,
-      executedAt: null,
-      result: null,
-      errorMessage: null
-    });
-  }
-  
-  // Always add logging action
-  actions.push({
-    action: RecoveryActionType.LOG_AND_CONTINUE,
-    description: 'Log error and continue with graceful degradation',
-    executed: false,
-    executedAt: null,
-    result: null,
-    errorMessage: null
-  });
-  
-  return actions;
-}
-
-// ============================================================================
-// REACT ERROR BOUNDARY INTEGRATION
-// ============================================================================
-
-/**
- * Error boundary integration data for client-side error handling
- */
-export interface ErrorBoundaryContext {
-  errorId: string;
-  errorMessage: string;
-  componentStack?: string;
-  errorBoundary: string;
-  userId?: number;
-  sessionId?: string;
-  timestamp: Date;
-  userAgent: string;
-  url: string;
-  additionalContext?: Record<string, unknown>;
-}
-
-/**
- * Processes React Error Boundary errors for logging and recovery
- * 
- * @param error - React error object
- * @param errorInfo - Error boundary information
- * @param userContext - User context if available
- * @returns Error boundary context for further processing
- */
-export function handleReactErrorBoundary(
-  error: Error,
-  errorInfo: { componentStack?: string },
-  userContext?: { userId?: number; sessionId?: string }
-): ErrorBoundaryContext {
-  const errorBoundaryContext: ErrorBoundaryContext = {
-    errorId: generateEventId(),
-    errorMessage: error.message,
-    componentStack: errorInfo.componentStack,
-    errorBoundary: 'React Error Boundary',
-    userId: userContext?.userId,
-    sessionId: userContext?.sessionId,
-    timestamp: new Date(),
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown',
-    url: typeof window !== 'undefined' ? window.location.href : 'Unknown',
-    additionalContext: {
-      errorName: error.name,
-      errorStack: error.stack,
-      componentStack: errorInfo.componentStack
-    }
-  };
-  
-  // Log error boundary error
-  logReactErrorBoundary(errorBoundaryContext);
-  
-  return errorBoundaryContext;
-}
-
-/**
- * Logs React Error Boundary errors
- * 
- * @param context - Error boundary context
- */
-function logReactErrorBoundary(context: ErrorBoundaryContext): void {
-  const logData = {
-    timestamp: context.timestamp.toISOString(),
-    level: 'error',
-    category: 'react_error_boundary',
-    errorId: context.errorId,
-    errorMessage: context.errorMessage,
-    userId: context.userId,
-    sessionId: context.sessionId,
-    userAgent: context.userAgent,
-    url: context.url,
-    componentStack: context.componentStack,
-    additionalContext: context.additionalContext
-  };
-  
-  console.error('[REACT ERROR BOUNDARY]', JSON.stringify(logData, null, 2));
-  
-  // In production, send to external logging service
-  // await sendToLoggingService(logData);
-}
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Classifies error based on message and code
- * 
- * @param errorMessage - Error message
- * @param errorCode - Error code
- * @returns Error category
- */
-function classifyError(errorMessage: string, errorCode?: string): ErrorCategory {
-  const message = errorMessage.toLowerCase();
-  
-  // Authentication errors
-  if (message.includes('unauthorized') || message.includes('authentication') || 
-      message.includes('token') || errorCode === 'UNAUTHORIZED') {
-    return ErrorCategory.AUTHENTICATION;
-  }
-  
-  // Authorization errors
-  if (message.includes('forbidden') || message.includes('permission') || 
-      message.includes('access denied') || errorCode === 'FORBIDDEN') {
-    return ErrorCategory.AUTHORIZATION;
-  }
-  
-  // Validation errors
-  if (message.includes('validation') || message.includes('invalid') || 
-      message.includes('required') || errorCode === 'VALIDATION_FAILED') {
-    return ErrorCategory.VALIDATION;
-  }
-  
-  // Network errors
-  if (message.includes('network') || message.includes('connection') || 
-      message.includes('timeout') || errorCode === 'NETWORK_ERROR') {
-    return ErrorCategory.NETWORK;
-  }
-  
-  // Server errors
-  if (message.includes('server') || message.includes('internal') || 
-      message.includes('service unavailable') || errorCode?.startsWith('5')) {
-    return ErrorCategory.SERVER;
-  }
-  
-  // Security errors
-  if (message.includes('security') || message.includes('csrf') || 
-      message.includes('suspicious') || errorCode === 'SECURITY_VIOLATION') {
-    return ErrorCategory.SECURITY;
-  }
-  
-  // Performance errors
-  if (message.includes('timeout') || message.includes('slow') || 
-      message.includes('performance') || errorCode === 'PERFORMANCE_DEGRADATION') {
-    return ErrorCategory.PERFORMANCE;
-  }
-  
-  // Configuration errors
-  if (message.includes('configuration') || message.includes('config') || 
-      message.includes('environment') || errorCode === 'CONFIG_ERROR') {
-    return ErrorCategory.CONFIGURATION;
-  }
-  
-  // Default to unknown
-  return ErrorCategory.UNKNOWN;
-}
-
-/**
- * Determines error severity based on category and code
- * 
- * @param errorCategory - Error category
- * @param errorCode - Error code
- * @returns Error severity
- */
-function determineErrorSeverity(errorCategory: ErrorCategory, errorCode?: string): ErrorSeverity {
-  switch (errorCategory) {
-    case ErrorCategory.SECURITY:
-      return ErrorSeverity.CRITICAL;
-    
-    case ErrorCategory.SERVER:
-      return errorCode?.startsWith('5') ? ErrorSeverity.HIGH : ErrorSeverity.MEDIUM;
-    
-    case ErrorCategory.AUTHENTICATION:
-    case ErrorCategory.AUTHORIZATION:
-      return ErrorSeverity.MEDIUM;
-    
-    case ErrorCategory.NETWORK:
-    case ErrorCategory.PERFORMANCE:
-    case ErrorCategory.CONFIGURATION:
-      return ErrorSeverity.MEDIUM;
-    
-    case ErrorCategory.VALIDATION:
-    case ErrorCategory.CLIENT:
-      return ErrorSeverity.LOW;
-    
-    default:
-      return ErrorSeverity.MEDIUM;
-  }
-}
-
-/**
- * Extracts safe headers for logging (excludes sensitive data)
- * 
- * @param headers - Request headers
- * @returns Safe headers object
- */
-function extractSafeHeaders(headers: Headers): Record<string, string> {
-  const safeHeaders: Record<string, string> = {};
-  const sensitiveHeaders = [
-    'authorization',
-    'cookie',
-    'x-dreamfactory-session-token',
-    'x-api-key',
-    'x-dreamfactory-api-key'
-  ];
-  
-  headers.forEach((value, key) => {
-    if (!sensitiveHeaders.includes(key.toLowerCase())) {
-      safeHeaders[key] = value;
-    }
-  });
-  
-  return safeHeaders;
-}
-
-/**
- * Determines if audit logging is required for error
- * 
- * @param errorCategory - Error category
- * @param errorSeverity - Error severity
- * @returns Boolean indicating if audit is required
- */
-function requiresAudit(errorCategory: ErrorCategory, errorSeverity: ErrorSeverity): boolean {
-  // Always audit security and authentication errors
-  if (errorCategory === ErrorCategory.SECURITY || 
-      errorCategory === ErrorCategory.AUTHENTICATION) {
-    return true;
-  }
-  
-  // Audit high and critical severity errors
-  if (errorSeverity === ErrorSeverity.HIGH || errorSeverity === ErrorSeverity.CRITICAL) {
-    return true;
-  }
-  
-  // Audit authorization errors
-  if (errorCategory === ErrorCategory.AUTHORIZATION) {
-    return true;
-  }
-  
-  return false;
-}
-
-/**
- * Checks if sensitive data might be involved in the error
- * 
- * @param requestPath - Request path
- * @param errorMessage - Error message
- * @returns Boolean indicating sensitive data involvement
- */
-function checkSensitiveDataInvolvement(requestPath: string, errorMessage: string): boolean {
-  const sensitivePaths = [
-    '/admin-settings',
-    '/system-settings',
-    '/api-security',
-    '/profile',
-    '/api/v2/user',
-    '/api/v2/system'
-  ];
-  
-  const sensitiveKeywords = [
-    'password',
-    'token',
-    'secret',
-    'credential',
-    'session',
-    'auth',
-    'key'
-  ];
-  
-  // Check if path involves sensitive data
-  if (sensitivePaths.some(path => requestPath.startsWith(path))) {
-    return true;
-  }
-  
-  // Check if error message contains sensitive keywords
-  const lowerMessage = errorMessage.toLowerCase();
-  if (sensitiveKeywords.some(keyword => lowerMessage.includes(keyword))) {
-    return true;
-  }
-  
-  return false;
-}
-
-/**
- * Assesses compliance impact of error
- * 
- * @param errorCategory - Error category
- * @param sensitiveDataInvolved - Whether sensitive data is involved
- * @returns Compliance impact assessment
- */
-function assessComplianceImpact(
-  errorCategory: ErrorCategory,
-  sensitiveDataInvolved: boolean
-): ComplianceImpact | undefined {
-  if (!sensitiveDataInvolved && errorCategory !== ErrorCategory.SECURITY) {
-    return undefined;
-  }
-  
-  let severity = ComplianceSeverity.LOW;
-  const regulations = ['SECURITY_AUDIT'];
-  const dataTypes = ['SYSTEM_DATA'];
-  
-  if (errorCategory === ErrorCategory.SECURITY) {
-    severity = ComplianceSeverity.HIGH;
-    regulations.push('SECURITY_COMPLIANCE');
-  }
-  
-  if (sensitiveDataInvolved) {
-    severity = ComplianceSeverity.MEDIUM;
-    dataTypes.push('SENSITIVE_DATA');
-  }
-  
-  return {
-    severity,
-    regulations,
-    dataTypes,
-    reportingRequired: severity === ComplianceSeverity.HIGH || severity === ComplianceSeverity.CRITICAL,
-    retentionPeriod: severity === ComplianceSeverity.HIGH ? 2555 : 365, // 7 years for high, 1 year for others
-    escalationRequired: severity === ComplianceSeverity.CRITICAL
-  };
-}
-
-/**
- * Gets appropriate log level for error severity
- * 
- * @param errorSeverity - Error severity
- * @returns Log level string
- */
-function getLogLevel(errorSeverity: ErrorSeverity): string {
-  switch (errorSeverity) {
-    case ErrorSeverity.LOW:
-      return 'info';
-    case ErrorSeverity.MEDIUM:
-      return 'warn';
-    case ErrorSeverity.HIGH:
-    case ErrorSeverity.CRITICAL:
-      return 'error';
-    default:
-      return 'warn';
-  }
-}
-
-/**
- * Gets audit event type based on error category
- * 
- * @param errorCategory - Error category
- * @returns Audit event type
- */
-function getAuditEventType(errorCategory: ErrorCategory): AuditEventType {
-  switch (errorCategory) {
-    case ErrorCategory.AUTHENTICATION:
-      return AuditEventType.LOGIN_FAILURE;
-    case ErrorCategory.AUTHORIZATION:
-      return AuditEventType.ACCESS_DENIED;
-    case ErrorCategory.SECURITY:
-      return AuditEventType.SECURITY_VIOLATION;
-    default:
-      return AuditEventType.SYSTEM_ERROR;
-  }
-}
-
-/**
- * Gets HTTP status code from error category
- * 
- * @param errorCategory - Error category
- * @returns HTTP status code
- */
-function getResponseStatusFromError(errorCategory: ErrorCategory): any {
-  switch (errorCategory) {
-    case ErrorCategory.AUTHENTICATION:
-      return 401;
-    case ErrorCategory.AUTHORIZATION:
-      return 403;
-    case ErrorCategory.VALIDATION:
-      return 400;
-    case ErrorCategory.NETWORK:
-      return 503;
-    case ErrorCategory.SERVER:
-      return 500;
-    default:
-      return 500;
-  }
-}
-
-/**
- * Gets default error transformation for unmatched errors
- * 
- * @param errorContext - Error context
- * @returns Default transformation
- */
-function getDefaultTransformation(errorContext: ErrorContext): {
-  userMessage: string;
-  statusCode: number;
-  includeDetails: boolean;
-  errorCode?: string;
-} {
-  switch (errorContext.errorCategory) {
-    case ErrorCategory.AUTHENTICATION:
-      return {
-        userMessage: 'Authentication required. Please sign in.',
-        statusCode: 401,
-        includeDetails: false,
-        errorCode: errorContext.errorCode
-      };
-    
-    case ErrorCategory.AUTHORIZATION:
-      return {
-        userMessage: 'You do not have permission to perform this action.',
-        statusCode: 403,
-        includeDetails: false,
-        errorCode: errorContext.errorCode
-      };
-    
-    case ErrorCategory.VALIDATION:
-      return {
-        userMessage: 'Invalid input provided. Please check your data and try again.',
-        statusCode: 400,
-        includeDetails: errorContext.isDevelopment,
-        errorCode: errorContext.errorCode
-      };
-    
-    case ErrorCategory.NETWORK:
-      return {
-        userMessage: 'Network connection error. Please check your connection and try again.',
-        statusCode: 503,
-        includeDetails: false,
-        errorCode: errorContext.errorCode
-      };
-    
-    case ErrorCategory.SERVER:
-      return {
-        userMessage: 'A server error occurred. Please try again later.',
-        statusCode: 500,
-        includeDetails: false,
-        errorCode: errorContext.errorCode
-      };
-    
-    case ErrorCategory.SECURITY:
-      return {
-        userMessage: 'Security violation detected. This incident has been logged.',
-        statusCode: 403,
-        includeDetails: false,
-        errorCode: errorContext.errorCode
-      };
-    
-    default:
-      return {
-        userMessage: 'An unexpected error occurred. Please try again.',
-        statusCode: 500,
-        includeDetails: errorContext.isDevelopment,
-        errorCode: errorContext.errorCode
-      };
-  }
-}
-
-/**
- * Adds security headers to error response
- * 
- * @param response - Response object
- * @param requestId - Request identifier
- */
-function addSecurityHeaders(response: NextResponse, requestId: string): void {
-  const headers = { ...ERROR_RESPONSE_SECURITY_HEADERS };
-  headers['X-Request-ID'] = requestId;
-  headers['X-Processing-Time'] = response.headers.get('X-Processing-Time') || '0ms';
-  
-  Object.entries(headers).forEach(([key, value]) => {
-    if (value) {
-      response.headers.set(key, value);
-    }
-  });
-}
-
-/**
- * Adds CORS headers for API error responses
- * 
- * @param response - Response object
- * @param request - Original request
- */
-function addCORSHeaders(response: NextResponse, request: NextRequest): void {
-  const origin = request.headers.get('origin');
-  
-  if (origin) {
-    response.headers.set('Access-Control-Allow-Origin', origin);
-    response.headers.set('Access-Control-Allow-Credentials', 'true');
-  }
-  
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-DreamFactory-Session-Token');
-}
-
-/**
- * Generates unique request identifier
- * 
- * @returns Unique request ID
- */
-function generateRequestId(): string {
-  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
- * Generates unique event identifier
- * 
- * @returns Unique event ID
- */
-function generateEventId(): string {
-  return `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-// ============================================================================
-// DEVELOPMENT MODE ENHANCEMENTS
-// ============================================================================
-
-/**
- * Development mode error enhancement with detailed debugging information
- * 
- * @param errorContext - Error context
- * @returns Enhanced error information for development
- */
-export function enhanceErrorForDevelopment(errorContext: ErrorContext): Record<string, unknown> {
-  if (!errorContext.isDevelopment) {
-    return {};
-  }
-  
-  return {
-    developmentInfo: {
-      errorCategory: errorContext.errorCategory,
-      errorSeverity: errorContext.errorSeverity,
-      middlewareComponent: errorContext.middlewareComponent,
-      processingStage: errorContext.processingStage,
-      stackTrace: errorContext.stackTrace,
-      originalError: errorContext.originalError?.toString(),
-      requestHeaders: errorContext.requestHeaders,
-      requestQuery: errorContext.requestQuery,
-      processingTimeMs: errorContext.processingTimeMs,
-      memoryUsage: errorContext.memoryUsage,
-      recoverable: errorContext.recoverable,
-      auditRequired: errorContext.auditRequired,
-      sensitiveDataInvolved: errorContext.sensitiveDataInvolved,
-      complianceImpact: errorContext.complianceImpact,
-      debugInfo: errorContext.debugInfo,
-      suggestions: getDevelopmentSuggestions(errorContext)
-    }
-  };
-}
-
-/**
- * Provides development suggestions based on error context
- * 
- * @param errorContext - Error context
- * @returns Array of suggestions for developers
- */
-function getDevelopmentSuggestions(errorContext: ErrorContext): string[] {
-  const suggestions: string[] = [];
-  
-  switch (errorContext.errorCategory) {
-    case ErrorCategory.AUTHENTICATION:
-      suggestions.push(
-        'Check if session token is valid and not expired',
-        'Verify authentication middleware configuration',
-        'Ensure proper token extraction from headers or cookies'
-      );
-      break;
-    
-    case ErrorCategory.AUTHORIZATION:
-      suggestions.push(
-        'Verify user permissions and role assignments',
-        'Check RBAC configuration for the requested resource',
-        'Ensure permission validation logic is correct'
-      );
-      break;
-    
-    case ErrorCategory.VALIDATION:
-      suggestions.push(
-        'Check Zod schema validation rules',
-        'Verify form field types and constraints',
-        'Ensure proper error handling in form components'
-      );
-      break;
-    
-    case ErrorCategory.NETWORK:
-      suggestions.push(
-        'Check network connectivity and API endpoints',
-        'Verify CORS configuration for cross-origin requests',
-        'Consider implementing retry logic for transient failures'
-      );
-      break;
-    
-    case ErrorCategory.SERVER:
-      suggestions.push(
-        'Check server logs for detailed error information',
-        'Verify API endpoint implementation and error handling',
-        'Consider implementing circuit breaker pattern'
-      );
-      break;
-    
-    case ErrorCategory.PERFORMANCE:
-      suggestions.push(
-        'Review processing time and identify bottlenecks',
-        'Consider caching strategies for improved performance',
-        'Optimize database queries and API calls'
-      );
-      break;
-    
-    default:
-      suggestions.push(
-        'Review error logs for additional context',
-        'Consider adding more specific error handling',
-        'Verify middleware configuration and order'
-      );
-  }
-  
-  if (errorContext.processingTimeMs > MIDDLEWARE_DEFAULTS.PERFORMANCE_WARNING_THRESHOLD) {
-    suggestions.push(
-      'Processing time exceeded threshold - consider optimization',
-      'Review middleware complexity and async operations',
-      'Consider implementing timeout handling'
+    const fallbackResponse = createErrorResponse(
+      'An unexpected error occurred while processing your request',
+      500,
+      {
+        fallback: true,
+        timestamp: new Date().toISOString(),
+        requestId: `fallback_${Date.now()}`,
+      }
     );
+    
+    return fallbackResponse;
+  } finally {
+    // Clean up rate limiter cache periodically
+    if (Math.random() < 0.01) { // 1% chance to trigger cleanup
+      EdgeRateLimiter.cleanup();
+    }
+  }
+}
+
+/**
+ * Error boundary integration helper for React components
+ * Provides server-side error context for client-side error boundaries
+ */
+export function createErrorBoundaryProps(
+  error: Error,
+  errorInfo?: any
+): {
+  error: Error;
+  errorInfo: any;
+  requestId: string;
+  timestamp: string;
+  development?: any;
+} {
+  const props = {
+    error,
+    errorInfo,
+    requestId: `client_error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: new Date().toISOString(),
+  };
+  
+  if (isDevelopmentMode()) {
+    props.development = {
+      stack: error.stack,
+      componentStack: errorInfo?.componentStack,
+      errorBoundary: errorInfo?.errorBoundary,
+      nodeVersion: process.version,
+    };
   }
   
-  return suggestions;
+  return props;
+}
+
+/**
+ * Development mode error enhancement
+ * Provides additional debugging information for development environments
+ */
+export function enhanceErrorForDevelopment(
+  error: any,
+  request: NextRequest,
+  additionalContext?: Record<string, any>
+): any {
+  if (!isDevelopmentMode()) {
+    return error;
+  }
+  
+  return {
+    ...error,
+    __development: {
+      originalError: error,
+      request: {
+        method: request.method,
+        url: request.url,
+        headers: Object.fromEntries(request.headers.entries()),
+        timestamp: new Date().toISOString(),
+      },
+      environment: {
+        nodeVersion: process.version,
+        nextVersion: process.env.NEXT_VERSION || 'unknown',
+        isDevelopment: true,
+      },
+      additionalContext,
+    },
+  };
+}
+
+/**
+ * Error metrics collector for monitoring and alerting
+ * Tracks error rates and patterns for system health monitoring
+ */
+export class ErrorMetricsCollector {
+  private static errorCounts = new Map<string, number>();
+  private static lastReset = Date.now();
+  private static readonly RESET_INTERVAL = 300000; // 5 minutes
+  
+  /**
+   * Records an error occurrence for metrics tracking
+   */
+  static recordError(
+    statusCode: number,
+    category: ErrorCategory,
+    severity: ErrorSeverity
+  ): void {
+    const key = `${statusCode}_${category}_${severity}`;
+    const current = this.errorCounts.get(key) || 0;
+    this.errorCounts.set(key, current + 1);
+    
+    // Reset metrics periodically
+    if (Date.now() - this.lastReset > this.RESET_INTERVAL) {
+      this.reset();
+    }
+  }
+  
+  /**
+   * Gets current error metrics
+   */
+  static getMetrics(): Record<string, number> {
+    return Object.fromEntries(this.errorCounts.entries());
+  }
+  
+  /**
+   * Resets error metrics
+   */
+  static reset(): void {
+    this.errorCounts.clear();
+    this.lastReset = Date.now();
+  }
+  
+  /**
+   * Gets error rate for specific category
+   */
+  static getErrorRate(category: ErrorCategory): number {
+    let totalErrors = 0;
+    let categoryErrors = 0;
+    
+    for (const [key, count] of this.errorCounts.entries()) {
+      totalErrors += count;
+      if (key.includes(category)) {
+        categoryErrors += count;
+      }
+    }
+    
+    return totalErrors > 0 ? categoryErrors / totalErrors : 0;
+  }
 }
 
 // ============================================================================
 // EXPORTS
 // ============================================================================
 
+// Export main error handling function
+export { handleError as default };
+
+// Export error classification and utilities
 export {
-  type ErrorContext,
-  type ErrorBoundaryContext,
-  type RecoveryStrategy,
-  type ErrorTransformationRule,
   ErrorCategory,
   ErrorSeverity,
-  HttpErrorCode,
-  DEFAULT_RECOVERY_STRATEGY,
-  DEFAULT_ERROR_TRANSFORMATIONS
+  RecoveryStrategy,
+  ERROR_CLASSIFICATION,
+  createErrorContext,
+  sanitizeErrorMessage,
+  calculateBackoffDelay,
+  shouldRetryError,
+  createErrorAuditLog,
+  ErrorMetricsCollector,
 };
 
-export default handleMiddlewareError;
+// Export response builders
+export {
+  createAPIErrorResponse,
+  createHTMLErrorResponse,
+  createRetryResponse,
+};
+
+// Export rate limiting functions
+export {
+  checkErrorRateLimit,
+  handleErrorRateLimitExceeded,
+};
+
+// Export error boundary integration
+export {
+  createErrorBoundaryProps,
+  enhanceErrorForDevelopment,
+};
+
+// Export configuration
+export {
+  DEFAULT_ERROR_CONFIG,
+  type ErrorHandlingConfig,
+  type ErrorContext,
+};
