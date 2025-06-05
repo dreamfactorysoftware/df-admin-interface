@@ -1,271 +1,621 @@
 /**
- * @fileoverview Comprehensive TypeScript type definitions for database field management 
- * adapted for React patterns. Defines interfaces for field schemas, form data structures, 
- * function usage patterns, and validation rules compatible with React Hook Form, Zod 
- * validation, and API responses while maintaining compatibility with DreamFactory field 
- * schema requirements.
+ * Database Field Management Types for React/Next.js DreamFactory Admin Interface
  * 
+ * Comprehensive TypeScript type definitions for database field management adapted for React patterns.
+ * Defines interfaces for field schemas, form data structures, function usage patterns, and validation
+ * rules compatible with React Hook Form, Zod validation, and API responses while maintaining 
+ * compatibility with DreamFactory field schema requirements.
+ * 
+ * @fileoverview Field management types for database schema operations
  * @version 1.0.0
- * @created 2024-12-28
- * 
- * Key Features:
- * - Type-safe configuration workflows per Section 5.2 Component Details
- * - React Hook Form with Zod schema validators for all user inputs
- * - TypeScript 5.8+ with enhanced template literal types and improved inference
- * - Strong typing for all field metadata and validation rules
- * - TanStack Table column definitions for field listing virtualization
- * - Next.js routing parameter types for dynamic field navigation
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { z } from 'zod'
-import type { FieldPath, FieldValues, UseFormReturn } from 'react-hook-form'
-import type { ColumnDef } from '@tanstack/react-table'
+import { z } from 'zod';
+import type { 
+  UseFormReturn, 
+  FieldValues, 
+  Control, 
+  FieldPath,
+  FieldPathValue,
+  FieldError
+} from 'react-hook-form';
+import type { ColumnDef } from '@tanstack/react-table';
+import type { ReactNode } from 'react';
+
+// Import related types for integration
+import type { 
+  ApiListResponse,
+  ApiResourceResponse,
+  ApiErrorResponse,
+  PaginationMeta
+} from '../../../types/api';
+import type {
+  DatabaseField,
+  TableRelationship,
+  DatabaseType
+} from '../../../types/database';
+import type {
+  BaseComponent,
+  ComponentVariant,
+  ComponentSize,
+  FormFieldComponent
+} from '../../../types/ui';
 
 // =============================================================================
-// CORE DATABASE FIELD TYPES
+// CORE FIELD TYPE DEFINITIONS
 // =============================================================================
 
 /**
- * Enhanced DatabaseSchemaFieldType extracted from Angular implementation
- * with React Hook Form compatibility and improved type safety
+ * Enhanced database schema field type migrated from Angular
+ * Maintains compatibility with existing DreamFactory API while adding React features
  */
 export interface DatabaseSchemaFieldType {
-  /** Field alias for API generation */
-  alias: string | null
-  /** Whether field accepts NULL values */
-  allowNull: boolean
-  /** Auto-increment field flag */
-  autoIncrement: boolean
-  /** Database function usage configurations */
-  dbFunction: DbFunctionUseType[] | null
-  /** Database-specific type (e.g., VARCHAR, INT) */
-  dbType: string | null
-  /** Field description for documentation */
-  description: string | null
-  /** Default value for the field */
-  default: string | number | boolean | null
-  /** Fixed-length field flag */
-  fixedLength: boolean
-  /** Aggregate field flag for calculated values */
-  isAggregate: boolean
-  /** Foreign key relationship flag */
-  isForeignKey: boolean
-  /** Primary key flag */
-  isPrimaryKey: boolean
-  /** Unique constraint flag */
-  isUnique: boolean
-  /** Virtual field flag (computed/calculated) */
-  isVirtual: boolean
-  /** Display label for UI components */
-  label: string
-  /** Field length constraint */
-  length: number | null
+  // Core field identification
   /** Field name (database column name) */
-  name: string
-  /** Native database-specific properties */
-  native: unknown[] | null
-  /** Comma-separated picklist values */
-  picklist: string | null
-  /** Decimal precision for numeric fields */
-  precision: number | null
-  /** Referenced field name for foreign keys */
-  refField: string | null
-  /** Referenced table name for foreign keys */
-  refTable: string | null
-  /** ON DELETE action for foreign key constraints */
-  refOnDelete: string | null
-  /** ON UPDATE action for foreign key constraints */
-  refOnUpdate: string | null
-  /** Required field validation flag */
-  required: boolean
-  /** Decimal scale for numeric fields */
-  scale: number
-  /** Multi-byte character support flag */
-  supportsMultibyte: boolean
-  /** DreamFactory field type (string, integer, boolean, etc.) */
-  type: DreamFactoryFieldType
-  /** JSON validation rules string */
-  validation: string | null
-  /** Field value array for complex types */
-  value: unknown[]
+  name: string;
+  /** Display label for UI */
+  label: string;
+  /** Field alias for API operations */
+  alias: string | null;
+  /** Field description or comment */
+  description: string | null;
+
+  // Data type definitions
+  /** DreamFactory field type (normalized) */
+  type: FieldDataType;
+  /** Native database type */
+  dbType: string | null;
+  /** Field length or maximum size */
+  length: number | null;
+  /** Numeric precision for decimal types */
+  precision: number | null;
+  /** Numeric scale for decimal types */
+  scale: number;
+  /** Fixed length string indicator */
+  fixedLength: boolean;
+  /** Supports multibyte characters */
+  supportsMultibyte: boolean;
+
+  // Constraints and properties
+  /** Field is required (NOT NULL) */
+  required: boolean;
+  /** Field allows NULL values */
+  allowNull: boolean;
+  /** Field is primary key */
+  isPrimaryKey: boolean;
+  /** Field is foreign key */
+  isForeignKey: boolean;
+  /** Field has unique constraint */
+  isUnique: boolean;
+  /** Field is auto-increment */
+  autoIncrement: boolean;
+  /** Field is virtual/computed */
+  isVirtual: boolean;
+  /** Field is aggregate function result */
+  isAggregate: boolean;
+
+  // Default and validation
+  /** Default value for field */
+  default: string | null;
+  /** Validation rules JSON string */
+  validation: string | null;
+  /** Picklist values (CSV format) */
+  picklist: string | null;
+
+  // Foreign key relationships
+  /** Referenced table name */
+  refTable: string | null;
+  /** Referenced field name */
+  refField: string | null;
+  /** Foreign key ON DELETE action */
+  refOnDelete: ReferentialAction | null;
+  /** Foreign key ON UPDATE action */
+  refOnUpdate: ReferentialAction | null;
+
+  // Database functions
+  /** Database function usage configurations */
+  dbFunction: DbFunctionUse[] | null;
+
+  // Native database metadata (usually null in admin interface)
+  /** Native database field properties */
+  native: any[] | null;
+  /** Field values for enum types */
+  value: any[];
 }
 
 /**
- * Database function usage configuration for calculated fields
+ * Database function usage configuration
+ * Enhanced from Angular component with React integration
  */
-export interface DbFunctionUseType {
-  /** Array of usage contexts where function applies */
-  use: string[]
+export interface DbFunctionUse {
+  /** SQL operations where function is applied */
+  use: FunctionUseOperation[];
   /** Database function name or expression */
-  function: string
+  function: string;
 }
 
 /**
- * DreamFactory supported field types with enhanced template literal types
+ * Field data types supported by DreamFactory
+ * Enhanced enumeration with additional database-specific types
  */
-export type DreamFactoryFieldType =
-  // String types
+export type FieldDataType =
+  // Core types
+  | 'id'
   | 'string'
-  | 'text'
-  | 'password'
-  | 'email'
-  | 'url'
-  // Numeric types
   | 'integer'
-  | 'bigint'
-  | 'smallint'
-  | 'decimal'
+  | 'text'
+  | 'boolean'
+  | 'binary'
   | 'float'
   | 'double'
-  | 'money'
-  // Date/Time types
+  | 'decimal'
+  
+  // Date/time types
+  | 'datetime'
   | 'date'
   | 'time'
-  | 'datetime'
   | 'timestamp'
-  // Boolean types
-  | 'boolean'
-  // Binary types
-  | 'binary'
-  | 'varbinary'
-  | 'blob'
-  | 'medium_blob'
-  | 'long_blob'
-  // Reference types
-  | 'reference'
+  | 'timestamp_on_create'
+  | 'timestamp_on_update'
+  
+  // User-related types
   | 'user_id'
   | 'user_id_on_create'
   | 'user_id_on_update'
-  | 'timestamp_on_create'
-  | 'timestamp_on_update'
+  
+  // Advanced types
+  | 'reference'
+  | 'json'
+  | 'xml'
+  | 'uuid'
+  | 'blob'
+  | 'clob'
+  | 'geometry'
+  | 'point'
+  | 'linestring'
+  | 'polygon'
+  | 'enum'
+  | 'set';
 
 /**
- * Database constraint types for enhanced validation
+ * SQL function usage operations
+ * Maps to HTTP methods and database operations
  */
-export type DatabaseConstraintType =
-  | 'primary_key'
-  | 'foreign_key'
-  | 'unique'
-  | 'check'
-  | 'not_null'
-  | 'default'
+export type FunctionUseOperation = 
+  | 'SELECT'  // GET operations
+  | 'FILTER'  // GET with filtering
+  | 'INSERT'  // POST operations  
+  | 'UPDATE'; // PATCH/PUT operations
+
+/**
+ * Foreign key referential actions
+ * Standard SQL referential integrity actions
+ */
+export type ReferentialAction = 
+  | 'CASCADE'
+  | 'SET NULL'
+  | 'RESTRICT'
+  | 'NO ACTION'
+  | 'SET DEFAULT';
 
 // =============================================================================
 // REACT HOOK FORM INTEGRATION TYPES
 // =============================================================================
 
 /**
- * React Hook Form compatible field configuration form data
+ * React Hook Form data structure for field configuration
  * Optimized for real-time validation under 100ms
  */
 export interface FieldFormData {
-  /** Basic field information */
-  name: string
-  alias: string
-  label: string
-  description: string
+  // Basic field information
+  name: string;
+  label: string;
+  alias?: string;
+  description?: string;
   
-  /** Type configuration */
-  type: DreamFactoryFieldType
-  dbType: string
+  // Type configuration
+  typeSelection: 'manual' | 'predefined';
+  type: FieldDataType;
+  dbType?: string;
+  manualType?: string;
   
-  /** Size constraints */
-  length: number | null
-  precision: number | null
-  scale: number
+  // Size and precision
+  length?: number;
+  precision?: number;
+  scale?: number;
+  fixedLength: boolean;
+  supportsMultibyte: boolean;
   
-  /** Default value */
-  default: string | number | boolean | null
+  // Constraints
+  required: boolean;
+  allowNull: boolean;
+  isPrimaryKey: boolean;
+  isForeignKey: boolean;
+  isUnique: boolean;
+  autoIncrement: boolean;
+  isVirtual: boolean;
+  isAggregate: boolean;
   
-  /** Boolean flags */
-  allowNull: boolean
-  autoIncrement: boolean
-  fixedLength: boolean
-  isAggregate: boolean
-  isForeignKey: boolean
-  isPrimaryKey: boolean
-  isUnique: boolean
-  isVirtual: boolean
-  required: boolean
-  supportsMultibyte: boolean
+  // Default value and validation
+  default?: string;
+  hasDefaultValue: boolean;
   
-  /** Reference configuration */
-  refTable: string | null
-  refField: string | null
-  refOnDelete: string | null
-  refOnUpdate: string | null
+  // Validation configuration
+  enableValidation: boolean;
+  validationRules?: FieldValidationConfig;
   
-  /** Advanced configuration */
-  picklist: string | null
-  validation: string | null
-  dbFunction: DbFunctionFormData[]
+  // Picklist configuration
+  enablePicklist: boolean;
+  picklistType: 'csv' | 'json';
+  picklistValues?: string;
+  picklistOptions?: string[];
+  
+  // Foreign key configuration
+  referenceTable?: string;
+  referenceField?: string;
+  onDeleteAction: ReferentialAction;
+  onUpdateAction: ReferentialAction;
+  
+  // Database functions
+  enableDbFunctions: boolean;
+  dbFunctions: FieldDbFunctionFormData[];
 }
 
 /**
- * Function usage form data for React Hook Form integration
+ * Database function form data structure
+ * React Hook Form compatible with array fields
  */
-export interface DbFunctionFormData {
-  /** Function usage contexts */
-  use: string[]
-  /** Database function expression */
-  function: string
-  /** Unique ID for form array management */
-  id: string
+export interface FieldDbFunctionFormData {
+  id: string; // Unique identifier for React keys
+  use: FunctionUseOperation[];
+  function: string;
+  enabled: boolean;
 }
 
 /**
- * React Hook Form return type for field configuration
+ * Field validation configuration for React Hook Form
+ * Integrates with Zod schema validation
  */
-export type FieldFormReturn = UseFormReturn<FieldFormData>
+export interface FieldValidationConfig {
+  // String validation
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  format?: 'email' | 'url' | 'phone' | 'custom';
+  
+  // Numeric validation
+  min?: number;
+  max?: number;
+  multipleOf?: number;
+  
+  // Date validation
+  minDate?: string;
+  maxDate?: string;
+  
+  // Custom validation
+  customRule?: string;
+  customMessage?: string;
+  
+  // Validation behavior
+  validateOnChange: boolean;
+  validateOnBlur: boolean;
+  debounceMs: number;
+}
 
 /**
- * Field paths for React Hook Form field references
+ * React Hook Form type-safe form interface
+ * Provides complete type safety for field configuration
  */
-export type FieldFormPaths = FieldPath<FieldFormData>
+export type FieldFormMethods = UseFormReturn<FieldFormData>;
+
+/**
+ * Field form component props interface
+ * Extends base form field component with field-specific features
+ */
+export interface FieldFormComponentProps extends FormFieldComponent {
+  /** Form methods from React Hook Form */
+  form: FieldFormMethods;
+  /** Field being edited (null for new fields) */
+  field?: DatabaseSchemaFieldType | null;
+  /** Available reference tables for foreign keys */
+  referenceTables: TableReference[];
+  /** Database type for type-specific features */
+  databaseType: DatabaseType;
+  /** Loading state for async operations */
+  loading?: boolean;
+  /** Form submission handler */
+  onSubmit: (data: FieldFormData) => Promise<void>;
+  /** Form cancellation handler */
+  onCancel: () => void;
+}
+
+/**
+ * Table reference information for foreign key configuration
+ */
+export interface TableReference {
+  /** Table name */
+  name: string;
+  /** Table display label */
+  label: string;
+  /** Available fields in the table */
+  fields: DatabaseSchemaFieldType[];
+  /** Table schema (for multi-schema databases) */
+  schema?: string;
+}
 
 // =============================================================================
-// ZOD VALIDATION SCHEMA TYPES
+// ZOD VALIDATION SCHEMAS
 // =============================================================================
 
 /**
- * Zod schema type for field validation
- * Ensures real-time validation under 100ms performance target
+ * Field name validation schema
+ * Ensures valid database identifier format
  */
-export type FieldValidationSchema = z.ZodType<FieldFormData>
+export const FieldNameSchema = z
+  .string()
+  .min(1, 'Field name is required')
+  .max(64, 'Field name must be 64 characters or less')
+  .regex(
+    /^[a-zA-Z][a-zA-Z0-9_]*$/,
+    'Field name must start with a letter and contain only letters, numbers, and underscores'
+  )
+  .refine(
+    (name) => !['id', 'created_date', 'last_modified_date'].includes(name.toLowerCase()),
+    'Field name conflicts with system reserved words'
+  );
 
 /**
- * Database function usage Zod schema type
+ * Field label validation schema
  */
-export type DbFunctionValidationSchema = z.ZodType<DbFunctionFormData>
+export const FieldLabelSchema = z
+  .string()
+  .min(1, 'Field label is required')
+  .max(255, 'Field label must be 255 characters or less')
+  .trim();
 
 /**
- * Zod validation error context for enhanced error reporting
+ * Field type validation schema
  */
-export interface FieldValidationError {
-  /** Field path where validation failed */
-  path: string[]
-  /** Error message */
-  message: string
-  /** Error code for programmatic handling */
-  code: string
-  /** Expected value type or format */
-  expected?: string
-  /** Received value that failed validation */
-  received?: unknown
+export const FieldTypeSchema = z.enum([
+  'id',
+  'string',
+  'integer', 
+  'text',
+  'boolean',
+  'binary',
+  'float',
+  'double',
+  'decimal',
+  'datetime',
+  'date',
+  'time',
+  'timestamp',
+  'timestamp_on_create',
+  'timestamp_on_update',
+  'user_id',
+  'user_id_on_create',
+  'user_id_on_update',
+  'reference',
+  'json',
+  'xml',
+  'uuid',
+  'blob',
+  'clob',
+  'geometry',
+  'point',
+  'linestring',
+  'polygon',
+  'enum',
+  'set'
+], {
+  errorMap: () => ({ message: 'Please select a valid field type' })
+});
+
+/**
+ * Database function use validation schema
+ */
+export const DbFunctionUseSchema = z.object({
+  id: z.string().uuid(),
+  use: z
+    .array(z.enum(['SELECT', 'FILTER', 'INSERT', 'UPDATE']))
+    .min(1, 'At least one operation must be selected'),
+  function: z
+    .string()
+    .min(1, 'Function expression is required')
+    .max(1000, 'Function expression is too long'),
+  enabled: z.boolean().default(true)
+}).strict();
+
+/**
+ * Field validation rules schema for real-time validation
+ */
+export const FieldValidationConfigSchema = z.object({
+  // String validation
+  minLength: z.number().min(0).max(65535).optional(),
+  maxLength: z.number().min(1).max(65535).optional(),
+  pattern: z.string().max(500).optional(),
+  format: z.enum(['email', 'url', 'phone', 'custom']).optional(),
+  
+  // Numeric validation
+  min: z.number().optional(),
+  max: z.number().optional(),
+  multipleOf: z.number().positive().optional(),
+  
+  // Date validation
+  minDate: z.string().datetime().optional(),
+  maxDate: z.string().datetime().optional(),
+  
+  // Custom validation
+  customRule: z.string().max(2000).optional(),
+  customMessage: z.string().max(255).optional(),
+  
+  // Validation behavior
+  validateOnChange: z.boolean().default(true),
+  validateOnBlur: z.boolean().default(true),
+  debounceMs: z.number().min(0).max(1000).default(100)
+}).strict().refine(
+  (data) => !data.maxLength || !data.minLength || data.maxLength >= data.minLength,
+  {
+    message: 'Maximum length must be greater than or equal to minimum length',
+    path: ['maxLength']
+  }
+).refine(
+  (data) => !data.max || !data.min || data.max >= data.min,
+  {
+    message: 'Maximum value must be greater than or equal to minimum value',
+    path: ['max']
+  }
+);
+
+/**
+ * Complete field form data validation schema
+ * Provides comprehensive validation for all field configuration options
+ */
+export const FieldFormDataSchema = z.object({
+  // Basic information
+  name: FieldNameSchema,
+  label: FieldLabelSchema,
+  alias: z.string().max(64).optional(),
+  description: z.string().max(1000).optional(),
+  
+  // Type configuration
+  typeSelection: z.enum(['manual', 'predefined']),
+  type: FieldTypeSchema,
+  dbType: z.string().max(100).optional(),
+  manualType: z.string().max(100).optional(),
+  
+  // Size and precision
+  length: z.number().min(1).max(2147483647).optional(),
+  precision: z.number().min(1).max(65).optional(),
+  scale: z.number().min(0).max(30).default(0),
+  fixedLength: z.boolean().default(false),
+  supportsMultibyte: z.boolean().default(false),
+  
+  // Constraints
+  required: z.boolean().default(false),
+  allowNull: z.boolean().default(true),
+  isPrimaryKey: z.boolean().default(false),
+  isForeignKey: z.boolean().default(false),
+  isUnique: z.boolean().default(false),
+  autoIncrement: z.boolean().default(false),
+  isVirtual: z.boolean().default(false),
+  isAggregate: z.boolean().default(false),
+  
+  // Default value
+  default: z.string().max(2000).optional(),
+  hasDefaultValue: z.boolean().default(false),
+  
+  // Validation
+  enableValidation: z.boolean().default(false),
+  validationRules: FieldValidationConfigSchema.optional(),
+  
+  // Picklist
+  enablePicklist: z.boolean().default(false),
+  picklistType: z.enum(['csv', 'json']).default('csv'),
+  picklistValues: z.string().max(10000).optional(),
+  picklistOptions: z.array(z.string()).optional(),
+  
+  // Foreign key
+  referenceTable: z.string().max(64).optional(),
+  referenceField: z.string().max(64).optional(),
+  onDeleteAction: z.enum(['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION', 'SET DEFAULT']).default('RESTRICT'),
+  onUpdateAction: z.enum(['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION', 'SET DEFAULT']).default('RESTRICT'),
+  
+  // Database functions
+  enableDbFunctions: z.boolean().default(false),
+  dbFunctions: z.array(DbFunctionUseSchema).default([])
+}).strict()
+.refine(
+  (data) => data.typeSelection !== 'manual' || !!data.manualType,
+  {
+    message: 'Manual type must be specified when using manual type selection',
+    path: ['manualType']
+  }
+)
+.refine(
+  (data) => !data.hasDefaultValue || !!data.default,
+  {
+    message: 'Default value must be provided when enabled',
+    path: ['default']
+  }
+)
+.refine(
+  (data) => !data.enableValidation || !!data.validationRules,
+  {
+    message: 'Validation rules must be configured when validation is enabled',
+    path: ['validationRules']
+  }
+)
+.refine(
+  (data) => !data.enablePicklist || !!data.picklistValues,
+  {
+    message: 'Picklist values must be provided when picklist is enabled',
+    path: ['picklistValues']
+  }
+)
+.refine(
+  (data) => !data.isForeignKey || (!!data.referenceTable && !!data.referenceField),
+  {
+    message: 'Reference table and field must be specified for foreign keys',
+    path: ['referenceTable']
+  }
+)
+.refine(
+  (data) => !data.isPrimaryKey || !data.allowNull,
+  {
+    message: 'Primary key fields cannot allow null values',
+    path: ['allowNull']
+  }
+);
+
+// =============================================================================
+// API RESPONSE TYPES
+// =============================================================================
+
+/**
+ * Field list API response type
+ * Compatible with DreamFactory schema discovery endpoints
+ */
+export type FieldListResponse = ApiListResponse<DatabaseSchemaFieldType>;
+
+/**
+ * Single field API response type
+ */
+export type FieldResponse = ApiResourceResponse<DatabaseSchemaFieldType>;
+
+/**
+ * Field creation/update request payload
+ */
+export interface FieldCreateRequest {
+  /** Service name */
+  service: string;
+  /** Table name */
+  table: string;
+  /** Field configuration */
+  field: Partial<DatabaseSchemaFieldType>;
 }
 
 /**
- * Custom validation result type for async validation scenarios
+ * Field update request payload
  */
-export interface AsyncValidationResult {
-  /** Validation success flag */
-  isValid: boolean
-  /** Error details if validation failed */
-  errors?: FieldValidationError[]
-  /** Validation completion timestamp */
-  timestamp: number
-  /** Field name being validated */
-  fieldName: string
+export interface FieldUpdateRequest extends FieldCreateRequest {
+  /** Original field name (for field renames) */
+  originalName?: string;
+}
+
+/**
+ * Batch field operations request
+ */
+export interface FieldBatchRequest {
+  /** Service name */
+  service: string;
+  /** Table name */
+  table: string;
+  /** Fields to create/update */
+  fields: Partial<DatabaseSchemaFieldType>[];
+  /** Whether to drop missing fields */
+  dropMissing?: boolean;
 }
 
 // =============================================================================
@@ -273,49 +623,48 @@ export interface AsyncValidationResult {
 // =============================================================================
 
 /**
- * Next.js route parameters for field management pages
+ * Page parameters for field management routes
+ * Provides type safety for Next.js dynamic routes
  */
-export interface FieldRouteParams {
-  /** Database service name */
-  service: string
-  /** Database name */
-  database?: string
-  /** Table name */
-  table?: string
-  /** Field ID for editing */
-  fieldId?: string
+export interface FieldPageParams {
+  /** Service name from route */
+  service: string;
+  /** Table name from route */
+  table: string;
+  /** Field name for editing (optional) */
+  fieldId?: string;
 }
 
 /**
- * Next.js search parameters for field listing and filtering
+ * Search parameters for field listing
  */
 export interface FieldSearchParams {
-  /** Current page number */
-  page?: string
-  /** Items per page */
-  limit?: string
-  /** Sort field name */
-  sortBy?: string
+  /** Search query for field names */
+  search?: string;
+  /** Filter by field type */
+  type?: FieldDataType;
+  /** Filter by constraint type */
+  constraint?: 'primary' | 'foreign' | 'unique' | 'required';
+  /** Sorting column */
+  sort?: 'name' | 'type' | 'required' | 'created';
   /** Sort direction */
-  sortOrder?: 'asc' | 'desc'
-  /** Search/filter query */
-  search?: string
-  /** Field type filter */
-  type?: DreamFactoryFieldType
-  /** Show only virtual fields */
-  virtualOnly?: string
-  /** Show only required fields */
-  requiredOnly?: string
+  order?: 'asc' | 'desc';
+  /** Page number for pagination */
+  page?: string;
+  /** Items per page */
+  limit?: string;
 }
 
 /**
- * Combined route context for field components
+ * Next.js route configuration for field management
  */
-export interface FieldRouteContext {
-  /** Route parameters */
-  params: FieldRouteParams
+export interface FieldRouteConfig {
+  /** Base path for field routes */
+  basePath: string;
+  /** Dynamic parameters */
+  params: FieldPageParams;
   /** Search parameters */
-  searchParams: FieldSearchParams
+  searchParams: FieldSearchParams;
 }
 
 // =============================================================================
@@ -323,351 +672,326 @@ export interface FieldRouteContext {
 // =============================================================================
 
 /**
- * Field table row data for TanStack Table virtualization
- * Optimized for 1000+ field listings
+ * Table column configuration for field listing
+ * Optimized for TanStack Table with virtualization support
  */
-export interface FieldTableRow {
-  /** Unique field identifier */
-  id: string
-  /** Field name */
-  name: string
-  /** Field alias */
-  alias: string
-  /** Field type */
-  type: DreamFactoryFieldType
-  /** Database type */
-  dbType: string
-  /** Virtual field flag */
-  isVirtual: boolean
-  /** Aggregate field flag */
-  isAggregate: boolean
-  /** Required field flag */
-  required: boolean
-  /** Constraint summary string */
-  constraints: string
-  /** Primary key indicator */
-  isPrimaryKey: boolean
-  /** Foreign key indicator */
-  isForeignKey: boolean
-  /** Reference table name */
-  refTable?: string
-  /** Field length */
-  length?: number
-  /** Default value */
-  default?: string | number | boolean
+export interface FieldTableColumn {
+  /** Column identifier */
+  id: keyof DatabaseSchemaFieldType | 'actions';
+  /** Column display name */
+  header: string;
+  /** Column accessor function or key */
+  accessorKey?: keyof DatabaseSchemaFieldType;
+  /** Custom cell renderer */
+  cell?: (props: { row: { original: DatabaseSchemaFieldType } }) => ReactNode;
+  /** Whether column is sortable */
+  enableSorting?: boolean;
+  /** Whether column is filterable */
+  enableColumnFilter?: boolean;
+  /** Column width for virtualization */
+  size?: number;
+  /** Minimum column width */
+  minSize?: number;
+  /** Maximum column width */
+  maxSize?: number;
 }
 
 /**
- * TanStack Table column definition type for field listing
+ * Field table data structure for TanStack Table
+ * Includes virtual scrolling metadata
  */
-export type FieldTableColumn = ColumnDef<FieldTableRow>
-
-/**
- * Field table configuration for customizable displays
- */
-export interface FieldTableConfig {
-  /** Visible columns */
-  columns: FieldTableColumn[]
-  /** Enable virtualization for large datasets */
-  enableVirtualization: boolean
-  /** Page size for pagination */
-  pageSize: number
-  /** Enable sorting */
-  enableSorting: boolean
-  /** Enable filtering */
-  enableFiltering: boolean
-  /** Enable column resizing */
-  enableColumnResizing: boolean
+export interface FieldTableData {
+  /** Field data rows */
+  rows: DatabaseSchemaFieldType[];
+  /** Total row count for pagination */
+  totalRows: number;
+  /** Virtual scrolling configuration */
+  virtualConfig: {
+    /** Estimated row height in pixels */
+    estimateSize: number;
+    /** Overscan count for smooth scrolling */
+    overscan: number;
+  };
+  /** Loading state indicators */
+  loading: {
+    /** Initial data loading */
+    isLoading: boolean;
+    /** Fetching next page */
+    isFetchingNextPage: boolean;
+    /** Background refresh */
+    isRefreshing: boolean;
+  };
+  /** Error state */
+  error?: ApiErrorResponse;
 }
 
 /**
- * Field table state for component management
+ * TanStack Table column definitions for field management
+ * Pre-configured columns with sorting, filtering, and virtualization
  */
-export interface FieldTableState {
-  /** Current page index */
-  pageIndex: number
-  /** Page size */
-  pageSize: number
-  /** Sort configuration */
-  sorting: Array<{
-    id: string
-    desc: boolean
-  }>
-  /** Filter values */
-  columnFilters: Array<{
-    id: string
-    value: unknown
-  }>
-  /** Column visibility */
-  columnVisibility: Record<string, boolean>
-}
-
-// =============================================================================
-// FUNCTION USAGE REACT COMPONENT TYPES
-// =============================================================================
-
-/**
- * Props for the React function usage component
- */
-export interface FunctionUseComponentProps {
-  /** Form control reference */
-  control: FieldFormReturn['control']
-  /** Field name for the function array */
-  name: 'dbFunction'
-  /** Available functions dropdown options */
-  functionOptions: FunctionOption[]
-  /** Available usage contexts */
-  usageOptions: UsageOption[]
-  /** Show as accordion/expandable section */
-  showAccordion?: boolean
-  /** Component disabled state */
-  disabled?: boolean
-  /** Maximum number of functions allowed */
-  maxFunctions?: number
-}
-
-/**
- * Function dropdown option
- */
-export interface FunctionOption {
-  /** Function value */
-  value: string
-  /** Display label */
-  label: string
-  /** Function description */
-  description?: string
-  /** Function category */
-  category?: string
-  /** SQL example */
-  example?: string
-}
-
-/**
- * Usage context option
- */
-export interface UsageOption {
-  /** Usage value */
-  value: string
-  /** Display label */
-  label: string
-  /** Usage description */
-  description?: string
-}
-
-/**
- * Function usage table row for component display
- */
-export interface FunctionUseTableRow {
-  /** Unique identifier */
-  id: string
-  /** Selected usage contexts */
-  use: string[]
-  /** Function expression */
-  function: string
-  /** Row index for form array management */
-  index: number
-}
-
-// =============================================================================
-// API RESPONSE TYPES
-// =============================================================================
-
-/**
- * API response for field CRUD operations
- */
-export interface FieldApiResponse {
-  /** Operation success flag */
-  success: boolean
-  /** Response message */
-  message?: string
-  /** Field data */
-  data?: DatabaseSchemaFieldType
-  /** Error details if operation failed */
-  error?: {
-    code: string
-    message: string
-    details?: unknown
+export const fieldTableColumns: ColumnDef<DatabaseSchemaFieldType>[] = [
+  {
+    id: 'name',
+    header: 'Field Name',
+    accessorKey: 'name',
+    enableSorting: true,
+    enableColumnFilter: true,
+    size: 200,
+    minSize: 150,
+    maxSize: 300
+  },
+  {
+    id: 'label',
+    header: 'Label',
+    accessorKey: 'label',
+    enableSorting: true,
+    enableColumnFilter: true,
+    size: 200,
+    minSize: 150,
+    maxSize: 300
+  },
+  {
+    id: 'type',
+    header: 'Type',
+    accessorKey: 'type',
+    enableSorting: true,
+    enableColumnFilter: true,
+    size: 120,
+    minSize: 100,
+    maxSize: 150
+  },
+  {
+    id: 'required',
+    header: 'Required',
+    accessorKey: 'required',
+    enableSorting: true,
+    enableColumnFilter: true,
+    size: 100,
+    minSize: 80,
+    maxSize: 120
+  },
+  {
+    id: 'isPrimaryKey',
+    header: 'Primary Key',
+    accessorKey: 'isPrimaryKey',
+    enableSorting: true,
+    enableColumnFilter: true,
+    size: 100,
+    minSize: 80,
+    maxSize: 120
+  },
+  {
+    id: 'isForeignKey',
+    header: 'Foreign Key',
+    accessorKey: 'isForeignKey',
+    enableSorting: true,
+    enableColumnFilter: true,
+    size: 100,
+    minSize: 80,
+    maxSize: 120
+  },
+  {
+    id: 'actions',
+    header: 'Actions',
+    size: 120,
+    minSize: 100,
+    maxSize: 150,
+    enableSorting: false,
+    enableColumnFilter: false
   }
-  /** Response metadata */
-  meta?: {
-    timestamp: number
-    requestId: string
+];
+
+// =============================================================================
+// UTILITY TYPES AND CONSTANTS
+// =============================================================================
+
+/**
+ * Field type dropdown options for form selection
+ * Migrated from Angular component with enhanced categorization
+ */
+export const FIELD_TYPE_OPTIONS: { 
+  label: string; 
+  value: FieldDataType | 'manual'; 
+  category: string;
+  description: string;
+}[] = [
+  // Core types
+  { label: 'I will manually enter a type', value: 'manual', category: 'Custom', description: 'Define a custom database-specific type' },
+  { label: 'ID (Auto-increment)', value: 'id', category: 'Core', description: 'Auto-incrementing primary key' },
+  { label: 'String', value: 'string', category: 'Core', description: 'Variable-length text field' },
+  { label: 'Integer', value: 'integer', category: 'Core', description: 'Whole number field' },
+  { label: 'Text', value: 'text', category: 'Core', description: 'Large text content' },
+  { label: 'Boolean', value: 'boolean', category: 'Core', description: 'True/false value' },
+  { label: 'Binary', value: 'binary', category: 'Core', description: 'Binary data storage' },
+  
+  // Numeric types
+  { label: 'Float', value: 'float', category: 'Numeric', description: 'Single precision floating point' },
+  { label: 'Double', value: 'double', category: 'Numeric', description: 'Double precision floating point' },
+  { label: 'Decimal', value: 'decimal', category: 'Numeric', description: 'Fixed precision decimal' },
+  
+  // Date/time types
+  { label: 'DateTime', value: 'datetime', category: 'Date/Time', description: 'Date and time value' },
+  { label: 'Date', value: 'date', category: 'Date/Time', description: 'Date only value' },
+  { label: 'Time', value: 'time', category: 'Date/Time', description: 'Time only value' },
+  { label: 'Timestamp', value: 'timestamp', category: 'Date/Time', description: 'Unix timestamp' },
+  { label: 'Timestamp (On Create)', value: 'timestamp_on_create', category: 'Date/Time', description: 'Automatically set on record creation' },
+  { label: 'Timestamp (On Update)', value: 'timestamp_on_update', category: 'Date/Time', description: 'Automatically set on record update' },
+  
+  // User-related types
+  { label: 'User ID', value: 'user_id', category: 'User', description: 'Reference to user ID' },
+  { label: 'User ID (On Create)', value: 'user_id_on_create', category: 'User', description: 'Set to current user on creation' },
+  { label: 'User ID (On Update)', value: 'user_id_on_update', category: 'User', description: 'Set to current user on update' },
+  
+  // Reference and advanced types
+  { label: 'Reference', value: 'reference', category: 'Relationships', description: 'Foreign key reference' },
+  { label: 'JSON', value: 'json', category: 'Advanced', description: 'JSON document storage' },
+  { label: 'XML', value: 'xml', category: 'Advanced', description: 'XML document storage' },
+  { label: 'UUID', value: 'uuid', category: 'Advanced', description: 'Universally unique identifier' }
+];
+
+/**
+ * Function use operation options for database functions
+ */
+export const FUNCTION_USE_OPTIONS: {
+  label: string;
+  value: FunctionUseOperation;
+  description: string;
+  httpMethod: string;
+}[] = [
+  { 
+    label: 'SELECT (GET)', 
+    value: 'SELECT', 
+    description: 'Apply function during SELECT operations',
+    httpMethod: 'GET'
+  },
+  { 
+    label: 'FILTER (GET)', 
+    value: 'FILTER', 
+    description: 'Apply function during filtering operations',
+    httpMethod: 'GET'
+  },
+  { 
+    label: 'INSERT (POST)', 
+    value: 'INSERT', 
+    description: 'Apply function during INSERT operations',
+    httpMethod: 'POST'
+  },
+  { 
+    label: 'UPDATE (PATCH)', 
+    value: 'UPDATE', 
+    description: 'Apply function during UPDATE operations',
+    httpMethod: 'PATCH'
   }
-}
+];
 
 /**
- * Bulk field operations response
+ * Referential action options for foreign key constraints
  */
-export interface BulkFieldApiResponse {
-  /** Overall operation success */
-  success: boolean
-  /** Successfully processed fields */
-  successful: string[]
-  /** Failed field operations */
-  failed: Array<{
-    fieldName: string
-    error: string
-  }>
-  /** Response message */
-  message?: string
-}
-
-// =============================================================================
-// UTILITY TYPES
-// =============================================================================
-
-/**
- * Field creation context with validation
- */
-export interface FieldCreationContext {
-  /** Parent table name */
-  tableName: string
-  /** Service name */
-  serviceName: string
-  /** Available field types for the database */
-  availableTypes: DreamFactoryFieldType[]
-  /** Existing field names for uniqueness validation */
-  existingFieldNames: string[]
-  /** Database constraints and limitations */
-  constraints: {
-    maxFieldNameLength: number
-    maxLabelLength: number
-    supportedConstraints: DatabaseConstraintType[]
+export const REFERENTIAL_ACTION_OPTIONS: {
+  label: string;
+  value: ReferentialAction;
+  description: string;
+}[] = [
+  { 
+    label: 'CASCADE', 
+    value: 'CASCADE', 
+    description: 'Automatically update/delete related records' 
+  },
+  { 
+    label: 'SET NULL', 
+    value: 'SET NULL', 
+    description: 'Set foreign key field to NULL' 
+  },
+  { 
+    label: 'RESTRICT', 
+    value: 'RESTRICT', 
+    description: 'Prevent update/delete if related records exist' 
+  },
+  { 
+    label: 'NO ACTION', 
+    value: 'NO ACTION', 
+    description: 'No action taken on related records' 
+  },
+  { 
+    label: 'SET DEFAULT', 
+    value: 'SET DEFAULT', 
+    description: 'Set foreign key field to default value' 
   }
-}
+];
 
 /**
- * Field update context with change tracking
+ * Default field configuration values
+ * Used for form initialization and field creation
  */
-export interface FieldUpdateContext extends FieldCreationContext {
-  /** Original field data for comparison */
-  originalField: DatabaseSchemaFieldType
-  /** Fields that have been modified */
-  modifiedFields: (keyof DatabaseSchemaFieldType)[]
-  /** Whether field rename is allowed */
-  allowRename: boolean
-}
+export const DEFAULT_FIELD_CONFIG: Partial<FieldFormData> = {
+  typeSelection: 'predefined',
+  type: 'string',
+  fixedLength: false,
+  supportsMultibyte: false,
+  required: false,
+  allowNull: true,
+  isPrimaryKey: false,
+  isForeignKey: false,
+  isUnique: false,
+  autoIncrement: false,
+  isVirtual: false,
+  isAggregate: false,
+  hasDefaultValue: false,
+  enableValidation: false,
+  enablePicklist: false,
+  picklistType: 'csv',
+  onDeleteAction: 'RESTRICT',
+  onUpdateAction: 'RESTRICT',
+  enableDbFunctions: false,
+  dbFunctions: [],
+  scale: 0
+};
 
 /**
- * Utility type for extracting field paths with dot notation
- */
-export type DeepFieldPath<T> = T extends object
-  ? {
-      [K in keyof T]: K extends string
-        ? T[K] extends object
-          ? `${K}` | `${K}.${DeepFieldPath<T[K]>}`
-          : `${K}`
-        : never
-    }[keyof T]
-  : never
-
-/**
- * Type-safe field access helper
- */
-export type FieldValue<T, P extends DeepFieldPath<T>> = P extends `${infer K}.${infer Rest}`
-  ? K extends keyof T
-    ? Rest extends DeepFieldPath<T[K]>
-      ? FieldValue<T[K], Rest>
-      : never
-    : never
-  : P extends keyof T
-  ? T[P]
-  : never
-
-// =============================================================================
-// FORM STEP WIZARD TYPES
-// =============================================================================
-
-/**
- * Field creation wizard step type
- */
-export type FieldWizardStep = 
-  | 'basic'
-  | 'type'
-  | 'constraints'
-  | 'reference'
-  | 'advanced'
-  | 'review'
-
-/**
- * Field wizard state management
- */
-export interface FieldWizardState {
-  /** Current step */
-  currentStep: FieldWizardStep
-  /** Completed steps */
-  completedSteps: FieldWizardStep[]
-  /** Step validation status */
-  stepValidation: Record<FieldWizardStep, boolean>
-  /** Form data */
-  formData: Partial<FieldFormData>
-  /** Wizard configuration */
-  config: {
-    allowStepSkip: boolean
-    showProgress: boolean
-    enableAutoSave: boolean
-  }
-}
-
-/**
- * Field wizard step component props
- */
-export interface FieldWizardStepProps {
-  /** Form control */
-  form: FieldFormReturn
-  /** Current wizard state */
-  wizardState: FieldWizardState
-  /** Step navigation functions */
-  navigation: {
-    nextStep: () => void
-    previousStep: () => void
-    goToStep: (step: FieldWizardStep) => void
-  }
-  /** Field creation context */
-  context: FieldCreationContext
-}
-
-// =============================================================================
-// EXPORTS
-// =============================================================================
-
-/**
- * Default export combining all field types for convenient importing
+ * Export all types for external consumption
+ * Provides convenient access to all field-related types
  */
 export type {
   // Core types
-  DatabaseSchemaFieldType as FieldType,
-  DbFunctionUseType as FunctionUse,
-  DreamFactoryFieldType as FieldValueType,
+  DatabaseSchemaFieldType,
+  DbFunctionUse,
+  FieldDataType,
+  FunctionUseOperation,
+  ReferentialAction,
   
   // Form types
-  FieldFormData as FormData,
-  FieldFormReturn as FormReturn,
-  
-  // Validation types
-  FieldValidationSchema as ValidationSchema,
-  AsyncValidationResult as ValidationResult,
-  
-  // Table types
-  FieldTableRow as TableRow,
-  FieldTableColumn as TableColumn,
-  FieldTableState as TableState,
-  
-  // Route types
-  FieldRouteParams as RouteParams,
-  FieldSearchParams as SearchParams,
-  FieldRouteContext as RouteContext,
+  FieldFormData,
+  FieldDbFunctionFormData,
+  FieldValidationConfig,
+  FieldFormMethods,
+  FieldFormComponentProps,
+  TableReference,
   
   // API types
-  FieldApiResponse as ApiResponse,
-  BulkFieldApiResponse as BulkApiResponse,
+  FieldListResponse,
+  FieldResponse,
+  FieldCreateRequest,
+  FieldUpdateRequest,
+  FieldBatchRequest,
   
-  // Context types
-  FieldCreationContext as CreationContext,
-  FieldUpdateContext as UpdateContext,
+  // Routing types
+  FieldPageParams,
+  FieldSearchParams,
+  FieldRouteConfig,
   
-  // Wizard types
-  FieldWizardStep as WizardStep,
-  FieldWizardState as WizardState,
-  FieldWizardStepProps as WizardStepProps,
-}
+  // Table types
+  FieldTableColumn,
+  FieldTableData
+};
+
+/**
+ * Validation schema exports for external use
+ */
+export {
+  FieldNameSchema,
+  FieldLabelSchema,
+  FieldTypeSchema,
+  DbFunctionUseSchema,
+  FieldValidationConfigSchema,
+  FieldFormDataSchema
+};
