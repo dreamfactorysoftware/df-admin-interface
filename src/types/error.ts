@@ -1,580 +1,671 @@
 /**
- * Error management types for global error state handling, categorization,
- * recovery workflows, and error boundary integration.
+ * Comprehensive error handling types for DreamFactory Admin Interface
  * 
- * Provides comprehensive error typing for React 19 Error Boundaries,
- * API error handling, validation errors, and user feedback systems.
+ * This module provides complete type definitions for the error handling system including:
+ * - Error classification and categorization types
+ * - Error boundary integration interfaces
+ * - Retry mechanism and circuit breaker configurations
+ * - Error context collection and reporting structures
+ * - User-friendly error message and recovery action types
+ * - Metrics and monitoring interfaces
+ * 
+ * Supports React 19 error boundaries, Next.js middleware patterns, and comprehensive
+ * error recovery workflows with accessibility and internationalization considerations.
+ * 
+ * @fileoverview Comprehensive error handling type definitions
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { LogLevel, LogContext } from './logging';
+import React from 'react';
+import { ApiErrorResponse, HttpStatusCode } from '@/types/api';
 
-export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
-export type ErrorCategory = 
-  | 'api' 
-  | 'network' 
-  | 'authentication' 
-  | 'authorization' 
-  | 'validation' 
-  | 'database' 
-  | 'schema' 
-  | 'permission' 
-  | 'configuration' 
-  | 'system' 
-  | 'user_input' 
-  | 'file_upload' 
-  | 'performance' 
-  | 'unknown';
-
-export type ErrorRecoveryAction = 
-  | 'retry' 
-  | 'refresh' 
-  | 'login' 
-  | 'navigate' 
-  | 'contact_support' 
-  | 'dismiss' 
-  | 'report' 
-  | 'fallback' 
-  | 'none';
-
-export type ErrorPersistenceLevel = 'session' | 'permanent' | 'temporary';
+// ============================================================================
+// Core Error Types and Classifications
+// ============================================================================
 
 /**
- * Core error interface defining the structure of all application errors
+ * Primary error type classification for different error scenarios
  */
-export interface AppError {
-  /** Unique error identifier */
-  id: string;
-  /** Error message for display */
-  message: string;
-  /** Technical error details for debugging */
-  details?: string;
-  /** Error category for classification */
-  category: ErrorCategory;
+export enum ErrorType {
+  /** Network connectivity and communication errors */
+  NETWORK = 'NETWORK',
+  /** Input validation and form errors */
+  VALIDATION = 'VALIDATION',
+  /** Authentication and session errors */
+  AUTHENTICATION = 'AUTHENTICATION',
+  /** Authorization and permission errors */
+  AUTHORIZATION = 'AUTHORIZATION',
+  /** Server-side processing errors */
+  SERVER = 'SERVER',
+  /** Client-side request errors */
+  CLIENT = 'CLIENT',
+  /** System-level and unexpected errors */
+  SYSTEM = 'SYSTEM',
+}
+
+/**
+ * Error severity levels for prioritization and handling
+ */
+export enum ErrorSeverity {
+  /** Minor issues that don't affect functionality */
+  LOW = 'LOW',
+  /** Issues that affect some functionality */
+  MEDIUM = 'MEDIUM',
+  /** Issues that significantly impact functionality */
+  HIGH = 'HIGH',
+  /** Issues that prevent application usage */
+  CRITICAL = 'CRITICAL',
+}
+
+/**
+ * Error categories for organizational and filtering purposes
+ */
+export enum ErrorCategory {
+  /** User input and interaction errors */
+  USER_INPUT = 'USER_INPUT',
+  /** Infrastructure and network errors */
+  INFRASTRUCTURE = 'INFRASTRUCTURE',
+  /** Security and authentication errors */
+  SECURITY = 'SECURITY',
+  /** Application logic and processing errors */
+  APPLICATION = 'APPLICATION',
+  /** External service and integration errors */
+  EXTERNAL_SERVICE = 'EXTERNAL_SERVICE',
+  /** Database and data access errors */
+  DATABASE = 'DATABASE',
+  /** Configuration and setup errors */
+  CONFIGURATION = 'CONFIGURATION',
+}
+
+/**
+ * Circuit breaker states for preventing cascade failures
+ */
+export enum CircuitBreakerState {
+  /** Normal operation, requests pass through */
+  CLOSED = 'CLOSED',
+  /** Failure threshold exceeded, requests blocked */
+  OPEN = 'OPEN',
+  /** Testing if service has recovered */
+  HALF_OPEN = 'HALF_OPEN',
+}
+
+// ============================================================================
+// Base Error Interfaces
+// ============================================================================
+
+/**
+ * Base error interface for all application errors
+ */
+export interface BaseError {
+  /** Error type classification */
+  type: ErrorType;
   /** Error severity level */
   severity: ErrorSeverity;
-  /** HTTP status code if applicable */
-  statusCode?: number;
-  /** Source of the error (component, API endpoint, etc.) */
-  source?: string;
-  /** Stack trace for debugging */
-  stack?: string;
-  /** Original error object */
-  originalError?: Error;
-  /** Error metadata */
-  metadata?: Record<string, unknown>;
+  /** Error category for organization */
+  category: ErrorCategory;
+  /** Unique error code for programmatic handling */
+  code: string;
+  /** Human-readable error message */
+  message: string;
+  /** Original error object for debugging */
+  originalError?: any;
+  /** Whether this error can be retried */
+  isRetryable: boolean;
   /** Timestamp when error occurred */
   timestamp: string;
-  /** User context when error occurred */
-  context?: LogContext;
-  /** How long to persist this error */
-  persistence: ErrorPersistenceLevel;
-  /** Suggested recovery actions */
-  recoveryActions: ErrorRecoveryAction[];
-  /** Whether error can be automatically retried */
-  retryable: boolean;
-  /** Number of retry attempts made */
-  retryCount?: number;
-  /** Maximum retry attempts allowed */
-  maxRetries?: number;
-  /** Timeout for error display (ms) */
-  timeout?: number;
-  /** Whether error has been dismissed by user */
-  dismissed?: boolean;
-  /** Whether error has been reported */
-  reported?: boolean;
-  /** Component that should handle this error */
-  boundaryComponent?: string;
+  /** Whether this error should be shown to users */
+  userFacing: boolean;
+  /** Correlation ID for request tracing */
+  correlationId?: string;
+  /** Additional error context */
+  context?: ErrorContext;
 }
 
 /**
- * API-specific error interface extending AppError
+ * Network-specific error interface
  */
-export interface ApiError extends AppError {
-  category: 'api' | 'network' | 'authentication' | 'authorization';
-  /** HTTP response status */
-  statusCode: number;
-  /** Response headers */
-  headers?: Record<string, string>;
-  /** Request URL that caused the error */
+export interface NetworkError extends BaseError {
+  type: ErrorType.NETWORK;
+  /** Network error code (e.g., 'TIMEOUT', 'CONNECTION_REFUSED') */
+  networkCode?: string;
+  /** Whether the device is currently offline */
+  isOffline?: boolean;
+  /** Request URL that failed */
   url?: string;
-  /** HTTP method used */
+  /** Request method that failed */
   method?: string;
-  /** Request payload */
-  requestData?: unknown;
-  /** Response data */
-  responseData?: unknown;
-  /** Rate limiting information */
-  rateLimitInfo?: {
-    limit: number;
-    remaining: number;
-    reset: number;
-  };
 }
 
 /**
- * Validation error interface for form and input validation
+ * Validation-specific error interface
  */
-export interface ValidationError extends AppError {
-  category: 'validation' | 'user_input';
-  /** Field name that caused the validation error */
-  field?: string;
-  /** All validation errors by field */
-  fieldErrors?: Record<string, string[]>;
-  /** Form ID or name */
+export interface ValidationError extends BaseError {
+  type: ErrorType.VALIDATION;
+  /** Field-specific validation errors */
+  fieldErrors: Record<string, string[]>;
+  /** Form or schema that failed validation */
   formId?: string;
-  /** Validation rule that failed */
-  rule?: string;
-  /** Expected value or format */
-  expected?: unknown;
-  /** Actual value that failed validation */
-  actual?: unknown;
+  /** Validation rules that were violated */
+  violatedRules?: string[];
 }
 
 /**
- * Database error interface for database operations
+ * Authentication-specific error interface
  */
-export interface DatabaseError extends AppError {
-  category: 'database' | 'schema';
-  /** Database connection name */
-  connection?: string;
-  /** SQL query that caused the error */
-  query?: string;
-  /** Database error code */
-  dbErrorCode?: string | number;
-  /** Database-specific error message */
-  dbMessage?: string;
-  /** Table or collection name */
-  table?: string;
-  /** Operation that failed */
-  operation?: 'create' | 'read' | 'update' | 'delete' | 'connect' | 'schema';
+export interface AuthenticationError extends BaseError {
+  type: ErrorType.AUTHENTICATION;
+  /** Whether user needs to log in again */
+  requiresLogin: boolean;
+  /** Session ID that expired */
+  sessionId?: string;
+  /** Authentication method that failed */
+  authMethod?: string;
 }
 
 /**
- * Permission error interface for access control
+ * Authorization-specific error interface
  */
-export interface PermissionError extends AppError {
-  category: 'permission' | 'authorization';
-  /** Required permission */
-  requiredPermission?: string;
+export interface AuthorizationError extends BaseError {
+  type: ErrorType.AUTHORIZATION;
+  /** Required permissions for the action */
+  requiredPermissions: string[];
   /** User's current permissions */
   userPermissions?: string[];
-  /** Resource being accessed */
+  /** Resource that was accessed */
   resource?: string;
-  /** Action being attempted */
+  /** Action that was attempted */
   action?: string;
-  /** Role requirements */
-  requiredRoles?: string[];
-  /** User's current roles */
-  userRoles?: string[];
 }
 
 /**
- * Network error interface for connectivity issues
+ * Server-specific error interface
  */
-export interface NetworkError extends AppError {
-  category: 'network';
-  /** Network error type */
-  networkErrorType: 'timeout' | 'offline' | 'dns' | 'connection_refused' | 'ssl' | 'unknown';
-  /** Whether device is online */
-  isOnline?: boolean;
-  /** Request timeout duration */
-  timeout?: number;
-  /** Retry strategy */
-  retryStrategy?: 'exponential' | 'linear' | 'immediate' | 'none';
+export interface ServerError extends BaseError {
+  type: ErrorType.SERVER;
+  /** HTTP status code */
+  statusCode: HttpStatusCode;
+  /** Server error message */
+  serverMessage?: string;
+  /** Server trace ID */
+  traceId?: string;
+  /** Service that generated the error */
+  service?: string;
 }
 
 /**
- * Error boundary props for React Error Boundaries
+ * Client-specific error interface
  */
-export interface ErrorBoundaryState {
-  /** Whether an error has occurred */
-  hasError: boolean;
-  /** Current error being displayed */
-  error: AppError | null;
-  /** Error info from React */
-  errorInfo?: {
-    componentStack: string;
+export interface ClientError extends BaseError {
+  type: ErrorType.CLIENT;
+  /** HTTP status code */
+  statusCode: HttpStatusCode;
+  /** Request data that caused the error */
+  requestData?: any;
+  /** Invalid parameters */
+  invalidParams?: string[];
+}
+
+/**
+ * System-specific error interface
+ */
+export interface SystemError extends BaseError {
+  type: ErrorType.SYSTEM;
+  /** Stack trace for debugging */
+  stackTrace?: string;
+  /** Component where error occurred */
+  component?: string;
+  /** Browser or runtime information */
+  runtime?: string;
+}
+
+/**
+ * Union type for all application errors
+ */
+export type AppError = 
+  | NetworkError 
+  | ValidationError 
+  | AuthenticationError 
+  | AuthorizationError 
+  | ServerError 
+  | ClientError 
+  | SystemError;
+
+// ============================================================================
+// Error Context and Reporting
+// ============================================================================
+
+/**
+ * Comprehensive error context for debugging and analysis
+ */
+export interface ErrorContext {
+  /** User-related context */
+  user?: {
+    id?: string;
+    email?: string;
+    role?: string;
+    lastAction?: string;
+    sessionStart?: string;
   };
-  /** Number of errors caught by this boundary */
-  errorCount: number;
-  /** Last error timestamp */
-  lastErrorTime?: string;
-}
-
-/**
- * Error recovery options for user interaction
- */
-export interface ErrorRecoveryOptions {
-  /** Text to display for the action */
-  label: string;
-  /** Action to perform */
-  action: ErrorRecoveryAction;
-  /** URL to navigate to (for navigate action) */
-  url?: string;
-  /** Function to call for custom actions */
-  handler?: () => void | Promise<void>;
-  /** Whether action is primary (highlighted) */
-  primary?: boolean;
-  /** Whether action is destructive */
-  destructive?: boolean;
-  /** Icon to display with action */
-  icon?: string;
-}
-
-/**
- * Error notification configuration
- */
-export interface ErrorNotification {
-  /** Error to display */
-  error: AppError;
-  /** Notification type */
-  type: 'toast' | 'banner' | 'modal' | 'inline';
-  /** Auto-dismiss timeout (0 = no auto-dismiss) */
-  autoHideDelay?: number;
-  /** Whether notification can be dismissed by user */
-  dismissible: boolean;
-  /** Recovery options to show */
-  recoveryOptions?: ErrorRecoveryOptions[];
-  /** Position for toast notifications */
-  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top-center' | 'bottom-center';
-}
-
-/**
- * Error filtering options
- */
-export interface ErrorFilter {
-  /** Filter by categories */
-  categories?: ErrorCategory[];
-  /** Filter by severity levels */
-  severities?: ErrorSeverity[];
-  /** Filter by sources */
-  sources?: string[];
-  /** Filter by date range */
-  dateRange?: {
-    start: Date;
-    end: Date;
+  
+  /** Application-related context */
+  application?: {
+    route?: string;
+    component?: string;
+    feature?: string;
+    version: string;
+    buildId: string;
+    timestamp: string;
   };
-  /** Filter dismissed errors */
-  includeDismissed?: boolean;
-  /** Filter reported errors */
-  includeReported?: boolean;
-  /** Text search in messages */
-  searchText?: string;
-  /** Filter by persistence level */
-  persistenceLevel?: ErrorPersistenceLevel[];
-}
-
-/**
- * Error statistics interface
- */
-export interface ErrorStats {
-  /** Total error count */
-  total: number;
-  /** Count by category */
-  byCategory: Record<ErrorCategory, number>;
-  /** Count by severity */
-  bySeverity: Record<ErrorSeverity, number>;
-  /** Most common error messages */
-  topErrors: Array<{
-    message: string;
-    count: number;
-    lastOccurrence: string;
-  }>;
-  /** Error trend data */
-  trend: Array<{
-    date: string;
-    count: number;
-  }>;
-  /** Resolution statistics */
-  resolution: {
-    dismissed: number;
-    retried: number;
-    reported: number;
-    unresolved: number;
+  
+  /** Environment-related context */
+  environment?: {
+    userAgent?: string;
+    url?: string;
+    referrer?: string;
+    viewport?: {
+      width: number;
+      height: number;
+    };
+    online?: boolean;
+    language?: string;
+  };
+  
+  /** Session-related context */
+  session?: {
+    id?: string;
+    duration?: number;
+    lastActivity?: string;
+    permissions?: string[];
+  };
+  
+  /** Performance-related context */
+  performance?: {
+    navigationStart?: number;
+    loadTime?: number;
+    memory?: {
+      usedJSMemorySize?: number;
+      totalJSMemorySize?: number;
+    };
   };
 }
 
 /**
  * Error reporting configuration
  */
-export interface ErrorReportingConfig {
+export interface ErrorReportingOptions {
   /** Whether error reporting is enabled */
   enabled: boolean;
-  /** API endpoint for error reporting */
-  endpoint?: string;
-  /** API key for error reporting service */
-  apiKey?: string;
-  /** Automatically report errors above this severity */
-  autoReportSeverity?: ErrorSeverity;
-  /** Include user context in reports */
-  includeUserContext: boolean;
-  /** Include stack traces in reports */
+  /** Sampling rate for error reporting (0.0 to 1.0) */
+  sampleRate: number;
+  /** Whether to include stack traces */
   includeStackTrace: boolean;
-  /** Maximum errors to report per session */
-  maxReportsPerSession?: number;
-  /** Batch reporting configuration */
-  batching?: {
-    enabled: boolean;
-    batchSize: number;
-    flushInterval: number;
+  /** Whether to include user context */
+  includeUserContext: boolean;
+  /** Whether to include application context */
+  includeAppContext: boolean;
+  /** Fields to exclude from error reports */
+  excludeFields: string[];
+  /** External monitoring service endpoint */
+  endpoint?: string;
+  /** API key for monitoring service */
+  apiKey?: string;
+}
+
+// ============================================================================
+// Retry and Circuit Breaker Configuration
+// ============================================================================
+
+/**
+ * Retry mechanism configuration
+ */
+export interface RetryConfig {
+  /** Maximum number of retry attempts */
+  maxAttempts: number;
+  /** Initial delay between retries in milliseconds */
+  initialDelay: number;
+  /** Maximum delay between retries in milliseconds */
+  maxDelay: number;
+  /** Backoff multiplier for exponential backoff */
+  backoffFactor: number;
+  /** Whether to add random jitter to delays */
+  jitter: boolean;
+  /** HTTP status codes that should trigger retries */
+  retryableStatusCodes: number[];
+  /** Network error codes that should trigger retries */
+  retryableNetworkErrors: string[];
+}
+
+/**
+ * Circuit breaker configuration
+ */
+export interface CircuitBreakerConfig {
+  /** Number of failures before opening circuit */
+  failureThreshold: number;
+  /** Time to wait before attempting recovery in milliseconds */
+  recoveryTimeout: number;
+  /** Period for monitoring failures in milliseconds */
+  monitoringPeriod: number;
+  /** Maximum attempts in half-open state */
+  halfOpenMaxAttempts: number;
+}
+
+/**
+ * Retry attempt information
+ */
+export interface RetryAttempt {
+  /** Attempt number */
+  attempt: number;
+  /** Delay before this attempt in milliseconds */
+  delay: number;
+  /** Error that triggered the retry */
+  error: AppError;
+  /** Timestamp of the attempt */
+  timestamp: string;
+}
+
+// ============================================================================
+// User Experience and Recovery
+// ============================================================================
+
+/**
+ * Recovery action types for user-initiated error recovery
+ */
+export type RecoveryActionType = 
+  | 'retry'
+  | 'refresh'
+  | 'login'
+  | 'dismiss'
+  | 'contact'
+  | 'navigate'
+  | 'reset';
+
+/**
+ * Recovery action configuration
+ */
+export interface RecoveryAction {
+  /** Type of recovery action */
+  type: RecoveryActionType;
+  /** Display label for the action */
+  label: string;
+  /** Whether this is the primary action */
+  primary: boolean;
+  /** URL for navigation actions */
+  url?: string;
+  /** Accessibility configuration */
+  accessibility?: {
+    ariaLabel: string;
+    keyboardShortcut?: string;
+    description?: string;
   };
 }
 
 /**
- * Error state management configuration
+ * User-friendly error message structure
  */
-export interface ErrorConfig {
-  /** Maximum errors to keep in memory */
-  maxErrors: number;
-  /** Default timeout for error display (ms) */
-  defaultTimeout: number;
-  /** Auto-clear dismissed errors after (ms) */
-  autoClearTimeout: number;
-  /** Maximum retry attempts for retryable errors */
-  maxRetries: number;
-  /** Enable error persistence across sessions */
-  persistErrors: boolean;
-  /** Error reporting configuration */
-  reporting: ErrorReportingConfig;
-  /** Default recovery actions by category */
-  defaultRecoveryActions: Partial<Record<ErrorCategory, ErrorRecoveryAction[]>>;
-  /** Auto-dismiss errors by severity */
-  autoHideBySeverity: Partial<Record<ErrorSeverity, number>>;
+export interface UserFriendlyErrorMessage {
+  /** Main error title */
+  title: string;
+  /** Primary error message */
+  message: string;
+  /** Actionable message with guidance */
+  actionableMessage: string;
+  /** Available recovery options */
+  recoveryOptions: RecoveryAction[];
+  /** Technical details for developers */
+  technicalDetails?: {
+    code: string;
+    timestamp: string;
+    correlationId?: string;
+  };
+  /** Accessibility enhancements */
+  accessibility?: {
+    ariaLabel: string;
+    role: string;
+    screenReaderText: string;
+  };
 }
 
 /**
- * Hook return interface for useError
+ * Error recovery options configuration
  */
-export interface UseErrorReturn {
-  /** Current errors in state */
-  errors: AppError[];
-  /** Add a new error */
-  addError: (error: Partial<AppError> & Pick<AppError, 'message' | 'category'>) => string;
-  /** Remove error by ID */
-  removeError: (id: string) => void;
-  /** Clear all errors */
-  clearErrors: () => void;
-  /** Clear errors by category */
-  clearErrorsByCategory: (category: ErrorCategory) => void;
-  /** Clear dismissed errors */
-  clearDismissedErrors: () => void;
-  /** Dismiss error (mark as dismissed) */
-  dismissError: (id: string) => void;
-  /** Retry error (for retryable errors) */
-  retryError: (id: string) => Promise<void>;
-  /** Report error to external service */
-  reportError: (id: string) => Promise<void>;
-  /** Get errors with filtering */
-  getErrors: (filter?: ErrorFilter) => AppError[];
-  /** Get error statistics */
-  getErrorStats: () => ErrorStats;
-  /** Update error configuration */
-  updateConfig: (config: Partial<ErrorConfig>) => void;
-  /** Current configuration */
-  config: ErrorConfig;
-  /** Whether any critical errors exist */
-  hasCriticalErrors: boolean;
-  /** Whether any unresolved errors exist */
-  hasUnresolvedErrors: boolean;
-  /** Error count by severity */
-  errorCountBySeverity: Record<ErrorSeverity, number>;
-  /** Subscribe to error changes */
-  onErrorChange: (callback: (errors: AppError[]) => void) => () => void;
+export interface ErrorRecoveryOptions {
+  /** Whether to prevent automatic redirects */
+  preventRedirect?: boolean;
+  /** Custom recovery actions */
+  customActions?: RecoveryAction[];
+  /** Component context for targeted recovery */
+  component?: string;
+  /** Feature context for scoped recovery */
+  feature?: string;
+  /** Whether to show technical details */
+  showTechnicalDetails?: boolean;
+}
+
+// ============================================================================
+// Error Boundary Integration
+// ============================================================================
+
+/**
+ * React Error Boundary information
+ */
+export interface ErrorBoundaryInfo {
+  /** Classified error information */
+  error: AppError;
+  /** React error info with component stack */
+  errorInfo?: React.ErrorInfo;
+  /** Function to retry/reset the error boundary */
+  retry: () => void;
+  /** Additional recovery actions */
+  recoveryActions?: RecoveryAction[];
 }
 
 /**
- * Error boundary props interface
+ * Error boundary component props
  */
 export interface ErrorBoundaryProps {
-  /** Children to render when no error */
-  children: React.ReactNode;
-  /** Fallback component to render on error */
-  fallback?: React.ComponentType<ErrorBoundaryFallbackProps>;
-  /** Callback when error occurs */
-  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
-  /** Component name for debugging */
-  componentName?: string;
-  /** Whether to isolate errors to this boundary */
-  isolate?: boolean;
-  /** Recovery actions to offer */
-  recoveryActions?: ErrorRecoveryOptions[];
-}
-
-/**
- * Error boundary fallback props
- */
-export interface ErrorBoundaryFallbackProps {
-  /** Error that occurred */
-  error: AppError;
-  /** Error info from React */
-  errorInfo?: React.ErrorInfo;
-  /** Reset error state */
-  resetError: () => void;
-  /** Retry the failed operation */
-  retry?: () => void;
+  /** Custom fallback component */
+  fallback?: React.ComponentType<ErrorBoundaryInfo>;
+  /** Error reporting callback */
+  onError?: (error: AppError, errorInfo: React.ErrorInfo) => void;
   /** Recovery options */
-  recoveryOptions?: ErrorRecoveryOptions[];
+  recoveryOptions?: ErrorRecoveryOptions;
+  /** Whether to isolate errors to this boundary */
+  isolateErrors?: boolean;
 }
 
-// Error severity mapping to log levels
-export const ERROR_SEVERITY_TO_LOG_LEVEL: Record<ErrorSeverity, LogLevel> = {
-  low: 'warn',
-  medium: 'error',
-  high: 'error',
-  critical: 'fatal',
-} as const;
-
-// Default recovery actions by category
-export const DEFAULT_RECOVERY_ACTIONS: Record<ErrorCategory, ErrorRecoveryAction[]> = {
-  api: ['retry', 'refresh', 'report'],
-  network: ['retry', 'refresh', 'dismiss'],
-  authentication: ['login', 'refresh', 'contact_support'],
-  authorization: ['contact_support', 'dismiss'],
-  validation: ['dismiss'],
-  database: ['retry', 'refresh', 'report'],
-  schema: ['refresh', 'report'],
-  permission: ['contact_support', 'dismiss'],
-  configuration: ['refresh', 'report'],
-  system: ['refresh', 'report', 'contact_support'],
-  user_input: ['dismiss'],
-  file_upload: ['retry', 'dismiss'],
-  performance: ['refresh', 'dismiss'],
-  unknown: ['refresh', 'report'],
-} as const;
-
-// Auto-hide timeouts by severity (in milliseconds)
-export const AUTO_HIDE_TIMEOUTS: Record<ErrorSeverity, number> = {
-  low: 5000,
-  medium: 8000,
-  high: 0, // No auto-hide
-  critical: 0, // No auto-hide
-} as const;
-
-// Default error configuration
-export const DEFAULT_ERROR_CONFIG: ErrorConfig = {
-  maxErrors: 100,
-  defaultTimeout: 8000,
-  autoClearTimeout: 60000, // 1 minute
-  maxRetries: 3,
-  persistErrors: true,
-  reporting: {
-    enabled: false,
-    includeUserContext: true,
-    includeStackTrace: true,
-    maxReportsPerSession: 10,
-    batching: {
-      enabled: true,
-      batchSize: 5,
-      flushInterval: 30000,
-    },
-  },
-  defaultRecoveryActions: DEFAULT_RECOVERY_ACTIONS,
-  autoHideBySeverity: AUTO_HIDE_TIMEOUTS,
-} as const;
+// ============================================================================
+// Metrics and Monitoring
+// ============================================================================
 
 /**
- * Utility function to create an API error
+ * Error metrics for monitoring and analysis
  */
-export function createApiError(
-  message: string,
-  statusCode: number,
-  details?: Partial<ApiError>
-): ApiError {
-  const severity: ErrorSeverity = 
-    statusCode >= 500 ? 'critical' :
-    statusCode >= 400 ? 'medium' : 'low';
+export interface ErrorMetrics {
+  /** Total number of errors */
+  totalErrors: number;
+  /** Errors by type classification */
+  errorsByType: Record<ErrorType, number>;
+  /** Errors by category */
+  errorsByCategory: Record<ErrorCategory, number>;
+  /** Total retry attempts */
+  retryAttempts: number;
+  /** Successfully recovered errors */
+  recoveredErrors: number;
+  /** Average error resolution time */
+  averageResolutionTime?: number;
+  /** Circuit breaker state changes */
+  circuitBreakerStateChanges?: number;
+}
 
-  return {
-    id: `api-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    message,
-    category: statusCode === 401 ? 'authentication' : 
-              statusCode === 403 ? 'authorization' : 'api',
-    severity,
-    statusCode,
-    timestamp: new Date().toISOString(),
-    persistence: 'session',
-    recoveryActions: DEFAULT_RECOVERY_ACTIONS.api,
-    retryable: statusCode >= 500 || statusCode === 408 || statusCode === 429,
-    retryCount: 0,
-    maxRetries: 3,
-    timeout: AUTO_HIDE_TIMEOUTS[severity],
-    ...details,
+/**
+ * Error handler event types
+ */
+export type ErrorHandlerEventType = 
+  | 'error'
+  | 'recovery'
+  | 'retry'
+  | 'circuit_breaker_state_change'
+  | 'metrics_update';
+
+/**
+ * Error handler event
+ */
+export interface ErrorHandlerEvent {
+  /** Event type */
+  type: ErrorHandlerEventType;
+  /** Error information */
+  error?: AppError;
+  /** User-friendly message */
+  userMessage?: UserFriendlyErrorMessage;
+  /** Recovery action taken */
+  recoveryAction?: RecoveryAction;
+  /** Retry attempt information */
+  retryAttempt?: RetryAttempt;
+  /** Circuit breaker state */
+  circuitBreakerState?: CircuitBreakerState;
+  /** Updated metrics */
+  metrics?: ErrorMetrics;
+  /** Event timestamp */
+  timestamp: string;
+}
+
+/**
+ * Error handler event listener function
+ */
+export type ErrorHandlerEventListener = (event: ErrorHandlerEvent) => void;
+
+// ============================================================================
+// Configuration and Setup
+// ============================================================================
+
+/**
+ * Comprehensive error handler configuration
+ */
+export interface ErrorHandlerConfig {
+  /** Retry mechanism configuration */
+  retry: RetryConfig;
+  /** Circuit breaker configuration */
+  circuitBreaker: CircuitBreakerConfig;
+  /** Error reporting configuration */
+  reporting: ErrorReportingOptions;
+  /** User experience configuration */
+  userExperience: {
+    /** Whether to show retry buttons */
+    showRetryButton: boolean;
+    /** Whether to automatically retry transient errors */
+    autoRetryTransientErrors: boolean;
+    /** Whether to show technical error details */
+    showErrorDetails: boolean;
+    /** Notification duration in milliseconds */
+    notificationDuration: number;
+    /** Whether to enable accessibility features */
+    enableAccessibility: boolean;
+    /** Whether to support internationalization */
+    supportI18n: boolean;
+  };
+  /** Performance and monitoring configuration */
+  performance: {
+    /** Whether to track error metrics */
+    trackErrorMetrics: boolean;
+    /** Whether to enable correlation IDs */
+    correlationIdEnabled: boolean;
+    /** Response time thresholds for warnings */
+    responseTimeThresholds: {
+      warn: number;
+      error: number;
+    };
   };
 }
 
-/**
- * Utility function to create a validation error
- */
-export function createValidationError(
-  message: string,
-  field?: string,
-  details?: Partial<ValidationError>
-): ValidationError {
-  return {
-    id: `validation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    message,
-    category: 'validation',
-    severity: 'low',
-    field,
-    timestamp: new Date().toISOString(),
-    persistence: 'temporary',
-    recoveryActions: ['dismiss'],
-    retryable: false,
-    timeout: AUTO_HIDE_TIMEOUTS.low,
-    ...details,
-  };
-}
+// ============================================================================
+// Hook Interface and Utilities
+// ============================================================================
 
 /**
- * Utility function to create a network error
+ * Error context collector function type
  */
-export function createNetworkError(
-  message: string,
-  networkErrorType: NetworkError['networkErrorType'],
-  details?: Partial<NetworkError>
-): NetworkError {
-  return {
-    id: `network-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    message,
-    category: 'network',
-    severity: 'medium',
-    networkErrorType,
-    timestamp: new Date().toISOString(),
-    persistence: 'session',
-    recoveryActions: DEFAULT_RECOVERY_ACTIONS.network,
-    retryable: true,
-    retryCount: 0,
-    maxRetries: 5,
-    timeout: AUTO_HIDE_TIMEOUTS.medium,
-    ...details,
-  };
-}
+export type ErrorContextCollector = (config: ErrorHandlerConfig) => ErrorContext;
 
 /**
- * Utility function to determine if an error is retryable
+ * Error message generator function type
  */
-export function isRetryableError(error: AppError): boolean {
-  if (!error.retryable) return false;
-  if (error.retryCount && error.maxRetries && error.retryCount >= error.maxRetries) return false;
-  return true;
-}
+export type ErrorMessageGenerator = (error: AppError, config: ErrorHandlerConfig) => UserFriendlyErrorMessage;
 
 /**
- * Utility function to get user-friendly error message
+ * Error handler hook return interface
  */
-export function getUserFriendlyMessage(error: AppError): string {
-  switch (error.category) {
-    case 'network':
-      return 'Unable to connect to the server. Please check your internet connection and try again.';
-    case 'authentication':
-      return 'Your session has expired. Please log in again to continue.';
-    case 'authorization':
-      return 'You do not have permission to perform this action. Please contact your administrator.';
-    case 'validation':
-      return error.message || 'Please correct the highlighted fields and try again.';
-    case 'database':
-      return 'A database error occurred. Please try again or contact support if the problem persists.';
-    default:
-      return error.message || 'An unexpected error occurred. Please try again.';
-  }
+export interface UseErrorHandlerReturn {
+  /** Handle any error with comprehensive processing */
+  handleError: (error: any, options?: Partial<ErrorRecoveryOptions>) => Promise<UserFriendlyErrorMessage>;
+  
+  /** Retry operation with circuit breaker and exponential backoff */
+  retryWithBackoff: <T>(
+    operation: () => Promise<T>,
+    options?: Partial<RetryConfig>
+  ) => Promise<T>;
+  
+  /** Create React Error Boundary component */
+  createErrorBoundary: (
+    fallbackComponent?: React.ComponentType<ErrorBoundaryInfo>
+  ) => React.ComponentType<React.PropsWithChildren<{}>>;
+  
+  /** Recover from a specific error */
+  recoverFromError: (errorId: string, action: RecoveryAction) => Promise<boolean>;
+  
+  /** Clear all active errors */
+  clearErrors: () => void;
+  
+  /** Get current active errors */
+  activeErrors: AppError[];
+  
+  /** Get error metrics */
+  getMetrics: () => ErrorMetrics;
+  
+  /** Reset circuit breaker */
+  resetCircuitBreaker: () => void;
+  
+  /** Get circuit breaker state */
+  getCircuitBreakerState: () => CircuitBreakerState;
+  
+  /** Add event listener */
+  addEventListener: (listener: ErrorHandlerEventListener) => () => void;
 }
+
+// ============================================================================
+// Utility Types for External Integration
+// ============================================================================
+
+/**
+ * API error response classifier
+ */
+export type ApiErrorClassifier = (response: ApiErrorResponse) => AppError;
+
+/**
+ * Network error detector
+ */
+export type NetworkErrorDetector = (error: any) => boolean;
+
+/**
+ * Error sanitizer for production environments
+ */
+export type ErrorSanitizer = (error: AppError, config: ErrorHandlerConfig) => AppError;
+
+/**
+ * Error recovery strategy
+ */
+export type ErrorRecoveryStrategy = (error: AppError) => RecoveryAction[];
+
+/**
+ * Error reporting service integration
+ */
+export interface ErrorReportingService {
+  /** Report error to external service */
+  report: (error: AppError, context: ErrorContext) => Promise<void>;
+  /** Batch report multiple errors */
+  batchReport: (errors: Array<{ error: AppError; context: ErrorContext }>) => Promise<void>;
+  /** Configure service settings */
+  configure: (options: ErrorReportingOptions) => void;
+}
+
+export default ErrorType;
