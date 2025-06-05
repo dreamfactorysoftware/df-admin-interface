@@ -43,7 +43,7 @@ import {
 } from 'rxjs/operators';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { BASE_URL } from 'src/app/shared/constants/urls';
-import { Subscription, of } from 'rxjs';
+import { Subscription, of, forkJoin } from 'rxjs';
 
 interface ServiceResponse {
   resource: Array<{
@@ -54,9 +54,22 @@ interface ServiceResponse {
 }
 
 interface ApiDocJson {
+  info: {
+    description: string | undefined;
+    title: string;
+    version: string | undefined;
+    group: string;
+  };
   paths: {
     [key: string]: any;
   };
+  [key: string]: any;
+}
+
+interface HealthCheckResult {
+  endpoint: string;
+  success?: boolean;
+  error?: string;
 }
 
 @UntilDestroy({ checkProperties: true })
@@ -95,6 +108,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   healthError: string | null = null;
   serviceName: string | null = null;
   showUnhealthyErrorDetails = false;
+  private static SUPPORTED_SERVICE_TYPE_GROUPS = ['Database', 'File'];
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -162,7 +176,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   ngAfterContentInit(): void {
     const apiDocumentation = this.apiDocJson;
-
     this.checkApiHealth();
 
     SwaggerUI({
@@ -228,15 +241,62 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   }
 
   private checkApiHealth(): void {
-    if (this.serviceName && this.apiDocJson?.paths['/_schema']?.get) {
+    let endpointsToValidate = this.getApiEnpointsToValidate();
+    if (this.serviceName && endpointsToValidate.length > 0) {
       // Perform health check
-      this.performHealthCheck(
-        this.serviceName,
-        `${BASE_URL}/${this.serviceName}/_schema`
-      );
+      this.performHealthCheck(endpointsToValidate);
     } else {
       this.setHealthState('warning');
     }
+  }
+
+  private getApiEnpointsToValidate(): string[] {
+    const endpointsToValidate: string[] = [];
+
+    if (!this.apiDocJson || !this.apiDocJson.info) {
+      return []; // Not enough info to determine endpoints
+    }
+
+    if (
+      DfApiDocsComponent.SUPPORTED_SERVICE_TYPE_GROUPS.includes(
+        this.apiDocJson.info.group
+      )
+    ) {
+      for (const path in this.apiDocJson.paths) {
+        if (
+          !Object.prototype.hasOwnProperty.call(this.apiDocJson.paths, path)
+        ) {
+          continue;
+        }
+        const methods = this.apiDocJson.paths[path];
+
+        for (const method in methods) {
+          if (!Object.prototype.hasOwnProperty.call(methods, method)) {
+            continue;
+          }
+          if (method.toLowerCase() === 'get') {
+            const operation = methods[method];
+            const parameters: Array<{
+              name: string;
+              in: string;
+              required?: boolean;
+            }> = operation.parameters || [];
+
+            const hasPathParameters = path.includes('{');
+
+            const hasRequiredQueryParameters = parameters.some(
+              param => param && param.in === 'query' && param.required === true
+            );
+
+            if (!hasPathParameters && !hasRequiredQueryParameters) {
+              endpointsToValidate.push(path);
+            }
+          }
+        }
+      }
+    }
+
+    return endpointsToValidate;
   }
 
   private setHealthState(
@@ -247,23 +307,39 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     this.healthError = error;
   }
 
-  private performHealthCheck(serviceName: string | null, url: string): void {
+  private performHealthCheck(endpoints: string[]): void {
     this.healthStatus = 'loading';
     this.healthError = null;
 
-    this.subscriptions.push(
+    const healthCheckRequests = endpoints.map(endpoint =>
       this.http
-        .get(url)
+        .get(`${BASE_URL}/${this.serviceName}${endpoint}`, {
+          responseType: 'text',
+        })
         .pipe(
-          tap(() => this.setHealthState('healthy')),
+          map(() => ({ endpoint, success: true }) as HealthCheckResult),
           catchError((error: HttpErrorResponse) => {
-            if (error.status >= 200 && error.status < 300) {
-              this.setHealthState('healthy');
-              return of(null);
-            }
+            return of({
+              endpoint,
+              error: error.message || error.error?.message || 'Unknown error',
+            } as HealthCheckResult);
+          })
+        )
+    );
 
-            this.setHealthState('unhealthy', error.message || 'Unknown error');
-            return of(null);
+    this.subscriptions.push(
+      forkJoin(healthCheckRequests)
+        .pipe(
+          tap((results: HealthCheckResult[]) => {
+            const errors = results.filter(result => result.error);
+            if (errors.length > 0) {
+              this.setHealthState(
+                'unhealthy',
+                errors.map(e => `${e.endpoint}: ${e.error}`).join(', \n\n')
+              );
+            } else {
+              this.setHealthState('healthy');
+            }
           })
         )
         .subscribe()
