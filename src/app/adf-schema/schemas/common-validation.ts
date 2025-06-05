@@ -1,705 +1,813 @@
 /**
- * Common validation schemas and utilities for DreamFactory schema management
+ * Shared Zod validation utilities and common patterns used across schema management forms.
  * 
- * Provides reusable Zod validation schemas for database connections, identifiers,
- * names, and configuration patterns used across schema management forms. Designed
- * for React Hook Form integration with real-time validation under 100ms.
+ * This module provides reusable validation schemas for database connections, identifiers,
+ * names, and configuration patterns with consistent error messaging and type safety.
+ * Integrates with React Hook Form for real-time validation under 100ms performance target.
  * 
- * @version React 19/Next.js 15.1 Migration
- * @author DreamFactory Admin Interface Team
+ * @fileoverview Common validation schemas for DreamFactory schema management workflows
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { z } from 'zod'
+import { z } from 'zod';
+import type { 
+  DatabaseType, 
+  DatabaseConfig,
+  MySQLConfig,
+  PostgreSQLConfig,
+  OracleConfig,
+  MongoDBConfig,
+  SnowflakeConfig
+} from '../../../types/database';
+import type { SchemaField, FieldType, SchemaTable } from '../../../types/schema';
+import type { ApiRequestOptions } from '../../../types/api';
 
-// =============================================================================
-// BASIC VALIDATION UTILITIES
-// =============================================================================
+// ============================================================================
+// CORE IDENTIFIER VALIDATION PATTERNS
+// ============================================================================
 
 /**
- * Validation error messages with consistent language and formatting
+ * Common identifier validation patterns for database objects
+ * Ensures consistency across all schema management forms
  */
-export const ValidationMessages = {
-  // Required field messages
-  REQUIRED: 'This field is required',
-  EMAIL_REQUIRED: 'Email address is required',
-  PASSWORD_REQUIRED: 'Password is required',
-  NAME_REQUIRED: 'Name is required',
-  
-  // Format validation messages
-  INVALID_EMAIL: 'Please enter a valid email address',
-  INVALID_URL: 'Please enter a valid URL',
-  INVALID_JSON: 'Please enter valid JSON',
-  INVALID_CSV: 'Please enter comma-separated values (e.g., item1, item2, item3)',
-  INVALID_PORT: 'Port must be between 1 and 65535',
-  INVALID_IDENTIFIER: 'Must contain only letters, numbers, and underscores',
-  
-  // Length validation messages
-  TOO_SHORT: (min: number) => `Must be at least ${min} characters`,
-  TOO_LONG: (max: number) => `Must be no more than ${max} characters`,
-  PASSWORD_TOO_SHORT: 'Password must be at least 8 characters',
-  
-  // Pattern validation messages
-  PASSWORDS_DO_NOT_MATCH: 'Passwords do not match',
-  NAME_NOT_UNIQUE: 'Name must be unique',
-  INVALID_DATABASE_NAME: 'Database name can only contain letters, numbers, and underscores',
-  INVALID_SERVICE_NAME: 'Service name must be unique and contain only letters, numbers, and hyphens',
-  INVALID_TABLE_NAME: 'Table name can only contain letters, numbers, and underscores, must start with a letter',
-  INVALID_FIELD_NAME: 'Field name can only contain letters, numbers, and underscores, must start with a letter',
-  
-  // Connection validation messages
-  CONNECTION_TIMEOUT: 'Connection timed out. Please verify host and port.',
-  INVALID_CREDENTIALS: 'Invalid username or password',
-  DATABASE_NOT_FOUND: 'Database not found or access denied',
-  
-  // Configuration validation messages
-  INVALID_CONFIGURATION: 'Invalid configuration provided',
-  MISSING_REQUIRED_CONFIG: 'Required configuration parameters are missing',
-} as const
+export const IdentifierPatterns = {
+  /**
+   * Service name validation for database service creation
+   * Must be unique, alphanumeric with underscores and hyphens only
+   */
+  serviceName: z
+    .string({ required_error: 'Service name is required' })
+    .min(1, 'Service name cannot be empty')
+    .max(50, 'Service name must be less than 50 characters')
+    .regex(
+      /^[a-zA-Z][a-zA-Z0-9_-]*$/,
+      'Service name must start with a letter and contain only letters, numbers, underscores, and hyphens'
+    )
+    .refine(
+      (value) => !['api', 'system', 'db', 'admin', 'test', 'default'].includes(value.toLowerCase()),
+      { message: 'Service name cannot be a reserved word' }
+    ),
 
-/**
- * Common regex patterns for validation
- */
-export const ValidationPatterns = {
-  // Identifier patterns
-  IDENTIFIER: /^[a-zA-Z_][a-zA-Z0-9_]*$/,
-  SERVICE_NAME: /^[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]$/,
-  DATABASE_NAME: /^[a-zA-Z_][a-zA-Z0-9_]*$/,
-  TABLE_NAME: /^[a-zA-Z_][a-zA-Z0-9_]*$/,
-  FIELD_NAME: /^[a-zA-Z_][a-zA-Z0-9_]*$/,
-  
-  // Data format patterns
-  CSV: /^\w+(?:\s*,\s*\w+)*$/,
-  URL: /^https?:\/\/.+/,
-  HOST: /^([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$/,
-  IPV4: /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/,
-  IPV6: /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/,
-  
-  // Character set patterns
-  ALPHANUMERIC: /^[a-zA-Z0-9]+$/,
-  ALPHANUMERIC_WITH_SPACES: /^[a-zA-Z0-9\s]+$/,
-  NO_SPECIAL_CHARS: /^[a-zA-Z0-9_-]+$/,
-} as const
+  /**
+   * Database table name validation
+   * Supports SQL naming conventions across different database types
+   */
+  tableName: z
+    .string({ required_error: 'Table name is required' })
+    .min(1, 'Table name cannot be empty')
+    .max(128, 'Table name must be less than 128 characters')
+    .regex(
+      /^[a-zA-Z_][a-zA-Z0-9_]*$/,
+      'Table name must start with a letter or underscore and contain only letters, numbers, and underscores'
+    )
+    .refine(
+      (value) => !value.startsWith('__') && !value.endsWith('__'),
+      { message: 'Table name cannot start or end with double underscores' }
+    ),
 
-// =============================================================================
-// BASIC FIELD VALIDATION SCHEMAS
-// =============================================================================
+  /**
+   * Database field/column name validation
+   * Ensures compatibility across different database systems
+   */
+  fieldName: z
+    .string({ required_error: 'Field name is required' })
+    .min(1, 'Field name cannot be empty')
+    .max(64, 'Field name must be less than 64 characters')
+    .regex(
+      /^[a-zA-Z_][a-zA-Z0-9_]*$/,
+      'Field name must start with a letter or underscore and contain only letters, numbers, and underscores'
+    )
+    .refine(
+      (value) => !['id', 'created_at', 'updated_at', 'deleted_at'].includes(value.toLowerCase()) || 
+                 ['id', 'created_at', 'updated_at', 'deleted_at'].includes(value),
+      { message: 'Field name conflicts with reserved system fields. Use exact casing if intentional.' }
+    ),
 
-/**
- * Required string field with minimum length
- */
-export const requiredString = (minLength = 1, maxLength = 255) => 
-  z.string()
-    .min(minLength, ValidationMessages.TOO_SHORT(minLength))
-    .max(maxLength, ValidationMessages.TOO_LONG(maxLength))
-    .trim()
+  /**
+   * Schema name validation for databases that support schemas
+   * PostgreSQL, Oracle, SQL Server specific patterns
+   */
+  schemaName: z
+    .string()
+    .min(1, 'Schema name cannot be empty')
+    .max(64, 'Schema name must be less than 64 characters')
+    .regex(
+      /^[a-zA-Z_][a-zA-Z0-9_]*$/,
+      'Schema name must start with a letter or underscore and contain only letters, numbers, and underscores'
+    )
+    .optional(),
 
-/**
- * Optional string field with maximum length
- */
-export const optionalString = (maxLength = 255) => 
-  z.string()
-    .max(maxLength, ValidationMessages.TOO_LONG(maxLength))
-    .trim()
-    .optional()
+  /**
+   * Index name validation for database indexes
+   */
+  indexName: z
+    .string({ required_error: 'Index name is required' })
+    .min(1, 'Index name cannot be empty')
+    .max(64, 'Index name must be less than 64 characters')
+    .regex(
+      /^[a-zA-Z_][a-zA-Z0-9_]*$/,
+      'Index name must start with a letter or underscore and contain only letters, numbers, and underscores'
+    ),
 
-/**
- * Email validation schema
- */
-export const emailSchema = z.string()
-  .min(1, ValidationMessages.EMAIL_REQUIRED)
-  .email(ValidationMessages.INVALID_EMAIL)
-  .trim()
-  .toLowerCase()
+  /**
+   * Constraint name validation for foreign keys, unique constraints, etc.
+   */
+  constraintName: z
+    .string({ required_error: 'Constraint name is required' })
+    .min(1, 'Constraint name cannot be empty')
+    .max(64, 'Constraint name must be less than 64 characters')
+    .regex(
+      /^[a-zA-Z_][a-zA-Z0-9_]*$/,
+      'Constraint name must start with a letter or underscore and contain only letters, numbers, and underscores'
+    ),
+} as const;
 
-/**
- * Password validation schema
- */
-export const passwordSchema = z.string()
-  .min(8, ValidationMessages.PASSWORD_TOO_SHORT)
-  .max(128, ValidationMessages.TOO_LONG(128))
-
-/**
- * Confirm password schema for password matching
- */
-export const confirmPasswordSchema = z.object({
-  password: passwordSchema,
-  confirmPassword: z.string()
-}).refine((data) => data.password === data.confirmPassword, {
-  message: ValidationMessages.PASSWORDS_DO_NOT_MATCH,
-  path: ['confirmPassword']
-})
-
-/**
- * URL validation schema
- */
-export const urlSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .regex(ValidationPatterns.URL, ValidationMessages.INVALID_URL)
-  .trim()
-
-/**
- * JSON validation schema
- */
-export const jsonSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .refine((value) => {
-    try {
-      JSON.parse(value)
-      return true
-    } catch {
-      return false
-    }
-  }, {
-    message: ValidationMessages.INVALID_JSON
-  })
-
-/**
- * CSV validation schema (converted from Angular CsvValidator)
- */
-export const csvSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .regex(ValidationPatterns.CSV, ValidationMessages.INVALID_CSV)
-  .trim()
-
-// =============================================================================
-// DATABASE IDENTIFIER VALIDATION SCHEMAS
-// =============================================================================
-
-/**
- * Generic identifier validation (letters, numbers, underscores)
- */
-export const identifierSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .max(64, ValidationMessages.TOO_LONG(64))
-  .regex(ValidationPatterns.IDENTIFIER, ValidationMessages.INVALID_IDENTIFIER)
-  .trim()
-
-/**
- * Service name validation schema
- */
-export const serviceNameSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .max(50, ValidationMessages.TOO_LONG(50))
-  .regex(ValidationPatterns.SERVICE_NAME, ValidationMessages.INVALID_SERVICE_NAME)
-  .trim()
-
-/**
- * Database name validation schema
- */
-export const databaseNameSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .max(64, ValidationMessages.TOO_LONG(64))
-  .regex(ValidationPatterns.DATABASE_NAME, ValidationMessages.INVALID_DATABASE_NAME)
-  .trim()
-
-/**
- * Table name validation schema
- */
-export const tableNameSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .max(64, ValidationMessages.TOO_LONG(64))
-  .regex(ValidationPatterns.TABLE_NAME, ValidationMessages.INVALID_TABLE_NAME)
-  .trim()
-
-/**
- * Field name validation schema
- */
-export const fieldNameSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .max(64, ValidationMessages.TOO_LONG(64))
-  .regex(ValidationPatterns.FIELD_NAME, ValidationMessages.INVALID_FIELD_NAME)
-  .trim()
-
-/**
- * Display label validation schema (allows spaces and special characters)
- */
-export const labelSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .max(100, ValidationMessages.TOO_LONG(100))
-  .trim()
-
-/**
- * Description validation schema (optional long text)
- */
-export const descriptionSchema = z.string()
-  .max(500, ValidationMessages.TOO_LONG(500))
-  .trim()
-  .optional()
-
-// =============================================================================
+// ============================================================================
 // DATABASE CONNECTION VALIDATION SCHEMAS
-// =============================================================================
+// ============================================================================
 
 /**
- * Host validation schema (supports both hostnames and IP addresses)
+ * Base database connection configuration schema
+ * Common fields across all database types with enhanced validation
  */
-export const hostSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .refine((value) => {
-    return ValidationPatterns.HOST.test(value) || 
-           ValidationPatterns.IPV4.test(value) || 
-           ValidationPatterns.IPV6.test(value) ||
-           value === 'localhost'
-  }, {
-    message: 'Please enter a valid hostname or IP address'
-  })
-  .trim()
-
-/**
- * Port validation schema
- */
-export const portSchema = z.number()
-  .min(1, ValidationMessages.INVALID_PORT)
-  .max(65535, ValidationMessages.INVALID_PORT)
-  .default(3306)
-
-/**
- * Connection timeout validation schema
- */
-export const timeoutSchema = z.number()
-  .min(1, 'Timeout must be at least 1 second')
-  .max(300, 'Timeout cannot exceed 300 seconds')
-  .default(30)
-
-/**
- * Username validation schema
- */
-export const usernameSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .max(64, ValidationMessages.TOO_LONG(64))
-  .trim()
-
-/**
- * Database connection string validation schema
- */
-export const connectionStringSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .max(1000, ValidationMessages.TOO_LONG(1000))
-  .trim()
-
-/**
- * SSL mode validation schema
- */
-export const sslModeSchema = z.enum(['disable', 'require', 'verify-ca', 'verify-full', 'preferred'])
-  .default('disable')
-
-/**
- * Basic database connection validation schema
- */
-export const basicConnectionSchema = z.object({
-  host: hostSchema,
-  port: portSchema,
-  database: databaseNameSchema,
-  username: usernameSchema,
-  password: passwordSchema,
-  timeout: timeoutSchema.optional()
-})
-
-/**
- * Advanced connection configuration schema
- */
-export const advancedConnectionSchema = basicConnectionSchema.extend({
-  charset: optionalString(20),
-  collation: optionalString(50),
-  timezone: optionalString(50),
-  ssl_enabled: z.boolean().default(false),
-  ssl_mode: sslModeSchema.optional(),
-  ssl_cert: optionalString(1000),
-  ssl_key: optionalString(1000),
-  ssl_ca: optionalString(1000),
-  options: optionalString(500)
-})
-
-// =============================================================================
-// API GENERATION VALIDATION SCHEMAS
-// =============================================================================
-
-/**
- * HTTP method validation schema
- */
-export const httpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
-
-/**
- * API endpoint path validation schema
- */
-export const endpointPathSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .max(200, ValidationMessages.TOO_LONG(200))
-  .regex(/^\/[a-zA-Z0-9\/_-]*$/, 'Path must start with / and contain only valid URL characters')
-  .trim()
-
-/**
- * API parameter validation schema
- */
-export const apiParameterSchema = z.object({
-  name: fieldNameSchema,
-  type: z.enum(['string', 'number', 'boolean', 'date']),
-  required: z.boolean().default(false),
-  description: descriptionSchema,
-  default_value: z.string().optional()
-})
-
-/**
- * API endpoint configuration schema
- */
-export const endpointConfigSchema = z.object({
-  name: serviceNameSchema,
-  path: endpointPathSchema,
-  method: httpMethodSchema,
-  description: descriptionSchema,
-  parameters: z.array(apiParameterSchema).default([]),
-  auth_required: z.boolean().default(true),
-  rate_limit: z.number().min(0).max(10000).optional(),
-  cache_ttl: z.number().min(0).max(3600).optional()
-})
-
-// =============================================================================
-// FORM FIELD CONFIGURATION VALIDATION SCHEMAS
-// =============================================================================
-
-/**
- * Field type validation schema
- */
-export const fieldTypeSchema = z.enum([
-  'string', 'text', 'integer', 'float', 'decimal', 'boolean',
-  'date', 'datetime', 'time', 'timestamp', 'binary', 'json',
-  'uuid', 'email', 'url', 'phone', 'currency'
-])
-
-/**
- * Field constraint validation schema
- */
-export const fieldConstraintSchema = z.object({
-  max_length: z.number().min(1).max(65535).optional(),
-  min_length: z.number().min(0).optional(),
-  max_value: z.number().optional(),
-  min_value: z.number().optional(),
-  pattern: z.string().optional(),
-  enum_values: z.array(z.string()).optional(),
-  decimal_places: z.number().min(0).max(10).optional(),
-  precision: z.number().min(1).max(65).optional()
-}).refine((data) => {
-  // Ensure min_length <= max_length if both are provided
-  if (data.min_length !== undefined && data.max_length !== undefined) {
-    return data.min_length <= data.max_length
-  }
-  return true
-}, {
-  message: 'Minimum length cannot be greater than maximum length',
-  path: ['min_length']
-}).refine((data) => {
-  // Ensure min_value <= max_value if both are provided
-  if (data.min_value !== undefined && data.max_value !== undefined) {
-    return data.min_value <= data.max_value
-  }
-  return true
-}, {
-  message: 'Minimum value cannot be greater than maximum value',
-  path: ['min_value']
-})
-
-/**
- * Complete field configuration validation schema
- */
-export const fieldConfigSchema = z.object({
-  name: fieldNameSchema,
-  label: labelSchema,
-  type: fieldTypeSchema,
-  required: z.boolean().default(false),
-  unique: z.boolean().default(false),
-  indexed: z.boolean().default(false),
-  description: descriptionSchema,
-  default_value: z.string().optional(),
-  constraints: fieldConstraintSchema.optional(),
-  picklist_values: csvSchema.optional(),
-  foreign_table: tableNameSchema.optional(),
-  foreign_key: fieldNameSchema.optional()
-})
-
-// =============================================================================
-// BULK OPERATION VALIDATION SCHEMAS
-// =============================================================================
-
-/**
- * Bulk ID validation schema (comma-separated IDs)
- */
-export const bulkIdSchema = z.string()
-  .min(1, ValidationMessages.REQUIRED)
-  .regex(/^[0-9]+(?:\s*,\s*[0-9]+)*$/, 'Please enter comma-separated numeric IDs')
-  .trim()
-
-/**
- * Bulk operation type schema
- */
-export const bulkOperationSchema = z.enum(['create', 'update', 'delete', 'clone'])
-
-/**
- * Import configuration schema
- */
-export const importConfigSchema = z.object({
-  file_type: z.enum(['csv', 'json', 'xml']),
-  delimiter: z.string().length(1).default(','),
-  quote_char: z.string().length(1).default('"'),
-  escape_char: z.string().length(1).default('\\'),
-  has_header: z.boolean().default(true),
-  encoding: z.enum(['utf-8', 'utf-16', 'iso-8859-1']).default('utf-8'),
-  batch_size: z.number().min(1).max(1000).default(100)
-})
-
-// =============================================================================
-// PAGINATION AND FILTERING VALIDATION SCHEMAS
-// =============================================================================
-
-/**
- * Pagination parameters schema
- */
-export const paginationSchema = z.object({
-  limit: z.number().min(1).max(1000).default(25),
-  offset: z.number().min(0).default(0),
-  sort: z.string().optional(),
-  order: z.enum(['asc', 'desc']).default('asc')
-})
-
-/**
- * Search and filter schema
- */
-export const searchFilterSchema = z.object({
-  search: z.string().max(255).optional(),
-  filter: z.string().max(1000).optional(),
-  fields: z.array(z.string()).optional(),
-  include_count: z.boolean().default(false)
-})
-
-// =============================================================================
-// UNIQUE NAME VALIDATION UTILITIES
-// =============================================================================
-
-/**
- * Creates a Zod refinement function for unique name validation within an array
- * Replaces the Angular uniqueNameValidator function
- */
-export function createUniqueNameValidation<T extends { name: string }>(
-  fieldName = 'name',
-  errorMessage = ValidationMessages.NAME_NOT_UNIQUE
-) {
-  return (items: T[]) => {
-    const nameSet = new Set<string>()
-    const duplicates = new Set<string>()
-    
-    items.forEach(item => {
-      const name = item[fieldName as keyof T] as string
-      if (name && nameSet.has(name)) {
-        duplicates.add(name)
-      } else if (name) {
-        nameSet.add(name)
-      }
+export const BaseDatabaseConnectionSchema = z.object({
+  name: IdentifierPatterns.serviceName,
+  label: z
+    .string({ required_error: 'Display label is required' })
+    .min(1, 'Label cannot be empty')
+    .max(100, 'Label must be less than 100 characters')
+    .regex(
+      /^[a-zA-Z0-9\s\-_().,]+$/,
+      'Label can contain letters, numbers, spaces, and common punctuation'
+    ),
+  description: z
+    .string()
+    .max(500, 'Description must be less than 500 characters')
+    .optional(),
+  type: z.enum([
+    'mysql',
+    'postgresql', 
+    'oracle',
+    'mongodb',
+    'snowflake',
+    'sqlsrv',
+    'sqlite',
+    'cassandra',
+    'couchdb'
+  ], {
+    errorMap: () => ({ message: 'Please select a valid database type' })
+  }),
+  host: z
+    .string({ required_error: 'Host is required' })
+    .min(1, 'Host cannot be empty')
+    .refine(
+      (value) => {
+        // Allow localhost, IP addresses, and domain names
+        const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+        const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+        const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+        return (
+          value === 'localhost' || 
+          domainRegex.test(value) || 
+          ipRegex.test(value) ||
+          ipv6Regex.test(value)
+        );
+      },
+      { message: 'Please enter a valid hostname, IP address, or localhost' }
+    ),
+  port: z
+    .number({ 
+      required_error: 'Port is required',
+      invalid_type_error: 'Port must be a number' 
     })
-    
-    return duplicates.size === 0
+    .int('Port must be an integer')
+    .min(1, 'Port must be greater than 0')
+    .max(65535, 'Port must be less than 65536'),
+  database: z
+    .string({ required_error: 'Database name is required' })
+    .min(1, 'Database name cannot be empty')
+    .max(64, 'Database name must be less than 64 characters')
+    .regex(
+      /^[a-zA-Z_][a-zA-Z0-9_-]*$/,
+      'Database name must start with a letter or underscore'
+    ),
+  username: z
+    .string({ required_error: 'Username is required' })
+    .min(1, 'Username cannot be empty')
+    .max(64, 'Username must be less than 64 characters'),
+  password: z
+    .string({ required_error: 'Password is required' })
+    .min(1, 'Password cannot be empty')
+    .max(256, 'Password is too long'),
+  isActive: z.boolean().default(true),
+  connectionTimeout: z
+    .number()
+    .int()
+    .min(1000, 'Connection timeout must be at least 1 second')
+    .max(300000, 'Connection timeout cannot exceed 5 minutes')
+    .default(5000),
+  queryTimeout: z
+    .number()
+    .int()
+    .min(1000, 'Query timeout must be at least 1 second')
+    .max(600000, 'Query timeout cannot exceed 10 minutes')
+    .optional(),
+});
+
+/**
+ * SSL configuration validation schema
+ * Used for secure database connections
+ */
+export const SSLConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  mode: z
+    .enum(['require', 'prefer', 'allow', 'disable', 'verify-ca', 'verify-full'])
+    .default('prefer'),
+  cert: z.string().optional(),
+  key: z.string().optional(),
+  ca: z.string().optional(),
+  rejectUnauthorized: z.boolean().default(true),
+  serverName: z.string().optional(),
+}).optional();
+
+/**
+ * Connection pooling configuration schema
+ */
+export const PoolingConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  minConnections: z
+    .number()
+    .int()
+    .min(0, 'Minimum connections cannot be negative')
+    .max(100, 'Minimum connections cannot exceed 100')
+    .default(0),
+  maxConnections: z
+    .number()
+    .int()
+    .min(1, 'Maximum connections must be at least 1')
+    .max(1000, 'Maximum connections cannot exceed 1000')
+    .default(10),
+  acquireTimeoutMillis: z
+    .number()
+    .int()
+    .min(1000, 'Acquire timeout must be at least 1 second')
+    .max(60000, 'Acquire timeout cannot exceed 1 minute')
+    .default(30000),
+  idleTimeoutMillis: z
+    .number()
+    .int()
+    .min(10000, 'Idle timeout must be at least 10 seconds')
+    .max(3600000, 'Idle timeout cannot exceed 1 hour')
+    .default(300000),
+}).optional();
+
+/**
+ * Database-specific connection schemas with enhanced validation
+ */
+export const DatabaseConnectionSchemas = {
+  mysql: BaseDatabaseConnectionSchema.extend({
+    type: z.literal('mysql'),
+    charset: z
+      .enum(['utf8', 'utf8mb4', 'latin1', 'ascii'])
+      .default('utf8mb4')
+      .optional(),
+    timezone: z
+      .string()
+      .regex(/^[+-]\d{2}:\d{2}$|^UTC$|^[A-Za-z]+\/[A-Za-z_]+$/, 'Invalid timezone format')
+      .default('UTC')
+      .optional(),
+    strictMode: z.boolean().default(true).optional(),
+    ssl: SSLConfigSchema,
+    pooling: PoolingConfigSchema,
+    options: z.record(z.any()).optional(),
+  }),
+
+  postgresql: BaseDatabaseConnectionSchema.extend({
+    type: z.literal('postgresql'),
+    searchPath: z
+      .array(z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Invalid schema name in search path'))
+      .default(['public'])
+      .optional(),
+    applicationName: z
+      .string()
+      .max(64, 'Application name must be less than 64 characters')
+      .default('DreamFactory')
+      .optional(),
+    statementTimeout: z
+      .number()
+      .int()
+      .min(0, 'Statement timeout cannot be negative')
+      .max(3600000, 'Statement timeout cannot exceed 1 hour')
+      .optional(),
+    sslVerification: z.boolean().default(true).optional(),
+    ssl: SSLConfigSchema,
+    pooling: PoolingConfigSchema,
+    options: z.record(z.any()).optional(),
+  }),
+
+  oracle: BaseDatabaseConnectionSchema.extend({
+    type: z.literal('oracle'),
+    serviceName: z
+      .string()
+      .max(64, 'Service name must be less than 64 characters')
+      .optional(),
+    tnsConnectString: z
+      .string()
+      .max(512, 'TNS connect string is too long')
+      .optional(),
+    edition: z
+      .enum(['standard', 'express', 'enterprise'])
+      .default('standard')
+      .optional(),
+    enableWallet: z.boolean().default(false).optional(),
+    walletLocation: z
+      .string()
+      .max(256, 'Wallet location path is too long')
+      .optional(),
+    ssl: SSLConfigSchema,
+    pooling: PoolingConfigSchema,
+    options: z.record(z.any()).optional(),
+  }),
+
+  mongodb: BaseDatabaseConnectionSchema.omit({ database: true }).extend({
+    type: z.literal('mongodb'),
+    uri: z
+      .string()
+      .regex(
+        /^mongodb(\+srv)?:\/\/([^@]+@)?[\w.-]+(:\d+)?(\/[\w-]*)?(\?.*)?$/,
+        'Invalid MongoDB connection URI format'
+      )
+      .optional(),
+    defaultDatabase: z
+      .string()
+      .min(1, 'Default database name cannot be empty')
+      .max(64, 'Default database name must be less than 64 characters')
+      .regex(/^[a-zA-Z_][a-zA-Z0-9_-]*$/, 'Invalid database name format')
+      .optional(),
+    authDatabase: z
+      .string()
+      .max(64, 'Auth database name must be less than 64 characters')
+      .default('admin')
+      .optional(),
+    replicaSet: z
+      .string()
+      .max(64, 'Replica set name must be less than 64 characters')
+      .optional(),
+    readPreference: z
+      .enum(['primary', 'primaryPreferred', 'secondary', 'secondaryPreferred', 'nearest'])
+      .default('primary')
+      .optional(),
+    writeConcern: z.object({
+      w: z.union([z.number().int().min(0), z.string()]).default(1).optional(),
+      j: z.boolean().default(false).optional(),
+      wtimeout: z.number().int().min(0).default(10000).optional(),
+    }).optional(),
+    ssl: SSLConfigSchema,
+    options: z.record(z.any()).optional(),
+  }),
+
+  snowflake: BaseDatabaseConnectionSchema.extend({
+    type: z.literal('snowflake'),
+    account: z
+      .string({ required_error: 'Snowflake account identifier is required' })
+      .min(1, 'Account identifier cannot be empty')
+      .max(64, 'Account identifier must be less than 64 characters')
+      .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid account identifier format'),
+    warehouse: z
+      .string()
+      .max(64, 'Warehouse name must be less than 64 characters')
+      .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Invalid warehouse name format')
+      .optional(),
+    role: z
+      .string()
+      .max(64, 'Role name must be less than 64 characters')
+      .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Invalid role name format')
+      .optional(),
+    sessionParameters: z
+      .record(z.string())
+      .optional(),
+    privateKey: z
+      .string()
+      .max(4096, 'Private key is too long')
+      .optional(),
+    privateKeyPassphrase: z
+      .string()
+      .max(256, 'Private key passphrase is too long')
+      .optional(),
+    ssl: SSLConfigSchema,
+    options: z.record(z.any()).optional(),
+  }),
+} as const;
+
+// ============================================================================
+// SCHEMA FIELD VALIDATION PATTERNS
+// ============================================================================
+
+/**
+ * Database field type validation schema
+ * Supports all common field types across different database systems
+ */
+export const FieldTypeSchema = z.enum([
+  // String types
+  'string', 'text', 'varchar', 'char', 'nvarchar', 'nchar', 'clob', 'nclob',
+  // Numeric types
+  'integer', 'bigint', 'smallint', 'decimal', 'numeric', 'float', 'double', 'real',
+  'tinyint', 'mediumint', 'bit',
+  // Date/time types
+  'datetime', 'timestamp', 'date', 'time', 'year',
+  // Binary types
+  'binary', 'varbinary', 'blob', 'longblob', 'mediumblob', 'tinyblob',
+  // Boolean type
+  'boolean',
+  // JSON and XML types
+  'json', 'jsonb', 'xml',
+  // UUID type
+  'uuid',
+  // Spatial types
+  'geometry', 'geography', 'point', 'polygon',
+  // Array types (PostgreSQL)
+  'array',
+  // Other types
+  'enum', 'set', 'inet', 'cidr', 'macaddr',
+], {
+  errorMap: () => ({ message: 'Please select a valid field type' })
+});
+
+/**
+ * Schema field definition validation
+ * Comprehensive validation for database field configuration
+ */
+export const SchemaFieldSchema = z.object({
+  name: IdentifierPatterns.fieldName,
+  label: z
+    .string()
+    .max(100, 'Field label must be less than 100 characters')
+    .optional(),
+  type: FieldTypeSchema,
+  size: z
+    .number()
+    .int()
+    .min(1, 'Field size must be at least 1')
+    .max(65535, 'Field size cannot exceed 65535')
+    .optional(),
+  precision: z
+    .number()
+    .int()
+    .min(1, 'Precision must be at least 1')
+    .max(65, 'Precision cannot exceed 65')
+    .optional(),
+  scale: z
+    .number()
+    .int()
+    .min(0, 'Scale cannot be negative')
+    .max(30, 'Scale cannot exceed 30')
+    .optional(),
+  isNullable: z.boolean().default(true),
+  isPrimaryKey: z.boolean().default(false),
+  isUnique: z.boolean().default(false),
+  isAutoIncrement: z.boolean().default(false),
+  defaultValue: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
+  comment: z
+    .string()
+    .max(1024, 'Comment must be less than 1024 characters')
+    .optional(),
+  // Validation constraints
+  minValue: z.number().optional(),
+  maxValue: z.number().optional(),
+  pattern: z
+    .string()
+    .refine(
+      (value) => {
+        try {
+          new RegExp(value);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: 'Invalid regular expression pattern' }
+    )
+    .optional(),
+  enumValues: z
+    .array(z.string().min(1, 'Enum value cannot be empty'))
+    .min(1, 'At least one enum value is required')
+    .optional(),
+  // Foreign key reference
+  referencedTable: IdentifierPatterns.tableName.optional(),
+  referencedField: IdentifierPatterns.fieldName.optional(),
+});
+
+/**
+ * Schema table definition validation
+ * Comprehensive validation for database table configuration
+ */
+export const SchemaTableSchema = z.object({
+  name: IdentifierPatterns.tableName,
+  label: z
+    .string()
+    .max(100, 'Table label must be less than 100 characters')
+    .optional(),
+  description: z
+    .string()
+    .max(1024, 'Table description must be less than 1024 characters')
+    .optional(),
+  schema: IdentifierPatterns.schemaName,
+  alias: z
+    .string()
+    .max(64, 'Table alias must be less than 64 characters')
+    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Invalid alias format')
+    .optional(),
+  plural: z
+    .string()
+    .max(64, 'Plural name must be less than 64 characters')
+    .optional(),
+  isView: z.boolean().default(false),
+  fields: z
+    .array(SchemaFieldSchema)
+    .min(1, 'Table must have at least one field')
+    .refine(
+      (fields) => {
+        const names = fields.map(f => f.name.toLowerCase());
+        return names.length === new Set(names).size;
+      },
+      { message: 'Field names must be unique within the table' }
+    )
+    .refine(
+      (fields) => fields.filter(f => f.isPrimaryKey).length <= 1,
+      { message: 'Table can have at most one primary key field' }
+    ),
+  // Table options
+  engine: z
+    .enum(['InnoDB', 'MyISAM', 'Memory', 'Archive', 'CSV'])
+    .default('InnoDB')
+    .optional(),
+  charset: z
+    .enum(['utf8', 'utf8mb4', 'latin1', 'ascii'])
+    .default('utf8mb4')
+    .optional(),
+  collation: z
+    .string()
+    .max(64, 'Collation name must be less than 64 characters')
+    .optional(),
+  comment: z
+    .string()
+    .max(2048, 'Table comment must be less than 2048 characters')
+    .optional(),
+});
+
+// ============================================================================
+// API GENERATION CONFIGURATION SCHEMAS
+// ============================================================================
+
+/**
+ * API endpoint configuration validation
+ * Used for configuring generated REST API endpoints
+ */
+export const ApiEndpointConfigSchema = z.object({
+  path: z
+    .string({ required_error: 'API path is required' })
+    .min(1, 'API path cannot be empty')
+    .regex(/^\/[a-zA-Z0-9_\-\/]*$/, 'API path must start with / and contain only valid URL characters')
+    .refine(
+      (value) => !value.includes('//'),
+      { message: 'API path cannot contain consecutive slashes' }
+    ),
+  methods: z
+    .array(z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']))
+    .min(1, 'At least one HTTP method must be selected')
+    .refine(
+      (methods) => methods.length === new Set(methods).size,
+      { message: 'HTTP methods must be unique' }
+    ),
+  requiresAuth: z.boolean().default(true),
+  allowedRoles: z
+    .array(z.string().min(1, 'Role name cannot be empty'))
+    .optional(),
+  rateLimit: z.object({
+    requests: z
+      .number()
+      .int()
+      .min(1, 'Rate limit requests must be at least 1')
+      .max(10000, 'Rate limit requests cannot exceed 10000'),
+    window: z
+      .number()
+      .int()
+      .min(1, 'Rate limit window must be at least 1 second')
+      .max(86400, 'Rate limit window cannot exceed 24 hours'),
+  }).optional(),
+  caching: z.object({
+    enabled: z.boolean().default(false),
+    ttl: z
+      .number()
+      .int()
+      .min(1, 'Cache TTL must be at least 1 second')
+      .max(86400, 'Cache TTL cannot exceed 24 hours')
+      .default(300),
+  }).optional(),
+  description: z
+    .string()
+    .max(1024, 'Endpoint description must be less than 1024 characters')
+    .optional(),
+});
+
+/**
+ * API generation workflow configuration
+ * Controls the overall API generation process
+ */
+export const ApiGenerationConfigSchema = z.object({
+  serviceName: IdentifierPatterns.serviceName,
+  version: z
+    .string()
+    .regex(/^v\d+(\.\d+)?$/, 'Version must be in format v1 or v1.0')
+    .default('v1'),
+  baseUrl: z
+    .string()
+    .url('Base URL must be a valid URL')
+    .optional(),
+  generateDocs: z.boolean().default(true),
+  enableCors: z.boolean().default(true),
+  corsOrigins: z
+    .array(z.string().url('CORS origin must be a valid URL'))
+    .default(['*'])
+    .optional(),
+  defaultContentType: z
+    .enum(['application/json', 'application/xml', 'text/plain'])
+    .default('application/json'),
+  includeMetadata: z.boolean().default(true),
+  enablePagination: z.boolean().default(true),
+  maxPageSize: z
+    .number()
+    .int()
+    .min(10, 'Maximum page size must be at least 10')
+    .max(10000, 'Maximum page size cannot exceed 10000')
+    .default(1000),
+  defaultPageSize: z
+    .number()
+    .int()
+    .min(1, 'Default page size must be at least 1')
+    .max(1000, 'Default page size cannot exceed 1000')
+    .default(25),
+});
+
+// ============================================================================
+// VALIDATION UTILITIES AND HELPERS
+// ============================================================================
+
+/**
+ * Validates database connection parameters based on database type
+ * Provides type-safe validation with database-specific rules
+ */
+export function validateDatabaseConnection(
+  type: DatabaseType,
+  config: Partial<DatabaseConfig>
+): z.ZodSchema<any> {
+  switch (type) {
+    case 'mysql':
+      return DatabaseConnectionSchemas.mysql;
+    case 'postgresql':
+      return DatabaseConnectionSchemas.postgresql;
+    case 'oracle':
+      return DatabaseConnectionSchemas.oracle;
+    case 'mongodb':
+      return DatabaseConnectionSchemas.mongodb;
+    case 'snowflake':
+      return DatabaseConnectionSchemas.snowflake;
+    default:
+      return BaseDatabaseConnectionSchema;
   }
 }
 
 /**
- * Schema for validating arrays with unique names
+ * Creates a validation schema for unique field names within a table
+ * Prevents duplicate field names and reserved word conflicts
  */
-export const uniqueNameArraySchema = <T extends z.ZodSchema>(itemSchema: T) =>
-  z.array(itemSchema)
+export function createUniqueFieldNamesSchema() {
+  return z
+    .array(SchemaFieldSchema)
     .refine(
-      (items) => {
-        const names = items.map((item: any) => item.name).filter(Boolean)
-        return names.length === new Set(names).size
+      (fields) => {
+        const names = fields.map(field => field.name.toLowerCase());
+        return names.length === new Set(names).size;
       },
       {
-        message: ValidationMessages.NAME_NOT_UNIQUE
+        message: 'Field names must be unique within the table',
+        path: ['fields'],
       }
-    )
-
-// =============================================================================
-// ENVIRONMENT AND CONFIGURATION VALIDATION
-// =============================================================================
+    );
+}
 
 /**
- * Environment variable validation schema
+ * Creates a validation schema for table relationships
+ * Ensures foreign key references are valid and avoid circular dependencies
  */
-export const environmentSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  API_BASE_URL: urlSchema,
-  SESSION_TIMEOUT: z.number().min(300).max(86400).default(3600), // 5 minutes to 24 hours
-  MAX_UPLOAD_SIZE: z.number().min(1024).max(104857600).default(10485760), // 1KB to 100MB
-  ENABLE_DEBUG: z.boolean().default(false),
-  ENABLE_ANALYTICS: z.boolean().default(false)
-})
+export function createTableRelationshipSchema(existingTables: string[]) {
+  return z.object({
+    sourceField: IdentifierPatterns.fieldName,
+    targetTable: z
+      .string()
+      .refine(
+        (table) => existingTables.includes(table),
+        { message: 'Referenced table must exist in the schema' }
+      ),
+    targetField: IdentifierPatterns.fieldName,
+    onDelete: z
+      .enum(['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'])
+      .default('RESTRICT'),
+    onUpdate: z
+      .enum(['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'])
+      .default('CASCADE'),
+  });
+}
 
 /**
- * Feature flag configuration schema
+ * Validates API endpoint path uniqueness across service configuration
+ * Prevents conflicting endpoint definitions
  */
-export const featureFlagSchema = z.object({
-  enable_advanced_forms: z.boolean().default(true),
-  enable_bulk_operations: z.boolean().default(true),
-  enable_schema_caching: z.boolean().default(true),
-  enable_connection_pooling: z.boolean().default(false),
-  enable_audit_logging: z.boolean().default(false),
-  max_schema_size: z.number().min(100).max(10000).default(1000)
-})
-
-// =============================================================================
-// PERFORMANCE AND OPTIMIZATION SCHEMAS
-// =============================================================================
+export function createUniqueEndpointPathsSchema() {
+  return z
+    .array(ApiEndpointConfigSchema)
+    .refine(
+      (endpoints) => {
+        const paths = endpoints.map(endpoint => endpoint.path.toLowerCase());
+        return paths.length === new Set(paths).size;
+      },
+      {
+        message: 'API endpoint paths must be unique',
+        path: ['endpoints'],
+      }
+    );
+}
 
 /**
- * Cache configuration schema
+ * Custom validation error formatter for consistent error messages
+ * Provides user-friendly error messages for schema validation failures
  */
-export const cacheConfigSchema = z.object({
-  ttl: z.number().min(60).max(3600).default(300), // 1 minute to 1 hour
-  max_size: z.number().min(100).max(10000).default(1000),
-  enable_compression: z.boolean().default(true),
-  enable_encryption: z.boolean().default(false)
-})
+export function formatValidationErrors(errors: z.ZodError): Record<string, string> {
+  const formattedErrors: Record<string, string> = {};
+  
+  errors.errors.forEach((error) => {
+    const path = error.path.join('.');
+    formattedErrors[path] = error.message;
+  });
+  
+  return formattedErrors;
+}
 
 /**
- * Performance monitoring schema
+ * Debounced validation function for real-time form validation
+ * Ensures validation performance under 100ms for responsive user experience
  */
-export const performanceSchema = z.object({
-  max_response_time: z.number().min(100).max(30000).default(5000), // 100ms to 30s
-  enable_monitoring: z.boolean().default(true),
-  sample_rate: z.number().min(0.01).max(1.0).default(0.1), // 1% to 100%
-  alert_threshold: z.number().min(1000).max(60000).default(10000) // 1s to 60s
-})
+export function createDebouncedValidator<T>(
+  schema: z.ZodSchema<T>,
+  debounceMs: number = 100
+) {
+  let timeoutId: NodeJS.Timeout;
+  
+  return (data: unknown): Promise<{ success: boolean; errors?: Record<string, string>; data?: T }> => {
+    return new Promise((resolve) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const result = schema.safeParse(data);
+        if (result.success) {
+          resolve({ success: true, data: result.data });
+        } else {
+          resolve({ 
+            success: false, 
+            errors: formatValidationErrors(result.error) 
+          });
+        }
+      }, debounceMs);
+    });
+  };
+}
 
-// =============================================================================
-// TYPE EXPORTS FOR TYPESCRIPT INTEGRATION
-// =============================================================================
+// ============================================================================
+// TYPE EXPORTS FOR FORM INTEGRATION
+// ============================================================================
 
-// Infer types from schemas for TypeScript usage
-export type RequiredString = z.infer<typeof requiredString>
-export type OptionalString = z.infer<typeof optionalString>
-export type EmailData = z.infer<typeof emailSchema>
-export type PasswordData = z.infer<typeof passwordSchema>
-export type ConfirmPasswordData = z.infer<typeof confirmPasswordSchema>
-export type JsonData = z.infer<typeof jsonSchema>
-export type CsvData = z.infer<typeof csvSchema>
+// Export inferred types for React Hook Form integration
+export type DatabaseConnectionFormData = z.infer<typeof BaseDatabaseConnectionSchema>;
+export type MySQLConnectionFormData = z.infer<typeof DatabaseConnectionSchemas.mysql>;
+export type PostgreSQLConnectionFormData = z.infer<typeof DatabaseConnectionSchemas.postgresql>;
+export type OracleConnectionFormData = z.infer<typeof DatabaseConnectionSchemas.oracle>;
+export type MongoDBConnectionFormData = z.infer<typeof DatabaseConnectionSchemas.mongodb>;
+export type SnowflakeConnectionFormData = z.infer<typeof DatabaseConnectionSchemas.snowflake>;
 
-export type ServiceNameData = z.infer<typeof serviceNameSchema>
-export type DatabaseNameData = z.infer<typeof databaseNameSchema>
-export type TableNameData = z.infer<typeof tableNameSchema>
-export type FieldNameData = z.infer<typeof fieldNameSchema>
+export type SchemaFieldFormData = z.infer<typeof SchemaFieldSchema>;
+export type SchemaTableFormData = z.infer<typeof SchemaTableSchema>;
+export type ApiEndpointConfigFormData = z.infer<typeof ApiEndpointConfigSchema>;
+export type ApiGenerationConfigFormData = z.infer<typeof ApiGenerationConfigSchema>;
 
-export type BasicConnectionData = z.infer<typeof basicConnectionSchema>
-export type AdvancedConnectionData = z.infer<typeof advancedConnectionSchema>
-
-export type EndpointConfigData = z.infer<typeof endpointConfigSchema>
-export type FieldConfigData = z.infer<typeof fieldConfigSchema>
-export type ImportConfigData = z.infer<typeof importConfigSchema>
-
-export type PaginationData = z.infer<typeof paginationSchema>
-export type SearchFilterData = z.infer<typeof searchFilterSchema>
-
-export type EnvironmentData = z.infer<typeof environmentSchema>
-export type FeatureFlagData = z.infer<typeof featureFlagSchema>
-export type CacheConfigData = z.infer<typeof cacheConfigSchema>
-export type PerformanceData = z.infer<typeof performanceSchema>
-
-// =============================================================================
-// SCHEMA COLLECTIONS FOR EASY IMPORT
-// =============================================================================
-
-/**
- * Collection of basic validation schemas
- */
-export const BasicValidation = {
-  requiredString,
-  optionalString,
-  email: emailSchema,
-  password: passwordSchema,
-  confirmPassword: confirmPasswordSchema,
-  url: urlSchema,
-  json: jsonSchema,
-  csv: csvSchema
-} as const
-
-/**
- * Collection of identifier validation schemas
- */
-export const IdentifierValidation = {
-  identifier: identifierSchema,
-  serviceName: serviceNameSchema,
-  databaseName: databaseNameSchema,
-  tableName: tableNameSchema,
-  fieldName: fieldNameSchema,
-  label: labelSchema,
-  description: descriptionSchema
-} as const
-
-/**
- * Collection of connection validation schemas
- */
-export const ConnectionValidation = {
-  host: hostSchema,
-  port: portSchema,
-  timeout: timeoutSchema,
-  username: usernameSchema,
-  connectionString: connectionStringSchema,
-  sslMode: sslModeSchema,
-  basicConnection: basicConnectionSchema,
-  advancedConnection: advancedConnectionSchema
-} as const
-
-/**
- * Collection of API validation schemas
- */
-export const ApiValidation = {
-  httpMethod: httpMethodSchema,
-  endpointPath: endpointPathSchema,
-  apiParameter: apiParameterSchema,
-  endpointConfig: endpointConfigSchema
-} as const
-
-/**
- * Collection of field validation schemas
- */
-export const FieldValidation = {
-  fieldType: fieldTypeSchema,
-  fieldConstraint: fieldConstraintSchema,
-  fieldConfig: fieldConfigSchema
-} as const
-
-/**
- * Collection of utility validation schemas
- */
-export const UtilityValidation = {
-  bulkId: bulkIdSchema,
-  bulkOperation: bulkOperationSchema,
-  importConfig: importConfigSchema,
-  pagination: paginationSchema,
-  searchFilter: searchFilterSchema,
-  uniqueNameArray: uniqueNameArraySchema
-} as const
-
-/**
- * Collection of configuration validation schemas
- */
-export const ConfigValidation = {
-  environment: environmentSchema,
-  featureFlag: featureFlagSchema,
-  cacheConfig: cacheConfigSchema,
-  performance: performanceSchema
-} as const
-
-/**
- * All validation schemas grouped by category
- */
-export const ValidationSchemas = {
-  Basic: BasicValidation,
-  Identifier: IdentifierValidation,
-  Connection: ConnectionValidation,
-  Api: ApiValidation,
-  Field: FieldValidation,
-  Utility: UtilityValidation,
-  Config: ConfigValidation
-} as const
-
-// =============================================================================
-// DEFAULT EXPORTS
-// =============================================================================
-
-export default ValidationSchemas
+// Export schema objects for form registration
+export {
+  BaseDatabaseConnectionSchema,
+  DatabaseConnectionSchemas,
+  SchemaFieldSchema,
+  SchemaTableSchema,
+  ApiEndpointConfigSchema,
+  ApiGenerationConfigSchema,
+  SSLConfigSchema,
+  PoolingConfigSchema,
+  FieldTypeSchema,
+};
