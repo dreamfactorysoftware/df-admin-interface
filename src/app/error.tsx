@@ -1,257 +1,423 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react'
-import { AlertTriangle, RefreshCw, Home, ChevronLeft } from 'lucide-react'
+import { useEffect, useState, useCallback } from 'react';
+import { AlertCircle, RefreshCw, Home, ArrowLeft } from 'lucide-react';
+
+/**
+ * Route-level error boundary component for Next.js app router that handles and displays
+ * error states with user-friendly messaging and recovery options. Implements comprehensive
+ * error handling with logging, user feedback, and graceful degradation patterns using
+ * React 19 error boundary capabilities.
+ * 
+ * This component transforms Angular global error handling to Next.js error boundary pattern
+ * per Section 4.7.1.2 interceptor to middleware migration, converting Angular error
+ * interceptor logic to React error boundary with server-side rendering support.
+ */
 
 interface ErrorPageProps {
-  error: Error & { digest?: string }
-  reset: () => void
+  error: Error & { digest?: string };
+  reset: () => void;
+}
+
+interface ErrorInfo {
+  errorBoundary?: boolean;
+  componentStack?: string;
+  errorInfo?: any;
 }
 
 /**
- * Route-level error boundary component for Next.js app router
- * 
- * Handles and displays error states with user-friendly messaging and recovery options.
- * Implements comprehensive error handling with logging, user feedback, and graceful 
- * degradation patterns using React 19 error boundary capabilities.
- * 
- * Features:
- * - React 19 error boundary integration for comprehensive client-side error capture
- * - User-friendly error messaging with recovery options
- * - Error logging and reporting integration
- * - Tailwind CSS styled interface replacing Angular Material components
- * - Accessibility compliant with WCAG 2.1 AA standards
- * - Retry mechanisms and navigation fallbacks
+ * Error classification for appropriate user messaging and recovery actions
  */
-export default function ErrorPage({ error, reset }: ErrorPageProps) {
-  useEffect(() => {
-    // Log error for monitoring and debugging
-    // This replaces the Angular error service pattern with modern error reporting
-    const logError = async () => {
+enum ErrorType {
+  NETWORK = 'network',
+  AUTHENTICATION = 'authentication',
+  AUTHORIZATION = 'authorization',
+  VALIDATION = 'validation',
+  SERVER = 'server',
+  CLIENT = 'client',
+  UNKNOWN = 'unknown'
+}
+
+/**
+ * Error logging service interface - will be implemented in src/lib/error-logger.ts
+ */
+interface ErrorLogger {
+  logError: (error: Error, context?: Record<string, any>) => void;
+  logUserAction: (action: string, context?: Record<string, any>) => void;
+}
+
+/**
+ * Basic error logger implementation for when the external service isn't available
+ */
+const basicErrorLogger: ErrorLogger = {
+  logError: (error: Error, context?: Record<string, any>) => {
+    // In development, log to console with enhanced detail
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error Boundary Caught Error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        context,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    
+    // In production, send to monitoring service
+    if (process.env.NODE_ENV === 'production') {
       try {
-        // In a real implementation, this would integrate with error-logger.ts
-        // For now, we'll use console.error as a fallback
-        console.error('Route Error Boundary - Error caught:', {
-          message: error.message,
-          stack: error.stack,
-          digest: error.digest,
+        // This would integrate with external error reporting service
+        // like Sentry, LogRocket, or custom error tracking endpoint
+        const errorData = {
+          error: {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          },
+          context,
           timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-          url: window.location.href
-        })
-
-        // Send error to monitoring service (e.g., Sentry, LogRocket, etc.)
-        // This would typically use the error-logger.ts service when available
-        if (typeof window !== 'undefined' && 'fetch' in window) {
-          // Example monitoring endpoint - replace with actual service
-          fetch('/api/v2/system/error-report', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              error: {
-                message: error.message,
-                stack: error.stack,
-                digest: error.digest
-              },
-              context: {
-                timestamp: new Date().toISOString(),
-                url: window.location.href,
-                userAgent: navigator.userAgent,
-                component: 'route-error-boundary'
-              }
-            })
-          }).catch(logError => {
-            // Silently fail error reporting to avoid infinite loops
-            console.warn('Failed to report error to monitoring service:', logError)
-          })
-        }
-      } catch (logError) {
-        // Prevent error logging from causing additional errors
-        console.warn('Error in error logging:', logError)
+          userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'SSR',
+          url: typeof window !== 'undefined' ? window.location.href : 'unknown',
+        };
+        
+        // Send to error tracking service
+        fetch('/api/errors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(errorData),
+        }).catch(() => {
+          // Silently fail if error reporting fails
+        });
+      } catch (reportingError) {
+        // Prevent error reporting from causing additional errors
       }
     }
+  },
+  
+  logUserAction: (action: string, context?: Record<string, any>) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('User Action:', { action, context, timestamp: new Date().toISOString() });
+    }
+  }
+};
 
-    logError()
-  }, [error])
+/**
+ * Classify error type based on error properties for appropriate handling
+ */
+function classifyError(error: Error): ErrorType {
+  const message = error.message.toLowerCase();
+  const name = error.name.toLowerCase();
+  
+  // Network-related errors
+  if (name.includes('network') || 
+      message.includes('network') || 
+      message.includes('fetch') ||
+      message.includes('connection')) {
+    return ErrorType.NETWORK;
+  }
+  
+  // Authentication errors
+  if (message.includes('unauthorized') || 
+      message.includes('authentication') ||
+      message.includes('login') ||
+      name.includes('auth')) {
+    return ErrorType.AUTHENTICATION;
+  }
+  
+  // Authorization errors
+  if (message.includes('forbidden') || 
+      message.includes('access denied') ||
+      message.includes('permission')) {
+    return ErrorType.AUTHORIZATION;
+  }
+  
+  // Validation errors
+  if (message.includes('validation') || 
+      message.includes('invalid') ||
+      name.includes('validation')) {
+    return ErrorType.VALIDATION;
+  }
+  
+  // Server errors
+  if (message.includes('server') || 
+      message.includes('500') ||
+      message.includes('internal')) {
+    return ErrorType.SERVER;
+  }
+  
+  // Client-side errors
+  if (name.includes('type') || 
+      name.includes('reference') ||
+      name.includes('syntax')) {
+    return ErrorType.CLIENT;
+  }
+  
+  return ErrorType.UNKNOWN;
+}
 
-  // Determine error type and appropriate messaging
-  const getErrorDetails = () => {
-    const message = error.message.toLowerCase()
-    
-    if (message.includes('network') || message.includes('fetch')) {
+/**
+ * Get user-friendly error message based on error type
+ */
+function getErrorMessage(errorType: ErrorType, originalError: Error): { title: string; description: string } {
+  switch (errorType) {
+    case ErrorType.NETWORK:
       return {
-        title: 'Connection Error',
-        description: 'Unable to connect to the server. Please check your internet connection and try again.',
-        suggestion: 'This might be a temporary network issue. Retrying often resolves the problem.',
-        retryRecommended: true
-      }
-    }
+        title: 'Connection Problem',
+        description: 'Unable to connect to the server. Please check your internet connection and try again.'
+      };
     
-    if (message.includes('timeout')) {
+    case ErrorType.AUTHENTICATION:
       return {
-        title: 'Request Timeout',
-        description: 'The request took too long to complete. Please try again.',
-        suggestion: 'The server might be experiencing high load. Please wait a moment before retrying.',
-        retryRecommended: true
-      }
-    }
+        title: 'Authentication Required',
+        description: 'Your session has expired or you need to log in to access this feature.'
+      };
     
-    if (message.includes('unauthorized') || message.includes('forbidden')) {
+    case ErrorType.AUTHORIZATION:
       return {
         title: 'Access Denied',
-        description: 'You do not have permission to access this resource.',
-        suggestion: 'Please contact your administrator if you believe this is an error.',
-        retryRecommended: false
-      }
-    }
+        description: 'You don\'t have permission to access this resource. Please contact your administrator if you believe this is an error.'
+      };
     
-    if (message.includes('not found')) {
+    case ErrorType.VALIDATION:
       return {
-        title: 'Resource Not Found',
-        description: 'The requested resource could not be found.',
-        suggestion: 'The page or resource you\'re looking for might have been moved or deleted.',
-        retryRecommended: false
-      }
+        title: 'Invalid Input',
+        description: 'The information provided is invalid. Please review your input and try again.'
+      };
+    
+    case ErrorType.SERVER:
+      return {
+        title: 'Server Error',
+        description: 'Something went wrong on our end. Our team has been notified and is working to fix the issue.'
+      };
+    
+    case ErrorType.CLIENT:
+      return {
+        title: 'Application Error',
+        description: 'An unexpected error occurred in the application. Please refresh the page and try again.'
+      };
+    
+    default:
+      return {
+        title: 'Unexpected Error',
+        description: 'An unexpected error occurred. Please try again or contact support if the problem persists.'
+      };
+  }
+}
+
+/**
+ * Route-level error boundary component implementing React 19 error boundary capabilities
+ * with comprehensive error handling, logging, and user recovery options.
+ */
+export default function ErrorPage({ error, reset }: ErrorPageProps) {
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [errorReported, setErrorReported] = useState(false);
+  const maxRetries = 3;
+  
+  const errorType = classifyError(error);
+  const errorMessage = getErrorMessage(errorType, error);
+  
+  /**
+   * Enhanced error logging with context information
+   */
+  useEffect(() => {
+    if (!errorReported) {
+      const errorContext = {
+        errorType,
+        retryCount,
+        digest: (error as any).digest,
+        route: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
+        timestamp: new Date().toISOString(),
+        userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'SSR',
+      };
+      
+      basicErrorLogger.logError(error, errorContext);
+      setErrorReported(true);
+    }
+  }, [error, errorType, retryCount, errorReported]);
+  
+  /**
+   * Enhanced retry mechanism with exponential backoff and limit
+   */
+  const handleRetry = useCallback(async () => {
+    if (retryCount >= maxRetries || isRetrying) {
+      return;
     }
     
-    // Default error handling
-    return {
-      title: 'Something went wrong',
-      description: 'An unexpected error has occurred while loading this page.',
-      suggestion: 'This error has been logged and our team has been notified. Please try refreshing the page.',
-      retryRecommended: true
+    setIsRetrying(true);
+    
+    basicErrorLogger.logUserAction('error_retry_attempted', {
+      retryCount: retryCount + 1,
+      errorType,
+      maxRetries,
+    });
+    
+    try {
+      // Implement exponential backoff for retries
+      const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 5000);
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+      
+      setRetryCount(prev => prev + 1);
+      reset();
+    } catch (retryError) {
+      basicErrorLogger.logError(retryError as Error, {
+        context: 'retry_failed',
+        retryCount: retryCount + 1,
+      });
+    } finally {
+      setIsRetrying(false);
     }
-  }
-
-  const errorDetails = getErrorDetails()
-
-  const handleRetry = () => {
-    // Reset the error boundary to retry the failed operation
-    reset()
-  }
-
-  const handleGoHome = () => {
-    // Navigate to the home page
-    window.location.href = '/'
-  }
-
-  const handleGoBack = () => {
-    // Navigate back to the previous page
-    if (window.history.length > 1) {
-      window.history.back()
+  }, [retryCount, isRetrying, maxRetries, reset, errorType]);
+  
+  /**
+   * Navigate to home page
+   */
+  const handleGoHome = useCallback(() => {
+    basicErrorLogger.logUserAction('error_navigate_home', { errorType });
+    window.location.href = '/';
+  }, [errorType]);
+  
+  /**
+   * Navigate back to previous page
+   */
+  const handleGoBack = useCallback(() => {
+    basicErrorLogger.logUserAction('error_navigate_back', { errorType });
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
     } else {
-      window.location.href = '/'
+      window.location.href = '/';
     }
-  }
-
+  }, [errorType]);
+  
+  /**
+   * Report error to support (could open email client or support form)
+   */
+  const handleReportError = useCallback(() => {
+    basicErrorLogger.logUserAction('error_report_requested', { errorType });
+    
+    const reportData = {
+      error: error.message,
+      type: errorType,
+      time: new Date().toISOString(),
+      page: typeof window !== 'undefined' ? window.location.href : 'unknown',
+    };
+    
+    const mailtoLink = `mailto:support@dreamfactory.com?subject=Error Report&body=${encodeURIComponent(
+      `Error Report:\n\nType: ${errorType}\nMessage: ${error.message}\nTime: ${reportData.time}\nPage: ${reportData.page}\n\nPlease describe what you were doing when this error occurred:`
+    )}`;
+    
+    window.location.href = mailtoLink;
+  }, [error, errorType]);
+  
+  const canRetry = retryCount < maxRetries && !isRetrying;
+  const shouldShowRetry = errorType === ErrorType.NETWORK || 
+                         errorType === ErrorType.SERVER || 
+                         errorType === ErrorType.UNKNOWN;
+  
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-8">
-      <div className="max-w-2xl w-full">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
         {/* Error Icon and Title */}
-        <div className="text-center mb-8">
-          <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
-            <AlertTriangle 
-              className="w-8 h-8 text-red-600 dark:text-red-400" 
-              aria-hidden="true"
-            />
+        <div className="text-center">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100">
+            <AlertCircle className="h-8 w-8 text-red-600" aria-hidden="true" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            {errorDetails.title}
+          <h1 className="mt-4 text-3xl font-bold text-gray-900">
+            {errorMessage.title}
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
-            {errorDetails.description}
+          <p className="mt-2 text-sm text-gray-600">
+            {errorMessage.description}
           </p>
         </div>
-
-        {/* Error Details Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                What can you do?
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {errorDetails.suggestion}
+        
+        {/* Error Details for Development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h3 className="text-sm font-medium text-red-800 mb-2">
+              Development Error Details:
+            </h3>
+            <pre className="text-xs text-red-700 whitespace-pre-wrap break-words">
+              {error.message}
+            </pre>
+            {(error as any).digest && (
+              <p className="text-xs text-red-600 mt-2">
+                Error ID: {(error as any).digest}
               </p>
-            </div>
-
-            {/* Development mode error details */}
-            {process.env.NODE_ENV === 'development' && (
-              <details className="border-t border-gray-200 dark:border-gray-600 pt-4">
-                <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100">
-                  Error Details (Development Mode)
-                </summary>
-                <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900 rounded text-xs font-mono text-gray-600 dark:text-gray-400 overflow-auto">
-                  <div className="space-y-2">
-                    <div>
-                      <strong>Message:</strong> {error.message}
-                    </div>
-                    {error.digest && (
-                      <div>
-                        <strong>Digest:</strong> {error.digest}
-                      </div>
-                    )}
-                    {error.stack && (
-                      <div>
-                        <strong>Stack:</strong>
-                        <pre className="mt-1 whitespace-pre-wrap">{error.stack}</pre>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </details>
             )}
           </div>
-        </div>
-
+        )}
+        
+        {/* Retry Information */}
+        {retryCount > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-sm text-yellow-800">
+              Retry attempt {retryCount} of {maxRetries}
+            </p>
+          </div>
+        )}
+        
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          {errorDetails.retryRecommended && (
+        <div className="space-y-3">
+          {/* Retry Button */}
+          {shouldShowRetry && canRetry && (
             <button
               onClick={handleRetry}
-              className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 transition-colors"
-              aria-label="Retry the failed operation"
+              disabled={isRetrying}
+              className="w-full flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
             >
-              <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />
-              Try Again
+              {isRetrying ? (
+                <>
+                  <RefreshCw className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                  Retrying...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="-ml-1 mr-2 h-4 w-4" />
+                  Try Again
+                </>
+              )}
             </button>
           )}
           
+          {/* Go Back Button */}
           <button
             onClick={handleGoBack}
-            className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-base font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 transition-colors"
-            aria-label="Go back to the previous page"
+            className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
           >
-            <ChevronLeft className="w-4 h-4 mr-2" aria-hidden="true" />
+            <ArrowLeft className="-ml-1 mr-2 h-4 w-4" />
             Go Back
           </button>
           
+          {/* Go Home Button */}
           <button
             onClick={handleGoHome}
-            className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-base font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 transition-colors"
-            aria-label="Go to the dashboard home page"
+            className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
           >
-            <Home className="w-4 h-4 mr-2" aria-hidden="true" />
-            Dashboard Home
+            <Home className="-ml-1 mr-2 h-4 w-4" />
+            Go to Dashboard
           </button>
         </div>
-
-        {/* Support Information */}
-        <div className="text-center mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            If this problem persists, please contact your administrator or check the{' '}
-            <a 
-              href="/admin-settings/system-info" 
-              className="text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 underline"
+        
+        {/* Additional Help Options */}
+        <div className="border-t border-gray-200 pt-6">
+          <div className="text-center">
+            <p className="text-sm text-gray-500 mb-3">
+              Need additional help?
+            </p>
+            <button
+              onClick={handleReportError}
+              className="text-sm text-blue-600 hover:text-blue-800 underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded"
             >
-              system status
-            </a>
-            {' '}for more information.
-          </p>
+              Report this error to support
+            </button>
+          </div>
+        </div>
+        
+        {/* Accessibility and Status Information */}
+        <div className="sr-only" role="status" aria-live="polite">
+          {isRetrying && "Retrying the operation"}
+          {retryCount >= maxRetries && shouldShowRetry && "Maximum retry attempts reached"}
         </div>
       </div>
     </div>
-  )
+  );
 }
