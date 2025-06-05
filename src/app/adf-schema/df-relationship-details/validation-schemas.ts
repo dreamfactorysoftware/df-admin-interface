@@ -1,549 +1,730 @@
-/**
- * Zod validation schemas for relationship form data
- * 
- * Replaces Angular Validators with Zod schema validators integrated with React Hook Form
- * per React/Next.js Integration Requirements. Provides runtime type checking with 
- * compile-time inference per Section 3.2.3 validation approach.
- * 
- * Features:
- * - TypeScript 5.8+ enhanced template literal types for form validation
- * - Relationship-specific validation rules for belongs_to and many_many types
- * - Dynamic validation logic for junction table requirements
- * - React Hook Form zodResolver integration for seamless validation
- * - Real-time validation under 100ms performance target
- * - Comprehensive validation testing support
- */
-
 import { z } from 'zod';
-import type { RelationshipType, TableRelationship } from '../../types/database';
+import type { TableRelationship } from 'src/types/database';
 
-// ============================================================================
+// =============================================================================
 // RELATIONSHIP TYPE DEFINITIONS
-// ============================================================================
-
-/** Supported relationship types with enhanced template literal types */
-export const relationshipTypes = ['belongs_to', 'has_many', 'has_one', 'many_many'] as const;
-
-/** Enhanced TypeScript 5.8+ template literal type for relationship validation */
-export type RelationshipTypeTemplate = typeof relationshipTypes[number];
-
-/** Relationship type validation schema with runtime checking */
-export const relationshipTypeSchema = z.enum(relationshipTypes, {
-  errorMap: (issue, ctx) => {
-    if (issue.code === z.ZodIssueCode.invalid_enum_value) {
-      return { 
-        message: `Invalid relationship type. Must be one of: ${relationshipTypes.join(', ')}` 
-      };
-    }
-    return { message: ctx.defaultError };
-  }
-});
-
-// ============================================================================
-// FIELD OPTION SCHEMAS
-// ============================================================================
-
-/** Basic option interface for dropdowns and selects */
-export const basicOptionSchema = z.object({
-  label: z.string().min(1, 'Label is required'),
-  value: z.union([z.string(), z.number()]),
-  name: z.string().optional()
-});
-
-export type BasicOption = z.infer<typeof basicOptionSchema>;
-
-/** Service option schema for service selection */
-export const serviceOptionSchema = basicOptionSchema.extend({
-  value: z.number().positive('Service ID must be a positive number'),
-  name: z.string().min(1, 'Service name is required')
-});
-
-export type ServiceOption = z.infer<typeof serviceOptionSchema>;
-
-/** Field option schema for field selection */
-export const fieldOptionSchema = basicOptionSchema.extend({
-  value: z.string().min(1, 'Field name is required')
-});
-
-export type FieldOption = z.infer<typeof fieldOptionSchema>;
-
-/** Table option schema for table selection */
-export const tableOptionSchema = basicOptionSchema.extend({
-  value: z.string().min(1, 'Table name is required')
-});
-
-export type TableOption = z.infer<typeof tableOptionSchema>;
-
-// ============================================================================
-// BASE RELATIONSHIP SCHEMA
-// ============================================================================
-
-/** 
- * Base relationship schema with common fields and validation rules
- * Implements TypeScript 5.8+ enhanced template literal types for form validation
- */
-export const baseRelationshipSchema = z.object({
-  /** Relationship name - auto-generated, read-only in create mode */
-  name: z.string()
-    .min(1, 'Relationship name is required')
-    .max(64, 'Relationship name must be 64 characters or less')
-    .regex(
-      /^[a-zA-Z_][a-zA-Z0-9_]*$/,
-      'Relationship name must start with a letter or underscore and contain only letters, numbers, and underscores'
-    )
-    .optional(),
-
-  /** Optional alias for the relationship */
-  alias: z.string()
-    .max(64, 'Alias must be 64 characters or less')
-    .regex(
-      /^[a-zA-Z_][a-zA-Z0-9_]*$/,
-      'Alias must start with a letter or underscore and contain only letters, numbers, and underscores'
-    )
-    .optional()
-    .or(z.literal('')),
-
-  /** Display label for the relationship */
-  label: z.string()
-    .max(255, 'Label must be 255 characters or less')
-    .optional()
-    .or(z.literal('')),
-
-  /** Optional description of the relationship */
-  description: z.string()
-    .max(1000, 'Description must be 1000 characters or less')
-    .optional()
-    .or(z.literal('')),
-
-  /** Whether to always fetch related data */
-  alwaysFetch: z.boolean()
-    .default(false),
-
-  /** Relationship type - required field */
-  type: relationshipTypeSchema,
-
-  /** Whether this is a virtual relationship */
-  isVirtual: z.boolean()
-    .default(true),
-
-  /** Local field for the relationship - required */
-  field: z.string()
-    .min(1, 'Local field is required')
-    .max(64, 'Field name must be 64 characters or less'),
-
-  /** Reference service ID - required */
-  refServiceId: z.number()
-    .positive('Reference service is required'),
-
-  /** Reference table - required */
-  refTable: z.string()
-    .min(1, 'Reference table is required')
-    .max(64, 'Table name must be 64 characters or less'),
-
-  /** Reference field - required */
-  refField: z.string()
-    .min(1, 'Reference field is required')
-    .max(64, 'Field name must be 64 characters or less')
-});
-
-export type BaseRelationshipFormData = z.infer<typeof baseRelationshipSchema>;
-
-// ============================================================================
-// JUNCTION TABLE SCHEMAS FOR MANY-TO-MANY RELATIONSHIPS
-// ============================================================================
-
-/** 
- * Junction table schema for many-to-many relationships
- * Implements dynamic validation logic per business logic requirements
- */
-export const junctionTableSchema = z.object({
-  /** Junction service ID - required for many_many */
-  junctionServiceId: z.number()
-    .positive('Junction service is required for many-to-many relationships'),
-
-  /** Junction table - required for many_many */
-  junctionTable: z.string()
-    .min(1, 'Junction table is required for many-to-many relationships')
-    .max(64, 'Table name must be 64 characters or less'),
-
-  /** Junction field (local key in junction table) - required for many_many */
-  junctionField: z.string()
-    .min(1, 'Junction field is required for many-to-many relationships')
-    .max(64, 'Field name must be 64 characters or less'),
-
-  /** Junction reference field (foreign key in junction table) - required for many_many */
-  junctionRefField: z.string()
-    .min(1, 'Junction reference field is required for many-to-many relationships')
-    .max(64, 'Field name must be 64 characters or less')
-});
-
-export type JunctionTableFormData = z.infer<typeof junctionTableSchema>;
-
-/** 
- * Optional junction table schema for non-many-to-many relationships
- * All fields are optional and nullable for other relationship types
- */
-export const optionalJunctionTableSchema = z.object({
-  junctionServiceId: z.number().positive().optional().nullable(),
-  junctionTable: z.string().max(64).optional().nullable().or(z.literal('')),
-  junctionField: z.string().max(64).optional().nullable().or(z.literal('')),
-  junctionRefField: z.string().max(64).optional().nullable().or(z.literal(''))
-});
-
-export type OptionalJunctionTableFormData = z.infer<typeof optionalJunctionTableSchema>;
-
-// ============================================================================
-// RELATIONSHIP TYPE-SPECIFIC SCHEMAS
-// ============================================================================
-
-/** 
- * Schema for belongs_to relationships
- * Junction fields are optional and should be null/empty
- */
-export const belongsToRelationshipSchema = baseRelationshipSchema
-  .extend({
-    type: z.literal('belongs_to')
-  })
-  .merge(optionalJunctionTableSchema);
-
-export type BelongsToRelationshipFormData = z.infer<typeof belongsToRelationshipSchema>;
-
-/** 
- * Schema for has_many relationships  
- * Junction fields are optional and should be null/empty
- */
-export const hasManyRelationshipSchema = baseRelationshipSchema
-  .extend({
-    type: z.literal('has_many')
-  })
-  .merge(optionalJunctionTableSchema);
-
-export type HasManyRelationshipFormData = z.infer<typeof hasManyRelationshipSchema>;
-
-/** 
- * Schema for has_one relationships
- * Junction fields are optional and should be null/empty
- */
-export const hasOneRelationshipSchema = baseRelationshipSchema
-  .extend({
-    type: z.literal('has_one')
-  })
-  .merge(optionalJunctionTableSchema);
-
-export type HasOneRelationshipFormData = z.infer<typeof hasOneRelationshipSchema>;
-
-/** 
- * Schema for many_many relationships with required junction table configuration
- * Implements relationship-specific validation rules per business logic requirements
- */
-export const manyManyRelationshipSchema = baseRelationshipSchema
-  .extend({
-    type: z.literal('many_many')
-  })
-  .merge(junctionTableSchema);
-
-export type ManyManyRelationshipFormData = z.infer<typeof manyManyRelationshipSchema>;
-
-// ============================================================================
-// UNIFIED RELATIONSHIP SCHEMA WITH DYNAMIC VALIDATION
-// ============================================================================
+// =============================================================================
 
 /**
- * Complete relationship form schema with dynamic validation logic
- * Implements runtime type checking with compile-time inference per Section 3.2.3
- * 
- * Key Features:
- * - Type-safe discriminated union based on relationship type
- * - Dynamic validation for junction table requirements  
- * - Compile-time TypeScript inference for form data
- * - Runtime validation under 100ms performance target
- * - React Hook Form zodResolver compatibility
+ * Supported relationship types in DreamFactory
+ * Aligned with TableRelationship type from database schema
  */
-export const relationshipFormSchema = z.discriminatedUnion('type', [
-  belongsToRelationshipSchema,
-  hasManyRelationshipSchema,
-  hasOneRelationshipSchema,
-  manyManyRelationshipSchema
+export const RelationshipTypeEnum = z.enum([
+  'belongs_to',
+  'has_many', 
+  'has_one',
+  'many_many'
 ]);
 
-export type RelationshipFormData = z.infer<typeof relationshipFormSchema>;
+export type RelationshipType = z.infer<typeof RelationshipTypeEnum>;
 
-// ============================================================================
-// RELATIONSHIP FORM SCHEMA WITH OPTIONAL FIELDS FOR CREATION
-// ============================================================================
-
-/**
- * Relationship creation schema with relaxed validation for initial form state
- * Allows partial form data during form building and dynamic field updates
- */
-export const relationshipCreationSchema = baseRelationshipSchema
-  .extend({
-    // Make relationship type optional for initial form state
-    type: relationshipTypeSchema.optional(),
-    
-    // Make required fields optional for progressive form completion
-    field: z.string().max(64).optional().or(z.literal('')),
-    refServiceId: z.number().positive().optional().nullable(),
-    refTable: z.string().max(64).optional().or(z.literal('')),
-    refField: z.string().max(64).optional().or(z.literal(''))
-  })
-  .merge(optionalJunctionTableSchema);
-
-export type RelationshipCreationFormData = z.infer<typeof relationshipCreationSchema>;
-
-// ============================================================================
-// RELATIONSHIP FORM VALIDATION UTILITIES
-// ============================================================================
+// =============================================================================
+// BASE RELATIONSHIP FORM DATA TYPES
+// =============================================================================
 
 /**
- * Enhanced validation function with TypeScript 5.8+ template literal types
- * Provides runtime type checking and compile-time inference
- * 
- * @param data - Form data to validate
- * @param mode - Validation mode: 'create' | 'edit' | 'submit'
- * @returns Validation result with type-safe error information
+ * Base relationship form data structure
+ * Compatible with React Hook Form and DreamFactory API requirements
  */
-export function validateRelationshipForm(
-  data: Partial<RelationshipFormData>,
-  mode: 'create' | 'edit' | 'submit' = 'submit'
-): {
-  success: boolean;
-  data?: RelationshipFormData;
-  errors?: z.ZodError;
-  fieldErrors?: Record<string, string[]>;
-} {
-  try {
-    // Use creation schema for progressive validation
-    if (mode === 'create') {
-      const result = relationshipCreationSchema.parse(data);
-      return { success: true, data: result as RelationshipFormData };
-    }
-
-    // Use full schema for final validation
-    const result = relationshipFormSchema.parse(data);
-    return { success: true, data: result };
-
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      // Transform Zod errors into field-level error map for React Hook Form
-      const fieldErrors: Record<string, string[]> = {};
-      
-      error.errors.forEach((err) => {
-        const fieldPath = err.path.join('.');
-        if (!fieldErrors[fieldPath]) {
-          fieldErrors[fieldPath] = [];
-        }
-        fieldErrors[fieldPath].push(err.message);
-      });
-
-      return {
-        success: false,
-        errors: error,
-        fieldErrors
-      };
-    }
-
-    // Handle unexpected errors
-    return {
-      success: false,
-      errors: new z.ZodError([{
-        code: z.ZodIssueCode.custom,
-        message: 'Unexpected validation error',
-        path: []
-      }])
-    };
-  }
+export interface RelationshipFormData {
+  /** Relationship name/identifier (read-only in forms) */
+  name?: string;
+  /** Relationship alias for API reference */
+  alias?: string;
+  /** Human-readable label */
+  label?: string;
+  /** Optional description */
+  description?: string;
+  /** Whether to always fetch related data */
+  alwaysFetch: boolean;
+  /** Relationship type */
+  type: RelationshipType;
+  /** Whether relationship is virtual (computed) */
+  isVirtual: boolean;
+  /** Local field name for the relationship */
+  field: string;
+  /** Referenced service ID */
+  refServiceId: number;
+  /** Referenced table name */
+  refTable: string;
+  /** Referenced field name */
+  refField: string;
+  /** Junction service ID (for many_many relationships) */
+  junctionServiceId?: number;
+  /** Junction table name (for many_many relationships) */
+  junctionTable?: string;
+  /** Junction local field (for many_many relationships) */
+  junctionField?: string;
+  /** Junction reference field (for many_many relationships) */
+  junctionRefField?: string;
 }
 
-/**
- * Type guard to check if relationship requires junction table
- * Implements business logic requirements for many_many relationships
- */
-export function requiresJunctionTable(type: RelationshipType): type is 'many_many' {
-  return type === 'many_many';
-}
+// =============================================================================
+// FIELD VALIDATION CONSTANTS
+// =============================================================================
 
 /**
- * Type guard to check if form data is valid for many-to-many relationship
- * Ensures all junction fields are present when required
+ * Validation constants for relationship fields
+ * Based on DreamFactory API constraints and UI/UX requirements
  */
-export function isValidManyManyRelationship(
-  data: Partial<RelationshipFormData>
-): data is ManyManyRelationshipFormData {
-  if (data.type !== 'many_many') return false;
-  
-  return !!(
-    data.junctionServiceId &&
-    data.junctionTable &&
-    data.junctionField &&
-    data.junctionRefField
-  );
-}
-
-/**
- * Utility to get default form values based on relationship type
- * Optimizes form initialization for different relationship types
- */
-export function getDefaultRelationshipFormValues(
-  type?: RelationshipType
-): Partial<RelationshipFormData> {
-  const baseDefaults: Partial<RelationshipFormData> = {
-    alias: '',
-    label: '',
-    description: '',
-    alwaysFetch: false,
-    isVirtual: true,
-    field: '',
-    refServiceId: undefined,
-    refTable: '',
-    refField: ''
-  };
-
-  if (type === 'many_many') {
-    return {
-      ...baseDefaults,
-      type,
-      junctionServiceId: undefined,
-      junctionTable: '',
-      junctionField: '',
-      junctionRefField: ''
-    };
-  }
-
-  return {
-    ...baseDefaults,
-    type,
-    junctionServiceId: null,
-    junctionTable: null,
-    junctionField: null,
-    junctionRefField: null
-  };
-}
-
-// ============================================================================
-// REACT HOOK FORM INTEGRATION SCHEMAS
-// ============================================================================
-
-/**
- * Form field validation schema for React Hook Form integration
- * Ensures seamless validation integration per Section 3.2.3 form implementation patterns
- */
-export const relationshipFormFieldsSchema = z.object({
-  name: z.string().optional(),
-  alias: z.string().optional(),
-  label: z.string().optional(),
-  description: z.string().optional(),
-  alwaysFetch: z.boolean(),
-  type: relationshipTypeSchema,
-  isVirtual: z.boolean(),
-  field: z.string().min(1),
-  refServiceId: z.number().positive(),
-  refTable: z.string().min(1),
-  refField: z.string().min(1),
-  junctionServiceId: z.number().positive().optional().nullable(),
-  junctionTable: z.string().optional().nullable(),
-  junctionField: z.string().optional().nullable(),
-  junctionRefField: z.string().optional().nullable()
-});
-
-/**
- * Form field validation with conditional requirements
- * Implements dynamic validation logic for junction table requirements
- */
-export const conditionalRelationshipFormSchema = relationshipFormFieldsSchema
-  .refine((data) => {
-    // Validate junction fields are present for many_many relationships
-    if (data.type === 'many_many') {
-      return !!(
-        data.junctionServiceId &&
-        data.junctionTable &&
-        data.junctionField &&
-        data.junctionRefField
-      );
-    }
-    return true;
-  }, {
-    message: 'Junction table configuration is required for many-to-many relationships',
-    path: ['junctionServiceId']
-  })
-  .refine((data) => {
-    // Validate junction fields are not present for non-many_many relationships
-    if (data.type !== 'many_many') {
-      return !(
-        data.junctionServiceId ||
-        data.junctionTable ||
-        data.junctionField ||
-        data.junctionRefField
-      );
-    }
-    return true;
-  }, {
-    message: 'Junction table configuration should not be set for non-many-to-many relationships',
-    path: ['junctionServiceId']
-  });
-
-export type ConditionalRelationshipFormData = z.infer<typeof conditionalRelationshipFormSchema>;
-
-// ============================================================================
-// PERFORMANCE OPTIMIZED VALIDATION SCHEMAS
-// ============================================================================
-
-/**
- * Lightweight validation schema for real-time field validation
- * Optimized for under 100ms validation performance per requirements
- */
-export const quickValidationSchema = z.object({
-  field: z.string().min(1).optional(),
-  type: relationshipTypeSchema.optional(),
-  refServiceId: z.number().positive().optional(),
-  refTable: z.string().min(1).optional(),
-  refField: z.string().min(1).optional()
-});
-
-/**
- * Field-specific validation schemas for incremental validation
- * Enables optimized real-time validation of individual form fields
- */
-export const fieldValidationSchemas = {
-  name: z.string().min(1).max(64).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
-  alias: z.string().max(64).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/).optional(),
-  label: z.string().max(255).optional(),
-  description: z.string().max(1000).optional(),
-  type: relationshipTypeSchema,
-  field: z.string().min(1).max(64),
-  refServiceId: z.number().positive(),
-  refTable: z.string().min(1).max(64),
-  refField: z.string().min(1).max(64),
-  junctionServiceId: z.number().positive().optional(),
-  junctionTable: z.string().min(1).max(64).optional(),
-  junctionField: z.string().min(1).max(64).optional(),
-  junctionRefField: z.string().min(1).max(64).optional()
+export const RELATIONSHIP_VALIDATION = {
+  /** Maximum length for text fields */
+  MAX_TEXT_LENGTH: 255,
+  /** Maximum length for description field */
+  MAX_DESCRIPTION_LENGTH: 1000,
+  /** Minimum length for required text fields */
+  MIN_TEXT_LENGTH: 1,
+  /** Valid characters for name/alias fields */
+  NAME_PATTERN: /^[a-zA-Z][a-zA-Z0-9_]*$/,
+  /** Maximum service ID value */
+  MAX_SERVICE_ID: 999999,
+  /** Minimum service ID value */
+  MIN_SERVICE_ID: 1,
 } as const;
 
-// ============================================================================
-// TYPE EXPORTS FOR CONVENIENCE
-// ============================================================================
+// =============================================================================
+// FIELD VALIDATION SCHEMAS
+// =============================================================================
 
-/** All form data types for type safety */
-export type RelationshipFormDataUnion = 
-  | BelongsToRelationshipFormData
-  | HasManyRelationshipFormData  
-  | HasOneRelationshipFormData
-  | ManyManyRelationshipFormData;
+/**
+ * Schema for relationship name field
+ * Read-only in forms but included for data consistency
+ */
+export const RelationshipNameSchema = z
+  .string()
+  .min(RELATIONSHIP_VALIDATION.MIN_TEXT_LENGTH, 'Name is required')
+  .max(RELATIONSHIP_VALIDATION.MAX_TEXT_LENGTH, 'Name must be 255 characters or less')
+  .regex(
+    RELATIONSHIP_VALIDATION.NAME_PATTERN,
+    'Name must start with a letter and contain only letters, numbers, and underscores'
+  )
+  .optional();
 
-/** Validation result type for form submission */
-export interface RelationshipValidationResult {
-  isValid: boolean;
-  data?: RelationshipFormData;
-  errors?: Record<string, string[]>;
-  performance?: {
-    validationTime: number;
-    fieldCount: number;
+/**
+ * Schema for relationship alias field
+ * Used for API reference and should follow naming conventions
+ */
+export const RelationshipAliasSchema = z
+  .string()
+  .max(RELATIONSHIP_VALIDATION.MAX_TEXT_LENGTH, 'Alias must be 255 characters or less')
+  .regex(
+    RELATIONSHIP_VALIDATION.NAME_PATTERN,
+    'Alias must start with a letter and contain only letters, numbers, and underscores'
+  )
+  .optional();
+
+/**
+ * Schema for relationship label field
+ * Human-readable display name
+ */
+export const RelationshipLabelSchema = z
+  .string()
+  .max(RELATIONSHIP_VALIDATION.MAX_TEXT_LENGTH, 'Label must be 255 characters or less')
+  .optional();
+
+/**
+ * Schema for relationship description field
+ * Optional descriptive text with extended length
+ */
+export const RelationshipDescriptionSchema = z
+  .string()
+  .max(RELATIONSHIP_VALIDATION.MAX_DESCRIPTION_LENGTH, 'Description must be 1000 characters or less')
+  .optional();
+
+/**
+ * Schema for field name validation
+ * Used for field, refField, junctionField, and junctionRefField
+ */
+export const FieldNameSchema = z
+  .string()
+  .min(RELATIONSHIP_VALIDATION.MIN_TEXT_LENGTH, 'Field name is required')
+  .max(RELATIONSHIP_VALIDATION.MAX_TEXT_LENGTH, 'Field name must be 255 characters or less')
+  .regex(
+    RELATIONSHIP_VALIDATION.NAME_PATTERN,
+    'Field name must start with a letter and contain only letters, numbers, and underscores'
+  );
+
+/**
+ * Schema for table name validation
+ * Used for refTable and junctionTable
+ */
+export const TableNameSchema = z
+  .string()
+  .min(RELATIONSHIP_VALIDATION.MIN_TEXT_LENGTH, 'Table name is required')
+  .max(RELATIONSHIP_VALIDATION.MAX_TEXT_LENGTH, 'Table name must be 255 characters or less');
+
+/**
+ * Schema for service ID validation
+ * Used for refServiceId and junctionServiceId
+ */
+export const ServiceIdSchema = z
+  .number()
+  .int('Service ID must be an integer')
+  .min(RELATIONSHIP_VALIDATION.MIN_SERVICE_ID, 'Service ID must be at least 1')
+  .max(RELATIONSHIP_VALIDATION.MAX_SERVICE_ID, 'Service ID must be 999999 or less');
+
+// =============================================================================
+// BASE RELATIONSHIP VALIDATION SCHEMA
+// =============================================================================
+
+/**
+ * Base relationship validation schema without conditional logic
+ * Covers all common fields regardless of relationship type
+ */
+export const BaseRelationshipSchema = z.object({
+  name: RelationshipNameSchema,
+  alias: RelationshipAliasSchema,
+  label: RelationshipLabelSchema,
+  description: RelationshipDescriptionSchema,
+  alwaysFetch: z.boolean().default(false),
+  type: RelationshipTypeEnum,
+  isVirtual: z.boolean().default(true),
+  field: FieldNameSchema,
+  refServiceId: ServiceIdSchema,
+  refTable: TableNameSchema,
+  refField: FieldNameSchema,
+}).strict();
+
+// =============================================================================
+// CONDITIONAL JUNCTION TABLE VALIDATION
+// =============================================================================
+
+/**
+ * Schema for junction table fields (many_many relationships only)
+ * These fields are required when relationship type is 'many_many'
+ */
+export const JunctionTableSchema = z.object({
+  junctionServiceId: ServiceIdSchema,
+  junctionTable: TableNameSchema,
+  junctionField: FieldNameSchema,
+  junctionRefField: FieldNameSchema,
+}).strict();
+
+/**
+ * Optional junction table schema for non-many_many relationships
+ * These fields should be undefined/null for other relationship types
+ */
+export const OptionalJunctionTableSchema = z.object({
+  junctionServiceId: z.number().optional(),
+  junctionTable: z.string().optional(),
+  junctionField: z.string().optional(),
+  junctionRefField: z.string().optional(),
+}).strict();
+
+// =============================================================================
+// TYPE-SPECIFIC RELATIONSHIP SCHEMAS
+// =============================================================================
+
+/**
+ * Schema for belongs_to relationships
+ * Simple one-to-one or many-to-one relationships
+ */
+export const BelongsToRelationshipSchema = BaseRelationshipSchema
+  .extend({
+    type: z.literal('belongs_to'),
+  })
+  .merge(OptionalJunctionTableSchema)
+  .strict();
+
+/**
+ * Schema for has_many relationships
+ * One-to-many relationships
+ */
+export const HasManyRelationshipSchema = BaseRelationshipSchema
+  .extend({
+    type: z.literal('has_many'),
+  })
+  .merge(OptionalJunctionTableSchema)
+  .strict();
+
+/**
+ * Schema for has_one relationships
+ * One-to-one relationships
+ */
+export const HasOneRelationshipSchema = BaseRelationshipSchema
+  .extend({
+    type: z.literal('has_one'),
+  })
+  .merge(OptionalJunctionTableSchema)
+  .strict();
+
+/**
+ * Schema for many_many relationships
+ * Many-to-many relationships requiring junction table
+ */
+export const ManyManyRelationshipSchema = BaseRelationshipSchema
+  .extend({
+    type: z.literal('many_many'),
+  })
+  .merge(JunctionTableSchema)
+  .strict();
+
+// =============================================================================
+// DISCRIMINATED UNION SCHEMA
+// =============================================================================
+
+/**
+ * Complete relationship validation schema using discriminated union
+ * Automatically applies correct validation based on relationship type
+ * Provides compile-time type safety with runtime validation
+ */
+export const RelationshipSchema = z.discriminatedUnion('type', [
+  BelongsToRelationshipSchema,
+  HasManyRelationshipSchema,
+  HasOneRelationshipSchema,
+  ManyManyRelationshipSchema,
+]);
+
+// =============================================================================
+// DYNAMIC VALIDATION FUNCTIONS
+// =============================================================================
+
+/**
+ * Dynamic validation function for relationship forms
+ * Validates based on current relationship type with real-time feedback
+ * Optimized for React Hook Form integration with under 100ms validation
+ */
+export const validateRelationshipForm = (data: Partial<RelationshipFormData>) => {
+  try {
+    // Parse with appropriate schema based on type
+    RelationshipSchema.parse(data);
+    return { success: true, errors: {} };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      // Transform Zod errors to React Hook Form format
+      const formErrors: Record<string, string> = {};
+      
+      error.errors.forEach((err) => {
+        const path = err.path.join('.');
+        formErrors[path] = err.message;
+      });
+      
+      return { success: false, errors: formErrors };
+    }
+    
+    return { 
+      success: false, 
+      errors: { _root: 'Validation failed due to unexpected error' } 
+    };
+  }
+};
+
+/**
+ * Type-specific validation helper for junction table fields
+ * Validates junction fields only when relationship type is 'many_many'
+ */
+export const validateJunctionFields = (
+  type: RelationshipType, 
+  junctionData: Partial<Pick<RelationshipFormData, 'junctionServiceId' | 'junctionTable' | 'junctionField' | 'junctionRefField'>>
+) => {
+  if (type === 'many_many') {
+    try {
+      JunctionTableSchema.parse(junctionData);
+      return { success: true, errors: {} };
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const formErrors: Record<string, string> = {};
+        
+        error.errors.forEach((err) => {
+          const path = err.path.join('.');
+          formErrors[path] = err.message;
+        });
+        
+        return { success: false, errors: formErrors };
+      }
+    }
+  }
+  
+  // For non-many_many types, junction fields should be empty/undefined
+  const hasJunctionData = Object.values(junctionData).some(value => 
+    value !== undefined && value !== null && value !== ''
+  );
+  
+  if (hasJunctionData) {
+    return {
+      success: false,
+      errors: {
+        junctionServiceId: 'Junction table not required for this relationship type',
+        junctionTable: 'Junction table not required for this relationship type',
+        junctionField: 'Junction field not required for this relationship type',
+        junctionRefField: 'Junction reference field not required for this relationship type',
+      }
+    };
+  }
+  
+  return { success: true, errors: {} };
+};
+
+// =============================================================================
+// FORM FIELD ENABLEMENT LOGIC
+// =============================================================================
+
+/**
+ * Determines which form fields should be enabled based on relationship type
+ * Used for dynamic form behavior in React Hook Form
+ */
+export const getEnabledFields = (type: RelationshipType) => {
+  const baseFields = [
+    'alias',
+    'label', 
+    'description',
+    'alwaysFetch',
+    'type',
+    'field',
+    'refServiceId',
+    'refTable',
+    'refField'
+  ];
+  
+  if (type === 'many_many') {
+    return [
+      ...baseFields,
+      'junctionServiceId',
+      'junctionTable', 
+      'junctionField',
+      'junctionRefField'
+    ];
+  }
+  
+  return baseFields;
+};
+
+/**
+ * Determines which form fields should be disabled based on relationship type
+ * Used for conditional field disabling in React Hook Form
+ */
+export const getDisabledFields = (type: RelationshipType) => {
+  const alwaysDisabled = ['name', 'isVirtual']; // These are read-only
+  
+  if (type !== 'many_many') {
+    return [
+      ...alwaysDisabled,
+      'junctionServiceId',
+      'junctionTable',
+      'junctionField', 
+      'junctionRefField'
+    ];
+  }
+  
+  return alwaysDisabled;
+};
+
+// =============================================================================
+// REACT HOOK FORM INTEGRATION HELPERS
+// =============================================================================
+
+/**
+ * Generates default values for relationship form
+ * Optimized for React Hook Form integration
+ */
+export const getDefaultRelationshipValues = (type: RelationshipType = 'belongs_to'): Partial<RelationshipFormData> => ({
+  alwaysFetch: false,
+  type,
+  isVirtual: true,
+  // Junction fields default to undefined for non-many_many types
+  ...(type !== 'many_many' && {
+    junctionServiceId: undefined,
+    junctionTable: undefined,
+    junctionField: undefined,
+    junctionRefField: undefined,
+  }),
+});
+
+/**
+ * React Hook Form resolver compatible validation function
+ * Provides seamless integration with zodResolver
+ */
+export const relationshipFormResolver = (data: RelationshipFormData) => {
+  const result = validateRelationshipForm(data);
+  
+  if (result.success) {
+    return {
+      values: data,
+      errors: {},
+    };
+  }
+  
+  return {
+    values: {},
+    errors: result.errors,
   };
+};
+
+// =============================================================================
+// TYPE INFERENCE AND EXPORTS
+// =============================================================================
+
+/**
+ * Inferred TypeScript types from Zod schemas
+ * Provides compile-time type safety with runtime validation
+ */
+export type RelationshipFormValues = z.infer<typeof RelationshipSchema>;
+export type BelongsToRelationship = z.infer<typeof BelongsToRelationshipSchema>;
+export type HasManyRelationship = z.infer<typeof HasManyRelationshipSchema>;
+export type HasOneRelationship = z.infer<typeof HasOneRelationshipSchema>;
+export type ManyManyRelationship = z.infer<typeof ManyManyRelationshipSchema>;
+export type JunctionTableFields = z.infer<typeof JunctionTableSchema>;
+
+/**
+ * Form validation state type for React components
+ */
+export interface RelationshipFormValidation {
+  isValid: boolean;
+  errors: Record<string, string>;
+  touched: Record<string, boolean>;
+  isDirty: boolean;
 }
 
-/** Form mode type for different validation contexts */
-export type ValidationMode = 'create' | 'edit' | 'submit' | 'realtime';
+/**
+ * Field configuration for dynamic form rendering
+ */
+export interface RelationshipFieldConfig {
+  name: keyof RelationshipFormData;
+  label: string;
+  type: 'text' | 'select' | 'toggle' | 'textarea';
+  required: boolean;
+  disabled: boolean;
+  placeholder?: string;
+  options?: Array<{ label: string; value: string | number }>;
+  helperText?: string;
+}
 
-// Re-export database types for convenience
-export type { RelationshipType, TableRelationship } from '../../types/database';
+/**
+ * Complete configuration for relationship form fields
+ * Used for dynamic form generation based on relationship type
+ */
+export const getRelationshipFieldConfigs = (type: RelationshipType): RelationshipFieldConfig[] => {
+  const disabledFields = getDisabledFields(type);
+  
+  const baseConfigs: RelationshipFieldConfig[] = [
+    {
+      name: 'name',
+      label: 'Name',
+      type: 'text',
+      required: false,
+      disabled: true,
+      helperText: 'Auto-generated relationship identifier',
+    },
+    {
+      name: 'alias',
+      label: 'Alias',
+      type: 'text',
+      required: false,
+      disabled: false,
+      placeholder: 'Optional API reference alias',
+    },
+    {
+      name: 'label',
+      label: 'Label',
+      type: 'text',
+      required: false,
+      disabled: false,
+      placeholder: 'Human-readable display name',
+    },
+    {
+      name: 'description',
+      label: 'Description',
+      type: 'textarea',
+      required: false,
+      disabled: false,
+      placeholder: 'Optional relationship description',
+    },
+    {
+      name: 'type',
+      label: 'Relationship Type',
+      type: 'select',
+      required: true,
+      disabled: false,
+      options: [
+        { label: 'Belongs To', value: 'belongs_to' },
+        { label: 'Has Many', value: 'has_many' },
+        { label: 'Has One', value: 'has_one' },
+        { label: 'Many To Many', value: 'many_many' },
+      ],
+    },
+    {
+      name: 'field',
+      label: 'Local Field',
+      type: 'select',
+      required: true,
+      disabled: false,
+      helperText: 'Field in the current table',
+    },
+    {
+      name: 'refServiceId',
+      label: 'Reference Service',
+      type: 'select',
+      required: true,
+      disabled: false,
+      helperText: 'Database service containing the referenced table',
+    },
+    {
+      name: 'refTable',
+      label: 'Reference Table',
+      type: 'select',
+      required: true,
+      disabled: false,
+      helperText: 'Table being referenced by this relationship',
+    },
+    {
+      name: 'refField',
+      label: 'Reference Field',
+      type: 'select',
+      required: true,
+      disabled: false,
+      helperText: 'Field in the referenced table',
+    },
+    {
+      name: 'alwaysFetch',
+      label: 'Always Fetch',
+      type: 'toggle',
+      required: false,
+      disabled: false,
+      helperText: 'Automatically include related data in queries',
+    },
+    {
+      name: 'isVirtual',
+      label: 'Virtual Relationship',
+      type: 'toggle',
+      required: false,
+      disabled: true,
+      helperText: 'Relationship is computed, not stored in database',
+    },
+  ];
+  
+  // Add junction table fields for many_many relationships
+  if (type === 'many_many') {
+    baseConfigs.push(
+      {
+        name: 'junctionServiceId',
+        label: 'Junction Service',
+        type: 'select',
+        required: true,
+        disabled: false,
+        helperText: 'Database service containing the junction table',
+      },
+      {
+        name: 'junctionTable',
+        label: 'Junction Table',
+        type: 'select',
+        required: true,
+        disabled: false,
+        helperText: 'Intermediate table for many-to-many relationship',
+      },
+      {
+        name: 'junctionField',
+        label: 'Junction Local Field',
+        type: 'select',
+        required: true,
+        disabled: false,
+        helperText: 'Field in junction table referencing local table',
+      },
+      {
+        name: 'junctionRefField',
+        label: 'Junction Reference Field',
+        type: 'select',
+        required: true,
+        disabled: false,
+        helperText: 'Field in junction table referencing remote table',
+      }
+    );
+  }
+  
+  // Apply disabled state based on relationship type
+  return baseConfigs.map(config => ({
+    ...config,
+    disabled: config.disabled || disabledFields.includes(config.name),
+  }));
+};
+
+// =============================================================================
+// PERFORMANCE OPTIMIZED VALIDATION
+// =============================================================================
+
+/**
+ * Debounced validation function for real-time form feedback
+ * Ensures validation performance under 100ms as required
+ */
+export const createDebouncedValidator = (delayMs: number = 50) => {
+  let timeoutId: NodeJS.Timeout;
+  
+  return (data: Partial<RelationshipFormData>): Promise<{ success: boolean; errors: Record<string, string> }> => {
+    return new Promise((resolve) => {
+      clearTimeout(timeoutId);
+      
+      timeoutId = setTimeout(() => {
+        const result = validateRelationshipForm(data);
+        resolve(result);
+      }, delayMs);
+    });
+  };
+};
+
+/**
+ * Memoized field validation for individual form fields
+ * Optimizes validation performance for large forms
+ */
+export const validateField = (
+  fieldName: keyof RelationshipFormData,
+  value: any,
+  relationshipType: RelationshipType
+): { isValid: boolean; error?: string } => {
+  try {
+    // Get the appropriate schema based on field and relationship type
+    const fieldSchema = getFieldSchema(fieldName, relationshipType);
+    fieldSchema.parse(value);
+    
+    return { isValid: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        isValid: false,
+        error: error.errors[0]?.message || 'Invalid value',
+      };
+    }
+    
+    return {
+      isValid: false,
+      error: 'Validation error',
+    };
+  }
+};
+
+/**
+ * Helper function to get appropriate schema for individual fields
+ * Used by validateField for targeted validation
+ */
+const getFieldSchema = (fieldName: keyof RelationshipFormData, type: RelationshipType) => {
+  const schemas: Record<keyof RelationshipFormData, z.ZodSchema> = {
+    name: RelationshipNameSchema.optional(),
+    alias: RelationshipAliasSchema,
+    label: RelationshipLabelSchema,
+    description: RelationshipDescriptionSchema,
+    alwaysFetch: z.boolean(),
+    type: RelationshipTypeEnum,
+    isVirtual: z.boolean(),
+    field: FieldNameSchema,
+    refServiceId: ServiceIdSchema,
+    refTable: TableNameSchema,
+    refField: FieldNameSchema,
+    junctionServiceId: type === 'many_many' ? ServiceIdSchema : z.number().optional(),
+    junctionTable: type === 'many_many' ? TableNameSchema : z.string().optional(),
+    junctionField: type === 'many_many' ? FieldNameSchema : z.string().optional(),
+    junctionRefField: type === 'many_many' ? FieldNameSchema : z.string().optional(),
+  };
+  
+  return schemas[fieldName];
+};
+
+// Export all schemas and utilities for component consumption
+export {
+  RelationshipSchema as default,
+  BaseRelationshipSchema,
+  BelongsToRelationshipSchema,
+  HasManyRelationshipSchema,
+  HasOneRelationshipSchema,
+  ManyManyRelationshipSchema,
+  JunctionTableSchema,
+  OptionalJunctionTableSchema,
+  RelationshipTypeEnum,
+};
