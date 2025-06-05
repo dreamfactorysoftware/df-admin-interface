@@ -1,528 +1,653 @@
 /**
- * @fileoverview Custom React hook implementing SWR-based data fetching for reference table and field options
- * with intelligent caching and conditional loading. Manages the dropdown options for foreign key relationships,
- * automatically fetching available tables and their fields based on user selections with cache hit responses under 50ms.
+ * Reference Options Hook for Foreign Key Field Management
  * 
- * Key Features:
+ * Custom React hook implementing SWR-based data fetching for reference table and field options
+ * with intelligent caching and conditional loading. Manages the dropdown options for foreign key
+ * relationships, automatically fetching available tables and their fields based on user selections
+ * with cache hit responses under 50ms per React/Next.js Integration Requirements.
+ * 
+ * Features:
  * - SWR conditional fetching for reference data per React/Next.js Integration Requirements
- * - Cache hit responses under 50ms per performance specifications
+ * - Cache hit responses under 50ms per performance requirements
  * - Automatic revalidation for schema changes per Section 4.3.2 Server State Management
  * - Type-safe reference data management per Section 5.2 Component Details
  * - Cascading data fetching for reference tables and fields with intelligent caching
- * - Comprehensive error handling and retry logic for reference data fetching failures
+ * - Conditional SWR hooks based on foreign key toggle state
+ * - Automatic cache invalidation when database schema changes
+ * - Error handling and retry logic for reference data fetching failures
  * 
+ * @fileoverview Foreign key reference options management hook
  * @version 1.0.0
- * @created 2024-12-28
- * @author DreamFactory Admin Interface Team
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import useSWR from 'swr';
-import { useMemo, useCallback } from 'react';
-import { apiClient } from '@/lib/api-client';
-import type { DatabaseSchemaFieldType } from '../field.types';
-import type { SchemaTable, SchemaField } from '@/types/database-schema';
+import { useMemo } from 'react';
+import useSWR, { mutate } from 'swr';
+import type { SWRConfiguration } from 'swr';
+import { createCrudClient, type ListResponse } from '@/lib/api-client';
+import type { DatabaseTable, DatabaseField } from '@/types/database';
+import type { FieldFormData } from '../field.types';
 
 // =============================================================================
-// INTERFACE DEFINITIONS
+// TYPE DEFINITIONS
 // =============================================================================
 
 /**
  * Reference table option for dropdown display
- * Provides user-friendly labels and metadata for table selection
+ * Simplified table metadata for field reference configuration
  */
 export interface ReferenceTableOption {
-  /** Table name used as value */
+  /** Table name (database identifier) */
   value: string;
-  /** Display label for the dropdown */
+  /** Display label for dropdown */
   label: string;
-  /** Optional description for tooltips */
+  /** Optional table description */
   description?: string;
-  /** Number of fields in the table */
-  fieldCount?: number;
-  /** Whether table has primary key */
-  hasPrimaryKey?: boolean;
-  /** Table type indicator */
-  isView?: boolean;
+  /** Number of fields in table */
+  fieldCount: number;
+  /** Whether table is a system table */
+  isSystem?: boolean;
 }
 
 /**
  * Reference field option for dropdown display
- * Provides detailed field information for foreign key configuration
+ * Field metadata for foreign key target selection
  */
 export interface ReferenceFieldOption {
-  /** Field name used as value */
+  /** Field name (database identifier) */
   value: string;
-  /** Display label combining field name and type */
+  /** Display label for dropdown */
   label: string;
-  /** Field type for validation */
+  /** Field data type */
   type: string;
-  /** Database-specific type */
-  dbType: string;
   /** Whether field is primary key */
-  isPrimaryKey?: boolean;
+  isPrimaryKey: boolean;
   /** Whether field is unique */
-  isUnique?: boolean;
-  /** Whether field allows null values */
-  isNullable?: boolean;
-  /** Field length constraint */
-  length?: number;
-  /** Field description */
+  isUnique: boolean;
+  /** Optional field description */
   description?: string;
 }
 
 /**
- * Reference options configuration
- * Controls the behavior of reference data fetching
+ * Hook configuration options
  */
-export interface ReferenceOptionsConfig {
-  /** Database service name */
+export interface UseReferenceOptionsConfig {
+  /** Service name for API requests */
   serviceName: string;
-  /** Current field configuration */
-  field: Partial<DatabaseSchemaFieldType>;
-  /** Whether foreign key is enabled */
+  /** Whether foreign key mode is enabled */
   isForeignKey: boolean;
-  /** Selected reference table */
-  refTable?: string | null;
-  /** Enable caching (default: true) */
-  enableCache?: boolean;
-  /** Cache time in milliseconds (default: 300000 - 5 minutes) */
-  cacheTime?: number;
-  /** Revalidation on focus (default: false) */
-  revalidateOnFocus?: boolean;
-  /** Revalidation on reconnect (default: true) */
-  revalidateOnReconnect?: boolean;
-  /** Include views in table options (default: false) */
-  includeViews?: boolean;
-  /** Filter to only show tables with primary keys (default: true) */
-  primaryKeyTablesOnly?: boolean;
+  /** Selected reference table name */
+  referenceTable?: string;
+  /** Custom SWR configuration */
+  swrConfig?: SWRConfiguration;
+  /** Enable aggressive caching (default: true) */
+  enableCaching?: boolean;
+  /** Custom cache key prefix */
+  cacheKeyPrefix?: string;
 }
 
 /**
- * Reference options hook return type
- * Provides comprehensive reference data and loading states
+ * Hook return interface
  */
 export interface UseReferenceOptionsReturn {
   // Table options
-  /** Available reference tables */
+  /** Available reference table options */
   tableOptions: ReferenceTableOption[];
-  /** Table options loading state */
-  tablesLoading: boolean;
-  /** Table options error */
-  tablesError: Error | null;
-  /** Refetch table options */
-  refetchTables: () => Promise<SchemaTable[]>;
+  /** Loading state for table options */
+  isLoadingTables: boolean;
+  /** Error state for table options */
+  tableError?: Error;
   
   // Field options
-  /** Available fields for selected reference table */
+  /** Available reference field options for selected table */
   fieldOptions: ReferenceFieldOption[];
-  /** Field options loading state */
-  fieldsLoading: boolean;
-  /** Field options error */
-  fieldsError: Error | null;
-  /** Refetch field options */
-  refetchFields: () => Promise<SchemaField[]>;
+  /** Loading state for field options */
+  isLoadingFields: boolean;
+  /** Error state for field options */
+  fieldError?: Error;
   
   // Cache management
-  /** Invalidate all reference data cache */
-  invalidateCache: () => void;
-  /** Invalidate tables cache */
-  invalidateTablesCache: () => void;
-  /** Invalidate fields cache for specific table */
-  invalidateFieldsCache: (tableName?: string) => void;
+  /** Manually refresh table options */
+  refreshTables: () => Promise<void>;
+  /** Manually refresh field options */
+  refreshFields: () => Promise<void>;
+  /** Clear all reference option caches */
+  clearCache: () => Promise<void>;
   
-  // Utility functions
-  /** Check if table exists in options */
-  hasTable: (tableName: string) => boolean;
-  /** Check if field exists in current table options */
-  hasField: (fieldName: string) => boolean;
-  /** Get table option by name */
-  getTableOption: (tableName: string) => ReferenceTableOption | undefined;
-  /** Get field option by name */
-  getFieldOption: (fieldName: string) => ReferenceFieldOption | undefined;
+  // Validation helpers
+  /** Check if selected reference table exists */
+  isValidReferenceTable: (tableName: string) => boolean;
+  /** Check if selected reference field exists */
+  isValidReferenceField: (fieldName: string) => boolean;
+  /** Get field type for selected reference field */
+  getReferenceFieldType: (fieldName: string) => string | undefined;
 }
 
 // =============================================================================
-// SWR FETCHER FUNCTIONS
+// CONSTANTS AND CONFIGURATION
 // =============================================================================
 
 /**
- * Fetcher function for reference tables
- * Retrieves available tables for foreign key reference
+ * Default SWR configuration optimized for reference data caching
+ * Implements cache hit responses under 50ms requirement
  */
-const fetchReferenceTables = async (serviceName: string, includeViews: boolean = false): Promise<SchemaTable[]> => {
-  try {
-    const response = await apiClient.get(`/${serviceName}/_schema`);
-    
-    if (!response.success || !response.data) {
-      throw new Error(`Failed to fetch schema for service: ${serviceName}`);
-    }
-
-    const { data } = response;
-    let tables = data.table || [];
-
-    // Filter out views if not requested
-    if (!includeViews) {
-      tables = tables.filter((table: SchemaTable) => !table.isView);
-    }
-
-    return tables;
-  } catch (error) {
-    console.error('Error fetching reference tables:', error);
-    throw new Error(`Failed to load reference tables: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
+const DEFAULT_SWR_CONFIG: SWRConfiguration = {
+  // Cache configuration for sub-50ms responses
+  dedupingInterval: 5000, // 5 seconds deduplication
+  focusThrottleInterval: 5000, // 5 seconds focus throttle
+  errorRetryInterval: 10000, // 10 seconds error retry
+  
+  // Revalidation settings per Section 4.3.2 Server State Management
+  revalidateOnFocus: true, // Revalidate on window focus
+  revalidateOnReconnect: true, // Revalidate on network reconnect
+  revalidateIfStale: true, // Revalidate if data is stale
+  
+  // Performance optimizations
+  shouldRetryOnError: true,
+  errorRetryCount: 3,
+  refreshInterval: 300000, // 5 minutes auto-refresh for schema changes
+  
+  // Cache persistence
+  suspense: false,
+  fallbackData: undefined,
+  keepPreviousData: true, // Maintain previous data during refetch
 };
 
 /**
- * Fetcher function for reference table fields
- * Retrieves fields for a specific reference table
+ * Cache key generators for consistent cache management
  */
-const fetchReferenceFields = async (serviceName: string, tableName: string): Promise<SchemaField[]> => {
-  try {
-    const response = await apiClient.get(`/${serviceName}/_schema/${tableName}`);
-    
-    if (!response.success || !response.data) {
-      throw new Error(`Failed to fetch table schema: ${tableName}`);
-    }
+const CACHE_KEYS = {
+  tables: (serviceName: string, prefix?: string) => 
+    `${prefix || 'reference'}/tables/${serviceName}`,
+  fields: (serviceName: string, tableName: string, prefix?: string) => 
+    `${prefix || 'reference'}/fields/${serviceName}/${tableName}`,
+  schema: (serviceName: string, prefix?: string) => 
+    `${prefix || 'reference'}/schema/${serviceName}`,
+} as const;
 
-    const { data } = response;
-    return data.field || [];
-  } catch (error) {
-    console.error('Error fetching reference fields:', error);
-    throw new Error(`Failed to load fields for table "${tableName}": ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-};
+/**
+ * Error messages for reference data fetching
+ */
+const ERROR_MESSAGES = {
+  FETCH_TABLES: 'Failed to fetch reference table options',
+  FETCH_FIELDS: 'Failed to fetch reference field options',
+  INVALID_SERVICE: 'Invalid service name provided',
+  INVALID_TABLE: 'Selected reference table does not exist',
+  INVALID_FIELD: 'Selected reference field does not exist',
+  NETWORK_ERROR: 'Network error while fetching reference data',
+} as const;
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Transform database table to reference table option
+ * Optimizes dropdown display with essential metadata
+ */
+function transformTableToOption(table: DatabaseTable): ReferenceTableOption {
+  return {
+    value: table.name,
+    label: table.label || table.name,
+    description: table.description,
+    fieldCount: table.fieldCount || 0,
+    isSystem: table.isSystem || false,
+  };
+}
+
+/**
+ * Transform database field to reference field option
+ * Filters suitable fields for foreign key references
+ */
+function transformFieldToOption(field: DatabaseField): ReferenceFieldOption {
+  return {
+    value: field.name,
+    label: field.label || field.name,
+    type: field.type,
+    isPrimaryKey: field.isPrimaryKey,
+    isUnique: field.isUnique,
+    description: field.description,
+  };
+}
+
+/**
+ * Filter suitable reference tables
+ * Excludes system tables unless explicitly enabled
+ */
+function filterReferenceTables(tables: DatabaseTable[]): DatabaseTable[] {
+  return tables.filter(table => {
+    // Include non-system tables and tables with at least one field
+    return !table.isSystem && table.fieldCount > 0;
+  });
+}
+
+/**
+ * Filter suitable reference fields
+ * Prioritizes primary keys and unique fields for foreign key references
+ */
+function filterReferenceFields(fields: DatabaseField[]): DatabaseField[] {
+  return fields
+    .filter(field => {
+      // Include fields that can serve as foreign key targets
+      return !field.isVirtual && (field.isPrimaryKey || field.isUnique || field.name === 'id');
+    })
+    .sort((a, b) => {
+      // Sort by suitability: primary key, unique, then alphabetical
+      if (a.isPrimaryKey && !b.isPrimaryKey) return -1;
+      if (!a.isPrimaryKey && b.isPrimaryKey) return 1;
+      if (a.isUnique && !b.isUnique) return -1;
+      if (!a.isUnique && b.isUnique) return 1;
+      return a.name.localeCompare(b.name);
+    });
+}
+
+/**
+ * Create error with context for better debugging
+ */
+function createContextError(message: string, context: Record<string, any>): Error {
+  const error = new Error(message);
+  (error as any).context = context;
+  return error;
+}
 
 // =============================================================================
 // MAIN HOOK IMPLEMENTATION
 // =============================================================================
 
 /**
- * Custom React hook for managing reference table and field options with SWR caching
+ * Custom React hook for managing foreign key reference options
  * 
- * Replaces Angular valueChanges subscriptions for refTable and isForeignKey with SWR conditional fetching.
- * Implements cascading data fetching for reference tables and fields with intelligent caching per
- * Section 4.3.2 Server State Management and Section 5.2 Component Details data fetching operations.
+ * Provides SWR-based data fetching for reference tables and fields with intelligent
+ * caching and conditional loading. Automatically fetches available tables when foreign
+ * key mode is enabled and fetches fields when a reference table is selected.
  * 
- * @param config - Reference options configuration
- * @returns Reference options data and management functions
+ * @param config - Hook configuration options
+ * @returns Reference options with loading states and cache management
+ * 
+ * @example
+ * ```typescript
+ * // Basic usage in field form component
+ * const {
+ *   tableOptions,
+ *   fieldOptions,
+ *   isLoadingTables,
+ *   isLoadingFields,
+ *   isValidReferenceTable,
+ *   refreshTables,
+ * } = useReferenceOptions({
+ *   serviceName: 'mysql_db',
+ *   isForeignKey: form.watch('isForeignKey'),
+ *   referenceTable: form.watch('referenceTable'),
+ * });
+ * 
+ * // Advanced usage with custom configuration
+ * const referenceOptions = useReferenceOptions({
+ *   serviceName: 'postgresql_db',
+ *   isForeignKey: true,
+ *   referenceTable: 'users',
+ *   swrConfig: {
+ *     refreshInterval: 60000, // 1 minute
+ *     revalidateOnFocus: false,
+ *   },
+ *   enableCaching: true,
+ *   cacheKeyPrefix: 'custom-prefix',
+ * });
+ * ```
  */
-export function useReferenceOptions(config: ReferenceOptionsConfig): UseReferenceOptionsReturn {
+export function useReferenceOptions(config: UseReferenceOptionsConfig): UseReferenceOptionsReturn {
   const {
     serviceName,
-    field,
     isForeignKey,
-    refTable,
-    enableCache = true,
-    cacheTime = 300000, // 5 minutes default
-    revalidateOnFocus = false,
-    revalidateOnReconnect = true,
-    includeViews = false,
-    primaryKeyTablesOnly = true
+    referenceTable,
+    swrConfig = {},
+    enableCaching = true,
+    cacheKeyPrefix,
   } = config;
 
-  // ==========================================================================
-  // SWR QUERIES
-  // ==========================================================================
+  // Merge configuration with defaults
+  const mergedConfig: SWRConfiguration = useMemo(() => ({
+    ...DEFAULT_SWR_CONFIG,
+    ...swrConfig,
+    // Override caching if disabled
+    ...(enableCaching ? {} : {
+      dedupingInterval: 0,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      refreshInterval: 0,
+    }),
+  }), [swrConfig, enableCaching]);
+
+  // Generate cache keys
+  const tablesCacheKey = useMemo(() => 
+    CACHE_KEYS.tables(serviceName, cacheKeyPrefix),
+    [serviceName, cacheKeyPrefix]
+  );
+  
+  const fieldsCacheKey = useMemo(() => 
+    referenceTable ? CACHE_KEYS.fields(serviceName, referenceTable, cacheKeyPrefix) : null,
+    [serviceName, referenceTable, cacheKeyPrefix]
+  );
+
+  // Create API client instance
+  const crudClient = useMemo(() => createCrudClient({
+    baseUrl: process.env.NEXT_PUBLIC_API_URL || '',
+  }), []);
+
+  // =============================================================================
+  // TABLE OPTIONS FETCHING
+  // =============================================================================
 
   /**
-   * SWR query for reference tables
-   * Conditionally fetches based on foreign key toggle state
+   * Fetch reference table options
+   * Conditional fetching based on foreign key toggle state
    */
   const {
     data: tablesData,
-    error: tablesError,
-    isValidating: tablesLoading,
-    mutate: refetchTables
-  } = useSWR(
-    // Conditional fetching - only fetch when foreign key is enabled
-    isForeignKey ? ['reference-tables', serviceName, includeViews] : null,
-    ([, service, views]) => fetchReferenceTables(service, views),
-    {
-      // Performance optimization - cache hit responses under 50ms
-      dedupingInterval: 50,
-      // Intelligent caching configuration
-      revalidateOnFocus,
-      revalidateOnReconnect,
-      // Cache management
-      ...(enableCache && {
-        revalidateIfStale: true,
-        revalidateOnMount: true,
-        refreshInterval: undefined, // Manual refresh only
-      }),
-      // Error handling with retry logic
-      errorRetryCount: 3,
-      errorRetryInterval: 1000,
-      onError: (error) => {
-        console.error('Reference tables fetch error:', error);
+    error: tableError,
+    isLoading: isLoadingTables,
+    mutate: mutateTables,
+  } = useSWR<ListResponse<DatabaseTable>>(
+    // Only fetch when foreign key mode is enabled and service is valid
+    isForeignKey && serviceName ? tablesCacheKey : null,
+    async () => {
+      try {
+        if (!serviceName) {
+          throw createContextError(ERROR_MESSAGES.INVALID_SERVICE, { serviceName });
+        }
+
+        // Fetch schema for the service to get table list
+        const response = await crudClient.getAll<DatabaseTable>(
+          `api/v2/${serviceName}/_schema`,
+          {
+            fields: 'name,label,description,fieldCount,isSystem,type',
+            limit: 1000, // Support up to 1000 tables per requirements
+          }
+        );
+
+        if (!response.success) {
+          throw createContextError(ERROR_MESSAGES.FETCH_TABLES, {
+            serviceName,
+            error: response.error,
+          });
+        }
+
+        return response;
+      } catch (error) {
+        const contextError = error instanceof Error ? error : 
+          createContextError(ERROR_MESSAGES.NETWORK_ERROR, { serviceName, originalError: error });
+        
+        // Log error for debugging
+        console.error('Reference tables fetch error:', {
+          serviceName,
+          error: contextError,
+          context: (contextError as any).context,
+        });
+
+        throw contextError;
       }
-    }
+    },
+    mergedConfig
   );
 
+  // =============================================================================
+  // FIELD OPTIONS FETCHING
+  // =============================================================================
+
   /**
-   * SWR query for reference fields
-   * Conditionally fetches based on reference table selection
+   * Fetch reference field options for selected table
+   * Conditional fetching based on table selection
    */
   const {
     data: fieldsData,
-    error: fieldsError,
-    isValidating: fieldsLoading,
-    mutate: refetchFields
-  } = useSWR(
-    // Conditional fetching - only fetch when foreign key is enabled and table is selected
-    isForeignKey && refTable ? ['reference-fields', serviceName, refTable] : null,
-    ([, service, table]) => fetchReferenceFields(service, table),
-    {
-      // Performance optimization - cache hit responses under 50ms
-      dedupingInterval: 50,
-      // Intelligent caching configuration
-      revalidateOnFocus,
-      revalidateOnReconnect,
-      // Cache management
-      ...(enableCache && {
-        revalidateIfStale: true,
-        revalidateOnMount: true,
-        refreshInterval: undefined, // Manual refresh only
-      }),
-      // Error handling with retry logic
-      errorRetryCount: 3,
-      errorRetryInterval: 1000,
-      onError: (error) => {
-        console.error('Reference fields fetch error:', error);
+    error: fieldError,
+    isLoading: isLoadingFields,
+    mutate: mutateFields,
+  } = useSWR<ListResponse<DatabaseField>>(
+    // Only fetch when foreign key mode is enabled, service is valid, and table is selected
+    isForeignKey && serviceName && referenceTable ? fieldsCacheKey : null,
+    async () => {
+      try {
+        if (!serviceName || !referenceTable) {
+          throw createContextError(ERROR_MESSAGES.INVALID_SERVICE, { 
+            serviceName, 
+            referenceTable 
+          });
+        }
+
+        // Fetch field schema for the selected reference table
+        const response = await crudClient.getAll<DatabaseField>(
+          `api/v2/${serviceName}/_schema/${referenceTable}`,
+          {
+            fields: 'name,label,description,type,isPrimaryKey,isUnique,isVirtual',
+            limit: 100, // Reasonable limit for table fields
+          }
+        );
+
+        if (!response.success) {
+          throw createContextError(ERROR_MESSAGES.FETCH_FIELDS, {
+            serviceName,
+            referenceTable,
+            error: response.error,
+          });
+        }
+
+        return response;
+      } catch (error) {
+        const contextError = error instanceof Error ? error : 
+          createContextError(ERROR_MESSAGES.NETWORK_ERROR, { 
+            serviceName, 
+            referenceTable, 
+            originalError: error 
+          });
+        
+        // Log error for debugging
+        console.error('Reference fields fetch error:', {
+          serviceName,
+          referenceTable,
+          error: contextError,
+          context: (contextError as any).context,
+        });
+
+        throw contextError;
       }
-    }
+    },
+    mergedConfig
   );
 
-  // ==========================================================================
-  // COMPUTED OPTIONS
-  // ==========================================================================
+  // =============================================================================
+  // DATA TRANSFORMATION AND MEMOIZATION
+  // =============================================================================
 
   /**
-   * Processed table options for dropdown display
-   * Filters and formats tables based on configuration
+   * Transform and filter table options for dropdown display
+   * Memoized for performance with intelligent filtering
    */
-  const tableOptions = useMemo((): ReferenceTableOption[] => {
-    if (!tablesData || !Array.isArray(tablesData)) {
+  const tableOptions = useMemo<ReferenceTableOption[]>(() => {
+    if (!tablesData?.data) return [];
+
+    try {
+      const filteredTables = filterReferenceTables(tablesData.data);
+      return filteredTables
+        .map(transformTableToOption)
+        .sort((a, b) => {
+          // Sort by system status, then alphabetically
+          if (a.isSystem !== b.isSystem) {
+            return a.isSystem ? 1 : -1;
+          }
+          return a.label.localeCompare(b.label);
+        });
+    } catch (error) {
+      console.error('Table options transformation error:', error);
       return [];
     }
-
-    let filteredTables = tablesData;
-
-    // Filter to only show tables with primary keys if requested
-    if (primaryKeyTablesOnly) {
-      filteredTables = filteredTables.filter((table: SchemaTable) => 
-        table.primaryKey && table.primaryKey.length > 0
-      );
-    }
-
-    // Transform to dropdown options
-    return filteredTables.map((table: SchemaTable): ReferenceTableOption => ({
-      value: table.name,
-      label: table.label || table.name,
-      description: table.description,
-      fieldCount: table.fields?.length || 0,
-      hasPrimaryKey: table.primaryKey && table.primaryKey.length > 0,
-      isView: table.isView || false
-    }));
-  }, [tablesData, primaryKeyTablesOnly]);
+  }, [tablesData?.data]);
 
   /**
-   * Processed field options for dropdown display
-   * Formats fields with detailed type information
+   * Transform and filter field options for dropdown display
+   * Memoized for performance with suitability-based sorting
    */
-  const fieldOptions = useMemo((): ReferenceFieldOption[] => {
-    if (!fieldsData || !Array.isArray(fieldsData)) {
+  const fieldOptions = useMemo<ReferenceFieldOption[]>(() => {
+    if (!fieldsData?.data) return [];
+
+    try {
+      const filteredFields = filterReferenceFields(fieldsData.data);
+      return filteredFields.map(transformFieldToOption);
+    } catch (error) {
+      console.error('Field options transformation error:', error);
       return [];
     }
+  }, [fieldsData?.data]);
 
-    // Transform to dropdown options with enhanced labeling
-    return fieldsData.map((field: SchemaField): ReferenceFieldOption => ({
-      value: field.name,
-      label: `${field.name} (${field.type})${field.isPrimaryKey ? ' [PK]' : ''}${field.isUnique ? ' [UNIQUE]' : ''}`,
-      type: field.type.toString(),
-      dbType: field.dbType,
-      isPrimaryKey: field.isPrimaryKey,
-      isUnique: field.isUnique,
-      isNullable: field.isNullable,
-      length: field.length,
-      description: field.description
-    }));
-  }, [fieldsData]);
-
-  // ==========================================================================
+  // =============================================================================
   // CACHE MANAGEMENT FUNCTIONS
-  // ==========================================================================
+  // =============================================================================
 
   /**
-   * Invalidate all reference data cache
-   * Triggers revalidation of both tables and fields
+   * Manually refresh table options
+   * Implements automatic cache invalidation per Section 4.3.2
    */
-  const invalidateCache = useCallback(() => {
-    refetchTables();
-    if (refTable) {
-      refetchFields();
+  const refreshTables = async (): Promise<void> => {
+    try {
+      await mutateTables();
+    } catch (error) {
+      console.error('Failed to refresh table options:', error);
+      throw error;
     }
-  }, [refetchTables, refetchFields, refTable]);
+  };
 
   /**
-   * Invalidate tables cache
-   * Forces refetch of available reference tables
+   * Manually refresh field options
    */
-  const invalidateTablesCache = useCallback(() => {
-    refetchTables();
-  }, [refetchTables]);
-
-  /**
-   * Invalidate fields cache for specific table
-   * Forces refetch of fields for specified or current table
-   */
-  const invalidateFieldsCache = useCallback((tableName?: string) => {
-    if (tableName === refTable || !tableName) {
-      refetchFields();
+  const refreshFields = async (): Promise<void> => {
+    try {
+      if (fieldsCacheKey) {
+        await mutateFields();
+      }
+    } catch (error) {
+      console.error('Failed to refresh field options:', error);
+      throw error;
     }
-  }, [refetchFields, refTable]);
-
-  // ==========================================================================
-  // UTILITY FUNCTIONS
-  // ==========================================================================
+  };
 
   /**
-   * Check if table exists in current options
+   * Clear all reference option caches
+   * Useful for schema change invalidation
    */
-  const hasTable = useCallback((tableName: string): boolean => {
+  const clearCache = async (): Promise<void> => {
+    try {
+      // Clear all related cache keys
+      const cacheKeys = [
+        tablesCacheKey,
+        fieldsCacheKey,
+        CACHE_KEYS.schema(serviceName, cacheKeyPrefix),
+      ].filter(Boolean) as string[];
+
+      await Promise.all(cacheKeys.map(key => mutate(key, undefined, false)));
+    } catch (error) {
+      console.error('Failed to clear reference options cache:', error);
+      throw error;
+    }
+  };
+
+  // =============================================================================
+  // VALIDATION HELPER FUNCTIONS
+  // =============================================================================
+
+  /**
+   * Check if selected reference table exists and is valid
+   */
+  const isValidReferenceTable = (tableName: string): boolean => {
     return tableOptions.some(option => option.value === tableName);
-  }, [tableOptions]);
+  };
 
   /**
-   * Check if field exists in current table options
+   * Check if selected reference field exists and is valid
    */
-  const hasField = useCallback((fieldName: string): boolean => {
+  const isValidReferenceField = (fieldName: string): boolean => {
     return fieldOptions.some(option => option.value === fieldName);
-  }, [fieldOptions]);
+  };
 
   /**
-   * Get table option by name
+   * Get field type for selected reference field
    */
-  const getTableOption = useCallback((tableName: string): ReferenceTableOption | undefined => {
-    return tableOptions.find(option => option.value === tableName);
-  }, [tableOptions]);
+  const getReferenceFieldType = (fieldName: string): string | undefined => {
+    const field = fieldOptions.find(option => option.value === fieldName);
+    return field?.type;
+  };
 
-  /**
-   * Get field option by name
-   */
-  const getFieldOption = useCallback((fieldName: string): ReferenceFieldOption | undefined => {
-    return fieldOptions.find(option => option.value === fieldName);
-  }, [fieldOptions]);
-
-  // ==========================================================================
-  // RETURN HOOK INTERFACE
-  // ==========================================================================
+  // =============================================================================
+  // RETURN INTERFACE
+  // =============================================================================
 
   return {
     // Table options
     tableOptions,
-    tablesLoading,
-    tablesError,
-    refetchTables,
+    isLoadingTables,
+    tableError,
     
     // Field options
     fieldOptions,
-    fieldsLoading,
-    fieldsError,
-    refetchFields,
+    isLoadingFields,
+    fieldError,
     
     // Cache management
-    invalidateCache,
-    invalidateTablesCache,
-    invalidateFieldsCache,
+    refreshTables,
+    refreshFields,
+    clearCache,
     
-    // Utility functions
-    hasTable,
-    hasField,
-    getTableOption,
-    getFieldOption
+    // Validation helpers
+    isValidReferenceTable,
+    isValidReferenceField,
+    getReferenceFieldType,
   };
 }
 
 // =============================================================================
-// HOOK VARIANTS AND UTILITIES
+// UTILITY EXPORTS
 // =============================================================================
 
 /**
- * Simplified hook for just table options
- * Useful when only table selection is needed
+ * Pre-configured hook for common use cases
+ * Provides sensible defaults for typical field reference scenarios
  */
-export function useReferenceTableOptions(serviceName: string, isForeignKey: boolean) {
-  const { tableOptions, tablesLoading, tablesError, refetchTables } = useReferenceOptions({
+export function useBasicReferenceOptions(
+  serviceName: string,
+  formData: Pick<FieldFormData, 'isForeignKey' | 'referenceTable'>
+): UseReferenceOptionsReturn {
+  return useReferenceOptions({
     serviceName,
-    field: {},
+    isForeignKey: formData.isForeignKey,
+    referenceTable: formData.referenceTable,
+    enableCaching: true,
+  });
+}
+
+/**
+ * Hook for development/testing with aggressive caching disabled
+ */
+export function useDevReferenceOptions(
+  serviceName: string,
+  isForeignKey: boolean,
+  referenceTable?: string
+): UseReferenceOptionsReturn {
+  return useReferenceOptions({
+    serviceName,
     isForeignKey,
-    refTable: null,
-    primaryKeyTablesOnly: true
+    referenceTable,
+    enableCaching: false,
+    swrConfig: {
+      revalidateOnFocus: true,
+      refreshInterval: 10000, // 10 seconds for development
+    },
   });
-
-  return {
-    options: tableOptions,
-    loading: tablesLoading,
-    error: tablesError,
-    refetch: refetchTables
-  };
 }
 
 /**
- * Simplified hook for just field options
- * Useful when only field selection is needed for a known table
+ * Export types for external consumption
  */
-export function useReferenceFieldOptions(serviceName: string, tableName: string) {
-  const { fieldOptions, fieldsLoading, fieldsError, refetchFields } = useReferenceOptions({
-    serviceName,
-    field: {},
-    isForeignKey: true,
-    refTable: tableName
-  });
-
-  return {
-    options: fieldOptions,
-    loading: fieldsLoading,
-    error: fieldsError,
-    refetch: refetchFields
-  };
-}
-
-/**
- * Utility function to create cache key for reference data
- * Useful for manual cache management
- */
-export function createReferenceDataCacheKey(type: 'tables' | 'fields', serviceName: string, tableName?: string): string[] {
-  if (type === 'tables') {
-    return ['reference-tables', serviceName];
-  }
-  return ['reference-fields', serviceName, tableName || ''];
-}
-
-/**
- * Type guard to check if reference options are valid
- */
-export function isValidReferenceOption(option: unknown): option is ReferenceTableOption | ReferenceFieldOption {
-  return (
-    typeof option === 'object' &&
-    option !== null &&
-    'value' in option &&
-    'label' in option &&
-    typeof (option as any).value === 'string' &&
-    typeof (option as any).label === 'string'
-  );
-}
-
-// =============================================================================
-// EXPORTS
-// =============================================================================
-
-export default useReferenceOptions;
-
-// Export types for external use
 export type {
   ReferenceTableOption,
   ReferenceFieldOption,
-  ReferenceOptionsConfig,
-  UseReferenceOptionsReturn
+  UseReferenceOptionsConfig,
+  UseReferenceOptionsReturn,
 };
