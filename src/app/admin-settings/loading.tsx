@@ -1,401 +1,322 @@
 /**
- * Administrative Dashboard Loading Component
+ * Loading state component for the administrative dashboard
  * 
- * This component provides accessible skeleton loading states for the administrative 
- * dashboard during data fetching operations. Implements WCAG 2.1 AA compliance
- * with proper ARIA attributes and responsive design using Tailwind CSS.
+ * Displays skeleton placeholders during data fetching operations for:
+ * - Admin metrics and statistics
+ * - User statistics and counts  
+ * - System health indicators
+ * - Audit trail loading
  * 
- * Features:
- * - Comprehensive skeleton UI for admin metrics, user statistics, system health
- * - Theme-aware loading indicators supporting light and dark mode
- * - Responsive layout adapting to admin dashboard grid system
- * - Accessibility announcements for administrative data loading progress
- * - Loading states optimized for sub-100ms response time requirements
+ * Implements WCAG 2.1 AA compliance with proper ARIA attributes
+ * and responsive design using Tailwind CSS animations.
  */
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 /**
- * Skeleton component for reusable loading placeholders
- * Implements WCAG 2.1 AA compliant loading animations
+ * Reusable skeleton component for consistent loading states
  */
 interface SkeletonProps {
   className?: string;
-  width?: string;
-  height?: string;
-  rounded?: boolean;
-  pulse?: boolean;
   'data-testid'?: string;
 }
 
-function Skeleton({ 
-  className = '', 
-  width = 'w-full', 
-  height = 'h-4', 
-  rounded = true,
-  pulse = true,
-  'data-testid': testId
-}: SkeletonProps) {
-  const baseClasses = `
-    bg-gray-200 dark:bg-gray-700 
-    ${rounded ? 'rounded' : ''} 
-    ${pulse ? 'animate-pulse' : ''}
-    ${width} 
-    ${height}
-    ${className}
-  `.trim();
-
+function Skeleton({ className, 'data-testid': testId, ...props }: SkeletonProps) {
   return (
-    <div 
-      className={baseClasses}
+    <div
+      className={cn(
+        'animate-pulse rounded-md bg-gray-200 dark:bg-gray-700',
+        className
+      )}
       data-testid={testId}
-      aria-hidden="true"
+      {...props}
     />
   );
 }
 
 /**
- * Card container for admin dashboard sections
+ * Spinner component for active loading indicators
  */
-interface LoadingCardProps {
-  children: React.ReactNode;
-  className?: string;
-  'data-testid'?: string;
-}
-
-function LoadingCard({ children, className = '', 'data-testid': testId }: LoadingCardProps) {
+function Spinner({ className }: { className?: string }) {
   return (
-    <div 
-      className={`
-        bg-white dark:bg-gray-900 
-        rounded-lg 
-        border border-gray-200 dark:border-gray-700 
-        shadow-sm 
-        p-6 
-        ${className}
-      `.trim()}
-      data-testid={testId}
+    <div
+      className={cn(
+        'animate-spin rounded-full border-2 border-current border-t-transparent',
+        'text-gray-400 dark:text-gray-500',
+        className
+      )}
+      role="status"
+      aria-label="Loading"
     >
-      {children}
+      <span className="sr-only">Loading...</span>
     </div>
   );
 }
 
 /**
- * Admin overview cards loading skeleton
+ * Card skeleton for admin metric cards
  */
-function AdminOverviewCardsLoading() {
-  const metrics = [
-    { label: 'Total Users', icon: '👥' },
-    { label: 'Active Services', icon: '🔌' },
-    { label: 'API Calls Today', icon: '📊' },
-    { label: 'System Health', icon: '💚' }
-  ];
-
+function MetricCardSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-      {metrics.map((metric, index) => (
-        <LoadingCard 
-          key={index} 
-          className="min-h-[120px]"
-          data-testid={`admin-metric-card-loading-${index}`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <Skeleton width="w-16" height="h-8" />
-            <div className="text-2xl opacity-30">{metric.icon}</div>
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <Skeleton className="h-6 w-32" data-testid="metric-title-skeleton" />
+        <Skeleton className="h-8 w-8 rounded-full" data-testid="metric-icon-skeleton" />
+      </div>
+      <div className="space-y-3">
+        <Skeleton className="h-8 w-20" data-testid="metric-value-skeleton" />
+        <div className="flex items-center space-x-2">
+          <Skeleton className="h-4 w-12" data-testid="metric-change-skeleton" />
+          <Skeleton className="h-4 w-24" data-testid="metric-label-skeleton" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Table skeleton for admin data tables
+ */
+function TableSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+      {/* Table Header */}
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <Skeleton className="h-6 w-40" data-testid="table-title-skeleton" />
+          <Skeleton className="h-10 w-32" data-testid="table-action-skeleton" />
+        </div>
+        <div className="grid grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-5 w-full" data-testid={`table-header-${i}`} />
+          ))}
+        </div>
+      </div>
+      
+      {/* Table Rows */}
+      <div className="divide-y divide-gray-200 dark:divide-gray-700">
+        {Array.from({ length: rows }).map((_, rowIndex) => (
+          <div key={rowIndex} className="p-4">
+            <div className="grid grid-cols-4 gap-4 items-center">
+              {Array.from({ length: 4 }).map((_, colIndex) => (
+                <Skeleton 
+                  key={colIndex} 
+                  className="h-4 w-full" 
+                  data-testid={`table-cell-${rowIndex}-${colIndex}`} 
+                />
+              ))}
+            </div>
           </div>
-          <div className="space-y-2">
-            <Skeleton width="w-20" height="h-8" />
-            <Skeleton width="w-full" height="h-4" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Chart skeleton for admin analytics
+ */
+function ChartSkeleton() {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="space-y-2">
+          <Skeleton className="h-6 w-48" data-testid="chart-title-skeleton" />
+          <Skeleton className="h-4 w-32" data-testid="chart-subtitle-skeleton" />
+        </div>
+        <Skeleton className="h-8 w-24" data-testid="chart-filter-skeleton" />
+      </div>
+      
+      {/* Chart Area */}
+      <div className="relative h-64">
+        <Skeleton className="h-full w-full" data-testid="chart-area-skeleton" />
+        
+        {/* Chart Bars Animation */}
+        <div className="absolute bottom-4 left-8 right-8 flex items-end justify-between space-x-2">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <Skeleton 
+              key={i} 
+              className={`w-6 bg-gray-300 dark:bg-gray-600`}
+              style={{ height: `${Math.random() * 120 + 20}px` }}
+              data-testid={`chart-bar-${i}`}
+            />
+          ))}
+        </div>
+      </div>
+      
+      {/* Chart Legend */}
+      <div className="flex items-center justify-center space-x-6 mt-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-center space-x-2">
+            <Skeleton className="h-3 w-3 rounded-full" data-testid={`legend-dot-${i}`} />
+            <Skeleton className="h-4 w-16" data-testid={`legend-label-${i}`} />
           </div>
-        </LoadingCard>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Quick actions skeleton for admin toolbar
+ */
+function QuickActionsSkeleton() {
+  return (
+    <div className="flex items-center space-x-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton 
+          key={i} 
+          className="h-10 w-28" 
+          data-testid={`quick-action-${i}`} 
+        />
       ))}
     </div>
   );
 }
 
 /**
- * Recent admin activity loading skeleton
- */
-function RecentActivityLoading() {
-  return (
-    <LoadingCard data-testid="recent-activity-loading">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Skeleton width="w-40" height="h-6" />
-          <Skeleton width="w-20" height="h-4" />
-        </div>
-        
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="flex items-center space-x-3 py-2">
-              <Skeleton width="w-8" height="h-8" rounded />
-              <div className="flex-1 space-y-1">
-                <Skeleton width="w-3/4" height="h-4" />
-                <Skeleton width="w-1/2" height="h-3" />
-              </div>
-              <Skeleton width="w-16" height="h-3" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </LoadingCard>
-  );
-}
-
-/**
- * User management summary loading skeleton
- */
-function UserManagementLoading() {
-  return (
-    <LoadingCard data-testid="user-management-loading">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Skeleton width="w-32" height="h-6" />
-          <Skeleton width="w-24" height="h-8" />
-        </div>
-        
-        {/* User statistics */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Skeleton width="w-16" height="h-4" />
-            <Skeleton width="w-12" height="h-6" />
-          </div>
-          <div className="space-y-2">
-            <Skeleton width="w-20" height="h-4" />
-            <Skeleton width="w-8" height="h-6" />
-          </div>
-        </div>
-        
-        {/* User table header */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-          <div className="grid grid-cols-4 gap-4 mb-3">
-            <Skeleton width="w-16" height="h-4" />
-            <Skeleton width="w-12" height="h-4" />
-            <Skeleton width="w-20" height="h-4" />
-            <Skeleton width="w-14" height="h-4" />
-          </div>
-          
-          {/* User table rows */}
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="grid grid-cols-4 gap-4 py-2">
-              <Skeleton width="w-20" height="h-4" />
-              <Skeleton width="w-16" height="h-4" />
-              <Skeleton width="w-24" height="h-4" />
-              <Skeleton width="w-12" height="h-4" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </LoadingCard>
-  );
-}
-
-/**
- * System health monitoring loading skeleton
- */
-function SystemHealthLoading() {
-  return (
-    <LoadingCard data-testid="system-health-loading">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Skeleton width="w-28" height="h-6" />
-          <Skeleton width="w-16" height="h-4" />
-        </div>
-        
-        {/* Health indicators */}
-        <div className="space-y-3">
-          {[
-            'Database Connections',
-            'API Response Time',
-            'Memory Usage',
-            'Cache Performance'
-          ].map((_, index) => (
-            <div key={index} className="flex items-center justify-between py-2">
-              <div className="flex items-center space-x-3">
-                <Skeleton width="w-3" height="h-3" rounded />
-                <Skeleton width="w-32" height="h-4" />
-              </div>
-              <Skeleton width="w-12" height="h-4" />
-            </div>
-          ))}
-        </div>
-        
-        {/* Performance chart placeholder */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-          <Skeleton width="w-full" height="h-32" />
-        </div>
-      </div>
-    </LoadingCard>
-  );
-}
-
-/**
- * Quick actions loading skeleton
- */
-function QuickActionsLoading() {
-  return (
-    <LoadingCard data-testid="quick-actions-loading">
-      <div className="space-y-4">
-        <Skeleton width="w-28" height="h-6" />
-        
-        <div className="grid grid-cols-1 gap-3">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="flex items-center space-x-3 p-3 rounded-md border border-gray-200 dark:border-gray-700">
-              <Skeleton width="w-5" height="h-5" />
-              <Skeleton width="w-24" height="h-4" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </LoadingCard>
-  );
-}
-
-/**
- * Main admin settings loading component
- * Implements comprehensive loading states for administrative dashboard
+ * Main loading component for admin settings page
  */
 export default function AdminSettingsLoading() {
-  const [loadingAnnounced, setLoadingAnnounced] = useState(false);
-
-  // Announce loading state to screen readers
-  useEffect(() => {
-    if (!loadingAnnounced) {
-      const announcement = document.createElement('div');
-      announcement.setAttribute('aria-live', 'polite');
-      announcement.setAttribute('aria-atomic', 'true');
-      announcement.className = 'sr-only';
-      announcement.textContent = 'Loading administrative dashboard. Please wait while we fetch your admin metrics, user statistics, and system health information.';
-      document.body.appendChild(announcement);
-      
-      setLoadingAnnounced(true);
-      
-      // Clean up announcement after screen reader has time to read it
-      setTimeout(() => {
-        if (document.body.contains(announcement)) {
-          document.body.removeChild(announcement);
-        }
-      }, 2000);
-    }
-  }, [loadingAnnounced]);
-
   return (
     <div 
-      className="space-y-6 md:space-y-8"
+      className="space-y-8 animate-in fade-in-0 duration-200" 
       data-testid="admin-settings-loading"
       role="status"
       aria-label="Loading administrative dashboard"
+      aria-live="polite"
     >
-      {/* Page Header Loading */}
-      <div className="space-y-2">
-        <Skeleton 
-          width="w-64 md:w-80" 
-          height="h-8 md:h-10" 
-          data-testid="page-title-loading"
-        />
-        <Skeleton 
-          width="w-96 md:w-[28rem]" 
-          height="h-5 md:h-6" 
-          data-testid="page-description-loading"
-        />
+      {/* Screen Reader Announcement */}
+      <div className="sr-only" aria-live="assertive">
+        Loading administrative dashboard. Please wait while we fetch your data.
       </div>
 
-      {/* Admin Overview Cards */}
-      <section 
-        aria-labelledby="overview-heading" 
-        className="space-y-4"
-      >
-        <div className="sr-only" id="overview-heading">
-          Administrative Overview Metrics
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" data-testid="page-title-skeleton" />
+          <Skeleton className="h-5 w-96" data-testid="page-description-skeleton" />
         </div>
-        <AdminOverviewCardsLoading />
-      </section>
-
-      {/* Main Dashboard Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        {/* Main Content Column */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Recent Admin Activity */}
-          <section aria-labelledby="activity-heading">
-            <div className="sr-only" id="activity-heading">
-              Recent Administrative Activity
-            </div>
-            <RecentActivityLoading />
-          </section>
-
-          {/* User Management Summary */}
-          <section aria-labelledby="users-heading">
-            <div className="sr-only" id="users-heading">
-              User Management Summary
-            </div>
-            <UserManagementLoading />
-          </section>
-        </div>
-
-        {/* Sidebar Column */}
-        <div className="space-y-6">
-          {/* System Health */}
-          <section aria-labelledby="health-heading">
-            <div className="sr-only" id="health-heading">
-              System Health Monitoring
-            </div>
-            <SystemHealthLoading />
-          </section>
-
-          {/* Quick Actions */}
-          <section aria-labelledby="actions-heading">
-            <div className="sr-only" id="actions-heading">
-              Quick Administrative Actions
-            </div>
-            <QuickActionsLoading />
-          </section>
-        </div>
+        <QuickActionsSkeleton />
       </div>
 
-      {/* Audit Trail Section */}
-      <section 
-        aria-labelledby="audit-heading" 
-        className="space-y-4"
+      {/* Admin Metrics Grid */}
+      <div 
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        role="region"
+        aria-label="Loading administrative metrics"
       >
-        <div className="sr-only" id="audit-heading">
-          Administrative Audit Trail
+        {Array.from({ length: 4 }).map((_, i) => (
+          <MetricCardSkeleton key={i} />
+        ))}
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Primary Content Area */}
+        <div className="lg:col-span-2 space-y-8">
+          {/* System Health Chart */}
+          <div role="region" aria-label="Loading system health indicators">
+            <ChartSkeleton />
+          </div>
+
+          {/* User Activity Table */}
+          <div role="region" aria-label="Loading user activity data">
+            <TableSkeleton rows={6} />
+          </div>
         </div>
-        <LoadingCard data-testid="audit-trail-loading">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Skeleton width="w-32" height="h-6" />
-              <Skeleton width="w-20" height="h-8" />
+
+        {/* Secondary Content Area */}
+        <div className="space-y-8">
+          {/* Recent Actions */}
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
+            role="region"
+            aria-label="Loading recent administrative actions"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <Skeleton className="h-6 w-40" data-testid="recent-actions-title" />
+              <Spinner className="h-4 w-4" />
             </div>
             
-            {/* Audit log entries */}
-            <div className="space-y-2">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
-                  <div className="flex items-center space-x-3">
-                    <Skeleton width="w-6" height="h-6" rounded />
-                    <div className="space-y-1">
-                      <Skeleton width="w-48" height="h-4" />
-                      <Skeleton width="w-32" height="h-3" />
-                    </div>
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-start space-x-3">
+                  <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" data-testid={`action-avatar-${i}`} />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-full" data-testid={`action-text-${i}`} />
+                    <Skeleton className="h-3 w-20" data-testid={`action-time-${i}`} />
                   </div>
-                  <Skeleton width="w-20" height="h-3" />
                 </div>
               ))}
             </div>
           </div>
-        </LoadingCard>
-      </section>
 
-      {/* Screen reader only loading completion message */}
+          {/* System Status */}
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
+            role="region" 
+            aria-label="Loading system status indicators"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <Skeleton className="h-6 w-32" data-testid="system-status-title" />
+              <Skeleton className="h-5 w-16 rounded-full" data-testid="status-badge" />
+            </div>
+            
+            <div className="space-y-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Skeleton className="h-4 w-4 rounded-full" data-testid={`status-indicator-${i}`} />
+                    <Skeleton className="h-4 w-24" data-testid={`status-label-${i}`} />
+                  </div>
+                  <Skeleton className="h-4 w-12" data-testid={`status-value-${i}`} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Audit Trail Preview */}
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
+            role="region"
+            aria-label="Loading audit trail preview"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <Skeleton className="h-6 w-28" data-testid="audit-trail-title" />
+              <Skeleton className="h-8 w-20" data-testid="view-all-button" />
+            </div>
+            
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded bg-gray-50 dark:bg-gray-900">
+                  <div className="flex-1 space-y-1">
+                    <Skeleton className="h-4 w-full" data-testid={`audit-action-${i}`} />
+                    <Skeleton className="h-3 w-32" data-testid={`audit-timestamp-${i}`} />
+                  </div>
+                  <Skeleton className="h-6 w-16 rounded" data-testid={`audit-severity-${i}`} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Loading Progress Indicator */}
       <div 
-        className="sr-only" 
+        className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4"
+        role="status"
         aria-live="polite"
-        data-testid="loading-status-message"
       >
-        Administrative dashboard is loading. This page contains metrics, user management, system health monitoring, and audit information.
+        <div className="flex items-center space-x-3">
+          <Spinner className="h-5 w-5" />
+          <div className="space-y-1">
+            <Skeleton className="h-4 w-32" data-testid="loading-text" />
+            <Skeleton className="h-2 w-40" data-testid="loading-progress" />
+          </div>
+        </div>
       </div>
     </div>
   );
