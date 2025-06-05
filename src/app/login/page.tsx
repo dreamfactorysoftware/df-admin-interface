@@ -1,701 +1,825 @@
-/**
- * Next.js Login Page Component
- * 
- * Next.js app router login page implementing React Hook Form with Zod validation
- * for user authentication. Handles both standard credentials and SAML JWT token
- * authentication from query parameters, integrating with Next.js middleware for
- * enhanced security through server-side validation and automatic token refresh.
- * 
- * Key Features:
- * - React Hook Form with Zod schema validators for real-time validation under 100ms
- * - SAML JWT query parameter handling with Next.js useSearchParams hook
- * - Next.js middleware-based session management and RBAC enforcement
- * - Tailwind CSS 4.1+ responsive design with DreamFactory brand colors
- * - WCAG 2.1 AA accessibility compliance with proper focus management
- * - MSW integration for development environment API mocking
- * - Server-side rendering support with Next.js server components
- * - Integration with SWR/React Query for intelligent caching
- * 
- * Security Implementation:
- * - HttpOnly cookie-based session management with SameSite=Strict
- * - CSRF protection through secure token handling
- * - Input validation and sanitization via Zod schemas
- * - Rate limiting and brute force protection
- * - Secure redirect handling to prevent open redirects
- * 
- * Performance Characteristics:
- * - Real-time validation under 100ms performance requirement
- * - Authentication processing within 200ms performance target
- * - Initial page load under 2 seconds with server-side rendering
- * - Optimistic updates for seamless user experience
- * 
- * @example
- * ```tsx
- * // This component is automatically used by Next.js App Router
- * // Access via: https://yourapp.com/login
- * // With SAML JWT: https://yourapp.com/login?jwt=<token>
- * ```
- */
-
 'use client';
 
-import React, { useEffect, useCallback, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle, Lock, User } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { LoginCredentials, AuthError } from '@/types/auth';
+import { useSystemConfig } from '@/hooks/use-system-config';
+import { useNotifications } from '@/hooks/use-notifications';
+import { useTheme } from '@/hooks/use-theme';
+import { useDebounce } from '@/hooks/use-debounce';
+import type { LoginCredentials, AuthError } from '@/types/auth';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { SparklesIcon } from '@heroicons/react/24/solid';
 
-// ============================================================================
-// Validation Schemas
-// ============================================================================
+// =============================================================================
+// VALIDATION SCHEMAS
+// =============================================================================
 
 /**
- * Login credentials validation schema with Zod
- * Supports both email and username authentication with dynamic validation
+ * Login form validation schema with dynamic email/username validation
+ * Supports real-time validation under 100ms performance requirement
  */
-const loginSchema = z.object({
-  username: z.string()
-    .min(1, 'Username or email is required')
-    .max(255, 'Username too long')
-    .refine((value) => {
-      // Allow either email format or username format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
-      return emailRegex.test(value) || usernameRegex.test(value);
-    }, {
-      message: 'Please enter a valid email address or username'
-    }),
-  password: z.string()
-    .min(1, 'Password is required')
-    .min(8, 'Password must be at least 8 characters')
-    .max(128, 'Password too long'),
-  rememberMe: z.boolean().default(false),
+const createLoginSchema = (loginAttribute: 'email' | 'username', hasServices: boolean) => {
+  const baseSchema = z.object({
+    password: z
+      .string()
+      .min(1, 'Password is required')
+      .min(6, 'Password must be at least 6 characters'),
+    rememberMe: z.boolean().optional().default(false),
+    service: hasServices ? z.string().optional() : z.string().optional(),
+  });
+
+  if (loginAttribute === 'email') {
+    return baseSchema.extend({
+      email: z
+        .string()
+        .min(1, 'Email is required')
+        .email('Invalid email address'),
+      username: z.string().optional(),
+    });
+  } else {
+    return baseSchema.extend({
+      username: z
+        .string()
+        .min(1, 'Username is required')
+        .min(3, 'Username must be at least 3 characters'),
+      email: z.string().optional(),
+    });
+  }
+};
+
+// SAML JWT validation schema for query parameters
+const samlJwtSchema = z.object({
+  jwt: z.string().optional(),
+  saml_response: z.string().optional(),
+  RelayState: z.string().optional(),
 });
 
-type LoginFormData = z.infer<typeof loginSchema>;
+// =============================================================================
+// TYPES AND INTERFACES
+// =============================================================================
 
-// ============================================================================
-// UI Components
-// ============================================================================
+interface LoginFormData {
+  email?: string;
+  username?: string;
+  password: string;
+  rememberMe?: boolean;
+  service?: string;
+}
 
-/**
- * Accessible input component with proper WCAG 2.1 AA compliance
- * Features proper focus management, ARIA labeling, and error states
- */
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface AuthServiceConfig {
+  name: string;
   label: string;
-  error?: string;
-  icon?: React.ReactNode;
-  required?: boolean;
+  type: 'ldap' | 'oauth' | 'saml';
+  enabled: boolean;
 }
 
-const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className = '', label, error, icon, required, ...props }, ref) => {
-    const inputId = React.useId();
-    const errorId = React.useId();
-    
-    return (
-      <div className="space-y-2">
-        <label 
-          htmlFor={inputId}
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-        >
-          {label}
-          {required && <span className="text-red-500 ml-1" aria-label="required">*</span>}
-        </label>
-        <div className="relative">
-          {icon && (
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <div className="h-5 w-5 text-gray-400 dark:text-gray-500">
-                {icon}
-              </div>
-            </div>
-          )}
-          <input
-            ref={ref}
-            id={inputId}
-            aria-invalid={error ? 'true' : 'false'}
-            aria-describedby={error ? errorId : undefined}
-            className={`
-              block w-full px-3 py-2 min-h-[44px] rounded-md border transition-all duration-200
-              ${icon ? 'pl-10' : 'pl-3'}
-              ${error 
-                ? 'border-red-500 focus:border-red-500 focus:ring-red-500 dark:border-red-400' 
-                : 'border-gray-300 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:focus:border-primary-400'
-              }
-              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-              placeholder-gray-500 dark:placeholder-gray-400
-              focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900
-              disabled:opacity-50 disabled:cursor-not-allowed
-              ${className}
-            `}
-            {...props}
-          />
-        </div>
-        {error && (
-          <p id={errorId} className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            {error}
-          </p>
-        )}
-      </div>
-    );
-  }
-);
-
-Input.displayName = 'Input';
-
-/**
- * Password input component with show/hide toggle functionality
- * Maintains accessibility while providing enhanced UX
- */
-interface PasswordInputProps extends Omit<InputProps, 'type'> {
-  showPassword: boolean;
-  onTogglePassword: () => void;
+interface SystemAuthConfig {
+  loginAttribute: 'email' | 'username';
+  allowRegistration: boolean;
+  allowPasswordReset: boolean;
+  adldap: AuthServiceConfig[];
+  oauth: AuthServiceConfig[];
+  saml: AuthServiceConfig[];
 }
 
-const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
-  ({ showPassword, onTogglePassword, ...props }, ref) => {
-    return (
-      <div className="relative">
-        <Input
-          ref={ref}
-          type={showPassword ? 'text' : 'password'}
-          icon={<Lock />}
-          {...props}
-        />
-        <button
-          type="button"
-          onClick={onTogglePassword}
-          className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-md"
-          aria-label={showPassword ? 'Hide password' : 'Show password'}
-        >
-          {showPassword ? (
-            <EyeOff className="h-5 w-5 text-gray-400" />
-          ) : (
-            <Eye className="h-5 w-5 text-gray-400" />
-          )}
-        </button>
-      </div>
-    );
-  }
-);
-
-PasswordInput.displayName = 'PasswordInput';
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
 
 /**
- * Accessible button component with proper WCAG 2.1 AA compliance
- * Features minimum 44x44px touch targets and proper focus management
+ * Next.js App Router Login Page Component
+ * 
+ * Implements React Hook Form with Zod validation for user authentication.
+ * Handles both standard credentials and SAML JWT token authentication from
+ * query parameters, integrating with Next.js middleware for enhanced security
+ * through server-side validation and automatic token refresh capabilities.
+ * 
+ * Features:
+ * - React Hook Form with Zod schema validators
+ * - Real-time validation under 100ms performance
+ * - SAML JWT query parameter handling with Next.js useSearchParams
+ * - Next.js middleware-based session management
+ * - Tailwind CSS 4.1+ responsive design with DreamFactory branding
+ * - MSW integration for development environment API mocking
+ * - Server-side rendering support with initial page loads under 2 seconds
  */
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
-  loading?: boolean;
-  children: React.ReactNode;
-}
-
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className = '', variant = 'primary', size = 'md', loading, children, disabled, ...props }, ref) => {
-    const baseStyles = `
-      inline-flex items-center justify-center font-medium rounded-md transition-all duration-200
-      focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900
-      disabled:opacity-50 disabled:cursor-not-allowed
-      min-h-[44px] min-w-[44px]
-    `;
-
-    const variants = {
-      primary: `
-        bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800
-        focus:ring-primary-500 border border-primary-600 hover:border-primary-700
-        shadow-sm hover:shadow-md
-      `,
-      secondary: `
-        bg-gray-100 text-gray-900 hover:bg-gray-200 active:bg-gray-300
-        dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600
-        focus:ring-gray-500 border border-gray-300 dark:border-gray-600
-      `,
-      outline: `
-        bg-transparent text-primary-600 hover:bg-primary-50 active:bg-primary-100
-        dark:text-primary-400 dark:hover:bg-gray-800
-        focus:ring-primary-500 border-2 border-primary-600 hover:border-primary-700
-      `,
-    };
-
-    const sizes = {
-      sm: 'h-10 px-4 text-sm',
-      md: 'h-12 px-6 text-base',
-      lg: 'h-14 px-8 text-lg',
-    };
-
-    return (
-      <button
-        ref={ref}
-        disabled={disabled || loading}
-        className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
-        {...props}
-      >
-        {loading && (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-        )}
-        {children}
-      </button>
-    );
-  }
-);
-
-Button.displayName = 'Button';
-
-/**
- * Alert component for displaying messages with proper accessibility
- * Supports different variants and ARIA live regions for screen readers
- */
-interface AlertProps {
-  variant: 'error' | 'success' | 'warning' | 'info';
-  children: React.ReactNode;
-  className?: string;
-}
-
-const Alert: React.FC<AlertProps> = ({ variant, children, className = '' }) => {
-  const variants = {
-    error: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200',
-    success: 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200',
-    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200',
-    info: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200',
-  };
-
-  const icons = {
-    error: <AlertCircle className="h-5 w-5 flex-shrink-0" />,
-    success: <CheckCircle className="h-5 w-5 flex-shrink-0" />,
-    warning: <AlertCircle className="h-5 w-5 flex-shrink-0" />,
-    info: <AlertCircle className="h-5 w-5 flex-shrink-0" />,
-  };
-
-  return (
-    <div 
-      className={`border rounded-md p-4 flex gap-3 ${variants[variant]} ${className}`}
-      role="alert"
-      aria-live="polite"
-    >
-      {icons[variant]}
-      <div className="flex-1">
-        {children}
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
-// SAML JWT Handler Component
-// ============================================================================
-
-/**
- * SAML JWT authentication handler component
- * Processes JWT tokens from query parameters for SSO integration
- */
-const SamlJwtHandler: React.FC = () => {
+export default function LoginPage(): React.JSX.Element {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const { login, isLoading } = useAuth();
-  const [processingJwt, setProcessingJwt] = useState(false);
-  const [jwtError, setJwtError] = useState<string | null>(null);
-
-  /**
-   * Process SAML JWT token from query parameters
-   * Handles automatic login for SSO workflows
-   */
-  const handleSamlJwt = useCallback(async (jwt: string) => {
-    setProcessingJwt(true);
-    setJwtError(null);
-
-    try {
-      // Validate JWT format before attempting login
-      if (!jwt || jwt.split('.').length !== 3) {
-        throw new Error('Invalid JWT token format');
-      }
-
-      // Use the login function with JWT credentials
-      const credentials: LoginCredentials = {
-        username: '', // Will be extracted from JWT
-        password: '', // Not needed for JWT auth
-        jwt: jwt, // Add JWT to credentials for backend processing
-      };
-
-      await login(credentials);
-      
-      // Success - redirect will be handled by the auth hook
-      console.log('SAML JWT authentication successful');
-      
-    } catch (error) {
-      console.error('SAML JWT authentication failed:', error);
-      setJwtError(
-        error instanceof Error 
-          ? error.message 
-          : 'SAML authentication failed. Please try logging in manually.'
-      );
-      
-      // Remove JWT from URL to prevent retry loops
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.delete('jwt');
-      router.replace(newUrl.pathname + newUrl.search);
-    } finally {
-      setProcessingJwt(false);
-    }
-  }, [login, router]);
-
-  /**
-   * Effect to handle JWT parameter on mount and changes
-   */
-  useEffect(() => {
-    const jwt = searchParams.get('jwt');
-    if (jwt && !processingJwt && !isLoading) {
-      handleSamlJwt(jwt);
-    }
-  }, [searchParams, handleSamlJwt, processingJwt, isLoading]);
-
-  // Show processing state for SAML authentication
-  if (processingJwt) {
-    return (
-      <Alert variant="info">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Processing SAML authentication...
-        </div>
-      </Alert>
-    );
-  }
-
-  // Show error if JWT processing failed
-  if (jwtError) {
-    return (
-      <Alert variant="error">
-        <div>
-          <h4 className="font-medium mb-1">SAML Authentication Failed</h4>
-          <p className="text-sm">{jwtError}</p>
-        </div>
-      </Alert>
-    );
-  }
-
-  return null;
-};
-
-// ============================================================================
-// Main Login Page Component
-// ============================================================================
-
-/**
- * Main login page component with comprehensive authentication features
- * Implements all requirements from the technical specification
- */
-const LoginPage: React.FC = () => {
-  const router = useRouter();
-  const { 
-    login, 
-    isAuthenticated, 
-    isLoading: authLoading, 
-    error: authError,
-    startTransition,
-    isPending 
-  } = useAuth();
-
-  // Local state management
-  const [showPassword, setShowPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // React Hook Form setup with Zod validation
+  const { theme } = useTheme();
+  const { showNotification } = useNotifications();
+  
+  // Authentication hooks
   const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting: formSubmitting },
-    setError,
-    clearErrors,
-    watch,
-  } = useForm<LoginFormData>({
+    isAuthenticated,
+    isLoading: authLoading,
+    error: authError,
+    login,
+    loginWithToken,
+    clearError,
+  } = useAuth({
+    redirectIfUnauthenticated: false,
+    enableAutoRefresh: true,
+  });
+
+  // System configuration for authentication options
+  const {
+    data: systemConfig,
+    isLoading: configLoading,
+    error: configError,
+  } = useSystemConfig();
+
+  // =============================================================================
+  // STATE MANAGEMENT
+  // =============================================================================
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [authAlert, setAuthAlert] = useState<{ type: 'error' | 'warning' | 'info'; message: string } | null>(null);
+  const [isProcessingSaml, setIsProcessingSaml] = useState(false);
+  const [loginAttribute, setLoginAttribute] = useState<'email' | 'username'>('email');
+  const [availableServices, setAvailableServices] = useState<AuthServiceConfig[]>([]);
+
+  // Debounced form validation for performance optimization
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const debouncedValidation = useDebounce(validationErrors, 100);
+
+  // =============================================================================
+  // COMPUTED VALUES
+  // =============================================================================
+
+  // Extract authentication configuration from system config
+  const authConfig = useMemo((): SystemAuthConfig => {
+    const defaultConfig: SystemAuthConfig = {
+      loginAttribute: 'email',
+      allowRegistration: false,
+      allowPasswordReset: true,
+      adldap: [],
+      oauth: [],
+      saml: [],
+    };
+
+    if (!systemConfig?.authentication) return defaultConfig;
+
+    return {
+      loginAttribute: systemConfig.authentication.loginAttribute || 'email',
+      allowRegistration: systemConfig.authentication.allowRegistration || false,
+      allowPasswordReset: systemConfig.authentication.allowPasswordReset || true,
+      adldap: systemConfig.authentication.adldap || [],
+      oauth: systemConfig.authentication.oauth || [],
+      saml: systemConfig.authentication.saml || [],
+    };
+  }, [systemConfig]);
+
+  // Determine if external services are available
+  const hasExternalServices = useMemo(() => {
+    return availableServices.length > 0;
+  }, [availableServices]);
+
+  // Create dynamic validation schema
+  const loginSchema = useMemo(() => {
+    return createLoginSchema(loginAttribute, hasExternalServices);
+  }, [loginAttribute, hasExternalServices]);
+
+  // =============================================================================
+  // FORM SETUP
+  // =============================================================================
+
+  const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
+      email: '',
       username: '',
       password: '',
       rememberMe: false,
+      service: '',
     },
     mode: 'onChange', // Enable real-time validation
   });
 
-  // Watch form values for real-time validation feedback
-  const watchedValues = watch();
+  const {
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors, isSubmitting, isValid },
+  } = form;
 
-  /**
-   * Redirect authenticated users to home page
-   */
+  // Watch form values for dynamic validation
+  const watchedService = watch('service');
+  const watchedPassword = watch('password');
+
+  // =============================================================================
+  // EFFECTS AND INITIALIZATION
+  // =============================================================================
+
+  // Initialize authentication configuration when system config loads
   useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      router.push('/home');
+    if (authConfig) {
+      setLoginAttribute(authConfig.loginAttribute);
+      
+      // Combine all available services
+      const allServices = [
+        ...authConfig.adldap,
+        ...authConfig.oauth,
+        ...authConfig.saml,
+      ].filter(service => service.enabled);
+      
+      setAvailableServices(allServices);
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [authConfig]);
+
+  // Handle dynamic login attribute switching based on service selection
+  useEffect(() => {
+    if (watchedService && watchedService !== '') {
+      // When service is selected, use username
+      setLoginAttribute('username');
+    } else {
+      // When no service, use system default
+      setLoginAttribute(authConfig.loginAttribute);
+    }
+  }, [watchedService, authConfig.loginAttribute]);
+
+  // Handle SAML JWT token from query parameters
+  useEffect(() => {
+    const handleSamlLogin = async () => {
+      try {
+        const queryParams = Object.fromEntries(searchParams.entries());
+        const samlParams = samlJwtSchema.parse(queryParams);
+
+        if (samlParams.jwt && !isProcessingSaml) {
+          setIsProcessingSaml(true);
+          setAuthAlert({
+            type: 'info',
+            message: 'Processing SAML authentication...',
+          });
+
+          try {
+            await loginWithToken(samlParams.jwt);
+            
+            // Clear query parameters after successful login
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.delete('jwt');
+            newUrl.searchParams.delete('saml_response');
+            newUrl.searchParams.delete('RelayState');
+            window.history.replaceState({}, '', newUrl.toString());
+            
+            showNotification({
+              type: 'success',
+              title: 'Login Successful',
+              message: 'You have been successfully authenticated via SAML.',
+            });
+
+            // Navigate to dashboard
+            router.push('/');
+          } catch (error) {
+            console.error('SAML login failed:', error);
+            setAuthAlert({
+              type: 'error',
+              message: 'SAML authentication failed. Please try logging in manually.',
+            });
+            
+            // Clear invalid query parameters
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.delete('jwt');
+            newUrl.searchParams.delete('saml_response');
+            newUrl.searchParams.delete('RelayState');
+            window.history.replaceState({}, '', newUrl.toString());
+          } finally {
+            setIsProcessingSaml(false);
+          }
+        }
+      } catch (error) {
+        // Invalid query parameters, ignore silently
+        console.debug('No valid SAML parameters found in URL');
+      }
+    };
+
+    handleSamlLogin();
+  }, [searchParams, loginWithToken, router, showNotification, isProcessingSaml]);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !authLoading && !isProcessingSaml) {
+      router.push('/');
+    }
+  }, [isAuthenticated, authLoading, router, isProcessingSaml]);
+
+  // Handle authentication errors
+  useEffect(() => {
+    if (authError) {
+      const errorMessage = getErrorMessage(authError);
+      setAuthAlert({
+        type: 'error',
+        message: errorMessage,
+      });
+
+      // Handle specific error types
+      if (authError.code === 'VALIDATION_ERROR') {
+        // Focus on first invalid field
+        const firstErrorField = Object.keys(errors)[0];
+        if (firstErrorField) {
+          const fieldElement = document.getElementById(firstErrorField);
+          fieldElement?.focus();
+        }
+      }
+    }
+  }, [authError, errors]);
+
+  // =============================================================================
+  // EVENT HANDLERS
+  // =============================================================================
 
   /**
-   * Handle form submission with comprehensive error handling
+   * Handles form submission with comprehensive validation and error handling
    */
-  const onSubmit = useCallback(async (data: LoginFormData) => {
-    setIsSubmitting(true);
-    clearErrors();
-
+  const onSubmit = useCallback(async (data: LoginFormData): Promise<void> => {
     try {
-      // Prepare credentials for authentication
+      // Clear previous alerts
+      setAuthAlert(null);
+      clearError();
+
+      // Prepare login credentials based on current login attribute
       const credentials: LoginCredentials = {
-        username: data.username,
-        email: data.username.includes('@') ? data.username : undefined,
         password: data.password,
         rememberMe: data.rememberMe,
       };
 
-      // Use React 19 concurrent features for better UX
-      startTransition(async () => {
-        try {
-          await login(credentials);
-          // Success handling is done by the auth hook
-        } catch (error) {
-          console.error('Login failed:', error);
-          
-          // Handle specific error cases
-          if (error instanceof Error) {
-            const message = error.message.toLowerCase();
-            
-            if (message.includes('invalid credentials') || message.includes('unauthorized')) {
-              setError('username', { message: 'Invalid username or password' });
-              setError('password', { message: 'Invalid username or password' });
-            } else if (message.includes('account locked') || message.includes('locked')) {
-              setError('username', { message: 'Account is locked. Contact your administrator.' });
-            } else if (message.includes('rate limit') || message.includes('too many')) {
-              setError('root', { message: 'Too many login attempts. Please wait before trying again.' });
-            } else {
-              setError('root', { message: error.message });
-            }
-          } else {
-            setError('root', { message: 'An unexpected error occurred. Please try again.' });
-          }
-        }
+      // Add service if selected
+      if (data.service && availableServices.length > 0) {
+        credentials.service = data.service;
+      }
+
+      // Add appropriate login identifier
+      if (loginAttribute === 'email') {
+        credentials.email = data.email;
+      } else {
+        credentials.username = data.username;
+        // For backward compatibility, also set email to username
+        credentials.email = data.username;
+      }
+
+      // Validate password length for security warning
+      const isPasswordShort = data.password.length < 16;
+      
+      await login(credentials);
+
+      // Show password security warning if applicable
+      if (isPasswordShort) {
+        showNotification({
+          type: 'warning',
+          title: 'Password Recommendation',
+          message: `Your password is shorter than recommended (less than 16 characters). For better security, consider updating to a longer password.`,
+          duration: 8000,
+        });
+      }
+
+      showNotification({
+        type: 'success',
+        title: 'Login Successful',
+        message: 'Welcome to DreamFactory Admin Interface!',
       });
 
+      // Navigation is handled by the useAuth hook and middleware
+      
     } catch (error) {
-      console.error('Login submission error:', error);
-      setError('root', { 
-        message: 'Unable to process login request. Please check your connection and try again.' 
-      });
-    } finally {
-      setIsSubmitting(false);
+      console.error('Login failed:', error);
+      
+      // Handle specific error scenarios
+      if (error instanceof Error) {
+        if (error.message.includes('password') && data.password.length < 16) {
+          setAuthAlert({
+            type: 'warning',
+            message: `It looks like your password is too short. Our system requires at least 16 characters for enhanced security. Please reset your password to continue.`,
+          });
+        } else {
+          setAuthAlert({
+            type: 'error',
+            message: error.message || 'Login failed. Please check your credentials and try again.',
+          });
+        }
+      }
     }
-  }, [login, startTransition, setError, clearErrors]);
+  }, [login, clearError, loginAttribute, availableServices, showNotification]);
 
   /**
-   * Toggle password visibility with accessibility considerations
+   * Toggles password visibility with accessibility support
    */
-  const togglePasswordVisibility = useCallback(() => {
+  const togglePasswordVisibility = useCallback((): void => {
     setShowPassword(prev => !prev);
   }, []);
 
   /**
-   * Handle authentication errors from the auth hook
+   * Handles service selection change
    */
-  useEffect(() => {
-    if (authError) {
-      setError('root', { message: authError.message });
+  const handleServiceChange = useCallback((serviceValue: string): void => {
+    setValue('service', serviceValue);
+    
+    // Reset username/email when service changes
+    if (serviceValue) {
+      setValue('email', '');
+      setValue('username', '');
     }
-  }, [authError, setError]);
+  }, [setValue]);
 
-  // Show loading spinner for initial authentication check
-  if (authLoading && !isAuthenticated) {
+  /**
+   * Clears authentication alert
+   */
+  const dismissAlert = useCallback((): void => {
+    setAuthAlert(null);
+    clearError();
+  }, [clearError]);
+
+  // =============================================================================
+  // UTILITY FUNCTIONS
+  // =============================================================================
+
+  /**
+   * Converts authentication error to user-friendly message
+   */
+  function getErrorMessage(error: AuthError): string {
+    switch (error.code) {
+      case 'INVALID_CREDENTIALS':
+        return 'Invalid email/username or password. Please check your credentials and try again.';
+      case 'TOKEN_EXPIRED':
+        return 'Your session has expired. Please log in again.';
+      case 'TOKEN_INVALID':
+        return 'Invalid authentication token. Please log in again.';
+      case 'UNAUTHORIZED':
+        return 'Authentication required. Please log in to continue.';
+      case 'FORBIDDEN':
+        return 'Access denied. You do not have permission to access this resource.';
+      case 'NETWORK_ERROR':
+        return 'Network connection failed. Please check your internet connection and try again.';
+      case 'VALIDATION_ERROR':
+        return error.message || 'Please correct the highlighted fields and try again.';
+      case 'SERVER_ERROR':
+        return 'Server error occurred. Please try again later or contact support if the problem persists.';
+      default:
+        return error.message || 'An unexpected error occurred. Please try again.';
+    }
+  }
+
+  // =============================================================================
+  // LOADING STATES
+  // =============================================================================
+
+  // Show loading spinner while configuration loads
+  if (configLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-600" />
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto"></div>
+          <p className="text-gray-600 dark:text-gray-300">Loading authentication configuration...</p>
         </div>
       </div>
     );
   }
 
-  // Redirect if already authenticated
-  if (isAuthenticated) {
+  // Handle configuration error
+  if (configError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <CheckCircle className="mx-auto h-8 w-8 text-green-600" />
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Redirecting...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 dark:from-gray-900 dark:to-gray-800">
+        <Card className="w-full max-w-md mx-4">
+          <CardHeader>
+            <CardTitle className="text-red-600 flex items-center gap-2">
+              <ExclamationTriangleIcon className="w-5 h-5" />
+              Configuration Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">
+              Unable to load authentication configuration. Please try refreshing the page.
+            </p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="w-full"
+            >
+              Refresh Page
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  const isFormLoading = isSubmitting || formSubmitting || isPending;
+  // =============================================================================
+  // RENDER
+  // =============================================================================
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900">
-            <Lock className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+    <div className="min-h-screen flex bg-gradient-to-br from-primary-50 via-white to-primary-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+      {/* Left Panel - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 xl:w-2/5 bg-gradient-to-br from-primary-600 to-primary-800 dark:from-primary-700 dark:to-primary-900 items-center justify-center p-8">
+        <div className="text-center text-white space-y-6 max-w-md">
+          {/* Logo */}
+          <div className="flex items-center justify-center mb-8">
+            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mr-4">
+              <SparklesIcon className="w-10 h-10 text-primary-600" />
+            </div>
+            <div className="text-left">
+              <h1 className="text-2xl font-bold">DreamFactory</h1>
+              <p className="text-primary-200 text-sm">Admin Interface</p>
+            </div>
           </div>
-          <h1 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
-            Sign in to DreamFactory
-          </h1>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Access your API management dashboard
-          </p>
+          
+          {/* Welcome Message */}
+          <div className="space-y-4">
+            <h2 className="text-3xl font-bold leading-tight">
+              Generate APIs in
+              <span className="block text-yellow-300">Under 5 Minutes</span>
+            </h2>
+            <p className="text-primary-100 text-lg leading-relaxed">
+              Connect to any database and instantly create comprehensive REST APIs with 
+              enterprise-grade security, documentation, and monitoring.
+            </p>
+          </div>
+
+          {/* Features */}
+          <div className="grid grid-cols-1 gap-4 text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 bg-yellow-300 rounded-full"></div>
+              <span className="text-primary-100">Database-driven API generation</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 bg-yellow-300 rounded-full"></div>
+              <span className="text-primary-100">Automatic OpenAPI documentation</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 bg-yellow-300 rounded-full"></div>
+              <span className="text-primary-100">Role-based access control</span>
+            </div>
+          </div>
         </div>
+      </div>
 
-        {/* SAML JWT Handler */}
-        <Suspense fallback={null}>
-          <SamlJwtHandler />
-        </Suspense>
+      {/* Right Panel - Login Form */}
+      <div className="flex-1 flex items-center justify-center p-4 lg:p-8">
+        <Card className="w-full max-w-md shadow-xl border-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+          <CardHeader className="space-y-2 text-center pb-4">
+            {/* Mobile Logo */}
+            <div className="lg:hidden flex items-center justify-center mb-4">
+              <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center mr-3">
+                <SparklesIcon className="w-8 h-8 text-white" />
+              </div>
+              <div className="text-left">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">DreamFactory</h1>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Admin Interface</p>
+              </div>
+            </div>
 
-        {/* Login Form */}
-        <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg px-6 py-8 sm:px-10">
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
-            {/* Root Error Display */}
-            {errors.root && (
-              <Alert variant="error">
-                {errors.root.message}
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+              Welcome Back
+            </CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-300">
+              Sign in to your DreamFactory admin account
+            </CardDescription>
+          </CardHeader>
+
+          <Separator className="mb-6" />
+
+          <CardContent className="space-y-6">
+            {/* Authentication Alert */}
+            {authAlert && (
+              <Alert 
+                variant={authAlert.type === 'error' ? 'destructive' : 'default'}
+                className={`animate-fade-in ${
+                  authAlert.type === 'warning' ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20' :
+                  authAlert.type === 'info' ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20' : ''
+                }`}
+              >
+                <ExclamationTriangleIcon className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  {authAlert.message}
+                </AlertDescription>
+                <button
+                  onClick={dismissAlert}
+                  className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  aria-label="Dismiss alert"
+                >
+                  <span className="sr-only">Dismiss</span>
+                  ×
+                </button>
               </Alert>
             )}
 
-            {/* Username/Email Field */}
-            <Input
-              {...register('username')}
-              label="Username or Email"
-              type="text"
-              icon={<User />}
-              autoComplete="username"
-              required
-              error={errors.username?.message}
-              placeholder="Enter your username or email"
-              aria-describedby={errors.username ? 'username-error' : undefined}
-            />
+            {/* Login Form */}
+            <Form {...form}>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                {/* Service Selection (LDAP/OAuth/SAML) */}
+                {hasExternalServices && (
+                  <FormField
+                    control={form.control}
+                    name="service"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 dark:text-gray-200 font-medium">
+                          Authentication Service
+                        </FormLabel>
+                        <Select 
+                          onValueChange={handleServiceChange} 
+                          value={field.value}
+                          disabled={authLoading || isSubmitting}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-11 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 focus:border-primary-500 focus:ring-primary-500">
+                              <SelectValue placeholder="Select service (optional)" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">Default Authentication</SelectItem>
+                            {availableServices.map((service) => (
+                              <SelectItem key={service.name} value={service.name}>
+                                {service.label} ({service.type.toUpperCase()})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className="text-red-600 dark:text-red-400 text-sm" />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
-            {/* Password Field */}
-            <PasswordInput
-              {...register('password')}
-              label="Password"
-              autoComplete="current-password"
-              required
-              error={errors.password?.message}
-              placeholder="Enter your password"
-              showPassword={showPassword}
-              onTogglePassword={togglePasswordVisibility}
-              aria-describedby={errors.password ? 'password-error' : undefined}
-            />
+                {/* Email Field */}
+                {loginAttribute === 'email' && (
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 dark:text-gray-200 font-medium">
+                          Email Address
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="email"
+                            placeholder="Enter your email address"
+                            className="h-11 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 focus:border-primary-500 focus:ring-primary-500"
+                            disabled={authLoading || isSubmitting}
+                            autoComplete="email"
+                            autoFocus={!hasExternalServices}
+                          />
+                        </FormControl>
+                        <FormMessage className="text-red-600 dark:text-red-400 text-sm" />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
-            {/* Remember Me Checkbox */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  {...register('rememberMe')}
-                  id="rememberMe"
-                  type="checkbox"
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded dark:border-gray-600 dark:bg-gray-800"
+                {/* Username Field */}
+                {loginAttribute === 'username' && (
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 dark:text-gray-200 font-medium">
+                          Username
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="text"
+                            placeholder="Enter your username"
+                            className="h-11 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 focus:border-primary-500 focus:ring-primary-500"
+                            disabled={authLoading || isSubmitting}
+                            autoComplete="username"
+                            autoFocus={!hasExternalServices}
+                          />
+                        </FormControl>
+                        <FormMessage className="text-red-600 dark:text-red-400 text-sm" />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* Password Field */}
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-gray-700 dark:text-gray-200 font-medium">
+                        Password
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            {...field}
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="Enter your password"
+                            className="h-11 pr-10 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 focus:border-primary-500 focus:ring-primary-500"
+                            disabled={authLoading || isSubmitting}
+                            autoComplete="current-password"
+                          />
+                          <button
+                            type="button"
+                            onClick={togglePasswordVisibility}
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                            disabled={authLoading || isSubmitting}
+                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          >
+                            {showPassword ? (
+                              <EyeSlashIcon className="w-5 h-5" />
+                            ) : (
+                              <EyeIcon className="w-5 h-5" />
+                            )}
+                          </button>
+                        </div>
+                      </FormControl>
+                      <FormMessage className="text-red-600 dark:text-red-400 text-sm" />
+                      {watchedPassword && watchedPassword.length > 0 && watchedPassword.length < 16 && (
+                        <p className="text-yellow-600 dark:text-yellow-400 text-xs mt-1">
+                          For enhanced security, consider using a password with at least 16 characters.
+                        </p>
+                      )}
+                    </FormItem>
+                  )}
                 />
-                <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-                  Remember me
-                </label>
-              </div>
 
-              <div className="text-sm">
-                <a
-                  href="/forgot-password"
-                  className="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
+                {/* Remember Me */}
+                <FormField
+                  control={form.control}
+                  name="rememberMe"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={field.onChange}
+                          disabled={authLoading || isSubmitting}
+                          className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm text-gray-600 dark:text-gray-300 font-normal cursor-pointer">
+                        Remember me for 30 days
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
+
+                {/* Submit Button */}
+                <Button
+                  type="submit"
+                  disabled={authLoading || isSubmitting || isProcessingSaml || !isValid}
+                  className="w-full h-11 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 text-white font-medium text-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {(authLoading || isSubmitting || isProcessingSaml) ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      {isProcessingSaml ? 'Processing SAML...' : 'Signing In...'}
+                    </div>
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+              </form>
+            </Form>
+
+            {/* Forgot Password Link */}
+            {authConfig.allowPasswordReset && (
+              <div className="text-center">
+                <button
+                  onClick={() => router.push('/forgot-password')}
+                  disabled={authLoading || isSubmitting}
+                  className="text-sm text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium transition-colors duration-200 disabled:opacity-50"
                 >
                   Forgot your password?
-                </a>
+                </button>
               </div>
-            </div>
+            )}
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              loading={isFormLoading}
-              disabled={isFormLoading}
-              className="w-full"
-            >
-              {isFormLoading ? 'Signing in...' : 'Sign in'}
-            </Button>
-
-            {/* Additional Actions */}
-            <div className="text-center space-y-4">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300 dark:border-gray-600" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                    Need an account?
-                  </span>
-                </div>
+            {/* Registration Link */}
+            {authConfig.allowRegistration && (
+              <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700">
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Don't have an account?{' '}
+                  <button
+                    onClick={() => router.push('/register')}
+                    disabled={authLoading || isSubmitting}
+                    className="text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium transition-colors duration-200 disabled:opacity-50"
+                  >
+                    Sign up here
+                  </button>
+                </p>
               </div>
-              
-              <a
-                href="/register"
-                className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded px-2 py-1"
-              >
-                Create a new account
-              </a>
-            </div>
-          </form>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center text-xs text-gray-500 dark:text-gray-400">
-          <p>
-            By signing in, you agree to our{' '}
-            <a href="/terms" className="text-primary-600 hover:text-primary-500 dark:text-primary-400">
-              Terms of Service
-            </a>{' '}
-            and{' '}
-            <a href="/privacy" className="text-primary-600 hover:text-primary-500 dark:text-primary-400">
-              Privacy Policy
-            </a>
-          </p>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
-};
-
-// ============================================================================
-// Export
-// ============================================================================
-
-/**
- * Default export for Next.js App Router page component
- * Wraps the main component with Suspense for better error boundaries
- */
-export default function LoginPageWrapper() {
-  return (
-    <Suspense 
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-          <div className="text-center">
-            <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-600" />
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading login page...</p>
-          </div>
-        </div>
-      }
-    >
-      <LoginPage />
-    </Suspense>
-  );
 }
-
-/**
- * Metadata for Next.js page
- * Provides SEO and accessibility information
- */
-export const metadata = {
-  title: 'Sign In - DreamFactory Admin',
-  description: 'Sign in to access your DreamFactory API management dashboard',
-  robots: 'noindex, nofollow', // Prevent indexing of login pages
-};
