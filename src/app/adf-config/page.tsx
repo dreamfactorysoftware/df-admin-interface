@@ -1,405 +1,303 @@
-import { Suspense } from 'react';
 import { Metadata } from 'next';
-import Link from 'next/link';
+import { Suspense } from 'react';
 import { 
-  Settings, 
-  Database, 
-  Mail, 
-  Shield, 
-  Key, 
-  Info, 
-  Zap,
-  Globe,
-  CheckCircle,
-  AlertCircle
-} from 'lucide-react';
+  CogIcon, 
+  ServerIcon, 
+  EnvelopeIcon, 
+  ShieldCheckIcon,
+  ClockIcon,
+  DocumentTextIcon,
+  CircleStackIcon,
+  KeyIcon
+} from '@heroicons/react/24/outline';
+import { ConfigDashboardClient } from './config-dashboard-client';
 
-// Metadata for the configuration dashboard page
+/**
+ * Configuration Dashboard Page Component
+ * 
+ * Main configuration dashboard page implementing Next.js server component architecture 
+ * to provide overview and navigation to system configuration features including cache 
+ * management, CORS settings, email templates, lookup keys, and system information.
+ * 
+ * Features:
+ * - SSR-optimized server component for initial page loads under 2 seconds
+ * - Central hub for all DreamFactory administrative configuration capabilities
+ * - Intelligent caching with React Query through client component delegation
+ * - Responsive Tailwind CSS design replacing Angular Material components
+ * - Comprehensive error handling and loading states
+ * - WCAG 2.1 AA compliant accessibility features
+ */
+
+// Metadata for SEO and performance optimization
 export const metadata: Metadata = {
-  title: 'System Configuration',
-  description: 'Manage DreamFactory system settings, cache, CORS, email templates, and security configuration',
-  openGraph: {
-    title: 'System Configuration | DreamFactory Admin Console',
-    description: 'Central hub for all DreamFactory administrative configuration capabilities',
-  },
+  title: 'System Configuration - DreamFactory Admin',
+  description: 'Manage DreamFactory system configuration including cache, CORS, email templates, and system information',
+  keywords: ['dreamfactory', 'configuration', 'admin', 'system', 'cache', 'cors', 'email'],
 };
 
-// Force dynamic rendering for real-time configuration data
-export const dynamic = 'force-dynamic';
-
-// Configuration section definitions with navigation details
-interface ConfigSection {
-  id: string;
-  title: string;
-  description: string;
-  icon: React.ComponentType<any>;
-  href: string;
-  status: 'active' | 'inactive' | 'warning';
-  category: 'core' | 'security' | 'communication' | 'system';
-}
-
-const configSections: ConfigSection[] = [
+/**
+ * Configuration feature definitions for dashboard navigation
+ * Replaces Angular router-based navigation with Next.js app router structure
+ */
+const CONFIG_FEATURES = [
   {
     id: 'cache',
     title: 'Cache Management',
-    description: 'Configure and manage system cache settings, flush cache, and monitor cache performance',
-    icon: Zap,
-    href: '/system-settings/cache',
-    status: 'active',
-    category: 'core',
+    description: 'Configure system cache settings and flush cache data',
+    icon: CircleStackIcon,
+    href: '/adf-config/df-cache',
+    status: 'active' as const,
+    color: 'bg-blue-500 hover:bg-blue-600',
+    iconColor: 'text-blue-600',
+    borderColor: 'border-blue-200 hover:border-blue-300',
+    actions: ['view', 'configure', 'flush'],
   },
   {
     id: 'cors',
     title: 'CORS Configuration',
-    description: 'Configure Cross-Origin Resource Sharing (CORS) policies for API access control',
-    icon: Globe,
-    href: '/system-settings/cors',
-    status: 'active',
-    category: 'security',
+    description: 'Manage Cross-Origin Resource Sharing policies and settings',
+    icon: ShieldCheckIcon,
+    href: '/adf-config/df-cors',
+    status: 'active' as const,
+    color: 'bg-green-500 hover:bg-green-600',
+    iconColor: 'text-green-600',
+    borderColor: 'border-green-200 hover:border-green-300',
+    actions: ['view', 'create', 'edit', 'delete'],
   },
   {
     id: 'email-templates',
     title: 'Email Templates',
-    description: 'Manage email templates for user registration, password reset, and system notifications',
-    icon: Mail,
-    href: '/system-settings/email-templates',
-    status: 'active',
-    category: 'communication',
+    description: 'Configure email templates for system notifications and user communications',
+    icon: EnvelopeIcon,
+    href: '/adf-config/df-email-templates',
+    status: 'active' as const,
+    color: 'bg-purple-500 hover:bg-purple-600',
+    iconColor: 'text-purple-600',
+    borderColor: 'border-purple-200 hover:border-purple-300',
+    actions: ['view', 'create', 'edit', 'delete'],
   },
   {
-    id: 'lookup-keys',
+    id: 'global-lookup-keys',
     title: 'Global Lookup Keys',
-    description: 'Configure global lookup keys and constants used across the system',
-    icon: Key,
-    href: '/system-settings/lookup-keys',
-    status: 'active',
-    category: 'core',
+    description: 'Manage global lookup keys for system-wide configuration values',
+    icon: KeyIcon,
+    href: '/adf-config/df-global-lookup-keys',
+    status: 'active' as const,
+    color: 'bg-orange-500 hover:bg-orange-600',
+    iconColor: 'text-orange-600',
+    borderColor: 'border-orange-200 hover:border-orange-300',
+    actions: ['view', 'create', 'edit', 'delete'],
   },
   {
     id: 'system-info',
     title: 'System Information',
-    description: 'View system information, environment details, and platform configuration',
-    icon: Info,
-    href: '/system-settings/system-info',
-    status: 'active',
-    category: 'system',
+    description: 'View comprehensive system information and environment details',
+    icon: ServerIcon,
+    href: '/adf-config/df-system-info',
+    status: 'active' as const,
+    color: 'bg-gray-500 hover:bg-gray-600',
+    iconColor: 'text-gray-600',
+    borderColor: 'border-gray-200 hover:border-gray-300',
+    actions: ['view'],
   },
-];
+] as const;
 
-// Category groupings for organized display
-const categoryConfig = {
-  core: {
-    title: 'Core Configuration',
-    description: 'Essential system settings and cache management',
-    color: 'blue',
-  },
-  security: {
-    title: 'Security & Access',
-    description: 'Authentication, authorization, and security policies',
-    color: 'red',
-  },
-  communication: {
-    title: 'Communication',
-    description: 'Email templates and notification settings',
-    color: 'green',
-  },
-  system: {
-    title: 'System Information',
-    description: 'Platform details and environment configuration',
-    color: 'gray',
-  },
-};
-
-// System status indicator component
-function SystemStatusIndicator() {
+/**
+ * Loading component for server-side rendering optimization
+ * Provides immediate visual feedback while client components hydrate
+ */
+function ConfigDashboardSkeleton() {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          System Status
-        </h3>
-        <div className="flex items-center space-x-2">
-          <CheckCircle className="h-5 w-5 text-green-500" />
-          <span className="text-sm text-green-600 dark:text-green-400 font-medium">
-            All Systems Operational
-          </span>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Header skeleton */}
+        <div className="mb-8">
+          <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4" />
+          <div className="h-5 w-96 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
         </div>
-      </div>
-      
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            {configSections.filter(s => s.status === 'active').length}
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Active Modules
-          </div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-            100%
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Uptime
-          </div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            Online
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Status
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-// Configuration section card component
-function ConfigSectionCard({ section }: { section: ConfigSection }) {
-  const IconComponent = section.icon;
-  
-  const getStatusColor = (status: ConfigSection['status']) => {
-    switch (status) {
-      case 'active':
-        return 'text-green-500';
-      case 'warning':
-        return 'text-yellow-500';
-      case 'inactive':
-        return 'text-gray-400';
-      default:
-        return 'text-gray-400';
-    }
-  };
-
-  const getCategoryColor = (category: ConfigSection['category']) => {
-    const colors = categoryConfig[category]?.color || 'gray';
-    switch (colors) {
-      case 'blue':
-        return 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800';
-      case 'red':
-        return 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
-      case 'green':
-        return 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800';
-      default:
-        return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
-    }
-  };
-
-  return (
-    <Link 
-      href={section.href}
-      className="group block"
-    >
-      <div className={`
-        p-6 rounded-lg border-2 transition-all duration-200
-        hover:shadow-lg hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary-500
-        ${getCategoryColor(section.category)}
-      `}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
-              <IconComponent className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+        {/* Status overview skeleton */}
+        <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={index}
+              className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
+            >
+              <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
+              <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                {section.title}
-              </h3>
+          ))}
+        </div>
+
+        {/* Configuration features skeleton */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div
+              key={index}
+              className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-center mb-4">
+                <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mr-3" />
+                <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              </div>
+              <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
+              <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4" />
+              <div className="h-10 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
             </div>
-          </div>
-          <div className={`h-3 w-3 rounded-full ${getStatusColor(section.status)}`} />
+          ))}
         </div>
-        
-        <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
-          {section.description}
-        </p>
-        
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {categoryConfig[section.category]?.title}
-          </span>
-          <div className="text-primary-600 dark:text-primary-400 group-hover:translate-x-1 transition-transform">
-            →
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-// Category section component
-function CategorySection({ 
-  category, 
-  sections 
-}: { 
-  category: keyof typeof categoryConfig; 
-  sections: ConfigSection[] 
-}) {
-  const config = categoryConfig[category];
-  
-  return (
-    <div className="space-y-6">
-      <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-          {config.title}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
-          {config.description}
-        </p>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {sections.map(section => (
-          <ConfigSectionCard key={section.id} section={section} />
-        ))}
       </div>
     </div>
   );
 }
 
-// Loading skeleton component
-function ConfigurationLoading() {
+/**
+ * Configuration Dashboard Page Server Component
+ * 
+ * Implements Next.js server component architecture with:
+ * - Server-side rendering for optimal initial load performance
+ * - Static configuration data rendering for immediate UI presentation
+ * - Delegation to client components for interactive features and data fetching
+ * - Comprehensive error boundaries and loading states
+ * 
+ * Performance targets:
+ * - SSR page load: < 2 seconds
+ * - First Contentful Paint: < 1.5 seconds
+ * - Largest Contentful Paint: < 2.5 seconds
+ * - Cumulative Layout Shift: < 0.1
+ */
+export default function ConfigDashboardPage() {
   return (
-    <div className="space-y-8" data-testid="configuration-loading">
-      {/* Header skeleton */}
-      <div className="space-y-2">
-        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-80 animate-pulse" />
-        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-96 animate-pulse" />
-      </div>
-      
-      {/* Status card skeleton */}
-      <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-      
-      {/* Category sections skeleton */}
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="space-y-6">
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-64 animate-pulse" />
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {Array.from({ length: 3 }).map((_, j) => (
-              <div key={j} className="h-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Main configuration dashboard page component
-export default function ConfigurationPage() {
-  // Group sections by category for organized display
-  const sectionsByCategory = configSections.reduce((acc, section) => {
-    if (!acc[section.category]) {
-      acc[section.category] = [];
-    }
-    acc[section.category].push(section);
-    return acc;
-  }, {} as Record<string, ConfigSection[]>);
-
-  return (
-    <div className="space-y-8" data-testid="configuration-page">
-      {/* Page Header */}
-      <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
-        <div className="flex items-center space-x-3 mb-3">
-          <div className="p-3 rounded-lg bg-primary-100 dark:bg-primary-900/30">
-            <Settings className="h-8 w-8 text-primary-600 dark:text-primary-400" />
-          </div>
-          <div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Page Header */}
+        <header className="mb-8">
+          <div className="flex items-center space-x-3 mb-4">
+            <CogIcon className="h-8 w-8 text-primary-600 dark:text-primary-400" />
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               System Configuration
             </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 mt-1">
-              Manage DreamFactory system settings and administrative configuration
-            </p>
           </div>
-        </div>
-        
-        {/* Breadcrumb navigation */}
-        <nav className="flex" aria-label="Breadcrumb">
-          <ol className="flex items-center space-x-4">
-            <li>
-              <Link href="/" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
-                Dashboard
-              </Link>
-            </li>
-            <li>
-              <span className="text-gray-400">/</span>
-            </li>
-            <li>
-              <span className="text-gray-900 dark:text-gray-100 font-medium">
-                Configuration
-              </span>
-            </li>
-          </ol>
-        </nav>
-      </div>
+          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl">
+            Manage and configure DreamFactory system settings, including cache management, 
+            CORS policies, email templates, lookup keys, and system information. 
+            Monitor system health and optimize performance through centralized configuration.
+          </p>
+        </header>
 
-      {/* System Status Overview */}
-      <Suspense fallback={<div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />}>
-        <SystemStatusIndicator />
-      </Suspense>
+        {/* Configuration Features Grid */}
+        <section className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+            Configuration Areas
+          </h2>
+          
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {CONFIG_FEATURES.map((feature) => {
+              const IconComponent = feature.icon;
+              
+              return (
+                <div
+                  key={feature.id}
+                  className={`
+                    bg-white dark:bg-gray-800 rounded-lg shadow-sm border-2 transition-all duration-200 hover:shadow-md
+                    ${feature.borderColor} dark:border-gray-700 dark:hover:border-gray-600
+                  `}
+                >
+                  <div className="p-6">
+                    {/* Feature Header */}
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className={`p-2 rounded-lg bg-gray-50 dark:bg-gray-700`}>
+                        <IconComponent className={`h-6 w-6 ${feature.iconColor} dark:text-current`} />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {feature.title}
+                      </h3>
+                    </div>
 
-      {/* Configuration Sections by Category */}
-      <Suspense fallback={<ConfigurationLoading />}>
-        <div className="space-y-12">
-          {Object.entries(sectionsByCategory).map(([category, sections]) => (
-            <CategorySection 
-              key={category} 
-              category={category as keyof typeof categoryConfig}
-              sections={sections} 
-            />
-          ))}
-        </div>
-      </Suspense>
-      
-      {/* Quick Actions Footer */}
-      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Quick Actions
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Link
-            href="/system-settings/cache"
-            className="flex items-center space-x-3 p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <Zap className="h-5 w-5 text-orange-500" />
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
-              Flush Cache
-            </span>
-          </Link>
-          
-          <Link
-            href="/system-settings/system-info"
-            className="flex items-center space-x-3 p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <Info className="h-5 w-5 text-blue-500" />
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
-              System Info
-            </span>
-          </Link>
-          
-          <Link
-            href="/system-settings/cors"
-            className="flex items-center space-x-3 p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <Shield className="h-5 w-5 text-red-500" />
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
-              CORS Settings
-            </span>
-          </Link>
-          
-          <Link
-            href="/system-settings/email-templates"
-            className="flex items-center space-x-3 p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <Mail className="h-5 w-5 text-green-500" />
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
-              Email Templates
-            </span>
-          </Link>
-        </div>
+                    {/* Feature Description */}
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
+                      {feature.description}
+                    </p>
+
+                    {/* Feature Actions */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {feature.actions.map((action) => (
+                        <span
+                          key={action}
+                          className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                        >
+                          {action}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Navigation Button */}
+                    <a
+                      href={feature.href}
+                      className={`
+                        inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-white rounded-md
+                        transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500
+                        ${feature.color} dark:bg-opacity-80 dark:hover:bg-opacity-90
+                      `}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      Configure {feature.title.split(' ')[0]}
+                      <svg
+                        className="ml-2 h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Client Component for Dynamic Data and Interactions */}
+        <Suspense fallback={<ConfigDashboardSkeleton />}>
+          <ConfigDashboardClient />
+        </Suspense>
+
+        {/* Additional Information Section */}
+        <section className="mt-12">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+            <div className="flex items-start space-x-3">
+              <DocumentTextIcon className="h-6 w-6 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <div>
+                <h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-2">
+                  Configuration Best Practices
+                </h3>
+                <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                  <li>• Regularly flush cache to ensure optimal performance</li>
+                  <li>• Configure CORS policies to match your application's security requirements</li>
+                  <li>• Customize email templates to maintain consistent branding</li>
+                  <li>• Use global lookup keys for environment-specific configuration</li>
+                  <li>• Monitor system information for health and capacity planning</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
 }
+
+/**
+ * Route segment configuration for Next.js App Router
+ * Optimizes page for server-side rendering and caching
+ */
+export const dynamic = 'force-dynamic'; // Ensure fresh data on each request
+export const revalidate = 300; // Revalidate every 5 minutes for configuration data
