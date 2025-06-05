@@ -1,338 +1,373 @@
 /**
- * Loading UI component for system settings section
- * 
- * This component displays skeleton states and loading indicators while system
- * configuration data is being fetched. Implements Tailwind CSS animations and
- * responsive design patterns to provide smooth user experience during system
- * administration data loading operations.
+ * Loading UI component for the system settings section that displays skeleton states
+ * and loading indicators while data is being fetched. Implements Tailwind CSS animations
+ * and responsive design patterns to provide smooth user experience during system
+ * configuration data loading operations.
  * 
  * Features:
- * - Skeleton UI that matches actual content layout
- * - WCAG 2.1 AA compliant animations and accessibility
+ * - Next.js app router loading.tsx convention compliance
+ * - Tailwind CSS skeleton animations replacing Angular Material loading components
+ * - Responsive loading states for different viewport sizes
+ * - WCAG 2.1 AA accessibility compliance
  * - SSR and client-side navigation support
- * - Feedback for slow network conditions
- * - React Query loading state integration
- * 
- * @component
- * @example
- * // Automatically displayed by Next.js app router during system settings navigation
- * // No manual usage required - Next.js handles this component automatically
+ * - Optimized for React Query loading states
  */
 
 import React from 'react';
 
 /**
- * Skeleton loading animation component
- * Provides a reusable animated skeleton element with accessibility support
+ * Skeleton component for consistent loading animations
+ * Uses Tailwind CSS utilities for smooth, accessible animations
  */
-const SkeletonElement: React.FC<{
+const Skeleton: React.FC<{
   className?: string;
   'aria-label'?: string;
-}> = ({ className = '', 'aria-label': ariaLabel }) => (
-  <div
-    className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className}`}
-    role="img"
-    aria-label={ariaLabel || 'Loading content'}
-    aria-hidden="true"
-  />
+  height?: 'sm' | 'md' | 'lg' | 'xl';
+  width?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+}> = ({ 
+  className = '', 
+  'aria-label': ariaLabel = 'Loading content',
+  height = 'md',
+  width = 'full'
+}) => {
+  const heightClasses = {
+    sm: 'h-4',
+    md: 'h-6',
+    lg: 'h-8',
+    xl: 'h-12'
+  };
+
+  const widthClasses = {
+    sm: 'w-24',
+    md: 'w-48',
+    lg: 'w-64',
+    xl: 'w-80',
+    full: 'w-full'
+  };
+
+  return (
+    <div
+      className={`
+        animate-pulse bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 
+        dark:from-gray-700 dark:via-gray-600 dark:to-gray-700
+        rounded-md
+        ${heightClasses[height]}
+        ${widthClasses[width]}
+        ${className}
+      `}
+      style={{
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 2s ease-in-out infinite'
+      }}
+      aria-label={ariaLabel}
+      role="status"
+    />
+  );
+};
+
+/**
+ * Card skeleton for dashboard overview sections
+ */
+const CardSkeleton: React.FC<{ showIcon?: boolean }> = ({ showIcon = true }) => (
+  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+    <div className="flex items-start justify-between mb-4">
+      <div className="space-y-2 flex-1">
+        {showIcon && (
+          <Skeleton 
+            height="sm" 
+            width="sm" 
+            className="mb-2"
+            aria-label="Loading icon"
+          />
+        )}
+        <Skeleton 
+          height="md" 
+          width="lg"
+          aria-label="Loading card title"
+        />
+        <Skeleton 
+          height="sm" 
+          width="xl"
+          aria-label="Loading card description"
+        />
+      </div>
+    </div>
+    <div className="space-y-2">
+      <Skeleton 
+        height="sm" 
+        width="md"
+        aria-label="Loading card metadata"
+      />
+      <Skeleton 
+        height="sm" 
+        width="lg"
+        aria-label="Loading card status"
+      />
+    </div>
+  </div>
 );
 
 /**
- * Skeleton table component
- * Provides loading state for system configuration tables
+ * Table skeleton for data tables (cache, email templates, etc.)
  */
-const SkeletonTable: React.FC = () => {
-  return (
-    <div className="bg-white dark:bg-gray-900 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700">
-      {/* Table header skeleton */}
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <SkeletonElement 
-            className="h-6 w-48" 
-            aria-label="Loading table title"
+const TableSkeleton: React.FC<{ rows?: number; columns?: number }> = ({ 
+  rows = 10, 
+  columns = 5 
+}) => (
+  <div 
+    className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+    role="table"
+    aria-label="Loading data table"
+  >
+    {/* Table Header */}
+    <div className="border-b border-gray-200 dark:border-gray-700 p-4">
+      <div className="flex items-center justify-between mb-4">
+        <Skeleton 
+          height="md" 
+          width="lg"
+          aria-label="Loading table title"
+        />
+        <div className="flex space-x-2">
+          <Skeleton 
+            height="md" 
+            width="sm"
+            aria-label="Loading search input"
           />
-          <SkeletonElement 
-            className="h-9 w-32" 
+          <Skeleton 
+            height="md" 
+            width="sm"
             aria-label="Loading action button"
           />
         </div>
       </div>
       
-      {/* Table content skeleton */}
-      <div className="divide-y divide-gray-200 dark:divide-gray-700">
-        {/* Table rows skeleton */}
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <SkeletonElement 
-                  className="h-4 w-32" 
-                  aria-label={`Loading table row ${index + 1} name`}
-                />
-                <SkeletonElement 
-                  className="h-4 w-48" 
-                  aria-label={`Loading table row ${index + 1} value`}
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <SkeletonElement 
-                  className="h-8 w-16" 
-                  aria-label={`Loading table row ${index + 1} action`}
-                />
-                <SkeletonElement 
-                  className="h-8 w-8 rounded-full" 
-                  aria-label={`Loading table row ${index + 1} menu`}
-                />
-              </div>
-            </div>
-          </div>
+      {/* Column Headers */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {Array.from({ length: columns }).map((_, index) => (
+          <Skeleton 
+            key={`header-${index}`}
+            height="sm" 
+            width="full"
+            aria-label={`Loading column ${index + 1} header`}
+          />
         ))}
       </div>
     </div>
-  );
-};
+
+    {/* Table Rows */}
+    <div className="divide-y divide-gray-200 dark:divide-gray-700">
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <div 
+          key={`row-${rowIndex}`} 
+          className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-center">
+            {Array.from({ length: columns }).map((_, colIndex) => (
+              <Skeleton 
+                key={`cell-${rowIndex}-${colIndex}`}
+                height="sm" 
+                width={colIndex === 0 ? 'lg' : 'md'}
+                aria-label={`Loading row ${rowIndex + 1}, column ${colIndex + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 /**
- * Skeleton card component
- * Provides loading state for system configuration cards
+ * Navigation skeleton for system settings navigation
  */
-const SkeletonCard: React.FC<{
-  title?: string;
-  showButton?: boolean;
-}> = ({ title, showButton = false }) => {
-  return (
-    <div className="bg-white dark:bg-gray-900 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-      {/* Card header */}
-      <div className="mb-4">
-        <SkeletonElement 
-          className="h-6 w-40 mb-2" 
-          aria-label={`Loading ${title || 'card'} title`}
+const NavigationSkeleton: React.FC = () => (
+  <div className="space-y-2 mb-6">
+    <Skeleton 
+      height="sm" 
+      width="lg"
+      aria-label="Loading navigation breadcrumb"
+    />
+    <div className="flex flex-wrap gap-2">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <Skeleton 
+          key={`nav-${index}`}
+          height="sm" 
+          width="md"
+          aria-label={`Loading navigation item ${index + 1}`}
         />
-        <SkeletonElement 
-          className="h-4 w-full" 
-          aria-label={`Loading ${title || 'card'} description`}
-        />
-      </div>
-      
-      {/* Card content */}
-      <div className="space-y-3">
-        <SkeletonElement 
-          className="h-4 w-3/4" 
-          aria-label={`Loading ${title || 'card'} content line 1`}
-        />
-        <SkeletonElement 
-          className="h-4 w-1/2" 
-          aria-label={`Loading ${title || 'card'} content line 2`}
-        />
-      </div>
-      
-      {/* Card action button */}
-      {showButton && (
-        <div className="mt-6">
-          <SkeletonElement 
-            className="h-9 w-32" 
-            aria-label={`Loading ${title || 'card'} action button`}
+      ))}
+    </div>
+  </div>
+);
+
+/**
+ * System status overview skeleton
+ */
+const StatusOverviewSkeleton: React.FC = () => (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    {Array.from({ length: 4 }).map((_, index) => (
+      <div 
+        key={`status-${index}`}
+        className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
+      >
+        <div className="flex items-center justify-between">
+          <Skeleton 
+            height="sm" 
+            width="md"
+            aria-label={`Loading status metric ${index + 1} label`}
+          />
+          <Skeleton 
+            height="sm" 
+            width="sm"
+            aria-label={`Loading status metric ${index + 1} icon`}
           />
         </div>
-      )}
-    </div>
-  );
-};
-
-/**
- * Navigation breadcrumb skeleton
- * Provides loading state for page navigation context
- */
-const SkeletonBreadcrumb: React.FC = () => {
-  return (
-    <div className="flex items-center space-x-2 mb-6">
-      <SkeletonElement 
-        className="h-4 w-20" 
-        aria-label="Loading breadcrumb home"
-      />
-      <div className="text-gray-400 dark:text-gray-500">/</div>
-      <SkeletonElement 
-        className="h-4 w-32" 
-        aria-label="Loading breadcrumb current page"
-      />
-    </div>
-  );
-};
-
-/**
- * Page header skeleton
- * Provides loading state for page title and description
- */
-const SkeletonPageHeader: React.FC = () => {
-  return (
-    <div className="mb-8">
-      <SkeletonElement 
-        className="h-8 w-64 mb-3" 
-        aria-label="Loading page title"
-      />
-      <SkeletonElement 
-        className="h-5 w-96" 
-        aria-label="Loading page description"
-      />
-    </div>
-  );
-};
-
-/**
- * System settings grid layout skeleton
- * Provides loading state for the main system settings dashboard
- */
-const SkeletonSystemGrid: React.FC = () => {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-      {/* Cache Management */}
-      <SkeletonCard title="cache management" showButton={true} />
-      
-      {/* CORS Configuration */}
-      <SkeletonCard title="CORS configuration" showButton={true} />
-      
-      {/* Email Templates */}
-      <SkeletonCard title="email templates" />
-      
-      {/* Global Lookup Keys */}
-      <SkeletonCard title="lookup keys" />
-      
-      {/* Scheduler Management */}
-      <SkeletonCard title="scheduler" showButton={true} />
-      
-      {/* System Information */}
-      <SkeletonCard title="system info" />
-    </div>
-  );
-};
-
-/**
- * Loading spinner for slow network conditions
- * Provides additional feedback when loading takes longer than expected
- */
-const SlowLoadingIndicator: React.FC = () => {
-  const [showSlowIndicator, setShowSlowIndicator] = React.useState(false);
-  
-  React.useEffect(() => {
-    // Show additional feedback after 3 seconds of loading
-    const timer = setTimeout(() => {
-      setShowSlowIndicator(true);
-    }, 3000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-  
-  if (!showSlowIndicator) return null;
-  
-  return (
-    <div className="fixed bottom-4 right-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 shadow-lg">
-      <div className="flex items-center space-x-3">
-        {/* Spinning indicator */}
-        <div className="animate-spin h-5 w-5 border-2 border-yellow-400 border-t-transparent rounded-full" />
-        <div>
-          <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-            Taking longer than usual
-          </p>
-          <p className="text-xs text-yellow-600 dark:text-yellow-300">
-            Loading system configuration...
-          </p>
+        <div className="mt-2">
+          <Skeleton 
+            height="lg" 
+            width="lg"
+            aria-label={`Loading status metric ${index + 1} value`}
+          />
         </div>
       </div>
-    </div>
-  );
-};
+    ))}
+  </div>
+);
 
 /**
- * System Settings Loading Component
- * 
- * This component is automatically displayed by Next.js during:
- * - Navigation to /system-settings routes
- * - Server-side data fetching for system configuration
- * - React Query cache misses for system data
- * - Suspense boundary fallbacks for system components
- * 
- * Features:
- * - Skeleton UI matching actual system settings layout
- * - Responsive design for mobile, tablet, and desktop
- * - WCAG 2.1 AA compliant with proper ARIA attributes
- * - Reduced motion support for accessibility
- * - Progressive loading feedback for slow connections
- * - Server-side rendering compatibility
- * 
- * @returns JSX element containing the system settings loading interface
+ * Main loading component for system settings
+ * Displays comprehensive skeleton states matching actual content layout
  */
-export default function SystemSettingsLoading(): JSX.Element {
+const SystemSettingsLoading: React.FC = () => {
   return (
-    <div
-      className="min-h-screen bg-gray-50 dark:bg-gray-950"
-      role="status"
+    <div 
+      className="p-6 space-y-8 min-h-screen bg-gray-50 dark:bg-gray-900"
+      role="main"
       aria-live="polite"
-      aria-busy="true"
-      aria-label="Loading system settings"
+      aria-label="System settings loading"
     >
-      {/* Main content container with proper spacing */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Breadcrumb navigation skeleton */}
-        <SkeletonBreadcrumb />
-        
-        {/* Page header skeleton */}
-        <SkeletonPageHeader />
-        
-        {/* Primary content area */}
-        <div className="space-y-8">
-          {/* System configuration overview grid */}
-          <div>
-            <SkeletonElement 
-              className="h-6 w-48 mb-4" 
-              aria-label="Loading section title"
-            />
-            <SkeletonSystemGrid />
-          </div>
-          
-          {/* Recent activity table */}
-          <div>
-            <SkeletonElement 
-              className="h-6 w-40 mb-4" 
-              aria-label="Loading activity section title"
-            />
-            <SkeletonTable />
-          </div>
-        </div>
-        
-        {/* Hidden text for screen readers */}
-        <span className="sr-only">
-          Loading system settings configuration. This includes cache management, 
-          CORS configuration, email templates, global lookup keys, scheduler 
-          settings, and system information. Please wait while we fetch the data.
-        </span>
+      {/* Page Header */}
+      <div className="space-y-4">
+        <Skeleton 
+          height="xl" 
+          width="lg"
+          aria-label="Loading page title"
+        />
+        <Skeleton 
+          height="sm" 
+          width="xl"
+          aria-label="Loading page description"
+        />
       </div>
-      
-      {/* Slow loading indicator for network feedback */}
-      <SlowLoadingIndicator />
-      
-      {/* Reduced motion fallback styles */}
+
+      {/* Navigation */}
+      <NavigationSkeleton />
+
+      {/* System Status Overview */}
+      <section aria-label="Loading system status overview">
+        <div className="mb-4">
+          <Skeleton 
+            height="md" 
+            width="md"
+            aria-label="Loading status section title"
+          />
+        </div>
+        <StatusOverviewSkeleton />
+      </section>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        {/* Primary Content Area */}
+        <section className="xl:col-span-2 space-y-6" aria-label="Loading main content">
+          {/* Quick Actions */}
+          <div className="space-y-4">
+            <Skeleton 
+              height="md" 
+              width="md"
+              aria-label="Loading quick actions title"
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <CardSkeleton 
+                  key={`action-${index}`} 
+                  showIcon={true}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Main Data Table */}
+          <div className="space-y-4">
+            <Skeleton 
+              height="md" 
+              width="lg"
+              aria-label="Loading data table title"
+            />
+            <TableSkeleton rows={8} columns={5} />
+          </div>
+        </section>
+
+        {/* Sidebar Content */}
+        <aside className="space-y-6" aria-label="Loading sidebar content">
+          {/* Recent Activity */}
+          <div className="space-y-4">
+            <Skeleton 
+              height="md" 
+              width="md"
+              aria-label="Loading recent activity title"
+            />
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <div className="space-y-4">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={`activity-${index}`} className="flex items-start space-x-3">
+                    <Skeleton 
+                      height="sm" 
+                      width="sm"
+                      aria-label={`Loading activity ${index + 1} icon`}
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Skeleton 
+                        height="sm" 
+                        width="full"
+                        aria-label={`Loading activity ${index + 1} description`}
+                      />
+                      <Skeleton 
+                        height="sm" 
+                        width="md"
+                        aria-label={`Loading activity ${index + 1} timestamp`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* System Health */}
+          <div className="space-y-4">
+            <Skeleton 
+              height="md" 
+              width="md"
+              aria-label="Loading system health title"
+            />
+            <CardSkeleton showIcon={false} />
+          </div>
+        </aside>
+      </div>
+
+      {/* CSS Keyframes for shimmer animation */}
       <style jsx>{`
-        @media (prefers-reduced-motion: reduce) {
-          .animate-pulse {
-            animation: none;
-            opacity: 0.6;
+        @keyframes shimmer {
+          0% {
+            background-position: -200% 0;
           }
-          .animate-spin {
-            animation: none;
+          100% {
+            background-position: 200% 0;
           }
         }
       `}</style>
     </div>
   );
-}
+};
 
-/**
- * Component metadata for Next.js optimization
- */
-SystemSettingsLoading.displayName = 'SystemSettingsLoading';
-
-// Ensure this component can be server-side rendered
-if (typeof window === 'undefined') {
-  // Server-side rendering compatibility check
-  // Component is designed to work without client-side JavaScript
-}
+export default SystemSettingsLoading;
