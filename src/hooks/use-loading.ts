@@ -1,409 +1,427 @@
-'use client';
-
-import { useCallback, useEffect, useRef, useState } from 'react';
-
 /**
- * Configuration options for the loading hook
- */
-export interface LoadingConfig {
-  /**
-   * Debounce delay in milliseconds for state changes to prevent flicker
-   * @default 100
-   */
-  debounceDelay?: number;
-  /**
-   * Whether to log loading state changes for debugging
-   * @default false
-   */
-  debug?: boolean;
-  /**
-   * Maximum number of concurrent loading operations to track
-   * @default 100
-   */
-  maxConcurrentOperations?: number;
-}
-
-/**
- * Loading state information
- */
-export interface LoadingState {
-  /** Whether any loading operation is currently active */
-  isLoading: boolean;
-  /** Number of active loading operations */
-  activeCount: number;
-  /** Last loading operation that was started */
-  lastOperation?: string;
-  /** Timestamp of the last state change */
-  lastUpdated: number;
-}
-
-/**
- * Return type for the loading hook
- */
-export interface UseLoadingReturn {
-  /** Current loading state */
-  state: LoadingState;
-  /** Start a loading operation with optional identifier */
-  startLoading: (operationId?: string) => void;
-  /** Stop a loading operation */
-  stopLoading: (operationId?: string) => void;
-  /** Reset all loading states */
-  reset: () => void;
-  /** Toggle loading state (for simple show/hide scenarios) */
-  toggle: (force?: boolean) => void;
-  /** Check if a specific operation is loading */
-  isOperationLoading: (operationId: string) => boolean;
-}
-
-/**
- * Global loading state management hook that handles loading indicators, spinner states,
- * and loading coordination across components. Replaces Angular DfLoadingSpinnerService
- * and DfSpinnerService with React state management and proper loading state coordination
+ * Loading state management hook that handles global loading indicators, spinner states,
+ * and loading coordination across components. Replaces Angular DfLoadingSpinnerService 
+ * and DfSpinnerService with React state management and proper loading state coordination 
  * to prevent flicker and ensure consistent UI feedback.
- *
- * Key Features:
- * - Counter-based overlapping request handling
+ * 
+ * Features:
+ * - Counter-based loading management for overlapping requests
  * - Configurable debouncing to prevent UI flicker
  * - Memory management with proper cleanup
  * - Loading state validation and error handling
- * - Integration ready for HTTP client interceptors
- * - Comprehensive TypeScript support
- *
+ * - Integration with HTTP client and request interceptors
+ * - Global loading coordination across components
+ * 
+ * @fileoverview Loading state management hook
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+
+// ============================================================================
+// Types and Interfaces
+// ============================================================================
+
+/**
+ * Loading hook configuration options
+ */
+export interface LoadingConfig {
+  /** Debounce delay in milliseconds to prevent UI flicker (default: 100ms) */
+  debounceDelay?: number;
+  /** Initial loading state (default: false) */
+  initialState?: boolean;
+  /** Enable debug logging for development (default: false) */
+  debug?: boolean;
+}
+
+/**
+ * Loading state information returned by the hook
+ */
+export interface LoadingState {
+  /** Current loading state */
+  isLoading: boolean;
+  /** Number of active loading operations */
+  activeCount: number;
+  /** Loading operations history for debugging */
+  loadingHistory: LoadingOperation[];
+}
+
+/**
+ * Individual loading operation metadata
+ */
+export interface LoadingOperation {
+  /** Unique identifier for the operation */
+  id: string;
+  /** Operation start timestamp */
+  startTime: number;
+  /** Operation type or source identifier */
+  source?: string;
+  /** Optional metadata for debugging */
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Loading hook return value
+ */
+export interface UseLoadingReturn {
+  /** Current loading state information */
+  state: LoadingState;
+  /** Show loading indicator */
+  show: (source?: string, metadata?: Record<string, any>) => string;
+  /** Hide loading indicator by operation ID */
+  hide: (operationId: string) => void;
+  /** Hide all loading indicators and reset state */
+  hideAll: () => void;
+  /** Reset loading state to initial values */
+  reset: () => void;
+  /** Check if specific operation is active */
+  isOperationActive: (operationId: string) => boolean;
+  /** Get loading operations by source */
+  getOperationsBySource: (source: string) => LoadingOperation[];
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const DEFAULT_CONFIG: Required<LoadingConfig> = {
+  debounceDelay: 100,
+  initialState: false,
+  debug: false,
+};
+
+const MAX_HISTORY_SIZE = 50;
+const OPERATION_ID_PREFIX = 'loading_op_';
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Generate unique operation ID
+ */
+const generateOperationId = (): string => {
+  return `${OPERATION_ID_PREFIX}${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
+/**
+ * Log debug information if debug mode is enabled
+ */
+const debugLog = (enabled: boolean, message: string, data?: any): void => {
+  if (enabled && process.env.NODE_ENV === 'development') {
+    console.debug(`[useLoading] ${message}`, data || '');
+  }
+};
+
+// ============================================================================
+// Main Hook Implementation
+// ============================================================================
+
+/**
+ * Loading state management hook with counter-based overlapping request handling,
+ * debouncing to prevent UI flicker, and comprehensive loading coordination.
+ * 
+ * Replaces Angular DfLoadingSpinnerService and DfSpinnerService functionality
+ * with React patterns and enhanced state management.
+ * 
+ * @param config - Loading configuration options
+ * @returns Loading state and control functions
+ * 
  * @example
  * ```tsx
- * // Basic usage
- * const { state, startLoading, stopLoading } = useLoading();
- *
+ * const loading = useLoading({ debounceDelay: 150 });
+ * 
+ * // Show loading during API call
  * const handleApiCall = async () => {
- *   startLoading('api-call');
+ *   const operationId = loading.show('api-call', { endpoint: '/api/services' });
  *   try {
- *     await apiCall();
+ *     const result = await apiClient.get('/api/services');
+ *     return result;
  *   } finally {
- *     stopLoading('api-call');
+ *     loading.hide(operationId);
  *   }
  * };
- *
+ * 
+ * // Use loading state in component
  * return (
  *   <div>
- *     {state.isLoading && <Spinner />}
- *     <button onClick={handleApiCall}>Call API</button>
+ *     {loading.state.isLoading && <LoadingSpinner />}
+ *     <button disabled={loading.state.isLoading}>
+ *       Click me
+ *     </button>
  *   </div>
  * );
  * ```
- *
- * @example
- * ```tsx
- * // With configuration
- * const loading = useLoading({
- *   debounceDelay: 200,
- *   debug: true
- * });
- * ```
- *
- * @param config - Configuration options for loading behavior
- * @returns Loading state management functions and current state
  */
 export function useLoading(config: LoadingConfig = {}): UseLoadingReturn {
-  const {
-    debounceDelay = 100,
-    debug = false,
-    maxConcurrentOperations = 100,
-  } = config;
+  // Merge configuration with defaults
+  const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  const { debounceDelay, initialState, debug } = finalConfig;
 
-  // Internal state management
-  const [activeCounter, setActiveCounter] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastOperation, setLastOperation] = useState<string | undefined>();
-  const [activeOperations] = useState<Set<string>>(new Set());
+  // ========================================================================
+  // State Management
+  // ========================================================================
+
+  const [isLoading, setIsLoading] = useState<boolean>(initialState);
+  const [activeOperations, setActiveOperations] = useState<Map<string, LoadingOperation>>(new Map());
+  const [loadingHistory, setLoadingHistory] = useState<LoadingOperation[]>([]);
 
   // Refs for cleanup and debouncing
-  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastUpdatedRef = useRef<number>(Date.now());
-  const isMountedRef = useRef(true);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef<boolean>(true);
 
-  // Debug logging utility
-  const logDebug = useCallback(
-    (message: string, data?: any) => {
-      if (debug && typeof window !== 'undefined' && window.console) {
-        console.log(`[useLoading] ${message}`, data);
-      }
-    },
-    [debug]
-  );
+  // ========================================================================
+  // Effect for Cleanup
+  // ========================================================================
 
-  // Update loading state with debouncing logic
-  const updateLoadingState = useCallback(
-    (newCounter: number, operationId?: string) => {
-      if (!isMountedRef.current) return;
-
-      // Validate counter bounds
-      const validatedCounter = Math.max(0, Math.min(newCounter, maxConcurrentOperations));
-      
-      if (validatedCounter !== newCounter && debug) {
-        console.warn(
-          `[useLoading] Counter clamped from ${newCounter} to ${validatedCounter}`
-        );
-      }
-
-      setActiveCounter(validatedCounter);
-      lastUpdatedRef.current = Date.now();
-
-      if (operationId) {
-        setLastOperation(operationId);
-      }
-
-      const shouldBeLoading = validatedCounter > 0;
-
-      if (shouldBeLoading) {
-        // Show loading immediately
-        if (hideTimeoutRef.current) {
-          clearTimeout(hideTimeoutRef.current);
-          hideTimeoutRef.current = null;
-        }
-        setIsLoading(true);
-        logDebug('Loading started', { counter: validatedCounter, operationId });
-      } else {
-        // Hide loading with debounce to prevent flicker
-        if (hideTimeoutRef.current) {
-          clearTimeout(hideTimeoutRef.current);
-        }
-        
-        hideTimeoutRef.current = setTimeout(() => {
-          if (isMountedRef.current) {
-            setIsLoading(false);
-            logDebug('Loading stopped', { counter: validatedCounter, operationId });
-          }
-        }, debounceDelay);
-      }
-    },
-    [debounceDelay, debug, maxConcurrentOperations, logDebug]
-  );
-
-  // Start a loading operation
-  const startLoading = useCallback(
-    (operationId?: string) => {
-      if (!isMountedRef.current) return;
-
-      const id = operationId || `operation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Track operation if ID provided
-      if (operationId && !activeOperations.has(id)) {
-        activeOperations.add(id);
-      }
-
-      setActiveCounter(current => {
-        const newCounter = current + 1;
-        updateLoadingState(newCounter, id);
-        return newCounter;
-      });
-
-      logDebug('Started loading operation', { operationId: id, activeOperations: activeOperations.size });
-    },
-    [updateLoadingState, activeOperations, logDebug]
-  );
-
-  // Stop a loading operation
-  const stopLoading = useCallback(
-    (operationId?: string) => {
-      if (!isMountedRef.current) return;
-
-      // Remove operation from tracking if ID provided
-      if (operationId && activeOperations.has(operationId)) {
-        activeOperations.delete(operationId);
-      }
-
-      setActiveCounter(current => {
-        const newCounter = Math.max(current - 1, 0);
-        updateLoadingState(newCounter, operationId);
-        return newCounter;
-      });
-
-      logDebug('Stopped loading operation', { operationId, activeOperations: activeOperations.size });
-    },
-    [updateLoadingState, activeOperations, logDebug]
-  );
-
-  // Reset all loading states
-  const reset = useCallback(() => {
-    if (!isMountedRef.current) return;
-
-    activeOperations.clear();
-    
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-
-    setActiveCounter(0);
-    setIsLoading(false);
-    setLastOperation(undefined);
-    lastUpdatedRef.current = Date.now();
-
-    logDebug('Reset all loading states');
-  }, [activeOperations, logDebug]);
-
-  // Toggle loading state (simple show/hide for compatibility)
-  const toggle = useCallback(
-    (force?: boolean) => {
-      if (!isMountedRef.current) return;
-
-      if (typeof force === 'boolean') {
-        if (force) {
-          startLoading('toggle-operation');
-        } else {
-          stopLoading('toggle-operation');
-        }
-      } else {
-        if (isLoading) {
-          stopLoading('toggle-operation');
-        } else {
-          startLoading('toggle-operation');
-        }
-      }
-    },
-    [isLoading, startLoading, stopLoading]
-  );
-
-  // Check if specific operation is loading
-  const isOperationLoading = useCallback(
-    (operationId: string) => {
-      return activeOperations.has(operationId);
-    },
-    [activeOperations]
-  );
-
-  // Cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true;
+    
     return () => {
       isMountedRef.current = false;
-      if (hideTimeoutRef.current) {
-        clearTimeout(hideTimeoutRef.current);
+      // Clear any pending debounce timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
       }
-      activeOperations.clear();
     };
+  }, []);
+
+  // ========================================================================
+  // Core Loading Logic
+  // ========================================================================
+
+  /**
+   * Update loading state with debouncing to prevent UI flicker
+   */
+  const updateLoadingState = useCallback((newState: boolean, immediate = false) => {
+    if (!isMountedRef.current) return;
+
+    debugLog(debug, `Updating loading state to: ${newState}`, { immediate, currentState: isLoading });
+
+    if (immediate) {
+      // Clear any pending debounce
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
+      setIsLoading(newState);
+      return;
+    }
+
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Set debounced update
+    debounceTimeoutRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        setIsLoading(newState);
+        debounceTimeoutRef.current = null;
+      }
+    }, debounceDelay);
+  }, [isLoading, debounceDelay, debug]);
+
+  /**
+   * Add operation to history with size management
+   */
+  const addToHistory = useCallback((operation: LoadingOperation) => {
+    setLoadingHistory(prev => {
+      const newHistory = [operation, ...prev];
+      // Maintain maximum history size
+      return newHistory.slice(0, MAX_HISTORY_SIZE);
+    });
+  }, []);
+
+  // ========================================================================
+  // Public API Functions
+  // ========================================================================
+
+  /**
+   * Show loading indicator and return operation ID
+   */
+  const show = useCallback((source?: string, metadata?: Record<string, any>): string => {
+    const operationId = generateOperationId();
+    const operation: LoadingOperation = {
+      id: operationId,
+      startTime: Date.now(),
+      source,
+      metadata,
+    };
+
+    debugLog(debug, `Starting loading operation: ${operationId}`, { source, metadata });
+
+    setActiveOperations(prev => {
+      const newMap = new Map(prev);
+      newMap.set(operationId, operation);
+      
+      // Update loading state when first operation starts
+      if (prev.size === 0) {
+        updateLoadingState(true);
+      }
+      
+      return newMap;
+    });
+
+    addToHistory(operation);
+    return operationId;
+  }, [debug, updateLoadingState, addToHistory]);
+
+  /**
+   * Hide loading indicator by operation ID
+   */
+  const hide = useCallback((operationId: string): void => {
+    if (!operationId || !operationId.startsWith(OPERATION_ID_PREFIX)) {
+      debugLog(debug, `Invalid operation ID: ${operationId}`);
+      return;
+    }
+
+    debugLog(debug, `Hiding loading operation: ${operationId}`);
+
+    setActiveOperations(prev => {
+      if (!prev.has(operationId)) {
+        debugLog(debug, `Operation not found: ${operationId}`);
+        return prev;
+      }
+
+      const newMap = new Map(prev);
+      newMap.delete(operationId);
+      
+      // Update loading state when last operation completes
+      if (newMap.size === 0) {
+        updateLoadingState(false);
+      }
+      
+      return newMap;
+    });
+  }, [debug, updateLoadingState]);
+
+  /**
+   * Hide all loading indicators and reset state
+   */
+  const hideAll = useCallback((): void => {
+    debugLog(debug, 'Hiding all loading operations', { activeCount: activeOperations.size });
+    
+    setActiveOperations(new Map());
+    updateLoadingState(false, true); // Immediate update for hideAll
+  }, [debug, activeOperations.size, updateLoadingState]);
+
+  /**
+   * Reset loading state to initial values
+   */
+  const reset = useCallback((): void => {
+    debugLog(debug, 'Resetting loading state');
+    
+    // Clear debounce timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
+    }
+    
+    setActiveOperations(new Map());
+    setLoadingHistory([]);
+    setIsLoading(initialState);
+  }, [debug, initialState]);
+
+  /**
+   * Check if specific operation is active
+   */
+  const isOperationActive = useCallback((operationId: string): boolean => {
+    return activeOperations.has(operationId);
   }, [activeOperations]);
 
-  // Construct current state
+  /**
+   * Get loading operations by source
+   */
+  const getOperationsBySource = useCallback((source: string): LoadingOperation[] => {
+    return Array.from(activeOperations.values()).filter(op => op.source === source);
+  }, [activeOperations]);
+
+  // ========================================================================
+  // Return Value Construction
+  // ========================================================================
+
   const state: LoadingState = {
     isLoading,
-    activeCount: activeCounter,
-    lastOperation,
-    lastUpdated: lastUpdatedRef.current,
+    activeCount: activeOperations.size,
+    loadingHistory,
   };
 
   return {
     state,
-    startLoading,
-    stopLoading,
+    show,
+    hide,
+    hideAll,
     reset,
-    toggle,
-    isOperationLoading,
+    isOperationActive,
+    getOperationsBySource,
   };
 }
 
-/**
- * Global loading context for application-wide loading state management.
- * This can be used with React Context for sharing loading state across components.
- */
-let globalLoadingHook: UseLoadingReturn | null = null;
+// ============================================================================
+// Convenience Hooks and Utilities
+// ============================================================================
 
 /**
- * Get or create a global loading instance for application-wide loading state.
- * This provides a singleton pattern similar to Angular services.
- *
- * @example
- * ```tsx
- * // In a component that needs to coordinate with global loading
- * const globalLoading = useGlobalLoading();
- * 
- * const handleGlobalOperation = async () => {
- *   globalLoading.startLoading('global-api-call');
- *   try {
- *     await globalApiCall();
- *   } finally {
- *     globalLoading.stopLoading('global-api-call');
- *   }
- * };
- * ```
- *
- * @param config - Configuration for the global loading instance
- * @returns Global loading state management functions
+ * Global loading hook instance for application-wide loading state.
+ * Use this for coordinating loading across different components.
  */
-export function useGlobalLoading(config: LoadingConfig = {}): UseLoadingReturn {
-  const localLoading = useLoading(config);
-  
-  // Initialize global instance if not already created
-  if (!globalLoadingHook) {
-    globalLoadingHook = localLoading;
-  }
-  
-  return globalLoadingHook;
+export function useGlobalLoading(): UseLoadingReturn {
+  return useLoading({
+    debounceDelay: 100,
+    debug: process.env.NODE_ENV === 'development',
+  });
 }
 
 /**
- * Higher-order hook for automatic loading state management with async operations.
- * Provides automatic loading state management for async functions.
- *
- * @example
- * ```tsx
- * const [performAction, { isLoading, error }] = useAsyncLoading(
- *   async (data) => {
- *     return await apiCall(data);
- *   },
- *   { operationId: 'api-call' }
- * );
- *
- * return (
- *   <button onClick={() => performAction(data)} disabled={isLoading}>
- *     {isLoading ? 'Loading...' : 'Submit'}
- *   </button>
- * );
- * ```
+ * Loading hook optimized for API requests with longer debounce delay
  */
-export function useAsyncLoading<T extends (...args: any[]) => Promise<any>>(
-  asyncFn: T,
-  options: {
-    operationId?: string;
-    loadingConfig?: LoadingConfig;
-    onSuccess?: (result: Awaited<ReturnType<T>>) => void;
-    onError?: (error: Error) => void;
-  } = {}
-): [T, { isLoading: boolean; error: Error | null; reset: () => void }] {
-  const { operationId, loadingConfig, onSuccess, onError } = options;
-  const loading = useLoading(loadingConfig);
-  const [error, setError] = useState<Error | null>(null);
-  const isLoading = operationId ? loading.isOperationLoading(operationId) : loading.state.isLoading;
-
-  const wrappedFn = useCallback(
-    async (...args: Parameters<T>) => {
-      const id = operationId || `async-${Date.now()}`;
-      loading.startLoading(id);
-      setError(null);
-
-      try {
-        const result = await asyncFn(...args);
-        onSuccess?.(result);
-        return result;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        setError(error);
-        onError?.(error);
-        throw error;
-      } finally {
-        loading.stopLoading(id);
-      }
-    },
-    [asyncFn, operationId, loading, onSuccess, onError]
-  ) as T;
-
-  const reset = useCallback(() => {
-    setError(null);
-    if (operationId) {
-      loading.stopLoading(operationId);
-    }
-  }, [loading, operationId]);
-
-  return [wrappedFn, { isLoading, error, reset }];
+export function useApiLoading(): UseLoadingReturn {
+  return useLoading({
+    debounceDelay: 150,
+    debug: process.env.NODE_ENV === 'development',
+  });
 }
 
+/**
+ * Loading hook for immediate UI feedback without debouncing
+ */
+export function useImmediateLoading(): UseLoadingReturn {
+  return useLoading({
+    debounceDelay: 0,
+    debug: process.env.NODE_ENV === 'development',
+  });
+}
+
+// ============================================================================
+// HOC for Loading Management
+// ============================================================================
+
+/**
+ * Higher-order component that provides loading state management
+ * @deprecated Use the hook directly for better performance and composition
+ */
+export function withLoading<P extends object>(
+  Component: React.ComponentType<P & { loading: UseLoadingReturn }>
+): React.ComponentType<P> {
+  return function WithLoadingComponent(props: P) {
+    const loading = useLoading();
+    return <Component {...props} loading={loading} />;
+  };
+}
+
+// ============================================================================
+// Types Export
+// ============================================================================
+
+export type {
+  LoadingConfig,
+  LoadingState,
+  LoadingOperation,
+  UseLoadingReturn,
+};
+
+// Default export
 export default useLoading;
