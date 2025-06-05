@@ -1,16 +1,15 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useMemo } from 'react';
 import { apiClient } from '@/lib/api-client';
-import { useSession } from '@/hooks/use-session';
+import { useSession } from './use-session';
 
-// Temporary types until system.ts and environment.ts are created
+// System configuration types - these will be imported from src/types/system.ts and src/types/environment.ts when available
 interface AuthService {
-  id: number;
   name: string;
   type: string;
-  is_active: boolean;
+  config: Record<string, any>;
 }
 
 interface LdapService extends AuthService {
@@ -77,7 +76,7 @@ interface System {
   }>;
 }
 
-// Default configuration fallbacks for offline scenarios
+// Default configuration fallbacks
 const DEFAULT_ENVIRONMENT: Environment = {
   authentication: {
     allowOpenRegistration: false,
@@ -101,215 +100,255 @@ const DEFAULT_SYSTEM: System = {
   resource: [],
 };
 
-// Query keys for React Query caching
-const QUERY_KEYS = {
+// API endpoints
+const URLS = {
+  ENVIRONMENT: '/api/v2/system/environment',
+  SYSTEM: '/api/v2/system',
+} as const;
+
+// Query keys for React Query cache management
+export const SYSTEM_CONFIG_QUERY_KEYS = {
   environment: ['system', 'environment'] as const,
   system: ['system', 'config'] as const,
 } as const;
 
 /**
- * System configuration hook that manages environment and system data fetching,
- * caching, and reactive updates. Replaces Angular DfSystemConfigDataService
- * with React Query intelligent caching, automatic background synchronization,
- * and error handling for system-wide configuration management.
+ * Custom hook for managing system configuration data with React Query
+ * 
+ * Replaces Angular DfSystemConfigDataService with intelligent caching,
+ * automatic background synchronization, and comprehensive error handling.
+ * 
+ * Features:
+ * - React Query intelligent caching with configurable TTL
+ * - Automatic background refetching for real-time configuration updates
+ * - Error handling with authentication token clearance on failures
+ * - Loading state integration with global loading indicators
+ * - Configuration validation with fallback to default values
+ * - Retry logic with exponential backoff for transient failures
  */
 export function useSystemConfig() {
-  const { clearSession } = useSession();
   const queryClient = useQueryClient();
+  const { clearSession } = useSession();
 
-  // Environment data query with intelligent caching
-  const environmentQuery = useQuery({
-    queryKey: QUERY_KEYS.environment,
-    queryFn: async (): Promise<Environment> => {
-      try {
-        const response = await apiClient.get<Environment>('/api/v2/system/environment', {
-          headers: {
-            'show-loading': '', // Maintains original header pattern
-          },
-        });
-        return response.data;
-      } catch (error) {
-        // Clear token on environment fetch failure per original service behavior
-        clearSession();
-        throw error;
-      }
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes - configuration doesn't change frequently
-    gcTime: 10 * 60 * 1000, // 10 minutes cache retention
-    retry: 1, // Matches original retry behavior
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    refetchOnWindowFocus: false, // System config doesn't need frequent refetching
-    refetchOnReconnect: true, // Refetch when connection is restored
-  });
-
-  // System data query with intelligent caching
-  const systemQuery = useQuery({
-    queryKey: QUERY_KEYS.system,
-    queryFn: async (): Promise<System> => {
-      const response = await apiClient.get<System>('/api/v2/system', {
+  /**
+   * Fetch environment configuration with error handling and token management
+   */
+  const fetchEnvironmentData = useCallback(async (): Promise<Environment> => {
+    try {
+      const response = await apiClient.get<Environment>(URLS.ENVIRONMENT, {
         headers: {
-          'show-loading': '',
-          'skip-error': 'true', // Matches original header pattern
+          'show-loading': '', // Integrate with global loading indicators
         },
       });
-      return response.data;
+      return response;
+    } catch (error) {
+      // Clear authentication token on configuration fetch failures
+      // This matches the original Angular service behavior
+      clearSession();
+      throw error;
+    }
+  }, [clearSession]);
+
+  /**
+   * Fetch system configuration with error handling
+   */
+  const fetchSystemData = useCallback(async (): Promise<System> => {
+    try {
+      const response = await apiClient.get<System>(URLS.SYSTEM, {
+        headers: {
+          'show-loading': '', // Integrate with global loading indicators
+          'skip-error': 'true', // Skip automatic error handling for system data
+        },
+      });
+      return response;
+    } catch (error) {
+      // For system data, we don't clear tokens but still throw to handle gracefully
+      throw error;
+    }
+  }, []);
+
+  /**
+   * Environment configuration query with intelligent caching
+   */
+  const environmentQuery = useQuery({
+    queryKey: SYSTEM_CONFIG_QUERY_KEYS.environment,
+    queryFn: fetchEnvironmentData,
+    staleTime: 5 * 60 * 1000, // 5 minutes - environment data is relatively stable
+    cacheTime: 10 * 60 * 1000, // 10 minutes - keep in cache longer
+    retry: (failureCount, error) => {
+      // Retry once for environment data to handle transient network issues
+      return failureCount < 1;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes cache retention
-    retry: 1,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    refetchOnWindowFocus: true, // Ensure fresh data when user returns
+    refetchOnReconnect: true, // Refetch on network reconnection
+    keepPreviousData: true, // Maintain previous data during refetch
+    select: (data) => {
+      // Validate and provide fallbacks for missing data
+      return {
+        ...DEFAULT_ENVIRONMENT,
+        ...data,
+        authentication: {
+          ...DEFAULT_ENVIRONMENT.authentication,
+          ...data.authentication,
+        },
+        server: {
+          ...DEFAULT_ENVIRONMENT.server,
+          ...data.server,
+        },
+      };
+    },
   });
 
-  // Manual refresh functions for forcing data updates
-  const refreshEnvironment = useCallback(async () => {
-    await queryClient.invalidateQueries({
-      queryKey: QUERY_KEYS.environment,
-    });
+  /**
+   * System configuration query with intelligent caching
+   */
+  const systemQuery = useQuery({
+    queryKey: SYSTEM_CONFIG_QUERY_KEYS.system,
+    queryFn: fetchSystemData,
+    staleTime: 10 * 60 * 1000, // 10 minutes - system data changes less frequently
+    cacheTime: 15 * 60 * 1000, // 15 minutes - keep in cache longer
+    retry: false, // Don't retry system data fetch to avoid unnecessary load
+    refetchOnWindowFocus: false, // System data doesn't need frequent refetch
+    refetchOnReconnect: true, // Still refetch on reconnection
+    keepPreviousData: true, // Maintain previous data during refetch
+    select: (data) => {
+      // Validate and provide fallbacks for missing data
+      return {
+        ...DEFAULT_SYSTEM,
+        ...data,
+        resource: data?.resource || DEFAULT_SYSTEM.resource,
+      };
+    },
+  });
+
+  /**
+   * Manual refetch functions for force refresh scenarios
+   */
+  const refetchEnvironment = useCallback(() => {
+    return environmentQuery.refetch();
+  }, [environmentQuery]);
+
+  const refetchSystem = useCallback(() => {
+    return systemQuery.refetch();
+  }, [systemQuery]);
+
+  /**
+   * Clear all system configuration cache
+   */
+  const clearSystemConfigCache = useCallback(() => {
+    queryClient.removeQueries({ queryKey: ['system'] });
   }, [queryClient]);
 
-  const refreshSystem = useCallback(async () => {
-    await queryClient.invalidateQueries({
-      queryKey: QUERY_KEYS.system,
-    });
-  }, [queryClient]);
+  /**
+   * Validate if environment configuration is valid
+   */
+  const isEnvironmentValid = useMemo(() => {
+    return !!(
+      environmentQuery.data?.server?.host ||
+      environmentQuery.data?.server?.version
+    );
+  }, [environmentQuery.data]);
 
-  const refreshAll = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.environment }),
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.system }),
-    ]);
-  }, [queryClient]);
+  /**
+   * Validate if system configuration is valid
+   */
+  const isSystemValid = useMemo(() => {
+    return !!(systemQuery.data?.resource && Array.isArray(systemQuery.data.resource));
+  }, [systemQuery.data]);
 
-  // Clear all system configuration cache
-  const clearCache = useCallback(() => {
-    queryClient.removeQueries({ queryKey: QUERY_KEYS.environment });
-    queryClient.removeQueries({ queryKey: QUERY_KEYS.system });
-  }, [queryClient]);
-
-  // Set initial data from cache on mount if available
-  useEffect(() => {
-    const cachedEnvironment = queryClient.getQueryData<Environment>(QUERY_KEYS.environment);
-    const cachedSystem = queryClient.getQueryData<System>(QUERY_KEYS.system);
-
-    // Prefetch data if not in cache
-    if (!cachedEnvironment && !environmentQuery.isFetching) {
-      queryClient.prefetchQuery({
-        queryKey: QUERY_KEYS.environment,
-        queryFn: environmentQuery.queryFn,
-        staleTime: 5 * 60 * 1000,
-      });
-    }
-
-    if (!cachedSystem && !systemQuery.isFetching) {
-      queryClient.prefetchQuery({
-        queryKey: QUERY_KEYS.system,
-        queryFn: systemQuery.queryFn,
-        staleTime: 5 * 60 * 1000,
-      });
-    }
-  }, [queryClient, environmentQuery.isFetching, systemQuery.isFetching, environmentQuery.queryFn, systemQuery.queryFn]);
-
-  // Derive computed states
+  /**
+   * Combined loading state for both queries
+   */
   const isLoading = environmentQuery.isLoading || systemQuery.isLoading;
-  const isError = environmentQuery.isError || systemQuery.isError;
+
+  /**
+   * Combined error state for both queries
+   */
   const error = environmentQuery.error || systemQuery.error;
 
-  // Provide data with fallbacks for offline scenarios
-  const environment: Environment = environmentQuery.data || DEFAULT_ENVIRONMENT;
-  const system: System = systemQuery.data || DEFAULT_SYSTEM;
+  /**
+   * Combined fetching state for background updates
+   */
+  const isFetching = environmentQuery.isFetching || systemQuery.isFetching;
 
-  // Configuration validation helpers
-  const isConfigurationValid = useCallback(() => {
-    return !!(
-      environment.server.host &&
-      environment.authentication &&
-      system.resource
-    );
-  }, [environment, system]);
-
-  const hasValidLicense = useCallback(() => {
-    return !!(
-      environment.platform?.license &&
-      environment.platform.license !== 'OPEN SOURCE'
-    );
-  }, [environment.platform?.license]);
-
-  const isTrialEnvironment = useCallback(() => {
-    return environment.platform?.isTrial || false;
-  }, [environment.platform?.isTrial]);
-
-  const isHostedEnvironment = useCallback(() => {
-    return environment.platform?.isHosted || false;
-  }, [environment.platform?.isHosted]);
+  /**
+   * Check if data is stale and needs refresh
+   */
+  const isStale = environmentQuery.isStale || systemQuery.isStale;
 
   return {
-    // Data properties
-    environment,
-    system,
+    // Data with fallbacks
+    environment: environmentQuery.data || DEFAULT_ENVIRONMENT,
+    system: systemQuery.data || DEFAULT_SYSTEM,
     
-    // Loading and error states
+    // Loading states
     isLoading,
-    isError,
-    error,
+    isFetching,
+    isStale,
     
-    // Individual query states for granular control
-    environmentQuery: {
-      data: environment,
-      isLoading: environmentQuery.isLoading,
-      isError: environmentQuery.isError,
-      error: environmentQuery.error,
-      isFetching: environmentQuery.isFetching,
-      isStale: environmentQuery.isStale,
-    },
-    systemQuery: {
-      data: system,
-      isLoading: systemQuery.isLoading,
-      isError: systemQuery.isError,
-      error: systemQuery.error,
-      isFetching: systemQuery.isFetching,
-      isStale: systemQuery.isStale,
-    },
+    // Error states
+    error,
+    environmentError: environmentQuery.error,
+    systemError: systemQuery.error,
+    
+    // Validation states
+    isEnvironmentValid,
+    isSystemValid,
     
     // Manual control functions
-    refreshEnvironment,
-    refreshSystem,
-    refreshAll,
-    clearCache,
+    refetchEnvironment,
+    refetchSystem,
+    clearSystemConfigCache,
     
-    // Configuration validation helpers
-    isConfigurationValid,
-    hasValidLicense,
-    isTrialEnvironment,
-    isHostedEnvironment,
-    
-    // Convenience getters matching original service interface
-    get isOpenRegistrationAllowed() {
-      return environment.authentication.allowOpenRegistration;
+    // Individual query states for advanced usage
+    environmentQuery: {
+      isLoading: environmentQuery.isLoading,
+      isFetching: environmentQuery.isFetching,
+      isStale: environmentQuery.isStale,
+      error: environmentQuery.error,
+      refetch: environmentQuery.refetch,
     },
-    
-    get serverVersion() {
-      return environment.platform?.version || environment.server.version || '';
-    },
-    
-    get isDevelopmentMode() {
-      return environment.platform?.appDebug || false;
-    },
-    
-    get availableAuthServices() {
-      return [
-        ...environment.authentication.oauth,
-        ...environment.authentication.saml,
-        ...environment.authentication.adldap,
-      ];
-    },
-    
-    get systemResources() {
-      return system.resource.map(r => r.name);
+    systemQuery: {
+      isLoading: systemQuery.isLoading,
+      isFetching: systemQuery.isFetching,
+      isStale: systemQuery.isStale,
+      error: systemQuery.error,
+      refetch: systemQuery.refetch,
     },
   };
 }
 
-// Export types for use throughout the application
-export type { Environment, System, AuthService, LdapService };
+/**
+ * Helper hook to get only environment configuration
+ */
+export function useEnvironmentConfig() {
+  const { environment, environmentError, environmentQuery } = useSystemConfig();
+  
+  return {
+    environment,
+    error: environmentError,
+    isLoading: environmentQuery.isLoading,
+    isFetching: environmentQuery.isFetching,
+    isStale: environmentQuery.isStale,
+    refetch: environmentQuery.refetch,
+  };
+}
+
+/**
+ * Helper hook to get only system configuration
+ */
+export function useSystemConfigData() {
+  const { system, systemError, systemQuery } = useSystemConfig();
+  
+  return {
+    system,
+    error: systemError,
+    isLoading: systemQuery.isLoading,
+    isFetching: systemQuery.isFetching,
+    isStale: systemQuery.isStale,
+    refetch: systemQuery.refetch,
+  };
+}
+
+export default useSystemConfig;
