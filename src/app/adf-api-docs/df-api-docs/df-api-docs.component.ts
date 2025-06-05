@@ -108,7 +108,11 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   healthError: string | null = null;
   serviceName: string | null = null;
   showUnhealthyErrorDetails = false;
-  private static SUPPORTED_SERVICE_TYPE_GROUPS = ['Database', 'File'];
+  // Mapping of service types to their corresponding endpoints, probably would be better to move to the back-end
+  healthCheckEndpointsMap: { [key: string]: string[] } = {
+    Database: ['/_schema', '/_table'],
+    File: ['/'],
+  };
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -241,62 +245,14 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   }
 
   private checkApiHealth(): void {
-    let endpointsToValidate = this.getApiEnpointsToValidate();
-    if (this.serviceName && endpointsToValidate.length > 0) {
+    let endpointsToValidate =
+      this.healthCheckEndpointsMap[this.apiDocJson.info.group];
+    if (this.serviceName && endpointsToValidate) {
       // Perform health check
-      this.performHealthCheck(endpointsToValidate);
+      this.performHealthCheck(endpointsToValidate[0]);
     } else {
       this.setHealthState('warning');
     }
-  }
-
-  private getApiEnpointsToValidate(): string[] {
-    const endpointsToValidate: string[] = [];
-
-    if (!this.apiDocJson || !this.apiDocJson.info) {
-      return []; // Not enough info to determine endpoints
-    }
-
-    if (
-      DfApiDocsComponent.SUPPORTED_SERVICE_TYPE_GROUPS.includes(
-        this.apiDocJson.info.group
-      )
-    ) {
-      for (const path in this.apiDocJson.paths) {
-        if (
-          !Object.prototype.hasOwnProperty.call(this.apiDocJson.paths, path)
-        ) {
-          continue;
-        }
-        const methods = this.apiDocJson.paths[path];
-
-        for (const method in methods) {
-          if (!Object.prototype.hasOwnProperty.call(methods, method)) {
-            continue;
-          }
-          if (method.toLowerCase() === 'get') {
-            const operation = methods[method];
-            const parameters: Array<{
-              name: string;
-              in: string;
-              required?: boolean;
-            }> = operation.parameters || [];
-
-            const hasPathParameters = path.includes('{');
-
-            const hasRequiredQueryParameters = parameters.some(
-              param => param && param.in === 'query' && param.required === true
-            );
-
-            if (!hasPathParameters && !hasRequiredQueryParameters) {
-              endpointsToValidate.push(path);
-            }
-          }
-        }
-      }
-    }
-
-    return endpointsToValidate;
   }
 
   private setHealthState(
@@ -307,39 +263,26 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     this.healthError = error;
   }
 
-  private performHealthCheck(endpoints: string[]): void {
+  private performHealthCheck(endpoint: string): void {
     this.healthStatus = 'loading';
     this.healthError = null;
 
-    const healthCheckRequests = endpoints.map(endpoint =>
+    this.subscriptions.push(
       this.http
         .get(`${BASE_URL}/${this.serviceName}${endpoint}`, {
           responseType: 'text',
         })
         .pipe(
-          map(() => ({ endpoint, success: true }) as HealthCheckResult),
+          tap(() => this.setHealthState('healthy')),
           catchError((error: HttpErrorResponse) => {
-            return of({
-              endpoint,
-              error: error.message || error.error?.message || 'Unknown error',
-            } as HealthCheckResult);
-          })
-        )
-    );
+            this.setHealthState(
+              'unhealthy',
+              `${endpoint}: ${
+                error.message || error.error.message || 'Unknown error'
+              }`
+            );
 
-    this.subscriptions.push(
-      forkJoin(healthCheckRequests)
-        .pipe(
-          tap((results: HealthCheckResult[]) => {
-            const errors = results.filter(result => result.error);
-            if (errors.length > 0) {
-              this.setHealthState(
-                'unhealthy',
-                errors.map(e => `${e.endpoint}: ${e.error}`).join(', \n\n')
-              );
-            } else {
-              this.setHealthState('healthy');
-            }
+            return of(null);
           })
         )
         .subscribe()
