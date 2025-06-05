@@ -1,1312 +1,1111 @@
+/**
+ * Database Field Configuration Form Component
+ * 
+ * Comprehensive React form component for configuring database field attributes
+ * including type selection, constraints, relationships, validation rules, and
+ * function usage. Built with React Hook Form, Zod validation, and WCAG 2.1 AA
+ * compliance for the DreamFactory Admin Interface database schema management.
+ * 
+ * Features:
+ * - React Hook Form with Zod schema validators for type-safe form handling
+ * - Real-time validation under 100ms with dynamic field enabling/disabling
+ * - Tailwind CSS 4.1+ styling with consistent theme injection
+ * - WCAG 2.1 AA accessibility compliance through Headless UI integration
+ * - Dynamic control management based on field type selection
+ * - Comprehensive field type support (string, integer, decimal, boolean, etc.)
+ * - Advanced validation rules including regex, min/max values, and constraints
+ * - Relationship configuration for foreign keys and database references
+ * - Function usage configuration for computed fields and transformations
+ * - CSV picklist validation and JSON validation for complex field types
+ * 
+ * @fileoverview Database field configuration form for schema management
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
+ */
+
 'use client';
+
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useForm, useWatch, type UseFormReturn } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { cn } from '@/lib/utils';
+
+// UI Components - Using the comprehensive form system
+import { FormField } from '@/components/ui/form/form-field';
+import { Select } from '@/components/ui/select/Select';
+import { Toggle } from '@/components/ui/toggle/toggle';
+import { Input } from '@/components/ui/input/input';
+import { TextArea } from '@/components/ui/input/textarea';
+import { Button } from '@/components/ui/button/Button';
+
+// Hook imports for functionality
+import { useTheme } from '@/hooks/use-theme';
+import { useDebounce } from '@/hooks/use-debounce';
+
+// Type definitions and schemas
+import type { 
+  DatabaseField, 
+  FieldType, 
+  FieldConstraint,
+  FieldRelationship,
+  FieldFunction,
+  FieldValidationRule 
+} from './field.types';
+
+// ============================================================================
+// FIELD TYPE DEFINITIONS AND CONSTANTS
+// ============================================================================
+
+/**
+ * Comprehensive database field types supporting all major database systems
+ * Includes types from MySQL, PostgreSQL, Oracle, MongoDB, and Snowflake
+ */
+export const FIELD_TYPES = [
+  // String types
+  { value: 'string', label: 'String', category: 'text' },
+  { value: 'text', label: 'Text', category: 'text' },
+  { value: 'longtext', label: 'Long Text', category: 'text' },
+  { value: 'char', label: 'Character', category: 'text' },
+  { value: 'varchar', label: 'Variable Character', category: 'text' },
+  
+  // Numeric types
+  { value: 'integer', label: 'Integer', category: 'numeric' },
+  { value: 'bigint', label: 'Big Integer', category: 'numeric' },
+  { value: 'smallint', label: 'Small Integer', category: 'numeric' },
+  { value: 'decimal', label: 'Decimal', category: 'numeric' },
+  { value: 'float', label: 'Float', category: 'numeric' },
+  { value: 'double', label: 'Double', category: 'numeric' },
+  { value: 'money', label: 'Money', category: 'numeric' },
+  
+  // Date/Time types
+  { value: 'date', label: 'Date', category: 'datetime' },
+  { value: 'time', label: 'Time', category: 'datetime' },
+  { value: 'datetime', label: 'Date Time', category: 'datetime' },
+  { value: 'timestamp', label: 'Timestamp', category: 'datetime' },
+  { value: 'year', label: 'Year', category: 'datetime' },
+  
+  // Boolean and binary types
+  { value: 'boolean', label: 'Boolean', category: 'boolean' },
+  { value: 'binary', label: 'Binary', category: 'binary' },
+  { value: 'blob', label: 'BLOB', category: 'binary' },
+  { value: 'longblob', label: 'Long BLOB', category: 'binary' },
+  
+  // JSON and array types
+  { value: 'json', label: 'JSON', category: 'structured' },
+  { value: 'array', label: 'Array', category: 'structured' },
+  { value: 'object', label: 'Object', category: 'structured' },
+  
+  // Special types
+  { value: 'uuid', label: 'UUID', category: 'special' },
+  { value: 'enum', label: 'Enumeration', category: 'special' },
+  { value: 'set', label: 'Set', category: 'special' },
+  { value: 'geometry', label: 'Geometry', category: 'special' },
+] as const;
+
+/**
+ * Field validation rule types
+ */
+export const VALIDATION_RULES = [
+  { value: 'required', label: 'Required Field' },
+  { value: 'unique', label: 'Unique Value' },
+  { value: 'min_length', label: 'Minimum Length' },
+  { value: 'max_length', label: 'Maximum Length' },
+  { value: 'min_value', label: 'Minimum Value' },
+  { value: 'max_value', label: 'Maximum Value' },
+  { value: 'regex', label: 'Regular Expression' },
+  { value: 'email', label: 'Email Format' },
+  { value: 'url', label: 'URL Format' },
+  { value: 'phone', label: 'Phone Number' },
+  { value: 'ip_address', label: 'IP Address' },
+  { value: 'date_format', label: 'Date Format' },
+  { value: 'json_schema', label: 'JSON Schema' },
+  { value: 'custom', label: 'Custom Validation' },
+] as const;
+
+/**
+ * Field relationship types for foreign keys and references
+ */
+export const RELATIONSHIP_TYPES = [
+  { value: 'belongs_to', label: 'Belongs To (N:1)' },
+  { value: 'has_many', label: 'Has Many (1:N)' },
+  { value: 'has_one', label: 'Has One (1:1)' },
+  { value: 'many_to_many', label: 'Many to Many (N:N)' },
+] as const;
+
+/**
+ * Function usage types for computed fields
+ */
+export const FUNCTION_TYPES = [
+  { value: 'auto_increment', label: 'Auto Increment' },
+  { value: 'auto_uuid', label: 'Auto UUID' },
+  { value: 'current_timestamp', label: 'Current Timestamp' },
+  { value: 'current_date', label: 'Current Date' },
+  { value: 'computed', label: 'Computed Expression' },
+  { value: 'hash', label: 'Hash Function' },
+  { value: 'encrypt', label: 'Encryption' },
+  { value: 'transform', label: 'Data Transform' },
+] as const;
+
+// ============================================================================
+// ZOD VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Comprehensive Zod schema for database field configuration
+ * Provides type-safe validation with real-time feedback under 100ms
+ */
+const fieldFormSchema = z.object({
+  // Basic field properties
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(64, 'Field name must be 64 characters or less')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  label: z.string()
+    .min(1, 'Field label is required')
+    .max(128, 'Field label must be 128 characters or less'),
+  
+  type: z.enum([
+    'string', 'text', 'longtext', 'char', 'varchar',
+    'integer', 'bigint', 'smallint', 'decimal', 'float', 'double', 'money',
+    'date', 'time', 'datetime', 'timestamp', 'year',
+    'boolean', 'binary', 'blob', 'longblob',
+    'json', 'array', 'object',
+    'uuid', 'enum', 'set', 'geometry'
+  ], { errorMap: () => ({ message: 'Please select a valid field type' }) }),
+  
+  description: z.string().max(500, 'Description must be 500 characters or less').optional(),
+  
+  // Field constraints
+  nullable: z.boolean().default(true),
+  default_value: z.string().optional(),
+  primary_key: z.boolean().default(false),
+  auto_increment: z.boolean().default(false),
+  
+  // Size and precision constraints
+  size: z.number()
+    .int('Size must be an integer')
+    .min(1, 'Size must be at least 1')
+    .max(65535, 'Size cannot exceed 65535')
+    .optional(),
+  
+  precision: z.number()
+    .int('Precision must be an integer')
+    .min(1, 'Precision must be at least 1')
+    .max(65, 'Precision cannot exceed 65')
+    .optional(),
+  
+  scale: z.number()
+    .int('Scale must be an integer')
+    .min(0, 'Scale cannot be negative')
+    .max(30, 'Scale cannot exceed 30')
+    .optional(),
+  
+  // Validation rules
+  validation_rules: z.array(z.object({
+    type: z.enum([
+      'required', 'unique', 'min_length', 'max_length', 'min_value', 'max_value',
+      'regex', 'email', 'url', 'phone', 'ip_address', 'date_format', 'json_schema', 'custom'
+    ]),
+    value: z.string().optional(),
+    message: z.string().optional(),
+    enabled: z.boolean().default(true),
+  })).default([]),
+  
+  // Index configuration
+  indexed: z.boolean().default(false),
+  unique: z.boolean().default(false),
+  
+  // Picklist/Enum values for dropdown fields
+  picklist_values: z.string()
+    .optional()
+    .refine((val) => {
+      if (!val) return true;
+      // Validate CSV format for picklist values
+      try {
+        const values = val.split(',').map(v => v.trim()).filter(v => v.length > 0);
+        return values.length > 0 && values.every(v => v.length <= 255);
+      } catch {
+        return false;
+      }
+    }, 'Picklist values must be a valid comma-separated list with each value under 255 characters'),
+  
+  // Foreign key relationship
+  relationship: z.object({
+    type: z.enum(['belongs_to', 'has_many', 'has_one', 'many_to_many']).optional(),
+    table: z.string().optional(),
+    field: z.string().optional(),
+    on_delete: z.enum(['CASCADE', 'SET_NULL', 'RESTRICT', 'NO_ACTION']).optional(),
+    on_update: z.enum(['CASCADE', 'SET_NULL', 'RESTRICT', 'NO_ACTION']).optional(),
+  }).optional(),
+  
+  // Function usage for computed fields
+  function_usage: z.object({
+    type: z.enum([
+      'auto_increment', 'auto_uuid', 'current_timestamp', 'current_date',
+      'computed', 'hash', 'encrypt', 'transform'
+    ]).optional(),
+    expression: z.string().optional(),
+    parameters: z.record(z.any()).optional(),
+  }).optional(),
+  
+  // JSON field validation
+  json_schema: z.string()
+    .optional()
+    .refine((val) => {
+      if (!val) return true;
+      try {
+        JSON.parse(val);
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'JSON schema must be valid JSON format'),
+  
+  // Additional metadata
+  metadata: z.record(z.any()).optional(),
+}).refine((data) => {
+  // Custom validation rules based on field type
+  if (data.type === 'decimal' || data.type === 'float' || data.type === 'double') {
+    if (data.precision && data.scale && data.scale >= data.precision) {
+      return false;
+    }
+  }
+  
+  // Primary key fields cannot be nullable
+  if (data.primary_key && data.nullable) {
+    return false;
+  }
+  
+  // Auto increment requires integer type and primary key
+  if (data.auto_increment && !['integer', 'bigint', 'smallint'].includes(data.type)) {
+    return false;
+  }
+  
+  return true;
+}, {
+  message: 'Field configuration is invalid. Please check type-specific constraints.',
+  path: ['type']
+});
+
+/**
+ * TypeScript type inference from Zod schema
+ */
+export type FieldFormData = z.infer<typeof fieldFormSchema>;
+
+// ============================================================================
+// FORM COMPONENT INTERFACES
+// ============================================================================
+
+/**
+ * Props interface for the FieldForm component
+ */
+export interface FieldFormProps {
+  /** Initial field data for editing existing fields */
+  initialData?: Partial<FieldFormData>;
+  
+  /** Form submission handler */
+  onSubmit: (data: FieldFormData) => void | Promise<void>;
+  
+  /** Form cancellation handler */
+  onCancel?: () => void;
+  
+  /** Available tables for relationship configuration */
+  availableTables?: Array<{ value: string; label: string; fields?: string[] }>;
+  
+  /** Loading state for form submission */
+  loading?: boolean;
+  
+  /** Disable form editing */
+  disabled?: boolean;
+  
+  /** Show advanced options */
+  showAdvanced?: boolean;
+  
+  /** Custom CSS classes */
+  className?: string;
+  
+  /** Test identifier */
+  'data-testid'?: string;
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Get field type category for conditional field visibility
+ */
+const getFieldTypeCategory = (type: string): string => {
+  const fieldType = FIELD_TYPES.find(ft => ft.value === type);
+  return fieldType?.category || 'general';
+};
+
+/**
+ * Check if field type supports size constraint
+ */
+const fieldTypeSupportsSize = (type: string): boolean => {
+  return ['string', 'varchar', 'char', 'decimal', 'float', 'double'].includes(type);
+};
+
+/**
+ * Check if field type supports precision/scale
+ */
+const fieldTypeSupportsPrecision = (type: string): boolean => {
+  return ['decimal', 'float', 'double', 'money'].includes(type);
+};
+
+/**
+ * Check if field type supports auto increment
+ */
+const fieldTypeSupportsAutoIncrement = (type: string): boolean => {
+  return ['integer', 'bigint', 'smallint'].includes(type);
+};
+
+/**
+ * Check if field type supports picklist values
+ */
+const fieldTypeSupportsPicklist = (type: string): boolean => {
+  return ['enum', 'set', 'string', 'varchar'].includes(type);
+};
+
+/**
+ * Check if field type supports JSON schema
+ */
+const fieldTypeSupportsJsonSchema = (type: string): boolean => {
+  return ['json', 'object', 'text', 'longtext'].includes(type);
+};
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 /**
  * Database Field Configuration Form Component
  * 
- * Comprehensive React component implementing field configuration form using React Hook Form
- * with Zod validation. Handles all field attributes including type selection, constraints,
- * relationships, validation rules, and function usage with real-time validation and dynamic
- * control enabling/disabling based on field type selections.
- * 
- * Features:
- * - React Hook Form with Zod schema validators per React/Next.js Integration Requirements
- * - Real-time validation under 100ms per React/Next.js Integration Requirements  
- * - Tailwind CSS 4.1+ with consistent theme injection per React/Next.js Integration Requirements
- * - WCAG 2.1 AA compliance through Headless UI integration per Section 7.1 accessibility requirements
- * - Dynamic control enabling/disabling based on field type selection per existing Angular functionality
- * 
- * @author DreamFactory Platform Migration Team
- * @version 1.0.0
- * @since Next.js 15.1+ / React 19
+ * Comprehensive form component for database field configuration with real-time
+ * validation, dynamic field enabling/disabling, and full accessibility support.
  */
-
-import React, { useEffect, useMemo, useCallback } from 'react';
-import { useForm, useWatch, FormProvider } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useRouter } from 'next/navigation';
-import { useParams } from 'next/navigation';
-import { InformationCircleIcon } from '@heroicons/react/24/outline';
-import { useMutation, useQuery } from '@tanstack/react-query';
-
-// Core component imports with proper typing
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form-field';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Toggle } from '@/components/ui/toggle';
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-
-// Function use component integration
-import { FunctionUseForm } from './function-use/function-use-form';
-
-// Type definitions and validation schemas
-import type { 
-  DatabaseSchemaFieldType,
-  FieldFormData,
-  FieldType,
-  ReferenceTable,
-  ReferenceField,
-  DatabaseFunctionUse
-} from './field.types';
-
-// Custom hooks for data fetching and validation
-import { useApi } from '@/hooks/use-api';
-import { useFieldValidation } from '@/hooks/use-field-validation';
-import { useNotifications } from '@/hooks/use-notifications';
-import { useDebounce } from '@/hooks/use-debounce';
-
-// Field schema definitions
-import { createFieldFormSchema } from '@/lib/field-schema';
-
-// =============================================================================
-// FIELD TYPE CONSTANTS AND CONFIGURATIONS
-// =============================================================================
-
-/**
- * Comprehensive field type options with enhanced metadata
- * Supports all DreamFactory field types and database-specific variations
- */
-const FIELD_TYPE_OPTIONS = [
-  { value: 'manual', label: 'I will manually enter a type', category: 'custom' },
-  { value: 'id', label: 'ID (Auto-incrementing identifier)', category: 'identifier' },
-  { value: 'string', label: 'String (Variable length text)', category: 'text' },
-  { value: 'integer', label: 'Integer (Whole numbers)', category: 'numeric' },
-  { value: 'text', label: 'Text (Large text blocks)', category: 'text' },
-  { value: 'boolean', label: 'Boolean (True/False)', category: 'logical' },
-  { value: 'binary', label: 'Binary (File data)', category: 'binary' },
-  { value: 'float', label: 'Float (Decimal numbers)', category: 'numeric' },
-  { value: 'double', label: 'Double (Large decimal numbers)', category: 'numeric' },
-  { value: 'decimal', label: 'Decimal (Precise decimal numbers)', category: 'numeric' },
-  { value: 'datetime', label: 'DateTime (Date and time)', category: 'temporal' },
-  { value: 'date', label: 'Date (Date only)', category: 'temporal' },
-  { value: 'time', label: 'Time (Time only)', category: 'temporal' },
-  { value: 'reference', label: 'Reference (Foreign key)', category: 'relationship' },
-  { value: 'user_id', label: 'User ID (Current user)', category: 'system' },
-  { value: 'user_id_on_create', label: 'User ID on Create (Creation user)', category: 'system' },
-  { value: 'user_id_on_update', label: 'User ID on Update (Update user)', category: 'system' },
-  { value: 'timestamp', label: 'Timestamp (Unix timestamp)', category: 'temporal' },
-  { value: 'timestamp_on_create', label: 'Timestamp on Create (Creation time)', category: 'system' },
-  { value: 'timestamp_on_update', label: 'Timestamp on Update (Update time)', category: 'system' },
-] as const;
-
-/**
- * Field type configuration mapping for dynamic form control
- * Defines which controls are enabled/disabled based on field type
- */
-const FIELD_TYPE_CONFIG: Record<string, {
-  enabledControls: string[];
-  disabledControls: string[];
-  showPicklist: boolean;
-  defaultValues?: Record<string, any>;
-}> = {
-  manual: {
-    enabledControls: ['dbType'],
-    disabledControls: ['length', 'precision', 'scale', 'fixedLength', 'supportsMultibyte'],
-    showPicklist: false,
-  },
-  string: {
-    enabledControls: ['length', 'fixedLength', 'supportsMultibyte'],
-    disabledControls: ['dbType', 'precision', 'scale'],
-    showPicklist: true,
-  },
-  integer: {
-    enabledControls: ['length'],
-    disabledControls: ['dbType', 'precision', 'scale', 'fixedLength', 'supportsMultibyte'],
-    showPicklist: true,
-  },
-  text: {
-    enabledControls: ['length'],
-    disabledControls: ['dbType', 'precision', 'scale', 'fixedLength', 'supportsMultibyte'],
-    showPicklist: false,
-  },
-  binary: {
-    enabledControls: ['length'],
-    disabledControls: ['dbType', 'precision', 'scale', 'fixedLength', 'supportsMultibyte'],
-    showPicklist: false,
-  },
-  float: {
-    enabledControls: ['precision', 'scale'],
-    disabledControls: ['dbType', 'length', 'fixedLength', 'supportsMultibyte'],
-    showPicklist: false,
-    defaultValues: { scale: 0 },
-  },
-  double: {
-    enabledControls: ['precision', 'scale'],
-    disabledControls: ['dbType', 'length', 'fixedLength', 'supportsMultibyte'],
-    showPicklist: false,
-    defaultValues: { scale: 0 },
-  },
-  decimal: {
-    enabledControls: ['precision', 'scale'],
-    disabledControls: ['dbType', 'length', 'fixedLength', 'supportsMultibyte'],
-    showPicklist: false,
-    defaultValues: { scale: 0 },
-  },
-  default: {
-    enabledControls: [],
-    disabledControls: ['dbType', 'length', 'precision', 'scale', 'fixedLength', 'supportsMultibyte'],
-    showPicklist: false,
-  },
-};
-
-// =============================================================================
-// MAIN COMPONENT INTERFACE AND PROPS
-// =============================================================================
-
-interface FieldFormProps {
-  /** Optional field data for editing existing fields */
-  fieldData?: DatabaseSchemaFieldType | null;
-  /** Form mode - create or edit */
-  mode: 'create' | 'edit';
-  /** Service name for API calls */
-  serviceName: string;
-  /** Table name for field creation */
-  tableName: string;
-  /** Field name for editing (edit mode only) */
-  fieldName?: string;
-  /** Callback when form is successfully submitted */
-  onSuccess?: (data: FieldFormData) => void;
-  /** Callback when form is cancelled */
-  onCancel?: () => void;
-  /** Form submission loading state */
-  isSubmitting?: boolean;
-  /** Custom form validation rules */
-  customValidation?: Record<string, z.ZodSchema>;
-}
-
-// =============================================================================
-// FIELD FORM COMPONENT IMPLEMENTATION
-// =============================================================================
-
-export function FieldForm({
-  fieldData = null,
-  mode = 'create',
-  serviceName,
-  tableName,
-  fieldName,
-  onSuccess,
+export const FieldForm: React.FC<FieldFormProps> = ({
+  initialData,
+  onSubmit,
   onCancel,
-  isSubmitting = false,
-  customValidation = {},
-}: FieldFormProps) {
+  availableTables = [],
+  loading = false,
+  disabled = false,
+  showAdvanced = false,
+  className,
+  'data-testid': testId,
+}) => {
+  // Theme management for consistent styling
+  const { resolvedTheme } = useTheme();
   
-  // =============================================================================
-  // HOOKS AND STATE MANAGEMENT
-  // =============================================================================
-  
-  const router = useRouter();
-  const params = useParams();
-  const { showNotification } = useNotifications();
-  const { validateField } = useFieldValidation();
-  
-  // API client for data fetching and mutations
-  const { get, post, put } = useApi();
-  
-  // =============================================================================
-  // FORM SCHEMA AND VALIDATION SETUP
-  // =============================================================================
-  
-  /**
-   * Dynamic form schema generation based on field type and requirements
-   * Uses Zod for runtime validation with compile-time type inference
-   */
-  const formSchema = useMemo(() => {
-    return createFieldFormSchema({
-      mode,
-      fieldType: fieldData?.type,
-      customValidation,
-      serviceName,
-      tableName,
-    });
-  }, [mode, fieldData?.type, customValidation, serviceName, tableName]);
-  
-  // =============================================================================
-  // REACT HOOK FORM CONFIGURATION
-  // =============================================================================
-  
-  /**
-   * Initialize React Hook Form with comprehensive configuration
-   * Includes Zod resolver, default values, and performance optimizations
-   */
+  // Form state management with React Hook Form and Zod validation
   const form = useForm<FieldFormData>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(fieldFormSchema),
     defaultValues: {
-      name: fieldData?.name || '',
-      alias: fieldData?.alias || '',
-      label: fieldData?.label || '',
-      type: fieldData?.type || '',
-      dbType: fieldData?.dbType || '',
-      length: fieldData?.length || undefined,
-      precision: fieldData?.precision || undefined,
-      scale: fieldData?.scale || 0,
-      default: fieldData?.default || '',
-      
-      // Boolean flags with proper defaults
-      isVirtual: fieldData?.isVirtual || false,
-      isAggregate: fieldData?.isAggregate || false,
-      allowNull: fieldData?.allowNull || false,
-      autoIncrement: fieldData?.autoIncrement || false,
-      isIndex: fieldData?.isIndex || false,
-      isUnique: fieldData?.isUnique || false,
-      isPrimaryKey: fieldData?.isPrimaryKey || false,
-      isForeignKey: fieldData?.isForeignKey || false,
-      fixedLength: fieldData?.fixedLength || false,
-      supportsMultibyte: fieldData?.supportsMultibyte || false,
-      
-      // Reference fields
-      refTable: fieldData?.refTable || '',
-      refField: fieldData?.refField || '',
-      
-      // JSON validation and picklist
-      validation: fieldData?.validation ? JSON.stringify(fieldData.validation, null, 2) : '',
-      picklist: fieldData?.picklist || '',
-      
-      // Database functions
-      dbFunction: fieldData?.dbFunction || [],
+      name: '',
+      label: '',
+      type: 'string',
+      description: '',
+      nullable: true,
+      primary_key: false,
+      auto_increment: false,
+      indexed: false,
+      unique: false,
+      validation_rules: [],
+      ...initialData,
     },
-    mode: 'onChange', // Real-time validation
-    criteriaMode: 'all',
-    shouldFocusError: true,
-    shouldUnregister: false,
+    mode: 'onChange', // Enable real-time validation
   });
   
-  const {
-    handleSubmit,
-    control,
-    setValue,
-    getValues,
-    reset,
-    trigger,
-    formState: { errors, isValid, isDirty },
-  } = form;
-  
-  // =============================================================================
-  // FORM FIELD WATCHERS FOR DYNAMIC BEHAVIOR
-  // =============================================================================
-  
-  // Watch critical fields for dynamic form behavior
-  const watchedType = useWatch({ control, name: 'type' });
-  const watchedIsVirtual = useWatch({ control, name: 'isVirtual' });
-  const watchedIsForeignKey = useWatch({ control, name: 'isForeignKey' });
-  const watchedRefTable = useWatch({ control, name: 'refTable' });
-  
-  // Debounced values for performance optimization
-  const debouncedType = useDebounce(watchedType, 100);
-  const debouncedRefTable = useDebounce(watchedRefTable, 300);
-  
-  // =============================================================================
-  // DATA FETCHING QUERIES
-  // =============================================================================
-  
-  /**
-   * Fetch available reference tables for foreign key relationships
-   * Only active when isForeignKey is enabled
-   */
-  const {
-    data: referenceTables = [],
-    isLoading: isLoadingTables,
-    error: tablesError,
-  } = useQuery<ReferenceTable[]>({
-    queryKey: ['schema', serviceName, 'tables'],
-    queryFn: () => get(`${serviceName}/_schema`).then(res => res.resource || []),
-    enabled: watchedIsForeignKey,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+  // Watch field type for dynamic field enabling/disabling
+  const watchedType = useWatch({
+    control: form.control,
+    name: 'type',
   });
   
-  /**
-   * Fetch reference fields for selected reference table
-   * Only active when a reference table is selected
-   */
-  const {
-    data: referenceFields = [],
-    isLoading: isLoadingFields,
-    error: fieldsError,
-  } = useQuery<ReferenceField[]>({
-    queryKey: ['schema', serviceName, 'table', debouncedRefTable, 'fields'],
-    queryFn: () => get(`${serviceName}/_schema/${debouncedRefTable}`).then(res => res.field || []),
-    enabled: Boolean(debouncedRefTable && watchedIsForeignKey),
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 10 * 60 * 1000,
+  const watchedPrimaryKey = useWatch({
+    control: form.control,
+    name: 'primary_key',
   });
   
-  // =============================================================================
-  // FORM SUBMISSION MUTATIONS
-  // =============================================================================
-  
-  /**
-   * Create new field mutation
-   */
-  const createFieldMutation = useMutation({
-    mutationFn: (data: FieldFormData) => 
-      post(`${serviceName}/_schema/${tableName}/_field`, {
-        resource: [data],
-      }),
-    onSuccess: (result, variables) => {
-      showNotification({
-        type: 'success',
-        title: 'Field Created',
-        message: `Field "${variables.name}" has been created successfully.`,
-      });
-      onSuccess?.(variables);
-      // Navigate back to fields list
-      router.push(`/adf-schema/fields?service=${serviceName}&table=${tableName}`);
+  // Debounce validation for performance optimization under 100ms
+  const debouncedValidation = useDebounce(
+    () => {
+      form.trigger(); // Trigger validation
     },
-    onError: (error: any) => {
-      showNotification({
-        type: 'error',
-        title: 'Creation Failed',
-        message: error.message || 'Failed to create field. Please try again.',
-      });
-    },
-  });
+    50 // 50ms debounce for sub-100ms validation response
+  );
   
-  /**
-   * Update existing field mutation
-   */
-  const updateFieldMutation = useMutation({
-    mutationFn: (data: FieldFormData) => 
-      put(`${serviceName}/_schema/${tableName}/_field`, {
-        resource: [data],
-      }),
-    onSuccess: (result, variables) => {
-      showNotification({
-        type: 'success',
-        title: 'Field Updated',
-        message: `Field "${variables.name}" has been updated successfully.`,
-      });
-      onSuccess?.(variables);
-      // Navigate back to fields list
-      router.push(`/adf-schema/fields?service=${serviceName}&table=${tableName}`);
-    },
-    onError: (error: any) => {
-      showNotification({
-        type: 'error',
-        title: 'Update Failed',
-        message: error.message || 'Failed to update field. Please try again.',
-      });
-    },
-  });
+  // Local state for advanced sections
+  const [showValidationRules, setShowValidationRules] = useState(false);
+  const [showRelationship, setShowRelationship] = useState(false);
+  const [showFunctionUsage, setShowFunctionUsage] = useState(false);
   
-  // =============================================================================
-  // DYNAMIC FORM CONTROL MANAGEMENT
-  // =============================================================================
+  // Memoized field type category for performance
+  const fieldTypeCategory = useMemo(() => getFieldTypeCategory(watchedType), [watchedType]);
   
-  /**
-   * Get field type configuration for dynamic control management
-   */
-  const getFieldTypeConfig = useCallback((type: string) => {
-    return FIELD_TYPE_CONFIG[type] || FIELD_TYPE_CONFIG.default;
-  }, []);
+  // Dynamic field enablement based on field type
+  const fieldConstraints = useMemo(() => ({
+    supportsSize: fieldTypeSupportsSize(watchedType),
+    supportsPrecision: fieldTypeSupportsPrecision(watchedType),
+    supportsAutoIncrement: fieldTypeSupportsAutoIncrement(watchedType),
+    supportsPicklist: fieldTypeSupportsPicklist(watchedType),
+    supportsJsonSchema: fieldTypeSupportsJsonSchema(watchedType),
+  }), [watchedType]);
   
-  /**
-   * Check if a form control should be enabled based on current state
-   */
-  const isControlEnabled = useCallback((controlName: string): boolean => {
-    const typeConfig = getFieldTypeConfig(debouncedType);
-    const isVirtual = getValues('isVirtual');
-    
-    // Special handling for virtual fields
-    if (isVirtual) {
-      if (controlName === 'dbType') return false;
-      if (controlName === 'isAggregate') return true;
-    }
-    
-    // Special handling for foreign key fields
-    if (controlName === 'refTable') {
-      return watchedIsForeignKey;
-    }
-    
-    if (controlName === 'refField') {
-      return watchedIsForeignKey && Boolean(debouncedRefTable);
-    }
-    
-    // Check type-specific configuration
-    if (typeConfig.enabledControls.includes(controlName)) {
-      return true;
-    }
-    
-    if (typeConfig.disabledControls.includes(controlName)) {
-      return false;
-    }
-    
-    // Default enabled for unconfigured controls
-    return true;
-  }, [debouncedType, watchedIsForeignKey, debouncedRefTable, getFieldTypeConfig, getValues]);
-  
-  /**
-   * Check if picklist should be shown for current field type
-   */
-  const shouldShowPicklist = useMemo(() => {
-    const typeConfig = getFieldTypeConfig(debouncedType);
-    return typeConfig.showPicklist;
-  }, [debouncedType, getFieldTypeConfig]);
-  
-  // =============================================================================
-  // FORM FIELD EFFECTS AND DYNAMIC UPDATES
-  // =============================================================================
-  
-  /**
-   * Handle field type changes and update form controls accordingly
-   */
+  // Effect to handle field type changes and constraint updates
   useEffect(() => {
-    if (!debouncedType) return;
-    
-    const typeConfig = getFieldTypeConfig(debouncedType);
-    
-    // Apply default values for the selected type
-    if (typeConfig.defaultValues) {
-      Object.entries(typeConfig.defaultValues).forEach(([key, value]) => {
-        setValue(key as keyof FieldFormData, value);
-      });
-    }
-    
-    // Clear disabled fields
-    typeConfig.disabledControls.forEach(controlName => {
-      if (controlName !== 'scale') { // Keep scale value for numeric types
-        setValue(controlName as keyof FieldFormData, undefined);
+    if (watchedType) {
+      // Clear incompatible constraints when field type changes
+      if (!fieldConstraints.supportsAutoIncrement) {
+        form.setValue('auto_increment', false);
       }
-    });
-    
-    // Trigger validation for affected fields
-    trigger(['length', 'precision', 'scale', 'dbType']);
-  }, [debouncedType, getFieldTypeConfig, setValue, trigger]);
-  
-  /**
-   * Handle virtual field state changes
-   */
-  useEffect(() => {
-    if (watchedIsVirtual) {
-      // Clear dbType for virtual fields
-      setValue('dbType', '');
-      // Enable isAggregate for virtual fields
-    } else {
-      // Disable isAggregate for non-virtual fields
-      setValue('isAggregate', false);
-      // Enable dbType if type is manual
-      if (debouncedType === 'manual') {
-        // dbType will be enabled by isControlEnabled logic
+      
+      if (!fieldConstraints.supportsPrecision) {
+        form.setValue('precision', undefined);
+        form.setValue('scale', undefined);
       }
+      
+      if (!fieldConstraints.supportsSize) {
+        form.setValue('size', undefined);
+      }
+      
+      // Trigger debounced validation
+      debouncedValidation();
     }
-    
-    trigger(['dbType', 'isAggregate']);
-  }, [watchedIsVirtual, debouncedType, setValue, trigger]);
+  }, [watchedType, fieldConstraints, form, debouncedValidation]);
   
-  /**
-   * Handle foreign key state changes
-   */
+  // Effect to handle primary key constraint changes
   useEffect(() => {
-    if (!watchedIsForeignKey) {
-      // Clear reference fields when foreign key is disabled
-      setValue('refTable', '');
-      setValue('refField', '');
+    if (watchedPrimaryKey) {
+      // Primary key fields cannot be nullable
+      form.setValue('nullable', false);
+      form.setValue('unique', true);
     }
-    
-    trigger(['refTable', 'refField']);
-  }, [watchedIsForeignKey, setValue, trigger]);
+  }, [watchedPrimaryKey, form]);
   
-  /**
-   * Clear reference field when reference table changes
-   */
-  useEffect(() => {
-    if (debouncedRefTable !== getValues('refTable')) {
-      setValue('refField', '');
-      trigger('refField');
-    }
-  }, [debouncedRefTable, setValue, trigger, getValues]);
-  
-  // =============================================================================
-  // FORM SUBMISSION HANDLERS
-  // =============================================================================
-  
-  /**
-   * Handle form submission with comprehensive data processing
-   */
-  const onSubmit = useCallback(async (data: FieldFormData) => {
+  // Form submission handler with error handling
+  const handleSubmit = useCallback(async (data: FieldFormData) => {
     try {
-      // Process and validate form data
-      const processedData = {
-        ...data,
-        // Parse JSON validation if provided
-        validation: data.validation ? JSON.parse(data.validation) : null,
-        // Convert empty strings to null for proper API handling
-        dbType: data.dbType || null,
-        length: data.length || null,
-        precision: data.precision || null,
-        default: data.default || null,
-        refTable: data.refTable || null,
-        refField: data.refField || null,
-        picklist: data.picklist || null,
-      };
-      
-      // Submit based on mode
-      if (mode === 'create') {
-        await createFieldMutation.mutateAsync(processedData);
-      } else {
-        await updateFieldMutation.mutateAsync(processedData);
-      }
+      await onSubmit(data);
     } catch (error) {
-      console.error('Form submission error:', error);
-      // Error handling is done in mutation callbacks
+      console.error('Field form submission error:', error);
+      // Additional error handling could be added here
     }
-  }, [mode, createFieldMutation, updateFieldMutation]);
+  }, [onSubmit]);
   
-  /**
-   * Handle form cancellation
-   */
-  const handleCancel = useCallback(() => {
-    if (isDirty) {
-      const confirmCancel = confirm(
-        'You have unsaved changes. Are you sure you want to cancel?'
-      );
-      if (!confirmCancel) return;
-    }
-    
-    if (onCancel) {
-      onCancel();
-    } else {
-      router.push(`/adf-schema/fields?service=${serviceName}&table=${tableName}`);
-    }
-  }, [isDirty, onCancel, router, serviceName, tableName]);
+  // Validation rule management
+  const addValidationRule = useCallback(() => {
+    const currentRules = form.getValues('validation_rules') || [];
+    form.setValue('validation_rules', [
+      ...currentRules,
+      {
+        type: 'required' as const,
+        value: '',
+        message: '',
+        enabled: true,
+      },
+    ]);
+  }, [form]);
   
-  // =============================================================================
-  // COMPONENT RENDER
-  // =============================================================================
+  const removeValidationRule = useCallback((index: number) => {
+    const currentRules = form.getValues('validation_rules') || [];
+    form.setValue('validation_rules', currentRules.filter((_, i) => i !== index));
+  }, [form]);
   
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-      {/* Form Header */}
-      <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-          {mode === 'create' ? 'Create New Field' : `Edit Field: ${fieldName}`}
-        </h2>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Configure database field properties, constraints, and validation rules.
-        </p>
-      </div>
-      
-      {/* Error Display */}
-      {(tablesError || fieldsError) && (
-        <Alert variant="destructive">
-          <AlertDescription>
-            Failed to load reference data. Please check your connection and try again.
-          </AlertDescription>
-        </Alert>
+    <div
+      className={cn(
+        'field-form-container',
+        'w-full max-w-4xl mx-auto p-6',
+        'bg-white dark:bg-gray-900',
+        'border border-gray-200 dark:border-gray-700',
+        'rounded-lg shadow-sm',
+        className
       )}
-      
-      {/* Main Form */}
-      <FormProvider {...form}>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      data-testid={testId}
+      data-theme={resolvedTheme}
+    >
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        {/* Form Header */}
+        <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {initialData ? 'Edit Field Configuration' : 'Create New Field'}
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Configure the database field properties, constraints, and validation rules.
+          </p>
+        </div>
+        
+        {/* Basic Field Properties */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Field Name */}
+          <FormField
+            control={form.control}
+            name="name"
+            config={{
+              label: 'Field Name',
+              placeholder: 'Enter field name (e.g., user_id)',
+              description: 'Database column name (letters, numbers, underscores only)',
+              required: true,
+            }}
+          >
+            <Input
+              type="text"
+              disabled={disabled || loading}
+              className="font-mono text-sm"
+            />
+          </FormField>
           
-          {/* Basic Field Information Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-              Basic Information
-            </h3>
+          {/* Field Label */}
+          <FormField
+            control={form.control}
+            name="label"
+            config={{
+              label: 'Field Label',
+              placeholder: 'Enter display label',
+              description: 'Human-readable label for forms and displays',
+              required: true,
+            }}
+          >
+            <Input
+              type="text"
+              disabled={disabled || loading}
+            />
+          </FormField>
+          
+          {/* Field Type */}
+          <FormField
+            control={form.control}
+            name="type"
+            config={{
+              label: 'Field Type',
+              description: 'Database field data type',
+              required: true,
+            }}
+          >
+            <Select
+              options={FIELD_TYPES.map(type => ({
+                value: type.value,
+                label: type.label,
+                group: type.category,
+              }))}
+              disabled={disabled || loading}
+              placeholder="Select field type..."
+            />
+          </FormField>
+          
+          {/* Field Description */}
+          <FormField
+            control={form.control}
+            name="description"
+            config={{
+              label: 'Description',
+              placeholder: 'Optional field description',
+              description: 'Additional information about this field',
+            }}
+          >
+            <TextArea
+              rows={3}
+              disabled={disabled || loading}
+            />
+          </FormField>
+        </div>
+        
+        {/* Field Constraints */}
+        <div className="space-y-4">
+          <h4 className="text-md font-medium text-gray-900 dark:text-white">
+            Field Constraints
+          </h4>
+          
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Nullable */}
+            <FormField
+              control={form.control}
+              name="nullable"
+              config={{
+                label: 'Allow NULL',
+                description: 'Field can have empty values',
+              }}
+            >
+              <Toggle
+                disabled={disabled || loading || watchedPrimaryKey}
+              />
+            </FormField>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Field Name */}
-              <FormField
-                control={control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="required">Field Name</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Enter field name"
-                        disabled={mode === 'edit'} // Field name cannot be changed in edit mode
-                        className="transition-colors duration-200"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            {/* Primary Key */}
+            <FormField
+              control={form.control}
+              name="primary_key"
+              config={{
+                label: 'Primary Key',
+                description: 'Field is a primary key',
+              }}
+            >
+              <Toggle
+                disabled={disabled || loading}
               />
-              
-              {/* Field Alias */}
-              <FormField
-                control={control}
-                name="alias"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      Alias
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <InformationCircleIcon className="h-4 w-4 text-gray-400" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Alternative name for this field in API responses</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Enter field alias"
-                        className="transition-colors duration-200"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            </FormField>
+            
+            {/* Auto Increment */}
+            <FormField
+              control={form.control}
+              name="auto_increment"
+              config={{
+                label: 'Auto Increment',
+                description: 'Automatically increment value',
+              }}
+            >
+              <Toggle
+                disabled={disabled || loading || !fieldConstraints.supportsAutoIncrement}
               />
-              
-              {/* Field Label */}
-              <FormField
-                control={control}
-                name="label"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      Label
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <InformationCircleIcon className="h-4 w-4 text-gray-400" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Human-readable label for this field</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Enter field label"
-                        className="transition-colors duration-200"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            </FormField>
+            
+            {/* Indexed */}
+            <FormField
+              control={form.control}
+              name="indexed"
+              config={{
+                label: 'Indexed',
+                description: 'Create database index',
+              }}
+            >
+              <Toggle
+                disabled={disabled || loading}
               />
-              
-              {/* Field Type */}
-              <FormField
-                control={control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="required flex items-center gap-2">
-                      Field Type
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <InformationCircleIcon className="h-4 w-4 text-gray-400" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Data type for this field - affects validation and storage</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="transition-colors duration-200">
-                          <SelectValue placeholder="Select field type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {FIELD_TYPE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            </FormField>
+            
+            {/* Unique */}
+            <FormField
+              control={form.control}
+              name="unique"
+              config={{
+                label: 'Unique',
+                description: 'Enforce unique values',
+              }}
+            >
+              <Toggle
+                disabled={disabled || loading}
               />
-            </div>
+            </FormField>
           </div>
-          
-          {/* Type Configuration Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-              Type Configuration
-            </h3>
+        </div>
+        
+        {/* Size and Precision Constraints */}
+        {(fieldConstraints.supportsSize || fieldConstraints.supportsPrecision) && (
+          <div className="space-y-4">
+            <h4 className="text-md font-medium text-gray-900 dark:text-white">
+              Size & Precision
+            </h4>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Database Type (manual entry) */}
-              <FormField
-                control={control}
-                name="dbType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      Database Type
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <InformationCircleIcon className="h-4 w-4 text-gray-400" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Native database type (e.g., VARCHAR, INT, TEXT)</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Enter database type"
-                        disabled={!isControlEnabled('dbType')}
-                        className="transition-colors duration-200 disabled:opacity-50"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Length */}
-              <FormField
-                control={control}
-                name="length"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Length</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="number"
-                        placeholder="Max length"
-                        disabled={!isControlEnabled('length')}
-                        className="transition-colors duration-200 disabled:opacity-50"
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Size */}
+              {fieldConstraints.supportsSize && (
+                <FormField
+                  control={form.control}
+                  name="size"
+                  config={{
+                    label: 'Size',
+                    placeholder: 'Enter size',
+                    description: 'Maximum field size',
+                  }}
+                >
+                  <Input
+                    type="number"
+                    min={1}
+                    max={65535}
+                    disabled={disabled || loading}
+                  />
+                </FormField>
+              )}
               
               {/* Precision */}
-              <FormField
-                control={control}
-                name="precision"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Precision</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="number"
-                        placeholder="Decimal precision"
-                        disabled={!isControlEnabled('precision')}
-                        className="transition-colors duration-200 disabled:opacity-50"
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {fieldConstraints.supportsPrecision && (
+                <FormField
+                  control={form.control}
+                  name="precision"
+                  config={{
+                    label: 'Precision',
+                    placeholder: 'Enter precision',
+                    description: 'Total number of digits',
+                  }}
+                >
+                  <Input
+                    type="number"
+                    min={1}
+                    max={65}
+                    disabled={disabled || loading}
+                  />
+                </FormField>
+              )}
               
               {/* Scale */}
-              <FormField
-                control={control}
-                name="scale"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Scale</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="number"
-                        placeholder="Decimal scale"
-                        disabled={!isControlEnabled('scale')}
-                        className="transition-colors duration-200 disabled:opacity-50"
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Default Value */}
-              <FormField
-                control={control}
-                name="default"
-                render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-                    <FormLabel>Default Value</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Enter default value"
-                        className="transition-colors duration-200"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-          
-          {/* Field Properties Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-              Field Properties
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Virtual Field */}
-              <FormField
-                control={control}
-                name="isVirtual"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Virtual Field</FormLabel>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Field exists only in API, not in database
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Toggle
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        aria-describedby="virtual-field-description"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              {/* Aggregate Field */}
-              <FormField
-                control={control}
-                name="isAggregate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Aggregate Field</FormLabel>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Field contains aggregated data
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Toggle
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={!isControlEnabled('isAggregate')}
-                        aria-describedby="aggregate-field-description"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              {/* Allow Null */}
-              <FormField
-                control={control}
-                name="allowNull"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Allow Null</FormLabel>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Field can contain null values
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Toggle
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        aria-describedby="allow-null-description"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              {/* Auto Increment */}
-              <FormField
-                control={control}
-                name="autoIncrement"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Auto Increment</FormLabel>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Automatically increment value
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Toggle
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        aria-describedby="auto-increment-description"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              {/* Index */}
-              <FormField
-                control={control}
-                name="isIndex"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Index</FormLabel>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Create database index for this field
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Toggle
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        aria-describedby="index-description"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              {/* Unique */}
-              <FormField
-                control={control}
-                name="isUnique"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Unique</FormLabel>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Field values must be unique
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Toggle
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        aria-describedby="unique-description"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              {/* Primary Key */}
-              <FormField
-                control={control}
-                name="isPrimaryKey"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Primary Key</FormLabel>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Field is part of primary key
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Toggle
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={!isControlEnabled('isPrimaryKey')}
-                        aria-describedby="primary-key-description"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              {/* Foreign Key */}
-              <FormField
-                control={control}
-                name="isForeignKey"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Foreign Key</FormLabel>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Field references another table
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Toggle
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        aria-describedby="foreign-key-description"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              {/* Fixed Length */}
-              <FormField
-                control={control}
-                name="fixedLength"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Fixed Length</FormLabel>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Field has fixed length
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Toggle
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={!isControlEnabled('fixedLength')}
-                        aria-describedby="fixed-length-description"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              {/* Supports Multibyte */}
-              <FormField
-                control={control}
-                name="supportsMultibyte"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Supports Multibyte</FormLabel>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Field supports multibyte characters
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Toggle
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={!isControlEnabled('supportsMultibyte')}
-                        aria-describedby="multibyte-description"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-          
-          {/* Foreign Key Reference Section */}
-          {watchedIsForeignKey && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-                Foreign Key Reference
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Reference Table */}
+              {fieldConstraints.supportsPrecision && (
                 <FormField
-                  control={control}
-                  name="refTable"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="required">Reference Table</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                        disabled={isLoadingTables}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="transition-colors duration-200">
-                            <SelectValue placeholder="Select reference table" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {referenceTables.map((table) => (
-                            <SelectItem key={table.name} value={table.name}>
-                              {table.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                {/* Reference Field */}
-                <FormField
-                  control={control}
-                  name="refField"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="required">Reference Field</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                        disabled={!debouncedRefTable || isLoadingFields}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="transition-colors duration-200">
-                            <SelectValue placeholder="Select reference field" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {referenceFields.map((field) => (
-                            <SelectItem key={field.name} value={field.name}>
-                              {field.label || field.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-          )}
-          
-          {/* Validation Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-              Validation and Constraints
-            </h3>
-            
-            <div className="space-y-6">
-              {/* JSON Validation Rules */}
-              <FormField
-                control={control}
-                name="validation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      Validation Rules (JSON)
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <InformationCircleIcon className="h-4 w-4 text-gray-400" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>JSON object containing validation rules for this field</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        placeholder='{"required": true, "minLength": 3}'
-                        rows={4}
-                        className="font-mono text-sm transition-colors duration-200"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Picklist (for supported field types) */}
-              {shouldShowPicklist && (
-                <FormField
-                  control={control}
-                  name="picklist"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Picklist Values (CSV)</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="value1,value2,value3"
-                          className="transition-colors duration-200"
-                        />
-                      </FormControl>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Comma-separated values for dropdown options
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  control={form.control}
+                  name="scale"
+                  config={{
+                    label: 'Scale',
+                    placeholder: 'Enter scale',
+                    description: 'Digits after decimal point',
+                  }}
+                >
+                  <Input
+                    type="number"
+                    min={0}
+                    max={30}
+                    disabled={disabled || loading}
+                  />
+                </FormField>
               )}
             </div>
           </div>
-          
-          {/* Database Functions Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-              Database Functions
-            </h3>
-            
-            <FormField
-              control={control}
-              name="dbFunction"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <FunctionUseForm
-                      value={field.value}
-                      onChange={field.onChange}
-                      serviceName={serviceName}
-                      tableName={tableName}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        )}
+        
+        {/* Default Value */}
+        <div className="space-y-4">
+          <FormField
+            control={form.control}
+            name="default_value"
+            config={{
+              label: 'Default Value',
+              placeholder: 'Enter default value',
+              description: 'Default value for new records',
+            }}
+          >
+            <Input
+              type="text"
+              disabled={disabled || loading}
             />
+          </FormField>
+        </div>
+        
+        {/* Picklist Values */}
+        {fieldConstraints.supportsPicklist && (
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="picklist_values"
+              config={{
+                label: 'Picklist Values',
+                placeholder: 'value1, value2, value3',
+                description: 'Comma-separated list of allowed values',
+              }}
+            >
+              <TextArea
+                rows={3}
+                disabled={disabled || loading}
+              />
+            </FormField>
+          </div>
+        )}
+        
+        {/* JSON Schema */}
+        {fieldConstraints.supportsJsonSchema && (
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="json_schema"
+              config={{
+                label: 'JSON Schema',
+                placeholder: '{"type": "object", "properties": {...}}',
+                description: 'JSON schema for validation',
+              }}
+            >
+              <TextArea
+                rows={4}
+                disabled={disabled || loading}
+                className="font-mono text-sm"
+              />
+            </FormField>
+          </div>
+        )}
+        
+        {/* Advanced Sections */}
+        {showAdvanced && (
+          <div className="space-y-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+            {/* Validation Rules Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-md font-medium text-gray-900 dark:text-white">
+                  Validation Rules
+                </h4>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowValidationRules(!showValidationRules)}
+                  disabled={disabled || loading}
+                >
+                  {showValidationRules ? 'Hide' : 'Show'} Rules
+                </Button>
+              </div>
+              
+              {showValidationRules && (
+                <div className="space-y-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                  {form.watch('validation_rules')?.map((rule, index) => (
+                    <div key={index} className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <FormField
+                        control={form.control}
+                        name={`validation_rules.${index}.type`}
+                        config={{
+                          label: 'Rule Type',
+                        }}
+                      >
+                        <Select
+                          options={VALIDATION_RULES}
+                          disabled={disabled || loading}
+                        />
+                      </FormField>
+                      
+                      <FormField
+                        control={form.control}
+                        name={`validation_rules.${index}.value`}
+                        config={{
+                          label: 'Rule Value',
+                        }}
+                      >
+                        <Input
+                          type="text"
+                          disabled={disabled || loading}
+                        />
+                      </FormField>
+                      
+                      <FormField
+                        control={form.control}
+                        name={`validation_rules.${index}.message`}
+                        config={{
+                          label: 'Error Message',
+                        }}
+                      >
+                        <Input
+                          type="text"
+                          disabled={disabled || loading}
+                        />
+                      </FormField>
+                      
+                      <div className="flex items-end space-x-2">
+                        <FormField
+                          control={form.control}
+                          name={`validation_rules.${index}.enabled`}
+                          config={{
+                            label: 'Enabled',
+                          }}
+                        >
+                          <Toggle
+                            disabled={disabled || loading}
+                          />
+                        </FormField>
+                        
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeValidationRule(index)}
+                          disabled={disabled || loading}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addValidationRule}
+                    disabled={disabled || loading}
+                  >
+                    Add Validation Rule
+                  </Button>
+                </div>
+              )}
+            </div>
+            
+            {/* Relationship Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-md font-medium text-gray-900 dark:text-white">
+                  Relationship Configuration
+                </h4>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowRelationship(!showRelationship)}
+                  disabled={disabled || loading}
+                >
+                  {showRelationship ? 'Hide' : 'Show'} Relationship
+                </Button>
+              </div>
+              
+              {showRelationship && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                  <FormField
+                    control={form.control}
+                    name="relationship.type"
+                    config={{
+                      label: 'Relationship Type',
+                    }}
+                  >
+                    <Select
+                      options={RELATIONSHIP_TYPES}
+                      disabled={disabled || loading}
+                      placeholder="Select relationship type..."
+                    />
+                  </FormField>
+                  
+                  <FormField
+                    control={form.control}
+                    name="relationship.table"
+                    config={{
+                      label: 'Related Table',
+                    }}
+                  >
+                    <Select
+                      options={availableTables}
+                      disabled={disabled || loading}
+                      placeholder="Select related table..."
+                    />
+                  </FormField>
+                  
+                  <FormField
+                    control={form.control}
+                    name="relationship.field"
+                    config={{
+                      label: 'Related Field',
+                    }}
+                  >
+                    <Input
+                      type="text"
+                      disabled={disabled || loading}
+                    />
+                  </FormField>
+                  
+                  <FormField
+                    control={form.control}
+                    name="relationship.on_delete"
+                    config={{
+                      label: 'On Delete',
+                    }}
+                  >
+                    <Select
+                      options={[
+                        { value: 'CASCADE', label: 'CASCADE' },
+                        { value: 'SET_NULL', label: 'SET NULL' },
+                        { value: 'RESTRICT', label: 'RESTRICT' },
+                        { value: 'NO_ACTION', label: 'NO ACTION' },
+                      ]}
+                      disabled={disabled || loading}
+                      placeholder="Select action..."
+                    />
+                  </FormField>
+                </div>
+              )}
+            </div>
+            
+            {/* Function Usage Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-md font-medium text-gray-900 dark:text-white">
+                  Function Usage
+                </h4>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFunctionUsage(!showFunctionUsage)}
+                  disabled={disabled || loading}
+                >
+                  {showFunctionUsage ? 'Hide' : 'Show'} Functions
+                </Button>
+              </div>
+              
+              {showFunctionUsage && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                  <FormField
+                    control={form.control}
+                    name="function_usage.type"
+                    config={{
+                      label: 'Function Type',
+                    }}
+                  >
+                    <Select
+                      options={FUNCTION_TYPES}
+                      disabled={disabled || loading}
+                      placeholder="Select function type..."
+                    />
+                  </FormField>
+                  
+                  <FormField
+                    control={form.control}
+                    name="function_usage.expression"
+                    config={{
+                      label: 'Function Expression',
+                      description: 'Custom expression or SQL function',
+                    }}
+                  >
+                    <TextArea
+                      rows={3}
+                      disabled={disabled || loading}
+                      className="font-mono text-sm"
+                    />
+                  </FormField>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Form Actions */}
+        <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex space-x-3">
+            {onCancel && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+            )}
           </div>
           
-          {/* Form Actions */}
-          <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex space-x-3">
             <Button
               type="button"
               variant="outline"
-              onClick={handleCancel}
-              disabled={isSubmitting || createFieldMutation.isPending || updateFieldMutation.isPending}
+              onClick={() => form.reset()}
+              disabled={disabled || loading}
             >
-              Cancel
+              Reset
             </Button>
             
             <Button
               type="submit"
-              disabled={
-                !isValid || 
-                isSubmitting || 
-                createFieldMutation.isPending || 
-                updateFieldMutation.isPending
-              }
-              className="min-w-24"
+              loading={loading}
+              disabled={disabled || !form.formState.isValid}
             >
-              {createFieldMutation.isPending || updateFieldMutation.isPending ? (
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>{mode === 'create' ? 'Creating...' : 'Updating...'}</span>
-                </div>
-              ) : (
-                <span>{mode === 'create' ? 'Create Field' : 'Update Field'}</span>
-              )}
+              {initialData ? 'Update Field' : 'Create Field'}
             </Button>
           </div>
-        </form>
-      </FormProvider>
+        </div>
+      </form>
     </div>
   );
-}
+};
 
-// =============================================================================
-// COMPONENT EXPORT WITH DISPLAY NAME
-// =============================================================================
-
+/**
+ * Display name for debugging
+ */
 FieldForm.displayName = 'FieldForm';
 
+/**
+ * Default export
+ */
 export default FieldForm;
