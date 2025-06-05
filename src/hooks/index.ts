@@ -1,481 +1,504 @@
 /**
- * Shared Hooks Library - Barrel Export File
+ * Shared Hooks Library - Barrel Export Module
  * 
- * Centralized exports for all global custom React hooks that replace Angular services.
- * Provides clean imports throughout the application and supports tree-shaking optimization
- * for Turbopack build pipeline per Section 3.2.5 build system requirements.
+ * Centralized export hub for all custom React hooks used throughout the DreamFactory
+ * Admin Interface. This barrel export file enables clean imports, supports tree-shaking
+ * optimization with Turbopack, and provides a unified interface for consuming shared
+ * functionality across the application.
  * 
- * This module exports hooks organized into logical categories:
- * - Authentication & Session Management
- * - User & Profile Management  
- * - System & Configuration
- * - Data Fetching & API Integration
- * - UI State & Theme Management
- * - Utility & Helper Hooks
+ * Key Features:
+ * - Tree-shaking optimization for Turbopack build pipeline
+ * - TypeScript 5.8+ module system with comprehensive type exports
+ * - React 19 compatible hook patterns with Next.js 15.1+ integration
+ * - Clean import patterns supporting component composition architecture
+ * - Centralized dependency management for all authentication, UI state, and data fetching hooks
  * 
- * All exports support ES modules tree-shaking for optimal bundle size and performance
- * in the Next.js 15.1+ build pipeline with Turbopack optimization.
+ * Architecture Benefits:
+ * - Eliminates relative import path complexity across components
+ * - Enables consistent hook usage patterns throughout the application
+ * - Supports build-time optimization through intelligent bundling
+ * - Provides single source of truth for shared hook availability
+ * - Facilitates refactoring and dependency management
  * 
- * @example
- * ```tsx
- * // Clean import patterns enabled by barrel exports
- * import { useAuth, useUser, useTheme } from '@/hooks';
+ * Usage Examples:
+ * ```typescript
+ * // Clean imports for multiple hooks
+ * import { useAuth, useTheme, useLoading } from '@/hooks';
  * 
- * // Tree-shaking optimization - only imported hooks are bundled
- * import { useAuth } from '@/hooks';
+ * // Tree-shaking friendly individual imports
+ * import { useApi } from '@/hooks';
  * 
- * // Component composition patterns
- * function Dashboard() {
- *   const { user, isAuthenticated } = useAuth();
- *   const { theme, toggleTheme } = useTheme();
- *   const { notifications } = useNotifications();
- *   
- *   return (
- *     <div className={theme === 'dark' ? 'dark' : ''}>
- *       {isAuthenticated && <WelcomeMessage user={user} />}
- *     </div>
- *   );
- * }
+ * // Type imports for component development
+ * import type { UseAuthReturn, LoadingState } from '@/hooks';
  * ```
+ * 
+ * @fileoverview Barrel export module for shared hooks library
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
+ * @module hooks
  */
 
-// ============================================================================
-// Authentication & Session Management Hooks
-// ============================================================================
+// =============================================================================
+// AUTHENTICATION AND SESSION MANAGEMENT HOOKS
+// =============================================================================
 
 /**
- * Primary authentication hook with comprehensive login/logout workflows,
- * JWT token handling, and authentication state management.
- * Replaces Angular AuthService with React Query mutations and Zustand state.
+ * Authentication and user session management hooks
+ * Provides comprehensive auth state management, session validation, and user operations
  */
-export { 
-  useAuth, 
-  AuthAPI, 
-  authQueryKeys,
-  default as useAuthDefault 
+export {
+  useAuth,
+  useSession,
+  useUser,
+  // Named exports for authentication utilities
+  AUTH_QUERY_KEYS,
+  AUTH_MUTATION_KEYS,
+  createAuthError,
+  parseHttpError,
+  // Type exports for authentication
+  type UseAuthReturn,
+  type AuthState,
+  type AuthActions,
+  type AuthStore,
+  type UseAuthConfig,
+  type UseSessionReturn,
+  type SessionData,
+  type SessionUser,
+  type UseSessionOptions,
 } from './use-auth';
 
-/**
- * Session management hook for user sessions, token validation,
- * and automatic session refresh with Next.js middleware integration.
- */
-export { 
-  useSession,
-  SessionAPI,
-  SessionCookieManager,
-  sessionQueryKeys
+// Re-export session hook with additional exports
+export {
+  type SessionToken,
+  type UserRole,
+  type RoleServiceAccess,
+  type SessionValidationResponse,
+  type SessionRefreshResponse,
+  type SessionLoginRequest,
+  type SessionLoginResponse,
 } from './use-session';
 
-// ============================================================================
-// User & Profile Management Hooks
-// ============================================================================
-
-/**
- * User data management hook providing profile operations, permission checking,
- * and user state synchronization with comprehensive CRUD capabilities.
- */
-export { 
-  useUser,
-  UserHookError,
-  userQueryKeys
+// Re-export user management hook with types
+export {
+  type UserProfile,
+  type AdminProfile,
+  type UserParams,
+  type UpdatePasswordRequest,
+  type UpdatePasswordResponse,
+  type UserProfileFormData,
+  type UserProfileSchema,
+  type UserAction,
+  type SessionValidationResult,
+  type SessionError,
 } from './use-user';
 
-// ============================================================================
-// System & Configuration Hooks
-// ============================================================================
+// =============================================================================
+// SYSTEM CONFIGURATION AND STATE HOOKS
+// =============================================================================
 
 /**
- * System configuration management hook for DreamFactory platform settings,
- * environment configuration, and feature flags with intelligent caching.
+ * System configuration and application state management hooks
+ * Handles global system settings, current service state, and configuration management
  */
-export { 
+export {
   useSystemConfig,
-  systemConfigQueryKeys
+  useCurrentService,
+  // Type exports for system configuration
+  type SystemConfig,
+  type SystemConfigUpdate,
+  type UseSystemConfigReturn,
+  type ServiceConfig,
+  type UseCurrentServiceReturn,
 } from './use-system-config';
 
-/**
- * Current service context hook for active database service management
- * and service-specific configuration state throughout the application.
- */
-export { 
-  useCurrentService,
-  currentServiceQueryKeys
+export {
+  type DatabaseService,
+  type ServiceType,
+  type ConnectionStatus,
+  type ServiceValidation,
 } from './use-current-service';
 
-// ============================================================================
-// Data Fetching & API Integration Hooks
-// ============================================================================
+// =============================================================================
+// UI STATE AND THEME MANAGEMENT HOOKS
+// =============================================================================
 
 /**
- * Core API client hook providing standardized HTTP operations,
- * request configuration, and response handling with React Query integration.
- * Replaces Angular DfBaseCrudService with modern data fetching patterns.
+ * UI state management hooks for theme, loading states, and notifications
+ * Provides comprehensive UI state coordination and user interface management
  */
-export { 
-  useApi,
-  ApiError,
-  apiQueryKeys
-} from './use-api';
-
-/**
- * Enhanced mutation hook for server state modifications with optimistic updates,
- * error handling, and cache invalidation strategies using React Query.
- */
-export { 
-  useMutation,
-  MutationError,
-  mutationQueryKeys
-} from './use-mutation';
-
-/**
- * File API operations hook for upload, download, and file management
- * with progress tracking and comprehensive error handling.
- */
-export { 
-  useFileApi,
-  FileApiError,
-  fileApiQueryKeys
-} from './use-file-api';
-
-// ============================================================================
-// UI State & Theme Management Hooks
-// ============================================================================
-
-/**
- * Theme management hook for dark/light mode toggling, theme persistence,
- * and CSS variable integration with Tailwind CSS theming system.
- */
-export { 
+export {
   useTheme,
-  ThemeConfig,
-  THEME_STORAGE_KEY
+  useSimpleTheme,
+  useThemeStyles,
+  // Type exports for theme management
+  type UseThemeReturn,
+  type PaginationPreferences,
+  type ThemeMode,
+  type ResolvedTheme,
+  type ThemeUtils,
+  type ThemeCSSProperties,
+  type ThemeTransition,
+  type SystemThemeConfig,
 } from './use-theme';
 
-/**
- * Loading state management hook for tracking application loading states,
- * providing centralized loading indicators with debouncing and conflict resolution.
- */
-export { 
+export {
   useLoading,
-  LoadingConfig,
-  LoadingState
+  useGlobalLoading,
+  useApiLoading,
+  useImmediateLoading,
+  withLoading,
+  // Type exports for loading management
+  type LoadingConfig,
+  type LoadingState,
+  type LoadingOperation,
+  type UseLoadingReturn,
 } from './use-loading';
 
-/**
- * Notification system hook for displaying alerts, messages, and notifications
- * with queue management, auto-dismissal, and type-safe notification handling.
- */
-export { 
+export {
   useNotifications,
-  NotificationItem,
-  NotificationConfig,
-  NotificationType
+  // Type exports for notifications
+  type NotificationLevel,
+  type NotificationConfig,
+  type NotificationState,
+  type UseNotificationsReturn,
 } from './use-notifications';
 
+// =============================================================================
+// DATA FETCHING AND API MANAGEMENT HOOKS
+// =============================================================================
+
 /**
- * Error handling hook for centralized error management, error boundaries,
- * and consistent error display throughout the application.
+ * Data fetching and API management hooks
+ * Provides comprehensive HTTP client functionality, mutations, and API abstractions
  */
-export { 
+export {
+  useApi,
+  // Type exports for API management
+  type ApiRequestOptions,
+  type FileUploadOptions,
+  type FileDownloadOptions,
+} from './use-api';
+
+export {
+  useMutation,
+  // Type exports for mutation management
+  type MutationConfig,
+  type MutationState,
+  type UseMutationReturn,
+} from './use-mutation';
+
+export {
+  useFileApi,
+  // Type exports for file operations
+  type FileApiConfig,
+  type FileOperation,
+  type UseFileApiReturn,
+} from './use-file-api';
+
+// =============================================================================
+// ERROR HANDLING AND LOGGING HOOKS
+// =============================================================================
+
+/**
+ * Error handling and logging hooks
+ * Provides comprehensive error management, logging, and debugging capabilities
+ */
+export {
   useError,
-  ErrorConfig,
-  ErrorState
+  useErrorHandler,
+  // Type exports for error management
+  type ErrorState,
+  type ErrorHandler,
+  type UseErrorReturn,
+  type UseErrorHandlerReturn,
 } from './use-error';
 
-/**
- * Enhanced error handler hook for global error handling strategies,
- * error reporting, and recovery mechanisms with logging integration.
- */
-export { 
-  useErrorHandler,
-  ErrorHandlerConfig,
-  ErrorSeverity
+export {
+  useErrorHandler as useErrorHandlerAlias,
+  // Additional error handling types
+  type ErrorContext,
+  type ErrorSeverity,
+  type ErrorReporting,
 } from './use-error-handler';
 
-/**
- * Search functionality hook for global search operations, query management,
- * and search result caching with debounced input handling.
- */
-export { 
-  useSearch,
-  SearchConfig,
-  SearchResult
-} from './use-search';
-
-// ============================================================================
-// Utility & Helper Hooks
-// ============================================================================
-
-/**
- * Local storage hook for client-side data persistence with type safety,
- * automatic serialization, and synchronization across browser tabs.
- */
-export { 
-  useLocalStorage,
-  LocalStorageConfig,
-  LocalStorageError
-} from './use-local-storage';
-
-/**
- * First-time user experience hook for onboarding workflows,
- * tutorial management, and guided user introduction features.
- */
-export { 
-  useFirstTimeUser,
-  FirstTimeUserConfig,
-  FirstTimeUserState
-} from './use-first-time-user';
-
-/**
- * License management hook for feature availability checking,
- * license validation, and enterprise feature access control.
- */
-export { 
-  useLicense,
-  LicenseConfig,
-  LicenseState
-} from './use-license';
-
-/**
- * Paywall management hook for premium feature access control,
- * subscription status checking, and upgrade flow management.
- */
-export { 
-  usePaywall,
-  PaywallConfig,
-  PaywallState
-} from './use-paywall';
-
-/**
- * Responsive design hook for breakpoint detection, media query matching,
- * and responsive component behavior with Tailwind CSS integration.
- */
-export { 
-  useBreakpoint,
-  BreakpointConfig,
-  BreakpointState
-} from './use-breakpoint';
-
-/**
- * Debouncing hook for input delay management, API call throttling,
- * and performance optimization with configurable delay strategies.
- */
-export { 
-  useDebounce,
-  DebounceConfig
-} from './use-debounce';
-
-/**
- * Logging hook for application logging, debugging, and monitoring
- * with configurable log levels and structured logging capabilities.
- */
-export { 
+export {
   useLogger,
-  LoggerConfig,
-  LogLevel
+  // Type exports for logging
+  type LogLevel,
+  type LogEntry,
+  type LoggerConfig,
+  type UseLoggerReturn,
 } from './use-logger';
 
-// ============================================================================
-// Type Re-exports for Convenience
-// ============================================================================
+// =============================================================================
+// UTILITY AND BROWSER INTEGRATION HOOKS
+// =============================================================================
 
 /**
- * Common authentication types re-exported for convenience
+ * Utility hooks for browser integration and common functionality
+ * Provides localStorage management, responsive design, debouncing, and search capabilities
  */
+export {
+  useLocalStorage,
+  // Type exports for local storage
+  type LocalStorageOptions,
+  type LocalStorageState,
+  type UseLocalStorageReturn,
+} from './use-local-storage';
+
+export {
+  useBreakpoint,
+  // Type exports for responsive design
+  type BreakpointConfig,
+  type BreakpointState,
+  type UseBreakpointReturn,
+} from './use-breakpoint';
+
+export {
+  useDebounce,
+  // Type exports for debouncing
+  type DebounceConfig,
+  type UseDebounceReturn,
+} from './use-debounce';
+
+export {
+  useSearch,
+  // Type exports for search functionality
+  type SearchConfig,
+  type SearchState,
+  type SearchResults,
+  type UseSearchReturn,
+} from './use-search';
+
+// =============================================================================
+// APPLICATION LIFECYCLE AND BUSINESS LOGIC HOOKS
+// =============================================================================
+
+/**
+ * Application lifecycle and business logic hooks
+ * Handles first-time user experience, licensing, and paywall functionality
+ */
+export {
+  useFirstTimeUser,
+  // Type exports for first-time user management
+  type FirstTimeUserState,
+  type OnboardingStep,
+  type UseFirstTimeUserReturn,
+} from './use-first-time-user';
+
+export {
+  useLicense,
+  // Type exports for license management
+  type LicenseState,
+  type LicenseInfo,
+  type UseLicenseReturn,
+} from './use-license';
+
+export {
+  usePaywall,
+  // Type exports for paywall functionality
+  type PaywallState,
+  type PaywallConfig,
+  type UsePaywallReturn,
+} from './use-paywall';
+
+// =============================================================================
+// ADDITIONAL TYPE EXPORTS FOR CROSS-CUTTING CONCERNS
+// =============================================================================
+
+/**
+ * Cross-cutting type definitions used across multiple hooks
+ * Provides shared interfaces for consistent typing throughout the application
+ */
+
+// Generic API types used across hooks
+export type {
+  GenericListResponse,
+  GenericSuccessResponse,
+  GenericCreateResponse,
+  GenericUpdateResponse,
+  RequestOptions,
+  KeyValuePair,
+} from '../types/generic-http';
+
+// Authentication and authorization types
 export type {
   LoginCredentials,
   LoginResponse,
-  UserSession,
+  RegisterDetails,
   AuthError,
   AuthErrorCode,
-  UseAuthReturn
-} from '@/types/auth';
+  ForgetPasswordRequest,
+  OAuthLoginRequest,
+  SAMLAuthParams,
+} from '../types/auth';
 
-/**
- * Common user types re-exported for convenience
- */
+// Theme and UI types
 export type {
-  UserProfile,
-  AdminUser,
-  UserPermissions,
-  NotificationPreferences
-} from '@/types/user';
+  DEFAULT_THEME_CONFIG,
+  THEME_CONSTANTS,
+} from '../types/theme';
+
+// =============================================================================
+// DEFAULT EXPORTS
+// =============================================================================
 
 /**
- * API client types re-exported for convenience
+ * Default export providing the most commonly used hooks as a convenience
+ * Enables import patterns like: import hooks from '@/hooks'
  */
-export type {
-  GenericSuccessResponse,
-  GenericErrorResponse,
-  GenericListResponse,
-  RequestOptions
-} from './use-api';
-
-// ============================================================================
-// Default Exports for Backward Compatibility
-// ============================================================================
-
-/**
- * Default export object containing all hooks for object destructuring patterns
- * Provides backward compatibility while maintaining tree-shaking support
- * 
- * @example
- * ```tsx
- * import hooks from '@/hooks';
- * const { useAuth, useTheme } = hooks;
- * ```
- */
-const hooks = {
-  // Authentication & Session
+export default {
+  // Most commonly used hooks
   useAuth,
   useSession,
-  
-  // User Management
   useUser,
-  
-  // System Configuration
-  useSystemConfig,
-  useCurrentService,
-  
-  // Data Fetching & API
-  useApi,
-  useMutation,
-  useFileApi,
-  
-  // UI State & Theme
   useTheme,
   useLoading,
+  useApi,
   useNotifications,
   useError,
-  useErrorHandler,
-  useSearch,
-  
-  // Utilities
   useLocalStorage,
-  useFirstTimeUser,
-  useLicense,
-  usePaywall,
-  useBreakpoint,
-  useDebounce,
-  useLogger,
-} as const;
-
-export default hooks;
-
-// ============================================================================
-// Hook Categories for Organized Imports
-// ============================================================================
-
-/**
- * Authentication-related hooks grouped for convenience
- * 
- * @example
- * ```tsx
- * import { authHooks } from '@/hooks';
- * const { useAuth, useSession } = authHooks;
- * ```
- */
-export const authHooks = {
-  useAuth,
-  useSession,
-} as const;
-
-/**
- * User management hooks grouped for convenience
- */
-export const userHooks = {
-  useUser,
-  useFirstTimeUser,
-} as const;
-
-/**
- * System configuration hooks grouped for convenience
- */
-export const systemHooks = {
   useSystemConfig,
   useCurrentService,
+  
+  // Utility hooks
+  useDebounce,
+  useBreakpoint,
+  useSearch,
+  
+  // Business logic hooks
   useLicense,
   usePaywall,
+  useFirstTimeUser,
 } as const;
 
+// =============================================================================
+// HOOK CATEGORIES FOR ORGANIZED IMPORTS
+// =============================================================================
+
 /**
- * Data fetching and API hooks grouped for convenience
+ * Categorized hook exports for organized imports and better code organization
+ * Enables import patterns like: import { auth } from '@/hooks'; auth.useAuth()
  */
-export const apiHooks = {
+export const auth = {
+  useAuth,
+  useSession,
+  useUser,
+} as const;
+
+export const ui = {
+  useTheme,
+  useSimpleTheme,
+  useThemeStyles,
+  useLoading,
+  useGlobalLoading,
+  useApiLoading,
+  useImmediateLoading,
+  useNotifications,
+  useBreakpoint,
+} as const;
+
+export const api = {
   useApi,
   useMutation,
   useFileApi,
 } as const;
 
-/**
- * UI state management hooks grouped for convenience
- */
-export const uiHooks = {
-  useTheme,
-  useLoading,
-  useNotifications,
+export const system = {
+  useSystemConfig,
+  useCurrentService,
   useError,
   useErrorHandler,
-  useSearch,
-} as const;
-
-/**
- * Utility hooks grouped for convenience
- */
-export const utilityHooks = {
-  useLocalStorage,
-  useBreakpoint,
-  useDebounce,
   useLogger,
 } as const;
 
-// ============================================================================
-// Module Metadata for Development Tools
-// ============================================================================
-
-/**
- * Hook registry for development tools and debugging
- * Provides metadata about available hooks for tooling integration
- */
-export const hookRegistry = {
-  hooks: Object.keys(hooks),
-  categories: {
-    auth: Object.keys(authHooks),
-    user: Object.keys(userHooks),
-    system: Object.keys(systemHooks),
-    api: Object.keys(apiHooks),
-    ui: Object.keys(uiHooks),
-    utility: Object.keys(utilityHooks),
-  },
-  total: Object.keys(hooks).length,
-  version: '1.0.0',
-  framework: 'React 19',
-  buildSystem: 'Next.js 15.1 + Turbopack',
+export const utils = {
+  useLocalStorage,
+  useDebounce,
+  useSearch,
 } as const;
 
-/**
- * Type guard for hook validation in development
- * Helps ensure proper hook usage patterns
- */
-export const isValidHook = (hookName: string): hookName is keyof typeof hooks => {
-  return hookName in hooks;
-};
+export const business = {
+  useLicense,
+  usePaywall,
+  useFirstTimeUser,
+} as const;
+
+// =============================================================================
+// PERFORMANCE OPTIMIZATION HELPERS
+// =============================================================================
 
 /**
- * Hook dependency graph for build optimization
- * Maps hook dependencies for intelligent code splitting
+ * Performance optimization exports for build-time tree shaking
+ * These constants help bundlers understand which exports are used
  */
-export const hookDependencies = {
-  useAuth: ['useSession', 'useUser'],
-  useUser: ['useLocalStorage', 'useApi'],
-  useSystemConfig: ['useApi', 'useSession'],
-  useCurrentService: ['useApi', 'useLocalStorage'],
-  useTheme: ['useLocalStorage'],
-  useNotifications: ['useDebounce'],
-  useError: ['useLogger'],
-  useErrorHandler: ['useError', 'useLogger'],
-  useSearch: ['useDebounce', 'useApi'],
-  useFileApi: ['useApi', 'useNotifications'],
-  useMutation: ['useApi', 'useError'],
-  // Add other dependencies as needed
-} as const;
+export const HOOK_NAMES = [
+  'useAuth',
+  'useSession',
+  'useUser',
+  'useSystemConfig',
+  'useCurrentService',
+  'useTheme',
+  'useLoading',
+  'useNotifications',
+  'useApi',
+  'useMutation',
+  'useFileApi',
+  'useError',
+  'useErrorHandler',
+  'useLogger',
+  'useLocalStorage',
+  'useBreakpoint',
+  'useDebounce',
+  'useSearch',
+  'useFirstTimeUser',
+  'useLicense',
+  'usePaywall',
+] as const;
+
+export const HOOK_CATEGORIES = [
+  'auth',
+  'ui', 
+  'api',
+  'system',
+  'utils',
+  'business',
+] as const;
+
+/**
+ * Type-only exports for improved TypeScript performance
+ * Enables import type { } patterns for better build optimization
+ */
+export type HookName = (typeof HOOK_NAMES)[number];
+export type HookCategory = (typeof HOOK_CATEGORIES)[number];
+
+// =============================================================================
+// JSDOC METADATA FOR DOCUMENTATION
+// =============================================================================
+
+/**
+ * @fileoverview This barrel export module provides centralized access to all custom React hooks
+ * used throughout the DreamFactory Admin Interface. It supports tree-shaking optimization,
+ * TypeScript 5.8+ module patterns, and React 19 compatibility with Next.js 15.1+.
+ * 
+ * @example Import individual hooks
+ * ```typescript
+ * import { useAuth, useTheme } from '@/hooks';
+ * ```
+ * 
+ * @example Import hook categories
+ * ```typescript
+ * import { auth, ui } from '@/hooks';
+ * const { user } = auth.useAuth();
+ * const { theme } = ui.useTheme();
+ * ```
+ * 
+ * @example Import types only
+ * ```typescript
+ * import type { UseAuthReturn, LoadingState } from '@/hooks';
+ * ```
+ * 
+ * @see {@link https://react.dev/reference/react/hooks} React Hooks Documentation
+ * @see {@link https://nextjs.org/docs/app/building-your-application/optimizing/bundle-analyzer} Next.js Bundle Optimization
+ * @see {@link https://turbo.build/pack/docs/features/tree-shaking} Turbopack Tree Shaking
+ */
