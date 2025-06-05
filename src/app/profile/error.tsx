@@ -1,636 +1,513 @@
-'use client';
+'use client'
+
+import { useEffect, useState } from 'react'
+import { AlertTriangle, RefreshCw, ArrowLeft, Bug, Shield, UserX } from 'lucide-react'
 
 /**
- * @fileoverview Profile Management Error Boundary Component
+ * Error types specific to profile management workflows
+ */
+type ProfileErrorType = 
+  | 'profile-update-failed'
+  | 'password-change-failed' 
+  | 'security-question-failed'
+  | 'authentication-expired'
+  | 'network-error'
+  | 'validation-error'
+  | 'permission-denied'
+  | 'server-error'
+  | 'unknown-error'
+
+interface ProfileErrorInfo {
+  type: ProfileErrorType
+  message: string
+  action: string
+  icon: React.ComponentType<{ className?: string }>
+  canRetry: boolean
+}
+
+/**
+ * Enhanced error logger for profile-specific errors
+ * Provides comprehensive error tracking and monitoring integration
+ */
+class ProfileErrorLogger {
+  private static instance: ProfileErrorLogger
+  private errors: Array<{ timestamp: Date; error: Error; errorInfo?: any; context?: string }> = []
+
+  static getInstance(): ProfileErrorLogger {
+    if (!ProfileErrorLogger.instance) {
+      ProfileErrorLogger.instance = new ProfileErrorLogger()
+    }
+    return ProfileErrorLogger.instance
+  }
+
+  /**
+   * Log error with profile-specific context and monitoring integration
+   */
+  logError(error: Error, errorInfo?: any, context?: string): void {
+    const errorEntry = {
+      timestamp: new Date(),
+      error,
+      errorInfo,
+      context: context || 'profile-management'
+    }
+
+    this.errors.push(errorEntry)
+    
+    // Console logging for development
+    if (process.env.NODE_ENV === 'development') {
+      console.group('🚨 Profile Error Boundary')
+      console.error('Error:', error)
+      console.error('Error Info:', errorInfo)
+      console.error('Context:', context)
+      console.error('Stack:', error.stack)
+      console.groupEnd()
+    }
+
+    // Production error monitoring integration
+    if (process.env.NODE_ENV === 'production') {
+      this.sendToMonitoring(errorEntry)
+    }
+
+    // Announce error to screen readers
+    this.announceErrorToScreenReader(error.message)
+  }
+
+  /**
+   * Send error to monitoring service (placeholder for actual implementation)
+   */
+  private sendToMonitoring(errorEntry: any): void {
+    // Integration with error monitoring services like Sentry, LogRocket, etc.
+    // This would be implemented based on the chosen monitoring solution
+    try {
+      // Example integration pattern:
+      // window.errorMonitoring?.captureException(errorEntry.error, {
+      //   tags: { component: 'profile-error-boundary' },
+      //   extra: { errorInfo: errorEntry.errorInfo, context: errorEntry.context }
+      // })
+    } catch (monitoringError) {
+      console.warn('Failed to send error to monitoring service:', monitoringError)
+    }
+  }
+
+  /**
+   * Announce error to screen readers for accessibility compliance
+   */
+  private announceErrorToScreenReader(message: string): void {
+    const announcement = document.createElement('div')
+    announcement.setAttribute('aria-live', 'assertive')
+    announcement.setAttribute('aria-atomic', 'true')
+    announcement.setAttribute('class', 'sr-only')
+    announcement.textContent = `Error occurred: ${message}. Please review the error details and try again.`
+    
+    document.body.appendChild(announcement)
+    
+    // Remove after announcement
+    setTimeout(() => {
+      document.body.removeChild(announcement)
+    }, 1000)
+  }
+
+  /**
+   * Get recent errors for debugging
+   */
+  getRecentErrors(limit: number = 10): Array<any> {
+    return this.errors.slice(-limit)
+  }
+
+  /**
+   * Clear error log
+   */
+  clearErrors(): void {
+    this.errors = []
+  }
+}
+
+/**
+ * Enhanced error recovery mechanisms for profile management
+ */
+class ProfileErrorRecovery {
+  /**
+   * Determine error type and recovery strategy based on error characteristics
+   */
+  static categorizeError(error: Error): ProfileErrorInfo {
+    const message = error.message.toLowerCase()
+    const stack = error.stack?.toLowerCase() || ''
+
+    // Profile update failures
+    if (message.includes('profile') && (message.includes('update') || message.includes('save'))) {
+      return {
+        type: 'profile-update-failed',
+        message: 'Failed to update profile information. Please check your input and try again.',
+        action: 'Verify your information and retry the update',
+        icon: UserX,
+        canRetry: true
+      }
+    }
+
+    // Password change errors
+    if (message.includes('password') || message.includes('credential')) {
+      return {
+        type: 'password-change-failed',
+        message: 'Password change failed. Please ensure your current password is correct.',
+        action: 'Verify your current password and try again',
+        icon: Shield,
+        canRetry: true
+      }
+    }
+
+    // Security question errors
+    if (message.includes('security') && message.includes('question')) {
+      return {
+        type: 'security-question-failed',
+        message: 'Failed to update security questions. Please try again.',
+        action: 'Review your security question answers and retry',
+        icon: Shield,
+        canRetry: true
+      }
+    }
+
+    // Authentication expiration
+    if (message.includes('token') || message.includes('auth') || message.includes('session')) {
+      return {
+        type: 'authentication-expired',
+        message: 'Your session has expired. Please log in again to continue.',
+        action: 'Log in again to access your profile',
+        icon: UserX,
+        canRetry: false
+      }
+    }
+
+    // Network connectivity issues
+    if (message.includes('network') || message.includes('fetch') || message.includes('connection')) {
+      return {
+        type: 'network-error',
+        message: 'Network connection error. Please check your internet connection.',
+        action: 'Check your connection and try again',
+        icon: RefreshCw,
+        canRetry: true
+      }
+    }
+
+    // Validation errors
+    if (message.includes('validation') || message.includes('invalid') || message.includes('required')) {
+      return {
+        type: 'validation-error',
+        message: 'Invalid input detected. Please review your information.',
+        action: 'Correct the highlighted fields and try again',
+        icon: AlertTriangle,
+        canRetry: true
+      }
+    }
+
+    // Permission errors
+    if (message.includes('permission') || message.includes('forbidden') || message.includes('access')) {
+      return {
+        type: 'permission-denied',
+        message: 'You do not have permission to perform this action.',
+        action: 'Contact your administrator for access',
+        icon: Shield,
+        canRetry: false
+      }
+    }
+
+    // Server errors
+    if (message.includes('server') || message.includes('500') || stack.includes('server')) {
+      return {
+        type: 'server-error',
+        message: 'Server error occurred. Please try again in a few moments.',
+        action: 'Wait a moment and try again',
+        icon: Bug,
+        canRetry: true
+      }
+    }
+
+    // Default unknown error
+    return {
+      type: 'unknown-error',
+      message: 'An unexpected error occurred while managing your profile.',
+      action: 'Try refreshing the page or contact support if the issue persists',
+      icon: AlertTriangle,
+      canRetry: true
+    }
+  }
+
+  /**
+   * Execute retry logic with exponential backoff
+   */
+  static async executeRetry(
+    retryFunction: () => void | Promise<void>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+  ): Promise<void> {
+    let attempt = 0
+    
+    while (attempt < maxRetries) {
+      try {
+        await retryFunction()
+        return
+      } catch (error) {
+        attempt++
+        if (attempt >= maxRetries) {
+          throw error
+        }
+        
+        // Exponential backoff: delay = baseDelay * 2^attempt + random jitter
+        const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+  }
+}
+
+/**
+ * Props for the ProfileError component
+ */
+interface ProfileErrorProps {
+  error: Error
+  reset: () => void
+}
+
+/**
+ * Next.js Error Boundary Component for Profile Management Route
  * 
- * Implements Next.js error boundary for the profile management route providing
- * comprehensive error handling with user-friendly recovery options. Features
- * React 19 error boundary capabilities, detailed error logging, accessibility
- * compliance (WCAG 2.1 AA), and specific handling for profile-related errors
- * including password changes, security question updates, and network issues.
+ * Provides comprehensive error handling with user-friendly messaging,
+ * recovery options, and accessibility compliance for profile-related errors.
  * 
- * Key Features:
- * - React 19 error boundary patterns with enhanced error info
- * - User-friendly error UI with contextual recovery options
- * - Comprehensive error logging and monitoring integration
+ * Features:
+ * - React 19 error boundary capabilities
  * - Profile-specific error categorization and messaging
- * - Retry mechanisms for transient profile operation errors
- * - WCAG 2.1 AA accessibility compliance with screen reader support
- * - Tailwind CSS responsive design with theme integration
- * - Error tracking and analytics for production debugging
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * - Retry mechanisms with exponential backoff
+ * - WCAG 2.1 AA compliant error announcements
+ * - Comprehensive error logging and monitoring integration
+ * - Graceful degradation with contextual recovery guidance
  */
+export default function ProfileError({ error, reset }: ProfileErrorProps) {
+  const [retrying, setRetrying] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+  const [errorInfo, setErrorInfo] = useState<ProfileErrorInfo | null>(null)
 
-import { useEffect, useState, useCallback } from 'react';
-import { AlertTriangleIcon, RefreshCwIcon, HomeIcon, UserIcon, KeyIcon, ShieldCheckIcon } from 'lucide-react';
+  const errorLogger = ProfileErrorLogger.getInstance()
+  const maxRetries = 3
 
-// UI Components (will be created by other team members - using assumed interfaces)
-import { Alert } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-
-// Error utilities (will be created by other team members - using assumed interfaces)
-import { logError, type ErrorContext } from '@/lib/error-logger';
-import { 
-  shouldRetryError, 
-  getRetryDelay, 
-  type ErrorRecoveryOptions 
-} from '@/lib/error-recovery';
-
-// Type definitions for profile-specific errors
-import type { 
-  AuthErrorCode, 
-  AUTH_ERROR_CODES,
-  UserProfile 
-} from '@/types/user';
-
-/**
- * Enhanced error interface with profile-specific context
- */
-interface ProfileError extends Error {
-  code?: string;
-  statusCode?: number;
-  context?: 'profile_update' | 'password_change' | 'security_question' | 'network' | 'authentication' | 'validation';
-  field?: string;
-  retryable?: boolean;
-  userMessage?: string;
-  originalError?: Error;
-}
-
-/**
- * Error boundary state interface
- */
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: ProfileError | null;
-  errorId: string | null;
-  retryCount: number;
-  isRetrying: boolean;
-  lastRetryAt: number | null;
-}
-
-/**
- * Props interface for the error boundary component
- */
-interface ProfileErrorBoundaryProps {
-  error: Error;
-  reset: () => void;
-}
-
-/**
- * Maximum number of retry attempts for transient errors
- */
-const MAX_RETRY_ATTEMPTS = 3;
-
-/**
- * Base delay for exponential backoff retry logic (in milliseconds)
- */
-const BASE_RETRY_DELAY = 1000;
-
-/**
- * Profile-specific error categorization and user messaging
- */
-const PROFILE_ERROR_CATEGORIES = {
-  PROFILE_UPDATE_FAILED: {
-    title: 'Profile Update Failed',
-    description: 'We encountered an issue while updating your profile information.',
-    icon: UserIcon,
-    severity: 'error' as const,
-    retryable: true,
-    recoveryActions: ['retry', 'refresh', 'contact_support']
-  },
-  PASSWORD_CHANGE_FAILED: {
-    title: 'Password Change Failed',
-    description: 'Your password could not be updated. Please check your current password and try again.',
-    icon: KeyIcon,
-    severity: 'error' as const,
-    retryable: true,
-    recoveryActions: ['retry', 'reset_form', 'contact_support']
-  },
-  SECURITY_QUESTION_FAILED: {
-    title: 'Security Question Update Failed',
-    description: 'Unable to update your security question. Please verify your information and try again.',
-    icon: ShieldCheckIcon,
-    severity: 'error' as const,
-    retryable: true,
-    recoveryActions: ['retry', 'reset_form', 'contact_support']
-  },
-  NETWORK_ERROR: {
-    title: 'Connection Problem',
-    description: 'Unable to connect to the server. Please check your internet connection and try again.',
-    icon: AlertTriangleIcon,
-    severity: 'warning' as const,
-    retryable: true,
-    recoveryActions: ['retry', 'refresh', 'check_connection']
-  },
-  AUTHENTICATION_ERROR: {
-    title: 'Session Expired',
-    description: 'Your session has expired. Please log in again to continue managing your profile.',
-    icon: ShieldCheckIcon,
-    severity: 'error' as const,
-    retryable: false,
-    recoveryActions: ['login', 'contact_support']
-  },
-  VALIDATION_ERROR: {
-    title: 'Invalid Information',
-    description: 'Please check the information you entered and correct any errors before continuing.',
-    icon: AlertTriangleIcon,
-    severity: 'warning' as const,
-    retryable: false,
-    recoveryActions: ['reset_form', 'contact_support']
-  },
-  UNKNOWN_ERROR: {
-    title: 'Unexpected Error',
-    description: 'An unexpected error occurred while processing your request. Our team has been notified.',
-    icon: AlertTriangleIcon,
-    severity: 'error' as const,
-    retryable: true,
-    recoveryActions: ['retry', 'refresh', 'go_home', 'contact_support']
-  }
-} as const;
-
-/**
- * Categorize error based on its properties and context
- */
-function categorizeError(error: Error): keyof typeof PROFILE_ERROR_CATEGORIES {
-  const profileError = error as ProfileError;
-  
-  // Check for authentication errors
-  if (profileError.code && Object.values(AUTH_ERROR_CODES).includes(profileError.code as AuthErrorCode)) {
-    return 'AUTHENTICATION_ERROR';
-  }
-  
-  // Check for network errors
-  if (profileError.code === 'NETWORK_ERROR' || profileError.message.toLowerCase().includes('network')) {
-    return 'NETWORK_ERROR';
-  }
-  
-  // Check for validation errors
-  if (profileError.statusCode === 400 || profileError.message.toLowerCase().includes('validation')) {
-    return 'VALIDATION_ERROR';
-  }
-  
-  // Check for context-specific errors
-  switch (profileError.context) {
-    case 'password_change':
-      return 'PASSWORD_CHANGE_FAILED';
-    case 'security_question':
-      return 'SECURITY_QUESTION_FAILED';
-    case 'profile_update':
-      return 'PROFILE_UPDATE_FAILED';
-    case 'network':
-      return 'NETWORK_ERROR';
-    case 'authentication':
-      return 'AUTHENTICATION_ERROR';
-    case 'validation':
-      return 'VALIDATION_ERROR';
-    default:
-      return 'UNKNOWN_ERROR';
-  }
-}
-
-/**
- * Generate contextual user message based on error category and details
- */
-function getContextualMessage(error: ProfileError, category: keyof typeof PROFILE_ERROR_CATEGORIES): string {
-  const baseMessage = PROFILE_ERROR_CATEGORIES[category].description;
-  
-  // Add field-specific context if available
-  if (error.field) {
-    const fieldMessages: Record<string, string> = {
-      email: 'There was an issue with the email address you provided.',
-      password: 'The password you entered is not valid.',
-      security_question: 'Please check your security question and answer.',
-      first_name: 'Please check the first name field.',
-      last_name: 'Please check the last name field.',
-      phone: 'Please verify the phone number format.',
-    };
-    
-    if (fieldMessages[error.field]) {
-      return `${baseMessage} ${fieldMessages[error.field]}`;
-    }
-  }
-  
-  // Use custom user message if available
-  if (error.userMessage) {
-    return error.userMessage;
-  }
-  
-  return baseMessage;
-}
-
-/**
- * Recovery action handlers
- */
-function useRecoveryActions(
-  error: ProfileError | null,
-  reset: () => void,
-  onRetry: () => void
-) {
-  const handleRefreshPage = useCallback(() => {
-    window.location.reload();
-  }, []);
-  
-  const handleGoHome = useCallback(() => {
-    window.location.href = '/';
-  }, []);
-  
-  const handleGoToLogin = useCallback(() => {
-    window.location.href = '/login';
-  }, []);
-  
-  const handleContactSupport = useCallback(() => {
-    // In a real implementation, this would open a support modal or redirect to support
-    console.log('Contact support requested for error:', error);
-    alert('Please contact support at support@dreamfactory.com or through the help section.');
-  }, [error]);
-  
-  const handleResetForm = useCallback(() => {
-    // Reset the form and clear error state
-    reset();
-  }, [reset]);
-  
-  const handleCheckConnection = useCallback(() => {
-    // Simple connectivity check
-    if (navigator.onLine) {
-      alert('Your internet connection appears to be working. Please try again.');
-    } else {
-      alert('Please check your internet connection and try again.');
-    }
-  }, []);
-  
-  return {
-    retry: onRetry,
-    refresh: handleRefreshPage,
-    go_home: handleGoHome,
-    login: handleGoToLogin,
-    contact_support: handleContactSupport,
-    reset_form: handleResetForm,
-    check_connection: handleCheckConnection,
-  };
-}
-
-/**
- * Recovery Action Button Component
- */
-function RecoveryActionButton({ 
-  action, 
-  handler, 
-  isPrimary = false,
-  isLoading = false,
-  disabled = false 
-}: {
-  action: string;
-  handler: () => void;
-  isPrimary?: boolean;
-  isLoading?: boolean;
-  disabled?: boolean;
-}) {
-  const actionLabels: Record<string, string> = {
-    retry: 'Try Again',
-    refresh: 'Refresh Page',
-    go_home: 'Go to Dashboard',
-    login: 'Log In Again',
-    contact_support: 'Contact Support',
-    reset_form: 'Reset Form',
-    check_connection: 'Check Connection',
-  };
-  
-  const actionIcons: Record<string, React.ReactNode> = {
-    retry: <RefreshCwIcon className="h-4 w-4" aria-hidden="true" />,
-    refresh: <RefreshCwIcon className="h-4 w-4" aria-hidden="true" />,
-    go_home: <HomeIcon className="h-4 w-4" aria-hidden="true" />,
-    login: <UserIcon className="h-4 w-4" aria-hidden="true" />,
-    contact_support: null,
-    reset_form: null,
-    check_connection: null,
-  };
-  
-  return (
-    <Button
-      onClick={handler}
-      variant={isPrimary ? 'primary' : 'secondary'}
-      size="md"
-      disabled={disabled || isLoading}
-      className="inline-flex items-center gap-2"
-      aria-describedby={action === 'retry' ? 'retry-description' : undefined}
-    >
-      {isLoading && action === 'retry' ? (
-        <RefreshCwIcon className="h-4 w-4 animate-spin" aria-hidden="true" />
-      ) : (
-        actionIcons[action]
-      )}
-      {actionLabels[action] || action}
-    </Button>
-  );
-}
-
-/**
- * Error Details Component for development and debugging
- */
-function ErrorDetails({ error, errorId }: { error: ProfileError; errorId: string }) {
-  const [showDetails, setShowDetails] = useState(false);
-  
-  if (process.env.NODE_ENV === 'production') {
-    return null;
-  }
-  
-  return (
-    <div className="mt-6 border-t border-gray-200 pt-6 dark:border-gray-700">
-      <button
-        onClick={() => setShowDetails(!showDetails)}
-        className="text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
-        aria-expanded={showDetails}
-        aria-controls="error-details"
-      >
-        {showDetails ? 'Hide' : 'Show'} Technical Details
-      </button>
-      
-      {showDetails && (
-        <div id="error-details" className="mt-3 space-y-3">
-          <div>
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Error ID</p>
-            <code className="mt-1 block text-xs text-gray-900 dark:text-gray-100">{errorId}</code>
-          </div>
-          
-          <div>
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Error Message</p>
-            <code className="mt-1 block text-xs text-gray-900 dark:text-gray-100">{error.message}</code>
-          </div>
-          
-          {error.code && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Error Code</p>
-              <code className="mt-1 block text-xs text-gray-900 dark:text-gray-100">{error.code}</code>
-            </div>
-          )}
-          
-          {error.context && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Context</p>
-              <code className="mt-1 block text-xs text-gray-900 dark:text-gray-100">{error.context}</code>
-            </div>
-          )}
-          
-          {error.stack && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Stack Trace</p>
-              <pre className="mt-1 max-h-32 overflow-auto rounded bg-gray-100 p-2 text-xs text-gray-800 dark:bg-gray-800 dark:text-gray-200">
-                {error.stack}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Profile Error Boundary Component
- * 
- * Provides comprehensive error handling for the profile management route with
- * user-friendly recovery options and accessibility compliance. Implements
- * React 19 error boundary patterns with enhanced error categorization,
- * contextual messaging, and intelligent retry mechanisms for profile operations.
- * 
- * @param error - Error object from Next.js error boundary
- * @param reset - Reset function to retry the operation
- * @returns JSX element representing the error boundary UI
- */
-export default function ProfileError({ error, reset }: ProfileErrorBoundaryProps) {
-  // State management for error boundary
-  const [state, setState] = useState<ErrorBoundaryState>({
-    hasError: true,
-    error: error as ProfileError,
-    errorId: `profile-error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    retryCount: 0,
-    isRetrying: false,
-    lastRetryAt: null,
-  });
-  
-  // Categorize the error for appropriate handling
-  const errorCategory = categorizeError(state.error!);
-  const categoryInfo = PROFILE_ERROR_CATEGORIES[errorCategory];
-  const IconComponent = categoryInfo.icon;
-  
-  // Get contextual error message
-  const contextualMessage = getContextualMessage(state.error!, errorCategory);
-  
-  // Log error for monitoring and debugging
+  // Categorize and log the error on mount
   useEffect(() => {
-    if (state.error && state.errorId) {
-      const errorContext: ErrorContext = {
-        errorId: state.errorId,
-        component: 'ProfileErrorBoundary',
-        route: '/profile',
-        category: errorCategory,
-        context: state.error.context || 'unknown',
-        userId: null, // Would be populated from auth context
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        url: window.location.href,
-        retryCount: state.retryCount,
-      };
-      
-      logError(state.error, errorContext);
-    }
-  }, [state.error, state.errorId, errorCategory, state.retryCount]);
-  
-  // Retry handler with exponential backoff
-  const handleRetry = useCallback(async () => {
-    if (!state.error || state.isRetrying || state.retryCount >= MAX_RETRY_ATTEMPTS) {
-      return;
-    }
+    const categorizedError = ProfileErrorRecovery.categorizeError(error)
+    setErrorInfo(categorizedError)
     
-    // Check if error is retryable
-    if (!shouldRetryError(state.error)) {
-      return;
+    // Log error with profile context
+    errorLogger.logError(error, { componentStack: 'ProfileError' }, 'profile-error-boundary')
+  }, [error, errorLogger])
+
+  /**
+   * Handle retry with exponential backoff and user feedback
+   */
+  const handleRetry = async () => {
+    if (!errorInfo?.canRetry || retrying || retryCount >= maxRetries) {
+      return
     }
-    
-    setState(prev => ({ ...prev, isRetrying: true }));
+
+    setRetrying(true)
     
     try {
-      // Calculate delay with exponential backoff
-      const delay = getRetryDelay(state.retryCount, BASE_RETRY_DELAY);
+      await ProfileErrorRecovery.executeRetry(
+        async () => {
+          // Simulate retry delay for user feedback
+          await new Promise(resolve => setTimeout(resolve, 500))
+          reset()
+        },
+        1,
+        1000
+      )
       
-      // Wait for the calculated delay
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      // Update state and attempt retry
-      setState(prev => ({
-        ...prev,
-        retryCount: prev.retryCount + 1,
-        lastRetryAt: Date.now(),
-        isRetrying: false,
-      }));
-      
-      // Call the reset function to retry the operation
-      reset();
-      
+      setRetryCount(prev => prev + 1)
     } catch (retryError) {
-      console.error('Retry failed:', retryError);
-      setState(prev => ({ ...prev, isRetrying: false }));
+      console.error('Retry failed:', retryError)
+      errorLogger.logError(
+        retryError as Error, 
+        { retryAttempt: retryCount + 1 }, 
+        'profile-error-retry'
+      )
+    } finally {
+      setRetrying(false)
     }
-  }, [state.error, state.isRetrying, state.retryCount, reset]);
-  
-  // Recovery action handlers
-  const recoveryActions = useRecoveryActions(state.error, reset, handleRetry);
-  
-  // Determine if retry is available
-  const canRetry = categoryInfo.retryable && 
-                   state.retryCount < MAX_RETRY_ATTEMPTS && 
-                   !state.isRetrying;
-  
-  // Get available recovery actions for this error category
-  const availableActions = categoryInfo.recoveryActions;
-  
-  // Announce error to screen readers
-  useEffect(() => {
-    const announcement = `Error occurred: ${categoryInfo.title}. ${contextualMessage}`;
-    const srElement = document.getElementById('sr-announcements');
-    if (srElement) {
-      srElement.textContent = announcement;
+  }
+
+  /**
+   * Navigate back to previous page or profile home
+   */
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      window.history.back()
+    } else {
+      window.location.href = '/profile'
     }
-  }, [categoryInfo.title, contextualMessage]);
-  
+  }
+
+  /**
+   * Handle authentication redirect for expired sessions
+   */
+  const handleLoginRedirect = () => {
+    // Clear any stored session data
+    localStorage.removeItem('session')
+    sessionStorage.clear()
+    
+    // Redirect to login with return URL
+    const returnUrl = encodeURIComponent(window.location.pathname)
+    window.location.href = `/login?returnUrl=${returnUrl}`
+  }
+
+  if (!errorInfo) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  const { type, message, action, icon: ErrorIcon, canRetry } = errorInfo
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 dark:bg-gray-900 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8">
-        {/* Main Error Card */}
-        <div className="rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
-          {/* Error Icon and Title */}
-          <div className="flex items-center space-x-3">
-            <div className={`flex-shrink-0 rounded-full p-2 ${
-              categoryInfo.severity === 'error' 
-                ? 'bg-red-100 dark:bg-red-900/20' 
-                : 'bg-yellow-100 dark:bg-yellow-900/20'
-            }`}>
-              <IconComponent 
-                className={`h-6 w-6 ${
-                  categoryInfo.severity === 'error'
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-yellow-600 dark:text-yellow-400'
-                }`}
-                aria-hidden="true"
-              />
-            </div>
-            <div className="flex-1">
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {categoryInfo.title}
-              </h1>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Profile Management Error
-              </p>
-            </div>
+    <div 
+      className="flex flex-col items-center justify-center min-h-[400px] px-4 py-8"
+      role="alert"
+      aria-labelledby="error-title"
+      aria-describedby="error-description error-action"
+    >
+      <div className="max-w-md w-full text-center space-y-6">
+        {/* Error Icon */}
+        <div className="flex justify-center">
+          <div className="rounded-full bg-red-100 p-4">
+            <ErrorIcon 
+              className="h-8 w-8 text-red-600" 
+              aria-hidden="true"
+            />
           </div>
-          
-          {/* Error Description */}
-          <div className="mt-4">
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              {contextualMessage}
-            </p>
-            
-            {/* Retry Information */}
-            {state.retryCount > 0 && (
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Retry attempts: {state.retryCount} of {MAX_RETRY_ATTEMPTS}
-              </p>
-            )}
-            
-            {state.lastRetryAt && (
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Last retry: {new Date(state.lastRetryAt).toLocaleTimeString()}
-              </p>
-            )}
-          </div>
-          
-          {/* Recovery Actions */}
-          <div className="mt-6 space-y-3">
-            {/* Primary Action (Retry if available) */}
-            {availableActions.includes('retry') && canRetry && (
-              <div className="flex flex-col">
-                <RecoveryActionButton
-                  action="retry"
-                  handler={recoveryActions.retry}
-                  isPrimary={true}
-                  isLoading={state.isRetrying}
-                  disabled={!canRetry}
-                />
-                {canRetry && (
-                  <p 
-                    id="retry-description" 
-                    className="mt-1 text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    Automatically retries with increasing delays
-                  </p>
-                )}
-              </div>
-            )}
-            
-            {/* Secondary Actions */}
-            <div className="flex flex-wrap gap-2">
-              {availableActions
-                .filter(action => action !== 'retry')
-                .slice(0, 3) // Limit to 3 secondary actions to avoid clutter
-                .map(action => (
-                  <RecoveryActionButton
-                    key={action}
-                    action={action}
-                    handler={recoveryActions[action as keyof typeof recoveryActions]}
-                    isPrimary={false}
-                  />
-                ))}
-            </div>
-          </div>
-          
-          {/* Additional Help */}
-          <Alert 
-            variant={categoryInfo.severity === 'error' ? 'error' : 'warning'}
-            className="mt-6"
-          >
-            <AlertTriangleIcon className="h-4 w-4" />
-            <div>
-              <p className="text-sm font-medium">
-                Need additional help?
-              </p>
-              <p className="mt-1 text-sm">
-                If this problem persists, please contact our support team with 
-                error ID: <code className="font-mono text-xs">{state.errorId}</code>
-              </p>
-            </div>
-          </Alert>
-          
-          {/* Development Error Details */}
-          {state.error && state.errorId && (
-            <ErrorDetails error={state.error} errorId={state.errorId} />
-          )}
         </div>
-        
-        {/* Quick Navigation */}
-        <div className="text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Having trouble with your profile?{' '}
-            <button
-              onClick={recoveryActions.go_home}
-              className="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
-            >
-              Return to Dashboard
-            </button>
+
+        {/* Error Title */}
+        <div className="space-y-2">
+          <h1 
+            id="error-title"
+            className="text-2xl font-bold text-gray-900"
+          >
+            Profile Error
+          </h1>
+          <p 
+            id="error-description"
+            className="text-gray-600 leading-relaxed"
+          >
+            {message}
           </p>
+        </div>
+
+        {/* Error Action Guidance */}
+        <div 
+          id="error-action"
+          className="bg-blue-50 border border-blue-200 rounded-lg p-4"
+        >
+          <p className="text-sm text-blue-800 font-medium">
+            What you can do:
+          </p>
+          <p className="text-sm text-blue-700 mt-1">
+            {action}
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          {/* Retry Button - Only show if error can be retried */}
+          {canRetry && retryCount < maxRetries && (
+            <button
+              onClick={handleRetry}
+              disabled={retrying}
+              className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-describedby="retry-help"
+            >
+              {retrying ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Retrying...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" aria-hidden="true" />
+                  Try Again
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Authentication Redirect - Show for auth errors */}
+          {type === 'authentication-expired' && (
+            <button
+              onClick={handleLoginRedirect}
+              className="w-full flex items-center justify-center px-4 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+            >
+              <Shield className="h-4 w-4 mr-2" aria-hidden="true" />
+              Log In Again
+            </button>
+          )}
+
+          {/* Go Back Button */}
+          <button
+            onClick={handleGoBack}
+            className="w-full flex items-center justify-center px-4 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" aria-hidden="true" />
+            Go Back
+          </button>
+        </div>
+
+        {/* Retry Count Information */}
+        {retryCount > 0 && (
+          <div className="text-sm text-gray-500">
+            {retryCount >= maxRetries ? (
+              <span className="text-red-600 font-medium">
+                Maximum retry attempts reached. Please contact support if the issue persists.
+              </span>
+            ) : (
+              <span>
+                Retry attempt {retryCount} of {maxRetries}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Development Error Details */}
+        {process.env.NODE_ENV === 'development' && (
+          <details className="text-left">
+            <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
+              Development Error Details
+            </summary>
+            <div className="mt-2 p-3 bg-gray-100 rounded border text-xs font-mono text-gray-800 overflow-auto max-h-32">
+              <div className="mb-2">
+                <strong>Error Type:</strong> {type}
+              </div>
+              <div className="mb-2">
+                <strong>Message:</strong> {error.message}
+              </div>
+              {error.stack && (
+                <div>
+                  <strong>Stack:</strong>
+                  <pre className="mt-1 whitespace-pre-wrap break-words">
+                    {error.stack}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </details>
+        )}
+      </div>
+
+      {/* Hidden elements for screen reader assistance */}
+      <div className="sr-only">
+        <div id="retry-help">
+          {canRetry 
+            ? `You can try this action again. Attempts remaining: ${maxRetries - retryCount}`
+            : "This action cannot be retried automatically. Please use the alternative options provided."
+          }
         </div>
       </div>
     </div>
-  );
+  )
 }
-
-/**
- * Export error boundary configuration for Next.js
- */
-export { ProfileError as default };
-
-/**
- * Re-export types for use by other components
- */
-export type { ProfileError, ErrorBoundaryState, ProfileErrorBoundaryProps };
