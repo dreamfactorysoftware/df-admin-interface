@@ -1,389 +1,427 @@
-/**
- * @fileoverview API Security Layout Component
- * 
- * Security section layout component that provides shared navigation, authentication 
- * context, and error boundaries for all security-related pages including limits 
- * and roles management. Implements consistent theming and responsive design across 
- * the security management interface.
- * 
- * This layout wraps all API security routes (/api-security/*) and provides:
- * - Shared navigation with active route highlighting
- * - Authentication context and middleware integration
- * - Error boundaries for security workflows
- * - Loading states and responsive design
- * - Consistent theme injection across components
- * 
- * Performance Requirements:
- * - SSR pages under 2 seconds (React/Next.js Integration Requirements)
- * - Client-side navigation under 100ms
- * - WCAG 2.1 AA compliance maintained
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- */
+'use client';
 
-import React, { Suspense } from 'react';
-import { ErrorBoundary } from 'react-error-boundary';
-import { Metadata } from 'next';
-
-// Layout and navigation components
-import { SecurityNavigation } from './components/security-nav';
+import { Suspense, ErrorBoundary } from 'react';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { 
+  ShieldCheckIcon, 
+  UsersIcon, 
+  ClockIcon,
+  ChevronRightIcon,
+  ExclamationTriangleIcon
+} from '@heroicons/react/24/outline';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
 import { Sidebar } from '@/components/layout/sidebar';
 
-// UI components
-import { Alert } from '@/components/ui/alert';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Button } from '@/components/ui/button';
+/**
+ * Security section navigation items with permissions and route configuration
+ */
+interface SecurityNavItem {
+  id: string;
+  path: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  permissions: string[];
+  description: string;
+}
 
-// Global styles
-import '@/styles/globals.css';
-
-// ============================================================================
-// TYPES AND INTERFACES
-// ============================================================================
+const SECURITY_NAV_ITEMS: SecurityNavItem[] = [
+  {
+    id: 'security-overview',
+    path: '/api-security',
+    label: 'Security Overview',
+    icon: ShieldCheckIcon,
+    permissions: ['api.security.read'],
+    description: 'API security dashboard and configuration overview'
+  },
+  {
+    id: 'roles',
+    path: '/api-security/roles',
+    label: 'Roles',
+    icon: UsersIcon,
+    permissions: ['api.security.read', 'roles.read'],
+    description: 'User role management and permission assignment'
+  },
+  {
+    id: 'limits',
+    path: '/api-security/limits',
+    label: 'Rate Limits',
+    icon: ClockIcon,
+    permissions: ['api.security.read', 'limits.read'],
+    description: 'API rate limiting and throttling configuration'
+  }
+];
 
 /**
- * Props interface for the API Security Layout component
+ * Security Section Error Boundary Component
+ * Provides graceful error handling specifically for security-related operations
+ */
+interface SecurityErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback?: React.ComponentType<{ error: Error; resetError: () => void }>;
+}
+
+function SecurityErrorBoundary({ children, fallback: Fallback }: SecurityErrorBoundaryProps) {
+  return (
+    <ErrorBoundary
+      fallback={Fallback || SecurityErrorFallback}
+      onError={(error, errorInfo) => {
+        // Log security-specific errors with appropriate context
+        console.error('[Security Error Boundary]', {
+          error: error.message,
+          stack: error.stack,
+          errorInfo,
+          timestamp: new Date().toISOString(),
+          section: 'api-security'
+        });
+
+        // In production, you would send this to your error tracking service
+        if (process.env.NODE_ENV === 'production') {
+          // sendErrorToTrackingService(error, { section: 'api-security', ...errorInfo });
+        }
+      }}
+    >
+      {children}
+    </ErrorBoundary>
+  );
+}
+
+/**
+ * Default error fallback component for security section
+ */
+interface SecurityErrorFallbackProps {
+  error: Error;
+  resetError: () => void;
+}
+
+function SecurityErrorFallback({ error, resetError }: SecurityErrorFallbackProps) {
+  return (
+    <div className="min-h-[400px] flex items-center justify-center p-8">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 text-center">
+        <div className="flex justify-center mb-4">
+          <ExclamationTriangleIcon className="h-12 w-12 text-red-500" />
+        </div>
+        
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          Security Section Error
+        </h3>
+        
+        <p className="text-gray-600 dark:text-gray-400 mb-4">
+          An error occurred while loading the security management interface. 
+          This may be due to insufficient permissions or a temporary system issue.
+        </p>
+        
+        <div className="text-sm text-gray-500 dark:text-gray-400 mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded border">
+          <strong>Error:</strong> {error.message}
+        </div>
+        
+        <div className="space-y-3">
+          <button
+            onClick={resetError}
+            className={cn(
+              "w-full px-4 py-2 text-sm font-medium rounded-md",
+              "bg-primary-600 text-white hover:bg-primary-700",
+              "focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2",
+              "transition-colors duration-200"
+            )}
+          >
+            Try Again
+          </button>
+          
+          <Link
+            href="/api-security"
+            className={cn(
+              "block w-full px-4 py-2 text-sm font-medium rounded-md",
+              "text-gray-700 bg-gray-100 hover:bg-gray-200",
+              "dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600",
+              "focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2",
+              "transition-colors duration-200"
+            )}
+          >
+            Return to Security Overview
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Security Navigation Component
+ * Provides section-specific navigation with active state highlighting
+ */
+function SecurityNavigation() {
+  const pathname = usePathname();
+  const { user, isAuthenticated } = useAuth();
+
+  // Filter navigation items based on user permissions
+  const filteredNavItems = SECURITY_NAV_ITEMS.filter(item => {
+    if (!isAuthenticated || !user) return false;
+    
+    // Root admins have access to all security features
+    if (user.isRootAdmin || user.isSysAdmin) return true;
+    
+    // Check if user has any of the required permissions
+    return item.permissions.some(permission => 
+      user.permissions?.includes(permission)
+    );
+  });
+
+  const isActiveRoute = (itemPath: string): boolean => {
+    if (itemPath === '/api-security') {
+      return pathname === '/api-security';
+    }
+    return pathname.startsWith(itemPath);
+  };
+
+  if (filteredNavItems.length === 0) {
+    return (
+      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-4">
+        <div className="flex items-start">
+          <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400 mt-0.5 mr-3 flex-shrink-0" />
+          <div>
+            <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+              Limited Access
+            </h4>
+            <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+              You don't have permissions to access security management features. 
+              Contact your administrator for access to API security configuration.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <nav 
+      className="space-y-1" 
+      aria-label="Security section navigation"
+      role="navigation"
+    >
+      {filteredNavItems.map((item) => {
+        const isActive = isActiveRoute(item.path);
+        const IconComponent = item.icon;
+        
+        return (
+          <Link
+            key={item.id}
+            href={item.path}
+            className={cn(
+              "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
+              isActive
+                ? "bg-primary-100 text-primary-900 border-r-4 border-primary-600 dark:bg-primary-900/50 dark:text-primary-100"
+                : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            )}
+            aria-current={isActive ? "page" : undefined}
+            title={item.description}
+          >
+            <IconComponent 
+              className={cn(
+                "mr-3 h-5 w-5 flex-shrink-0 transition-colors duration-200",
+                isActive 
+                  ? "text-primary-600 dark:text-primary-400" 
+                  : "text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-300"
+              )}
+              aria-hidden="true"
+            />
+            <span className="flex-1">{item.label}</span>
+            
+            {/* Active route indicator */}
+            {isActive && (
+              <ChevronRightIcon 
+                className="ml-2 h-4 w-4 text-primary-600 dark:text-primary-400" 
+                aria-hidden="true"
+              />
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+/**
+ * Security Section Loading Component
+ * Provides consistent loading state for security-related operations
+ */
+function SecurityLoadingState() {
+  return (
+    <div className="min-h-[200px] flex items-center justify-center">
+      <div className="text-center">
+        <div className="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-primary-500 bg-white dark:bg-gray-800 transition ease-in-out duration-150">
+          <svg 
+            className="animate-spin -ml-1 mr-3 h-5 w-5 text-primary-500" 
+            xmlns="http://www.w3.org/2000/svg" 
+            fill="none" 
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle 
+              className="opacity-25" 
+              cx="12" 
+              cy="12" 
+              r="10" 
+              stroke="currentColor" 
+              strokeWidth="4"
+            ></circle>
+            <path 
+              className="opacity-75" 
+              fill="currentColor" 
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <span>Loading security configuration...</span>
+        </div>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          Verifying permissions and loading security management interface
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Security Section Layout Component
+ * 
+ * Provides the layout structure for all API security pages including roles management,
+ * rate limits configuration, and security overview. Features comprehensive error boundaries,
+ * authentication context integration, responsive design, and accessibility compliance.
+ * 
+ * Key Features:
+ * - Next.js 15.1+ app router layout conventions
+ * - Authentication context providers and middleware integration
+ * - Security-specific navigation with permission-based filtering
+ * - Error boundaries for graceful error handling
+ * - Loading states for security workflows
+ * - Responsive design with Tailwind CSS
+ * - WCAG 2.1 AA accessibility compliance
+ * - Active route highlighting with semantic markup
+ * 
+ * @param props Layout component props
+ * @param props.children Child page components to render within the layout
+ * @returns Security section layout with navigation, error handling, and authentication
  */
 interface ApiSecurityLayoutProps {
-  /** Child pages rendered within the layout */
   children: React.ReactNode;
 }
 
-/**
- * Error boundary fallback component props
- */
-interface SecurityErrorFallbackProps {
-  /** Error object from React Error Boundary */
-  error: Error;
-  /** Reset error boundary function */
-  resetErrorBoundary: () => void;
-}
+export default function ApiSecurityLayout({ children }: ApiSecurityLayoutProps) {
+  const { isAuthenticated, isLoading } = useAuth();
+  const pathname = usePathname();
 
-/**
- * Loading component props for security section
- */
-interface SecurityLoadingProps {
-  /** Optional loading message */
-  message?: string;
-}
-
-// ============================================================================
-// METADATA CONFIGURATION
-// ============================================================================
-
-/**
- * Metadata for API Security section
- * Provides SEO optimization and accessibility information
- */
-export const metadata: Metadata = {
-  title: {
-    template: '%s | API Security | DreamFactory Admin',
-    default: 'API Security | DreamFactory Admin'
-  },
-  description: 'Manage API security configurations including rate limits and role-based access controls for DreamFactory services.',
-  keywords: ['API Security', 'Rate Limits', 'Role Management', 'Access Control', 'DreamFactory'],
-  robots: {
-    index: false, // Admin interface should not be indexed
-    follow: false
-  },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    viewportFit: 'cover'
-  }
-};
-
-// ============================================================================
-// ERROR BOUNDARY COMPONENTS
-// ============================================================================
-
-/**
- * Error fallback component for security section failures
- * Provides user-friendly error messages and recovery actions
- * 
- * @param props - Error fallback component props
- * @returns JSX element with error recovery interface
- */
-function SecurityErrorFallback({ error, resetErrorBoundary }: SecurityErrorFallbackProps): JSX.Element {
-  // Log error for monitoring (development only)
-  if (process.env.NODE_ENV === 'development') {
-    console.error('[API_SECURITY_ERROR]', error);
-  }
-
-  return (
-    <div 
-      className="flex min-h-[400px] w-full flex-col items-center justify-center space-y-6 p-8"
-      role="alert"
-      aria-live="assertive"
-    >
-      <div className="text-center">
-        <h2 className="text-xl font-semibold text-foreground mb-2">
-          Security Configuration Error
-        </h2>
-        <p className="text-muted-foreground mb-4 max-w-md">
-          We encountered an issue loading the security management interface. 
-          This may be due to a temporary service interruption or network connectivity issue.
-        </p>
-      </div>
-      
-      <Alert variant="destructive" className="max-w-md">
-        <Alert.Icon name="alert-triangle" />
-        <Alert.Title>Error Details</Alert.Title>
-        <Alert.Description className="font-mono text-sm">
-          {error.message || 'Unknown security configuration error'}
-        </Alert.Description>
-      </Alert>
-      
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Button 
-          onClick={resetErrorBoundary}
-          variant="default"
-          size="default"
-          className="min-w-[120px]"
-        >
-          Try Again
-        </Button>
-        <Button 
-          onClick={() => window.location.href = '/'}
-          variant="outline"
-          size="default"
-          className="min-w-[120px]"
-        >
-          Go to Dashboard
-        </Button>
-      </div>
-      
-      <details className="mt-4 max-w-md">
-        <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-          Technical Details
-        </summary>
-        <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto max-h-32">
-          {error.stack || error.toString()}
-        </pre>
-      </details>
-    </div>
-  );
-}
-
-/**
- * Loading component for security section data fetching
- * Displays skeleton states and loading indicators
- * 
- * @param props - Loading component props
- * @returns JSX element with loading interface
- */
-function SecurityLoading({ message = 'Loading security configuration...' }: SecurityLoadingProps): JSX.Element {
-  return (
-    <div 
-      className="flex min-h-[200px] w-full flex-col items-center justify-center space-y-4 p-8"
-      role="status"
-      aria-live="polite"
-    >
-      <LoadingSpinner 
-        size="lg" 
-        className="text-primary"
-        aria-label="Loading security data"
-      />
-      <p className="text-muted-foreground text-sm animate-pulse">
-        {message}
-      </p>
-      
-      {/* Skeleton UI for navigation */}
-      <div className="w-full max-w-md space-y-2 mt-8">
-        <div className="h-8 bg-muted rounded animate-pulse" />
-        <div className="h-8 bg-muted rounded animate-pulse opacity-75" />
-        <div className="h-8 bg-muted rounded animate-pulse opacity-50" />
-      </div>
-      
-      {/* Screen reader only content */}
-      <span className="sr-only">
-        Loading API security management interface. Please wait while we fetch your security configurations.
-      </span>
-    </div>
-  );
-}
-
-// ============================================================================
-// MAIN LAYOUT COMPONENT
-// ============================================================================
-
-/**
- * API Security Layout Component
- * 
- * Provides the layout structure for all API security pages including shared
- * navigation, error boundaries, loading states, and consistent theming.
- * 
- * Features:
- * - Next.js app router layout conventions
- * - Security section navigation with active route highlighting
- * - Authentication context and middleware integration
- * - Error boundaries for security workflows
- * - Responsive design with Tailwind CSS
- * - WCAG 2.1 AA accessibility compliance
- * 
- * @param props - Layout component props
- * @returns JSX element with complete layout structure
- */
-export default function ApiSecurityLayout({ 
-  children 
-}: ApiSecurityLayoutProps): JSX.Element {
-  
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Skip to content link for accessibility */}
-      <a 
-        href="#main-content"
-        className="sr-only-focusable fixed top-4 left-4 z-[9999] bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 focus:not-sr-only"
-      >
-        Skip to main content
-      </a>
-      
-      {/* Main layout container */}
-      <div className="flex h-screen overflow-hidden">
-        
-        {/* Sidebar Navigation */}
-        <aside className="hidden lg:flex lg:flex-shrink-0">
-          <div className="flex flex-col w-64 border-r border-border bg-card">
-            <ErrorBoundary
-              FallbackComponent={({ error, resetErrorBoundary }) => (
-                <div className="p-4">
-                  <Alert variant="destructive">
-                    <Alert.Icon name="alert-triangle" />
-                    <Alert.Title>Navigation Error</Alert.Title>
-                    <Alert.Description>
-                      Unable to load navigation menu.
-                    </Alert.Description>
-                  </Alert>
-                  <Button 
-                    onClick={resetErrorBoundary} 
-                    size="sm" 
-                    className="mt-2"
-                  >
-                    Retry
-                  </Button>
-                </div>
-              )}
-              onError={(error) => {
-                // Log navigation errors
-                console.error('[SIDEBAR_ERROR]', error);
-              }}
-            >
-              <Suspense fallback={
-                <div className="p-4">
-                  <div className="space-y-2">
-                    <div className="h-8 bg-muted rounded animate-pulse" />
-                    <div className="h-8 bg-muted rounded animate-pulse" />
-                    <div className="h-8 bg-muted rounded animate-pulse" />
-                  </div>
-                </div>
-              }>
-                <Sidebar />
-              </Suspense>
-            </ErrorBoundary>
-          </div>
-        </aside>
-        
-        {/* Main content area */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          
-          {/* Security section navigation */}
-          <header className="border-b border-border bg-card shadow-sm">
-            <ErrorBoundary
-              FallbackComponent={({ error, resetErrorBoundary }) => (
-                <div className="p-4">
-                  <Alert variant="destructive">
-                    <Alert.Icon name="alert-triangle" />
-                    <Alert.Title>Navigation Error</Alert.Title>
-                    <Alert.Description>
-                      Security navigation failed to load.
-                    </Alert.Description>
-                  </Alert>
-                  <Button 
-                    onClick={resetErrorBoundary} 
-                    size="sm" 
-                    className="mt-2"
-                  >
-                    Retry
-                  </Button>
-                </div>
-              )}
-              onError={(error) => {
-                console.error('[SECURITY_NAV_ERROR]', error);
-              }}
-            >
-              <Suspense fallback={
-                <div className="px-6 py-4">
-                  <div className="flex space-x-4">
-                    <div className="h-8 w-20 bg-muted rounded animate-pulse" />
-                    <div className="h-8 w-20 bg-muted rounded animate-pulse" />
-                    <div className="h-8 w-20 bg-muted rounded animate-pulse" />
-                  </div>
-                </div>
-              }>
-                <SecurityNavigation />
-              </Suspense>
-            </ErrorBoundary>
-          </header>
-          
-          {/* Main content with error boundary */}
-          <main 
-            id="main-content"
-            className="flex-1 overflow-auto bg-background"
-            role="main"
-            aria-label="API Security Management"
-          >
-            <ErrorBoundary
-              FallbackComponent={SecurityErrorFallback}
-              onError={(error, errorInfo) => {
-                // Log security page errors for monitoring
-                console.error('[SECURITY_PAGE_ERROR]', error, errorInfo);
-                
-                // In production, send to error monitoring service
-                if (process.env.NODE_ENV === 'production') {
-                  // Example: Sentry, LogRocket, or custom error service
-                  // errorMonitoring.captureException(error, { context: errorInfo });
-                }
-              }}
-              onReset={() => {
-                // Reset any global state if needed
-                window.location.reload();
-              }}
-            >
-              <Suspense 
-                fallback={<SecurityLoading />}
-              >
-                <div className="container mx-auto px-6 py-8 max-w-7xl">
-                  {children}
-                </div>
-              </Suspense>
-            </ErrorBoundary>
+  // Show loading state while authentication is being verified
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <main className="flex-1 p-6 overflow-y-auto">
+            <SecurityLoadingState />
           </main>
         </div>
       </div>
+    );
+  }
+
+  // Redirect to login if not authenticated (handled by middleware, but defensive check)
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <ShieldCheckIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Authentication Required
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Please log in to access the API security management interface.
+          </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          >
+            Go to Login
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-900">
+      {/* Main Sidebar */}
+      <Sidebar />
       
-      {/* Mobile sidebar overlay (for responsive design) */}
-      <div className="lg:hidden">
-        {/* This would be handled by the Sidebar component's mobile state */}
+      {/* Security Section Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Security Section Header */}
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <ShieldCheckIcon className="h-8 w-8 text-primary-600 dark:text-primary-400" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  API Security
+                </h1>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Manage roles, permissions, and security policies for your APIs
+                </p>
+              </div>
+            </div>
+            
+            {/* Breadcrumb Navigation */}
+            <nav className="flex" aria-label="Breadcrumb">
+              <ol className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                <li>
+                  <Link 
+                    href="/" 
+                    className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200"
+                  >
+                    Dashboard
+                  </Link>
+                </li>
+                <li>
+                  <ChevronRightIcon className="h-4 w-4 mx-2" aria-hidden="true" />
+                </li>
+                <li>
+                  <span className="text-gray-900 dark:text-white font-medium">
+                    API Security
+                  </span>
+                </li>
+                {pathname !== '/api-security' && (
+                  <>
+                    <li>
+                      <ChevronRightIcon className="h-4 w-4 mx-2" aria-hidden="true" />
+                    </li>
+                    <li>
+                      <span className="text-gray-900 dark:text-white">
+                        {SECURITY_NAV_ITEMS.find(item => pathname.startsWith(item.path))?.label}
+                      </span>
+                    </li>
+                  </>
+                )}
+              </ol>
+            </nav>
+          </div>
+          
+          {/* Security Section Navigation */}
+          <div className="mt-4">
+            <SecurityNavigation />
+          </div>
+        </header>
+        
+        {/* Main Content Area with Error Boundary */}
+        <main className="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+          <SecurityErrorBoundary>
+            <Suspense fallback={<SecurityLoadingState />}>
+              <div className="max-w-7xl mx-auto">
+                {children}
+              </div>
+            </Suspense>
+          </SecurityErrorBoundary>
+        </main>
       </div>
     </div>
   );
 }
-
-// ============================================================================
-// ADDITIONAL EXPORTS
-// ============================================================================
-
-/**
- * Named export for testing and composition
- */
-export { ApiSecurityLayout };
-
-/**
- * Type exports for external usage
- */
-export type {
-  ApiSecurityLayoutProps,
-  SecurityErrorFallbackProps,
-  SecurityLoadingProps
-};
