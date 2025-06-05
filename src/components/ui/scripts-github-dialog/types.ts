@@ -1,1018 +1,446 @@
 /**
- * @fileoverview Comprehensive TypeScript interface definitions for the GitHub scripts import dialog component system
- * @version 1.0.0
- * @since 2024-12-19
- * 
- * Migrated from Angular MAT_DIALOG_DATA injection pattern to React component props architecture.
- * Provides complete type safety for GitHub repository integration, authentication workflows,
- * file validation, and error handling scenarios.
- * 
- * Key Features:
- * - React Hook Form + Zod schema validation integration
- * - GitHub API v3/v4 compatibility with rate limiting awareness
- * - Private repository authentication handling
- * - Comprehensive error boundary integration
- * - WCAG 2.1 AA accessibility compliance
- * - Promise-based dialog resolution pattern
+ * TypeScript interface definitions for the GitHub scripts dialog component.
+ * Migrated from Angular dialog types to React-specific patterns with proper typing
+ * for controlled dialogs, GitHub API integration, and form validation.
  */
 
+import { ReactNode } from 'react';
 import { z } from 'zod';
-import { UseFormReturn, FieldErrors } from 'react-hook-form';
-import { ReactNode, RefObject } from 'react';
 
 // =============================================================================
-// CORE COMPONENT INTERFACES
+// BASE DIALOG INTERFACES
 // =============================================================================
 
 /**
- * Main props interface for the ScriptsGithubDialog React component.
- * Replaces Angular's MAT_DIALOG_DATA injection pattern with modern React props.
- * 
- * @interface ScriptsGithubDialogProps
- * @since 1.0.0
+ * Base dialog props interface extending React's standard dialog patterns
  */
-export interface ScriptsGithubDialogProps {
-  /** Whether the dialog is currently open/visible */
-  isOpen: boolean;
-  
-  /** Callback function to handle dialog close events */
+export interface BaseDialogProps {
+  /** Whether the dialog is open */
+  open: boolean;
+  /** Callback when the dialog should close */
   onClose: () => void;
-  
-  /** Promise-based callback to handle successful script import */
-  onSuccess: (scriptData: GitHubScriptContent) => Promise<void>;
-  
-  /** Error callback for failed import operations */
-  onError: (error: GitHubDialogError) => void;
-  
-  /** Optional initial URL value for the GitHub file input */
-  initialUrl?: string;
-  
-  /** Configuration for file type validation */
-  fileConfig?: ScriptFileConfig;
-  
-  /** Whether to show debug information in development mode */
-  showDebugInfo?: boolean;
-  
-  /** Custom CSS classes for styling customization */
+  /** Dialog size variant */
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  /** Whether clicking the backdrop closes the dialog */
+  closeOnBackdropClick?: boolean;
+  /** Whether the escape key closes the dialog */
+  closeOnEscape?: boolean;
+  /** Custom className for styling */
   className?: string;
-  
-  /** Test ID for automated testing */
-  testId?: string;
-  
-  /** Accessibility configuration */
-  ariaConfig?: DialogAriaConfig;
+  /** Test id for testing */
+  'data-testid'?: string;
 }
 
 /**
- * Configuration interface for dialog accessibility compliance.
- * Ensures WCAG 2.1 AA standards are met.
- * 
- * @interface DialogAriaConfig
- * @since 1.0.0
+ * Dialog result type for promise-based workflows
  */
-export interface DialogAriaConfig {
-  /** Accessible label for the dialog */
-  'aria-label'?: string;
-  
-  /** ID of element that labels the dialog */
-  'aria-labelledby'?: string;
-  
-  /** ID of element that describes the dialog */
-  'aria-describedby'?: string;
-  
-  /** Whether to trap focus within the dialog */
-  trapFocus?: boolean;
-  
-  /** Element to focus when dialog opens */
-  initialFocus?: RefObject<HTMLElement>;
-  
-  /** Element to focus when dialog closes */
-  restoreFocus?: RefObject<HTMLElement>;
-}
+export type DialogResult<T = unknown> = {
+  /** Whether the dialog was confirmed or cancelled */
+  confirmed: boolean;
+  /** Data payload from the dialog */
+  data?: T;
+};
 
 // =============================================================================
-// GITHUB API INTEGRATION TYPES
+// GITHUB SCRIPTS DIALOG INTERFACES
 // =============================================================================
 
 /**
- * GitHub repository metadata interface for API responses.
- * Compatible with GitHub API v3 and v4 repository endpoints.
- * 
- * @interface GitHubRepositoryInfo
- * @since 1.0.0
+ * Props interface for the GitHub scripts dialog component
  */
-export interface GitHubRepositoryInfo {
-  /** Repository ID from GitHub */
-  id: number;
-  
-  /** Repository name */
-  name: string;
-  
-  /** Repository full name (owner/repo) */
-  full_name: string;
-  
-  /** Repository owner information */
-  owner: GitHubUserInfo;
-  
-  /** Whether the repository is private */
-  private: boolean;
-  
-  /** Repository description */
-  description: string | null;
-  
-  /** Whether the repository is a fork */
-  fork: boolean;
-  
-  /** Repository URL */
-  html_url: string;
-  
-  /** API URL for repository contents */
-  contents_url: string;
-  
-  /** Default branch name */
-  default_branch: string;
-  
-  /** Repository language */
-  language: string | null;
-  
-  /** Repository size in KB */
-  size: number;
-  
-  /** Last update timestamp */
-  updated_at: string;
-  
-  /** Creation timestamp */
-  created_at: string;
-  
-  /** Repository permissions for authenticated user */
-  permissions?: GitHubRepositoryPermissions;
+export interface ScriptsGitHubDialogProps extends BaseDialogProps {
+  /** Dialog title */
+  title?: string;
+  /** Dialog description or help text */
+  description?: string;
+  /** Callback when a script is successfully selected */
+  onScriptSelect?: (result: GitHubScriptResult) => void;
+  /** Callback when the dialog operation fails */
+  onError?: (error: GitHubError) => void;
+  /** Custom actions to render in the dialog footer */
+  customActions?: ReactNode;
+  /** Whether to show advanced options */
+  showAdvancedOptions?: boolean;
 }
 
 /**
- * GitHub user/organization information.
- * 
- * @interface GitHubUserInfo
- * @since 1.0.0
+ * GitHub script file data structure from API response
  */
-export interface GitHubUserInfo {
-  /** User ID */
-  id: number;
-  
-  /** Username */
-  login: string;
-  
-  /** User type (User or Organization) */
-  type: 'User' | 'Organization';
-  
-  /** Avatar URL */
-  avatar_url: string;
-  
-  /** Profile URL */
-  html_url: string;
-}
-
-/**
- * Repository permissions for the authenticated user.
- * 
- * @interface GitHubRepositoryPermissions
- * @since 1.0.0
- */
-export interface GitHubRepositoryPermissions {
-  /** Can read repository contents */
-  pull: boolean;
-  
-  /** Can push to repository */
-  push: boolean;
-  
-  /** Has admin access */
-  admin: boolean;
-}
-
-/**
- * GitHub file content response structure.
- * 
- * @interface GitHubFileContent
- * @since 1.0.0
- */
-export interface GitHubFileContent {
+export interface GitHubFileData {
   /** File name */
   name: string;
-  
-  /** File path within repository */
+  /** File path in repository */
   path: string;
-  
-  /** File SHA hash */
+  /** SHA hash of the file */
   sha: string;
-  
   /** File size in bytes */
   size: number;
-  
-  /** Download URL for file content */
+  /** File download URL */
   download_url: string;
-  
-  /** File content (base64 encoded for API) */
+  /** File content (base64 encoded) */
   content: string;
-  
-  /** Content encoding type */
-  encoding: 'base64' | 'utf-8';
-  
+  /** Content encoding (usually 'base64') */
+  encoding: string;
   /** File type */
   type: 'file' | 'dir';
-  
-  /** API URL for this file */
+  /** GitHub API URL for the file */
   url: string;
-  
-  /** HTML URL for file on GitHub */
+  /** Git URL for the file */
+  git_url: string;
+  /** HTML URL for the file */
   html_url: string;
 }
 
 /**
- * Processed script content with metadata.
- * 
- * @interface GitHubScriptContent
- * @since 1.0.0
+ * GitHub repository metadata from API response
  */
-export interface GitHubScriptContent {
-  /** Original file name */
-  fileName: string;
-  
-  /** File extension */
-  extension: ScriptFileExtension;
-  
-  /** Decoded file content */
-  content: string;
-  
-  /** Content type/language */
-  language: ScriptLanguage;
-  
-  /** File size in bytes */
-  size: number;
-  
-  /** Repository information */
-  repository: Pick<GitHubRepositoryInfo, 'name' | 'full_name' | 'html_url'>;
-  
-  /** File path within repository */
-  path: string;
-  
-  /** GitHub file URL */
-  url: string;
-  
-  /** Import timestamp */
-  importedAt: string;
-  
-  /** File SHA for version tracking */
-  sha: string;
+export interface GitHubRepoData {
+  /** Repository ID */
+  id: number;
+  /** Repository name */
+  name: string;
+  /** Full repository name (owner/repo) */
+  full_name: string;
+  /** Repository description */
+  description?: string;
+  /** Whether the repository is private */
+  private: boolean;
+  /** Repository owner information */
+  owner: {
+    /** Owner login username */
+    login: string;
+    /** Owner ID */
+    id: number;
+    /** Owner type (User or Organization) */
+    type: 'User' | 'Organization';
+  };
+  /** Default branch name */
+  default_branch: string;
+  /** Repository clone URL */
+  clone_url: string;
+  /** SSH clone URL */
+  ssh_url: string;
+  /** Repository HTML URL */
+  html_url: string;
+  /** Repository creation date */
+  created_at: string;
+  /** Repository last update date */
+  updated_at: string;
 }
 
-// =============================================================================
-// AUTHENTICATION & CREDENTIALS
-// =============================================================================
-
 /**
- * Authentication credentials for private GitHub repositories.
- * Supports username/password and personal access token authentication.
- * 
- * @interface GitHubAuthCredentials
- * @since 1.0.0
+ * Authentication credentials for private repositories
  */
 export interface GitHubAuthCredentials {
   /** GitHub username */
   username: string;
-  
-  /** GitHub password or personal access token */
+  /** Personal access token or password */
   password: string;
-  
-  /** Authentication type */
-  authType: 'basic' | 'token';
-  
-  /** Whether to remember credentials (store in session) */
-  rememberCredentials?: boolean;
 }
 
 /**
- * Authentication state and metadata.
- * 
- * @interface GitHubAuthState
- * @since 1.0.0
+ * Parsed GitHub URL components
  */
-export interface GitHubAuthState {
-  /** Whether user is authenticated */
-  isAuthenticated: boolean;
-  
-  /** Authentication method used */
-  authMethod: 'public' | 'basic' | 'token' | 'oauth';
-  
-  /** Authenticated user information */
-  user?: GitHubUserInfo;
-  
-  /** Rate limiting information */
-  rateLimit?: GitHubRateLimit;
-  
-  /** Authentication timestamp */
-  authenticatedAt?: string;
-  
-  /** Whether credentials are stored in session */
-  hasStoredCredentials?: boolean;
-}
-
-/**
- * GitHub API rate limiting information.
- * 
- * @interface GitHubRateLimit
- * @since 1.0.0
- */
-export interface GitHubRateLimit {
-  /** Request limit per hour */
-  limit: number;
-  
-  /** Remaining requests */
-  remaining: number;
-  
-  /** Rate limit reset timestamp */
-  reset: number;
-  
-  /** Used requests */
-  used: number;
-  
-  /** Resource type (core, search, etc.) */
-  resource: string;
-}
-
-// =============================================================================
-// FILE VALIDATION & CONFIGURATION
-// =============================================================================
-
-/**
- * Supported script file extensions.
- * 
- * @type ScriptFileExtension
- * @since 1.0.0
- */
-export type ScriptFileExtension = '.js' | '.py' | '.php' | '.txt' | '.json' | '.md' | '.yml' | '.yaml';
-
-/**
- * Supported programming languages.
- * 
- * @type ScriptLanguage
- * @since 1.0.0
- */
-export type ScriptLanguage = 'javascript' | 'python' | 'php' | 'text' | 'json' | 'markdown' | 'yaml';
-
-/**
- * Configuration for script file validation and processing.
- * 
- * @interface ScriptFileConfig
- * @since 1.0.0
- */
-export interface ScriptFileConfig {
-  /** Allowed file extensions */
-  allowedExtensions: ScriptFileExtension[];
-  
-  /** Maximum file size in bytes */
-  maxFileSize: number;
-  
-  /** Whether to validate file content */
-  validateContent: boolean;
-  
-  /** Custom file validation function */
-  customValidator?: (fileName: string, content: string) => ValidationResult;
-  
-  /** File processing options */
-  processingOptions: FileProcessingOptions;
-}
-
-/**
- * File processing configuration options.
- * 
- * @interface FileProcessingOptions
- * @since 1.0.0
- */
-export interface FileProcessingOptions {
-  /** Whether to minify content */
-  minify: boolean;
-  
-  /** Whether to validate syntax */
-  validateSyntax: boolean;
-  
-  /** Content encoding to use */
-  encoding: 'utf-8' | 'base64';
-  
-  /** Whether to preserve original formatting */
-  preserveFormatting: boolean;
-  
-  /** Maximum content length */
-  maxContentLength: number;
-}
-
-/**
- * File validation result.
- * 
- * @interface ValidationResult
- * @since 1.0.0
- */
-export interface ValidationResult {
-  /** Whether validation passed */
+export interface GitHubUrlParts {
+  /** Repository owner username */
+  owner: string;
+  /** Repository name */
+  repo: string;
+  /** File path within the repository */
+  filePath: string;
+  /** Original URL */
+  originalUrl: string;
+  /** Whether the URL is valid */
   isValid: boolean;
-  
-  /** Validation error messages */
-  errors: string[];
-  
-  /** Validation warnings */
-  warnings: string[];
-  
-  /** Detected file metadata */
-  metadata?: FileMetadata;
 }
 
 /**
- * File metadata information.
- * 
- * @interface FileMetadata
- * @since 1.0.0
+ * Dialog result when a script is successfully selected
  */
-export interface FileMetadata {
-  /** Detected language */
-  language: ScriptLanguage;
-  
-  /** File size in bytes */
-  size: number;
-  
-  /** Line count */
-  lineCount: number;
-  
-  /** Character count */
-  characterCount: number;
-  
-  /** Whether file contains binary data */
-  isBinary: boolean;
-  
-  /** File encoding */
-  encoding: string;
-  
-  /** MIME type */
-  mimeType: string;
+export interface GitHubScriptResult {
+  /** File content */
+  content: string;
+  /** File metadata */
+  fileData: GitHubFileData;
+  /** Repository metadata */
+  repoData?: GitHubRepoData;
+  /** Parsed URL parts */
+  urlParts: GitHubUrlParts;
+}
+
+/**
+ * Dialog result when operation is cancelled
+ */
+export interface GitHubDialogCancelResult {
+  /** Always false for cancelled operations */
+  confirmed: false;
+  /** Cancellation reason */
+  reason: 'user_cancelled' | 'escape_pressed' | 'backdrop_clicked';
 }
 
 // =============================================================================
-// FORM VALIDATION & STATE MANAGEMENT
+// FORM DATA INTERFACES
 // =============================================================================
 
 /**
- * Form validation schema interface for React Hook Form + Zod integration.
- * 
- * @interface FormValidationSchema
- * @since 1.0.0
+ * Form data structure for the GitHub scripts dialog
  */
-export interface FormValidationSchema {
-  /** URL validation schema */
-  url: z.ZodString;
-  
-  /** Username validation schema (conditional) */
-  username?: z.ZodString;
-  
-  /** Password validation schema (conditional) */
-  password?: z.ZodString;
-  
-  /** Custom validation rules */
-  customRules?: Record<string, z.ZodType>;
-}
-
-/**
- * GitHub URL form data interface.
- * 
- * @interface GitHubUrlFormData
- * @since 1.0.0
- */
-export interface GitHubUrlFormData {
+export interface GitHubFormData {
   /** GitHub file URL */
   url: string;
-  
   /** Username for private repositories */
   username?: string;
-  
-  /** Password/token for private repositories */
+  /** Personal access token for private repositories */
   password?: string;
 }
 
 /**
- * Form state interface with React Hook Form integration.
- * 
- * @interface GitHubDialogFormState
- * @since 1.0.0
+ * Form field configuration for dynamic rendering
  */
-export interface GitHubDialogFormState {
-  /** React Hook Form instance */
-  form: UseFormReturn<GitHubUrlFormData>;
-  
-  /** Current form errors */
-  errors: FieldErrors<GitHubUrlFormData>;
-  
-  /** Whether form is currently validating */
-  isValidating: boolean;
-  
-  /** Whether form is valid */
-  isValid: boolean;
-  
-  /** Whether form is dirty (has changes) */
-  isDirty: boolean;
-  
-  /** Whether form has been submitted */
-  isSubmitted: boolean;
-  
-  /** Current form values */
-  values: Partial<GitHubUrlFormData>;
-}
-
-/**
- * Dialog workflow state enumeration.
- * Tracks the current stage of the import process.
- * 
- * @enum DialogState
- * @since 1.0.0
- */
-export enum DialogState {
-  /** Initial state, waiting for user input */
-  IDLE = 'idle',
-  
-  /** Validating GitHub URL */
-  VALIDATING_URL = 'validating_url',
-  
-  /** Checking repository privacy */
-  CHECKING_PRIVACY = 'checking_privacy',
-  
-  /** Authenticating with credentials */
-  AUTHENTICATING = 'authenticating',
-  
-  /** Fetching file content */
-  FETCHING_CONTENT = 'fetching_content',
-  
-  /** Processing file content */
-  PROCESSING = 'processing',
-  
-  /** Import completed successfully */
-  SUCCESS = 'success',
-  
-  /** Error occurred during process */
-  ERROR = 'error',
-  
-  /** User cancelled operation */
-  CANCELLED = 'cancelled'
-}
-
-/**
- * Dialog state context with additional metadata.
- * 
- * @interface DialogStateContext
- * @since 1.0.0
- */
-export interface DialogStateContext {
-  /** Current dialog state */
-  state: DialogState;
-  
-  /** Previous state */
-  previousState?: DialogState;
-  
-  /** State change timestamp */
-  timestamp: string;
-  
-  /** Progress percentage (0-100) */
-  progress: number;
-  
-  /** Current operation message */
-  message?: string;
-  
-  /** Additional state metadata */
-  metadata?: Record<string, unknown>;
+export interface GitHubFormField {
+  /** Field name */
+  name: keyof GitHubFormData;
+  /** Field label */
+  label: string;
+  /** Field type */
+  type: 'text' | 'password' | 'url';
+  /** Placeholder text */
+  placeholder?: string;
+  /** Whether the field is required */
+  required: boolean;
+  /** Whether the field is visible */
+  visible: boolean;
+  /** Field validation rules */
+  validation?: {
+    /** Minimum length */
+    minLength?: number;
+    /** Maximum length */
+    maxLength?: number;
+    /** Pattern for validation */
+    pattern?: RegExp;
+    /** Custom validation message */
+    message?: string;
+  };
 }
 
 // =============================================================================
-// API RESPONSE TYPES
+// VALIDATION SCHEMAS
 // =============================================================================
 
 /**
- * Generic GitHub API response wrapper.
- * 
- * @interface GitHubApiResponse<T>
- * @template T - Response data type
- * @since 1.0.0
+ * Zod validation schema for GitHub URL
  */
-export interface GitHubApiResponse<T = unknown> {
-  /** Response data */
-  data: T;
-  
-  /** HTTP status code */
-  status: number;
-  
-  /** Response headers */
-  headers: Record<string, string>;
-  
-  /** Request URL */
-  url: string;
-  
-  /** Whether request was successful */
-  ok: boolean;
-  
-  /** Response timestamp */
-  timestamp: string;
-  
-  /** Rate limit information */
-  rateLimit?: GitHubRateLimit;
-}
+export const GitHubUrlSchema = z
+  .string()
+  .min(1, 'GitHub URL is required')
+  .url('Must be a valid URL')
+  .refine(
+    (url) => {
+      // Check if it's a GitHub URL with supported file extensions
+      const supportedExtensions = ['.js', '.py', '.php', '.txt', '.json', '.ts', '.jsx', '.tsx'];
+      return (
+        url.includes('github.com') &&
+        supportedExtensions.some(ext => url.includes(ext))
+      );
+    },
+    {
+      message: 'Must be a GitHub URL pointing to a script file (.js, .py, .php, .txt, .json, .ts, .jsx, .tsx)',
+    }
+  );
 
 /**
- * Repository information API response.
- * 
- * @type GitHubRepositoryResponse
- * @since 1.0.0
+ * Zod validation schema for GitHub authentication credentials
  */
-export type GitHubRepositoryResponse = GitHubApiResponse<GitHubRepositoryInfo>;
+export const GitHubAuthSchema = z.object({
+  username: z
+    .string()
+    .min(1, 'Username is required for private repositories')
+    .max(39, 'GitHub username cannot exceed 39 characters'),
+  password: z
+    .string()
+    .min(1, 'Personal access token is required for private repositories')
+    .min(40, 'GitHub personal access tokens are typically 40+ characters'),
+});
 
 /**
- * File content API response.
- * 
- * @type GitHubFileResponse
- * @since 1.0.0
+ * Zod validation schema for the complete form
  */
-export type GitHubFileResponse = GitHubApiResponse<GitHubFileContent>;
+export const GitHubFormSchema = z.object({
+  url: GitHubUrlSchema,
+  username: z.string().optional(),
+  password: z.string().optional(),
+}).refine(
+  (data) => {
+    // If username is provided, password must also be provided
+    if (data.username && !data.password) {
+      return false;
+    }
+    if (data.password && !data.username) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: 'Both username and password must be provided for private repositories',
+    path: ['username'],
+  }
+);
 
 /**
- * User information API response.
- * 
- * @type GitHubUserResponse
- * @since 1.0.0
+ * Type inference from Zod schemas
  */
-export type GitHubUserResponse = GitHubApiResponse<GitHubUserInfo>;
+export type GitHubFormSchemaType = z.infer<typeof GitHubFormSchema>;
+export type GitHubUrlSchemaType = z.infer<typeof GitHubUrlSchema>;
+export type GitHubAuthSchemaType = z.infer<typeof GitHubAuthSchema>;
 
 // =============================================================================
 // ERROR HANDLING INTERFACES
 // =============================================================================
 
 /**
- * Comprehensive error types for GitHub dialog operations.
- * 
- * @type GitHubDialogErrorType
- * @since 1.0.0
+ * GitHub API error types
  */
-export type GitHubDialogErrorType = 
-  | 'INVALID_URL'
-  | 'UNSUPPORTED_FILE_TYPE'
-  | 'REPOSITORY_NOT_FOUND'
-  | 'REPOSITORY_PRIVATE'
-  | 'AUTHENTICATION_FAILED'
-  | 'INSUFFICIENT_PERMISSIONS'
-  | 'FILE_NOT_FOUND'
-  | 'FILE_TOO_LARGE'
-  | 'NETWORK_ERROR'
-  | 'RATE_LIMITED'
-  | 'SERVER_ERROR'
-  | 'VALIDATION_ERROR'
-  | 'PARSING_ERROR'
-  | 'TIMEOUT_ERROR'
-  | 'UNKNOWN_ERROR';
+export type GitHubErrorType = 
+  | 'network_error'
+  | 'authentication_failed'
+  | 'repository_not_found'
+  | 'file_not_found'
+  | 'invalid_url'
+  | 'rate_limit_exceeded'
+  | 'forbidden_access'
+  | 'unknown_error';
 
 /**
- * GitHub dialog error interface with comprehensive error information.
- * 
- * @interface GitHubDialogError
- * @since 1.0.0
+ * Comprehensive error interface for GitHub operations
  */
-export interface GitHubDialogError extends Error {
-  /** Error type classification */
-  type: GitHubDialogErrorType;
-  
-  /** HTTP status code (if applicable) */
+export interface GitHubError {
+  /** Error type for programmatic handling */
+  type: GitHubErrorType;
+  /** Human-readable error message */
+  message: string;
+  /** Additional error details */
+  details?: string;
+  /** HTTP status code if applicable */
   statusCode?: number;
-  
-  /** GitHub API error code */
-  apiErrorCode?: string;
-  
-  /** Detailed error context */
-  context?: GitHubErrorContext;
-  
-  /** Whether error is recoverable */
-  recoverable: boolean;
-  
-  /** Suggested recovery actions */
-  recoveryActions?: string[];
-  
-  /** Error timestamp */
+  /** GitHub API error code if applicable */
+  githubErrorCode?: string;
+  /** Original error object */
+  originalError?: unknown;
+  /** Timestamp when error occurred */
   timestamp: string;
-  
-  /** Request ID for debugging */
-  requestId?: string;
-}
-
-/**
- * Additional error context information.
- * 
- * @interface GitHubErrorContext
- * @since 1.0.0
- */
-export interface GitHubErrorContext {
-  /** URL that caused the error */
-  url?: string;
-  
-  /** Repository information */
-  repository?: Partial<GitHubRepositoryInfo>;
-  
-  /** File path */
-  filePath?: string;
-  
-  /** User authentication state */
-  authState?: GitHubAuthState;
-  
-  /** Request parameters */
-  requestParams?: Record<string, unknown>;
-  
-  /** Response data (if any) */
-  responseData?: unknown;
-  
-  /** Rate limit information */
-  rateLimit?: GitHubRateLimit;
-}
-
-/**
- * Error recovery options interface.
- * 
- * @interface ErrorRecoveryOptions
- * @since 1.0.0
- */
-export interface ErrorRecoveryOptions {
-  /** Whether to retry the operation */
-  retry: boolean;
-  
-  /** Number of retry attempts */
-  maxRetries: number;
-  
-  /** Retry delay in milliseconds */
-  retryDelay: number;
-  
-  /** Whether to use exponential backoff */
-  useBackoff: boolean;
-  
-  /** Custom retry strategy */
-  retryStrategy?: (attempt: number, error: GitHubDialogError) => boolean;
+  /** Suggested recovery actions */
+  suggestions?: string[];
 }
 
 // =============================================================================
-// CALLBACK & EVENT HANDLER TYPES
+// DIALOG STATE INTERFACES
 // =============================================================================
 
 /**
- * Callback function type for successful script import.
- * 
- * @type OnSuccessCallback
- * @since 1.0.0
+ * Dialog internal state interface
  */
-export type OnSuccessCallback = (scriptData: GitHubScriptContent) => Promise<void> | void;
-
-/**
- * Callback function type for error handling.
- * 
- * @type OnErrorCallback
- * @since 1.0.0
- */
-export type OnErrorCallback = (error: GitHubDialogError) => Promise<void> | void;
-
-/**
- * Callback function type for dialog state changes.
- * 
- * @type OnStateChangeCallback
- * @since 1.0.0
- */
-export type OnStateChangeCallback = (
-  state: DialogState,
-  context: DialogStateContext
-) => Promise<void> | void;
-
-/**
- * Callback function type for progress updates.
- * 
- * @type OnProgressCallback
- * @since 1.0.0
- */
-export type OnProgressCallback = (progress: number, message?: string) => void;
-
-/**
- * Dialog event handlers interface.
- * 
- * @interface DialogEventHandlers
- * @since 1.0.0
- */
-export interface DialogEventHandlers {
-  /** Called when dialog opens */
-  onOpen?: () => void;
-  
-  /** Called when dialog closes */
-  onClose?: () => void;
-  
-  /** Called when URL changes */
-  onUrlChange?: (url: string) => void;
-  
-  /** Called when repository privacy is detected */
-  onPrivacyDetected?: (isPrivate: boolean, repo: GitHubRepositoryInfo) => void;
-  
-  /** Called when authentication is required */
-  onAuthRequired?: () => void;
-  
-  /** Called when authentication succeeds */
-  onAuthSuccess?: (user: GitHubUserInfo) => void;
-  
-  /** Called during file processing */
-  onProgress?: OnProgressCallback;
-  
-  /** Called when import succeeds */
-  onSuccess?: OnSuccessCallback;
-  
-  /** Called when error occurs */
-  onError?: OnErrorCallback;
-  
-  /** Called on state changes */
-  onStateChange?: OnStateChangeCallback;
+export interface GitHubDialogState {
+  /** Whether the dialog is loading */
+  loading: boolean;
+  /** Current error if any */
+  error: GitHubError | null;
+  /** Whether repository is private */
+  isPrivateRepo: boolean;
+  /** Repository metadata */
+  repoData: GitHubRepoData | null;
+  /** File metadata */
+  fileData: GitHubFileData | null;
+  /** Parsed URL parts */
+  urlParts: GitHubUrlParts | null;
+  /** Form validation errors */
+  formErrors: Partial<Record<keyof GitHubFormData, string>>;
 }
+
+/**
+ * Dialog action types for state management
+ */
+export type GitHubDialogAction = 
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: GitHubError | null }
+  | { type: 'SET_PRIVATE_REPO'; payload: boolean }
+  | { type: 'SET_REPO_DATA'; payload: GitHubRepoData | null }
+  | { type: 'SET_FILE_DATA'; payload: GitHubFileData | null }
+  | { type: 'SET_URL_PARTS'; payload: GitHubUrlParts | null }
+  | { type: 'SET_FORM_ERRORS'; payload: Partial<Record<keyof GitHubFormData, string>> }
+  | { type: 'RESET_STATE' };
 
 // =============================================================================
 // UTILITY TYPES
 // =============================================================================
 
 /**
- * Partial dialog props for testing and mock scenarios.
- * 
- * @type PartialDialogProps
- * @since 1.0.0
+ * Type for dialog promise resolution
  */
-export type PartialDialogProps = Partial<ScriptsGithubDialogProps>;
+export type GitHubDialogPromise = Promise<DialogResult<GitHubScriptResult>>;
 
 /**
- * Required dialog props that must be provided.
- * 
- * @type RequiredDialogProps
- * @since 1.0.0
+ * Configuration options for the GitHub service
  */
-export type RequiredDialogProps = Pick<
-  ScriptsGithubDialogProps,
-  'isOpen' | 'onClose' | 'onSuccess' | 'onError'
->;
-
-/**
- * Dialog configuration options.
- * 
- * @type DialogConfiguration
- * @since 1.0.0
- */
-export type DialogConfiguration = Omit<
-  ScriptsGithubDialogProps,
-  'isOpen' | 'onClose' | 'onSuccess' | 'onError'
->;
-
-/**
- * GitHub URL parsing result.
- * 
- * @interface GitHubUrlParts
- * @since 1.0.0
- */
-export interface GitHubUrlParts {
-  /** Repository owner */
-  owner: string;
-  
-  /** Repository name */
-  repo: string;
-  
-  /** File path within repository */
-  path: string;
-  
-  /** Branch name */
-  branch?: string;
-  
-  /** Commit SHA */
-  sha?: string;
-  
-  /** Whether URL is valid */
-  isValid: boolean;
-  
-  /** Original URL */
-  originalUrl: string;
+export interface GitHubServiceConfig {
+  /** GitHub API base URL */
+  apiBaseUrl?: string;
+  /** Request timeout in milliseconds */
+  timeout?: number;
+  /** Whether to include authentication headers */
+  includeAuth?: boolean;
+  /** Rate limiting configuration */
+  rateLimiting?: {
+    /** Requests per hour */
+    requestsPerHour: number;
+    /** Requests per minute */
+    requestsPerMinute: number;
+  };
 }
 
 /**
- * Component ref interface for imperative API.
- * 
- * @interface ScriptsGithubDialogRef
- * @since 1.0.0
+ * GitHub API response wrapper
  */
-export interface ScriptsGithubDialogRef {
-  /** Open the dialog */
-  open: () => void;
-  
-  /** Close the dialog */
-  close: () => void;
-  
-  /** Reset dialog state */
-  reset: () => void;
-  
-  /** Get current form values */
-  getFormValues: () => GitHubUrlFormData;
-  
-  /** Set form values */
-  setFormValues: (values: Partial<GitHubUrlFormData>) => void;
-  
-  /** Trigger form validation */
-  validateForm: () => Promise<boolean>;
-  
-  /** Get current dialog state */
-  getState: () => DialogStateContext;
-}
-
-// =============================================================================
-// EXPORTED TYPE UNIONS & HELPERS
-// =============================================================================
-
-/**
- * All possible dialog states union type.
- * 
- * @type DialogStates
- * @since 1.0.0
- */
-export type DialogStates = keyof typeof DialogState;
-
-/**
- * File extension mapping to language.
- * 
- * @type ExtensionLanguageMap
- * @since 1.0.0
- */
-export type ExtensionLanguageMap = {
-  [K in ScriptFileExtension]: ScriptLanguage;
-};
-
-/**
- * Type guard for checking if a value is a valid GitHub dialog error.
- * 
- * @param error - Value to check
- * @returns Whether the value is a GitHubDialogError
- * @since 1.0.0
- */
-export function isGitHubDialogError(error: unknown): error is GitHubDialogError {
-  return (
-    error instanceof Error &&
-    'type' in error &&
-    'recoverable' in error &&
-    'timestamp' in error
-  );
+export interface GitHubApiResponse<T = unknown> {
+  /** Response data */
+  data: T;
+  /** Response status */
+  status: number;
+  /** Response headers */
+  headers: Record<string, string>;
+  /** Rate limit information */
+  rateLimit?: {
+    /** Remaining requests */
+    remaining: number;
+    /** Rate limit reset time */
+    reset: number;
+    /** Total requests allowed */
+    limit: number;
+  };
 }
 
 /**
- * Type guard for checking if a URL points to a GitHub file.
- * 
- * @param url - URL to check
- * @returns Whether the URL is a valid GitHub file URL
- * @since 1.0.0
+ * Export all types for barrel export
  */
-export function isGitHubFileUrl(url: string): boolean {
-  const githubPattern = /^https?:\/\/github\.com\/[^\/]+\/[^\/]+\/blob\/[^\/]+\/.+\.(js|py|php|txt|json|md|yml|yaml)$/i;
-  return githubPattern.test(url);
-}
-
-/**
- * Utility type for extracting props from component type.
- * 
- * @template T - Component type
- * @since 1.0.0
- */
-export type ComponentProps<T> = T extends React.ComponentType<infer P> ? P : never;
-
-/**
- * Default file configuration for common script types.
- * 
- * @constant DEFAULT_FILE_CONFIG
- * @since 1.0.0
- */
-export const DEFAULT_FILE_CONFIG: ScriptFileConfig = {
-  allowedExtensions: ['.js', '.py', '.php', '.txt'],
-  maxFileSize: 1048576, // 1MB
-  validateContent: true,
-  processingOptions: {
-    minify: false,
-    validateSyntax: true,
-    encoding: 'utf-8',
-    preserveFormatting: true,
-    maxContentLength: 1000000, // 1M characters
-  },
-};
-
-/**
- * Extension to language mapping.
- * 
- * @constant EXTENSION_LANGUAGE_MAP
- * @since 1.0.0
- */
-export const EXTENSION_LANGUAGE_MAP: ExtensionLanguageMap = {
-  '.js': 'javascript',
-  '.py': 'python',
-  '.php': 'php',
-  '.txt': 'text',
-  '.json': 'json',
-  '.md': 'markdown',
-  '.yml': 'yaml',
-  '.yaml': 'yaml',
+export type {
+  BaseDialogProps,
+  DialogResult,
+  ScriptsGitHubDialogProps,
+  GitHubFileData,
+  GitHubRepoData,
+  GitHubAuthCredentials,
+  GitHubUrlParts,
+  GitHubScriptResult,
+  GitHubDialogCancelResult,
+  GitHubFormData,
+  GitHubFormField,
+  GitHubError,
+  GitHubErrorType,
+  GitHubDialogState,
+  GitHubDialogAction,
+  GitHubDialogPromise,
+  GitHubServiceConfig,
+  GitHubApiResponse,
+  GitHubFormSchemaType,
+  GitHubUrlSchemaType,
+  GitHubAuthSchemaType,
 };
