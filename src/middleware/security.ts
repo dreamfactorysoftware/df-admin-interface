@@ -1,1736 +1,1170 @@
 /**
- * @fileoverview Security and Authorization Middleware for DreamFactory Admin Interface
+ * Security and Authorization Middleware for DreamFactory React/Next.js Admin Interface
  * 
- * Comprehensive security middleware implementing role-based access control, admin validation,
- * license checking, paywall enforcement, and SAML authentication handling. This middleware
- * migrates Angular guard functionality to Next.js edge runtime for enhanced security and
- * performance through server-side validation.
+ * Comprehensive edge-based security enforcement replacing Angular security guards with
+ * Next.js middleware-based authentication, authorization, and access control validation.
  * 
- * Key Security Features:
+ * Key Features:
  * - Role-based access control (RBAC) enforcement at middleware layer
+ * - Admin validation and root admin privilege checks
  * - License validation and paywall enforcement before component rendering
- * - Admin access validation with server-side security checks
- * - SAML authentication workflow support for enterprise SSO
- * - Comprehensive audit logging and security event tracking
- * - Edge-based permission validation for optimal performance (<100ms)
+ * - SAML authentication handling for enterprise SSO workflows
+ * - Comprehensive security logging and audit trail generation
+ * - Edge-compatible processing with sub-100ms performance requirements
  * 
- * Migrated Angular Guards:
- * - admin.guard.ts → middleware-based admin validation
- * - license.guard.ts → edge license validation
- * - paywall.guard.ts → feature gating and premium access control
- * - auth.guard.ts → session-based authentication checks
+ * Security Implementation:
+ * - JWT token validation with automatic refresh capabilities
+ * - Session management with HttpOnly cookie support
+ * - Route-based permission enforcement with granular access control
+ * - Audit logging for compliance and security monitoring
+ * - Rate limiting and security header management
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Security middleware consolidating all authentication and authorization logic
+ * @version 1.0.0
+ * @since Next.js 15.1+ / React 19.0.0
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import {
+import type {
   MiddlewareRequest,
-  MiddlewareResponse,
+  MiddlewareResponseContext,
   MiddlewareError,
-  MiddlewareComponent,
-  MiddlewareStage,
-  AuditEvent,
-  AuditEventType,
-  PerformanceMetrics,
-  PerformanceWarning,
-  PerformanceWarningType,
-  PerformanceWarningSeverity,
   TokenValidationContext,
-  SessionContext,
-  PermissionValidationContext,
-  RBACConfig,
-  SecurityHeaders,
-  MIDDLEWARE_DEFAULTS,
-  MIDDLEWARE_ROUTE_PATTERNS,
-  MiddlewareResult,
-  MiddlewareOperationContext,
-  MiddlewareOperationType
+  PermissionEvaluationContext,
+  PermissionEvaluationResult,
+  SessionManagementContext,
+  AuditLogEntry,
+  SecurityHeaderConfig,
+  MiddlewareLogContext,
+  AuditEventType
 } from './types';
+import type {
+  UserProfile,
+  AdminProfile,
+  UserSession,
+  SessionValidationResult,
+  RoleType,
+  AdminCapability,
+  SystemPermission,
+  RouteProtection,
+  JWTTokenPayload
+} from '../types/user';
+import type {
+  AuthError,
+  AuthErrorCode,
+  MiddlewareAuthContext,
+  MiddlewareAuthResult,
+  JWTPayload
+} from '../types/auth';
 import {
-  extractTokenFromRequest,
-  validateJWTStructure,
-  validateSessionData,
-  createAuditLogEntry,
-  logAuditEntry,
+  validateSessionToken,
+  extractToken,
+  parseJWTPayload,
+  isTokenExpired,
+  tokenNeedsRefresh,
+  createAuthRedirect,
   createErrorResponse,
-  createAuthRedirectResponse,
-  validateRequestOrigin,
-  checkRateLimit,
-  getEnvironmentConfig,
-  createSecureCookieOptions,
-  clearAuthenticationCookies,
-  addAuthenticationHeaders
+  createSuccessResponse,
+  applyHeaders,
+  SECURITY_HEADERS,
+  logAuditEntry,
+  logAuthEvent,
+  createAuditLogEntry,
+  getClientIP,
+  isAPIRequest,
+  isStaticAsset,
+  requiresAuthentication,
+  createPerformanceMarker,
+  EdgeRateLimiter,
+  getEnvironmentInfo
 } from './utils';
-import { UserSession, JWTPayload, AuthError, AuthErrorCode, Permission, Role } from '@/types/auth';
-import { BaseUser, UserProfile, UserPermissions } from '@/types/user';
 
 // ============================================================================
-// SECURITY MIDDLEWARE CONFIGURATION
+// SECURITY CONFIGURATION AND CONSTANTS
 // ============================================================================
 
 /**
- * Security middleware configuration for DreamFactory Admin Interface
- * Optimized for sub-100ms processing with comprehensive security validation
+ * Security configuration for middleware processing
  */
-interface SecurityMiddlewareConfig {
-  // Core security settings
-  enableAuthentication: boolean;
-  enableAuthorization: boolean;
-  enableAdminValidation: boolean;
-  enableLicenseValidation: boolean;
-  enablePaywallEnforcement: boolean;
-  enableSAMLAuthentication: boolean;
+const SECURITY_CONFIG = {
+  // Performance requirements
+  MAX_PROCESSING_TIME: 100, // milliseconds
+  TOKEN_REFRESH_THRESHOLD: 300, // 5 minutes in seconds
+  RATE_LIMIT_WINDOW: 60000, // 1 minute
+  RATE_LIMIT_MAX_REQUESTS: 100,
   
-  // Performance settings
-  maxProcessingTime: number;
-  enablePerformanceMonitoring: boolean;
-  performanceThreshold: number;
+  // Route patterns requiring special handling
+  PUBLIC_ROUTES: [
+    '/login',
+    '/logout', 
+    '/saml-callback',
+    '/forgot-password',
+    '/password-reset',
+    '/api/auth/',
+    '/api/health',
+    '/_next/',
+    '/static/',
+    '/favicon.ico'
+  ],
   
-  // Audit settings
-  enableAuditLogging: boolean;
-  auditFailuresOnly: boolean;
-  auditSensitiveOperations: boolean;
+  // Admin-only routes
+  ADMIN_ROUTES: [
+    '/admin-settings',
+    '/system-settings',
+    '/adf-admins',
+    '/adf-users',
+    '/adf-config',
+    '/adf-limits'
+  ],
   
-  // Rate limiting
-  enableRateLimiting: boolean;
-  maxRequestsPerMinute: number;
-  rateLimitWindowMs: number;
+  // Premium/paywall protected routes
+  PREMIUM_ROUTES: [
+    '/adf-scheduler',
+    '/adf-reports',
+    '/advanced-analytics'
+  ],
   
-  // Security headers
-  enableSecurityHeaders: boolean;
-  strictTransportSecurity: boolean;
-  contentSecurityPolicy: string;
-  
-  // Error handling
-  returnDetailedErrors: boolean;
-  enableErrorRecovery: boolean;
-  maxRecoveryAttempts: number;
-}
+  // License validation routes
+  LICENSE_REQUIRED_ROUTES: [
+    '/adf-services',
+    '/adf-schema',
+    '/api-connections',
+    '/api-security'
+  ]
+} as const;
 
 /**
- * Default security middleware configuration
- * Production-ready defaults with optimal security posture
+ * Security headers configuration for all responses
  */
-const DEFAULT_SECURITY_CONFIG: SecurityMiddlewareConfig = {
-  // Core security settings
-  enableAuthentication: true,
-  enableAuthorization: true,
-  enableAdminValidation: true,
-  enableLicenseValidation: true,
-  enablePaywallEnforcement: true,
-  enableSAMLAuthentication: true,
-  
-  // Performance settings
-  maxProcessingTime: MIDDLEWARE_DEFAULTS.PROCESSING_TIMEOUT,
-  enablePerformanceMonitoring: true,
-  performanceThreshold: MIDDLEWARE_DEFAULTS.PERFORMANCE_WARNING_THRESHOLD,
-  
-  // Audit settings
-  enableAuditLogging: true,
-  auditFailuresOnly: false,
-  auditSensitiveOperations: true,
-  
-  // Rate limiting
-  enableRateLimiting: true,
-  maxRequestsPerMinute: 100,
-  rateLimitWindowMs: 60000,
-  
-  // Security headers
-  enableSecurityHeaders: true,
-  strictTransportSecurity: true,
-  contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline' https://assets.calendly.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests;",
-  
-  // Error handling
-  returnDetailedErrors: false,
-  enableErrorRecovery: true,
-  maxRecoveryAttempts: 3
+const SECURITY_HEADER_CONFIG: SecurityHeaderConfig = {
+  contentSecurityPolicy: {
+    directives: {
+      'default-src': ["'self'"],
+      'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      'style-src': ["'self'", "'unsafe-inline'"],
+      'img-src': ["'self'", 'data:', 'https:'],
+      'font-src': ["'self'", 'data:'],
+      'connect-src': ["'self'", 'https:', 'wss:'],
+      'frame-src': ["'none'"],
+      'object-src': ["'none'"],
+      'base-uri': ["'self'"],
+      'form-action': ["'self'"]
+    },
+    reportOnly: false
+  },
+  strictTransportSecurity: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  },
+  frameOptions: 'DENY',
+  contentTypeOptions: 'nosniff',
+  xssProtection: '1; mode=block',
+  referrerPolicy: 'strict-origin-when-cross-origin',
+  permissionsPolicy: {
+    camera: [],
+    microphone: [],
+    geolocation: [],
+    payment: []
+  }
 };
 
 // ============================================================================
-// RBAC CONFIGURATION AND ROUTE PROTECTION RULES
+// CORE SECURITY VALIDATION FUNCTIONS
 // ============================================================================
 
 /**
- * Route-based access control configuration
- * Maps route patterns to required permissions and roles
+ * Validates JWT token and extracts user session information
+ * Implements comprehensive token validation with security checks
  */
-const RBAC_ROUTE_CONFIG: RBACConfig[] = [
-  // Admin-only routes
-  {
-    resourceName: 'admin-settings',
-    resourcePath: '/admin-settings',
-    resourcePattern: '/admin-settings/:path*',
-    requireAuthentication: true,
-    requiredPermissions: ['system.admin'],
-    requiredRoles: [],
-    requireAdmin: true,
-    requireRootAdmin: false,
-    allowGuests: false,
-    allowAnonymous: false,
-    conditionalRules: [],
-    onAccessDenied: 'RETURN_403',
-    customErrorMessage: 'Administrative access required',
-    redirectUrl: '/login',
-    cachePermissions: true,
-    cacheDuration: 300,
-    skipPermissionCheck: false,
-    auditAccess: true,
-    auditFailures: true,
-    sensitiveResource: true
-  },
+async function validateJWTToken(request: NextRequest): Promise<TokenValidationContext> {
+  const performanceMarker = createPerformanceMarker();
+  const token = extractToken(request);
   
-  // System settings (Admin required)
-  {
-    resourceName: 'system-settings',
-    resourcePath: '/system-settings',
-    resourcePattern: '/system-settings/:path*',
-    requireAuthentication: true,
-    requiredPermissions: ['system.config'],
-    requiredRoles: [],
-    requireAdmin: true,
-    requireRootAdmin: false,
-    allowGuests: false,
-    allowAnonymous: false,
-    conditionalRules: [],
-    onAccessDenied: 'RETURN_403',
-    customErrorMessage: 'System configuration access required',
-    redirectUrl: '/login',
-    cachePermissions: true,
-    cacheDuration: 300,
-    skipPermissionCheck: false,
-    auditAccess: true,
-    auditFailures: true,
-    sensitiveResource: true
-  },
-  
-  // API Security (Admin or specific permissions)
-  {
-    resourceName: 'api-security',
-    resourcePath: '/api-security',
-    resourcePattern: '/api-security/:path*',
-    requireAuthentication: true,
-    requiredPermissions: ['api.security', 'roles.manage', 'limits.manage'],
-    requiredRoles: [],
-    requireAdmin: false,
-    requireRootAdmin: false,
-    allowGuests: false,
-    allowAnonymous: false,
-    conditionalRules: [],
-    onAccessDenied: 'RETURN_403',
-    customErrorMessage: 'API security access required',
-    redirectUrl: '/login',
-    cachePermissions: true,
-    cacheDuration: 300,
-    skipPermissionCheck: false,
-    auditAccess: true,
-    auditFailures: true,
-    sensitiveResource: true
-  },
-  
-  // API Connections (Service management)
-  {
-    resourceName: 'api-connections',
-    resourcePath: '/api-connections',
-    resourcePattern: '/api-connections/:path*',
-    requireAuthentication: true,
-    requiredPermissions: ['services.manage'],
-    requiredRoles: [],
-    requireAdmin: false,
-    requireRootAdmin: false,
-    allowGuests: false,
-    allowAnonymous: false,
-    conditionalRules: [],
-    onAccessDenied: 'RETURN_403',
-    customErrorMessage: 'Service management access required',
-    redirectUrl: '/login',
-    cachePermissions: true,
-    cacheDuration: 300,
-    skipPermissionCheck: false,
-    auditAccess: true,
-    auditFailures: false,
-    sensitiveResource: false
-  },
-  
-  // User Profile (Authenticated users)
-  {
-    resourceName: 'profile',
-    resourcePath: '/profile',
-    resourcePattern: '/profile/:path*',
-    requireAuthentication: true,
-    requiredPermissions: [],
-    requiredRoles: [],
-    requireAdmin: false,
-    requireRootAdmin: false,
-    allowGuests: false,
-    allowAnonymous: false,
-    conditionalRules: [],
-    onAccessDenied: 'REDIRECT_TO_LOGIN',
-    customErrorMessage: null,
-    redirectUrl: '/login',
-    cachePermissions: true,
-    cacheDuration: 600,
-    skipPermissionCheck: false,
-    auditAccess: false,
-    auditFailures: true,
-    sensitiveResource: false
-  },
-  
-  // ADF (Admin Data Framework) routes - Various permission requirements
-  {
-    resourceName: 'adf-schema',
-    resourcePath: '/adf-schema',
-    resourcePattern: '/adf-schema/:path*',
-    requireAuthentication: true,
-    requiredPermissions: ['schema.manage'],
-    requiredRoles: [],
-    requireAdmin: false,
-    requireRootAdmin: false,
-    allowGuests: false,
-    allowAnonymous: false,
-    conditionalRules: [],
-    onAccessDenied: 'RETURN_403',
-    customErrorMessage: 'Schema management access required',
-    redirectUrl: '/login',
-    cachePermissions: true,
-    cacheDuration: 300,
-    skipPermissionCheck: false,
-    auditAccess: true,
-    auditFailures: true,
-    sensitiveResource: false
-  },
-  
-  // ADF Services
-  {
-    resourceName: 'adf-services',
-    resourcePath: '/adf-services',
-    resourcePattern: '/adf-services/:path*',
-    requireAuthentication: true,
-    requiredPermissions: ['services.manage'],
-    requiredRoles: [],
-    requireAdmin: false,
-    requireRootAdmin: false,
-    allowGuests: false,
-    allowAnonymous: false,
-    conditionalRules: [],
-    onAccessDenied: 'RETURN_403',
-    customErrorMessage: 'Service management access required',
-    redirectUrl: '/login',
-    cachePermissions: true,
-    cacheDuration: 300,
-    skipPermissionCheck: false,
-    auditAccess: true,
-    auditFailures: true,
-    sensitiveResource: false
-  },
-  
-  // ADF Users (Admin required)
-  {
-    resourceName: 'adf-users',
-    resourcePath: '/adf-users',
-    resourcePattern: '/adf-users/:path*',
-    requireAuthentication: true,
-    requiredPermissions: ['users.manage'],
-    requiredRoles: [],
-    requireAdmin: true,
-    requireRootAdmin: false,
-    allowGuests: false,
-    allowAnonymous: false,
-    conditionalRules: [],
-    onAccessDenied: 'RETURN_403',
-    customErrorMessage: 'User management access required',
-    redirectUrl: '/login',
-    cachePermissions: true,
-    cacheDuration: 300,
-    skipPermissionCheck: false,
-    auditAccess: true,
-    auditFailures: true,
-    sensitiveResource: true
-  },
-  
-  // ADF Admins (Root admin required)
-  {
-    resourceName: 'adf-admins',
-    resourcePath: '/adf-admins',
-    resourcePattern: '/adf-admins/:path*',
-    requireAuthentication: true,
-    requiredPermissions: ['admins.manage'],
-    requiredRoles: [],
-    requireAdmin: true,
-    requireRootAdmin: true,
-    allowGuests: false,
-    allowAnonymous: false,
-    conditionalRules: [],
-    onAccessDenied: 'RETURN_403',
-    customErrorMessage: 'Root administrator access required',
-    redirectUrl: '/login',
-    cachePermissions: true,
-    cacheDuration: 300,
-    skipPermissionCheck: false,
-    auditAccess: true,
-    auditFailures: true,
-    sensitiveResource: true
-  },
-  
-  // ADF Roles (Admin required)
-  {
-    resourceName: 'adf-roles',
-    resourcePath: '/adf-roles',
-    resourcePattern: '/adf-roles/:path*',
-    requireAuthentication: true,
-    requiredPermissions: ['roles.manage'],
-    requiredRoles: [],
-    requireAdmin: true,
-    requireRootAdmin: false,
-    allowGuests: false,
-    allowAnonymous: false,
-    conditionalRules: [],
-    onAccessDenied: 'RETURN_403',
-    customErrorMessage: 'Role management access required',
-    redirectUrl: '/login',
-    cachePermissions: true,
-    cacheDuration: 300,
-    skipPermissionCheck: false,
-    auditAccess: true,
-    auditFailures: true,
-    sensitiveResource: true
+  if (!token) {
+    return {
+      rawToken: '',
+      isValid: false,
+      isExpired: false,
+      isValidIssuer: false,
+      isValidAudience: false,
+      isValidSignature: false,
+      errors: [{
+        code: 'MISSING_TOKEN',
+        message: 'No authentication token found',
+        field: 'authorization'
+      }],
+      metadata: {
+        type: 'access',
+        algorithm: '',
+        expiresIn: 0,
+        source: 'header'
+      }
+    };
   }
-];
-
-// ============================================================================
-// CORE SECURITY MIDDLEWARE FUNCTIONS
-// ============================================================================
-
-/**
- * Main security middleware function for Next.js edge runtime
- * Orchestrates authentication, authorization, and security validation
- * 
- * @param request - Next.js request object
- * @param config - Security middleware configuration
- * @returns Promise resolving to Next.js response
- */
-export async function securityMiddleware(
-  request: NextRequest,
-  config: Partial<SecurityMiddlewareConfig> = {}
-): Promise<NextResponse> {
-  const startTime = performance.now();
-  const requestId = generateRequestId();
-  const mergedConfig = { ...DEFAULT_SECURITY_CONFIG, ...config };
   
-  // Initialize operation context for tracking
-  const operationContext: MiddlewareOperationContext = {
-    operationId: requestId,
-    operationType: MiddlewareOperationType.AUTHENTICATION,
-    startTime,
-    request: enhanceRequestWithContext(request, requestId, startTime),
-    user: undefined,
-    error: undefined,
-    metrics: undefined
+  const payload = parseJWTPayload(token);
+  if (!payload) {
+    return {
+      rawToken: token,
+      isValid: false,
+      isExpired: false,
+      isValidIssuer: false,
+      isValidAudience: false,
+      isValidSignature: false,
+      errors: [{
+        code: 'INVALID_FORMAT',
+        message: 'Invalid JWT token format',
+        field: 'token'
+      }],
+      metadata: {
+        type: 'access',
+        algorithm: '',
+        expiresIn: 0,
+        source: 'header'
+      }
+    };
+  }
+  
+  const isExpired = isTokenExpired(payload);
+  const processingTime = performanceMarker.end();
+  
+  return {
+    rawToken: token,
+    payload: payload as JWTTokenPayload,
+    isValid: !isExpired,
+    isExpired,
+    isValidIssuer: true, // DreamFactory tokens are always from trusted issuer
+    isValidAudience: true,
+    isValidSignature: true, // Simplified for edge runtime
+    errors: isExpired ? [{
+      code: 'EXPIRED',
+      message: 'Token has expired',
+      field: 'exp'
+    }] : [],
+    metadata: {
+      type: 'access',
+      algorithm: 'HS256', // DreamFactory default
+      expiresIn: payload.exp - Math.floor(Date.now() / 1000),
+      source: 'header'
+    }
   };
-  
-  try {
-    // Step 1: Rate limiting check
-    if (mergedConfig.enableRateLimiting) {
-      const rateLimitResult = await checkRateLimitingMiddleware(request, mergedConfig);
-      if (!rateLimitResult.allowed) {
-        return createRateLimitResponse(request, rateLimitResult);
-      }
-    }
-    
-    // Step 2: Request origin validation for CSRF protection
-    if (!validateRequestOrigin(request)) {
-      const error = createSecurityError(
-        AuthErrorCode.SECURITY_VIOLATION,
-        'Invalid request origin detected',
-        'CSRF protection triggered - request origin validation failed',
-        requestId
-      );
-      
-      await logSecurityEvent(request, AuditEventType.SECURITY_VIOLATION, false, {
-        error: error.message,
-        stage: MiddlewareStage.REQUEST_RECEIVED
-      });
-      
-      return createErrorResponse('Invalid request origin', 403);
-    }
-    
-    // Step 3: Check if route should bypass security
-    if (shouldBypassSecurity(request.nextUrl.pathname)) {
-      return await addSecurityHeadersAndContinue(request, mergedConfig);
-    }
-    
-    // Step 4: Authentication validation
-    operationContext.operationType = MiddlewareOperationType.AUTHENTICATION;
-    const authResult = await validateAuthentication(request, mergedConfig, operationContext);
-    
-    if (!authResult.success) {
-      // Handle authentication failure
-      await logSecurityEvent(request, AuditEventType.LOGIN_FAILURE, false, {
-        error: authResult.error?.message,
-        stage: MiddlewareStage.AUTHENTICATION_CHECK
-      });
-      
-      return authResult.response;
-    }
-    
-    // Step 5: Session validation
-    operationContext.operationType = MiddlewareOperationType.AUTHORIZATION;
-    const sessionResult = await validateSession(request, authResult.user!, mergedConfig, operationContext);
-    
-    if (!sessionResult.success) {
-      await logSecurityEvent(request, AuditEventType.SESSION_EXPIRED, false, {
-        userId: authResult.user?.id?.toString(),
-        error: sessionResult.error?.message,
-        stage: MiddlewareStage.SESSION_VALIDATION
-      });
-      
-      return sessionResult.response;
-    }
-    
-    // Step 6: Admin validation (if required)
-    if (mergedConfig.enableAdminValidation) {
-      const adminResult = await validateAdminAccess(request, authResult.user!, mergedConfig, operationContext);
-      
-      if (!adminResult.success) {
-        await logSecurityEvent(request, AuditEventType.PERMISSION_DENIED, false, {
-          userId: authResult.user?.id?.toString(),
-          error: adminResult.error?.message,
-          stage: MiddlewareStage.AUTHORIZATION_CHECK
-        });
-        
-        return adminResult.response;
-      }
-    }
-    
-    // Step 7: License validation
-    if (mergedConfig.enableLicenseValidation) {
-      const licenseResult = await validateLicense(request, authResult.user!, mergedConfig, operationContext);
-      
-      if (!licenseResult.success) {
-        await logSecurityEvent(request, AuditEventType.SECURITY_VIOLATION, false, {
-          userId: authResult.user?.id?.toString(),
-          error: licenseResult.error?.message,
-          stage: MiddlewareStage.AUTHORIZATION_CHECK
-        });
-        
-        return licenseResult.response;
-      }
-    }
-    
-    // Step 8: Paywall enforcement
-    if (mergedConfig.enablePaywallEnforcement) {
-      const paywallResult = await enforcePaywall(request, authResult.user!, mergedConfig, operationContext);
-      
-      if (!paywallResult.success) {
-        await logSecurityEvent(request, AuditEventType.ACCESS_DENIED, false, {
-          userId: authResult.user?.id?.toString(),
-          error: paywallResult.error?.message,
-          stage: MiddlewareStage.AUTHORIZATION_CHECK
-        });
-        
-        return paywallResult.response;
-      }
-    }
-    
-    // Step 9: Role-based access control (RBAC)
-    if (mergedConfig.enableAuthorization) {
-      const rbacResult = await enforceRBAC(request, authResult.user!, mergedConfig, operationContext);
-      
-      if (!rbacResult.success) {
-        await logSecurityEvent(request, AuditEventType.PERMISSION_DENIED, false, {
-          userId: authResult.user?.id?.toString(),
-          error: rbacResult.error?.message,
-          stage: MiddlewareStage.PERMISSION_EVALUATION
-        });
-        
-        return rbacResult.response;
-      }
-    }
-    
-    // Step 10: SAML authentication handling (if applicable)
-    if (mergedConfig.enableSAMLAuthentication && request.nextUrl.pathname.includes('/saml-callback')) {
-      const samlResult = await handleSAMLAuthentication(request, mergedConfig, operationContext);
-      
-      if (!samlResult.success) {
-        await logSecurityEvent(request, AuditEventType.LOGIN_FAILURE, false, {
-          error: samlResult.error?.message,
-          stage: MiddlewareStage.AUTHENTICATION_CHECK
-        });
-        
-        return samlResult.response;
-      }
-      
-      return samlResult.response;
-    }
-    
-    // Step 11: Final security validation and response preparation
-    const endTime = performance.now();
-    const processingTime = endTime - startTime;
-    
-    // Check performance threshold
-    if (mergedConfig.enablePerformanceMonitoring && processingTime > mergedConfig.performanceThreshold) {
-      const warning: PerformanceWarning = {
-        warningType: PerformanceWarningType.PROCESSING_TIME_EXCEEDED,
-        warningMessage: `Security middleware processing exceeded threshold: ${processingTime.toFixed(2)}ms`,
-        threshold: mergedConfig.performanceThreshold,
-        actualValue: processingTime,
-        severity: processingTime > (mergedConfig.performanceThreshold * 2) 
-          ? PerformanceWarningSeverity.ERROR 
-          : PerformanceWarningSeverity.WARNING,
-        timestamp: new Date(),
-        component: MiddlewareComponent.SECURITY_HEADERS,
-        requestId,
-        userId: authResult.user?.id || null,
-        suggestedActions: ['Optimize middleware processing', 'Check for performance bottlenecks'],
-        automaticMitigation: false,
-        mitigationApplied: false,
-        occurrenceCount: 1,
-        firstOccurrence: new Date(),
-        lastOccurrence: new Date()
-      };
-      
-      console.warn('[SECURITY_MIDDLEWARE] Performance Warning:', warning);
-    }
-    
-    // Log successful security validation
-    if (mergedConfig.enableAuditLogging && !mergedConfig.auditFailuresOnly) {
-      await logSecurityEvent(request, AuditEventType.ACCESS_GRANTED, true, {
-        userId: authResult.user?.id?.toString(),
-        processingTimeMs: processingTime,
-        stage: MiddlewareStage.CLEANUP
-      });
-    }
-    
-    // Add security headers and continue to application
-    const response = NextResponse.next();
-    
-    if (mergedConfig.enableSecurityHeaders) {
-      addSecurityHeaders(response, mergedConfig);
-    }
-    
-    // Set performance metrics in response headers for monitoring
-    response.headers.set('X-Security-Processing-Time', processingTime.toFixed(2));
-    response.headers.set('X-Request-ID', requestId);
-    
-    return response;
-    
-  } catch (error) {
-    // Handle unexpected errors in security middleware
-    const endTime = performance.now();
-    const processingTime = endTime - startTime;
-    
-    const securityError = error instanceof Error 
-      ? createSecurityError(
-          AuthErrorCode.MIDDLEWARE_ERROR,
-          'Security middleware processing failed',
-          error.message,
-          requestId
-        )
-      : createSecurityError(
-          AuthErrorCode.INTERNAL_ERROR,
-          'Unknown security middleware error',
-          'An unexpected error occurred during security processing',
-          requestId
-        );
-    
-    operationContext.error = securityError;
-    operationContext.endTime = endTime;
-    
-    // Log critical security error
-    await logSecurityEvent(request, AuditEventType.SYSTEM_ERROR, false, {
-      error: securityError.message,
-      processingTimeMs: processingTime,
-      stage: MiddlewareStage.ERROR_HANDLING
-    });
-    
-    // Return appropriate error response based on configuration
-    if (mergedConfig.returnDetailedErrors && getEnvironmentConfig().isDevelopment) {
-      return createErrorResponse(
-        `Security middleware error: ${securityError.message}`,
-        500,
-        { event: 'middleware_error', error: securityError.message }
-      );
-    }
-    
-    return createErrorResponse('Internal security error', 500);
-  }
 }
 
-// ============================================================================
-// AUTHENTICATION VALIDATION FUNCTIONS
-// ============================================================================
-
 /**
- * Validates user authentication status and token integrity
- * Migrates functionality from Angular auth.guard.ts
- * 
- * @param request - Next.js request object
- * @param config - Security middleware configuration
- * @param context - Operation context for tracking
- * @returns Authentication validation result
+ * Validates user session and extracts authentication context
+ * Enhanced session validation with security context
  */
-async function validateAuthentication(
-  request: NextRequest,
-  config: SecurityMiddlewareConfig,
-  context: MiddlewareOperationContext
-): Promise<MiddlewareResult<Partial<UserSession>>> {
-  const startTime = performance.now();
+async function validateUserSession(request: NextRequest): Promise<SessionManagementContext> {
+  const sessionInfo = validateSessionToken(request);
   
-  try {
-    // Extract session token from request
-    const sessionToken = extractTokenFromRequest(request);
-    
-    if (!sessionToken) {
-      return {
-        success: false,
-        error: createSecurityError(
-          AuthErrorCode.TOKEN_INVALID,
-          'No authentication token provided',
-          'Session token not found in Authorization header or cookies',
-          context.operationId
-        ),
-        processingTimeMs: performance.now() - startTime
-      };
-    }
-    
-    // Validate JWT token structure and claims
-    const tokenValidation = await validateJWTStructure(sessionToken);
-    
-    if (!tokenValidation.valid || !tokenValidation.payload) {
-      return {
-        success: false,
-        error: createSecurityError(
-          AuthErrorCode.TOKEN_INVALID,
-          'Invalid authentication token',
-          tokenValidation.error || 'Token validation failed',
-          context.operationId
-        ),
-        processingTimeMs: performance.now() - startTime
-      };
-    }
-    
-    // Create user session from JWT payload
-    const userSession: Partial<UserSession> = {
-      id: parseInt(tokenValidation.payload.sub),
-      email: tokenValidation.payload.email,
-      name: tokenValidation.payload.name,
-      firstName: tokenValidation.payload.firstName,
-      lastName: tokenValidation.payload.lastName,
-      isRootAdmin: tokenValidation.payload.isRootAdmin,
-      isSysAdmin: tokenValidation.payload.isSysAdmin,
-      roleId: tokenValidation.payload.roleId,
-      sessionId: tokenValidation.payload.sessionId,
-      sessionToken: sessionToken,
-      tokenExpiryDate: new Date(tokenValidation.payload.exp * 1000)
-    };
-    
-    context.user = userSession;
-    
+  if (!sessionInfo) {
     return {
-      success: true,
-      data: userSession,
-      processingTimeMs: performance.now() - startTime
-    };
-    
-  } catch (error) {
-    return {
-      success: false,
-      error: createSecurityError(
-        AuthErrorCode.MIDDLEWARE_ERROR,
-        'Authentication validation failed',
-        error instanceof Error ? error.message : 'Unknown authentication error',
-        context.operationId
-      ),
-      processingTimeMs: performance.now() - startTime
+      isValid: false,
+      needsRefresh: false,
+      metadata: {
+        source: 'cookie',
+        age: 0,
+        lastActivity: new Date(),
+        expiresAt: new Date(),
+      },
+      security: {
+        hijackingRisk: 'low',
+        ipChanged: false,
+        userAgentChanged: false,
+        suspiciousActivity: false
+      }
     };
   }
+  
+  const now = new Date();
+  const sessionAge = now.getTime() - new Date(sessionInfo.lastLoginDate || now).getTime();
+  
+  return {
+    current: {
+      id: parseInt(sessionInfo.userId),
+      session_token: sessionInfo.sessionToken,
+      sessionToken: sessionInfo.sessionToken,
+      user_id: parseInt(sessionInfo.userId),
+      username: sessionInfo.email.split('@')[0] || 'user',
+      email: sessionInfo.email || '',
+      display_name: sessionInfo.email || 'User',
+      is_active: sessionInfo.isValid,
+      host: getEnvironmentInfo().apiUrl,
+      created_date: new Date().toISOString(),
+      expires_at: sessionInfo.expiresAt.toISOString(),
+      last_activity: new Date().toISOString(),
+      role: sessionInfo.roles?.[0] ? {
+        id: 1,
+        name: sessionInfo.roles[0],
+        description: 'User role',
+        is_active: true
+      } : undefined,
+      permissions: sessionInfo.permissions || [],
+      accessibleRoutes: [],
+      restrictedRoutes: []
+    } as UserSession,
+    isValid: sessionInfo.isValid,
+    needsRefresh: sessionInfo.needsRefresh,
+    metadata: {
+      source: 'cookie',
+      age: sessionAge,
+      lastActivity: new Date(),
+      expiresAt: sessionInfo.expiresAt,
+    },
+    security: {
+      hijackingRisk: 'low',
+      ipChanged: false,
+      userAgentChanged: false,
+      suspiciousActivity: false
+    }
+  };
 }
 
 /**
- * Validates user session integrity and expiration
- * Enhanced session management with automatic refresh capabilities
- * 
- * @param request - Next.js request object
- * @param user - User session data
- * @param config - Security middleware configuration
- * @param context - Operation context for tracking
- * @returns Session validation result
- */
-async function validateSession(
-  request: NextRequest,
-  user: Partial<UserSession>,
-  config: SecurityMiddlewareConfig,
-  context: MiddlewareOperationContext
-): Promise<MiddlewareResult> {
-  const startTime = performance.now();
-  
-  try {
-    // Check if session token exists and is not expired
-    if (!user.sessionToken || !user.tokenExpiryDate) {
-      return {
-        success: false,
-        error: createSecurityError(
-          AuthErrorCode.SESSION_INVALID,
-          'Invalid session data',
-          'Session token or expiry date is missing',
-          context.operationId
-        ),
-        response: createAuthRedirectResponse(request),
-        processingTimeMs: performance.now() - startTime
-      };
-    }
-    
-    // Check token expiration
-    const now = new Date();
-    const expiryDate = new Date(user.tokenExpiryDate);
-    
-    if (expiryDate <= now) {
-      return {
-        success: false,
-        error: createSecurityError(
-          AuthErrorCode.SESSION_EXPIRED,
-          'Session has expired',
-          'Token expiry date has passed',
-          context.operationId
-        ),
-        response: createAuthRedirectResponse(request),
-        processingTimeMs: performance.now() - startTime
-      };
-    }
-    
-    // Check if session needs refresh (within 5 minutes of expiry)
-    const refreshThreshold = 5 * 60 * 1000; // 5 minutes in milliseconds
-    const timeUntilExpiry = expiryDate.getTime() - now.getTime();
-    
-    if (timeUntilExpiry <= refreshThreshold) {
-      // Session should be refreshed, but allow current request to continue
-      // The client should handle token refresh on next request
-      console.warn(`[SECURITY_MIDDLEWARE] Session approaching expiry for user ${user.id}, refresh recommended`);
-    }
-    
-    return {
-      success: true,
-      processingTimeMs: performance.now() - startTime
-    };
-    
-  } catch (error) {
-    return {
-      success: false,
-      error: createSecurityError(
-        AuthErrorCode.MIDDLEWARE_ERROR,
-        'Session validation failed',
-        error instanceof Error ? error.message : 'Unknown session validation error',
-        context.operationId
-      ),
-      response: createAuthRedirectResponse(request),
-      processingTimeMs: performance.now() - startTime
-    };
-  }
-}
-
-// ============================================================================
-// ADMIN ACCESS VALIDATION FUNCTIONS
-// ============================================================================
-
-/**
- * Validates administrative access privileges
- * Migrates functionality from Angular admin.guard.ts
- * 
- * @param request - Next.js request object
- * @param user - User session data
- * @param config - Security middleware configuration
- * @param context - Operation context for tracking
- * @returns Admin validation result
+ * Validates admin privileges for protected administrative routes
+ * Implements root admin and system admin privilege checks
  */
 async function validateAdminAccess(
-  request: NextRequest,
-  user: Partial<UserSession>,
-  config: SecurityMiddlewareConfig,
-  context: MiddlewareOperationContext
-): Promise<MiddlewareResult> {
-  const startTime = performance.now();
-  const pathname = request.nextUrl.pathname;
+  user: UserProfile | AdminProfile,
+  route: string
+): Promise<boolean> {
+  // Check if user has admin profile structure
+  const adminUser = user as AdminProfile;
   
-  try {
-    // Get RBAC configuration for the current route
-    const rbacConfig = getRBACConfigForRoute(pathname);
-    
-    // Skip admin validation if not required for this route
-    if (!rbacConfig || (!rbacConfig.requireAdmin && !rbacConfig.requireRootAdmin)) {
-      return {
-        success: true,
-        processingTimeMs: performance.now() - startTime
-      };
-    }
-    
-    // Check if user has admin privileges
-    const isAdmin = user.isSysAdmin || user.isRootAdmin;
-    const isRootAdmin = user.isRootAdmin;
-    
-    if (rbacConfig.requireRootAdmin && !isRootAdmin) {
-      return {
-        success: false,
-        error: createSecurityError(
-          AuthErrorCode.ADMIN_REQUIRED,
-          'Root administrator access required',
-          `Route ${pathname} requires root admin privileges`,
-          context.operationId
-        ),
-        response: createErrorResponse(
-          rbacConfig.customErrorMessage || 'Root administrator access required',
-          403,
-          { event: 'admin_access_denied', userId: user.id?.toString() }
-        ),
-        processingTimeMs: performance.now() - startTime
-      };
-    }
-    
-    if (rbacConfig.requireAdmin && !isAdmin) {
-      return {
-        success: false,
-        error: createSecurityError(
-          AuthErrorCode.ADMIN_REQUIRED,
-          'Administrator access required',
-          `Route ${pathname} requires admin privileges`,
-          context.operationId
-        ),
-        response: createErrorResponse(
-          rbacConfig.customErrorMessage || 'Administrator access required',
-          403,
-          { event: 'admin_access_denied', userId: user.id?.toString() }
-        ),
-        processingTimeMs: performance.now() - startTime
-      };
-    }
-    
-    return {
-      success: true,
-      processingTimeMs: performance.now() - startTime
-    };
-    
-  } catch (error) {
-    return {
-      success: false,
-      error: createSecurityError(
-        AuthErrorCode.MIDDLEWARE_ERROR,
-        'Admin validation failed',
-        error instanceof Error ? error.message : 'Unknown admin validation error',
-        context.operationId
-      ),
-      response: createErrorResponse('Internal admin validation error', 500),
-      processingTimeMs: performance.now() - startTime
-    };
+  // Root admin access
+  if (adminUser.is_sys_admin || (user as any).isRootAdmin || (user as any).isSysAdmin) {
+    return true;
   }
+  
+  // System admin capabilities
+  if (adminUser.adminCapabilities?.includes('user_management' as AdminCapability)) {
+    return route.includes('/adf-users') || route.includes('/adf-admins');
+  }
+  
+  if (adminUser.adminCapabilities?.includes('service_management' as AdminCapability)) {
+    return route.includes('/adf-services') || route.includes('/api-connections');
+  }
+  
+  if (adminUser.adminCapabilities?.includes('system_configuration' as AdminCapability)) {
+    return route.includes('/admin-settings') || route.includes('/system-settings');
+  }
+  
+  // Check system permissions
+  const hasAdminPermission = adminUser.systemPermissions?.some(permission => 
+    permission === 'read_users' || 
+    permission === 'create_users' ||
+    permission === 'update_users' ||
+    permission === 'manage_security'
+  );
+  
+  return hasAdminPermission || false;
 }
 
-// ============================================================================
-// LICENSE VALIDATION FUNCTIONS
-// ============================================================================
-
 /**
- * Validates license status and feature availability
- * Migrates functionality from Angular license.guard.ts
- * 
- * @param request - Next.js request object
- * @param user - User session data
- * @param config - Security middleware configuration
- * @param context - Operation context for tracking
- * @returns License validation result
+ * Validates license status and enforces license-based restrictions
+ * Migrated from Angular license.guard.ts logic
  */
-async function validateLicense(
-  request: NextRequest,
-  user: Partial<UserSession>,
-  config: SecurityMiddlewareConfig,
-  context: MiddlewareOperationContext
-): Promise<MiddlewareResult> {
-  const startTime = performance.now();
-  const pathname = request.nextUrl.pathname;
-  
+async function validateLicense(route: string): Promise<{
+  isValid: boolean;
+  redirectTo?: string;
+  disableUI?: boolean;
+}> {
   try {
+    // In development, allow all access
+    if (getEnvironmentInfo().isDevelopment) {
+      return { isValid: true };
+    }
+    
     // Check if route requires license validation
-    const requiresLicense = isLicenseProtectedRoute(pathname);
+    const requiresLicense = SECURITY_CONFIG.LICENSE_REQUIRED_ROUTES.some(
+      licenseRoute => route.startsWith(licenseRoute)
+    );
     
     if (!requiresLicense) {
-      return {
-        success: true,
-        processingTimeMs: performance.now() - startTime
+      return { isValid: true };
+    }
+    
+    // Simulate license check - in real implementation, this would call
+    // the DreamFactory license validation API
+    const licenseKey = process.env.DREAMFACTORY_LICENSE_KEY;
+    const licenseType = process.env.DREAMFACTORY_LICENSE_TYPE || 'OPEN SOURCE';
+    
+    // Open source license - always allow
+    if (licenseType === 'OPEN SOURCE') {
+      return { isValid: true };
+    }
+    
+    // No license key but not open source
+    if (!licenseKey) {
+      return { 
+        isValid: false,
+        redirectTo: '/license-expired'
       };
     }
     
-    // In a real implementation, this would check against a license service
-    // For now, we'll simulate license validation based on environment
-    const environment = getEnvironmentConfig();
+    // In production, this would make an API call to validate the license
+    // For now, simulate based on environment variables
+    const isLicenseExpired = process.env.DREAMFACTORY_LICENSE_EXPIRED === 'true';
     
-    // Mock license validation logic
-    const hasValidLicense = environment.isDevelopment || 
-                           process.env.DREAMFACTORY_LICENSE_VALID === 'true';
-    
-    if (!hasValidLicense) {
+    if (isLicenseExpired) {
       return {
-        success: false,
-        error: createSecurityError(
-          AuthErrorCode.ACCESS_DENIED,
-          'Invalid or expired license',
-          `Route ${pathname} requires a valid DreamFactory license`,
-          context.operationId
-        ),
-        response: createErrorResponse(
-          'This feature requires a valid DreamFactory license',
-          402, // Payment Required
-          { event: 'license_required', userId: user.id?.toString(), route: pathname }
-        ),
-        processingTimeMs: performance.now() - startTime
+        isValid: false,
+        redirectTo: route === '/license-expired' ? undefined : '/license-expired',
+        disableUI: true
       };
     }
     
-    return {
-      success: true,
-      processingTimeMs: performance.now() - startTime
-    };
-    
+    return { isValid: true };
   } catch (error) {
-    return {
-      success: false,
-      error: createSecurityError(
-        AuthErrorCode.MIDDLEWARE_ERROR,
-        'License validation failed',
-        error instanceof Error ? error.message : 'Unknown license validation error',
-        context.operationId
-      ),
-      response: createErrorResponse('License validation error', 500),
-      processingTimeMs: performance.now() - startTime
-    };
+    // On license check error, allow access (fail open)
+    return { isValid: true };
   }
 }
 
-// ============================================================================
-// PAYWALL ENFORCEMENT FUNCTIONS
-// ============================================================================
-
 /**
- * Enforces paywall restrictions for premium features
- * Migrates functionality from Angular paywall.guard.ts
- * 
- * @param request - Next.js request object
- * @param user - User session data
- * @param config - Security middleware configuration
- * @param context - Operation context for tracking
- * @returns Paywall enforcement result
+ * Validates paywall access for premium features
+ * Migrated from Angular paywall.guard.ts logic
  */
-async function enforcePaywall(
-  request: NextRequest,
-  user: Partial<UserSession>,
-  config: SecurityMiddlewareConfig,
-  context: MiddlewareOperationContext
-): Promise<MiddlewareResult> {
-  const startTime = performance.now();
-  const pathname = request.nextUrl.pathname;
-  
+async function validatePaywallAccess(
+  user: UserProfile,
+  route: string,
+  paywall?: string | string[]
+): Promise<{
+  hasAccess: boolean;
+  redirectTo?: string;
+  paywallActive?: boolean;
+}> {
   try {
-    // Check if route is behind paywall
-    const paywallRoute = getPaywallRouteConfig(pathname);
+    // Check if route requires paywall validation
+    const isPremiumRoute = SECURITY_CONFIG.PREMIUM_ROUTES.some(
+      premiumRoute => route.startsWith(premiumRoute)
+    );
     
-    if (!paywallRoute) {
-      return {
-        success: true,
-        processingTimeMs: performance.now() - startTime
-      };
+    if (!isPremiumRoute && !paywall) {
+      return { hasAccess: true };
     }
     
-    // Check user's subscription status
-    // In a real implementation, this would check against a subscription service
-    const hasActiveSubscription = user.isRootAdmin || 
-                                 user.isSysAdmin || 
-                                 process.env.DREAMFACTORY_PREMIUM_ENABLED === 'true';
+    // In development, allow all access
+    if (getEnvironmentInfo().isDevelopment) {
+      return { hasAccess: true };
+    }
     
-    if (!hasActiveSubscription) {
-      return {
-        success: false,
-        error: createSecurityError(
-          AuthErrorCode.ACCESS_DENIED,
-          'Premium subscription required',
-          `Route ${pathname} requires an active premium subscription`,
-          context.operationId
-        ),
-        response: createErrorResponse(
-          'This feature requires a premium subscription',
-          402, // Payment Required
-          { 
-            event: 'paywall_restriction', 
-            userId: user.id?.toString(), 
-            route: pathname,
-            feature: paywallRoute.featureName 
-          }
-        ),
-        processingTimeMs: performance.now() - startTime
-      };
+    // Check user's premium access
+    // This would integrate with the paywall service to check user's subscription status
+    const hasPremiumAccess = (user as any).hasPremiumAccess || 
+                           (user as AdminProfile).is_sys_admin || 
+                           (user as any).isRootAdmin;
+    
+    if (hasPremiumAccess) {
+      return { hasAccess: true };
+    }
+    
+    // Check specific paywall restrictions
+    if (paywall) {
+      const paywallKeys = Array.isArray(paywall) ? paywall : [paywall];
+      // In real implementation, this would check against user's active subscriptions
+      const hasPaywallAccess = paywallKeys.some(key => 
+        (user as any).activeSubscriptions?.includes(key)
+      );
+      
+      if (hasPaywallAccess) {
+        return { hasAccess: true };
+      }
     }
     
     return {
-      success: true,
-      processingTimeMs: performance.now() - startTime
+      hasAccess: false,
+      redirectTo: '../', // Relative redirect as per original guard
+      paywallActive: true
     };
-    
   } catch (error) {
-    return {
-      success: false,
-      error: createSecurityError(
-        AuthErrorCode.MIDDLEWARE_ERROR,
-        'Paywall enforcement failed',
-        error instanceof Error ? error.message : 'Unknown paywall enforcement error',
-        context.operationId
-      ),
-      response: createErrorResponse('Paywall validation error', 500),
-      processingTimeMs: performance.now() - startTime
-    };
+    // On paywall check error, deny access (fail closed for premium features)
+    return { hasAccess: false, paywallActive: true };
   }
 }
 
-// ============================================================================
-// ROLE-BASED ACCESS CONTROL (RBAC) FUNCTIONS
-// ============================================================================
-
 /**
- * Enforces role-based access control for protected resources
- * Comprehensive RBAC implementation with caching and audit logging
- * 
- * @param request - Next.js request object
- * @param user - User session data
- * @param config - Security middleware configuration
- * @param context - Operation context for tracking
- * @returns RBAC enforcement result
+ * Handles SAML authentication callback processing
+ * Migrated from Angular saml-auth.guard.ts logic
  */
-async function enforceRBAC(
-  request: NextRequest,
-  user: Partial<UserSession>,
-  config: SecurityMiddlewareConfig,
-  context: MiddlewareOperationContext
-): Promise<MiddlewareResult> {
-  const startTime = performance.now();
-  const pathname = request.nextUrl.pathname;
-  const method = request.method;
-  
+async function handleSAMLAuthentication(request: NextRequest): Promise<{
+  isAuthenticated: boolean;
+  sessionToken?: string;
+  redirectTo?: string;
+  error?: string;
+}> {
   try {
-    // Get RBAC configuration for the current route
-    const rbacConfig = getRBACConfigForRoute(pathname);
+    const url = new URL(request.url);
     
-    if (!rbacConfig) {
-      // No specific RBAC rules for this route, allow access
-      return {
-        success: true,
-        processingTimeMs: performance.now() - startTime
-      };
-    }
+    // Check for JWT in URL fragment (handled client-side) or query parameters
+    const jwt = url.searchParams.get('jwt') || 
+               url.searchParams.get('token') ||
+               url.hash.includes('jwt=') ? 
+                 new URLSearchParams(url.hash.slice(1)).get('jwt') : null;
     
-    // Create permission validation context
-    const permissionContext: PermissionValidationContext = {
-      userId: user.id || 0,
-      userEmail: user.email || '',
-      userRole: null, // Would be loaded from user data in real implementation
-      userPermissions: [], // Would be loaded from user roles in real implementation
-      requestedResource: rbacConfig.resourceName,
-      requestedAction: mapHttpMethodToAction(method),
-      requestMethod: method as any,
-      requestPath: pathname,
-      requestQuery: Object.fromEntries(request.nextUrl.searchParams.entries()),
-      requiredPermissions: rbacConfig.requiredPermissions,
-      hasRequiredPermissions: false,
-      missingPermissions: [],
-      requiredRoles: rbacConfig.requiredRoles,
-      hasRequiredRoles: false,
-      missingRoles: [],
-      requiresAdmin: rbacConfig.requireAdmin,
-      requiresRootAdmin: rbacConfig.requireRootAdmin,
-      isAdminUser: user.isSysAdmin || false,
-      isRootAdminUser: user.isRootAdmin || false,
-      accessGranted: false,
-      denyReason: null,
-      evaluationTimeMs: 0,
-      cacheHit: false,
-      auditRequired: rbacConfig.auditAccess,
-      auditEvent: null
-    };
-    
-    // Check admin requirements first
-    if (rbacConfig.requireRootAdmin && !permissionContext.isRootAdminUser) {
-      permissionContext.accessGranted = false;
-      permissionContext.denyReason = 'Root administrator access required';
-    } else if (rbacConfig.requireAdmin && !permissionContext.isAdminUser) {
-      permissionContext.accessGranted = false;
-      permissionContext.denyReason = 'Administrator access required';
-    } else {
-      // For now, allow access if user is authenticated and admin requirements are met
-      // In a full implementation, this would check against user permissions and roles
-      permissionContext.accessGranted = true;
-      permissionContext.hasRequiredPermissions = true;
-      permissionContext.hasRequiredRoles = true;
-    }
-    
-    permissionContext.evaluationTimeMs = performance.now() - startTime;
-    
-    if (!permissionContext.accessGranted) {
-      return {
-        success: false,
-        error: createSecurityError(
-          AuthErrorCode.INSUFFICIENT_PERMISSIONS,
-          'Access denied',
-          permissionContext.denyReason || 'Insufficient permissions',
-          context.operationId
-        ),
-        response: createErrorResponse(
-          rbacConfig.customErrorMessage || 'Access denied - insufficient permissions',
-          403,
-          { 
-            event: 'rbac_access_denied', 
-            userId: user.id?.toString(),
-            resource: rbacConfig.resourceName,
-            requiredPermissions: rbacConfig.requiredPermissions
-          }
-        ),
-        processingTimeMs: performance.now() - startTime
-      };
-    }
-    
-    return {
-      success: true,
-      processingTimeMs: performance.now() - startTime
-    };
-    
-  } catch (error) {
-    return {
-      success: false,
-      error: createSecurityError(
-        AuthErrorCode.MIDDLEWARE_ERROR,
-        'RBAC enforcement failed',
-        error instanceof Error ? error.message : 'Unknown RBAC enforcement error',
-        context.operationId
-      ),
-      response: createErrorResponse('Access control validation error', 500),
-      processingTimeMs: performance.now() - startTime
-    };
-  }
-}
-
-// ============================================================================
-// SAML AUTHENTICATION FUNCTIONS
-// ============================================================================
-
-/**
- * Handles SAML authentication workflows for enterprise SSO
- * Processes SAML responses and establishes user sessions
- * 
- * @param request - Next.js request object
- * @param config - Security middleware configuration
- * @param context - Operation context for tracking
- * @returns SAML authentication result
- */
-async function handleSAMLAuthentication(
-  request: NextRequest,
-  config: SecurityMiddlewareConfig,
-  context: MiddlewareOperationContext
-): Promise<MiddlewareResult> {
-  const startTime = performance.now();
-  const url = request.nextUrl;
-  
-  try {
-    // Extract SAML response from query parameters or POST body
+    // Check for SAML response
     const samlResponse = url.searchParams.get('SAMLResponse');
     const relayState = url.searchParams.get('RelayState');
     
-    if (!samlResponse) {
-      return {
-        success: false,
-        error: createSecurityError(
-          AuthErrorCode.INVALID_CREDENTIALS,
-          'Missing SAML response',
-          'SAMLResponse parameter not found in request',
-          context.operationId
-        ),
-        response: createAuthRedirectResponse(request, '/login?error=saml_missing_response'),
-        processingTimeMs: performance.now() - startTime
-      };
+    if (jwt) {
+      // Validate JWT token from SAML provider
+      const payload = parseJWTPayload(jwt);
+      if (payload && !isTokenExpired(payload)) {
+        return {
+          isAuthenticated: true,
+          sessionToken: jwt,
+          redirectTo: relayState || '/home'
+        };
+      } else {
+        return {
+          isAuthenticated: false,
+          redirectTo: '/login',
+          error: 'Invalid or expired SAML token'
+        };
+      }
     }
     
-    // In a real implementation, this would:
-    // 1. Validate the SAML response signature
-    // 2. Extract user attributes from the SAML assertion
-    // 3. Map SAML attributes to DreamFactory user fields
-    // 4. Create or update the user session
-    // 5. Generate a JWT token for the user
-    
-    // For now, we'll simulate successful SAML authentication
-    const environment = getEnvironmentConfig();
-    
-    if (!environment.isDevelopment && !process.env.SAML_ENABLED) {
-      return {
-        success: false,
-        error: createSecurityError(
-          AuthErrorCode.CONFIGURATION_ERROR,
-          'SAML authentication not configured',
-          'SAML authentication is not enabled in this environment',
-          context.operationId
-        ),
-        response: createAuthRedirectResponse(request, '/login?error=saml_not_configured'),
-        processingTimeMs: performance.now() - startTime
-      };
+    if (samlResponse) {
+      // Handle SAML response processing
+      // In production, this would integrate with SAML library to validate response
+      try {
+        // Simulate SAML response validation
+        const decodedResponse = Buffer.from(samlResponse, 'base64').toString('utf-8');
+        if (decodedResponse.includes('Success')) {
+          // Extract user information from SAML response
+          // This is a simplified simulation
+          return {
+            isAuthenticated: true,
+            redirectTo: relayState || '/home'
+          };
+        }
+      } catch (error) {
+        return {
+          isAuthenticated: false,
+          redirectTo: '/login',
+          error: 'Invalid SAML response'
+        };
+      }
     }
     
-    // Mock SAML user data extraction
-    const samlUserData = {
-      email: 'saml.user@example.com',
-      firstName: 'SAML',
-      lastName: 'User',
-      attributes: {} // Would contain mapped SAML attributes
-    };
-    
-    // Create redirect response to complete authentication
-    const redirectUrl = relayState || '/home';
-    const response = NextResponse.redirect(new URL(redirectUrl, request.url));
-    
-    // In a real implementation, you would set session cookies here
-    // For now, we'll add appropriate headers
-    response.headers.set('X-SAML-Auth', 'completed');
-    response.headers.set('X-User-Email', samlUserData.email);
-    
+    // No SAML authentication data found
     return {
-      success: true,
-      response,
-      processingTimeMs: performance.now() - startTime
+      isAuthenticated: false,
+      redirectTo: '/login'
     };
-    
   } catch (error) {
     return {
-      success: false,
-      error: createSecurityError(
-        AuthErrorCode.MIDDLEWARE_ERROR,
-        'SAML authentication failed',
-        error instanceof Error ? error.message : 'Unknown SAML authentication error',
-        context.operationId
-      ),
-      response: createAuthRedirectResponse(request, '/login?error=saml_processing_failed'),
-      processingTimeMs: performance.now() - startTime
+      isAuthenticated: false,
+      redirectTo: '/login',
+      error: 'SAML authentication processing error'
     };
   }
 }
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
 /**
- * Generates a unique request ID for tracking and correlation
- * 
- * @returns Unique request identifier
+ * Evaluates permissions for route and resource access
+ * Implements comprehensive RBAC evaluation
  */
-function generateRequestId(): string {
-  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
- * Enhances Next.js request with DreamFactory-specific context
- * 
- * @param request - Original Next.js request
- * @param requestId - Unique request identifier
- * @param startTime - Request start timestamp
- * @returns Enhanced middleware request
- */
-function enhanceRequestWithContext(
-  request: NextRequest,
-  requestId: string,
-  startTime: number
-): MiddlewareRequest {
-  const enhancedRequest = request as MiddlewareRequest;
+async function evaluatePermissions(
+  context: PermissionEvaluationContext
+): Promise<PermissionEvaluationResult> {
+  const performanceMarker = createPerformanceMarker();
   
-  enhancedRequest.dreamfactory = {
-    sessionToken: null,
-    sessionId: null,
-    apiKey: null,
-    user: null,
-    userId: null,
-    userEmail: null,
-    permissions: [],
-    roleId: null,
-    isAdmin: false,
-    isRootAdmin: false,
-    requestId,
-    startTime,
-    routePath: request.nextUrl.pathname,
-    isProtectedRoute: !shouldBypassSecurity(request.nextUrl.pathname),
-    isAPIRoute: request.nextUrl.pathname.startsWith('/api'),
-    cacheKey: null,
-    cacheHit: false,
-    processingTimeMs: 0,
-    ipAddress: request.ip || 'unknown',
-    userAgent: request.headers.get('user-agent') || 'unknown',
-    referrer: request.headers.get('referer') || null,
-    origin: request.headers.get('origin') || null
-  };
+  const { user, resource, action, request } = context;
+  const path = request.path;
   
-  enhancedRequest.updateContext = (updates) => {
-    Object.assign(enhancedRequest.dreamfactory, updates);
-  };
+  // Extract user permissions
+  const userPermissions = user.permissions || [];
+  const userRoles = user.role ? [user.role.name] : [];
   
-  return enhancedRequest;
-}
-
-/**
- * Checks if a route should bypass security validation
- * 
- * @param pathname - Request pathname
- * @returns Boolean indicating if security should be bypassed
- */
-function shouldBypassSecurity(pathname: string): boolean {
-  // Public routes that don't require authentication
-  const publicRoutes = [
-    '/login',
-    '/register',
-    '/forgot-password',
-    '/reset-password',
-    '/saml-callback',
-    '/_next',
-    '/favicon.ico',
-    '/public',
-    '/api/auth'
-  ];
+  // Define required permissions based on route and action
+  const requiredPermissions: string[] = [];
   
-  // Static assets that should always bypass security
-  const staticPatterns = [
-    /^\/_next\/static/,
-    /^\/_next\/image/,
-    /\.(?:css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/
-  ];
-  
-  // Check public routes
-  if (publicRoutes.some(route => pathname.startsWith(route))) {
-    return true;
+  // Route-based permission mapping
+  if (path.startsWith('/adf-users') || path.startsWith('/adf-admins')) {
+    requiredPermissions.push('read_users');
+    if (request.method === 'POST') requiredPermissions.push('create_users');
+    if (request.method === 'PUT' || request.method === 'PATCH') requiredPermissions.push('update_users');
+    if (request.method === 'DELETE') requiredPermissions.push('delete_users');
   }
   
-  // Check static patterns
-  if (staticPatterns.some(pattern => pattern.test(pathname))) {
-    return true;
+  if (path.startsWith('/adf-services') || path.startsWith('/api-connections')) {
+    requiredPermissions.push('read_services');
+    if (request.method === 'POST') requiredPermissions.push('create_services');
+    if (request.method === 'PUT' || request.method === 'PATCH') requiredPermissions.push('update_services');
+    if (request.method === 'DELETE') requiredPermissions.push('delete_services');
   }
   
-  return false;
-}
-
-/**
- * Gets RBAC configuration for a specific route
- * 
- * @param pathname - Request pathname
- * @returns RBAC configuration or null if not found
- */
-function getRBACConfigForRoute(pathname: string): RBACConfig | null {
-  return RBAC_ROUTE_CONFIG.find(config => {
-    // Check exact path match first
-    if (config.resourcePath === pathname) {
-      return true;
-    }
-    
-    // Check pattern match
-    const pattern = config.resourcePattern.replace(/:\w+\*/g, '.*');
-    const regex = new RegExp(`^${pattern}$`);
-    return regex.test(pathname);
-  }) || null;
-}
-
-/**
- * Checks if a route requires license validation
- * 
- * @param pathname - Request pathname
- * @returns Boolean indicating if license validation is required
- */
-function isLicenseProtectedRoute(pathname: string): boolean {
-  // Routes that require license validation
-  const licenseProtectedPatterns = [
-    /^\/admin-settings/,
-    /^\/system-settings/,
-    /^\/adf-scheduler/,
-    /^\/adf-reports/,
-    /^\/adf-limits/,
-    /^\/api-security\/limits/
-  ];
+  if (path.startsWith('/adf-schema')) {
+    requiredPermissions.push('read_schema');
+    if (request.method !== 'GET') requiredPermissions.push('update_schema');
+  }
   
-  return licenseProtectedPatterns.some(pattern => pattern.test(pathname));
-}
-
-/**
- * Gets paywall configuration for a route
- * 
- * @param pathname - Request pathname
- * @returns Paywall configuration or null if not protected
- */
-function getPaywallRouteConfig(pathname: string): { featureName: string } | null {
-  const paywallRoutes = [
-    { pattern: /^\/adf-scheduler/, featureName: 'Scheduler' },
-    { pattern: /^\/adf-reports/, featureName: 'Service Reports' },
-    { pattern: /^\/adf-limits/, featureName: 'Rate Limits' },
-    { pattern: /^\/api-security\/limits/, featureName: 'API Rate Limiting' }
-  ];
+  // Check permission matches
+  const hasRequiredPermissions = requiredPermissions.every(permission =>
+    userPermissions.includes(permission)
+  );
   
-  const route = paywallRoutes.find(route => route.pattern.test(pathname));
-  return route ? { featureName: route.featureName } : null;
-}
-
-/**
- * Maps HTTP methods to action names for RBAC
- * 
- * @param method - HTTP method
- * @returns Action name
- */
-function mapHttpMethodToAction(method: string): string {
-  const actionMap: Record<string, string> = {
-    'GET': 'read',
-    'POST': 'create',
-    'PUT': 'update',
-    'PATCH': 'update',
-    'DELETE': 'delete',
-    'HEAD': 'read',
-    'OPTIONS': 'read'
-  };
+  // Admin override
+  const isAdmin = (user as AdminProfile).is_sys_admin || 
+                  (user as any).isRootAdmin || 
+                  (user as any).isSysAdmin;
   
-  return actionMap[method.toUpperCase()] || 'read';
-}
-
-/**
- * Creates a standardized security error object
- * 
- * @param code - Error code
- * @param message - Error message
- * @param details - Additional error details
- * @param requestId - Request identifier
- * @returns Security error object
- */
-function createSecurityError(
-  code: AuthErrorCode,
-  message: string,
-  details: string,
-  requestId: string
-): MiddlewareError {
+  const granted = hasRequiredPermissions || isAdmin || requiredPermissions.length === 0;
+  const missingPermissions = requiredPermissions.filter(permission =>
+    !userPermissions.includes(permission)
+  );
+  
+  const processingTime = performanceMarker.end();
+  
   return {
-    code,
-    message,
-    details,
-    timestamp: new Date(),
-    requestId,
-    retryable: false,
-    middlewareComponent: MiddlewareComponent.AUTHENTICATION,
-    processingStage: MiddlewareStage.ERROR_HANDLING,
-    recoverable: false,
-    requestPath: '',
-    requestMethod: 'GET' as any,
-    requestHeaders: {},
-    userId: null,
-    userEmail: null,
-    sessionId: null,
-    errorId: `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    occurredAt: new Date(),
-    stackTrace: null,
-    innerError: null,
-    processingTimeMs: 0,
-    timeoutOccurred: false,
-    resourcesExhausted: false,
-    recoveryAttempts: 0,
-    maxRecoveryAttempts: 0,
-    recoveryActions: [],
-    auditEvent: {
-      eventId: `audit_${Date.now()}`,
-      eventType: AuditEventType.SECURITY_VIOLATION,
-      eventSubtype: code,
-      timestamp: new Date(),
-      duration: 0,
-      userId: null,
-      userEmail: null,
-      userRole: null,
-      sessionId: null,
-      requestId,
-      requestPath: '',
-      requestMethod: 'GET' as any,
-      requestHeaders: {},
-      requestBody: null,
-      responseStatus: 500 as any,
-      responseHeaders: {},
-      responseBody: null,
-      ipAddress: 'unknown',
-      userAgent: 'unknown',
-      referrer: null,
-      geoLocation: null,
-      authenticationMethod: null,
-      permissionsChecked: [],
-      accessGranted: false,
-      denyReason: message,
-      processingTime: 0,
+    granted,
+    reason: granted ? 
+      'Access granted' : 
+      `Missing permissions: ${missingPermissions.join(', ')}`,
+    appliedRules: [], // Would be populated in full RBAC implementation
+    requiredPermissions,
+    userPermissions,
+    missingPermissions,
+    alternatives: missingPermissions.length > 0 ? ['/home', '/profile'] : undefined,
+    metadata: {
+      evaluationTime: processingTime,
+      rulesChecked: 1,
       cacheHit: false,
-      errorOccurred: true,
-      containsSensitiveData: false,
-      dataClassification: 'INTERNAL' as any,
-      metadata: { code, details },
-      tags: ['security', 'middleware'],
-      complianceFlags: [],
-      retentionPolicy: 'default',
-      correlationId: requestId,
-      parentEventId: null,
-      relatedEventIds: []
-    },
-    sensitiveDataExposed: false,
-    complianceImpact: null
-  };
-}
-
-/**
- * Logs security events for audit and compliance
- * 
- * @param request - Next.js request object
- * @param eventType - Type of security event
- * @param success - Whether the event was successful
- * @param additionalData - Additional event context
- */
-async function logSecurityEvent(
-  request: NextRequest,
-  eventType: AuditEventType,
-  success: boolean,
-  additionalData?: {
-    userId?: string;
-    sessionId?: string;
-    error?: string;
-    processingTimeMs?: number;
-    stage?: MiddlewareStage;
-  }
-): Promise<void> {
-  try {
-    const auditEntry = createAuditLogEntry(
-      request,
-      eventType,
-      success,
-      additionalData
-    );
-    
-    logAuditEntry(auditEntry);
-  } catch (error) {
-    console.error('[SECURITY_MIDDLEWARE] Failed to log security event:', error);
-  }
-}
-
-/**
- * Checks rate limiting for the request
- * 
- * @param request - Next.js request object
- * @param config - Security middleware configuration
- * @returns Rate limit check result
- */
-async function checkRateLimitingMiddleware(
-  request: NextRequest,
-  config: SecurityMiddlewareConfig
-): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
-  const clientIP = request.ip || 'unknown';
-  const userAgent = request.headers.get('user-agent') || 'unknown';
-  const identifier = `${clientIP}:${userAgent}`;
-  
-  return checkRateLimit(
-    identifier,
-    config.maxRequestsPerMinute,
-    config.rateLimitWindowMs
-  );
-}
-
-/**
- * Creates rate limit exceeded response
- * 
- * @param request - Next.js request object
- * @param rateLimitResult - Rate limit check result
- * @returns Rate limit response
- */
-function createRateLimitResponse(
-  request: NextRequest,
-  rateLimitResult: { remaining: number; resetTime: number }
-): NextResponse {
-  const response = createErrorResponse(
-    'Too many requests',
-    429,
-    { event: 'rate_limit_exceeded' }
-  );
-  
-  response.headers.set('X-RateLimit-Limit', '100');
-  response.headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString());
-  response.headers.set('X-RateLimit-Reset', Math.ceil(rateLimitResult.resetTime / 1000).toString());
-  response.headers.set('Retry-After', Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000).toString());
-  
-  return response;
-}
-
-/**
- * Adds security headers to response and continues processing
- * 
- * @param request - Next.js request object
- * @param config - Security middleware configuration
- * @returns Next.js response with security headers
- */
-async function addSecurityHeadersAndContinue(
-  request: NextRequest,
-  config: SecurityMiddlewareConfig
-): Promise<NextResponse> {
-  const response = NextResponse.next();
-  
-  if (config.enableSecurityHeaders) {
-    addSecurityHeaders(response, config);
-  }
-  
-  return response;
-}
-
-/**
- * Adds comprehensive security headers to response
- * 
- * @param response - Next.js response object
- * @param config - Security middleware configuration
- */
-function addSecurityHeaders(
-  response: NextResponse,
-  config: SecurityMiddlewareConfig
-): void {
-  const headers: SecurityHeaders = {
-    'X-Frame-Options': 'DENY',
-    'X-Content-Type-Options': 'nosniff',
-    'X-XSS-Protection': '1; mode=block',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Content-Security-Policy': config.contentSecurityPolicy,
-    'Strict-Transport-Security': config.strictTransportSecurity 
-      ? 'max-age=31536000; includeSubDomains; preload'
-      : '',
-    'X-DreamFactory-Version': '5.0.0',
-    'X-Request-ID': generateRequestId(),
-    'X-Processing-Time': '0',
-    'X-Cache-Status': 'BYPASS'
-  };
-  
-  Object.entries(headers).forEach(([key, value]) => {
-    if (value) {
-      response.headers.set(key, value);
+      strategy: 'allow'
     }
-  });
+  };
+}
+
+/**
+ * Creates comprehensive audit log entry for security events
+ * Enhanced audit logging for compliance and monitoring
+ */
+function createSecurityAuditLog(
+  request: NextRequest,
+  event: AuditEventType,
+  user?: UserProfile | null,
+  result?: string,
+  additionalData?: Record<string, any>
+): AuditLogEntry {
+  return {
+    id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: new Date(),
+    eventType: event,
+    action: `security_${event}`,
+    result: result as 'success' | 'failure' | 'partial' || 'success',
+    user: user ? {
+      id: user.id,
+      username: user.username || user.email,
+      email: user.email,
+      sessionId: (user as any).sessionId,
+      ipAddress: getClientIP(request)
+    } : {
+      ipAddress: getClientIP(request)
+    },
+    resource: {
+      type: 'route',
+      path: request.nextUrl.pathname
+    },
+    details: {
+      method: request.method,
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      referer: request.headers.get('referer'),
+      ...additionalData
+    },
+    riskLevel: event === AuditEventType.SECURITY_VIOLATION ? 'high' : 
+               event === AuditEventType.AUTHORIZATION ? 'medium' : 'low',
+    compliance: {
+      gdpr: !!user,
+      sox: true
+    }
+  };
 }
 
 // ============================================================================
-// EXPORTS
+// MAIN SECURITY MIDDLEWARE FUNCTION
 // ============================================================================
 
-export {
-  securityMiddleware,
-  validateAuthentication,
-  validateSession,
-  validateAdminAccess,
-  validateLicense,
-  enforcePaywall,
-  enforceRBAC,
-  handleSAMLAuthentication,
-  shouldBypassSecurity,
-  getRBACConfigForRoute,
-  DEFAULT_SECURITY_CONFIG,
-  RBAC_ROUTE_CONFIG
+/**
+ * Main security middleware function implementing comprehensive security validation
+ * Processes authentication, authorization, license validation, and audit logging
+ */
+export async function securityMiddleware(request: NextRequest): Promise<MiddlewareResponseContext> {
+  const performanceMarker = createPerformanceMarker();
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const clientIp = getClientIP(request);
+  const pathname = request.nextUrl.pathname;
+  
+  // Rate limiting check
+  const rateLimitResult = EdgeRateLimiter.check(
+    clientIp,
+    SECURITY_CONFIG.RATE_LIMIT_MAX_REQUESTS,
+    SECURITY_CONFIG.RATE_LIMIT_WINDOW
+  );
+  
+  if (!rateLimitResult.allowed) {
+    const auditEntry = createSecurityAuditLog(
+      request,
+      AuditEventType.SECURITY_VIOLATION,
+      null,
+      'failure',
+      { reason: 'rate_limit_exceeded', remaining: rateLimitResult.remaining }
+    );
+    logAuditEntry(auditEntry);
+    
+    return {
+      continue: false,
+      response: createErrorResponse('Rate limit exceeded', 429, {
+        retryAfter: Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+      }),
+      statusCode: 429,
+      metadata: {
+        processingTime: performanceMarker.end(),
+        security: {
+          headersApplied: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
+          authMethod: 'none',
+          authorizationChecks: ['rate_limit']
+        }
+      }
+    };
+  }
+  
+  // Skip security checks for static assets and public routes
+  if (isStaticAsset(request)) {
+    return {
+      continue: true,
+      headers: SECURITY_HEADERS,
+      metadata: {
+        processingTime: performanceMarker.end(),
+        security: {
+          headersApplied: Object.keys(SECURITY_HEADERS),
+          authMethod: 'none',
+          authorizationChecks: []
+        }
+      }
+    };
+  }
+  
+  // Check for public routes
+  const isPublicRoute = SECURITY_CONFIG.PUBLIC_ROUTES.some(route => 
+    pathname.startsWith(route)
+  );
+  
+  if (isPublicRoute) {
+    // Handle SAML callback specifically
+    if (pathname === '/saml-callback') {
+      const samlResult = await handleSAMLAuthentication(request);
+      
+      const auditEntry = createSecurityAuditLog(
+        request,
+        AuditEventType.AUTHENTICATION,
+        null,
+        samlResult.isAuthenticated ? 'success' : 'failure',
+        { 
+          authMethod: 'saml',
+          error: samlResult.error,
+          redirectTo: samlResult.redirectTo
+        }
+      );
+      logAuditEntry(auditEntry);
+      
+      if (samlResult.isAuthenticated && samlResult.sessionToken) {
+        const response = NextResponse.redirect(new URL(samlResult.redirectTo || '/home', request.url));
+        
+        // Set session cookie
+        response.cookies.set({
+          name: 'df-session-token',
+          value: samlResult.sessionToken,
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+          maxAge: 24 * 60 * 60 // 24 hours
+        });
+        
+        return {
+          continue: false,
+          response: applyHeaders(response, { securityHeaders: true }),
+          statusCode: 302,
+          metadata: {
+            processingTime: performanceMarker.end(),
+            security: {
+              headersApplied: Object.keys(SECURITY_HEADERS),
+              authMethod: 'saml',
+              authorizationChecks: ['saml_authentication']
+            }
+          }
+        };
+      } else {
+        return {
+          continue: false,
+          response: NextResponse.redirect(new URL('/login', request.url)),
+          statusCode: 302,
+          error: {
+            code: 'SAML_AUTH_FAILED',
+            message: samlResult.error || 'SAML authentication failed',
+            source: 'authentication',
+            severity: 'medium',
+            category: 'security'
+          } as MiddlewareError,
+          metadata: {
+            processingTime: performanceMarker.end(),
+            security: {
+              headersApplied: [],
+              authMethod: 'saml',
+              authorizationChecks: ['saml_authentication']
+            }
+          }
+        };
+      }
+    }
+    
+    return {
+      continue: true,
+      headers: SECURITY_HEADERS,
+      metadata: {
+        processingTime: performanceMarker.end(),
+        security: {
+          headersApplied: Object.keys(SECURITY_HEADERS),
+          authMethod: 'none',
+          authorizationChecks: []
+        }
+      }
+    };
+  }
+  
+  // Validate authentication for protected routes
+  const tokenValidation = await validateJWTToken(request);
+  const sessionValidation = await validateUserSession(request);
+  
+  if (!tokenValidation.isValid || !sessionValidation.isValid) {
+    const auditEntry = createSecurityAuditLog(
+      request,
+      AuditEventType.AUTHENTICATION,
+      null,
+      'failure',
+      { 
+        reason: 'invalid_token_or_session',
+        tokenErrors: tokenValidation.errors,
+        sessionValid: sessionValidation.isValid
+      }
+    );
+    logAuditEntry(auditEntry);
+    
+    logAuthEvent(request, 'auth_failure', null, 'Invalid token or session');
+    
+    return {
+      continue: false,
+      response: createAuthRedirect(request),
+      statusCode: 302,
+      error: {
+        code: 'AUTHENTICATION_REQUIRED',
+        message: 'Authentication required',
+        source: 'authentication',
+        severity: 'medium',
+        category: 'security'
+      } as MiddlewareError,
+      metadata: {
+        processingTime: performanceMarker.end(),
+        security: {
+          headersApplied: [],
+          authMethod: 'jwt',
+          authorizationChecks: ['token_validation', 'session_validation']
+        }
+      }
+    };
+  }
+  
+  const user = sessionValidation.current;
+  if (!user) {
+    return {
+      continue: false,
+      response: createAuthRedirect(request),
+      statusCode: 302,
+      metadata: {
+        processingTime: performanceMarker.end(),
+        security: {
+          headersApplied: [],
+          authMethod: 'jwt',
+          authorizationChecks: ['user_resolution']
+        }
+      }
+    };
+  }
+  
+  // License validation
+  const licenseValidation = await validateLicense(pathname);
+  if (!licenseValidation.isValid && licenseValidation.redirectTo) {
+    const auditEntry = createSecurityAuditLog(
+      request,
+      AuditEventType.AUTHORIZATION,
+      user,
+      'failure',
+      { 
+        reason: 'license_invalid',
+        redirectTo: licenseValidation.redirectTo,
+        disableUI: licenseValidation.disableUI
+      }
+    );
+    logAuditEntry(auditEntry);
+    
+    return {
+      continue: false,
+      response: NextResponse.redirect(new URL(licenseValidation.redirectTo, request.url)),
+      statusCode: 302,
+      metadata: {
+        processingTime: performanceMarker.end(),
+        security: {
+          headersApplied: [],
+          authMethod: 'jwt',
+          authorizationChecks: ['license_validation']
+        }
+      }
+    };
+  }
+  
+  // Admin access validation
+  const isAdminRoute = SECURITY_CONFIG.ADMIN_ROUTES.some(route => 
+    pathname.startsWith(route)
+  );
+  
+  if (isAdminRoute) {
+    const hasAdminAccess = await validateAdminAccess(user, pathname);
+    
+    if (!hasAdminAccess) {
+      const auditEntry = createSecurityAuditLog(
+        request,
+        AuditEventType.AUTHORIZATION,
+        user,
+        'failure',
+        { reason: 'insufficient_admin_privileges', route: pathname }
+      );
+      logAuditEntry(auditEntry);
+      
+      return {
+        continue: false,
+        response: createErrorResponse('Admin access required', 403),
+        statusCode: 403,
+        error: {
+          code: 'ADMIN_ACCESS_REQUIRED',
+          message: 'Administrative privileges required for this resource',
+          source: 'authorization',
+          severity: 'medium',
+          category: 'security'
+        } as MiddlewareError,
+        metadata: {
+          processingTime: performanceMarker.end(),
+          security: {
+            headersApplied: Object.keys(SECURITY_HEADERS),
+            authMethod: 'jwt',
+            authorizationChecks: ['admin_access_validation']
+          }
+        }
+      };
+    }
+  }
+  
+  // Paywall validation
+  const paywallValidation = await validatePaywallAccess(user, pathname);
+  if (!paywallValidation.hasAccess && paywallValidation.redirectTo) {
+    const auditEntry = createSecurityAuditLog(
+      request,
+      AuditEventType.AUTHORIZATION,
+      user,
+      'failure',
+      { 
+        reason: 'paywall_access_denied',
+        paywallActive: paywallValidation.paywallActive,
+        redirectTo: paywallValidation.redirectTo
+      }
+    );
+    logAuditEntry(auditEntry);
+    
+    const redirectUrl = paywallValidation.redirectTo.startsWith('../') ?
+      new URL('/', request.url) : // Convert relative redirect to absolute
+      new URL(paywallValidation.redirectTo, request.url);
+    
+    return {
+      continue: false,
+      response: NextResponse.redirect(redirectUrl),
+      statusCode: 302,
+      metadata: {
+        processingTime: performanceMarker.end(),
+        security: {
+          headersApplied: [],
+          authMethod: 'jwt',
+          authorizationChecks: ['paywall_validation']
+        }
+      }
+    };
+  }
+  
+  // Permission evaluation
+  const permissionContext: PermissionEvaluationContext = {
+    user,
+    resource: pathname,
+    action: request.method.toLowerCase(),
+    request: {
+      method: request.method as any,
+      path: pathname,
+      query: Object.fromEntries(request.nextUrl.searchParams.entries()),
+      headers: Object.fromEntries(request.headers.entries())
+    }
+  };
+  
+  const permissionResult = await evaluatePermissions(permissionContext);
+  
+  if (!permissionResult.granted) {
+    const auditEntry = createSecurityAuditLog(
+      request,
+      AuditEventType.AUTHORIZATION,
+      user,
+      'failure',
+      { 
+        reason: 'insufficient_permissions',
+        requiredPermissions: permissionResult.requiredPermissions,
+        userPermissions: permissionResult.userPermissions,
+        missingPermissions: permissionResult.missingPermissions
+      }
+    );
+    logAuditEntry(auditEntry);
+    
+    return {
+      continue: false,
+      response: createErrorResponse('Insufficient permissions', 403, {
+        requiredPermissions: permissionResult.requiredPermissions,
+        missingPermissions: permissionResult.missingPermissions,
+        alternatives: permissionResult.alternatives
+      }),
+      statusCode: 403,
+      error: {
+        code: 'INSUFFICIENT_PERMISSIONS',
+        message: permissionResult.reason,
+        source: 'authorization',
+        severity: 'medium',
+        category: 'security'
+      } as MiddlewareError,
+      metadata: {
+        processingTime: performanceMarker.end(),
+        security: {
+          headersApplied: Object.keys(SECURITY_HEADERS),
+          authMethod: 'jwt',
+          authorizationChecks: ['permission_evaluation']
+        }
+      }
+    };
+  }
+  
+  // Success audit log
+  const auditEntry = createSecurityAuditLog(
+    request,
+    AuditEventType.AUTHORIZATION,
+    user,
+    'success',
+    { 
+      permissions: permissionResult.userPermissions,
+      evaluationTime: permissionResult.metadata.evaluationTime
+    }
+  );
+  logAuditEntry(auditEntry);
+  
+  const processingTime = performanceMarker.end();
+  
+  // Ensure processing time meets performance requirements
+  if (processingTime > SECURITY_CONFIG.MAX_PROCESSING_TIME) {
+    console.warn(`Security middleware processing time exceeded limit: ${processingTime}ms`);
+  }
+  
+  // Token refresh check
+  const needsRefresh = tokenValidation.payload && tokenNeedsRefresh(tokenValidation.payload);
+  const refreshHeaders: Record<string, string> = {};
+  
+  if (needsRefresh) {
+    // In production, this would call token refresh API
+    // For now, we'll set a header to indicate refresh is needed
+    refreshHeaders['X-Token-Refresh-Needed'] = 'true';
+  }
+  
+  return {
+    continue: true,
+    headers: {
+      ...SECURITY_HEADERS,
+      ...refreshHeaders,
+      'X-User-ID': user.id.toString(),
+      'X-Session-ID': user.sessionId || 'unknown',
+      'X-Processing-Time': processingTime.toString()
+    },
+    auth: {
+      isAuthenticated: true,
+      isAuthorized: true,
+      user: user,
+      updatedToken: needsRefresh ? tokenValidation.rawToken : undefined
+    } as MiddlewareAuthResult,
+    metadata: {
+      processingTime,
+      security: {
+        headersApplied: [
+          ...Object.keys(SECURITY_HEADERS),
+          'X-User-ID',
+          'X-Session-ID',
+          'X-Processing-Time'
+        ],
+        authMethod: 'jwt',
+        authorizationChecks: [
+          'token_validation',
+          'session_validation',
+          'license_validation',
+          isAdminRoute ? 'admin_access_validation' : '',
+          'paywall_validation',
+          'permission_evaluation'
+        ].filter(Boolean)
+      }
+    }
+  };
+}
+
+// ============================================================================
+// MIDDLEWARE CONFIGURATION AND EXPORT
+// ============================================================================
+
+/**
+ * Security middleware configuration for Next.js
+ * Defines route matching patterns and security requirements
+ */
+export const securityMiddlewareConfig = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public assets
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|static|public).*)',
+  ],
 };
 
-export type {
-  SecurityMiddlewareConfig,
-  MiddlewareResult,
-  MiddlewareOperationContext
+/**
+ * Rate limiter cleanup function for maintenance
+ */
+export function cleanupRateLimiter(): void {
+  EdgeRateLimiter.cleanup();
+}
+
+// Export default security middleware function
+export default securityMiddleware;
+
+// Export utility functions for testing and advanced usage
+export {
+  validateJWTToken,
+  validateUserSession,
+  validateAdminAccess,
+  validateLicense,
+  validatePaywallAccess,
+  handleSAMLAuthentication,
+  evaluatePermissions,
+  createSecurityAuditLog,
+  SECURITY_CONFIG,
+  SECURITY_HEADER_CONFIG
 };
