@@ -1,800 +1,848 @@
 /**
- * @fileoverview Middleware utility functions for Next.js edge runtime
+ * Middleware Utilities
  * 
- * Provides comprehensive utility functions for middleware operations including:
- * - JWT token validation and parsing with edge runtime compatibility
- * - Request/response header management for DreamFactory API integration
- * - Case transformation utilities maintaining API compatibility
- * - Session management and secure cookie handling
- * - Logging and audit trail functionality
- * - Environment detection and configuration utilities
+ * Provides essential utility functions for Next.js edge middleware operations including
+ * JWT token validation, header management, case transformation, session handling,
+ * and logging capabilities. All utilities are designed for edge runtime compatibility.
  * 
- * All functions are optimized for Next.js 15.1+ edge runtime and maintain
- * security best practices for DreamFactory authentication workflows.
+ * @fileoverview Comprehensive middleware utilities supporting authentication, security,
+ * and request/response transformation for the DreamFactory Admin Interface
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
 
-// =============================================================================
-// TYPES AND INTERFACES
-// =============================================================================
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
 
 /**
- * JWT token payload structure for DreamFactory sessions
+ * JWT payload structure for DreamFactory session tokens
  */
 export interface JWTPayload {
-  sub: string          // User ID
-  iat: number         // Issued at timestamp
-  exp: number         // Expiration timestamp
-  aud: string         // Audience (DreamFactory instance)
-  iss: string         // Issuer
-  jti: string         // JWT ID
-  session_id: string  // DreamFactory session identifier
-  role?: string       // User role
-  email?: string      // User email
-  name?: string       // User display name
+  sub: string;           // User ID
+  iat: number;          // Issued at timestamp
+  exp: number;          // Expiration timestamp
+  sessionId: string;    // Session identifier
+  email?: string;       // User email
+  roles?: string[];     // User roles
+  permissions?: string[]; // User permissions
 }
 
 /**
- * Session data structure maintained in middleware
+ * Parsed session information
  */
-export interface SessionData {
-  token: string
-  payload: JWTPayload
-  expiresAt: number
-  refreshToken?: string
-  lastActivity: number
+export interface SessionInfo {
+  userId: string;
+  sessionId: string;
+  email?: string;
+  roles: string[];
+  permissions: string[];
+  isValid: boolean;
+  expiresAt: Date;
+  needsRefresh: boolean;
 }
 
 /**
- * Audit log entry structure for security tracking
+ * Header management configuration
+ */
+export interface HeaderConfig {
+  removeHeaders?: string[];
+  addHeaders?: Record<string, string>;
+  corsHeaders?: boolean;
+  securityHeaders?: boolean;
+}
+
+/**
+ * Audit log entry structure
  */
 export interface AuditLogEntry {
-  timestamp: number
-  event: string
-  userId?: string
-  sessionId?: string
-  ip: string
-  userAgent: string
-  path: string
-  method: string
-  success: boolean
-  error?: string
-  metadata?: Record<string, unknown>
+  timestamp: string;
+  action: string;
+  userId?: string;
+  sessionId?: string;
+  ip: string;
+  userAgent: string;
+  path: string;
+  method: string;
+  statusCode?: number;
+  error?: string;
+  details?: Record<string, any>;
 }
 
 /**
- * Environment configuration type
+ * Environment detection result
  */
-export interface EnvironmentConfig {
-  isDevelopment: boolean
-  isProduction: boolean
-  isTest: boolean
-  dreamfactoryUrl: string
-  jwtSecret: string
-  sessionCookieName: string
-  sessionTimeout: number
-  auditLoggingEnabled: boolean
+export interface EnvironmentInfo {
+  isProduction: boolean;
+  isDevelopment: boolean;
+  isTest: boolean;
+  apiUrl: string;
+  enableMSW: boolean;
+  logLevel: 'error' | 'warn' | 'info' | 'debug';
 }
 
-// =============================================================================
+// ============================================================================
 // JWT TOKEN UTILITIES
-// =============================================================================
+// ============================================================================
 
 /**
- * Validates JWT token structure and signature compatibility
- * Optimized for edge runtime with minimal dependencies
- * 
- * @param token - JWT token string to validate
- * @returns Promise resolving to validation result
+ * Validates JWT token structure without signature verification
+ * For edge runtime compatibility, only performs basic validation
  */
-export async function validateJWTStructure(token: string): Promise<{
-  valid: boolean
-  payload?: JWTPayload
-  error?: string
-}> {
+export function validateJWTStructure(token: string): boolean {
   try {
-    if (!token || typeof token !== 'string') {
-      return { valid: false, error: 'Invalid token format' }
-    }
-
-    const parts = token.split('.')
-    if (parts.length !== 3) {
-      return { valid: false, error: 'Invalid JWT structure' }
-    }
-
-    // Decode payload (validation of signature would require crypto in production)
-    const payloadBase64 = parts[1]
-    const paddedPayload = payloadBase64 + '='.repeat((4 - payloadBase64.length % 4) % 4)
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
     
-    let payload: JWTPayload
-    try {
-      const decoded = atob(paddedPayload)
-      payload = JSON.parse(decoded)
-    } catch {
-      return { valid: false, error: 'Invalid payload encoding' }
-    }
-
-    // Validate required claims
-    if (!payload.sub || !payload.iat || !payload.exp || !payload.session_id) {
-      return { valid: false, error: 'Missing required claims' }
-    }
-
-    // Check expiration
-    const now = Math.floor(Date.now() / 1000)
-    if (payload.exp <= now) {
-      return { valid: false, error: 'Token expired' }
-    }
-
-    return { valid: true, payload }
-  } catch (error) {
-    return { 
-      valid: false, 
-      error: error instanceof Error ? error.message : 'Token validation failed' 
-    }
+    // Validate base64url encoding
+    parts.forEach(part => {
+      if (!part || !/^[A-Za-z0-9_-]+$/.test(part)) {
+        throw new Error('Invalid base64url encoding');
+      }
+    });
+    
+    return true;
+  } catch {
+    return false;
   }
 }
 
 /**
- * Extracts JWT token from Authorization header or cookies
- * Supports multiple token sources for flexible authentication
- * 
- * @param request - Next.js request object
- * @returns Extracted token string or null
+ * Parses JWT payload without signature verification
+ * @param token JWT token string
+ * @returns Parsed payload or null if invalid
  */
-export function extractTokenFromRequest(request: NextRequest): string | null {
-  // Try Authorization header first (Bearer token)
-  const authHeader = request.headers.get('Authorization')
+export function parseJWTPayload(token: string): JWTPayload | null {
+  try {
+    if (!validateJWTStructure(token)) return null;
+    
+    const parts = token.split('.');
+    const payload = parts[1];
+    
+    // Decode base64url
+    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const parsed = JSON.parse(decoded) as JWTPayload;
+    
+    // Validate required fields
+    if (!parsed.sub || !parsed.iat || !parsed.exp || !parsed.sessionId) {
+      return null;
+    }
+    
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks if JWT token is expired
+ */
+export function isTokenExpired(payload: JWTPayload): boolean {
+  const now = Math.floor(Date.now() / 1000);
+  return payload.exp <= now;
+}
+
+/**
+ * Checks if JWT token needs refresh (expires within 5 minutes)
+ */
+export function tokenNeedsRefresh(payload: JWTPayload): boolean {
+  const now = Math.floor(Date.now() / 1000);
+  const fiveMinutes = 5 * 60;
+  return (payload.exp - now) <= fiveMinutes;
+}
+
+/**
+ * Extracts JWT token from request headers or cookies
+ */
+export function extractToken(request: NextRequest): string | null {
+  // Check Authorization header
+  const authHeader = request.headers.get('authorization');
   if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.slice(7)
+    return authHeader.substring(7);
   }
-
-  // Try X-DreamFactory-Session-Token header (DreamFactory specific)
-  const sessionHeader = request.headers.get('X-DreamFactory-Session-Token')
+  
+  // Check X-DreamFactory-Session-Token header
+  const sessionHeader = request.headers.get('x-dreamfactory-session-token');
   if (sessionHeader) {
-    return sessionHeader
+    return sessionHeader;
   }
-
-  // Try session cookie as fallback
-  const sessionCookieName = getEnvironmentConfig().sessionCookieName
-  const cookieToken = request.cookies.get(sessionCookieName)?.value
-  if (cookieToken) {
-    return cookieToken
+  
+  // Check session cookie
+  const sessionCookie = request.cookies.get('df-session-token');
+  if (sessionCookie?.value) {
+    return sessionCookie.value;
   }
-
-  return null
+  
+  return null;
 }
 
 /**
- * Checks if token needs refresh based on expiration time
- * Implements configurable refresh threshold for optimal UX
- * 
- * @param payload - JWT payload to check
- * @param refreshThresholdSeconds - Seconds before expiration to trigger refresh
- * @returns Boolean indicating if refresh is needed
+ * Validates token and returns session information
  */
-export function shouldRefreshToken(
-  payload: JWTPayload, 
-  refreshThresholdSeconds: number = 300 // 5 minutes default
-): boolean {
-  const now = Math.floor(Date.now() / 1000)
-  const refreshTime = payload.exp - refreshThresholdSeconds
-  return now >= refreshTime
+export function validateSessionToken(request: NextRequest): SessionInfo | null {
+  const token = extractToken(request);
+  if (!token) return null;
+  
+  const payload = parseJWTPayload(token);
+  if (!payload) return null;
+  
+  const isExpired = isTokenExpired(payload);
+  const needsRefresh = tokenNeedsRefresh(payload);
+  
+  return {
+    userId: payload.sub,
+    sessionId: payload.sessionId,
+    email: payload.email,
+    roles: payload.roles || [],
+    permissions: payload.permissions || [],
+    isValid: !isExpired,
+    expiresAt: new Date(payload.exp * 1000),
+    needsRefresh: needsRefresh && !isExpired
+  };
 }
 
-// =============================================================================
+// ============================================================================
 // HEADER MANAGEMENT UTILITIES
-// =============================================================================
+// ============================================================================
 
 /**
- * Sanitizes and normalizes request headers for DreamFactory API compatibility
- * Removes sensitive headers and ensures proper formatting
- * 
- * @param headers - Headers object to sanitize
- * @returns Sanitized headers object
+ * Security headers for all responses
  */
-export function sanitizeRequestHeaders(headers: Headers): Record<string, string> {
-  const sanitized: Record<string, string> = {}
-  const sensitiveHeaders = ['authorization', 'cookie', 'x-dreamfactory-session-token']
+export const SECURITY_HEADERS = {
+  'X-Frame-Options': 'DENY',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-XSS-Protection': '1; mode=block',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+} as const;
+
+/**
+ * CORS headers for API requests
+ */
+export const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-DreamFactory-Session-Token, X-DreamFactory-API-Key',
+  'Access-Control-Expose-Headers': 'X-DreamFactory-Session-Token',
+  'Access-Control-Max-Age': '86400', // 24 hours
+} as const;
+
+/**
+ * Applies headers to response based on configuration
+ */
+export function applyHeaders(
+  response: NextResponse,
+  config: HeaderConfig = {}
+): NextResponse {
+  const { removeHeaders = [], addHeaders = {}, corsHeaders = false, securityHeaders = true } = config;
   
-  headers.forEach((value, key) => {
-    const normalizedKey = key.toLowerCase()
-    
-    // Skip sensitive headers that should be handled separately
-    if (sensitiveHeaders.includes(normalizedKey)) {
-      return
-    }
-    
-    // Normalize content-type for consistency
-    if (normalizedKey === 'content-type') {
-      sanitized['Content-Type'] = value.trim()
-      return
-    }
-    
-    // Pass through other headers with proper casing
-    sanitized[toPascalCase(key)] = value.trim()
-  })
+  // Remove specified headers
+  removeHeaders.forEach(header => {
+    response.headers.delete(header);
+  });
   
-  return sanitized
+  // Add security headers
+  if (securityHeaders) {
+    Object.entries(SECURITY_HEADERS).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+  }
+  
+  // Add CORS headers
+  if (corsHeaders) {
+    Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+  }
+  
+  // Add custom headers
+  Object.entries(addHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  
+  return response;
 }
 
 /**
- * Adds authentication headers to outgoing requests
- * Handles both JWT and API key authentication patterns
- * 
- * @param headers - Existing headers object
- * @param token - JWT session token
- * @param apiKey - Optional API key for service authentication
- * @returns Updated headers object
+ * Creates standardized API response headers
  */
-export function addAuthenticationHeaders(
-  headers: Headers,
-  token?: string,
-  apiKey?: string
-): Headers {
-  const newHeaders = new Headers(headers)
+export function createAPIHeaders(sessionToken?: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  };
   
-  if (token) {
-    newHeaders.set('X-DreamFactory-Session-Token', token)
-    newHeaders.set('Authorization', `Bearer ${token}`)
-  }
-  
-  if (apiKey) {
-    newHeaders.set('X-DreamFactory-API-Key', apiKey)
-  }
-  
-  // Ensure proper content type for API requests
-  if (!newHeaders.has('Content-Type')) {
-    newHeaders.set('Content-Type', 'application/json')
-  }
-  
-  return newHeaders
-}
-
-/**
- * Creates response headers for successful authentication
- * Includes security headers and session management
- * 
- * @param sessionToken - New session token to set
- * @param maxAge - Cookie max age in seconds
- * @returns Headers object for response
- */
-export function createAuthenticationResponseHeaders(
-  sessionToken?: string,
-  maxAge: number = 3600 // 1 hour default
-): Headers {
-  const headers = new Headers()
-  
-  // Security headers
-  headers.set('X-Content-Type-Options', 'nosniff')
-  headers.set('X-Frame-Options', 'DENY')
-  headers.set('X-XSS-Protection', '1; mode=block')
-  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  
-  // Session headers
   if (sessionToken) {
-    const config = getEnvironmentConfig()
-    const secure = config.isProduction
-    const sameSite = config.isProduction ? 'strict' : 'lax'
-    
-    headers.set(
-      'Set-Cookie',
-      `${config.sessionCookieName}=${sessionToken}; HttpOnly; Secure=${secure}; SameSite=${sameSite}; Max-Age=${maxAge}; Path=/`
-    )
+    headers['X-DreamFactory-Session-Token'] = sessionToken;
   }
   
-  return headers
+  return headers;
 }
 
-// =============================================================================
+/**
+ * Extracts DreamFactory-specific headers from request
+ */
+export function extractDFHeaders(request: NextRequest): Record<string, string> {
+  const dfHeaders: Record<string, string> = {};
+  
+  // Extract DreamFactory session token
+  const sessionToken = extractToken(request);
+  if (sessionToken) {
+    dfHeaders['X-DreamFactory-Session-Token'] = sessionToken;
+  }
+  
+  // Extract API key
+  const apiKey = request.headers.get('x-dreamfactory-api-key');
+  if (apiKey) {
+    dfHeaders['X-DreamFactory-API-Key'] = apiKey;
+  }
+  
+  // Extract application name
+  const appName = request.headers.get('x-dreamfactory-application-name');
+  if (appName) {
+    dfHeaders['X-DreamFactory-Application-Name'] = appName;
+  }
+  
+  return dfHeaders;
+}
+
+// ============================================================================
 // CASE TRANSFORMATION UTILITIES
-// =============================================================================
+// ============================================================================
 
 /**
- * Converts string to PascalCase for consistent header formatting
- * Maintains compatibility with HTTP header conventions
- * 
- * @param str - String to convert
- * @returns PascalCase string
+ * Converts camelCase to snake_case
  */
-export function toPascalCase(str: string): string {
-  return str
-    .split(/[-_\s]/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join('-')
+export function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 }
 
 /**
- * Converts object keys to camelCase for JavaScript compatibility
- * Preserves data integrity while ensuring consistent naming
- * 
- * @param obj - Object to transform
- * @returns Object with camelCase keys
+ * Converts snake_case to camelCase
  */
-export function transformKeysToCamelCase<T>(obj: Record<string, unknown>): T {
-  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
-    return obj as T
+export function snakeToCamel(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+/**
+ * Recursively transforms object keys from camelCase to snake_case
+ */
+export function transformKeysToSnakeCase(obj: any): any {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
   }
   
-  const transformed: Record<string, unknown> = {}
+  if (Array.isArray(obj)) {
+    return obj.map(transformKeysToSnakeCase);
+  }
   
+  const transformed: any = {};
   for (const [key, value] of Object.entries(obj)) {
-    const camelKey = key.replace(/[-_](.)/g, (_, char) => char.toUpperCase())
-    
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      transformed[camelKey] = transformKeysToCamelCase(value as Record<string, unknown>)
-    } else if (Array.isArray(value)) {
-      transformed[camelKey] = value.map(item => 
-        typeof item === 'object' && item !== null 
-          ? transformKeysToCamelCase(item as Record<string, unknown>)
-          : item
-      )
-    } else {
-      transformed[camelKey] = value
-    }
+    const snakeKey = camelToSnake(key);
+    transformed[snakeKey] = transformKeysToSnakeCase(value);
   }
   
-  return transformed as T
+  return transformed;
 }
 
 /**
- * Converts object keys to snake_case for API compatibility
- * Ensures proper formatting for DreamFactory API requests
- * 
- * @param obj - Object to transform
- * @returns Object with snake_case keys
+ * Recursively transforms object keys from snake_case to camelCase
  */
-export function transformKeysToSnakeCase<T>(obj: Record<string, unknown>): T {
-  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
-    return obj as T
+export function transformKeysToCamelCase(obj: any): any {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
   }
   
-  const transformed: Record<string, unknown> = {}
+  if (Array.isArray(obj)) {
+    return obj.map(transformKeysToCamelCase);
+  }
   
+  const transformed: any = {};
   for (const [key, value] of Object.entries(obj)) {
-    const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)
-    
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      transformed[snakeKey] = transformKeysToSnakeCase(value as Record<string, unknown>)
-    } else if (Array.isArray(value)) {
-      transformed[snakeKey] = value.map(item => 
-        typeof item === 'object' && item !== null 
-          ? transformKeysToSnakeCase(item as Record<string, unknown>)
-          : item
-      )
-    } else {
-      transformed[snakeKey] = value
-    }
+    const camelKey = snakeToCamel(key);
+    transformed[camelKey] = transformKeysToCamelCase(value);
   }
   
-  return transformed as T
-}
-
-// =============================================================================
-// SESSION MANAGEMENT UTILITIES
-// =============================================================================
-
-/**
- * Creates secure session data object with proper validation
- * Implements stateless session management patterns
- * 
- * @param token - JWT token string
- * @param payload - Decoded JWT payload
- * @returns Session data object
- */
-export function createSessionData(token: string, payload: JWTPayload): SessionData {
-  return {
-    token,
-    payload,
-    expiresAt: payload.exp * 1000, // Convert to milliseconds
-    lastActivity: Date.now()
-  }
+  return transformed;
 }
 
 /**
- * Validates session data integrity and expiration
- * Ensures session security and proper lifecycle management
- * 
- * @param sessionData - Session data to validate
- * @returns Validation result with details
+ * Transforms request body for API compatibility
  */
-export function validateSessionData(sessionData: SessionData): {
-  valid: boolean
-  expired: boolean
-  needsRefresh: boolean
-  error?: string
-} {
+export function transformRequestBody(body: any, toSnakeCase: boolean = true): any {
+  if (!body) return body;
+  
   try {
-    if (!sessionData || !sessionData.token || !sessionData.payload) {
-      return { valid: false, expired: false, needsRefresh: false, error: 'Invalid session data' }
-    }
-
-    const now = Date.now()
-    const expired = sessionData.expiresAt <= now
-    const needsRefresh = shouldRefreshToken(sessionData.payload)
-    
-    // Check for session timeout (inactive for too long)
-    const config = getEnvironmentConfig()
-    const sessionTimeout = config.sessionTimeout * 1000 // Convert to milliseconds
-    const inactiveTime = now - sessionData.lastActivity
-    
-    if (inactiveTime > sessionTimeout) {
-      return { valid: false, expired: true, needsRefresh: false, error: 'Session timeout' }
-    }
-
-    return {
-      valid: !expired,
-      expired,
-      needsRefresh,
-      error: expired ? 'Session expired' : undefined
-    }
-  } catch (error) {
-    return { 
-      valid: false, 
-      expired: false, 
-      needsRefresh: false, 
-      error: error instanceof Error ? error.message : 'Session validation failed' 
-    }
+    const parsedBody = typeof body === 'string' ? JSON.parse(body) : body;
+    return toSnakeCase 
+      ? transformKeysToSnakeCase(parsedBody)
+      : transformKeysToCamelCase(parsedBody);
+  } catch {
+    return body; // Return original if parsing fails
   }
 }
 
+// ============================================================================
+// SESSION MANAGEMENT UTILITIES
+// ============================================================================
+
 /**
- * Updates session activity timestamp for timeout management
- * Maintains session lifecycle in stateless environment
- * 
- * @param sessionData - Session data to update
- * @returns Updated session data
+ * Cookie configuration for session management
  */
-export function updateSessionActivity(sessionData: SessionData): SessionData {
-  return {
-    ...sessionData,
-    lastActivity: Date.now()
-  }
+export const SESSION_COOKIE_CONFIG = {
+  name: 'df-session-token',
+  maxAge: 24 * 60 * 60, // 24 hours in seconds
+  httpOnly: true,
+  secure: true,
+  sameSite: 'strict' as const,
+  path: '/',
+};
+
+/**
+ * Sets session cookie in response
+ */
+export function setSessionCookie(response: NextResponse, token: string): void {
+  response.cookies.set({
+    name: SESSION_COOKIE_CONFIG.name,
+    value: token,
+    maxAge: SESSION_COOKIE_CONFIG.maxAge,
+    httpOnly: SESSION_COOKIE_CONFIG.httpOnly,
+    secure: SESSION_COOKIE_CONFIG.secure,
+    sameSite: SESSION_COOKIE_CONFIG.sameSite,
+    path: SESSION_COOKIE_CONFIG.path,
+  });
 }
 
-// =============================================================================
-// COOKIE HANDLING UTILITIES
-// =============================================================================
+/**
+ * Clears session cookie from response
+ */
+export function clearSessionCookie(response: NextResponse): void {
+  response.cookies.set({
+    name: SESSION_COOKIE_CONFIG.name,
+    value: '',
+    maxAge: 0,
+    httpOnly: SESSION_COOKIE_CONFIG.httpOnly,
+    secure: SESSION_COOKIE_CONFIG.secure,
+    sameSite: SESSION_COOKIE_CONFIG.sameSite,
+    path: SESSION_COOKIE_CONFIG.path,
+  });
+}
 
 /**
- * Creates secure cookie options for session management
- * Implements security best practices for authentication cookies
- * 
- * @param maxAge - Cookie lifetime in seconds
- * @returns Cookie options object
+ * Creates session-aware redirect response
  */
-export function createSecureCookieOptions(maxAge: number = 3600): {
-  httpOnly: boolean
-  secure: boolean
-  sameSite: 'strict' | 'lax' | 'none'
-  maxAge: number
-  path: string
+export function createAuthRedirect(
+  request: NextRequest,
+  loginPath: string = '/login'
+): NextResponse {
+  const url = request.nextUrl.clone();
+  url.pathname = loginPath;
+  
+  // Preserve return URL for post-login redirect
+  if (request.nextUrl.pathname !== loginPath) {
+    url.searchParams.set('returnUrl', request.nextUrl.pathname + request.nextUrl.search);
+  }
+  
+  const response = NextResponse.redirect(url);
+  clearSessionCookie(response);
+  
+  return response;
+}
+
+/**
+ * Validates session and returns appropriate response
+ */
+export function validateSessionMiddleware(request: NextRequest): {
+  isValid: boolean;
+  sessionInfo: SessionInfo | null;
+  response?: NextResponse;
 } {
-  const config = getEnvironmentConfig()
+  const sessionInfo = validateSessionToken(request);
+  
+  if (!sessionInfo) {
+    return {
+      isValid: false,
+      sessionInfo: null,
+      response: createAuthRedirect(request)
+    };
+  }
+  
+  if (!sessionInfo.isValid) {
+    return {
+      isValid: false,
+      sessionInfo,
+      response: createAuthRedirect(request)
+    };
+  }
   
   return {
-    httpOnly: true,
-    secure: config.isProduction,
-    sameSite: config.isProduction ? 'strict' : 'lax',
-    maxAge,
-    path: '/'
-  }
+    isValid: true,
+    sessionInfo
+  };
 }
 
-/**
- * Clears authentication cookies for logout
- * Ensures complete session cleanup
- * 
- * @param response - Next.js response object
- * @returns Updated response with cleared cookies
- */
-export function clearAuthenticationCookies(response: NextResponse): NextResponse {
-  const config = getEnvironmentConfig()
-  const expiredCookie = `${config.sessionCookieName}=; HttpOnly; Secure=${config.isProduction}; SameSite=${config.isProduction ? 'strict' : 'lax'}; Max-Age=0; Path=/`
-  
-  response.headers.set('Set-Cookie', expiredCookie)
-  return response
-}
-
-// =============================================================================
+// ============================================================================
 // LOGGING AND AUDIT UTILITIES
-// =============================================================================
+// ============================================================================
 
 /**
- * Creates structured audit log entry for security events
- * Implements comprehensive audit trail for compliance
- * 
- * @param request - Next.js request object
- * @param event - Event type description
- * @param success - Whether the event was successful
- * @param additionalData - Optional additional context
- * @returns Audit log entry
+ * Creates audit log entry from request
  */
 export function createAuditLogEntry(
   request: NextRequest,
-  event: string,
-  success: boolean,
-  additionalData?: {
-    userId?: string
-    sessionId?: string
-    error?: string
-    metadata?: Record<string, unknown>
-  }
+  action: string,
+  sessionInfo?: SessionInfo | null,
+  statusCode?: number,
+  error?: string,
+  details?: Record<string, any>
 ): AuditLogEntry {
-  const ip = getClientIP(request)
-  const userAgent = request.headers.get('user-agent') || 'Unknown'
+  const forwarded = request.headers.get('x-forwarded-for');
+  const ip = forwarded ? forwarded.split(',')[0].trim() : 
+            request.headers.get('x-real-ip') || 'unknown';
   
   return {
-    timestamp: Date.now(),
-    event,
-    userId: additionalData?.userId,
-    sessionId: additionalData?.sessionId,
+    timestamp: new Date().toISOString(),
+    action,
+    userId: sessionInfo?.userId,
+    sessionId: sessionInfo?.sessionId,
     ip,
-    userAgent,
+    userAgent: request.headers.get('user-agent') || 'unknown',
     path: request.nextUrl.pathname,
     method: request.method,
-    success,
-    error: additionalData?.error,
-    metadata: additionalData?.metadata
+    statusCode,
+    error,
+    details
+  };
+}
+
+/**
+ * Logs audit entry (edge-compatible logging)
+ */
+export function logAuditEntry(entry: AuditLogEntry): void {
+  // In edge runtime, use console.log with structured format
+  // In production, this would integrate with external logging service
+  const logLevel = getEnvironmentInfo().logLevel;
+  
+  if (logLevel === 'debug' || (logLevel === 'info' && !entry.error) || 
+      (logLevel === 'warn' && entry.statusCode && entry.statusCode >= 400) ||
+      (logLevel === 'error' && entry.error)) {
+    
+    console.log(JSON.stringify({
+      ...entry,
+      level: entry.error ? 'error' : entry.statusCode && entry.statusCode >= 400 ? 'warn' : 'info',
+      service: 'middleware'
+    }));
   }
 }
 
 /**
- * Logs audit entry with appropriate formatting
- * Provides structured logging for monitoring systems
- * 
- * @param auditEntry - Audit log entry to log
+ * Logs authentication events
  */
-export function logAuditEntry(auditEntry: AuditLogEntry): void {
-  const config = getEnvironmentConfig()
+export function logAuthEvent(
+  request: NextRequest,
+  event: 'login' | 'logout' | 'token_refresh' | 'auth_failure' | 'access_denied',
+  sessionInfo?: SessionInfo | null,
+  error?: string
+): void {
+  const entry = createAuditLogEntry(
+    request,
+    `auth_${event}`,
+    sessionInfo,
+    event === 'auth_failure' || event === 'access_denied' ? 401 : 200,
+    error,
+    { event }
+  );
   
-  if (!config.auditLoggingEnabled) {
-    return
-  }
-  
-  // In development, use console logging
-  if (config.isDevelopment) {
-    console.log('[AUDIT]', JSON.stringify(auditEntry, null, 2))
-    return
-  }
-  
-  // In production, this would integrate with your logging service
-  // For now, using structured console logging that can be captured by log aggregators
-  console.log(JSON.stringify({
-    level: auditEntry.success ? 'info' : 'warn',
-    category: 'security_audit',
-    ...auditEntry
-  }))
+  logAuditEntry(entry);
 }
+
+/**
+ * Logs API access events
+ */
+export function logAPIAccess(
+  request: NextRequest,
+  sessionInfo: SessionInfo | null,
+  statusCode: number,
+  responseTime?: number
+): void {
+  const entry = createAuditLogEntry(
+    request,
+    'api_access',
+    sessionInfo,
+    statusCode,
+    undefined,
+    { responseTime }
+  );
+  
+  logAuditEntry(entry);
+}
+
+// ============================================================================
+// ENVIRONMENT DETECTION UTILITIES
+// ============================================================================
+
+/**
+ * Detects current environment and returns configuration
+ */
+export function getEnvironmentInfo(): EnvironmentInfo {
+  // Edge runtime compatible environment detection
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  const isDevelopment = nodeEnv === 'development';
+  const isProduction = nodeEnv === 'production';
+  const isTest = nodeEnv === 'test';
+  
+  return {
+    isProduction,
+    isDevelopment,
+    isTest,
+    apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:80',
+    enableMSW: isDevelopment || isTest,
+    logLevel: (process.env.LOG_LEVEL as any) || (isDevelopment ? 'debug' : 'warn')
+  };
+}
+
+/**
+ * Checks if MSW (Mock Service Worker) should be enabled
+ */
+export function shouldEnableMSW(): boolean {
+  const env = getEnvironmentInfo();
+  return env.enableMSW && typeof window !== 'undefined';
+}
+
+/**
+ * Gets API base URL for the current environment
+ */
+export function getAPIBaseURL(): string {
+  return getEnvironmentInfo().apiUrl;
+}
+
+/**
+ * Checks if running in development mode
+ */
+export function isDevelopmentMode(): boolean {
+  return getEnvironmentInfo().isDevelopment;
+}
+
+/**
+ * Checks if running in production mode
+ */
+export function isProductionMode(): boolean {
+  return getEnvironmentInfo().isProduction;
+}
+
+// ============================================================================
+// REQUEST PROCESSING UTILITIES
+// ============================================================================
 
 /**
  * Extracts client IP address from request
- * Handles various proxy configurations and headers
- * 
- * @param request - Next.js request object
- * @returns Client IP address
  */
-function getClientIP(request: NextRequest): string {
-  // Check various headers for real IP (common proxy configurations)
-  const xForwardedFor = request.headers.get('x-forwarded-for')
-  if (xForwardedFor) {
-    return xForwardedFor.split(',')[0].trim()
+export function getClientIP(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
   }
   
-  const xRealIP = request.headers.get('x-real-ip')
-  if (xRealIP) {
-    return xRealIP
-  }
-  
-  const cfConnectingIP = request.headers.get('cf-connecting-ip')
-  if (cfConnectingIP) {
-    return cfConnectingIP
-  }
-  
-  // Fallback to connection IP
-  return request.ip || 'unknown'
-}
-
-// =============================================================================
-// ENVIRONMENT AND CONFIGURATION UTILITIES
-// =============================================================================
-
-/**
- * Detects runtime environment and returns configuration
- * Provides centralized environment detection for middleware
- * 
- * @returns Environment configuration object
- */
-export function getEnvironmentConfig(): EnvironmentConfig {
-  const nodeEnv = process.env.NODE_ENV
-  const isDevelopment = nodeEnv === 'development'
-  const isProduction = nodeEnv === 'production'
-  const isTest = nodeEnv === 'test'
-  
-  return {
-    isDevelopment,
-    isProduction,
-    isTest,
-    dreamfactoryUrl: process.env.DREAMFACTORY_URL || 'http://localhost:8080',
-    jwtSecret: process.env.JWT_SECRET || 'dev-secret-key',
-    sessionCookieName: process.env.SESSION_COOKIE_NAME || 'df-session',
-    sessionTimeout: parseInt(process.env.SESSION_TIMEOUT || '3600', 10), // 1 hour default
-    auditLoggingEnabled: process.env.AUDIT_LOGGING === 'true' || isDevelopment
-  }
+  return request.headers.get('x-real-ip') || 
+         request.headers.get('x-client-ip') || 
+         'unknown';
 }
 
 /**
- * Checks if current environment supports edge runtime features
- * Ensures compatibility with Next.js middleware constraints
- * 
- * @returns Boolean indicating edge runtime support
+ * Checks if request is for API endpoint
  */
-export function isEdgeRuntimeSupported(): boolean {
-  // Edge runtime detection based on available APIs
-  return typeof EdgeRuntime !== 'undefined' || 
-         (typeof globalThis !== 'undefined' && 'EdgeRuntime' in globalThis)
+export function isAPIRequest(request: NextRequest): boolean {
+  return request.nextUrl.pathname.startsWith('/api/');
 }
 
 /**
- * Gets environment-specific API endpoints
- * Provides dynamic endpoint configuration based on environment
- * 
- * @returns API endpoint configuration
+ * Checks if request is for static assets
  */
-export function getAPIEndpoints(): {
-  auth: string
-  session: string
-  user: string
-  system: string
-} {
-  const config = getEnvironmentConfig()
-  const baseUrl = config.dreamfactoryUrl
+export function isStaticAsset(request: NextRequest): boolean {
+  const { pathname } = request.nextUrl;
+  return pathname.startsWith('/_next/') ||
+         pathname.startsWith('/static/') ||
+         pathname.includes('.') && 
+         /\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|pdf)$/.test(pathname);
+}
+
+/**
+ * Checks if request requires authentication
+ */
+export function requiresAuthentication(request: NextRequest): boolean {
+  const { pathname } = request.nextUrl;
   
-  return {
-    auth: `${baseUrl}/api/v2/user/session`,
-    session: `${baseUrl}/api/v2/user/session`,
-    user: `${baseUrl}/api/v2/user`,
-    system: `${baseUrl}/system/api/v2`
-  }
+  // Public routes that don't require authentication
+  const publicRoutes = [
+    '/login',
+    '/logout',
+    '/saml-callback',
+    '/forgot-password',
+    '/password-reset',
+    '/api/auth/',
+    '/api/health'
+  ];
+  
+  return !publicRoutes.some(route => pathname.startsWith(route)) &&
+         !isStaticAsset(request);
 }
 
-// =============================================================================
-// REQUEST PROCESSING UTILITIES
-// =============================================================================
-
 /**
- * Creates standardized error response for middleware
- * Provides consistent error handling across authentication flows
- * 
- * @param error - Error message
- * @param status - HTTP status code
- * @param auditData - Optional audit information
- * @returns NextResponse with error details
+ * Creates standardized error response
  */
 export function createErrorResponse(
-  error: string,
-  status: number = 401,
-  auditData?: { event: string; userId?: string; sessionId?: string }
+  message: string,
+  statusCode: number = 500,
+  details?: Record<string, any>
 ): NextResponse {
   const response = NextResponse.json(
-    { 
-      error, 
-      timestamp: new Date().toISOString(),
-      status 
+    {
+      error: {
+        message,
+        code: statusCode,
+        timestamp: new Date().toISOString(),
+        ...details
+      }
     },
-    { status }
-  )
+    { status: statusCode }
+  );
   
-  // Add security headers
-  response.headers.set('X-Content-Type-Options', 'nosniff')
-  response.headers.set('X-Frame-Options', 'DENY')
-  
-  return response
+  return applyHeaders(response, { securityHeaders: true });
 }
 
 /**
- * Creates redirect response for authentication
- * Handles login redirects with proper URL preservation
- * 
- * @param request - Original request
- * @param loginUrl - Login page URL
- * @returns NextResponse redirect
+ * Creates successful JSON response
  */
-export function createAuthRedirectResponse(
-  request: NextRequest,
-  loginUrl: string = '/login'
+export function createSuccessResponse<T = any>(
+  data: T,
+  statusCode: number = 200,
+  headers?: Record<string, string>
 ): NextResponse {
-  const url = request.nextUrl.clone()
-  url.pathname = loginUrl
+  const response = NextResponse.json(data, { status: statusCode });
   
-  // Preserve the original URL for post-login redirect
-  const returnUrl = encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search)
-  url.searchParams.set('returnUrl', returnUrl)
+  return applyHeaders(response, { 
+    securityHeaders: true,
+    addHeaders: headers 
+  });
+}
+
+// ============================================================================
+// PERFORMANCE UTILITIES
+// ============================================================================
+
+/**
+ * Creates performance timing marker
+ */
+export function createPerformanceMarker(): {
+  end: () => number;
+} {
+  const start = Date.now();
   
-  const response = NextResponse.redirect(url)
-  
-  // Clear any existing session cookies
-  return clearAuthenticationCookies(response)
+  return {
+    end: () => Date.now() - start
+  };
 }
 
 /**
- * Validates request origin for CSRF protection
- * Implements origin-based security validation
- * 
- * @param request - Next.js request object
- * @returns Boolean indicating if origin is valid
+ * Rate limiting utility for edge runtime
  */
-export function validateRequestOrigin(request: NextRequest): boolean {
-  const origin = request.headers.get('origin')
-  const referer = request.headers.get('referer')
-  const host = request.headers.get('host')
+export class EdgeRateLimiter {
+  private static instances = new Map<string, { count: number; resetTime: number }>();
   
-  // Allow same-origin requests
-  if (origin && host) {
-    const originHost = new URL(origin).host
-    return originHost === host
+  static check(
+    key: string, 
+    limit: number, 
+    windowMs: number = 60000
+  ): { allowed: boolean; remaining: number; resetTime: number } {
+    const now = Date.now();
+    const instance = this.instances.get(key);
+    
+    if (!instance || now > instance.resetTime) {
+      const resetTime = now + windowMs;
+      this.instances.set(key, { count: 1, resetTime });
+      return { allowed: true, remaining: limit - 1, resetTime };
+    }
+    
+    if (instance.count >= limit) {
+      return { allowed: false, remaining: 0, resetTime: instance.resetTime };
+    }
+    
+    instance.count++;
+    return { 
+      allowed: true, 
+      remaining: limit - instance.count, 
+      resetTime: instance.resetTime 
+    };
   }
   
-  // Check referer as fallback
-  if (referer && host) {
-    const refererHost = new URL(referer).host
-    return refererHost === host
-  }
-  
-  // Allow requests without origin/referer in development
-  const config = getEnvironmentConfig()
-  return config.isDevelopment
-}
-
-/**
- * Rate limiting utility for middleware
- * Simple in-memory rate limiting for development
- * 
- * @param identifier - Unique identifier (IP, user ID, etc.)
- * @param maxRequests - Maximum requests allowed
- * @param windowMs - Time window in milliseconds
- * @returns Boolean indicating if request is allowed
- */
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
-
-export function checkRateLimit(
-  identifier: string,
-  maxRequests: number = 100,
-  windowMs: number = 60000 // 1 minute
-): { allowed: boolean; remaining: number; resetTime: number } {
-  const now = Date.now()
-  const key = identifier
-  
-  // Clean up expired entries
-  if (rateLimitStore.size > 1000) {
-    for (const [k, v] of rateLimitStore.entries()) {
-      if (v.resetTime <= now) {
-        rateLimitStore.delete(k)
+  static cleanup(): void {
+    const now = Date.now();
+    for (const [key, instance] of this.instances.entries()) {
+      if (now > instance.resetTime) {
+        this.instances.delete(key);
       }
     }
   }
-  
-  const entry = rateLimitStore.get(key)
-  
-  if (!entry || entry.resetTime <= now) {
-    // First request or window expired
-    const resetTime = now + windowMs
-    rateLimitStore.set(key, { count: 1, resetTime })
-    return { allowed: true, remaining: maxRequests - 1, resetTime }
-  }
-  
-  if (entry.count >= maxRequests) {
-    // Rate limit exceeded
-    return { allowed: false, remaining: 0, resetTime: entry.resetTime }
-  }
-  
-  // Increment count
-  entry.count++
-  rateLimitStore.set(key, entry)
-  
-  return { 
-    allowed: true, 
-    remaining: maxRequests - entry.count, 
-    resetTime: entry.resetTime 
-  }
 }
+
+// ============================================================================
+// EXPORT ALL UTILITIES
+// ============================================================================
+
+export default {
+  // JWT utilities
+  validateJWTStructure,
+  parseJWTPayload,
+  isTokenExpired,
+  tokenNeedsRefresh,
+  extractToken,
+  validateSessionToken,
+  
+  // Header utilities
+  SECURITY_HEADERS,
+  CORS_HEADERS,
+  applyHeaders,
+  createAPIHeaders,
+  extractDFHeaders,
+  
+  // Case transformation
+  camelToSnake,
+  snakeToCamel,
+  transformKeysToSnakeCase,
+  transformKeysToCamelCase,
+  transformRequestBody,
+  
+  // Session management
+  SESSION_COOKIE_CONFIG,
+  setSessionCookie,
+  clearSessionCookie,
+  createAuthRedirect,
+  validateSessionMiddleware,
+  
+  // Logging and audit
+  createAuditLogEntry,
+  logAuditEntry,
+  logAuthEvent,
+  logAPIAccess,
+  
+  // Environment detection
+  getEnvironmentInfo,
+  shouldEnableMSW,
+  getAPIBaseURL,
+  isDevelopmentMode,
+  isProductionMode,
+  
+  // Request processing
+  getClientIP,
+  isAPIRequest,
+  isStaticAsset,
+  requiresAuthentication,
+  createErrorResponse,
+  createSuccessResponse,
+  
+  // Performance
+  createPerformanceMarker,
+  EdgeRateLimiter
+};
