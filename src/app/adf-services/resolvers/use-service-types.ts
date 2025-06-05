@@ -1,343 +1,338 @@
-/**
- * React Query-based Service Types Hook for DreamFactory Admin Interface
- * 
- * This hook replaces the Angular serviceTypesResolver by implementing parallel queries
- * for multiple groups using React Query's useQueries, with TTL configuration 
- * (staleTime: 300s, cacheTime: 900s) for optimal performance.
- * 
- * Supports both filtered group-based requests and unfiltered requests, maintaining
- * the same data fetching logic as the original Angular resolver.
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- */
+'use client';
 
-import { useQueries, useQuery, UseQueryResult } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
-import type { ServiceTypeDefinition } from '@/types/services';
-import type { ApiListResponse } from '@/types/api';
-
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
+import { useQuery, useQueries } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useApi } from '../../../hooks/use-api';
+import type { ServiceType } from '../../../types/services';
+import type { ApiListResponse } from '../../../types/api';
 
 /**
- * Cache configuration per Section 5.2 Schema Discovery Component requirements
- * - staleTime: 300 seconds (5 minutes) - data considered fresh for 5 minutes
- * - cacheTime: 900 seconds (15 minutes) - data kept in cache for 15 minutes
+ * Configuration options for service types query
  */
-const CACHE_CONFIG = {
-  staleTime: 5 * 60 * 1000,  // 300 seconds
-  cacheTime: 15 * 60 * 1000, // 900 seconds (React Query v4 compatible)
-} as const;
-
-/**
- * Query key factory for service types
- * Ensures consistent cache management across the application
- */
-export const serviceTypeQueryKeys = {
-  all: ['service-types'] as const,
-  lists: () => [...serviceTypeQueryKeys.all, 'list'] as const,
-  byGroup: (group: string) => [...serviceTypeQueryKeys.lists(), 'group', group] as const,
-  allGroups: (groups: string[]) => [...serviceTypeQueryKeys.lists(), 'groups', groups.sort()] as const,
-} as const;
-
-// ============================================================================
-// TYPES AND INTERFACES
-// ============================================================================
-
-/**
- * Service types hook parameters
- */
-export interface UseServiceTypesParams {
-  /**
-   * Optional array of groups to filter service types
-   * When provided, parallel queries are executed for each group
-   */
+export interface UseServiceTypesOptions {
+  /** Array of service type groups to filter by */
   groups?: string[];
-  
-  /**
-   * Whether the query should be enabled
-   * @default true
-   */
+  /** Whether to enable the query (default: true) */
   enabled?: boolean;
-  
-  /**
-   * Additional query options to override defaults
-   */
-  queryOptions?: {
-    staleTime?: number;
-    cacheTime?: number;
-    refetchOnMount?: boolean;
-    refetchOnWindowFocus?: boolean;
-    refetchOnReconnect?: boolean;
-  };
+  /** Custom stale time in milliseconds (default: 300000 - 5 minutes) */
+  staleTime?: number;
+  /** Custom cache time in milliseconds (default: 900000 - 15 minutes) */
+  cacheTime?: number;
+  /** Custom select function to transform data */
+  select?: (data: ServiceType[]) => any;
+  /** Whether to refetch on window focus (default: false) */
+  refetchOnWindowFocus?: boolean;
+  /** Background refetch interval in milliseconds */
+  refetchInterval?: number;
 }
 
 /**
- * Service types hook return type
- */
-export interface UseServiceTypesResult {
-  /**
-   * Array of service type definitions
-   */
-  data: ServiceTypeDefinition[] | undefined;
-  
-  /**
-   * Loading state - true when any query is loading
-   */
-  isLoading: boolean;
-  
-  /**
-   * Error state - contains error if any query failed
-   */
-  error: Error | null;
-  
-  /**
-   * Success state - true when all queries have succeeded
-   */
-  isSuccess: boolean;
-  
-  /**
-   * Fetching state - true when any query is fetching (including background refetch)
-   */
-  isFetching: boolean;
-  
-  /**
-   * Refetch function to manually trigger data refresh
-   */
-  refetch: () => void;
-}
-
-// ============================================================================
-// API FUNCTIONS
-// ============================================================================
-
-/**
- * Fetches service types from DreamFactory API
- * Maintains compatibility with existing backend endpoints
- */
-async function fetchServiceTypes(): Promise<ServiceTypeDefinition[]> {
-  try {
-    const response = await apiClient.get('/system/service_type');
-    const listResponse = response as ApiListResponse<ServiceTypeDefinition>;
-    return listResponse.resource || [];
-  } catch (error) {
-    console.error('Failed to fetch service types:', error);
-    throw new Error('Failed to fetch service types');
-  }
-}
-
-/**
- * Fetches service types filtered by group
- * Uses DreamFactory's group filtering capability
- */
-async function fetchServiceTypesByGroup(group: string): Promise<ServiceTypeDefinition[]> {
-  try {
-    const response = await apiClient.get('/system/service_type', {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    // Add group parameter via URL search params since apiClient.get doesn't support params yet
-    const url = new URL(`/system/service_type`, window.location.origin);
-    url.searchParams.set('group', group);
-    
-    const groupResponse = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!groupResponse.ok) {
-      throw new Error(`Failed to fetch service types for group ${group}: ${groupResponse.statusText}`);
-    }
-    
-    const listResponse = await groupResponse.json() as ApiListResponse<ServiceTypeDefinition>;
-    return listResponse.resource || [];
-  } catch (error) {
-    console.error(`Failed to fetch service types for group ${group}:`, error);
-    throw new Error(`Failed to fetch service types for group ${group}`);
-  }
-}
-
-// ============================================================================
-// REACT QUERY HOOKS
-// ============================================================================
-
-/**
- * React Query hook for fetching service types with intelligent caching
+ * React Query-based custom hook that fetches ServiceType entities with intelligent caching.
  * 
- * Replaces the Angular serviceTypesResolver by implementing:
- * - Parallel queries for multiple groups using React Query's useQueries
- * - Single query for unfiltered requests
- * - TTL configuration (staleTime: 300s, cacheTime: 900s)
+ * This hook replaces the Angular serviceTypesResolver by implementing parallel queries for 
+ * multiple groups using React Query's useQueries, with TTL configuration for optimal performance.
+ * Supports both filtered group-based requests and unfiltered requests, maintaining the same 
+ * data fetching logic as the original resolver.
+ * 
+ * Features:
+ * - React Query-powered service management with intelligent caching
  * - Cache hit responses under 50ms per React/Next.js Integration Requirements
+ * - TanStack React Query 5.79.2 for complex server-state management
+ * - Database Service Management feature F-001 requiring service type enumeration
+ * - TTL configuration with staleTime: 300 seconds and cacheTime: 900 seconds
+ * - Parallel query execution for multiple groups with automatic data flattening
+ * - Support for optional group filtering with React Query select functions
  * 
- * @param params - Hook parameters including optional groups array
- * @returns Service types data with loading states and error handling
+ * @param options - Configuration options for the service types query
+ * @returns Query result with service types data, loading states, and error handling
  * 
  * @example
- * ```typescript
- * // Fetch all service types
- * const { data, isLoading, error } = useServiceTypes();
+ * // Basic usage - fetch all service types
+ * const { data: serviceTypes, isLoading, error } = useServiceTypes();
  * 
- * // Fetch service types for specific groups
- * const { data, isLoading, error } = useServiceTypes({
- *   groups: ['Database', 'Remote Service']
+ * @example
+ * // Filtered usage - fetch specific groups
+ * const { data: databaseServices } = useServiceTypes({ 
+ *   groups: ['database', 'cache'] 
  * });
  * 
- * // With custom options
- * const { data, isLoading, error } = useServiceTypes({
- *   groups: ['Database'],
- *   enabled: isAuthenticated,
- *   queryOptions: {
- *     staleTime: 10 * 60 * 1000 // 10 minutes
- *   }
+ * @example
+ * // Custom configuration with data transformation
+ * const { data: serviceNames } = useServiceTypes({
+ *   groups: ['database'],
+ *   select: (types) => types.map(type => type.name),
+ *   staleTime: 10 * 60 * 1000, // 10 minutes
  * });
- * ```
  */
-export function useServiceTypes(params: UseServiceTypesParams = {}): UseServiceTypesResult {
+export function useServiceTypes(options: UseServiceTypesOptions = {}) {
   const {
     groups,
     enabled = true,
-    queryOptions = {},
-  } = params;
+    staleTime = 300000, // 5 minutes (300 seconds)
+    cacheTime = 900000, // 15 minutes (900 seconds)
+    select,
+    refetchOnWindowFocus = false,
+    refetchInterval,
+  } = options;
 
-  // Merge user options with default cache configuration
-  const mergedOptions = {
-    ...CACHE_CONFIG,
-    ...queryOptions,
-    enabled,
-    // Performance optimizations per React/Next.js Integration Requirements
-    refetchOnMount: queryOptions.refetchOnMount ?? false,
-    refetchOnWindowFocus: queryOptions.refetchOnWindowFocus ?? false,
-    refetchOnReconnect: queryOptions.refetchOnReconnect ?? true,
-  };
+  // Initialize API client for service type endpoints
+  const api = useApi('/api/v2/system');
 
-  // Use parallel queries for multiple groups (equivalent to Angular's forkJoin)
+  // Memoize query keys to prevent unnecessary re-renders
+  const queryKeys = useMemo(() => {
+    if (groups && groups.length > 0) {
+      // Create separate query keys for each group
+      return groups.map(group => [
+        'service-types',
+        'group',
+        group,
+        { additionalParams: [{ key: 'group', value: group }] }
+      ]);
+    }
+    // Single query key for unfiltered request
+    return [['service-types', 'all', {}]];
+  }, [groups]);
+
+  // Handle multiple group queries using useQueries for parallel execution
   const groupQueries = useQueries({
-    queries: groups?.map((group) => ({
-      queryKey: serviceTypeQueryKeys.byGroup(group),
-      queryFn: () => fetchServiceTypesByGroup(group),
-      ...mergedOptions,
-    })) || [],
+    queries: groups && groups.length > 0 ? 
+      queryKeys.map((queryKey, index) => ({
+        queryKey,
+        queryFn: () => api.apiRequest<ApiListResponse<ServiceType>>(
+          '/service_type',
+          {
+            method: 'GET',
+            params: {
+              group: groups[index]
+            }
+          },
+          {
+            snackbarError: 'server',
+            includeAuth: true,
+          }
+        ),
+        enabled,
+        staleTime,
+        cacheTime,
+        refetchOnWindowFocus,
+        refetchInterval,
+        retry: 3,
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      })) : [],
   });
 
-  // Use single query for unfiltered request
-  const allTypesQuery = useQuery({
-    queryKey: serviceTypeQueryKeys.lists(),
-    queryFn: fetchServiceTypes,
-    ...mergedOptions,
-    enabled: enabled && !groups, // Only enabled when no groups specified
+  // Handle single unfiltered query
+  const singleQuery = useQuery({
+    queryKey: queryKeys[0],
+    queryFn: () => api.apiRequest<ApiListResponse<ServiceType>>(
+      '/service_type',
+      {
+        method: 'GET',
+      },
+      {
+        snackbarError: 'server',
+        includeAuth: true,
+      }
+    ),
+    enabled: enabled && (!groups || groups.length === 0),
+    staleTime,
+    cacheTime,
+    refetchOnWindowFocus,
+    refetchInterval,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-  // Handle parallel group queries results
-  if (groups && groups.length > 0) {
-    const isLoading = groupQueries.some(query => query.isLoading);
-    const isFetching = groupQueries.some(query => query.isFetching);
-    const isSuccess = groupQueries.every(query => query.isSuccess);
-    const error = groupQueries.find(query => query.error)?.error || null;
+  // Process and flatten results from multiple group queries
+  const processedResult = useMemo(() => {
+    if (groups && groups.length > 0) {
+      // Handle multiple group queries
+      const allLoading = groupQueries.some(query => query.isLoading);
+      const allErrors = groupQueries.map(query => query.error).filter(Boolean);
+      const hasError = allErrors.length > 0;
+      
+      // Flatten and combine data from all group queries
+      const flattenedData = groupQueries
+        .map(query => query.data?.resource || [])
+        .flat();
 
-    // Flatten results from all group queries (equivalent to Angular's map().flat())
-    const data = isSuccess 
-      ? groupQueries.map(query => query.data || []).flat()
-      : undefined;
+      // Apply custom select function if provided
+      const selectedData = select ? select(flattenedData) : flattenedData;
 
-    const refetch = () => {
-      groupQueries.forEach(query => query.refetch());
-    };
+      return {
+        data: selectedData,
+        isLoading: allLoading,
+        error: hasError ? allErrors[0] : null,
+        isError: hasError,
+        isSuccess: !allLoading && !hasError && groupQueries.every(query => query.isSuccess),
+        isFetching: groupQueries.some(query => query.isFetching),
+        isStale: groupQueries.some(query => query.isStale),
+        dataUpdatedAt: Math.max(...groupQueries.map(query => query.dataUpdatedAt || 0)),
+        errorUpdatedAt: Math.max(...groupQueries.map(query => query.errorUpdatedAt || 0)),
+        refetch: () => Promise.all(groupQueries.map(query => query.refetch())),
+        remove: () => groupQueries.forEach(query => query.remove()),
+      };
+    } else {
+      // Handle single unfiltered query
+      const selectedData = select && singleQuery.data?.resource ? 
+        select(singleQuery.data.resource) : 
+        singleQuery.data?.resource;
 
-    return {
-      data,
-      isLoading,
-      error: error as Error | null,
-      isSuccess,
-      isFetching,
-      refetch,
-    };
-  }
+      return {
+        data: selectedData,
+        isLoading: singleQuery.isLoading,
+        error: singleQuery.error,
+        isError: singleQuery.isError,
+        isSuccess: singleQuery.isSuccess,
+        isFetching: singleQuery.isFetching,
+        isStale: singleQuery.isStale,
+        dataUpdatedAt: singleQuery.dataUpdatedAt,
+        errorUpdatedAt: singleQuery.errorUpdatedAt,
+        refetch: singleQuery.refetch,
+        remove: singleQuery.remove,
+      };
+    }
+  }, [groups, groupQueries, singleQuery, select]);
 
-  // Handle single query results
+  // Additional query metadata for debugging and monitoring
+  const queryMetadata = useMemo(() => ({
+    // Query configuration
+    config: {
+      groups,
+      enabled,
+      staleTime,
+      cacheTime,
+      hasSelect: !!select,
+      refetchOnWindowFocus,
+      refetchInterval,
+    },
+    // Query statistics
+    stats: {
+      queryCount: groups && groups.length > 0 ? groups.length : 1,
+      totalQueries: groups && groups.length > 0 ? groupQueries.length : 1,
+      cacheHits: groups && groups.length > 0 ? 
+        groupQueries.filter(query => query.status === 'success' && !query.isFetching).length : 
+        (singleQuery.status === 'success' && !singleQuery.isFetching ? 1 : 0),
+      errors: groups && groups.length > 0 ? 
+        groupQueries.filter(query => query.isError).length : 
+        (singleQuery.isError ? 1 : 0),
+    },
+    // Cache status
+    cache: {
+      isStale: processedResult.isStale,
+      lastUpdate: new Date(processedResult.dataUpdatedAt || 0).toISOString(),
+      nextRefresh: processedResult.dataUpdatedAt ? 
+        new Date(processedResult.dataUpdatedAt + staleTime).toISOString() : null,
+    },
+  }), [
+    groups, enabled, staleTime, cacheTime, select, refetchOnWindowFocus, refetchInterval,
+    groupQueries, singleQuery, processedResult.isStale, processedResult.dataUpdatedAt
+  ]);
+
   return {
-    data: allTypesQuery.data,
-    isLoading: allTypesQuery.isLoading,
-    error: allTypesQuery.error as Error | null,
-    isSuccess: allTypesQuery.isSuccess,
-    isFetching: allTypesQuery.isFetching,
-    refetch: allTypesQuery.refetch,
+    ...processedResult,
+    // Additional metadata for debugging and monitoring
+    _metadata: queryMetadata,
   };
 }
 
-// ============================================================================
-// QUERY KEY UTILITIES
-// ============================================================================
-
 /**
- * Utility function to invalidate service types cache
- * Useful for cache management after mutations
+ * Factory function to create a pre-configured service types hook for specific groups
+ * 
+ * @param defaultGroups - Default groups to filter by
+ * @param defaultOptions - Default configuration options
+ * @returns Configured hook function
+ * 
+ * @example
+ * // Create a specialized hook for database services
+ * const useDatabaseServiceTypes = createServiceTypesHook(['database', 'cache']);
+ * 
+ * // Use the specialized hook
+ * const { data: dbTypes } = useDatabaseServiceTypes();
  */
-export function invalidateServiceTypesCache(queryClient: any, groups?: string[]) {
-  if (groups) {
-    groups.forEach(group => {
-      queryClient.invalidateQueries({
-        queryKey: serviceTypeQueryKeys.byGroup(group),
-      });
-    });
-  } else {
-    queryClient.invalidateQueries({
-      queryKey: serviceTypeQueryKeys.all,
-    });
-  }
-}
-
-/**
- * Utility function to prefetch service types
- * Useful for optimistic loading before navigation
- */
-export async function prefetchServiceTypes(
-  queryClient: any, 
-  groups?: string[]
-): Promise<void> {
-  const options = {
-    ...CACHE_CONFIG,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  };
-
-  if (groups && groups.length > 0) {
-    await Promise.all(
-      groups.map(group =>
-        queryClient.prefetchQuery({
-          queryKey: serviceTypeQueryKeys.byGroup(group),
-          queryFn: () => fetchServiceTypesByGroup(group),
-          ...options,
-        })
-      )
-    );
-  } else {
-    await queryClient.prefetchQuery({
-      queryKey: serviceTypeQueryKeys.lists(),
-      queryFn: fetchServiceTypes,
+export function createServiceTypesHook(
+  defaultGroups?: string[],
+  defaultOptions?: Partial<UseServiceTypesOptions>
+) {
+  return function useSpecializedServiceTypes(options: UseServiceTypesOptions = {}) {
+    return useServiceTypes({
+      groups: defaultGroups,
+      ...defaultOptions,
       ...options,
+      // Merge groups if both default and options specify them
+      groups: options.groups || defaultGroups,
     });
-  }
+  };
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+/**
+ * Pre-configured hooks for common service type groups
+ */
 
+/** Hook for database service types only */
+export const useDatabaseServiceTypes = createServiceTypesHook(['database']);
+
+/** Hook for authentication service types only */
+export const useAuthServiceTypes = createServiceTypesHook(['oauth', 'ldap', 'saml']);
+
+/** Hook for file service types only */
+export const useFileServiceTypes = createServiceTypesHook(['file']);
+
+/** Hook for email service types only */
+export const useEmailServiceTypes = createServiceTypesHook(['email']);
+
+/**
+ * Type definitions for hook return value
+ */
+export type UseServiceTypesResult<T = ServiceType[]> = {
+  /** Service types data (flattened array from all groups) */
+  data: T | undefined;
+  /** Whether any query is currently loading */
+  isLoading: boolean;
+  /** First error encountered from any query */
+  error: Error | null;
+  /** Whether any query has an error */
+  isError: boolean;
+  /** Whether all queries are successful */
+  isSuccess: boolean;
+  /** Whether any query is currently fetching */
+  isFetching: boolean;
+  /** Whether any query has stale data */
+  isStale: boolean;
+  /** Timestamp of most recent successful data update */
+  dataUpdatedAt: number;
+  /** Timestamp of most recent error */
+  errorUpdatedAt: number;
+  /** Refetch all queries */
+  refetch: () => Promise<any>;
+  /** Remove all queries from cache */
+  remove: () => void;
+  /** Query metadata for debugging and monitoring */
+  _metadata: {
+    config: {
+      groups?: string[];
+      enabled: boolean;
+      staleTime: number;
+      cacheTime: number;
+      hasSelect: boolean;
+      refetchOnWindowFocus: boolean;
+      refetchInterval?: number;
+    };
+    stats: {
+      queryCount: number;
+      totalQueries: number;
+      cacheHits: number;
+      errors: number;
+    };
+    cache: {
+      isStale: boolean;
+      lastUpdate: string;
+      nextRefresh: string | null;
+    };
+  };
+};
+
+/**
+ * Default export for convenience
+ */
 export default useServiceTypes;
-
-export type {
-  UseServiceTypesParams,
-  UseServiceTypesResult,
-};
-
-export {
-  serviceTypeQueryKeys,
-  fetchServiceTypes,
-  fetchServiceTypesByGroup,
-};
