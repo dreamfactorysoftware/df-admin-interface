@@ -1,26 +1,24 @@
 # See http://help.github.com/ignore-files/ for more about ignoring files.
 
-# Next.js build output
-/.next/
-/dist/
-/out/
-/.swc/
-
 # Compiled output
+/dist
+/.next
 /tmp
+/build
+/out
 
 # Node
 /node_modules
 npm-debug.log
 yarn-error.log
 pnpm-debug.log
-
-# Package manager cache and locks
 .pnpm-store/
-.yarn/cache/
-.yarn/unplugged/
-.yarn/build-state.yml
-.yarn/install-state.gz
+
+# Package managers
+/.pnpm-store
+/.pnpm-debug.log
+/.npm
+/.yarn
 
 # IDEs and editors
 .idea/
@@ -40,40 +38,42 @@ pnpm-debug.log
 .history/*
 
 # Testing
-/coverage/
+/coverage
+/test-results
+/playwright-report
 /test-results/
-/playwright-report/
-/test-output/
-vitest-coverage/
-.vitest/
+/.vitest-cache/
+vitest.config.ts.timestamp*
 
-# Environment files
-.env.local
-.env.production
-.env.staging
-.env.development
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+.vercel
+.turbo/
 
 # Tailwind CSS
-/src/styles/tailwind.css.map
-/.tailwindcss-cache/
+/src/styles/tailwind.output.css
 
-# Turbopack and PostCSS generated files
-.turbo/
-.postcssrc.cache
+# PostCSS
+.postcssrc.js.timestamp*
 
-# Next.js generated files
-.next/
-.vercel/
-.netlify/
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Miscellaneous
 /connect.lock
 /libpeerconnection.log
+/typings
 
 # System files
 .DS_Store
 Thumbs.db
 
-# Assets that shouldn't be formatted
-/src/assets/*
-/public/assets/*
+# Static assets
+/public/uploads/*
+/src/assets/i18n/*
