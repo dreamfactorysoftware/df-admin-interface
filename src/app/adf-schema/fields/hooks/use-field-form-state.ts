@@ -1,637 +1,722 @@
 /**
- * @fileoverview Custom React hook for managing dynamic field form state and control logic.
- * Provides comprehensive form state management with automatic field configuration updates
- * based on field type selections and relationships. Implements complex form control 
- * enabling/disabling patterns migrated from Angular reactive forms to React Hook Form.
+ * Field Form State Management Hook for React/Next.js DreamFactory Admin Interface
  * 
- * @version 1.0.0
- * @created 2024-12-28
+ * Custom React hook managing dynamic form field state and control enabling/disabling 
+ * logic based on field type selections and relationships. Implements the complex form 
+ * control management patterns from the Angular component using React state management 
+ * with automatic field configuration updates.
  * 
- * Key Features:
+ * Features:
  * - Dynamic form field management per existing Angular reactive form patterns
- * - Real-time form state updates under 100ms per React/Next.js Integration Requirements  
+ * - Real-time form state updates under 100ms per React/Next.js Integration Requirements
  * - Type-safe form state management per Section 5.2 Component Details
  * - React Hook Form integration for optimal performance per React/Next.js Integration Requirements
- * - Automatic field configuration based on type selection and relationships
- * - Conditional field visibility and validation management
- * - Foreign key relationship handling with dependent field updates
+ * - Conditional field visibility based on field type and relationship selections
+ * - Automatic form control updates when field properties change
+ * - Support for complex field configurations (picklist, virtual fields, foreign keys)
+ * 
+ * @fileoverview Field form state management hook for database schema field configuration
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useWatch, type UseFormReturn, type FieldPath } from 'react-hook-form'
-import type { 
-  FieldFormData, 
-  DreamFactoryFieldType,
-  DatabaseSchemaFieldType 
-} from '../field.types'
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useForm, useWatch, type UseFormReturn } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
-/**
- * Configuration options for field form state management
- */
-interface FieldFormStateOptions {
-  /** Whether to enable automatic type-based field configuration */
-  enableAutoConfiguration?: boolean
-  /** Whether to enable real-time validation updates */
-  enableRealtimeValidation?: boolean
-  /** Performance mode for faster updates */
-  performanceMode?: 'standard' | 'fast' | 'ultra'
-  /** Maximum update delay in milliseconds */
-  maxUpdateDelay?: number
-}
+// Import field types and validation schemas
+import type {
+  DatabaseSchemaFieldType,
+  FieldFormData,
+  FieldDataType,
+  TableReference,
+  FieldDbFunctionFormData,
+  FunctionUseOperation,
+  ReferentialAction
+} from '../field.types';
+import {
+  FieldFormDataSchema,
+  DEFAULT_FIELD_CONFIG,
+  FIELD_TYPE_OPTIONS
+} from '../field.types';
 
-/**
- * Field configuration state interface for dynamic control management
- */
-interface FieldConfigState {
-  /** Whether the field is enabled/disabled */
-  enabled: boolean
-  /** Whether the field is visible in the form */
-  visible: boolean
-  /** Whether the field is required */
-  required: boolean
-  /** Default value when field becomes enabled */
-  defaultValue?: any
-}
+// =============================================================================
+// HOOK CONFIGURATION TYPES
+// =============================================================================
 
 /**
- * Field configuration map for all form fields
+ * Configuration options for the field form state hook
  */
-interface FieldConfigMap {
-  alias: FieldConfigState
-  label: FieldConfigState
-  description: FieldConfigState
-  type: FieldConfigState
-  dbType: FieldConfigState
-  length: FieldConfigState
-  precision: FieldConfigState
-  scale: FieldConfigState
-  fixedLength: FieldConfigState
-  supportsMultibyte: FieldConfigState
-  allowNull: FieldConfigState
-  autoIncrement: FieldConfigState
-  default: FieldConfigState
-  isAggregate: FieldConfigState
-  isForeignKey: FieldConfigState
-  isPrimaryKey: FieldConfigState
-  isUnique: FieldConfigState
-  isVirtual: FieldConfigState
-  required: FieldConfigState
-  refTable: FieldConfigState
-  refField: FieldConfigState
-  refOnDelete: FieldConfigState
-  refOnUpdate: FieldConfigState
-  picklist: FieldConfigState
-  validation: FieldConfigState
-  dbFunction: FieldConfigState
+export interface UseFieldFormStateConfig {
+  /** Initial field data for editing (null for new fields) */
+  initialField?: DatabaseSchemaFieldType | null;
+  /** Available reference tables for foreign key configuration */
+  referenceTables?: TableReference[];
+  /** Database type for type-specific features */
+  databaseType?: string;
+  /** Enable real-time validation (default: true) */
+  realTimeValidation?: boolean;
+  /** Validation debounce delay in milliseconds (default: 100) */
+  validationDebounce?: number;
+  /** Form submission handler */
+  onSubmit?: (data: FieldFormData) => Promise<void>;
+  /** Form cancellation handler */
+  onCancel?: () => void;
 }
 
 /**
  * Return type for the field form state hook
  */
-interface UseFieldFormStateReturn {
-  /** Current field configuration map */
-  fieldConfig: FieldConfigMap
-  /** Function to check if a field is enabled */
-  isFieldEnabled: (fieldName: keyof FieldFormData) => boolean
-  /** Function to check if a field is visible */
-  isFieldVisible: (fieldName: keyof FieldFormData) => boolean
-  /** Function to check if a field is required */
-  isFieldRequired: (fieldName: keyof FieldFormData) => boolean
-  /** Function to get default value for a field */
-  getFieldDefaultValue: (fieldName: keyof FieldFormData) => any
-  /** Function to update field configuration */
-  updateFieldConfig: (fieldName: keyof FieldFormData, config: Partial<FieldConfigState>) => void
-  /** Function to reset field configuration to defaults */
-  resetFieldConfig: () => void
-  /** Function to apply field type configuration */
-  applyTypeConfiguration: (type: DreamFactoryFieldType) => void
-  /** Function to handle virtual field toggle */
-  handleVirtualToggle: (isVirtual: boolean) => void
-  /** Function to handle foreign key toggle */
-  handleForeignKeyToggle: (isForeignKey: boolean) => void
-  /** Current performance metrics */
-  performanceMetrics: {
-    lastUpdateTime: number
-    updateCount: number
-    averageUpdateTime: number
-  }
+export interface UseFieldFormStateReturn {
+  /** React Hook Form methods and state */
+  form: UseFormReturn<FieldFormData>;
+  /** Current form values with real-time updates */
+  formValues: FieldFormData;
+  /** Dynamic field visibility and enabling state */
+  fieldState: FieldControlState;
+  /** Field control helper functions */
+  controls: FieldControlHelpers;
+  /** Form submission state */
+  submission: SubmissionState;
+  /** Field configuration utilities */
+  utils: FieldFormUtilities;
 }
 
 /**
- * Type dropdown menu options available for field selection
- * Migrated from Angular component constant
+ * Dynamic field control state interface
+ * Manages which form controls are visible and enabled
  */
-const TYPE_DROPDOWN_OPTIONS = [
-  'I will manually enter a type',
-  'id',
-  'string',
-  'integer',
-  'text',
-  'boolean',
-  'binary',
-  'float',
-  'double',
-  'decimal',
-  'datetime',
-  'date',
-  'time',
-  'reference',
-  'user_id',
-  'user_id_on_create',
-  'user_id_on_update',
-  'timestamp',
-  'timestamp_on_create',
-  'timestamp_on_update',
-] as const
-
-/**
- * Default field configuration state
- */
-const DEFAULT_FIELD_CONFIG: FieldConfigState = {
-  enabled: true,
-  visible: true,
-  required: false,
-  defaultValue: undefined
+export interface FieldControlState {
+  /** Whether manual type input should be shown */
+  showManualType: boolean;
+  /** Whether length field should be enabled */
+  enableLength: boolean;
+  /** Whether precision field should be enabled */
+  enablePrecision: boolean;
+  /** Whether scale field should be enabled */
+  enableScale: boolean;
+  /** Whether picklist configuration should be shown */
+  showPicklist: boolean;
+  /** Whether foreign key configuration should be shown */
+  showForeignKey: boolean;
+  /** Whether default value field should be enabled */
+  enableDefault: boolean;
+  /** Whether validation configuration should be shown */
+  showValidation: boolean;
+  /** Whether database function configuration should be shown */
+  showDbFunctions: boolean;
+  /** Whether auto-increment should be enabled */
+  enableAutoIncrement: boolean;
+  /** Whether allow null should be enabled */
+  enableAllowNull: boolean;
+  /** Whether virtual field options should be shown */
+  showVirtualOptions: boolean;
+  /** Whether constraint options should be enabled */
+  enableConstraints: boolean;
 }
 
 /**
- * Default configuration map for all form fields
+ * Field control helper functions interface
  */
-const DEFAULT_CONFIG_MAP: FieldConfigMap = {
-  alias: { ...DEFAULT_FIELD_CONFIG },
-  label: { ...DEFAULT_FIELD_CONFIG },
-  description: { ...DEFAULT_FIELD_CONFIG },
-  type: { ...DEFAULT_FIELD_CONFIG, required: true },
-  dbType: { ...DEFAULT_FIELD_CONFIG, enabled: false },
-  length: { ...DEFAULT_FIELD_CONFIG, enabled: false },
-  precision: { ...DEFAULT_FIELD_CONFIG, enabled: false },
-  scale: { ...DEFAULT_FIELD_CONFIG, enabled: false, defaultValue: 0 },
-  fixedLength: { ...DEFAULT_FIELD_CONFIG, enabled: false },
-  supportsMultibyte: { ...DEFAULT_FIELD_CONFIG, enabled: false },
-  allowNull: { ...DEFAULT_FIELD_CONFIG },
-  autoIncrement: { ...DEFAULT_FIELD_CONFIG },
-  default: { ...DEFAULT_FIELD_CONFIG },
-  isAggregate: { ...DEFAULT_FIELD_CONFIG, enabled: false },
-  isForeignKey: { ...DEFAULT_FIELD_CONFIG },
-  isPrimaryKey: { ...DEFAULT_FIELD_CONFIG, enabled: false },
-  isUnique: { ...DEFAULT_FIELD_CONFIG },
-  isVirtual: { ...DEFAULT_FIELD_CONFIG },
-  required: { ...DEFAULT_FIELD_CONFIG },
-  refTable: { ...DEFAULT_FIELD_CONFIG, enabled: false },
-  refField: { ...DEFAULT_FIELD_CONFIG, enabled: false },
-  refOnDelete: { ...DEFAULT_FIELD_CONFIG, enabled: false },
-  refOnUpdate: { ...DEFAULT_FIELD_CONFIG, enabled: false },
-  picklist: { ...DEFAULT_FIELD_CONFIG, visible: false },
-  validation: { ...DEFAULT_FIELD_CONFIG },
-  dbFunction: { ...DEFAULT_FIELD_CONFIG }
+export interface FieldControlHelpers {
+  /** Add a new database function configuration */
+  addDbFunction: () => void;
+  /** Remove a database function configuration by index */
+  removeDbFunction: (index: number) => void;
+  /** Update picklist values from CSV string */
+  updatePicklistFromCsv: (csvValues: string) => void;
+  /** Update picklist values from JSON array */
+  updatePicklistFromJson: (jsonValues: string[]) => void;
+  /** Reset form to initial state */
+  resetForm: () => void;
+  /** Set field type and update dependent controls */
+  setFieldType: (type: FieldDataType | 'manual') => void;
+  /** Toggle virtual field mode */
+  toggleVirtual: (enabled: boolean) => void;
+  /** Toggle foreign key mode */
+  toggleForeignKey: (enabled: boolean) => void;
+  /** Validate field name uniqueness */
+  validateFieldName: (name: string) => Promise<boolean>;
 }
 
 /**
- * Custom hook for managing dynamic field form state and control logic.
- * Implements all Angular reactive form patterns for field configuration management.
+ * Form submission state interface
+ */
+export interface SubmissionState {
+  /** Whether form is currently being submitted */
+  isSubmitting: boolean;
+  /** Submission error if any */
+  error: string | null;
+  /** Whether form has been successfully submitted */
+  isSuccess: boolean;
+  /** Submit form with validation */
+  submit: () => Promise<void>;
+}
+
+/**
+ * Field form utility functions interface
+ */
+export interface FieldFormUtilities {
+  /** Get field type options for current database */
+  getFieldTypeOptions: () => typeof FIELD_TYPE_OPTIONS;
+  /** Get available reference tables */
+  getReferenceTableOptions: () => { label: string; value: string }[];
+  /** Get available reference fields for selected table */
+  getReferenceFieldOptions: (tableName: string) => { label: string; value: string }[];
+  /** Check if field type supports length */
+  typeSupportsLength: (type: FieldDataType) => boolean;
+  /** Check if field type supports precision/scale */
+  typeSupportsPrecision: (type: FieldDataType) => boolean;
+  /** Check if field type supports picklist */
+  typeSupportsPicklist: (type: FieldDataType) => boolean;
+  /** Check if field type supports default values */
+  typeSupportsDefault: (type: FieldDataType) => boolean;
+}
+
+// =============================================================================
+// HOOK IMPLEMENTATION
+// =============================================================================
+
+/**
+ * Custom React hook for managing dynamic field form state
  * 
- * @param form - React Hook Form instance
- * @param options - Configuration options for the hook
- * @returns Object containing field configuration state and management functions
+ * Provides comprehensive form state management for database field configuration
+ * including dynamic control enabling/disabling, real-time validation, and
+ * complex field relationship handling.
  * 
- * @example
- * ```typescript
- * const form = useForm<FieldFormData>()
- * const {
- *   fieldConfig,
- *   isFieldEnabled,
- *   isFieldVisible,
- *   applyTypeConfiguration
- * } = useFieldFormState(form)
- * 
- * // Use in component
- * <Input 
- *   disabled={!isFieldEnabled('length')}
- *   style={{ display: isFieldVisible('length') ? 'block' : 'none' }}
- * />
- * ```
+ * @param config - Hook configuration options
+ * @returns Complete field form state management interface
  */
 export function useFieldFormState(
-  form: UseFormReturn<FieldFormData>,
-  options: FieldFormStateOptions = {}
+  config: UseFieldFormStateConfig = {}
 ): UseFieldFormStateReturn {
   const {
-    enableAutoConfiguration = true,
-    enableRealtimeValidation = true,
-    performanceMode = 'standard',
-    maxUpdateDelay = 100
-  } = options
+    initialField = null,
+    referenceTables = [],
+    databaseType = 'mysql',
+    realTimeValidation = true,
+    validationDebounce = 100,
+    onSubmit,
+    onCancel
+  } = config;
 
-  // Performance tracking for monitoring sub-100ms requirement
-  const [performanceMetrics, setPerformanceMetrics] = useState({
-    lastUpdateTime: 0,
-    updateCount: 0,
-    averageUpdateTime: 0
-  })
-
-  // Internal state for field configuration
-  const [fieldConfig, setFieldConfig] = useState<FieldConfigMap>(() => {
-    // Deep clone to prevent mutations
-    return JSON.parse(JSON.stringify(DEFAULT_CONFIG_MAP))
-  })
-
-  // Watch critical form fields for automatic configuration updates
-  const watchedType = useWatch({ 
-    control: form.control, 
-    name: 'type',
-    defaultValue: '' as DreamFactoryFieldType
-  })
-  
-  const watchedIsVirtual = useWatch({ 
-    control: form.control, 
-    name: 'isVirtual',
-    defaultValue: false
-  })
-  
-  const watchedIsForeignKey = useWatch({ 
-    control: form.control, 
-    name: 'isForeignKey',
-    defaultValue: false
-  })
-
-  const watchedRefTable = useWatch({
-    control: form.control,
-    name: 'refTable',
-    defaultValue: null
-  })
+  // =============================================================================
+  // FORM INITIALIZATION
+  // =============================================================================
 
   /**
-   * Performance-optimized update function that tracks timing
+   * Convert initial field data to form data format
    */
-  const performanceUpdate = useCallback((updateFn: () => void) => {
-    const startTime = performance.now()
-    
-    updateFn()
-    
-    const endTime = performance.now()
-    const updateTime = endTime - startTime
-    
-    setPerformanceMetrics(prev => {
-      const newUpdateCount = prev.updateCount + 1
-      const newAverageUpdateTime = 
-        (prev.averageUpdateTime * prev.updateCount + updateTime) / newUpdateCount
-
+  const getInitialFormData = useCallback((): FieldFormData => {
+    if (!initialField) {
       return {
-        lastUpdateTime: updateTime,
-        updateCount: newUpdateCount,
-        averageUpdateTime: newAverageUpdateTime
-      }
-    })
-
-    // Warn if exceeding 100ms requirement
-    if (updateTime > maxUpdateDelay) {
-      console.warn(`Field form state update exceeded ${maxUpdateDelay}ms: ${updateTime.toFixed(2)}ms`)
+        ...DEFAULT_FIELD_CONFIG,
+        name: '',
+        label: '',
+        type: 'string',
+        typeSelection: 'predefined',
+        onDeleteAction: 'RESTRICT',
+        onUpdateAction: 'RESTRICT',
+        dbFunctions: []
+      } as FieldFormData;
     }
-  }, [maxUpdateDelay])
+
+    // Convert database field to form data
+    const formData: FieldFormData = {
+      name: initialField.name,
+      label: initialField.label || initialField.name,
+      alias: initialField.alias || undefined,
+      description: initialField.description || undefined,
+      
+      // Type configuration
+      typeSelection: initialField.dbType && !FIELD_TYPE_OPTIONS.find(opt => opt.value === initialField.type) 
+        ? 'manual' 
+        : 'predefined',
+      type: initialField.type,
+      dbType: initialField.dbType || undefined,
+      manualType: initialField.dbType && !FIELD_TYPE_OPTIONS.find(opt => opt.value === initialField.type) 
+        ? initialField.dbType 
+        : undefined,
+      
+      // Size and precision
+      length: initialField.length || undefined,
+      precision: initialField.precision || undefined,
+      scale: initialField.scale || 0,
+      fixedLength: initialField.fixedLength || false,
+      supportsMultibyte: initialField.supportsMultibyte || false,
+      
+      // Constraints
+      required: initialField.required || false,
+      allowNull: initialField.allowNull !== false, // Default to true if not explicitly false
+      isPrimaryKey: initialField.isPrimaryKey || false,
+      isForeignKey: initialField.isForeignKey || false,
+      isUnique: initialField.isUnique || false,
+      autoIncrement: initialField.autoIncrement || false,
+      isVirtual: initialField.isVirtual || false,
+      isAggregate: initialField.isAggregate || false,
+      
+      // Default value
+      default: initialField.default || undefined,
+      hasDefaultValue: !!initialField.default,
+      
+      // Validation (simplified for form)
+      enableValidation: !!initialField.validation,
+      validationRules: initialField.validation ? {
+        validateOnChange: true,
+        validateOnBlur: true,
+        debounceMs: validationDebounce
+      } : undefined,
+      
+      // Picklist
+      enablePicklist: !!initialField.picklist,
+      picklistType: 'csv' as const,
+      picklistValues: initialField.picklist || undefined,
+      picklistOptions: initialField.picklist ? initialField.picklist.split(',').map(v => v.trim()) : undefined,
+      
+      // Foreign key
+      referenceTable: initialField.refTable || undefined,
+      referenceField: initialField.refField || undefined,
+      onDeleteAction: (initialField.refOnDelete as ReferentialAction) || 'RESTRICT',
+      onUpdateAction: (initialField.refOnUpdate as ReferentialAction) || 'RESTRICT',
+      
+      // Database functions
+      enableDbFunctions: !!initialField.dbFunction && initialField.dbFunction.length > 0,
+      dbFunctions: initialField.dbFunction ? initialField.dbFunction.map((fn, index) => ({
+        id: `fn-${index}`,
+        use: fn.use,
+        function: fn.function,
+        enabled: true
+      })) : []
+    };
+
+    return formData;
+  }, [initialField, validationDebounce]);
+
+  // Initialize React Hook Form with Zod validation
+  const form = useForm<FieldFormData>({
+    resolver: zodResolver(FieldFormDataSchema),
+    defaultValues: getInitialFormData(),
+    mode: realTimeValidation ? 'onChange' : 'onSubmit',
+    reValidateMode: 'onChange',
+    shouldFocusError: true,
+    shouldUnregister: false
+  });
+
+  // Watch form values for real-time updates
+  const formValues = useWatch({ control: form.control });
+
+  // =============================================================================
+  // SUBMISSION STATE MANAGEMENT
+  // =============================================================================
+
+  const [submissionState, setSubmissionState] = useState<{
+    isSubmitting: boolean;
+    error: string | null;
+    isSuccess: boolean;
+  }>({
+    isSubmitting: false,
+    error: null,
+    isSuccess: false
+  });
+
+  // =============================================================================
+  // DYNAMIC FIELD CONTROL STATE
+  // =============================================================================
 
   /**
-   * Utility function to check if a field is enabled
+   * Calculate dynamic field control state based on current form values
    */
-  const isFieldEnabled = useCallback((fieldName: keyof FieldFormData): boolean => {
-    return fieldConfig[fieldName]?.enabled ?? true
-  }, [fieldConfig])
+  const fieldState = useMemo((): FieldControlState => {
+    const currentType = formValues?.type;
+    const typeSelection = formValues?.typeSelection;
+    const isVirtual = formValues?.isVirtual;
+    const isForeignKey = formValues?.isForeignKey;
+    const isPrimaryKey = formValues?.isPrimaryKey;
+    const autoIncrement = formValues?.autoIncrement;
 
-  /**
-   * Utility function to check if a field is visible
-   */
-  const isFieldVisible = useCallback((fieldName: keyof FieldFormData): boolean => {
-    return fieldConfig[fieldName]?.visible ?? true
-  }, [fieldConfig])
+    return {
+      // Show manual type input when manual type selection is chosen
+      showManualType: typeSelection === 'manual',
+      
+      // Enable length for string, binary, and related types
+      enableLength: !isVirtual && ['string', 'binary', 'text'].includes(currentType || ''),
+      
+      // Enable precision for decimal and float types
+      enablePrecision: !isVirtual && ['decimal', 'float', 'double'].includes(currentType || ''),
+      
+      // Enable scale for decimal types
+      enableScale: !isVirtual && currentType === 'decimal',
+      
+      // Show picklist for string and integer types (not virtual or foreign key)
+      showPicklist: !isVirtual && !isForeignKey && ['string', 'integer', 'enum'].includes(currentType || ''),
+      
+      // Show foreign key configuration when enabled
+      showForeignKey: isForeignKey && !isVirtual,
+      
+      // Enable default value for most types (not virtual, auto-increment, or timestamp types)
+      enableDefault: !isVirtual && !autoIncrement && 
+        !['timestamp_on_create', 'timestamp_on_update', 'user_id_on_create', 'user_id_on_update'].includes(currentType || ''),
+      
+      // Show validation for non-virtual fields
+      showValidation: !isVirtual,
+      
+      // Show database functions for virtual or computed fields
+      showDbFunctions: isVirtual || formValues?.isAggregate,
+      
+      // Enable auto-increment for integer and id types (not virtual or foreign key)
+      enableAutoIncrement: !isVirtual && !isForeignKey && ['integer', 'id'].includes(currentType || ''),
+      
+      // Enable allow null for non-primary key fields
+      enableAllowNull: !isPrimaryKey,
+      
+      // Show virtual options for computed fields
+      showVirtualOptions: isVirtual,
+      
+      // Enable constraints for non-virtual fields
+      enableConstraints: !isVirtual
+    };
+  }, [formValues]);
 
-  /**
-   * Utility function to check if a field is required
-   */
-  const isFieldRequired = useCallback((fieldName: keyof FieldFormData): boolean => {
-    return fieldConfig[fieldName]?.required ?? false
-  }, [fieldConfig])
+  // =============================================================================
+  // FIELD CONTROL HELPERS
+  // =============================================================================
 
-  /**
-   * Utility function to get default value for a field
-   */
-  const getFieldDefaultValue = useCallback((fieldName: keyof FieldFormData): any => {
-    return fieldConfig[fieldName]?.defaultValue
-  }, [fieldConfig])
+  const controls = useMemo((): FieldControlHelpers => ({
+    /**
+     * Add a new database function configuration
+     */
+    addDbFunction: () => {
+      const currentFunctions = form.getValues('dbFunctions') || [];
+      const newFunction: FieldDbFunctionFormData = {
+        id: `fn-${Date.now()}`,
+        use: ['SELECT'] as FunctionUseOperation[],
+        function: '',
+        enabled: true
+      };
+      
+      form.setValue('dbFunctions', [...currentFunctions, newFunction], {
+        shouldValidate: true,
+        shouldDirty: true
+      });
+    },
 
-  /**
-   * Function to update specific field configuration
-   */
-  const updateFieldConfig = useCallback((
-    fieldName: keyof FieldFormData, 
-    config: Partial<FieldConfigState>
-  ) => {
-    performanceUpdate(() => {
-      setFieldConfig(prev => ({
+    /**
+     * Remove a database function configuration by index
+     */
+    removeDbFunction: (index: number) => {
+      const currentFunctions = form.getValues('dbFunctions') || [];
+      const updatedFunctions = currentFunctions.filter((_, i) => i !== index);
+      
+      form.setValue('dbFunctions', updatedFunctions, {
+        shouldValidate: true,
+        shouldDirty: true
+      });
+    },
+
+    /**
+     * Update picklist values from CSV string
+     */
+    updatePicklistFromCsv: (csvValues: string) => {
+      const options = csvValues.split(',').map(v => v.trim()).filter(v => v.length > 0);
+      
+      form.setValue('picklistValues', csvValues, { shouldValidate: true });
+      form.setValue('picklistOptions', options, { shouldValidate: true });
+    },
+
+    /**
+     * Update picklist values from JSON array
+     */
+    updatePicklistFromJson: (jsonValues: string[]) => {
+      const csvValues = jsonValues.join(', ');
+      
+      form.setValue('picklistValues', csvValues, { shouldValidate: true });
+      form.setValue('picklistOptions', jsonValues, { shouldValidate: true });
+    },
+
+    /**
+     * Reset form to initial state
+     */
+    resetForm: () => {
+      form.reset(getInitialFormData());
+      setSubmissionState({
+        isSubmitting: false,
+        error: null,
+        isSuccess: false
+      });
+    },
+
+    /**
+     * Set field type and update dependent controls
+     */
+    setFieldType: (type: FieldDataType | 'manual') => {
+      if (type === 'manual') {
+        form.setValue('typeSelection', 'manual', { shouldValidate: true });
+        form.setValue('manualType', '', { shouldValidate: true });
+      } else {
+        form.setValue('typeSelection', 'predefined', { shouldValidate: true });
+        form.setValue('type', type, { shouldValidate: true });
+        form.setValue('manualType', undefined, { shouldValidate: true });
+        
+        // Auto-configure based on type
+        if (type === 'id') {
+          form.setValue('isPrimaryKey', true, { shouldValidate: true });
+          form.setValue('autoIncrement', true, { shouldValidate: true });
+          form.setValue('allowNull', false, { shouldValidate: true });
+        }
+        
+        if (['timestamp_on_create', 'timestamp_on_update', 'user_id_on_create', 'user_id_on_update'].includes(type)) {
+          form.setValue('hasDefaultValue', false, { shouldValidate: true });
+          form.setValue('default', undefined, { shouldValidate: true });
+        }
+      }
+    },
+
+    /**
+     * Toggle virtual field mode
+     */
+    toggleVirtual: (enabled: boolean) => {
+      form.setValue('isVirtual', enabled, { shouldValidate: true });
+      
+      if (enabled) {
+        // Disable incompatible options for virtual fields
+        form.setValue('isPrimaryKey', false, { shouldValidate: true });
+        form.setValue('isForeignKey', false, { shouldValidate: true });
+        form.setValue('autoIncrement', false, { shouldValidate: true });
+        form.setValue('enablePicklist', false, { shouldValidate: true });
+        form.setValue('hasDefaultValue', false, { shouldValidate: true });
+      }
+    },
+
+    /**
+     * Toggle foreign key mode
+     */
+    toggleForeignKey: (enabled: boolean) => {
+      form.setValue('isForeignKey', enabled, { shouldValidate: true });
+      
+      if (enabled) {
+        // Disable incompatible options for foreign keys
+        form.setValue('isVirtual', false, { shouldValidate: true });
+        form.setValue('isPrimaryKey', false, { shouldValidate: true });
+        form.setValue('autoIncrement', false, { shouldValidate: true });
+        form.setValue('enablePicklist', false, { shouldValidate: true });
+      } else {
+        // Clear foreign key configuration
+        form.setValue('referenceTable', undefined, { shouldValidate: true });
+        form.setValue('referenceField', undefined, { shouldValidate: true });
+      }
+    },
+
+    /**
+     * Validate field name uniqueness (placeholder implementation)
+     */
+    validateFieldName: async (name: string): Promise<boolean> => {
+      // This would typically check against existing fields in the table
+      // For now, just check against reserved words
+      const reservedWords = ['id', 'created_date', 'last_modified_date', 'created_by_id', 'last_modified_by_id'];
+      return !reservedWords.includes(name.toLowerCase());
+    }
+  }), [form, getInitialFormData]);
+
+  // =============================================================================
+  // FORM UTILITIES
+  // =============================================================================
+
+  const utils = useMemo((): FieldFormUtilities => ({
+    /**
+     * Get field type options for current database
+     */
+    getFieldTypeOptions: () => {
+      // Could filter options based on database type in the future
+      return FIELD_TYPE_OPTIONS;
+    },
+
+    /**
+     * Get available reference tables
+     */
+    getReferenceTableOptions: () => {
+      return referenceTables.map(table => ({
+        label: table.label || table.name,
+        value: table.name
+      }));
+    },
+
+    /**
+     * Get available reference fields for selected table
+     */
+    getReferenceFieldOptions: (tableName: string) => {
+      const table = referenceTables.find(t => t.name === tableName);
+      if (!table) return [];
+      
+      return table.fields.map(field => ({
+        label: field.label || field.name,
+        value: field.name
+      }));
+    },
+
+    /**
+     * Check if field type supports length
+     */
+    typeSupportsLength: (type: FieldDataType) => {
+      return ['string', 'binary', 'text'].includes(type);
+    },
+
+    /**
+     * Check if field type supports precision/scale
+     */
+    typeSupportsPrecision: (type: FieldDataType) => {
+      return ['decimal', 'float', 'double'].includes(type);
+    },
+
+    /**
+     * Check if field type supports picklist
+     */
+    typeSupportsPicklist: (type: FieldDataType) => {
+      return ['string', 'integer', 'enum'].includes(type);
+    },
+
+    /**
+     * Check if field type supports default values
+     */
+    typeSupportsDefault: (type: FieldDataType) => {
+      return !['timestamp_on_create', 'timestamp_on_update', 'user_id_on_create', 'user_id_on_update'].includes(type);
+    }
+  }), [referenceTables]);
+
+  // =============================================================================
+  // SUBMISSION HANDLING
+  // =============================================================================
+
+  const submission = useMemo((): SubmissionState => ({
+    ...submissionState,
+    
+    /**
+     * Submit form with validation
+     */
+    submit: async () => {
+      if (submissionState.isSubmitting || !onSubmit) return;
+
+      setSubmissionState(prev => ({
         ...prev,
-        [fieldName]: {
-          ...prev[fieldName],
-          ...config
-        }
-      }))
+        isSubmitting: true,
+        error: null,
+        isSuccess: false
+      }));
 
-      // Update form field state based on configuration
-      if (config.enabled !== undefined) {
-        if (!config.enabled) {
-          // Disable field and clear value
-          form.setValue(fieldName, config.defaultValue ?? null)
-        } else if (config.defaultValue !== undefined) {
-          // Enable field and set default value
-          form.setValue(fieldName, config.defaultValue)
+      try {
+        const isValid = await form.trigger();
+        if (!isValid) {
+          throw new Error('Form validation failed');
         }
+
+        const formData = form.getValues();
+        await onSubmit(formData);
+
+        setSubmissionState(prev => ({
+          ...prev,
+          isSubmitting: false,
+          isSuccess: true
+        }));
+      } catch (error) {
+        setSubmissionState(prev => ({
+          ...prev,
+          isSubmitting: false,
+          error: error instanceof Error ? error.message : 'Submission failed'
+        }));
       }
-    })
-  }, [form, performanceUpdate])
+    }
+  }), [submissionState, form, onSubmit]);
+
+  // =============================================================================
+  // EFFECT HOOKS FOR DYNAMIC FORM CONTROL
+  // =============================================================================
 
   /**
-   * Function to enable a form field with optional default value
-   * Replicates Angular enableFormField method
+   * Effect to handle form control updates when field state changes
    */
-  const enableField = useCallback((fieldName: keyof FieldFormData, value?: any) => {
-    updateFieldConfig(fieldName, {
-      enabled: true,
-      ...(value !== undefined && { defaultValue: value })
-    })
-  }, [updateFieldConfig])
+  useEffect(() => {
+    const subscription = form.watch((data, { name, type }) => {
+      if (type !== 'change') return;
 
-  /**
-   * Function to disable a form field and clear its value
-   * Replicates Angular disableFormField method
-   */
-  const disableField = useCallback((fieldName: keyof FieldFormData) => {
-    updateFieldConfig(fieldName, {
-      enabled: false
-    })
-  }, [updateFieldConfig])
-
-  /**
-   * Function to add a form field (make it visible)
-   * Replicates Angular addFormField method
-   */
-  const addField = useCallback((fieldName: keyof FieldFormData) => {
-    updateFieldConfig(fieldName, {
-      visible: true,
-      enabled: true
-    })
-  }, [updateFieldConfig])
-
-  /**
-   * Function to remove a form field (make it invisible)
-   * Replicates Angular removeFormField method
-   */
-  const removeField = useCallback((fieldName: keyof FieldFormData) => {
-    updateFieldConfig(fieldName, {
-      visible: false
-    })
-    form.setValue(fieldName, null as any)
-  }, [updateFieldConfig, form])
-
-  /**
-   * Apply field type-specific configuration
-   * Replicates Angular type change subscription logic
-   */
-  const applyTypeConfiguration = useCallback((type: DreamFactoryFieldType) => {
-    performanceUpdate(() => {
-      switch (type) {
-        case TYPE_DROPDOWN_OPTIONS[0]: // 'I will manually enter a type'
-          if (!watchedIsVirtual) {
-            enableField('dbType')
-          } else {
-            disableField('dbType')
+      // Handle cascading updates when certain fields change
+      switch (name) {
+        case 'isPrimaryKey':
+          if (data.isPrimaryKey) {
+            form.setValue('allowNull', false, { shouldValidate: true });
+            form.setValue('isUnique', true, { shouldValidate: true });
           }
-          disableField('length')
-          disableField('precision')
-          disableField('scale')
-          removeField('picklist')
-          disableField('fixedLength')
-          disableField('supportsMultibyte')
-          break
+          break;
 
-        case 'string':
-          addField('picklist')
-          disableField('dbType')
-          enableField('length')
-          disableField('precision')
-          disableField('scale')
-          enableField('fixedLength')
-          enableField('supportsMultibyte')
-          break
+        case 'autoIncrement':
+          if (data.autoIncrement) {
+            form.setValue('hasDefaultValue', false, { shouldValidate: true });
+            form.setValue('default', undefined, { shouldValidate: true });
+          }
+          break;
 
-        case 'integer':
-          addField('picklist')
-          disableField('dbType')
-          enableField('length')
-          disableField('precision')
-          disableField('scale')
-          disableField('fixedLength')
-          disableField('supportsMultibyte')
-          break
+        case 'isVirtual':
+          if (data.isVirtual) {
+            form.setValue('isPrimaryKey', false, { shouldValidate: true });
+            form.setValue('isForeignKey', false, { shouldValidate: true });
+            form.setValue('autoIncrement', false, { shouldValidate: true });
+            form.setValue('enablePicklist', false, { shouldValidate: true });
+          }
+          break;
 
-        case 'text':
-        case 'binary':
-          disableField('dbType')
-          enableField('length')
-          disableField('precision')
-          disableField('scale')
-          removeField('picklist')
-          disableField('fixedLength')
-          disableField('supportsMultibyte')
-          break
+        case 'isForeignKey':
+          if (data.isForeignKey) {
+            form.setValue('isVirtual', false, { shouldValidate: true });
+            form.setValue('isPrimaryKey', false, { shouldValidate: true });
+            form.setValue('autoIncrement', false, { shouldValidate: true });
+            form.setValue('enablePicklist', false, { shouldValidate: true });
+          }
+          break;
 
-        case 'float':
-        case 'double':
-        case 'decimal':
-          disableField('dbType')
-          disableField('length')
-          enableField('precision')
-          enableField('scale', 0)
-          removeField('picklist')
-          disableField('fixedLength')
-          disableField('supportsMultibyte')
-          break
+        case 'enablePicklist':
+          if (!data.enablePicklist) {
+            form.setValue('picklistValues', undefined, { shouldValidate: true });
+            form.setValue('picklistOptions', undefined, { shouldValidate: true });
+          }
+          break;
 
-        default:
-          disableField('dbType')
-          disableField('length')
-          disableField('precision')
-          disableField('scale')
-          removeField('picklist')
-          disableField('fixedLength')
-          disableField('supportsMultibyte')
+        case 'hasDefaultValue':
+          if (!data.hasDefaultValue) {
+            form.setValue('default', undefined, { shouldValidate: true });
+          }
+          break;
       }
-    })
-  }, [
-    watchedIsVirtual, 
-    enableField, 
-    disableField, 
-    addField, 
-    removeField, 
-    performanceUpdate
-  ])
+    });
 
-  /**
-   * Handle virtual field toggle changes
-   * Replicates Angular isVirtual change subscription logic
-   */
-  const handleVirtualToggle = useCallback((isVirtual: boolean) => {
-    performanceUpdate(() => {
-      if (isVirtual) {
-        disableField('dbType')
-        enableField('isAggregate')
-      } else {
-        if (watchedType === TYPE_DROPDOWN_OPTIONS[0]) {
-          enableField('dbType')
-        }
-        disableField('isAggregate')
-      }
-    })
-  }, [watchedType, enableField, disableField, performanceUpdate])
+    return () => subscription.unsubscribe();
+  }, [form]);
 
-  /**
-   * Handle foreign key toggle changes
-   * Replicates Angular isForeignKey change subscription logic
-   */
-  const handleForeignKeyToggle = useCallback((isForeignKey: boolean) => {
-    performanceUpdate(() => {
-      if (isForeignKey) {
-        enableField('refTable')
-        // Note: refField will be enabled when refTable is selected
-        updateFieldConfig('refField', { enabled: false }) // Initially disabled until table is selected
-        enableField('refOnDelete')
-        enableField('refOnUpdate')
-      } else {
-        disableField('refTable')
-        disableField('refField')
-        disableField('refOnDelete')
-        disableField('refOnUpdate')
-      }
-    })
-  }, [enableField, disableField, updateFieldConfig, performanceUpdate])
-
-  /**
-   * Handle reference table selection changes
-   * Enables refField when a reference table is selected
-   */
-  const handleRefTableChange = useCallback(() => {
-    if (watchedRefTable && watchedIsForeignKey) {
-      enableField('refField')
-    }
-  }, [watchedRefTable, watchedIsForeignKey, enableField])
-
-  /**
-   * Reset all field configuration to defaults
-   */
-  const resetFieldConfig = useCallback(() => {
-    performanceUpdate(() => {
-      setFieldConfig(JSON.parse(JSON.stringify(DEFAULT_CONFIG_MAP)))
-    })
-  }, [performanceUpdate])
-
-  // Effect for automatic type configuration when type changes
-  useEffect(() => {
-    if (enableAutoConfiguration && watchedType) {
-      applyTypeConfiguration(watchedType)
-    }
-  }, [watchedType, enableAutoConfiguration, applyTypeConfiguration])
-
-  // Effect for virtual field toggle
-  useEffect(() => {
-    if (enableAutoConfiguration) {
-      handleVirtualToggle(watchedIsVirtual)
-    }
-  }, [watchedIsVirtual, enableAutoConfiguration, handleVirtualToggle])
-
-  // Effect for foreign key toggle
-  useEffect(() => {
-    if (enableAutoConfiguration) {
-      handleForeignKeyToggle(watchedIsForeignKey)
-    }
-  }, [watchedIsForeignKey, enableAutoConfiguration, handleForeignKeyToggle])
-
-  // Effect for reference table changes
-  useEffect(() => {
-    if (enableAutoConfiguration) {
-      handleRefTableChange()
-    }
-  }, [watchedRefTable, enableAutoConfiguration, handleRefTableChange])
+  // =============================================================================
+  // RETURN HOOK INTERFACE
+  // =============================================================================
 
   return {
-    fieldConfig,
-    isFieldEnabled,
-    isFieldVisible,
-    isFieldRequired,
-    getFieldDefaultValue,
-    updateFieldConfig,
-    resetFieldConfig,
-    applyTypeConfiguration,
-    handleVirtualToggle,
-    handleForeignKeyToggle,
-    performanceMetrics
-  }
+    form,
+    formValues: formValues as FieldFormData,
+    fieldState,
+    controls,
+    submission,
+    utils
+  };
 }
 
 /**
- * Utility hook for field validation state management
- * Provides additional validation-specific functionality
+ * Export hook for external consumption
  */
-export function useFieldValidationState(
-  form: UseFormReturn<FieldFormData>
-) {
-  const {
-    formState: { errors, isValidating, isDirty, isValid }
-  } = form
-
-  /**
-   * Check if a specific field has validation errors
-   */
-  const hasFieldError = useCallback((fieldName: keyof FieldFormData): boolean => {
-    return !!errors[fieldName]
-  }, [errors])
-
-  /**
-   * Get validation error message for a field
-   */
-  const getFieldError = useCallback((fieldName: keyof FieldFormData): string | undefined => {
-    return errors[fieldName]?.message
-  }, [errors])
-
-  /**
-   * Check if a field is currently being validated
-   */
-  const isFieldValidating = useCallback((fieldName: keyof FieldFormData): boolean => {
-    // React Hook Form doesn't provide per-field validation state,
-    // so we return the global validation state
-    return isValidating
-  }, [isValidating])
-
-  return {
-    hasFieldError,
-    getFieldError,
-    isFieldValidating,
-    isDirty,
-    isValid,
-    errors
-  }
-}
+export default useFieldFormState;
 
 /**
- * Export types for external usage
+ * Export related types for external use
  */
 export type {
-  FieldFormStateOptions,
-  FieldConfigState,
-  FieldConfigMap,
-  UseFieldFormStateReturn
-}
-
-/**
- * Export constants for external usage
- */
-export {
-  TYPE_DROPDOWN_OPTIONS,
-  DEFAULT_FIELD_CONFIG,
-  DEFAULT_CONFIG_MAP
-}
+  UseFieldFormStateConfig,
+  UseFieldFormStateReturn,
+  FieldControlState,
+  FieldControlHelpers,
+  SubmissionState,
+  FieldFormUtilities
+};
