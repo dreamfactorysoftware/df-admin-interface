@@ -1,300 +1,164 @@
 /**
- * User Management Types for DreamFactory Admin Interface
+ * User Management Types for DreamFactory React/Next.js Admin Interface
  * 
- * Comprehensive user management types including authentication payloads, user profiles,
- * admin configurations, role assignments, and session management. Supports JWT-based
- * authentication with Next.js middleware integration and role-based access control.
+ * Comprehensive type definitions for user authentication, authorization, and management
+ * supporting JWT-based authentication with Next.js middleware integration and RBAC.
  * 
- * Migrated from Angular guards to Next.js middleware patterns with React Hook Form
- * schemas and Zod validation for enhanced security and type safety.
+ * Key Features:
+ * - JWT-based session management with Next.js middleware patterns
+ * - Role-based access control (RBAC) enforcement
+ * - React Hook Form integration with Zod validation schemas
+ * - Server-side rendering compatibility
+ * - Enhanced security with cookie hydration support
  */
 
 import { z } from 'zod';
 
 // ============================================================================
-// Core User Types
+// CORE USER TYPES
 // ============================================================================
 
 /**
- * Base user interface with core properties
+ * User profile type union for distinguishing between regular users and administrators
  */
-export interface BaseUser {
+export type UserProfileType = 'users' | 'admins';
+
+/**
+ * Core user role type for RBAC integration
+ */
+export interface RoleType {
   id: number;
   name: string;
+  description?: string;
+  is_active: boolean;
+  created_date?: string;
+  last_modified_date?: string;
+  created_by_id?: number;
+  last_modified_by_id?: number;
+  lookup_by_role_id?: number[];
+  accessibleTabs?: string[];
+}
+
+/**
+ * Lookup key for additional user metadata and configuration
+ */
+export interface LookupKey {
+  id?: number;
+  name: string;
+  value: string;
+  private?: boolean;
+  description?: string;
+  created_date?: string;
+  last_modified_date?: string;
+  created_by_id?: number;
+  last_modified_by_id?: number;
+}
+
+/**
+ * Comprehensive user profile interface supporting both regular users and admins
+ * Enhanced for React/Next.js with server-side rendering compatibility
+ */
+export interface UserProfile {
+  // Core identification
+  id: number;
+  username: string;
+  email: string;
   first_name?: string;
   last_name?: string;
   display_name?: string;
-  email: string;
-  username?: string;
-  phone?: string;
+  
+  // Authentication & Security
+  is_active: boolean;
+  confirmed?: boolean;
   security_question?: string;
   security_answer?: string;
-  confirm_code?: string;
-  default_app_id?: number;
-  oauth_provider?: string;
+  password_set_date?: string;
+  last_login_date?: string;
+  failed_login_attempts?: number;
+  locked_until?: string;
+  
+  // Profile details
+  phone?: string;
+  name?: string;
+  
+  // Audit trail
   created_date?: string;
   last_modified_date?: string;
-  email_verified_at?: string;
-  is_active: boolean;
-  is_sys_admin?: boolean;
-  last_login_date?: string;
-  host?: string;
-}
-
-/**
- * Complete user profile with all available fields
- */
-export interface UserProfile extends BaseUser {
-  avatar_url?: string;
-  timezone?: string;
-  locale?: string;
-  theme_preference?: 'light' | 'dark' | 'system';
-  notification_preferences?: NotificationPreferences;
-  api_key?: string;
-  adldap?: string;
-  openid_connect?: string;
-  saml?: string;
   created_by_id?: number;
   last_modified_by_id?: number;
-  user_lookup_by_user_id?: UserLookup[];
+  
+  // Relationships and metadata
+  lookup_by_user_id?: LookupKey[];
   user_to_app_to_role_by_user_id?: UserAppRole[];
+  
+  // RBAC integration - enhanced for Next.js middleware
+  role?: RoleType;
+  permissions?: string[];
+  accessibleRoutes?: string[];
+  
+  // Enhanced security for Next.js SSR
+  sessionId?: string;
+  tokenVersion?: number;
+  lastActivity?: string;
 }
 
 /**
- * Admin user with additional administrative fields
+ * Admin profile extending user profile with administrative capabilities
+ * Enhanced for Next.js middleware-based access control
  */
-export interface AdminUser extends UserProfile {
-  is_sys_admin: true;
-  role_id?: number;
-  admin_permissions?: AdminPermission[];
-  managed_services?: string[];
-  system_access_level?: 'full' | 'limited' | 'readonly';
-}
-
-/**
- * User notification preferences
- */
-export interface NotificationPreferences {
-  email_notifications: boolean;
-  system_alerts: boolean;
-  api_quota_warnings: boolean;
-  security_notifications: boolean;
-  maintenance_notifications: boolean;
-  newsletter_subscription?: boolean;
-}
-
-/**
- * User lookup key-value pairs
- */
-export interface UserLookup {
-  id?: number;
-  user_id: number;
-  name: string;
-  value?: string;
-  private?: boolean;
-  description?: string;
-}
-
-// ============================================================================
-// Authentication Types
-// ============================================================================
-
-/**
- * JWT token payload structure
- */
-export interface JWTPayload {
-  sub: string; // Subject (user ID)
-  email: string;
-  name: string;
-  iss: string; // Issuer
-  aud: string; // Audience
-  exp: number; // Expiration time
-  iat: number; // Issued at time
-  jti?: string; // JWT ID
-  session_id?: string;
+export interface AdminProfile extends UserProfile {
+  // Admin-specific flags
   is_sys_admin?: boolean;
-  role_id?: number;
-  app_id?: number;
-  scopes?: string[];
+  
+  // Enhanced access control for Next.js routes
+  accessibleTabs?: string[];
+  restrictedRoutes?: string[];
+  adminCapabilities?: AdminCapability[];
+  
+  // System-level permissions
+  systemPermissions?: SystemPermission[];
 }
 
 /**
- * Authentication session data
+ * Admin capability enum for granular permission control
  */
-export interface AuthSession {
-  id: string;
-  session_token: string;
-  refresh_token?: string;
-  expires_at: number;
-  created_at: number;
-  last_activity: number;
-  user_id: number;
-  user_agent?: string;
-  ip_address?: string;
-  is_active: boolean;
-}
+export type AdminCapability = 
+  | 'user_management'
+  | 'service_management' 
+  | 'schema_management'
+  | 'api_generation'
+  | 'system_configuration'
+  | 'security_management'
+  | 'audit_access'
+  | 'backup_restore';
 
 /**
- * Login credentials payload
+ * System-level permissions for administrative operations
  */
-export interface LoginCredentials {
-  email: string;
-  password: string;
-  remember_me?: boolean;
-  duration?: number;
-}
+export type SystemPermission =
+  | 'read_users'
+  | 'create_users'
+  | 'update_users'
+  | 'delete_users'
+  | 'read_services'
+  | 'create_services'
+  | 'update_services'
+  | 'delete_services'
+  | 'read_schema'
+  | 'update_schema'
+  | 'generate_apis'
+  | 'manage_security'
+  | 'view_logs'
+  | 'system_backup';
 
 /**
- * OAuth login payload
- */
-export interface OAuthCredentials {
-  provider: string;
-  code: string;
-  state?: string;
-  redirect_uri?: string;
-}
-
-/**
- * API Key authentication payload
- */
-export interface ApiKeyAuth {
-  api_key: string;
-  session_token?: string;
-}
-
-/**
- * Authentication response from DreamFactory API
- */
-export interface AuthResponse {
-  success: boolean;
-  session_token: string;
-  session_id: string;
-  user_id: number;
-  name: string;
-  first_name?: string;
-  last_name?: string;
-  display_name?: string;
-  email: string;
-  is_sys_admin: boolean;
-  last_login_date?: string;
-  host?: string;
-  role?: UserRole;
-  app?: UserApp;
-  expires?: number;
-  refresh_token?: string;
-}
-
-/**
- * Password reset request payload
- */
-export interface PasswordResetRequest {
-  email: string;
-  reset_url?: string;
-}
-
-/**
- * Password reset confirmation payload
- */
-export interface PasswordResetConfirmation {
-  email: string;
-  code: string;
-  password: string;
-  password_confirmation: string;
-}
-
-/**
- * Change password payload
- */
-export interface ChangePasswordRequest {
-  old_password: string;
-  new_password: string;
-  new_password_confirmation: string;
-}
-
-// ============================================================================
-// Role-Based Access Control (RBAC) Types
-// ============================================================================
-
-/**
- * User role definition
- */
-export interface UserRole {
-  id: number;
-  name: string;
-  description?: string;
-  is_active: boolean;
-  role_service_access_by_role_id?: RoleServiceAccess[];
-  role_lookup_by_role_id?: RoleLookup[];
-  created_date?: string;
-  last_modified_date?: string;
-  created_by_id?: number;
-  last_modified_by_id?: number;
-}
-
-/**
- * Role service access permissions
- */
-export interface RoleServiceAccess {
-  id?: number;
-  role_id: number;
-  service_id?: number;
-  service?: string;
-  component?: string;
-  verb_mask?: number;
-  requestor_type?: RequestorType;
-  filters?: AccessFilter[];
-  filter_op?: 'AND' | 'OR';
-  created_date?: string;
-  last_modified_date?: string;
-  created_by_id?: number;
-  last_modified_by_id?: number;
-}
-
-/**
- * Access filter for role-based permissions
- */
-export interface AccessFilter {
-  name: string;
-  operator: FilterOperator;
-  value: any;
-}
-
-/**
- * Filter operators for access control
- */
-export type FilterOperator = 
-  | 'EQ' | 'NE' | 'GT' | 'GTE' | 'LT' | 'LTE'
-  | 'IN' | 'NOT IN' | 'LIKE' | 'NOT LIKE'
-  | 'IS NULL' | 'IS NOT NULL'
-  | 'CONTAINS' | 'STARTS WITH' | 'ENDS WITH';
-
-/**
- * Requestor types for role access
- */
-export type RequestorType = 'API' | 'SCRIPT' | 'EVENT';
-
-/**
- * Role lookup key-value pairs
- */
-export interface RoleLookup {
-  id?: number;
-  role_id: number;
-  name: string;
-  value?: string;
-  private?: boolean;
-  description?: string;
-}
-
-/**
- * User application role assignment
+ * User-to-application role mapping for multi-app access control
  */
 export interface UserAppRole {
   id?: number;
   user_id: number;
   app_id: number;
   role_id: number;
-  app?: UserApp;
-  role?: UserRole;
   created_date?: string;
   last_modified_date?: string;
   created_by_id?: number;
@@ -302,146 +166,445 @@ export interface UserAppRole {
 }
 
 /**
- * Application definition
+ * Lightweight user representation for table/list views
+ * Optimized for React components with SSR support
  */
-export interface UserApp {
+export interface UserRow {
   id: number;
-  name: string;
-  description?: string;
+  username: string;
+  email: string;
+  display_name?: string;
+  name?: string;
   is_active: boolean;
-  type?: AppType;
-  path?: string;
-  url?: string;
-  storage_service_id?: number;
-  storage_container?: string;
-  requires_fullscreen?: boolean;
-  allow_fullscreen_toggle?: boolean;
-  toggle_location?: string;
+  last_login_date?: string;
   created_date?: string;
-  last_modified_date?: string;
-  created_by_id?: number;
-  last_modified_by_id?: number;
-}
-
-/**
- * Application types
- */
-export type AppType = 'Web App' | 'Native App' | 'No Storage Required';
-
-/**
- * Admin permission types
- */
-export interface AdminPermission {
-  resource: string;
-  actions: AdminAction[];
-  scope?: 'global' | 'limited';
-  conditions?: PermissionCondition[];
-}
-
-/**
- * Admin actions
- */
-export type AdminAction = 
-  | 'create' | 'read' | 'update' | 'delete'
-  | 'manage' | 'configure' | 'monitor'
-  | 'backup' | 'restore' | 'import' | 'export';
-
-/**
- * Permission conditions
- */
-export interface PermissionCondition {
-  field: string;
-  operator: FilterOperator;
-  value: any;
+  role?: string;
+  
+  // UI state for React components
+  isLoading?: boolean;
+  isSelected?: boolean;
 }
 
 // ============================================================================
-// Session Management Types
+// SESSION MANAGEMENT TYPES
 // ============================================================================
 
 /**
- * Client-side session state
+ * Enhanced user session for Next.js middleware integration
+ * Supports both client-side and server-side rendering
  */
-export interface SessionState {
-  isAuthenticated: boolean;
-  user: UserProfile | null;
-  session: AuthSession | null;
-  permissions: UserPermissions | null;
-  loading: boolean;
-  error: string | null;
-  lastActivity: number;
-  expiresAt: number;
-}
-
-/**
- * User permissions derived from roles
- */
-export interface UserPermissions {
-  isSystemAdmin: boolean;
-  canManageUsers: boolean;
-  canManageRoles: boolean;
-  canManageServices: boolean;
-  canManageApps: boolean;
-  canViewReports: boolean;
-  canConfigureSystem: boolean;
-  canManageFiles: boolean;
-  canManageScripts: boolean;
-  canManageScheduler: boolean;
-  canManageCache: boolean;
-  canManageCors: boolean;
-  canManageEmailTemplates: boolean;
-  canManageLookupKeys: boolean;
-  serviceAccess: ServicePermission[];
-  appAccess: AppPermission[];
-}
-
-/**
- * Service-level permissions
- */
-export interface ServicePermission {
-  serviceId: number;
-  serviceName: string;
-  component?: string;
-  canCreate: boolean;
-  canRead: boolean;
-  canUpdate: boolean;
-  canDelete: boolean;
-  filters?: AccessFilter[];
-}
-
-/**
- * App-level permissions
- */
-export interface AppPermission {
-  appId: number;
-  appName: string;
-  roleId: number;
-  roleName: string;
-  canAccess: boolean;
-}
-
-/**
- * Session refresh request
- */
-export interface SessionRefreshRequest {
-  refresh_token?: string;
+export interface UserSession {
+  // Core session data
+  id: number;
   session_token: string;
+  sessionToken?: string; // Alternate naming for compatibility
+  user_id: number;
+  username: string;
+  email: string;
+  display_name?: string;
+  
+  // Enhanced for Next.js middleware
+  host?: string;
+  is_sys_admin?: boolean;
+  is_active: boolean;
+  token_map?: { [key: string]: string };
+  
+  // Session metadata
+  created_date?: string;
+  expires_at?: string;
+  last_activity?: string;
+  user_agent?: string;
+  ip_address?: string;
+  
+  // RBAC data for middleware
+  role?: RoleType;
+  permissions?: string[];
+  accessibleRoutes?: string[];
+  restrictedRoutes?: string[];
+  
+  // Security enhancements
+  tokenVersion?: number;
+  refreshToken?: string;
+  csrfToken?: string;
+  
+  // Next.js specific
+  isServerSide?: boolean;
+  cookieData?: SessionCookieData;
 }
 
 /**
- * Session validation result
+ * Session cookie data for Next.js middleware hydration
  */
-export interface SessionValidation {
-  valid: boolean;
-  expired: boolean;
-  user_id?: number;
-  session_id?: string;
-  expires_at?: number;
+export interface SessionCookieData {
+  sessionId: string;
+  userId: number;
+  tokenVersion: number;
+  expiresAt: string;
+  secure: boolean;
+  httpOnly: boolean;
+  sameSite: 'strict' | 'lax' | 'none';
+}
+
+/**
+ * Session validation result for middleware processing
+ */
+export interface SessionValidationResult {
+  isValid: boolean;
+  session?: UserSession;
+  error?: SessionError;
+  requiresRefresh?: boolean;
+  redirectTo?: string;
+}
+
+/**
+ * Session error types for enhanced error handling
+ */
+export type SessionError = 
+  | 'token_expired'
+  | 'token_invalid'
+  | 'user_inactive'
+  | 'permission_denied'
+  | 'session_expired'
+  | 'refresh_required'
+  | 'authentication_required';
+
+// ============================================================================
+// AUTHENTICATION TYPES
+// ============================================================================
+
+/**
+ * Login credentials interface with enhanced validation
+ */
+export interface LoginCredentials {
+  username?: string;
+  email?: string;
+  password: string;
+  remember?: boolean;
+  service?: string;
+  
+  // Enhanced security
+  captcha?: string;
+  twoFactorCode?: string;
+  deviceId?: string;
+}
+
+/**
+ * Login response with enhanced JWT support
+ */
+export interface LoginResponse {
+  session_token?: string;
+  sessionToken?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  token_type?: string;
+  user?: UserProfile;
+  permissions?: string[];
+  
+  // Enhanced session data
+  sessionId?: string;
+  tokenVersion?: number;
+  csrfToken?: string;
+  
+  // Error handling
   error?: string;
+  error_description?: string;
+  
+  // Additional fields support
+  [key: string]: any;
+}
+
+/**
+ * User registration details with comprehensive validation
+ */
+export interface RegisterDetails {
+  username: string;
+  email: string;
+  password: string;
+  confirmPassword?: string;
+  first_name?: string;
+  last_name?: string;
+  display_name?: string;
+  phone?: string;
+  
+  // Security questions
+  security_question?: string;
+  security_answer?: string;
+  
+  // Terms and privacy
+  acceptTerms?: boolean;
+  acceptPrivacy?: boolean;
+  
+  // Additional metadata
+  source?: string;
+  referral?: string;
+}
+
+/**
+ * Password reset request interface
+ */
+export interface ForgetPasswordRequest {
+  email?: string;
+  username?: string;
+  captcha?: string;
+}
+
+/**
+ * Password reset form data
+ */
+export interface ResetFormData {
+  code: string;
+  password: string;
+  confirmPassword: string;
+  email?: string;
+  username?: string;
+  
+  // Security enhancement
+  deviceId?: string;
+  timestamp?: string;
+}
+
+/**
+ * Security question interface
+ */
+export interface SecurityQuestion {
+  id?: number;
+  question: string;
+  answer?: string;
+  is_default?: boolean;
+}
+
+/**
+ * Password update request
+ */
+export interface UpdatePasswordRequest {
+  old_password: string;
+  new_password: string;
+  confirm_password?: string;
+  
+  // Enhanced security
+  force_logout_all?: boolean;
+  sessionId?: string;
+}
+
+/**
+ * Password update response
+ */
+export interface UpdatePasswordResponse {
+  success: boolean;
+  message?: string;
+  session_token?: string;
+  sessionToken?: string;
+  
+  // Force re-authentication
+  requiresReauth?: boolean;
+  loggedOutSessions?: number;
+}
+
+/**
+ * User parameters for routing and API calls
+ */
+export interface UserParams {
+  admin?: boolean;
+  code?: string;
+  email?: string;
+  username?: string;
+  id?: string | number;
+  
+  // Enhanced routing support
+  tab?: string;
+  action?: string;
+  returnUrl?: string;
 }
 
 // ============================================================================
-// Next.js Middleware Integration Types
+// REACT HOOK FORM & ZOD VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Zod validation schema for login form
+ */
+export const LoginSchema = z.object({
+  username: z.string().optional(),
+  email: z.string().email('Invalid email format').optional(),
+  password: z.string().min(1, 'Password is required'),
+  remember: z.boolean().optional(),
+  service: z.string().optional(),
+  captcha: z.string().optional(),
+  twoFactorCode: z.string().optional(),
+}).refine(data => data.username || data.email, {
+  message: 'Either username or email is required',
+  path: ['username'],
+});
+
+export type LoginFormData = z.infer<typeof LoginSchema>;
+
+/**
+ * Zod validation schema for user registration
+ */
+export const RegisterSchema = z.object({
+  username: z.string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(50, 'Username must not exceed 50 characters')
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, hyphens, and underscores'),
+  email: z.string()
+    .email('Invalid email format')
+    .max(255, 'Email must not exceed 255 characters'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  confirmPassword: z.string(),
+  first_name: z.string().max(100, 'First name must not exceed 100 characters').optional(),
+  last_name: z.string().max(100, 'Last name must not exceed 100 characters').optional(),
+  display_name: z.string().max(100, 'Display name must not exceed 100 characters').optional(),
+  phone: z.string().optional(),
+  security_question: z.string().optional(),
+  security_answer: z.string().optional(),
+  acceptTerms: z.boolean().refine(val => val === true, 'You must accept the terms of service'),
+  acceptPrivacy: z.boolean().refine(val => val === true, 'You must accept the privacy policy'),
+  source: z.string().optional(),
+  referral: z.string().optional(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+});
+
+export type RegisterFormData = z.infer<typeof RegisterSchema>;
+
+/**
+ * Zod validation schema for password reset request
+ */
+export const ForgetPasswordSchema = z.object({
+  email: z.string().email('Invalid email format').optional(),
+  username: z.string().optional(),
+  captcha: z.string().optional(),
+}).refine(data => data.email || data.username, {
+  message: 'Either email or username is required',
+  path: ['email'],
+});
+
+export type ForgetPasswordFormData = z.infer<typeof ForgetPasswordSchema>;
+
+/**
+ * Zod validation schema for password reset
+ */
+export const ResetPasswordSchema = z.object({
+  code: z.string().min(1, 'Reset code is required'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  confirmPassword: z.string(),
+  email: z.string().email().optional(),
+  username: z.string().optional(),
+  deviceId: z.string().optional(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+});
+
+export type ResetPasswordFormData = z.infer<typeof ResetPasswordSchema>;
+
+/**
+ * Zod validation schema for password update
+ */
+export const UpdatePasswordSchema = z.object({
+  old_password: z.string().min(1, 'Current password is required'),
+  new_password: z.string()
+    .min(8, 'New password must be at least 8 characters')
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  confirm_password: z.string(),
+  force_logout_all: z.boolean().optional(),
+}).refine(data => data.new_password === data.confirm_password, {
+  message: 'Passwords do not match',
+  path: ['confirm_password'],
+});
+
+export type UpdatePasswordFormData = z.infer<typeof UpdatePasswordSchema>;
+
+/**
+ * Zod validation schema for user profile editing
+ */
+export const UserProfileSchema = z.object({
+  username: z.string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(50, 'Username must not exceed 50 characters')
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, hyphens, and underscores'),
+  email: z.string()
+    .email('Invalid email format')
+    .max(255, 'Email must not exceed 255 characters'),
+  first_name: z.string().max(100, 'First name must not exceed 100 characters').optional(),
+  last_name: z.string().max(100, 'Last name must not exceed 100 characters').optional(),
+  display_name: z.string().max(100, 'Display name must not exceed 100 characters').optional(),
+  phone: z.string().optional(),
+  security_question: z.string().optional(),
+  security_answer: z.string().optional(),
+  is_active: z.boolean().optional(),
+});
+
+export type UserProfileFormData = z.infer<typeof UserProfileSchema>;
+
+// ============================================================================
+// RBAC & PERMISSION TYPES
+// ============================================================================
+
+/**
+ * Permission context for route and component access control
+ */
+export interface PermissionContext {
+  user: UserProfile | null;
+  permissions: string[];
+  roles: RoleType[];
+  route: string;
+  resource?: string;
+  action?: string;
+}
+
+/**
+ * RBAC rule for Next.js middleware evaluation
+ */
+export interface RBACRule {
+  resource: string;
+  action: string;
+  conditions?: RBACCondition[];
+  roles?: string[];
+  permissions?: string[];
+  deny?: boolean;
+}
+
+/**
+ * RBAC condition for advanced permission logic
+ */
+export interface RBACCondition {
+  field: string;
+  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'in' | 'not_in';
+  value: any;
+  contextField?: string;
+}
+
+/**
+ * Permission check result for UI components
+ */
+export interface PermissionCheckResult {
+  granted: boolean;
+  reason?: string;
+  alternatives?: string[];
+  requiredPermissions?: string[];
+}
+
+/**
+ * Route protection configuration for Next.js middleware
+ */
+export interface RouteProtection {
+  path: string;
+  requiresAuth: boolean;
+  requiredPermissions?: string[];
+  requiredRoles?: string[];
+  adminOnly?: boolean;
+  redirectTo?: string;
+  allowGuests?: boolean;
+}
+
+// ============================================================================
+// NEXT.JS MIDDLEWARE TYPES
 // ============================================================================
 
 /**
@@ -449,205 +612,58 @@ export interface SessionValidation {
  */
 export interface MiddlewareAuthContext {
   user: UserProfile | null;
-  session: AuthSession | null;
-  permissions: UserPermissions | null;
+  session: UserSession | null;
   isAuthenticated: boolean;
-  requiresRefresh: boolean;
+  permissions: string[];
+  roles: string[];
+  route: string;
+  requestHeaders: Record<string, string>;
 }
 
 /**
- * Route protection configuration
+ * Middleware response for authentication handling
  */
-export interface RouteProtection {
-  path: string;
-  requireAuth: boolean;
-  requiredPermissions?: string[];
-  requireSystemAdmin?: boolean;
-  allowedRoles?: string[];
-  redirectTo?: string;
+export interface MiddlewareResponse {
+  continue: boolean;
+  redirect?: string;
+  headers?: Record<string, string>;
+  cookies?: Record<string, string>;
+  status?: number;
+  error?: string;
 }
 
 /**
- * Middleware request context
+ * JWT token payload structure for Next.js middleware
  */
-export interface MiddlewareRequest {
-  pathname: string;
-  searchParams: URLSearchParams;
-  headers: Headers;
-  cookies: Record<string, string>;
-  userAgent?: string;
-  ip?: string;
+export interface JWTTokenPayload {
+  sub: string | number; // User ID
+  username: string;
+  email: string;
+  role?: string;
+  permissions?: string[];
+  iat: number; // Issued at
+  exp: number; // Expires at
+  jti?: string; // JWT ID
+  aud?: string; // Audience
+  iss?: string; // Issuer
+  tokenVersion?: number;
+  sessionId?: string;
 }
 
 /**
- * Middleware response actions
+ * Token refresh result for automatic token renewal
  */
-export type MiddlewareAction = 
-  | { type: 'continue' }
-  | { type: 'redirect'; url: string }
-  | { type: 'rewrite'; url: string }
-  | { type: 'block'; status: number; message?: string }
-  | { type: 'refresh_token'; token: string };
+export interface TokenRefreshResult {
+  success: boolean;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresIn?: number;
+  error?: string;
+  requiresReauth?: boolean;
+}
 
 // ============================================================================
-// React Hook Form & Zod Schemas
-// ============================================================================
-
-/**
- * User registration schema for React Hook Form
- */
-export const userRegistrationSchema = z.object({
-  first_name: z.string().min(1, 'First name is required').max(50, 'First name too long'),
-  last_name: z.string().min(1, 'Last name is required').max(50, 'Last name too long'),
-  display_name: z.string().optional(),
-  email: z.string().email('Invalid email address'),
-  username: z.string().min(3, 'Username must be at least 3 characters').optional(),
-  phone: z.string().optional(),
-  password: z.string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain uppercase, lowercase, and number'),
-  password_confirmation: z.string(),
-  security_question: z.string().optional(),
-  security_answer: z.string().optional(),
-  default_app_id: z.number().optional(),
-  is_active: z.boolean().default(true),
-}).refine((data) => data.password === data.password_confirmation, {
-  message: "Passwords don't match",
-  path: ["password_confirmation"],
-});
-
-/**
- * User profile update schema
- */
-export const userProfileUpdateSchema = z.object({
-  first_name: z.string().min(1, 'First name is required').max(50, 'First name too long'),
-  last_name: z.string().min(1, 'Last name is required').max(50, 'Last name too long'),
-  display_name: z.string().optional(),
-  email: z.string().email('Invalid email address'),
-  username: z.string().min(3, 'Username must be at least 3 characters').optional(),
-  phone: z.string().optional(),
-  security_question: z.string().optional(),
-  security_answer: z.string().optional(),
-  default_app_id: z.number().optional(),
-  timezone: z.string().optional(),
-  locale: z.string().optional(),
-  theme_preference: z.enum(['light', 'dark', 'system']).optional(),
-  notification_preferences: z.object({
-    email_notifications: z.boolean(),
-    system_alerts: z.boolean(),
-    api_quota_warnings: z.boolean(),
-    security_notifications: z.boolean(),
-    maintenance_notifications: z.boolean(),
-    newsletter_subscription: z.boolean().optional(),
-  }).optional(),
-  is_active: z.boolean(),
-});
-
-/**
- * Login form schema
- */
-export const loginFormSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
-  remember_me: z.boolean().optional(),
-  duration: z.number().optional(),
-});
-
-/**
- * Password reset request schema
- */
-export const passwordResetRequestSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  reset_url: z.string().url().optional(),
-});
-
-/**
- * Password reset confirmation schema
- */
-export const passwordResetConfirmationSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  code: z.string().min(1, 'Reset code is required'),
-  password: z.string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain uppercase, lowercase, and number'),
-  password_confirmation: z.string(),
-}).refine((data) => data.password === data.password_confirmation, {
-  message: "Passwords don't match",
-  path: ["password_confirmation"],
-});
-
-/**
- * Change password schema
- */
-export const changePasswordSchema = z.object({
-  old_password: z.string().min(1, 'Current password is required'),
-  new_password: z.string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain uppercase, lowercase, and number'),
-  new_password_confirmation: z.string(),
-}).refine((data) => data.new_password === data.new_password_confirmation, {
-  message: "Passwords don't match",
-  path: ["new_password_confirmation"],
-}).refine((data) => data.old_password !== data.new_password, {
-  message: "New password must be different from current password",
-  path: ["new_password"],
-});
-
-/**
- * Role creation/update schema
- */
-export const roleSchema = z.object({
-  name: z.string().min(1, 'Role name is required').max(64, 'Role name too long'),
-  description: z.string().optional(),
-  is_active: z.boolean().default(true),
-  role_service_access_by_role_id: z.array(z.object({
-    service_id: z.number().optional(),
-    service: z.string().optional(),
-    component: z.string().optional(),
-    verb_mask: z.number().optional(),
-    requestor_type: z.enum(['API', 'SCRIPT', 'EVENT']).optional(),
-    filters: z.array(z.object({
-      name: z.string(),
-      operator: z.string(),
-      value: z.any(),
-    })).optional(),
-    filter_op: z.enum(['AND', 'OR']).optional(),
-  })).optional(),
-  role_lookup_by_role_id: z.array(z.object({
-    name: z.string().min(1, 'Lookup name is required'),
-    value: z.string().optional(),
-    private: z.boolean().optional(),
-    description: z.string().optional(),
-  })).optional(),
-});
-
-/**
- * User app role assignment schema
- */
-export const userAppRoleSchema = z.object({
-  user_id: z.number().min(1, 'User ID is required'),
-  app_id: z.number().min(1, 'App ID is required'),
-  role_id: z.number().min(1, 'Role ID is required'),
-});
-
-// ============================================================================
-// React Hook Form Type Inference
-// ============================================================================
-
-/**
- * TypeScript type inference for form schemas
- */
-export type UserRegistrationForm = z.infer<typeof userRegistrationSchema>;
-export type UserProfileUpdateForm = z.infer<typeof userProfileUpdateSchema>;
-export type LoginForm = z.infer<typeof loginFormSchema>;
-export type PasswordResetRequestForm = z.infer<typeof passwordResetRequestSchema>;
-export type PasswordResetConfirmationForm = z.infer<typeof passwordResetConfirmationSchema>;
-export type ChangePasswordForm = z.infer<typeof changePasswordSchema>;
-export type RoleForm = z.infer<typeof roleSchema>;
-export type UserAppRoleForm = z.infer<typeof userAppRoleSchema>;
-
-// ============================================================================
-// API Response Types
+// API RESPONSE TYPES
 // ============================================================================
 
 /**
@@ -656,265 +672,104 @@ export type UserAppRoleForm = z.infer<typeof userAppRoleSchema>;
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
-  error?: {
-    code: number;
-    message: string;
-    details?: any;
-  };
+  error?: string;
+  message?: string;
+  statusCode?: number;
+  timestamp?: string;
+}
+
+/**
+ * Paginated user list response
+ */
+export interface UserListResponse extends ApiResponse<UserRow[]> {
   meta?: {
-    total?: number;
-    count?: number;
-    offset?: number;
-    limit?: number;
-  };
-}
-
-/**
- * User list API response
- */
-export interface UsersListResponse extends ApiResponse<UserProfile[]> {
-  meta: {
     total: number;
-    count: number;
-    offset: number;
-    limit: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
   };
 }
 
 /**
- * Role list API response
+ * User creation/update response
  */
-export interface RolesListResponse extends ApiResponse<UserRole[]> {
-  meta: {
-    total: number;
-    count: number;
-    offset: number;
-    limit: number;
-  };
-}
-
-/**
- * User session response
- */
-export interface UserSessionResponse extends ApiResponse<AuthResponse> {}
-
-// ============================================================================
-// State Management Types (Zustand)
-// ============================================================================
-
-/**
- * Authentication store state
- */
-export interface AuthStore {
-  // State
-  session: SessionState;
-  
-  // Actions
-  login: (credentials: LoginCredentials) => Promise<boolean>;
-  loginWithOAuth: (credentials: OAuthCredentials) => Promise<boolean>;
-  logout: () => Promise<void>;
-  refreshSession: () => Promise<boolean>;
-  updateProfile: (updates: Partial<UserProfile>) => Promise<boolean>;
-  changePassword: (data: ChangePasswordForm) => Promise<boolean>;
-  requestPasswordReset: (email: string) => Promise<boolean>;
-  confirmPasswordReset: (data: PasswordResetConfirmationForm) => Promise<boolean>;
-  
-  // Utilities
-  checkPermission: (permission: string) => boolean;
-  hasRole: (roleName: string) => boolean;
-  canAccessService: (serviceId: number, action: AdminAction) => boolean;
-  canAccessApp: (appId: number) => boolean;
-  isSessionExpiring: () => boolean;
-  updateLastActivity: () => void;
-  
-  // Internal actions
-  setUser: (user: UserProfile | null) => void;
-  setSession: (session: AuthSession | null) => void;
-  setPermissions: (permissions: UserPermissions | null) => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
-  clearError: () => void;
-  reset: () => void;
+export interface UserMutationResponse extends ApiResponse<UserProfile> {
+  created?: boolean;
+  updated?: boolean;
+  validationErrors?: Record<string, string[]>;
 }
 
 // ============================================================================
-// React Query Types
+// UTILITY TYPES
 // ============================================================================
 
 /**
- * User query key factory
+ * User search filters for list views
  */
-export const userQueryKeys = {
-  all: ['users'] as const,
-  lists: () => [...userQueryKeys.all, 'list'] as const,
-  list: (filters: Record<string, any>) => [...userQueryKeys.lists(), filters] as const,
-  details: () => [...userQueryKeys.all, 'detail'] as const,
-  detail: (id: number) => [...userQueryKeys.details(), id] as const,
-  profile: () => [...userQueryKeys.all, 'profile'] as const,
-  permissions: (userId: number) => [...userQueryKeys.all, 'permissions', userId] as const,
-  roles: () => ['roles'] as const,
-  rolesList: () => [...userQueryKeys.roles(), 'list'] as const,
-  roleDetail: (id: number) => [...userQueryKeys.roles(), 'detail', id] as const,
-  apps: () => ['apps'] as const,
-  appsList: () => [...userQueryKeys.apps(), 'list'] as const,
-  appDetail: (id: number) => [...userQueryKeys.apps(), 'detail', id] as const,
-  session: () => ['session'] as const,
-};
-
-/**
- * User mutation types
- */
-export interface UserMutations {
-  createUser: (data: UserRegistrationForm) => Promise<UserProfile>;
-  updateUser: (id: number, data: Partial<UserProfileUpdateForm>) => Promise<UserProfile>;
-  deleteUser: (id: number) => Promise<void>;
-  createRole: (data: RoleForm) => Promise<UserRole>;
-  updateRole: (id: number, data: Partial<RoleForm>) => Promise<UserRole>;
-  deleteRole: (id: number) => Promise<void>;
-  assignUserRole: (data: UserAppRoleForm) => Promise<UserAppRole>;
-  removeUserRole: (userAppRoleId: number) => Promise<void>;
-}
-
-// ============================================================================
-// Error Types
-// ============================================================================
-
-/**
- * Authentication error types
- */
-export interface AuthError {
-  code: string;
-  message: string;
-  field?: string;
-  details?: any;
+export interface UserSearchFilters {
+  query?: string;
+  isActive?: boolean;
+  role?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  lastLoginAfter?: string;
+  lastLoginBefore?: string;
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 /**
- * Common authentication error codes
+ * User form state for React components
  */
-export const AUTH_ERROR_CODES = {
-  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
-  ACCOUNT_DISABLED: 'ACCOUNT_DISABLED',
-  ACCOUNT_NOT_VERIFIED: 'ACCOUNT_NOT_VERIFIED',
-  SESSION_EXPIRED: 'SESSION_EXPIRED',
-  TOKEN_INVALID: 'TOKEN_INVALID',
-  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
-  PERMISSION_DENIED: 'PERMISSION_DENIED',
-  RATE_LIMITED: 'RATE_LIMITED',
-  SERVER_ERROR: 'SERVER_ERROR',
-  NETWORK_ERROR: 'NETWORK_ERROR',
-} as const;
+export interface UserFormState {
+  isLoading: boolean;
+  isSubmitting: boolean;
+  isDirty: boolean;
+  errors: Record<string, string>;
+  touchedFields: Record<string, boolean>;
+  submitCount: number;
+}
 
-export type AuthErrorCode = keyof typeof AUTH_ERROR_CODES;
+/**
+ * User action types for state management
+ */
+export type UserAction = 
+  | 'create'
+  | 'read'
+  | 'update'
+  | 'delete'
+  | 'activate'
+  | 'deactivate'
+  | 'reset_password'
+  | 'unlock'
+  | 'view_profile'
+  | 'edit_profile';
 
 // ============================================================================
-// Utility Types
+// EXPORTS
 // ============================================================================
 
-/**
- * Extract user ID from various user objects
- */
-export type UserId<T extends { id: number }> = T['id'];
-
-/**
- * User creation payload (without server-generated fields)
- */
-export type CreateUserPayload = Omit<
-  UserProfile,
-  'id' | 'created_date' | 'last_modified_date' | 'created_by_id' | 'last_modified_by_id' | 'last_login_date'
->;
-
-/**
- * User update payload (without immutable fields)
- */
-export type UpdateUserPayload = Partial<Omit<
-  UserProfile,
-  'id' | 'created_date' | 'last_modified_date' | 'created_by_id' | 'last_modified_by_id' | 'last_login_date'
->>;
-
-/**
- * Role creation payload
- */
-export type CreateRolePayload = Omit<
-  UserRole,
-  'id' | 'created_date' | 'last_modified_date' | 'created_by_id' | 'last_modified_by_id'
->;
-
-/**
- * Role update payload
- */
-export type UpdateRolePayload = Partial<CreateRolePayload>;
-
-/**
- * Type guards for user types
- */
-export const isAdminUser = (user: UserProfile): user is AdminUser => {
-  return user.is_sys_admin === true;
-};
-
-export const isAuthenticatedUser = (user: any): user is UserProfile => {
-  return user && typeof user === 'object' && 'id' in user && 'email' in user;
-};
-
-export const isValidSession = (session: any): session is AuthSession => {
-  return session && 
-         typeof session === 'object' && 
-         'session_token' in session && 
-         'expires_at' in session && 
-         session.expires_at > Date.now();
-};
-
-// ============================================================================
-// Export All Types
-// ============================================================================
-
+// Re-export commonly used types for convenience
 export type {
-  BaseUser,
   UserProfile,
-  AdminUser,
-  NotificationPreferences,
-  UserLookup,
-  JWTPayload,
-  AuthSession,
+  AdminProfile,
+  UserSession,
   LoginCredentials,
-  OAuthCredentials,
-  ApiKeyAuth,
-  AuthResponse,
-  PasswordResetRequest,
-  PasswordResetConfirmation,
-  ChangePasswordRequest,
-  UserRole,
-  RoleServiceAccess,
-  AccessFilter,
-  FilterOperator,
-  RequestorType,
-  RoleLookup,
-  UserAppRole,
-  UserApp,
-  AppType,
-  AdminPermission,
-  AdminAction,
-  PermissionCondition,
-  SessionState,
-  UserPermissions,
-  ServicePermission,
-  AppPermission,
-  SessionRefreshRequest,
-  SessionValidation,
-  MiddlewareAuthContext,
-  RouteProtection,
-  MiddlewareRequest,
-  MiddlewareAction,
-  ApiResponse,
-  UsersListResponse,
-  RolesListResponse,
-  UserSessionResponse,
-  AuthStore,
-  UserMutations,
-  AuthError,
-  AuthErrorCode,
-  CreateUserPayload,
-  UpdateUserPayload,
-  CreateRolePayload,
-  UpdateRolePayload,
+  LoginResponse,
+  RegisterDetails,
+  UserRow,
+  RoleType,
+  LookupKey,
+};
+
+// Export validation schemas
+export {
+  LoginSchema,
+  RegisterSchema,
+  ForgetPasswordSchema,
+  ResetPasswordSchema,
+  UpdatePasswordSchema,
+  UserProfileSchema,
 };
