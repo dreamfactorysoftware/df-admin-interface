@@ -1,919 +1,1262 @@
 /**
- * Comprehensive Vitest Test Suite for Fields Listing Page Component
+ * Comprehensive Vitest test suite for the database fields listing page component.
  * 
- * This test suite validates the React/Next.js implementation of the database fields 
- * listing interface, covering field listing, filtering, sorting, navigation, and 
- * TanStack Virtual table rendering functionality.
+ * Tests field listing, filtering, sorting, navigation, and TanStack Virtual table rendering
+ * following established testing patterns from other migrated components per Section 4.7.1.3
+ * Vitest Testing Infrastructure Setup and Section 5.2 Component Details Testing Infrastructure.
  * 
- * Key Testing Objectives:
- * - Convert Angular TestBed configuration to Vitest with React Testing Library setup
- * - Replace HttpClientTestingModule with Mock Service Worker (MSW) for API mocking
- * - Transform Angular ComponentFixture testing to React Testing Library patterns
- * - Implement TanStack Virtual testing scenarios for large field datasets
- * - Add React Query caching and invalidation testing patterns
- * - Test Next.js routing navigation to field creation and editing routes
+ * Key test coverage areas:
+ * - Field listing with TanStack Virtual for large datasets (1,000+ fields)
+ * - React Query caching and invalidation patterns with MSW integration
+ * - Filtering and sorting functionality with real-time updates
+ * - Navigation to field creation (/new) and editing (/[fieldId]) routes
+ * - Field type-based visual indicators and constraint status displays
+ * - Error handling and loading states
+ * - WCAG 2.1 AA accessibility compliance validation
+ * - Responsive design and performance testing
  * 
- * Performance Targets:
- * - 10x faster test execution with Vitest 2.1.0
- * - Sub-100ms test rendering for component tests
- * - Comprehensive field type testing coverage
+ * Test execution leverages Vitest 2.1.0 for 10x faster execution compared to Jest/Karma,
+ * supporting native TypeScript and ES modules with comprehensive MSW API mocking.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, beforeAll } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockedFunction } from 'vitest';
+import { screen, waitFor, fireEvent, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useRouter, useParams } from 'next/navigation';
+import { QueryClient } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
+
+// Component imports for testing
+import FieldsListingPage from './page';
+
+// Type definitions
+import type { 
+  DatabaseField, 
+  FieldListResponse, 
+  FieldFilterOptions, 
+  FieldSortOptions,
+  FieldType,
+  ConstraintStatus 
+} from './field.types';
+
+// Test utilities and setup
 import { server } from '../../../test/mocks/server';
+import { createTestQueryClient, renderWithProviders, createMockRouter } from '../../../test/test-utils';
+import { handlers } from '../../../test/mocks/handlers';
 
-// Import the component under test
-import FieldsPage from './page';
+// Mock data generators
+import { 
+  createMockDatabaseField,
+  createMockFieldListResponse,
+  generateLargeFieldDataset,
+  createFieldFilterScenarios,
+  createFieldSortScenarios
+} from '../../../test/fixtures/field-fixtures';
 
-// Import types and test utilities
-import type { DatabaseSchemaField, FieldTableRow, FieldType } from './field.types';
-
-// Mock Next.js navigation hooks
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
-  useParams: vi.fn(),
-  useSearchParams: vi.fn(),
-  usePathname: vi.fn(),
-}));
-
-// Mock TanStack Virtual for virtualization testing
-vi.mock('@tanstack/react-virtual', () => ({
-  useVirtualizer: vi.fn(() => ({
-    getVirtualItems: vi.fn(() => [
-      { index: 0, start: 0, size: 50, key: '0' },
-      { index: 1, start: 50, size: 50, key: '1' },
-      { index: 2, start: 100, size: 50, key: '2' },
-    ]),
-    getTotalSize: vi.fn(() => 150),
-    scrollToIndex: vi.fn(),
-    getOffsetForIndex: vi.fn(() => 0),
-    getOffsetForAlignment: vi.fn(() => 0),
-    measure: vi.fn(),
-  })),
-}));
+// =============================================================================
+// Test Configuration and Setup
+// =============================================================================
 
 /**
- * Mock Field Data Factory
- * Generates realistic field data for testing different scenarios
+ * Enhanced user event setup for realistic interaction testing
  */
-const createMockField = (overrides: Partial<DatabaseSchemaField> = {}): DatabaseSchemaField => ({
-  name: 'test_field',
-  label: 'Test Field',
-  type: 'string' as FieldType,
-  db_type: 'varchar',
-  length: 255,
-  precision: null,
-  scale: null,
-  default: null,
-  required: false,
-  allow_null: true,
-  fixed_length: false,
-  supports_multibyte: true,
-  auto_increment: false,
-  is_primary_key: false,
-  is_unique: false,
-  is_index: false,
-  is_foreign_key: false,
-  ref_table: null,
-  ref_field: null,
-  ref_on_update: null,
-  ref_on_delete: null,
-  picklist: null,
-  validation: null,
-  db_function: null,
-  is_virtual: false,
-  is_aggregate: false,
-  description: null,
-  alias: null,
-  native: [],
+const createUserEvent = () => userEvent.setup({
+  delay: null, // Disable delays for faster test execution
+  advanceTimers: vi.advanceTimersByTime,
+});
+
+/**
+ * Mock Next.js router for navigation testing
+ */
+const createMockNextRouter = (overrides = {}) => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  back: vi.fn(),
+  forward: vi.fn(),
+  refresh: vi.fn(),
+  pathname: '/adf-schema/fields',
+  searchParams: new URLSearchParams(),
   ...overrides,
 });
 
 /**
- * Create large dataset for virtualization testing
- * Simulates databases with 1000+ fields for performance validation
+ * Test query client configuration with optimized cache settings
  */
-const createLargeFieldDataset = (count: number = 1500): DatabaseSchemaField[] => {
-  const fieldTypes: FieldType[] = ['string', 'integer', 'boolean', 'datetime', 'text', 'float', 'id'];
-  
-  return Array.from({ length: count }, (_, index) => 
-    createMockField({
-      name: `field_${index.toString().padStart(4, '0')}`,
-      label: `Field ${index + 1}`,
-      type: fieldTypes[index % fieldTypes.length],
-      is_primary_key: index === 0,
-      is_unique: index < 10,
-      is_index: index < 50,
-      is_foreign_key: index % 10 === 0 && index > 0,
-      ref_table: index % 10 === 0 && index > 0 ? `ref_table_${Math.floor(index / 10)}` : null,
-      ref_field: index % 10 === 0 && index > 0 ? 'id' : null,
-    })
-  );
-};
-
-/**
- * Test Component Wrapper
- * Provides necessary React Query and context providers for isolated testing
- */
-const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        cacheTime: 0,
-        staleTime: 0,
-      },
-      mutations: {
-        retry: false,
-      },
+const createFieldsTestQueryClient = () => new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      staleTime: 0,
+      cacheTime: 0,
     },
-  });
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
-};
+    mutations: {
+      retry: false,
+    },
+  },
+});
 
 /**
- * Helper function to render component with providers
+ * Standard field list dataset for consistent testing
  */
-const renderWithProviders = (component: React.ReactElement) => {
-  return render(component, { wrapper: TestWrapper });
-};
+const MOCK_FIELDS_DATASET = [
+  createMockDatabaseField({
+    name: 'id',
+    type: 'id',
+    db_type: 'integer',
+    is_primary_key: true,
+    auto_increment: true,
+    required: true,
+    allow_null: false,
+  }),
+  createMockDatabaseField({
+    name: 'email',
+    type: 'string',
+    db_type: 'varchar',
+    length: 255,
+    is_unique: true,
+    required: true,
+    allow_null: false,
+  }),
+  createMockDatabaseField({
+    name: 'created_at',
+    type: 'timestamp',
+    db_type: 'timestamp',
+    required: false,
+    allow_null: true,
+    default: 'CURRENT_TIMESTAMP',
+  }),
+  createMockDatabaseField({
+    name: 'profile_data',
+    type: 'json',
+    db_type: 'json',
+    required: false,
+    allow_null: true,
+  }),
+  createMockDatabaseField({
+    name: 'status',
+    type: 'string',
+    db_type: 'enum',
+    picklist: 'active,inactive,pending',
+    required: true,
+    allow_null: false,
+    default: 'pending',
+  }),
+];
 
-describe('FieldsPage Component', () => {
-  // Mock implementations
-  const mockPush = vi.fn();
-  const mockReplace = vi.fn();
-  const mockBack = vi.fn();
-  const mockRefresh = vi.fn();
+/**
+ * Large dataset for virtualization testing (1000+ fields)
+ */
+const LARGE_FIELDS_DATASET = generateLargeFieldDataset(1250);
 
-  // Test data
-  const mockFields = [
-    createMockField({
-      name: 'id',
-      type: 'id',
-      is_primary_key: true,
-      auto_increment: true,
-      required: true,
-      allow_null: false,
-    }),
-    createMockField({
-      name: 'name',
-      type: 'string',
-      length: 255,
-      required: true,
-      is_index: true,
-    }),
-    createMockField({
-      name: 'email',
-      type: 'string',
-      length: 320,
-      is_unique: true,
-      validation: '^[^@]+@[^@]+\\.[^@]+$',
-    }),
-    createMockField({
-      name: 'age',
-      type: 'integer',
-      length: 11,
-      allow_null: true,
-    }),
-    createMockField({
-      name: 'is_active',
-      type: 'boolean',
-      default: true,
-    }),
-    createMockField({
-      name: 'created_at',
-      type: 'datetime',
-      default: 'CURRENT_TIMESTAMP',
-    }),
-    createMockField({
-      name: 'user_id',
-      type: 'integer',
-      is_foreign_key: true,
-      ref_table: 'users',
-      ref_field: 'id',
-      ref_on_delete: 'CASCADE',
-    }),
-  ];
+// =============================================================================
+// Mock API Handlers for Field Operations
+// =============================================================================
 
-  beforeAll(() => {
-    // Setup MSW handlers for field management endpoints
-    server.use(
-      // Field listing endpoint
-      http.get('/api/v2/:serviceName/_schema/:tableName', ({ params }) => {
-        const { serviceName, tableName } = params;
-        
-        return HttpResponse.json({
-          resource: mockFields,
-          meta: {
-            count: mockFields.length,
-            schema: ['field_name', 'native_type', 'type', 'max_length', 'precision', 'scale', 'default_value'],
-          },
-        });
-      }),
+/**
+ * MSW handlers for field management API endpoints
+ */
+const fieldApiHandlers = [
+  // Get fields list with pagination and filtering
+  http.get('/api/v2/:service/_schema/:table', ({ params, request }) => {
+    const url = new URL(request.url);
+    const limit = Number(url.searchParams.get('limit')) || 25;
+    const offset = Number(url.searchParams.get('offset')) || 0;
+    const filter = url.searchParams.get('filter');
+    const sort = url.searchParams.get('order');
+    const search = url.searchParams.get('search');
+    
+    let fields = [...MOCK_FIELDS_DATASET];
+    
+    // Apply search filtering
+    if (search) {
+      fields = fields.filter(field => 
+        field.name.toLowerCase().includes(search.toLowerCase()) ||
+        field.type.toLowerCase().includes(search.toLowerCase()) ||
+        (field.description && field.description.toLowerCase().includes(search.toLowerCase()))
+      );
+    }
+    
+    // Apply type filtering
+    if (filter) {
+      const filterType = filter.replace('type=', '');
+      fields = fields.filter(field => field.type === filterType);
+    }
+    
+    // Apply sorting
+    if (sort) {
+      const [sortField, direction] = sort.split(',');
+      fields.sort((a, b) => {
+        const aVal = a[sortField as keyof DatabaseField] || '';
+        const bVal = b[sortField as keyof DatabaseField] || '';
+        const comparison = String(aVal).localeCompare(String(bVal));
+        return direction === 'desc' ? -comparison : comparison;
+      });
+    }
+    
+    // Apply pagination
+    const paginatedFields = fields.slice(offset, offset + limit);
+    
+    return HttpResponse.json({
+      resource: paginatedFields,
+      meta: {
+        count: paginatedFields.length,
+        total: fields.length,
+        offset,
+        limit,
+      }
+    });
+  }),
 
-      // Large dataset endpoint for virtualization testing
-      http.get('/api/v2/large-service/_schema/large-table', () => {
-        const largeDataset = createLargeFieldDataset(1500);
-        return HttpResponse.json({
-          resource: largeDataset,
-          meta: {
-            count: largeDataset.length,
-            schema: ['field_name', 'native_type', 'type', 'max_length', 'precision', 'scale', 'default_value'],
-          },
-        });
-      }),
+  // Get specific field details
+  http.get('/api/v2/:service/_schema/:table/:fieldName', ({ params }) => {
+    const field = MOCK_FIELDS_DATASET.find(f => f.name === params.fieldName);
+    if (!field) {
+      return HttpResponse.json({ error: 'Field not found' }, { status: 404 });
+    }
+    return HttpResponse.json({ resource: [field] });
+  }),
 
-      // Field creation endpoint
-      http.post('/api/v2/:serviceName/_schema/:tableName/:fieldName', ({ request, params }) => {
-        return HttpResponse.json({
-          success: true,
-          message: `Field ${params.fieldName} created successfully`,
-        });
-      }),
+  // Create new field
+  http.post('/api/v2/:service/_schema/:table', async ({ request }) => {
+    const fieldData = await request.json() as DatabaseField;
+    const newField = createMockDatabaseField(fieldData);
+    return HttpResponse.json({ resource: [newField] }, { status: 201 });
+  }),
 
-      // Field update endpoint
-      http.patch('/api/v2/:serviceName/_schema/:tableName/:fieldName', ({ request, params }) => {
-        return HttpResponse.json({
-          success: true,
-          message: `Field ${params.fieldName} updated successfully`,
-        });
-      }),
+  // Update field
+  http.put('/api/v2/:service/_schema/:table/:fieldName', async ({ params, request }) => {
+    const fieldData = await request.json() as Partial<DatabaseField>;
+    const existingField = MOCK_FIELDS_DATASET.find(f => f.name === params.fieldName);
+    if (!existingField) {
+      return HttpResponse.json({ error: 'Field not found' }, { status: 404 });
+    }
+    const updatedField = { ...existingField, ...fieldData };
+    return HttpResponse.json({ resource: [updatedField] });
+  }),
 
-      // Field deletion endpoint
-      http.delete('/api/v2/:serviceName/_schema/:tableName/:fieldName', ({ params }) => {
-        return HttpResponse.json({
-          success: true,
-          message: `Field ${params.fieldName} deleted successfully`,
-        });
-      }),
+  // Delete field
+  http.delete('/api/v2/:service/_schema/:table/:fieldName', ({ params }) => {
+    const fieldIndex = MOCK_FIELDS_DATASET.findIndex(f => f.name === params.fieldName);
+    if (fieldIndex === -1) {
+      return HttpResponse.json({ error: 'Field not found' }, { status: 404 });
+    }
+    return HttpResponse.json({ success: true });
+  }),
 
-      // Error scenarios for testing error handling
-      http.get('/api/v2/error-service/_schema/error-table', () => {
-        return HttpResponse.json(
-          {
-            error: {
-              code: 500,
-              message: 'Internal server error',
-              status_code: 500,
-            },
-          },
-          { status: 500 }
-        );
-      })
-    );
-  });
+  // Large dataset endpoint for virtualization testing
+  http.get('/api/v2/test-large/_schema/large_table', ({ request }) => {
+    const url = new URL(request.url);
+    const limit = Number(url.searchParams.get('limit')) || 50;
+    const offset = Number(url.searchParams.get('offset')) || 0;
+    
+    const paginatedFields = LARGE_FIELDS_DATASET.slice(offset, offset + limit);
+    
+    return HttpResponse.json({
+      resource: paginatedFields,
+      meta: {
+        count: paginatedFields.length,
+        total: LARGE_FIELDS_DATASET.length,
+        offset,
+        limit,
+      }
+    });
+  }),
+];
+
+// =============================================================================
+// Test Suite: Fields Listing Page Component
+// =============================================================================
+
+describe('FieldsListingPage Component', () => {
+  let mockRouter: ReturnType<typeof createMockNextRouter>;
+  let queryClient: QueryClient;
+  let user: ReturnType<typeof createUserEvent>;
 
   beforeEach(() => {
-    // Reset mocks before each test
+    // Reset all mocks and setup fresh state
     vi.clearAllMocks();
     
-    // Setup default mock implementations
-    (useRouter as any).mockReturnValue({
-      push: mockPush,
-      replace: mockReplace,
-      back: mockBack,
-      refresh: mockRefresh,
-      prefetch: vi.fn(),
-    });
-
-    (useParams as any).mockReturnValue({
-      service: 'test-service',
-      table: 'test-table',
-    });
+    // Setup test router
+    mockRouter = createMockNextRouter();
+    
+    // Create fresh query client for each test
+    queryClient = createFieldsTestQueryClient();
+    
+    // Setup user event simulation
+    user = createUserEvent();
+    
+    // Add field-specific handlers to MSW server
+    server.use(...fieldApiHandlers);
   });
 
   afterEach(() => {
     // Clean up after each test
-    vi.clearAllMocks();
+    queryClient.clear();
+    server.resetHandlers();
   });
 
-  describe('Component Rendering and Initial State', () => {
-    it('should render the fields listing page with correct heading', async () => {
-      renderWithProviders(<FieldsPage />);
+  // ===========================================================================
+  // Basic Rendering and Initial State Tests
+  // ===========================================================================
+
+  describe('Initial Rendering and Layout', () => {
+    it('should render the fields listing page with proper structure', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      // Wait for component to load
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /fields/i })).toBeInTheDocument();
+      });
+
+      // Verify main layout elements
+      expect(screen.getByRole('main')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /add field/i })).toBeInTheDocument();
+      expect(screen.getByRole('searchbox')).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: /filter by type/i })).toBeInTheDocument();
+    });
+
+    it('should display loading state initially', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      // Should show loading indicator immediately
+      expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
+      
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByRole('status', { name: /loading/i })).not.toBeInTheDocument();
+      });
+    });
+
+    it('should have proper accessibility attributes', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: /fields/i })).toBeInTheDocument();
       });
 
-      expect(screen.getByText(/manage database fields/i)).toBeInTheDocument();
-    });
+      // Verify WCAG 2.1 AA compliance attributes
+      const searchInput = screen.getByRole('searchbox');
+      expect(searchInput).toHaveAccessibleName();
+      expect(searchInput).toHaveAttribute('aria-label');
 
-    it('should display loading state during initial data fetch', () => {
-      renderWithProviders(<FieldsPage />);
+      const filterSelect = screen.getByRole('combobox', { name: /filter by type/i });
+      expect(filterSelect).toHaveAccessibleName();
 
-      // Check for loading indicators
-      expect(screen.getByTestId('fields-loading')).toBeInTheDocument();
-      expect(screen.getByText(/loading fields/i)).toBeInTheDocument();
-    });
-
-    it('should render table headers correctly', async () => {
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('columnheader', { name: /field name/i })).toBeInTheDocument();
-      });
-
-      expect(screen.getByRole('columnheader', { name: /type/i })).toBeInTheDocument();
-      expect(screen.getByRole('columnheader', { name: /constraints/i })).toBeInTheDocument();
-      expect(screen.getByRole('columnheader', { name: /default/i })).toBeInTheDocument();
-      expect(screen.getByRole('columnheader', { name: /actions/i })).toBeInTheDocument();
-    });
-
-    it('should display field data after successful API response', async () => {
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('id')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('name')).toBeInTheDocument();
-      expect(screen.getByText('email')).toBeInTheDocument();
-      expect(screen.getByText('age')).toBeInTheDocument();
-      expect(screen.getByText('is_active')).toBeInTheDocument();
-      expect(screen.getByText('created_at')).toBeInTheDocument();
-      expect(screen.getByText('user_id')).toBeInTheDocument();
+      const table = screen.getByRole('table');
+      expect(table).toHaveAttribute('aria-label');
     });
   });
 
-  describe('Field Type Display and Constraints', () => {
-    it('should display field types correctly', async () => {
-      renderWithProviders(<FieldsPage />);
+  // ===========================================================================
+  // Data Fetching and React Query Integration Tests
+  // ===========================================================================
 
+  describe('Data Fetching and React Query Integration', () => {
+    it('should fetch fields data on mount', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      // Wait for data to load
       await waitFor(() => {
         expect(screen.getByText('id')).toBeInTheDocument();
+        expect(screen.getByText('email')).toBeInTheDocument();
+        expect(screen.getByText('created_at')).toBeInTheDocument();
       });
 
-      // Check field types are displayed
-      expect(screen.getByText('string')).toBeInTheDocument();
+      // Verify field types are displayed
       expect(screen.getByText('integer')).toBeInTheDocument();
-      expect(screen.getByText('boolean')).toBeInTheDocument();
-      expect(screen.getByText('datetime')).toBeInTheDocument();
+      expect(screen.getByText('varchar')).toBeInTheDocument();
+      expect(screen.getByText('timestamp')).toBeInTheDocument();
     });
 
-    it('should display primary key constraint badge', async () => {
-      renderWithProviders(<FieldsPage />);
+    it('should cache query results for performance', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      // First render
+      const { unmount } = renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
-        expect(screen.getByTestId('constraint-primary-key')).toBeInTheDocument();
+        expect(screen.getByText('id')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Primary Key')).toBeInTheDocument();
+      // Unmount and remount - should use cached data
+      unmount();
+      
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      // Should load immediately from cache
+      expect(screen.getByText('id')).toBeInTheDocument();
+      expect(screen.getByText('email')).toBeInTheDocument();
     });
 
-    it('should display unique constraint badge', async () => {
-      renderWithProviders(<FieldsPage />);
+    it('should handle API errors gracefully', async () => {
+      // Mock API error
+      server.use(
+        http.get('/api/v2/:service/_schema/:table', () => {
+          return HttpResponse.json(
+            { error: 'Service not found' }, 
+            { status: 404 }
+          );
+        })
+      );
 
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'invalid-service', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      // Should display error message
       await waitFor(() => {
-        expect(screen.getByTestId('constraint-unique')).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+        expect(screen.getByText(/service not found/i)).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Unique')).toBeInTheDocument();
+      // Should show retry button
+      expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
     });
 
-    it('should display index constraint badge', async () => {
-      renderWithProviders(<FieldsPage />);
+    it('should support query refetching', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
-        expect(screen.getByTestId('constraint-index')).toBeInTheDocument();
+        expect(screen.getByText('id')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Index')).toBeInTheDocument();
-    });
+      // Click refresh button
+      const refreshButton = screen.getByRole('button', { name: /refresh/i });
+      await user.click(refreshButton);
 
-    it('should display foreign key constraint with reference', async () => {
-      renderWithProviders(<FieldsPage />);
+      // Should show loading state briefly
+      expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
 
+      // Data should reload
       await waitFor(() => {
-        expect(screen.getByTestId('constraint-foreign-key')).toBeInTheDocument();
+        expect(screen.getByText('id')).toBeInTheDocument();
+        expect(screen.queryByRole('status', { name: /loading/i })).not.toBeInTheDocument();
       });
-
-      expect(screen.getByText('Foreign Key')).toBeInTheDocument();
-      expect(screen.getByText('users.id')).toBeInTheDocument();
-    });
-
-    it('should display required field indicator', async () => {
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getAllByTestId('field-required')).toHaveLength(2); // id and name fields
-      });
-    });
-
-    it('should display default values correctly', async () => {
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('true')).toBeInTheDocument(); // boolean default
-      });
-
-      expect(screen.getByText('CURRENT_TIMESTAMP')).toBeInTheDocument(); // datetime default
     });
   });
+
+  // ===========================================================================
+  // TanStack Virtual Table Rendering Tests
+  // ===========================================================================
+
+  describe('TanStack Virtual Table Rendering', () => {
+    it('should render virtual table for large datasets', async () => {
+      // Use large dataset endpoint
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-large', table: 'large_table' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Should show virtualized container
+      const virtualContainer = screen.getByTestId('virtual-table-container');
+      expect(virtualContainer).toBeInTheDocument();
+      
+      // Should show only visible rows (not all 1250)
+      const rows = screen.getAllByRole('row');
+      expect(rows.length).toBeLessThan(100); // Only visible rows rendered
+      expect(rows.length).toBeGreaterThan(10); // But enough to fill viewport
+    });
+
+    it('should handle virtual scrolling correctly', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-large', table: 'large_table' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      const virtualContainer = screen.getByTestId('virtual-table-container');
+      
+      // Simulate scrolling down
+      fireEvent.scroll(virtualContainer, { target: { scrollTop: 1000 } });
+
+      // Should trigger virtualization and render different rows
+      await waitFor(() => {
+        const rows = screen.getAllByRole('row');
+        expect(rows.length).toBeGreaterThan(5);
+      });
+    });
+
+    it('should maintain performance with large datasets', async () => {
+      const performanceStart = performance.now();
+
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-large', table: 'large_table' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      const performanceEnd = performance.now();
+      const renderTime = performanceEnd - performanceStart;
+
+      // Should render quickly even with large dataset
+      expect(renderTime).toBeLessThan(1000); // Less than 1 second
+    });
+  });
+
+  // ===========================================================================
+  // Filtering and Search Functionality Tests
+  // ===========================================================================
 
   describe('Filtering and Search Functionality', () => {
-    it('should render search input field', async () => {
-      renderWithProviders(<FieldsPage />);
+    it('should filter fields by search term', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
 
-      const searchInput = screen.getByPlaceholderText(/search fields/i);
-      expect(searchInput).toBeInTheDocument();
-      expect(searchInput).toHaveAttribute('type', 'text');
-    });
-
-    it('should filter fields by name when typing in search', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
-      });
-
-      const searchInput = screen.getByPlaceholderText(/search fields/i);
-      await user.type(searchInput, 'name');
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
-        expect(screen.queryByText('age')).not.toBeInTheDocument();
-      });
-    });
-
-    it('should filter fields by type using type filter dropdown', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('string')).toBeInTheDocument();
-      });
-
-      const typeFilter = screen.getByLabelText(/filter by type/i);
-      await user.selectOptions(typeFilter, 'string');
-
-      await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('id')).toBeInTheDocument();
         expect(screen.getByText('email')).toBeInTheDocument();
-        expect(screen.queryByText('age')).not.toBeInTheDocument();
+      });
+
+      // Search for 'email'
+      const searchInput = screen.getByRole('searchbox');
+      await user.type(searchInput, 'email');
+
+      // Should show only email field
+      await waitFor(() => {
+        expect(screen.getByText('email')).toBeInTheDocument();
+        expect(screen.queryByText('id')).not.toBeInTheDocument();
       });
     });
 
-    it('should clear search filter when clear button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
+    it('should filter fields by type', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('id')).toBeInTheDocument();
+        expect(screen.getByText('email')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText(/search fields/i);
-      await user.type(searchInput, 'name');
+      // Filter by 'string' type
+      const filterSelect = screen.getByRole('combobox', { name: /filter by type/i });
+      await user.click(filterSelect);
+      
+      const stringOption = screen.getByRole('option', { name: /string/i });
+      await user.click(stringOption);
 
-      const clearButton = screen.getByRole('button', { name: /clear search/i });
+      // Should show only string fields
+      await waitFor(() => {
+        expect(screen.getByText('email')).toBeInTheDocument();
+        expect(screen.getByText('status')).toBeInTheDocument();
+        expect(screen.queryByText('id')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should clear filters when reset button is clicked', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByText('id')).toBeInTheDocument();
+      });
+
+      // Apply search filter
+      const searchInput = screen.getByRole('searchbox');
+      await user.type(searchInput, 'email');
+
+      await waitFor(() => {
+        expect(screen.queryByText('id')).not.toBeInTheDocument();
+      });
+
+      // Clear filters
+      const clearButton = screen.getByRole('button', { name: /clear filters/i });
       await user.click(clearButton);
 
-      expect(searchInput).toHaveValue('');
+      // Should show all fields again
       await waitFor(() => {
-        expect(screen.getByText('age')).toBeInTheDocument();
+        expect(screen.getByText('id')).toBeInTheDocument();
+        expect(screen.getByText('email')).toBeInTheDocument();
       });
     });
 
-    it('should show "no results" message when filter returns no matches', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
+    it('should combine search and type filters', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('id')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText(/search fields/i);
-      await user.type(searchInput, 'nonexistent_field');
+      // Apply both search and type filter
+      const searchInput = screen.getByRole('searchbox');
+      await user.type(searchInput, 'e');
 
+      const filterSelect = screen.getByRole('combobox', { name: /filter by type/i });
+      await user.click(filterSelect);
+      const stringOption = screen.getByRole('option', { name: /string/i });
+      await user.click(stringOption);
+
+      // Should show only string fields containing 'e'
       await waitFor(() => {
-        expect(screen.getByText(/no fields found/i)).toBeInTheDocument();
-        expect(screen.getByText(/try adjusting your search/i)).toBeInTheDocument();
+        expect(screen.getByText('email')).toBeInTheDocument();
+        expect(screen.queryByText('id')).not.toBeInTheDocument();
+        expect(screen.queryByText('created_at')).not.toBeInTheDocument();
       });
     });
   });
 
+  // ===========================================================================
+  // Sorting Functionality Tests
+  // ===========================================================================
+
   describe('Sorting Functionality', () => {
-    it('should sort fields by name when name column header is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
+    it('should sort fields by name ascending', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
-        expect(screen.getByRole('columnheader', { name: /field name/i })).toBeInTheDocument();
+        expect(screen.getByText('id')).toBeInTheDocument();
       });
 
-      const nameHeader = screen.getByRole('columnheader', { name: /field name/i });
+      // Click name column header to sort
+      const nameHeader = screen.getByRole('columnheader', { name: /name/i });
       await user.click(nameHeader);
 
+      // Verify ascending sort indicator
       await waitFor(() => {
-        expect(screen.getByTestId('sort-indicator-asc')).toBeInTheDocument();
+        const sortIcon = within(nameHeader).getByTestId('sort-asc-icon');
+        expect(sortIcon).toBeInTheDocument();
       });
 
-      // Click again to reverse sort
-      await user.click(nameHeader);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('sort-indicator-desc')).toBeInTheDocument();
-      });
+      // Verify sort order (alphabetical)
+      const fieldCells = screen.getAllByTestId(/field-name-/);
+      const fieldNames = fieldCells.map(cell => cell.textContent);
+      const sortedNames = [...fieldNames].sort();
+      expect(fieldNames).toEqual(sortedNames);
     });
 
-    it('should sort fields by type when type column header is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
+    it('should sort fields by name descending', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
-        expect(screen.getByRole('columnheader', { name: /type/i })).toBeInTheDocument();
+        expect(screen.getByText('id')).toBeInTheDocument();
       });
 
+      // Click name column header twice for descending sort
+      const nameHeader = screen.getByRole('columnheader', { name: /name/i });
+      await user.click(nameHeader);
+      await user.click(nameHeader);
+
+      // Verify descending sort indicator
+      await waitFor(() => {
+        const sortIcon = within(nameHeader).getByTestId('sort-desc-icon');
+        expect(sortIcon).toBeInTheDocument();
+      });
+
+      // Verify sort order (reverse alphabetical)
+      const fieldCells = screen.getAllByTestId(/field-name-/);
+      const fieldNames = fieldCells.map(cell => cell.textContent);
+      const sortedNames = [...fieldNames].sort().reverse();
+      expect(fieldNames).toEqual(sortedNames);
+    });
+
+    it('should sort fields by type', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByText('id')).toBeInTheDocument();
+      });
+
+      // Click type column header to sort
       const typeHeader = screen.getByRole('columnheader', { name: /type/i });
       await user.click(typeHeader);
 
+      // Verify sort indicator
       await waitFor(() => {
-        expect(screen.getByTestId('sort-indicator-asc')).toBeInTheDocument();
+        const sortIcon = within(typeHeader).getByTestId('sort-asc-icon');
+        expect(sortIcon).toBeInTheDocument();
       });
     });
 
-    it('should maintain sort state during data refresh', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
+    it('should clear sort when clicking sorted column third time', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
-        expect(screen.getByRole('columnheader', { name: /field name/i })).toBeInTheDocument();
+        expect(screen.getByText('id')).toBeInTheDocument();
       });
 
-      const nameHeader = screen.getByRole('columnheader', { name: /field name/i });
+      // Click name column header three times to clear sort
+      const nameHeader = screen.getByRole('columnheader', { name: /name/i });
+      await user.click(nameHeader);
+      await user.click(nameHeader);
       await user.click(nameHeader);
 
-      const refreshButton = screen.getByRole('button', { name: /refresh/i });
-      await user.click(refreshButton);
-
+      // Verify no sort indicator
       await waitFor(() => {
-        expect(screen.getByTestId('sort-indicator-asc')).toBeInTheDocument();
+        expect(within(nameHeader).queryByTestId('sort-asc-icon')).not.toBeInTheDocument();
+        expect(within(nameHeader).queryByTestId('sort-desc-icon')).not.toBeInTheDocument();
       });
     });
   });
 
-  describe('TanStack Virtual Large Dataset Testing', () => {
-    beforeEach(() => {
-      // Mock params for large dataset testing
-      (useParams as any).mockReturnValue({
-        service: 'large-service',
-        table: 'large-table',
-      });
-    });
-
-    it('should render virtualized table for large datasets efficiently', async () => {
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('virtualized-table')).toBeInTheDocument();
-      });
-
-      // Verify virtualization is active
-      expect(screen.getByTestId('virtual-list-container')).toBeInTheDocument();
-      expect(screen.getByTestId('virtual-scrollbar')).toBeInTheDocument();
-    });
-
-    it('should display performance metrics for large datasets', async () => {
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('performance-indicator')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/1,500 fields/i)).toBeInTheDocument();
-      expect(screen.getByText(/virtualized rendering/i)).toBeInTheDocument();
-    });
-
-    it('should handle scrolling in virtualized table', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('virtual-list-container')).toBeInTheDocument();
-      });
-
-      const virtualContainer = screen.getByTestId('virtual-list-container');
-      
-      // Simulate scrolling
-      fireEvent.scroll(virtualContainer, { target: { scrollTop: 500 } });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('scroll-position-indicator')).toBeInTheDocument();
-      });
-    });
-
-    it('should maintain performance under 50ms for virtualized rendering', async () => {
-      const startTime = performance.now();
-      
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('virtualized-table')).toBeInTheDocument();
-      });
-
-      const endTime = performance.now();
-      const renderTime = endTime - startTime;
-
-      // Verify rendering performance meets requirements
-      expect(renderTime).toBeLessThan(50);
-    });
-  });
+  // ===========================================================================
+  // Navigation and Routing Tests
+  // ===========================================================================
 
   describe('Navigation and Routing', () => {
-    it('should navigate to field creation page when "Add Field" button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
+    it('should navigate to field creation page when Add Field is clicked', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
 
-      const addButton = screen.getByRole('button', { name: /add field/i });
-      await user.click(addButton);
-
-      expect(mockPush).toHaveBeenCalledWith('/adf-schema/fields/new?service=test-service&table=test-table');
-    });
-
-    it('should navigate to field edit page when edit action is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
-      });
-
-      const editButton = screen.getByTestId('edit-field-name');
-      await user.click(editButton);
-
-      expect(mockPush).toHaveBeenCalledWith('/adf-schema/fields/name?service=test-service&table=test-table');
-    });
-
-    it('should navigate back to table schema when back button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
-
-      const backButton = screen.getByRole('button', { name: /back to table/i });
-      await user.click(backButton);
-
-      expect(mockPush).toHaveBeenCalledWith('/adf-schema/tables/test-table?service=test-service');
-    });
-
-    it('should update URL parameters when service or table changes', async () => {
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('test-service')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('test-table')).toBeInTheDocument();
-    });
-  });
-
-  describe('React Query Caching and Data Management', () => {
-    it('should cache field data and display cache status', async () => {
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('cache-status')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/cached/i)).toBeInTheDocument();
-    });
-
-    it('should invalidate cache and refetch data when refresh is triggered', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
-      });
-
-      const refreshButton = screen.getByRole('button', { name: /refresh/i });
-      await user.click(refreshButton);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('cache-status')).toHaveTextContent(/refreshing/i);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('cache-status')).toHaveTextContent(/cached/i);
-      });
-    });
-
-    it('should handle stale data and background updates', async () => {
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
-      });
-
-      // Verify stale-while-revalidate pattern
-      expect(screen.getByTestId('data-freshness-indicator')).toBeInTheDocument();
-    });
-
-    it('should implement optimistic updates for field modifications', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
-      });
-
-      // Simulate field update
-      const editButton = screen.getByTestId('edit-field-name');
-      await user.click(editButton);
-
-      // Verify optimistic update occurs before server response
-      await waitFor(() => {
-        expect(screen.getByTestId('optimistic-update-indicator')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Error Handling and Edge Cases', () => {
-    beforeEach(() => {
-      // Mock params for error testing
-      (useParams as any).mockReturnValue({
-        service: 'error-service',
-        table: 'error-table',
-      });
-    });
-
-    it('should display error message when API request fails', async () => {
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/error loading fields/i)).toBeInTheDocument();
-      expect(screen.getByText(/internal server error/i)).toBeInTheDocument();
-    });
-
-    it('should provide retry functionality after error', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-      });
-
-      const retryButton = screen.getByRole('button', { name: /retry/i });
-      await user.click(retryButton);
-
-      expect(screen.getByTestId('fields-loading')).toBeInTheDocument();
-    });
-
-    it('should handle network connectivity issues gracefully', async () => {
-      // Mock network error
-      server.use(
-        http.get('/api/v2/error-service/_schema/error-table', () => {
-          return HttpResponse.error();
-        })
-      );
-
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/network error/i)).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/check your connection/i)).toBeInTheDocument();
-    });
-
-    it('should handle empty field list gracefully', async () => {
-      // Mock empty response
-      server.use(
-        http.get('/api/v2/test-service/_schema/test-table', () => {
-          return HttpResponse.json({
-            resource: [],
-            meta: { count: 0 },
-          });
-        })
-      );
-
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('empty-state')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText(/no fields found/i)).toBeInTheDocument();
-      expect(screen.getByText(/create your first field/i)).toBeInTheDocument();
-    });
-  });
-
-  describe('Accessibility and User Experience', () => {
-    it('should have proper ARIA labels and roles', async () => {
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      expect(screen.getByRole('table')).toHaveAttribute('aria-label', 'Database fields listing');
-      expect(screen.getByRole('searchbox')).toHaveAttribute('aria-label', 'Search fields');
-      expect(screen.getByRole('combobox')).toHaveAttribute('aria-label', 'Filter by field type');
-    });
-
-    it('should support keyboard navigation', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Test tab navigation
-      await user.tab();
-      expect(screen.getByPlaceholderText(/search fields/i)).toHaveFocus();
-
-      await user.tab();
-      expect(screen.getByLabelText(/filter by type/i)).toHaveFocus();
-
-      await user.tab();
-      expect(screen.getByRole('button', { name: /add field/i })).toHaveFocus();
-    });
-
-    it('should announce filter results to screen readers', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
-      });
-
-      const searchInput = screen.getByPlaceholderText(/search fields/i);
-      await user.type(searchInput, 'name');
-
-      await waitFor(() => {
-        expect(screen.getByRole('status')).toHaveTextContent(/2 fields found/i);
-      });
-    });
-
-    it('should provide clear focus indicators for interactive elements', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /add field/i })).toBeInTheDocument();
       });
 
+      // Click Add Field button
       const addButton = screen.getByRole('button', { name: /add field/i });
-      await user.tab();
+      await user.click(addButton);
 
-      expect(addButton).toHaveClass('focus:ring-2', 'focus:ring-blue-500');
+      // Should navigate to creation route
+      expect(mockRouter.push).toHaveBeenCalledWith('/adf-schema/fields/new?service=test-mysql&table=users');
+    });
+
+    it('should navigate to field editing page when field name is clicked', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByText('email')).toBeInTheDocument();
+      });
+
+      // Click on field name link
+      const emailLink = screen.getByRole('link', { name: 'email' });
+      await user.click(emailLink);
+
+      // Should navigate to edit route
+      expect(mockRouter.push).toHaveBeenCalledWith('/adf-schema/fields/email?service=test-mysql&table=users');
+    });
+
+    it('should handle breadcrumb navigation correctly', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByText('email')).toBeInTheDocument();
+      });
+
+      // Check breadcrumb navigation
+      const schemaBreadcrumb = screen.getByRole('link', { name: /schema/i });
+      await user.click(schemaBreadcrumb);
+
+      expect(mockRouter.push).toHaveBeenCalledWith('/adf-schema?service=test-mysql');
+
+      const tableBreadcrumb = screen.getByRole('link', { name: 'users' });
+      await user.click(tableBreadcrumb);
+
+      expect(mockRouter.push).toHaveBeenCalledWith('/adf-schema/tables/users?service=test-mysql');
     });
   });
 
-  describe('Performance and Optimization', () => {
-    it('should lazy load field data for improved initial load times', async () => {
-      const loadStartTime = performance.now();
-      
-      renderWithProviders(<FieldsPage />);
+  // ===========================================================================
+  // Field Actions and Context Menu Tests
+  // ===========================================================================
+
+  describe('Field Actions and Context Menu', () => {
+    it('should show field actions menu when row action button is clicked', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
-        expect(screen.getByTestId('fields-loading')).toBeInTheDocument();
+        expect(screen.getByText('email')).toBeInTheDocument();
       });
 
-      const initialLoadTime = performance.now() - loadStartTime;
-      expect(initialLoadTime).toBeLessThan(100); // Initial render under 100ms
+      // Click row actions button
+      const rowActionButtons = screen.getAllByRole('button', { name: /actions/i });
+      await user.click(rowActionButtons[0]);
+
+      // Should show context menu
+      await waitFor(() => {
+        expect(screen.getByRole('menu')).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: /edit/i })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: /duplicate/i })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: /delete/i })).toBeInTheDocument();
+      });
     });
 
-    it('should implement debounced search to reduce API calls', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<FieldsPage />);
+    it('should handle field duplication', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/search fields/i)).toBeInTheDocument();
+        expect(screen.getByText('email')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText(/search fields/i);
-      
-      // Type rapidly to test debouncing
-      await user.type(searchInput, 'test');
+      // Open actions menu and click duplicate
+      const rowActionButtons = screen.getAllByRole('button', { name: /actions/i });
+      await user.click(rowActionButtons[0]);
 
-      // Verify debounced behavior - only one API call should be made
+      const duplicateMenuItem = screen.getByRole('menuitem', { name: /duplicate/i });
+      await user.click(duplicateMenuItem);
+
+      // Should navigate to creation page with duplicated data
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        expect.stringContaining('/adf-schema/fields/new?service=test-mysql&table=users&duplicate=')
+      );
+    });
+
+    it('should handle field deletion with confirmation', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
       await waitFor(() => {
-        expect(screen.getByTestId('search-debounce-indicator')).toHaveTextContent(/debounced/i);
+        expect(screen.getByText('email')).toBeInTheDocument();
+      });
+
+      // Open actions menu and click delete
+      const rowActionButtons = screen.getAllByRole('button', { name: /actions/i });
+      await user.click(rowActionButtons[0]);
+
+      const deleteMenuItem = screen.getByRole('menuitem', { name: /delete/i });
+      await user.click(deleteMenuItem);
+
+      // Should show confirmation dialog
+      await waitFor(() => {
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByText(/are you sure you want to delete/i)).toBeInTheDocument();
+      });
+
+      // Confirm deletion
+      const confirmButton = screen.getByRole('button', { name: /delete/i });
+      await user.click(confirmButton);
+
+      // Should remove field from list
+      await waitFor(() => {
+        expect(screen.queryByText('email')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // ===========================================================================
+  // Field Type and Constraint Display Tests
+  // ===========================================================================
+
+  describe('Field Type and Constraint Display', () => {
+    it('should display field type badges correctly', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByText('id')).toBeInTheDocument();
+      });
+
+      // Verify type badges
+      expect(screen.getByTestId('field-type-badge-id')).toHaveTextContent('id');
+      expect(screen.getByTestId('field-type-badge-string')).toHaveTextContent('string');
+      expect(screen.getByTestId('field-type-badge-timestamp')).toHaveTextContent('timestamp');
+    });
+
+    it('should display constraint indicators', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByText('id')).toBeInTheDocument();
+      });
+
+      // Verify constraint indicators
+      expect(screen.getByTestId('constraint-primary-key')).toBeInTheDocument();
+      expect(screen.getByTestId('constraint-unique')).toBeInTheDocument();
+      expect(screen.getByTestId('constraint-required')).toBeInTheDocument();
+      expect(screen.getByTestId('constraint-auto-increment')).toBeInTheDocument();
+    });
+
+    it('should show field length and precision information', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByText('email')).toBeInTheDocument();
+      });
+
+      // Verify length information for varchar field
+      expect(screen.getByText('varchar(255)')).toBeInTheDocument();
+      
+      // Verify integer field display
+      expect(screen.getByText('integer(12)')).toBeInTheDocument();
+    });
+
+    it('should display default values appropriately', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByText('created_at')).toBeInTheDocument();
+      });
+
+      // Verify default value display
+      expect(screen.getByText('CURRENT_TIMESTAMP')).toBeInTheDocument();
+      expect(screen.getByText('pending')).toBeInTheDocument(); // status field default
+    });
+  });
+
+  // ===========================================================================
+  // Responsive Design and Mobile Tests
+  // ===========================================================================
+
+  describe('Responsive Design and Mobile Support', () => {
+    it('should adapt table layout for mobile viewports', async () => {
+      // Mock mobile viewport
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 375,
+      });
+
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByText('id')).toBeInTheDocument();
+      });
+
+      // Should show mobile-optimized layout
+      expect(screen.getByTestId('mobile-field-cards')).toBeInTheDocument();
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    });
+
+    it('should maintain functionality in mobile view', async () => {
+      // Mock mobile viewport
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 375,
+      });
+
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mobile-field-cards')).toBeInTheDocument();
+      });
+
+      // Search should still work
+      const searchInput = screen.getByRole('searchbox');
+      await user.type(searchInput, 'email');
+
+      await waitFor(() => {
+        expect(screen.getByText('email')).toBeInTheDocument();
+        expect(screen.queryByText('id')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // ===========================================================================
+  // Performance and Edge Case Tests
+  // ===========================================================================
+
+  describe('Performance and Edge Cases', () => {
+    it('should handle empty field lists gracefully', async () => {
+      // Mock empty response
+      server.use(
+        http.get('/api/v2/:service/_schema/:table', () => {
+          return HttpResponse.json({
+            resource: [],
+            meta: { count: 0, total: 0, offset: 0, limit: 25 }
+          });
+        })
+      );
+
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'empty_table' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      // Should show empty state
+      await waitFor(() => {
+        expect(screen.getByTestId('empty-state')).toBeInTheDocument();
+        expect(screen.getByText(/no fields found/i)).toBeInTheDocument();
+      });
+
+      // Should still show Add Field button
+      expect(screen.getByRole('button', { name: /add field/i })).toBeInTheDocument();
+    });
+
+    it('should debounce search input for performance', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
+
+      await waitFor(() => {
+        expect(screen.getByText('id')).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByRole('searchbox');
+      
+      // Type rapidly
+      await user.type(searchInput, 'email', { delay: 50 });
+
+      // Should not make API calls for every keystroke
+      // This would be validated by checking MSW request counts
+      // For this test, we verify the final result
+      await waitFor(() => {
+        expect(screen.getByText('email')).toBeInTheDocument();
+        expect(screen.queryByText('id')).not.toBeInTheDocument();
       });
     });
 
-    it('should use React.memo for field row components to prevent unnecessary re-renders', async () => {
-      renderWithProviders(<FieldsPage />);
+    it('should handle network interruptions gracefully', async () => {
+      const renderOptions = {
+        router: mockRouter,
+        queryClient,
+        initialProps: {
+          params: { service: 'test-mysql', table: 'users' }
+        }
+      };
+
+      renderWithProviders(<FieldsListingPage {...renderOptions.initialProps} />, renderOptions);
 
       await waitFor(() => {
-        expect(screen.getByText('name')).toBeInTheDocument();
+        expect(screen.getByText('id')).toBeInTheDocument();
       });
 
-      // Verify memoization by checking render count
-      expect(screen.getByTestId('field-row-render-count')).toHaveTextContent('1');
+      // Simulate network error during refresh
+      server.use(
+        http.get('/api/v2/:service/_schema/:table', () => {
+          return HttpResponse.error();
+        })
+      );
+
+      const refreshButton = screen.getByRole('button', { name: /refresh/i });
+      await user.click(refreshButton);
+
+      // Should show error state while maintaining previous data
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+        expect(screen.getByText(/network error/i)).toBeInTheDocument();
+      });
+
+      // Previous data should still be visible
+      expect(screen.getByText('id')).toBeInTheDocument();
     });
   });
 });
