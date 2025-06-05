@@ -1,280 +1,173 @@
 /**
  * Loading UI component for the user management section
  * 
- * Displays skeleton placeholders during data fetching operations with:
- * - Next.js app router loading state patterns
- * - WCAG 2.1 AA compliant accessibility features
- * - Responsive design for mobile and desktop viewports
- * - Theme-aware styling with Tailwind CSS animations
- * - Semantic structure matching the actual user management interface
+ * Displays skeleton placeholders during data fetching operations for user table
+ * and form components. Implements Next.js app router loading states with accessible
+ * loading indicators and responsive design using Tailwind CSS animations.
  * 
- * @returns React component for user management loading state
+ * Features:
+ * - Skeleton placeholders for user table and forms
+ * - WCAG 2.1 AA compliance with proper ARIA attributes
+ * - Responsive design that adapts to different viewport sizes
+ * - Theme-aware styling matching application design system
+ * - Performance optimized animations with Tailwind CSS
+ * - Server-side rendering compatibility
  */
+
 export default function UsersLoading() {
   return (
-    <div 
-      className="space-y-6 animate-pulse" 
-      data-testid="users-loading"
-      role="status"
-      aria-label="Loading user management interface"
-    >
-      {/* Screen reader announcement */}
-      <div className="sr-only" aria-live="polite" aria-atomic="true">
-        Loading user management interface, please wait
-      </div>
-
+    <div className="min-h-screen bg-white dark:bg-gray-900">
       {/* Page Header Skeleton */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-2">
-          {/* Page Title */}
-          <div 
-            className="h-8 bg-gray-200 dark:bg-gray-700 rounded-md w-48 animate-pulse"
-            aria-hidden="true"
-          />
-          {/* Page Description */}
-          <div 
-            className="h-5 bg-gray-200 dark:bg-gray-700 rounded-md w-80 animate-pulse"
-            aria-hidden="true"
-          />
-        </div>
-        
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div 
-            className="h-10 bg-gray-200 dark:bg-gray-700 rounded-md w-32 animate-pulse"
-            aria-hidden="true"
-          />
-          <div 
-            className="h-10 bg-primary-200 dark:bg-primary-700 rounded-md w-36 animate-pulse"
-            aria-hidden="true"
-          />
-        </div>
-      </div>
-
-      {/* Statistics Cards - Responsive grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div 
-            key={`stat-${index}`}
-            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-3"
-            aria-hidden="true"
-          >
-            {/* Stat Icon */}
-            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
-            {/* Stat Value */}
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse" />
-            {/* Stat Label */}
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse" />
-          </div>
-        ))}
-      </div>
-
-      {/* Search and Filters Section */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search Bar */}
-          <div className="flex-1">
-            <div 
-              className="h-10 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"
-              aria-hidden="true"
-            />
-          </div>
-          
-          {/* Filter Dropdowns */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div 
-                key={`filter-${index}`}
-                className="h-10 bg-gray-200 dark:bg-gray-700 rounded-md w-full sm:w-36 animate-pulse"
-                aria-hidden="true"
-              />
-            ))}
+      <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+        <div className="px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
+            {/* Title Skeleton */}
+            <div className="animate-pulse">
+              <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded-lg mb-2" />
+              <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded" />
+            </div>
+            
+            {/* Action Buttons Skeleton */}
+            <div className="flex gap-3">
+              <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
+              <div className="h-10 w-32 bg-primary-200 dark:bg-primary-800 rounded-md animate-pulse" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Bulk Actions Bar */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            {/* Select All Checkbox */}
-            <div 
-              className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-              aria-hidden="true"
-            />
-            {/* Selection Count */}
-            <div 
-              className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse"
-              aria-hidden="true"
-            />
-          </div>
-          
-          {/* Bulk Actions */}
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div 
-                key={`bulk-action-${index}`}
-                className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse"
-                aria-hidden="true"
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Data Table Skeleton */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        {/* Table Header */}
-        <div className="border-b border-gray-200 dark:border-gray-700 p-4">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-            {/* Table column headers */}
-            {['Select', 'Avatar', 'Name', 'Email', 'Role', 'Actions'].map((header, index) => (
-              <div 
-                key={`header-${index}`}
-                className={`h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse ${
-                  index === 0 ? 'w-12' : 
-                  index === 1 ? 'w-16' : 
-                  index === 5 ? 'w-20' : 'w-full'
-                }`}
-                aria-hidden="true"
-              />
-            ))}
+      {/* Main Content Area */}
+      <div className="px-4 py-6 sm:px-6 lg:px-8">
+        {/* Search and Filters Skeleton */}
+        <div className="mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            {/* Search Bar Skeleton */}
+            <div className="flex-1 max-w-md">
+              <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
+            </div>
+            
+            {/* Filter Controls Skeleton */}
+            <div className="flex gap-2">
+              <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
+              <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
+            </div>
           </div>
         </div>
 
-        {/* Table Rows */}
-        <div className="divide-y divide-gray-200 dark:divide-gray-700">
-          {Array.from({ length: 8 }).map((_, rowIndex) => (
-            <div key={`row-${rowIndex}`} className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
-                {/* Checkbox */}
-                <div 
-                  className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-                  aria-hidden="true"
-                />
+        {/* Data Table Skeleton */}
+        <div className="bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-900/5 dark:ring-gray-700 rounded-lg overflow-hidden">
+          {/* Table Header */}
+          <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                {/* Select All Checkbox Skeleton */}
+                <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                 
-                {/* Avatar */}
-                <div 
-                  className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"
-                  aria-hidden="true"
-                />
-                
-                {/* Name */}
-                <div className="space-y-2">
-                  <div 
-                    className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"
-                    aria-hidden="true"
-                  />
-                  <div 
-                    className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse"
-                    aria-hidden="true"
-                  />
-                </div>
-                
-                {/* Email */}
-                <div 
-                  className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-40 animate-pulse"
-                  aria-hidden="true"
-                />
-                
-                {/* Role Badge */}
-                <div 
-                  className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-20 animate-pulse"
-                  aria-hidden="true"
-                />
-                
-                {/* Actions Menu */}
-                <div className="flex gap-2">
-                  <div 
-                    className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-                    aria-hidden="true"
-                  />
-                  <div 
-                    className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-                    aria-hidden="true"
-                  />
+                {/* Column Headers Skeleton */}
+                <div className="flex gap-8">
+                  <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  <div className="h-4 w-18 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  <div className="h-4 w-14 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                 </div>
               </div>
+              
+              {/* Table Actions Skeleton */}
+              <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* Pagination Skeleton */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          {/* Pagination Info */}
-          <div 
-            className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse"
-            aria-hidden="true"
-          />
-          
-          {/* Pagination Controls */}
+          {/* Table Rows Skeleton */}
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {Array.from({ length: 10 }, (_, index) => (
+              <div key={index} className="px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    {/* Row Checkbox Skeleton */}
+                    <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    
+                    {/* User Avatar Skeleton */}
+                    <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                    
+                    {/* User Data Skeleton */}
+                    <div className="flex gap-8">
+                      <div className="space-y-1">
+                        <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                        <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      </div>
+                      <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    </div>
+                  </div>
+                  
+                  {/* Row Actions Skeleton */}
+                  <div className="flex gap-2">
+                    <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Pagination Skeleton */}
+        <div className="mt-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {/* Previous Button */}
-            <div 
-              className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-              aria-hidden="true"
-            />
-            
-            {/* Page Numbers */}
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div 
-                key={`page-${index}`}
-                className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-                aria-hidden="true"
-              />
-            ))}
-            
-            {/* Next Button */}
-            <div 
-              className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-              aria-hidden="true"
-            />
+            <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
           </div>
         </div>
       </div>
 
-      {/* Mobile-optimized loading state for smaller screens */}
-      <div className="md:hidden space-y-4">
-        {/* Mobile user cards */}
-        {Array.from({ length: 6 }).map((_, index) => (
-          <div 
-            key={`mobile-card-${index}`}
-            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3"
-            aria-hidden="true"
-          >
-            <div className="flex items-center gap-3">
-              {/* Avatar */}
-              <div className="h-12 w-12 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
-              
-              <div className="flex-1 space-y-2">
-                {/* Name */}
-                <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
-                {/* Email */}
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-40 animate-pulse" />
-              </div>
-              
-              {/* Actions */}
-              <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-            </div>
-            
-            {/* Role Badge */}
-            <div className="flex justify-between items-center">
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-20 animate-pulse" />
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse" />
-            </div>
-          </div>
-        ))}
+      {/* Loading Status for Screen Readers */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-label="Loading user management interface"
+        className="sr-only"
+      >
+        Loading user management interface. Please wait while we fetch user data and prepare the table view.
       </div>
 
-      {/* Loading indicator for screen readers */}
-      <div 
-        className="sr-only" 
-        aria-live="polite" 
-        aria-atomic="true"
+      {/* Progress Indicator */}
+      <div
+        className="fixed bottom-4 right-4 z-50"
+        role="progressbar"
+        aria-label="Page loading progress"
+        aria-valuenow={75}
+        aria-valuemin={0}
+        aria-valuemax={100}
       >
-        User data is being loaded. This page will update automatically when ready.
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-3">
+            {/* Spinning Loader */}
+            <div className="relative">
+              <div className="h-4 w-4 rounded-full border-2 border-gray-200 dark:border-gray-600" />
+              <div className="absolute inset-0 h-4 w-4 animate-spin rounded-full border-2 border-transparent border-t-primary-500 border-r-primary-500" />
+            </div>
+            
+            {/* Loading Text */}
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Loading users...
+            </span>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="mt-2 w-32 bg-gray-200 rounded-full h-1 dark:bg-gray-700">
+            <div className="bg-primary-500 h-1 rounded-full animate-pulse w-3/4 transition-all duration-300"></div>
+          </div>
+        </div>
       </div>
     </div>
   );
