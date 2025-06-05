@@ -1,511 +1,1029 @@
-import { z } from 'zod';
-
 /**
  * Comprehensive Zod validation schemas for database field configuration
  * Supports all field types, constraints, relationships, and validation rules
- * Integrates with React Hook Form for real-time field form validation
+ * 
+ * Integrates with React Hook Form for real-time field form validation with
+ * dynamic control enabling/disabling based on field type selections.
+ * 
+ * Performance target: Real-time validation under 100ms per React/Next.js Integration Requirements
+ * 
+ * @module FieldValidationSchemas
  */
 
-// ==============================================================================
-// Field Type Enumerations
-// ==============================================================================
+import { z } from 'zod'
+
+// ============================================================================
+// CORE FIELD TYPE DEFINITIONS
+// ============================================================================
 
 /**
- * Supported database field types matching the Angular implementation
+ * Supported database field types enumeration
+ * Based on DreamFactory field type specifications and database compatibility
  */
 export const FieldTypeSchema = z.enum([
-  'id',
-  'string',
-  'integer', 
-  'text',
-  'boolean',
-  'binary',
+  'integer',
+  'bigint', 
+  'decimal',
   'float',
   'double',
-  'decimal',
-  'datetime',
+  'string',
+  'text',
+  'boolean',
   'date',
-  'time',
-  'reference',
-  'user_id',
-  'user_id_on_create',
-  'user_id_on_update',
+  'datetime',
   'timestamp',
-  'timestamp_on_create',
-  'timestamp_on_update',
+  'time',
+  'binary',
+  'json',
+  'xml',
+  'uuid',
+  'enum',
+  'set',
+  'blob',
+  'clob',
+  'geometry',
+  'point',
+  'linestring',
+  'polygon',
 ], {
-  errorMap: () => ({ message: 'Please select a valid field type' })
-});
+  errorMap: () => ({ message: 'Please select a valid field type' }),
+})
 
 /**
- * Database types that support length constraints
+ * Referential action types for foreign key constraints
  */
-const TYPES_WITH_LENGTH = ['string', 'text', 'binary'] as const;
+export const ReferentialActionSchema = z.enum([
+  'CASCADE',
+  'SET_NULL', 
+  'RESTRICT',
+  'NO_ACTION',
+], {
+  errorMap: () => ({ message: 'Please select a valid referential action' }),
+})
 
 /**
- * Database types that support precision and scale constraints
+ * Field format options for display and validation
  */
-const TYPES_WITH_PRECISION = ['decimal', 'float', 'double'] as const;
+export const FieldFormatSchema = z.enum([
+  'none',
+  'email',
+  'url',
+  'phone',
+  'currency',
+  'percentage',
+  'date_iso',
+  'datetime_iso',
+  'time_12',
+  'time_24',
+], {
+  errorMap: () => ({ message: 'Please select a valid field format' }),
+})
+
+// ============================================================================
+// VALIDATION UTILITY SCHEMAS
+// ============================================================================
 
 /**
- * Database types that support reference relationships
+ * CSV validation schema for picklist fields
+ * Validates comma-separated values with proper escaping and formatting
  */
-const REFERENCE_TYPES = ['reference'] as const;
-
-/**
- * Database types that are automatically managed timestamps
- */
-const TIMESTAMP_TYPES = ['timestamp', 'timestamp_on_create', 'timestamp_on_update'] as const;
-
-/**
- * Database types that are automatically managed user IDs
- */
-const USER_ID_TYPES = ['user_id', 'user_id_on_create', 'user_id_on_update'] as const;
-
-// ==============================================================================
-// Database Function Validation
-// ==============================================================================
-
-/**
- * Validation schema for database function usage
- * Matches the DbFunctionUseType from Angular implementation
- */
-export const DbFunctionUseSchema = z.object({
-  use: z.array(z.string().min(1, 'Function use type is required')).min(1, 'At least one use type is required'),
-  function: z.string().min(1, 'Function name is required').max(255, 'Function name must be less than 255 characters')
-});
-
-/**
- * Array of database function usages
- */
-export const DbFunctionArraySchema = z.array(DbFunctionUseSchema).optional().nullable();
-
-// ==============================================================================
-// JSON Validation Schema
-// ==============================================================================
-
-/**
- * JSON validation schema that validates JSON string format
- * Replaces the Angular JsonValidator function
- */
-export const JsonStringSchema = z.string().optional().nullable().refine(
-  (value) => {
-    if (!value || value.trim().length === 0) {
-      return true; // Empty values are valid
+export const csvValidationSchema = z
+  .string()
+  .refine(
+    (value) => {
+      if (!value || value.trim() === '') return true
+      
+      try {
+        // Split by comma and validate each value
+        const values = value.split(',').map(v => v.trim())
+        
+        // Check for empty values
+        if (values.some(v => v === '')) {
+          return false
+        }
+        
+        // Check for duplicate values
+        const uniqueValues = new Set(values.map(v => v.toLowerCase()))
+        if (uniqueValues.size !== values.length) {
+          return false
+        }
+        
+        // Check each value is valid (no special characters that could break parsing)
+        const validValueRegex = /^[a-zA-Z0-9\s\-_\.]+$/
+        return values.every(v => validValueRegex.test(v))
+        
+      } catch {
+        return false
+      }
+    },
+    {
+      message: 'Invalid CSV format. Use comma-separated values without duplicates or special characters.',
     }
-    try {
-      JSON.parse(value);
-      return true;
-    } catch {
-      return false;
-    }
-  },
-  {
-    message: 'Please enter valid JSON format'
-  }
-);
-
-// ==============================================================================
-// CSV Validation Schema  
-// ==============================================================================
+  )
 
 /**
- * CSV validation schema that validates comma-separated word lists
- * Replaces the Angular CsvValidator function using the same regex pattern
+ * JSON validation schema for complex field configuration
+ * Validates well-formed JSON with error handling for malformed input
  */
-export const CsvStringSchema = z.string().optional().nullable().refine(
-  (value) => {
-    if (!value || value.trim().length === 0) {
-      return true; // Empty values are valid
+export const jsonValidationSchema = z
+  .string()
+  .refine(
+    (value) => {
+      if (!value || value.trim() === '') return true
+      try {
+        JSON.parse(value)
+        return true
+      } catch {
+        return false
+      }
+    },
+    {
+      message: 'Invalid JSON format. Please check syntax and try again.',
     }
-    const csvRegex = /^\w+(?:\s*,\s*\w+)*$/;
-    return csvRegex.test(value);
-  },
-  {
-    message: 'Please enter comma-separated words (letters, numbers, underscores only)'
-  }
-);
-
-// ==============================================================================
-// Core Field Configuration Schema
-// ==============================================================================
+  )
 
 /**
- * Base field configuration schema without conditional validation
+ * Database function validation schema
+ * Validates database function names and parameters
  */
-const BaseFieldSchema = z.object({
-  // Required fields
+export const dbFunctionSchema = z.object({
+  function: z.string().min(1, 'Function name is required').max(64, 'Function name is too long'),
+  use: z.array(z.string()).min(1, 'At least one usage context is required'),
+})
+
+/**
+ * Field constraint validation schema
+ */
+export const fieldConstraintSchema = z.object({
+  type: z.enum(['CHECK', 'UNIQUE', 'INDEX', 'DEFAULT']),
+  definition: z.string().min(1, 'Constraint definition is required').max(500, 'Constraint definition is too long'),
+  enabled: z.boolean().default(true),
+})
+
+// ============================================================================
+// FIELD-TYPE-SPECIFIC VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Numeric field validation schema (integer, bigint, decimal, float, double)
+ */
+export const numericFieldValidationSchema = z.object({
+  // Core properties
   name: z.string()
     .min(1, 'Field name is required')
-    .max(255, 'Field name must be less than 255 characters')
-    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Field name must start with letter or underscore and contain only letters, numbers, and underscores'),
+    .max(128, 'Field name must be less than 128 characters')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
   
   label: z.string()
     .min(1, 'Field label is required')
-    .max(255, 'Field label must be less than 255 characters'),
+    .max(255, 'Field label is too long'),
   
-  type: FieldTypeSchema,
-
-  // Optional basic fields
-  alias: z.string().max(255, 'Alias must be less than 255 characters').optional().nullable(),
-  description: z.string().max(1000, 'Description must be less than 1000 characters').optional().nullable(),
-  dbType: z.string().max(100, 'Database type must be less than 100 characters').optional().nullable(),
-  default: z.string().max(500, 'Default value must be less than 500 characters').optional().nullable(),
-
-  // Numeric constraints (conditional validation applied later)
-  length: z.number().int().min(0).max(65535).optional().nullable(),
-  precision: z.number().int().min(0).max(65).optional().nullable(),
-  scale: z.number().int().min(0).max(30).optional().nullable(),
-
-  // Boolean flags
-  allowNull: z.boolean().default(true),
-  autoIncrement: z.boolean().default(false),
-  fixedLength: z.boolean().default(false),
-  isAggregate: z.boolean().default(false),
-  isForeignKey: z.boolean().default(false),
+  description: z.string()
+    .max(500, 'Description is too long')
+    .optional(),
+  
+  type: z.enum(['integer', 'bigint', 'decimal', 'float', 'double']),
+  
+  // Numeric-specific properties
+  length: z.number()
+    .int('Length must be an integer')
+    .min(1, 'Length must be at least 1')
+    .max(65, 'Length cannot exceed 65')
+    .optional(),
+  
+  precision: z.number()
+    .int('Precision must be an integer')
+    .min(1, 'Precision must be at least 1')
+    .max(65, 'Precision cannot exceed 65')
+    .optional(),
+  
+  scale: z.number()
+    .int('Scale must be an integer')
+    .min(0, 'Scale cannot be negative')
+    .max(30, 'Scale cannot exceed 30')
+    .optional(),
+  
+  // Constraints
+  isNullable: z.boolean().default(true),
   isPrimaryKey: z.boolean().default(false),
   isUnique: z.boolean().default(false),
-  isVirtual: z.boolean().default(false),
-  required: z.boolean().default(false),
-  supportsMultibyte: z.boolean().default(false),
-
-  // Reference relationship fields (conditional validation applied later)
-  refTable: z.string().max(255, 'Reference table name must be less than 255 characters').optional().nullable(),
-  refField: z.string().max(255, 'Reference field name must be less than 255 characters').optional().nullable(),
-  refOnDelete: z.enum(['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION']).optional().nullable(),
-  refOnUpdate: z.enum(['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION']).optional().nullable(),
-
-  // Complex configuration fields
-  validation: JsonStringSchema,
-  picklist: CsvStringSchema,
+  isAutoIncrement: z.boolean().default(false),
   
-  // Database functions
-  dbFunction: DbFunctionArraySchema,
-
-  // System fields (typically read-only)
-  native: z.array(z.any()).optional().nullable(),
-  value: z.array(z.any()).default([])
-});
-
-// ==============================================================================
-// Conditional Field Validation Schema
-// ==============================================================================
+  // Default value
+  defaultValue: z.union([
+    z.number(),
+    z.string().max(255, 'Default value is too long'),
+    z.null(),
+  ]).optional(),
+  
+  // Validation rules
+  minValue: z.number().optional(),
+  maxValue: z.number().optional(),
+})
+.refine((data) => {
+  // Validate precision/scale relationship for decimal types
+  if ((data.type === 'decimal' || data.type === 'float' || data.type === 'double') && data.scale && data.precision) {
+    return data.scale <= data.precision
+  }
+  return true
+}, {
+  message: 'Scale cannot be greater than precision',
+  path: ['scale'],
+})
+.refine((data) => {
+  // Validate min/max value relationship
+  if (data.minValue !== undefined && data.maxValue !== undefined) {
+    return data.minValue <= data.maxValue
+  }
+  return true
+}, {
+  message: 'Minimum value cannot be greater than maximum value',
+  path: ['maxValue'],
+})
 
 /**
- * Main field validation schema with conditional logic based on field type
- * Implements dynamic control enabling/disabling per Section 5.2 Component Details
+ * String field validation schema (string, text)
  */
-export const FieldValidationSchema = BaseFieldSchema.superRefine((data, ctx) => {
-  const { type, length, precision, scale, refTable, refField, isVirtual, isForeignKey } = data;
-
-  // Length validation for string/text/binary types
-  if (TYPES_WITH_LENGTH.includes(type as any)) {
-    if (!isVirtual && length !== null && length !== undefined && length <= 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['length'],
-        message: 'Length must be greater than 0 for string, text, and binary fields'
-      });
-    }
-  } else {
-    // Clear length for non-supported types
-    if (length !== null && length !== undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['length'],
-        message: 'Length is not applicable for this field type'
-      });
+export const stringFieldValidationSchema = z.object({
+  // Core properties
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(128, 'Field name must be less than 128 characters')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  label: z.string()
+    .min(1, 'Field label is required')
+    .max(255, 'Field label is too long'),
+  
+  description: z.string()
+    .max(500, 'Description is too long')
+    .optional(),
+  
+  type: z.enum(['string', 'text']),
+  
+  // String-specific properties
+  length: z.number()
+    .int('Length must be an integer')
+    .min(1, 'Length must be at least 1')
+    .max(65535, 'Length cannot exceed 65535')
+    .optional(),
+  
+  fixedLength: z.boolean().default(false),
+  supportsMultibyte: z.boolean().default(true),
+  
+  // Format and validation
+  format: FieldFormatSchema.optional(),
+  
+  // Constraints
+  isNullable: z.boolean().default(true),
+  isPrimaryKey: z.boolean().default(false),
+  isUnique: z.boolean().default(false),
+  
+  // Default value
+  defaultValue: z.string()
+    .max(255, 'Default value is too long')
+    .optional(),
+  
+  // Validation rules
+  minLength: z.number()
+    .int('Minimum length must be an integer')
+    .min(0, 'Minimum length cannot be negative')
+    .optional(),
+  
+  maxLength: z.number()
+    .int('Maximum length must be an integer')
+    .min(1, 'Maximum length must be at least 1')
+    .optional(),
+  
+  pattern: z.string()
+    .max(255, 'Pattern is too long')
+    .optional(),
+  
+  // Picklist support
+  isPicklist: z.boolean().default(false),
+  picklistValues: csvValidationSchema.optional(),
+})
+.refine((data) => {
+  // Validate min/max length relationship
+  if (data.minLength !== undefined && data.maxLength !== undefined) {
+    return data.minLength <= data.maxLength
+  }
+  return true
+}, {
+  message: 'Minimum length cannot be greater than maximum length',
+  path: ['maxLength'],
+})
+.refine((data) => {
+  // Validate picklist values when picklist is enabled
+  if (data.isPicklist && (!data.picklistValues || data.picklistValues.trim() === '')) {
+    return false
+  }
+  return true
+}, {
+  message: 'Picklist values are required when picklist is enabled',
+  path: ['picklistValues'],
+})
+.refine((data) => {
+  // Validate regex pattern if provided
+  if (data.pattern) {
+    try {
+      new RegExp(data.pattern)
+      return true
+    } catch {
+      return false
     }
   }
+  return true
+}, {
+  message: 'Invalid regular expression pattern',
+  path: ['pattern'],
+})
 
-  // Precision and scale validation for decimal/float/double types
-  if (TYPES_WITH_PRECISION.includes(type as any)) {
-    if (!isVirtual) {
-      if (precision !== null && precision !== undefined) {
-        if (precision <= 0) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['precision'],
-            message: 'Precision must be greater than 0 for decimal, float, and double fields'
-          });
-        }
-        
-        if (scale !== null && scale !== undefined) {
-          if (scale < 0) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ['scale'],
-              message: 'Scale must be 0 or greater'
-            });
-          }
-          
-          if (scale > precision) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ['scale'],
-              message: 'Scale cannot be greater than precision'
-            });
-          }
-        }
-      }
-    }
-  } else {
-    // Clear precision/scale for non-supported types
-    if (precision !== null && precision !== undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['precision'],
-        message: 'Precision is not applicable for this field type'
-      });
-    }
-    if (scale !== null && scale !== undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['scale'],  
-        message: 'Scale is not applicable for this field type'
-      });
+/**
+ * Boolean field validation schema
+ */
+export const booleanFieldValidationSchema = z.object({
+  // Core properties
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(128, 'Field name must be less than 128 characters')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  label: z.string()
+    .min(1, 'Field label is required')
+    .max(255, 'Field label is too long'),
+  
+  description: z.string()
+    .max(500, 'Description is too long')
+    .optional(),
+  
+  type: z.literal('boolean'),
+  
+  // Constraints
+  isNullable: z.boolean().default(true),
+  isPrimaryKey: z.boolean().default(false),
+  
+  // Default value
+  defaultValue: z.union([
+    z.boolean(),
+    z.enum(['true', 'false', '1', '0']),
+    z.null(),
+  ]).optional(),
+  
+  // Display options
+  trueLabel: z.string().max(50, 'True label is too long').default('Yes'),
+  falseLabel: z.string().max(50, 'False label is too long').default('No'),
+})
+
+/**
+ * Date/time field validation schema (date, datetime, timestamp, time)
+ */
+export const dateTimeFieldValidationSchema = z.object({
+  // Core properties
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(128, 'Field name must be less than 128 characters')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  label: z.string()
+    .min(1, 'Field label is required')
+    .max(255, 'Field label is too long'),
+  
+  description: z.string()
+    .max(500, 'Description is too long')
+    .optional(),
+  
+  type: z.enum(['date', 'datetime', 'timestamp', 'time']),
+  
+  // Date/time-specific properties
+  format: z.enum(['date_iso', 'datetime_iso', 'time_12', 'time_24']).optional(),
+  timezone: z.string().max(50, 'Timezone is too long').optional(),
+  
+  // Constraints
+  isNullable: z.boolean().default(true),
+  isPrimaryKey: z.boolean().default(false),
+  isUnique: z.boolean().default(false),
+  
+  // Auto-timestamp options
+  updateOnChange: z.boolean().default(false),
+  setOnCreate: z.boolean().default(false),
+  
+  // Default value
+  defaultValue: z.union([
+    z.string().datetime(),
+    z.enum(['CURRENT_TIMESTAMP', 'NOW()', 'CURRENT_DATE', 'CURRENT_TIME']),
+    z.null(),
+  ]).optional(),
+  
+  // Validation rules
+  minDate: z.string().datetime().optional(),
+  maxDate: z.string().datetime().optional(),
+})
+.refine((data) => {
+  // Validate min/max date relationship
+  if (data.minDate && data.maxDate) {
+    return new Date(data.minDate) <= new Date(data.maxDate)
+  }
+  return true
+}, {
+  message: 'Minimum date cannot be after maximum date',
+  path: ['maxDate'],
+})
+
+/**
+ * Binary field validation schema (binary, blob, clob)
+ */
+export const binaryFieldValidationSchema = z.object({
+  // Core properties
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(128, 'Field name must be less than 128 characters')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  label: z.string()
+    .min(1, 'Field label is required')
+    .max(255, 'Field label is too long'),
+  
+  description: z.string()
+    .max(500, 'Description is too long')
+    .optional(),
+  
+  type: z.enum(['binary', 'blob', 'clob']),
+  
+  // Binary-specific properties
+  maxSize: z.number()
+    .int('Maximum size must be an integer')
+    .min(1, 'Maximum size must be at least 1 byte')
+    .max(4294967295, 'Maximum size cannot exceed 4GB')
+    .optional(),
+  
+  allowedMimeTypes: csvValidationSchema.optional(),
+  
+  // Constraints
+  isNullable: z.boolean().default(true),
+  
+  // Storage options
+  storeExternally: z.boolean().default(false),
+  compressData: z.boolean().default(false),
+})
+
+/**
+ * JSON/XML field validation schema
+ */
+export const jsonXmlFieldValidationSchema = z.object({
+  // Core properties
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(128, 'Field name must be less than 128 characters')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  label: z.string()
+    .min(1, 'Field label is required')
+    .max(255, 'Field label is too long'),
+  
+  description: z.string()
+    .max(500, 'Description is too long')
+    .optional(),
+  
+  type: z.enum(['json', 'xml']),
+  
+  // Constraints
+  isNullable: z.boolean().default(true),
+  
+  // Validation schema
+  validationSchema: jsonValidationSchema.optional(),
+  
+  // Default value (must be valid JSON/XML)
+  defaultValue: z.string()
+    .max(10000, 'Default value is too long')
+    .optional(),
+})
+.refine((data) => {
+  // Validate default value is valid JSON if type is json
+  if (data.type === 'json' && data.defaultValue) {
+    try {
+      JSON.parse(data.defaultValue)
+      return true
+    } catch {
+      return false
     }
   }
+  return true
+}, {
+  message: 'Default value must be valid JSON',
+  path: ['defaultValue'],
+})
 
-  // Reference field validation for reference types
-  if (REFERENCE_TYPES.includes(type as any) || isForeignKey) {
-    if (!isVirtual) {
-      if (!refTable || refTable.trim().length === 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['refTable'],
-          message: 'Reference table is required for reference fields'
-        });
-      }
-      
-      if (!refField || refField.trim().length === 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['refField'],
-          message: 'Reference field is required for reference fields'
-        });
-      }
-    }
-  } else {
-    // Clear reference fields for non-reference types
-    if (refTable !== null && refTable !== undefined && refTable.trim().length > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['refTable'],
-        message: 'Reference table is not applicable for this field type'
-      });
-    }
-    if (refField !== null && refField !== undefined && refField.trim().length > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['refField'],
-        message: 'Reference field is not applicable for this field type'
-      });
-    }
+/**
+ * UUID field validation schema
+ */
+export const uuidFieldValidationSchema = z.object({
+  // Core properties
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(128, 'Field name must be less than 128 characters')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  label: z.string()
+    .min(1, 'Field label is required')
+    .max(255, 'Field label is too long'),
+  
+  description: z.string()
+    .max(500, 'Description is too long')
+    .optional(),
+  
+  type: z.literal('uuid'),
+  
+  // Constraints
+  isNullable: z.boolean().default(true),
+  isPrimaryKey: z.boolean().default(false),
+  isUnique: z.boolean().default(true),
+  
+  // UUID options
+  autoGenerate: z.boolean().default(true),
+  uuidVersion: z.enum(['1', '4']).default('4'),
+  
+  // Default value (must be valid UUID format)
+  defaultValue: z.string()
+    .uuid('Default value must be a valid UUID')
+    .optional(),
+})
+
+/**
+ * Enum/Set field validation schema
+ */
+export const enumSetFieldValidationSchema = z.object({
+  // Core properties
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(128, 'Field name must be less than 128 characters')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  label: z.string()
+    .min(1, 'Field label is required')
+    .max(255, 'Field label is too long'),
+  
+  description: z.string()
+    .max(500, 'Description is too long')
+    .optional(),
+  
+  type: z.enum(['enum', 'set']),
+  
+  // Enum/Set values
+  values: csvValidationSchema,
+  
+  // Constraints
+  isNullable: z.boolean().default(true),
+  isPrimaryKey: z.boolean().default(false),
+  
+  // Default value
+  defaultValue: z.string()
+    .max(255, 'Default value is too long')
+    .optional(),
+  
+  // Set-specific options
+  allowMultiple: z.boolean().default(false),
+  maxSelections: z.number()
+    .int('Maximum selections must be an integer')
+    .min(1, 'Maximum selections must be at least 1')
+    .optional(),
+})
+.refine((data) => {
+  // Ensure allowMultiple is only used with 'set' type
+  if (data.allowMultiple && data.type !== 'set') {
+    return false
   }
+  return true
+}, {
+  message: 'Multiple selections are only allowed for SET type fields',
+  path: ['allowMultiple'],
+})
+.refine((data) => {
+  // Validate default value is in the values list
+  if (data.defaultValue && data.values) {
+    const values = data.values.split(',').map(v => v.trim())
+    return values.includes(data.defaultValue)
+  }
+  return true
+}, {
+  message: 'Default value must be one of the defined values',
+  path: ['defaultValue'],
+})
 
-  // Virtual field constraints
-  if (isVirtual) {
-    // Virtual fields cannot be primary keys
-    if (data.isPrimaryKey) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['isPrimaryKey'],
-        message: 'Virtual fields cannot be primary keys'
-      });
+/**
+ * Geometry field validation schema (geometry, point, linestring, polygon)
+ */
+export const geometryFieldValidationSchema = z.object({
+  // Core properties
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(128, 'Field name must be less than 128 characters')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  label: z.string()
+    .min(1, 'Field label is required')
+    .max(255, 'Field label is too long'),
+  
+  description: z.string()
+    .max(500, 'Description is too long')
+    .optional(),
+  
+  type: z.enum(['geometry', 'point', 'linestring', 'polygon']),
+  
+  // Geometry-specific properties
+  srid: z.number()
+    .int('SRID must be an integer')
+    .min(0, 'SRID cannot be negative')
+    .default(4326), // WGS84
+  
+  dimensions: z.enum(['2D', '3D', '4D']).default('2D'),
+  
+  // Constraints
+  isNullable: z.boolean().default(true),
+  isIndexed: z.boolean().default(true),
+  
+  // Validation rules
+  allowEmptyGeometry: z.boolean().default(true),
+})
+
+// ============================================================================
+// FOREIGN KEY AND RELATIONSHIP SCHEMAS
+// ============================================================================
+
+/**
+ * Foreign key relationship validation schema
+ */
+export const foreignKeyValidationSchema = z.object({
+  // Core foreign key properties
+  isEnabled: z.boolean().default(false),
+  
+  // Referenced table and field
+  refTable: z.string()
+    .min(1, 'Referenced table is required')
+    .max(128, 'Referenced table name is too long')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Referenced table name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  refField: z.string()
+    .min(1, 'Referenced field is required')
+    .max(128, 'Referenced field name is too long')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Referenced field name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  // Referential actions
+  onUpdate: ReferentialActionSchema.default('CASCADE'),
+  onDelete: ReferentialActionSchema.default('RESTRICT'),
+  
+  // Constraint naming
+  constraintName: z.string()
+    .max(128, 'Constraint name is too long')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Constraint name must start with a letter and contain only letters, numbers, and underscores')
+    .optional(),
+})
+
+/**
+ * Function usage validation schema
+ */
+export const functionUsageValidationSchema = z.object({
+  // Core function properties
+  isEnabled: z.boolean().default(false),
+  
+  // Function definition
+  functions: z.array(dbFunctionSchema).optional(),
+  
+  // Function context
+  applyOnInsert: z.boolean().default(false),
+  applyOnUpdate: z.boolean().default(false),
+  applyOnSelect: z.boolean().default(false),
+})
+
+// ============================================================================
+// COMPREHENSIVE FIELD VALIDATION SCHEMA
+// ============================================================================
+
+/**
+ * Base field properties shared across all field types
+ */
+export const baseFieldSchema = z.object({
+  // Identification
+  id: z.string().optional(),
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(128, 'Field name must be less than 128 characters')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
+  
+  label: z.string()
+    .min(1, 'Field label is required')
+    .max(255, 'Field label is too long'),
+  
+  description: z.string()
+    .max(500, 'Description is too long')
+    .optional(),
+  
+  alias: z.string()
+    .max(128, 'Alias is too long')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Alias must start with a letter and contain only letters, numbers, and underscores')
+    .optional(),
+  
+  // Field type
+  type: FieldTypeSchema,
+  
+  // Common constraints
+  isNullable: z.boolean().default(true),
+  isPrimaryKey: z.boolean().default(false),
+  isUnique: z.boolean().default(false),
+  isIndex: z.boolean().default(false),
+  isVirtual: z.boolean().default(false),
+  isComputed: z.boolean().default(false),
+  
+  // Display options
+  hidden: z.boolean().default(false),
+  
+  // Relationships and functions
+  foreignKey: foreignKeyValidationSchema.optional(),
+  functionUsage: functionUsageValidationSchema.optional(),
+  
+  // Additional constraints
+  constraints: z.array(fieldConstraintSchema).optional(),
+})
+
+/**
+ * Main field validation schema with conditional validation
+ * Based on field type selection, different validation rules apply
+ */
+export const fieldValidationSchema = z.discriminatedUnion('type', [
+  numericFieldValidationSchema,
+  stringFieldValidationSchema,
+  booleanFieldValidationSchema,
+  dateTimeFieldValidationSchema,
+  binaryFieldValidationSchema,
+  jsonXmlFieldValidationSchema,
+  uuidFieldValidationSchema,
+  enumSetFieldValidationSchema,
+  geometryFieldValidationSchema,
+])
+
+/**
+ * Field array validation schema for table management
+ * Ensures unique field names and at least one primary key if required
+ */
+export const fieldArrayValidationSchema = z
+  .array(fieldValidationSchema)
+  .min(1, 'At least one field is required')
+  .refine(
+    (fields) => {
+      // Check for unique field names
+      const names = fields.map(f => f.name.toLowerCase())
+      return names.length === new Set(names).size
+    },
+    {
+      message: 'Field names must be unique',
     }
+  )
+  .refine(
+    (fields) => {
+      // Check for unique aliases
+      const aliases = fields
+        .map(f => f.alias?.toLowerCase())
+        .filter(Boolean)
+      return aliases.length === new Set(aliases).size
+    },
+    {
+      message: 'Field aliases must be unique',
+    }
+  )
+
+// ============================================================================
+// FORM-SPECIFIC VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Field creation form validation schema
+ * Used for React Hook Form integration with real-time validation
+ */
+export const fieldCreationFormSchema = fieldValidationSchema.extend({
+  // Form-specific properties
+  tableName: z.string()
+    .min(1, 'Table name is required')
+    .max(128, 'Table name is too long'),
+  
+  serviceId: z.number()
+    .int('Service ID must be an integer')
+    .positive('Service ID must be positive'),
+  
+  // Form state
+  isDirty: z.boolean().default(false),
+  isSubmitting: z.boolean().default(false),
+})
+
+/**
+ * Field update form validation schema
+ * Allows partial updates with optional field ID
+ */
+export const fieldUpdateFormSchema = fieldCreationFormSchema.partial().extend({
+  id: z.string().min(1, 'Field ID is required'),
+  name: z.string()
+    .min(1, 'Field name is required')
+    .max(128, 'Field name must be less than 128 characters')
+    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Field name must start with a letter and contain only letters, numbers, and underscores'),
+})
+
+/**
+ * Bulk field operations validation schema
+ */
+export const bulkFieldOperationSchema = z.object({
+  operation: z.enum(['create', 'update', 'delete']),
+  fields: z.array(fieldValidationSchema.partial()).min(1, 'At least one field is required'),
+  tableName: z.string().min(1, 'Table name is required'),
+  serviceId: z.number().int().positive('Service ID must be positive'),
+})
+
+// ============================================================================
+// DYNAMIC VALIDATION HELPERS
+// ============================================================================
+
+/**
+ * Creates field type-specific validation schema
+ * Enables dynamic control enabling/disabling based on field type selection
+ */
+export const createFieldTypeValidationSchema = (fieldType: string) => {
+  switch (fieldType) {
+    case 'integer':
+    case 'bigint':
+    case 'decimal':
+    case 'float':
+    case 'double':
+      return numericFieldValidationSchema
     
-    // Virtual fields cannot have auto increment
-    if (data.autoIncrement) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['autoIncrement'],
-        message: 'Virtual fields cannot have auto increment'
-      });
-    }
-  }
-
-  // Primary key constraints
-  if (data.isPrimaryKey) {
-    // Primary keys cannot allow null
-    if (data.allowNull) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['allowNull'],
-        message: 'Primary keys cannot allow null values'
-      });
-    }
-  }
-
-  // Auto increment constraints
-  if (data.autoIncrement) {
-    // Auto increment fields must be numeric
-    if (!['id', 'integer'].includes(type)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['autoIncrement'],
-        message: 'Auto increment is only applicable to ID and integer fields'
-      });
-    }
+    case 'string':
+    case 'text':
+      return stringFieldValidationSchema
     
-    // Auto increment fields cannot allow null
-    if (data.allowNull) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['allowNull'],
-        message: 'Auto increment fields cannot allow null values'
-      });
-    }
+    case 'boolean':
+      return booleanFieldValidationSchema
+    
+    case 'date':
+    case 'datetime':
+    case 'timestamp':
+    case 'time':
+      return dateTimeFieldValidationSchema
+    
+    case 'binary':
+    case 'blob':
+    case 'clob':
+      return binaryFieldValidationSchema
+    
+    case 'json':
+    case 'xml':
+      return jsonXmlFieldValidationSchema
+    
+    case 'uuid':
+      return uuidFieldValidationSchema
+    
+    case 'enum':
+    case 'set':
+      return enumSetFieldValidationSchema
+    
+    case 'geometry':
+    case 'point':
+    case 'linestring':
+    case 'polygon':
+      return geometryFieldValidationSchema
+    
+    default:
+      return baseFieldSchema
   }
-
-  // Timestamp field constraints
-  if (TIMESTAMP_TYPES.includes(type as any)) {
-    // Timestamp fields should not have custom defaults
-    if (data.default !== null && data.default !== undefined && data.default.trim().length > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['default'],
-        message: 'Timestamp fields automatically manage their values and should not have custom defaults'
-      });
-    }
-  }
-
-  // User ID field constraints
-  if (USER_ID_TYPES.includes(type as any)) {
-    // User ID fields should not have custom defaults
-    if (data.default !== null && data.default !== undefined && data.default.trim().length > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['default'],
-        message: 'User ID fields automatically manage their values and should not have custom defaults'
-      });
-    }
-  }
-});
-
-// ==============================================================================
-// Type Inference and Exports
-// ==============================================================================
-
-/**
- * Inferred TypeScript type from the field validation schema
- * Provides type safety for React Hook Form integration
- */
-export type FieldFormData = z.infer<typeof FieldValidationSchema>;
-
-/**
- * Utility schema for validating field names in bulk operations
- */
-export const FieldNameSchema = z.string()
-  .min(1, 'Field name is required')
-  .max(255, 'Field name must be less than 255 characters')
-  .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Field name must start with letter or underscore and contain only letters, numbers, and underscores');
-
-/**
- * Schema for validating arrays of field names
- */
-export const FieldNamesArraySchema = z.array(FieldNameSchema).min(1, 'At least one field name is required');
-
-/**
- * Schema for field creation with minimal required fields
- */
-export const CreateFieldSchema = FieldValidationSchema.pick({
-  name: true,
-  label: true,
-  type: true
-}).extend({
-  // Override to make label optional for creation
-  label: z.string().optional().default('')
-});
-
-/**
- * Schema for field update operations (name is typically immutable)
- */
-export const UpdateFieldSchema = FieldValidationSchema.omit({ name: true });
-
-/**
- * Helper function to get field type-specific validation rules
- * Used for dynamic form control enabling/disabling in React components
- */
-export function getFieldTypeCapabilities(fieldType: z.infer<typeof FieldTypeSchema>) {
-  return {
-    supportsLength: TYPES_WITH_LENGTH.includes(fieldType as any),
-    supportsPrecision: TYPES_WITH_PRECISION.includes(fieldType as any),
-    isReference: REFERENCE_TYPES.includes(fieldType as any),
-    isTimestamp: TIMESTAMP_TYPES.includes(fieldType as any),
-    isUserId: USER_ID_TYPES.includes(fieldType as any),
-    isAutoManaged: TIMESTAMP_TYPES.includes(fieldType as any) || USER_ID_TYPES.includes(fieldType as any),
-  };
 }
 
 /**
- * Validation schema for bulk field operations
+ * Field-type-specific property enablement configuration
+ * Used for dynamic control enabling/disabling in React Hook Form
  */
-export const BulkFieldOperationSchema = z.object({
-  operation: z.enum(['create', 'update', 'delete']),
-  fields: z.array(FieldValidationSchema),
-  options: z.object({
-    validateReferences: z.boolean().default(true),
-    createIndexes: z.boolean().default(false),
-    preserveData: z.boolean().default(true)
-  }).optional()
-});
-
-// ==============================================================================
-// Error Message Utilities
-// ==============================================================================
+export const getFieldTypeEnabledProperties = (fieldType: string) => {
+  const baseProperties = ['name', 'label', 'description', 'type', 'isNullable', 'isPrimaryKey']
+  
+  const typeSpecificProperties: Record<string, string[]> = {
+    integer: [...baseProperties, 'length', 'isUnique', 'isAutoIncrement', 'defaultValue', 'minValue', 'maxValue'],
+    bigint: [...baseProperties, 'length', 'isUnique', 'isAutoIncrement', 'defaultValue', 'minValue', 'maxValue'],
+    decimal: [...baseProperties, 'precision', 'scale', 'isUnique', 'defaultValue', 'minValue', 'maxValue'],
+    float: [...baseProperties, 'precision', 'scale', 'isUnique', 'defaultValue', 'minValue', 'maxValue'],
+    double: [...baseProperties, 'precision', 'scale', 'isUnique', 'defaultValue', 'minValue', 'maxValue'],
+    string: [...baseProperties, 'length', 'isUnique', 'format', 'defaultValue', 'minLength', 'maxLength', 'pattern', 'isPicklist', 'picklistValues'],
+    text: [...baseProperties, 'length', 'format', 'defaultValue', 'minLength', 'maxLength', 'pattern'],
+    boolean: [...baseProperties, 'defaultValue', 'trueLabel', 'falseLabel'],
+    date: [...baseProperties, 'isUnique', 'format', 'timezone', 'defaultValue', 'minDate', 'maxDate', 'setOnCreate'],
+    datetime: [...baseProperties, 'isUnique', 'format', 'timezone', 'defaultValue', 'minDate', 'maxDate', 'setOnCreate', 'updateOnChange'],
+    timestamp: [...baseProperties, 'isUnique', 'format', 'timezone', 'defaultValue', 'minDate', 'maxDate', 'setOnCreate', 'updateOnChange'],
+    time: [...baseProperties, 'format', 'defaultValue'],
+    binary: [...baseProperties, 'maxSize', 'allowedMimeTypes', 'storeExternally', 'compressData'],
+    blob: [...baseProperties, 'maxSize', 'storeExternally', 'compressData'],
+    clob: [...baseProperties, 'maxSize', 'storeExternally', 'compressData'],
+    json: [...baseProperties, 'validationSchema', 'defaultValue'],
+    xml: [...baseProperties, 'validationSchema', 'defaultValue'],
+    uuid: [...baseProperties, 'isUnique', 'autoGenerate', 'uuidVersion', 'defaultValue'],
+    enum: [...baseProperties, 'values', 'defaultValue'],
+    set: [...baseProperties, 'values', 'defaultValue', 'allowMultiple', 'maxSelections'],
+    geometry: [...baseProperties, 'srid', 'dimensions', 'isIndexed', 'allowEmptyGeometry'],
+    point: [...baseProperties, 'srid', 'dimensions', 'isIndexed', 'allowEmptyGeometry'],
+    linestring: [...baseProperties, 'srid', 'dimensions', 'isIndexed', 'allowEmptyGeometry'],
+    polygon: [...baseProperties, 'srid', 'dimensions', 'isIndexed', 'allowEmptyGeometry'],
+  }
+  
+  return typeSpecificProperties[fieldType] || baseProperties
+}
 
 /**
- * Custom error messages for field validation
- * Provides consistent error messaging across all schema components
+ * Performance-optimized field validation function
+ * Ensures validation completes under 100ms performance target
  */
-export const FieldValidationMessages = {
-  name: {
-    required: 'Field name is required',
-    invalid: 'Field name must start with letter or underscore and contain only letters, numbers, and underscores',
-    maxLength: 'Field name must be less than 255 characters'
-  },
-  label: {
-    required: 'Field label is required',
-    maxLength: 'Field label must be less than 255 characters'
-  },
-  type: {
-    required: 'Field type is required',
-    invalid: 'Please select a valid field type'
-  },
-  length: {
-    required: 'Length is required for string, text, and binary fields',
-    positive: 'Length must be greater than 0',
-    notApplicable: 'Length is not applicable for this field type'
-  },
-  precision: {
-    required: 'Precision is required for decimal, float, and double fields',
-    positive: 'Precision must be greater than 0',
-    notApplicable: 'Precision is not applicable for this field type'
-  },
-  scale: {
-    nonNegative: 'Scale must be 0 or greater',
-    maxPrecision: 'Scale cannot be greater than precision',
-    notApplicable: 'Scale is not applicable for this field type'
-  },
-  reference: {
-    tableRequired: 'Reference table is required for reference fields',
-    fieldRequired: 'Reference field is required for reference fields',
-    notApplicable: 'Reference fields are not applicable for this field type'
-  },
-  constraints: {
-    virtualPrimaryKey: 'Virtual fields cannot be primary keys',
-    virtualAutoIncrement: 'Virtual fields cannot have auto increment',
-    primaryKeyNull: 'Primary keys cannot allow null values',
-    autoIncrementType: 'Auto increment is only applicable to ID and integer fields',
-    autoIncrementNull: 'Auto increment fields cannot allow null values',
-    timestampDefault: 'Timestamp fields automatically manage their values and should not have custom defaults',
-    userIdDefault: 'User ID fields automatically manage their values and should not have custom defaults'
-  },
-  json: {
-    invalid: 'Please enter valid JSON format'
-  },
-  csv: {
-    invalid: 'Please enter comma-separated words (letters, numbers, underscores only)'
+export const validateFieldProperty = <T>(
+  fieldType: string,
+  property: string,
+  value: T
+): string | undefined => {
+  try {
+    const schema = createFieldTypeValidationSchema(fieldType)
+    const propertySchema = (schema.shape as any)[property]
+    
+    if (!propertySchema) {
+      return undefined
+    }
+    
+    propertySchema.parse(value)
+    return undefined
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return error.errors[0]?.message
+    }
+    return 'Validation error occurred'
   }
-} as const;
+}
+
+// ============================================================================
+// TYPE EXPORTS FOR REACT HOOK FORM INTEGRATION
+// ============================================================================
+
+export type FieldValidationFormData = z.infer<typeof fieldValidationSchema>
+export type FieldCreationFormData = z.infer<typeof fieldCreationFormSchema>
+export type FieldUpdateFormData = z.infer<typeof fieldUpdateFormSchema>
+export type BulkFieldOperationData = z.infer<typeof bulkFieldOperationSchema>
+export type ForeignKeyValidationData = z.infer<typeof foreignKeyValidationSchema>
+export type FunctionUsageValidationData = z.infer<typeof functionUsageValidationSchema>
+
+// Field type-specific form data types
+export type NumericFieldFormData = z.infer<typeof numericFieldValidationSchema>
+export type StringFieldFormData = z.infer<typeof stringFieldValidationSchema>
+export type BooleanFieldFormData = z.infer<typeof booleanFieldValidationSchema>
+export type DateTimeFieldFormData = z.infer<typeof dateTimeFieldValidationSchema>
+export type BinaryFieldFormData = z.infer<typeof binaryFieldValidationSchema>
+export type JsonXmlFieldFormData = z.infer<typeof jsonXmlFieldValidationSchema>
+export type UuidFieldFormData = z.infer<typeof uuidFieldValidationSchema>
+export type EnumSetFieldFormData = z.infer<typeof enumSetFieldValidationSchema>
+export type GeometryFieldFormData = z.infer<typeof geometryFieldValidationSchema>
+
+/**
+ * React Hook Form resolver factory for field validation
+ * Provides real-time validation with comprehensive error handling
+ */
+export const createFieldFormResolver = <T>(schema: z.ZodSchema<T>) => {
+  return async (data: any) => {
+    try {
+      const result = await schema.parseAsync(data)
+      return { values: result, errors: {} }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const formErrors: Record<string, { message: string }> = {}
+        error.errors.forEach((err) => {
+          const path = err.path.join('.')
+          formErrors[path] = { message: err.message }
+        })
+        return { values: {}, errors: formErrors }
+      }
+      throw error
+    }
+  }
+}
+
+/**
+ * Field validation middleware for Next.js API routes
+ * Provides server-side validation with comprehensive error handling
+ */
+export const validateFieldApiPayload = async <T>(
+  schema: z.ZodSchema<T>,
+  payload: any
+): Promise<{ success: true; data: T } | { success: false; errors: Array<{ field: string; message: string }> }> => {
+  try {
+    const data = await schema.parseAsync(payload)
+    return { success: true, data }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const errors = error.errors.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }))
+      return { success: false, errors }
+    }
+    return {
+      success: false,
+      errors: [{ field: 'general', message: 'Field validation failed' }],
+    }
+  }
+}
