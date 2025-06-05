@@ -1,186 +1,278 @@
 /**
- * Logging utility hook that provides centralized logging capabilities,
- * log management, and development debugging support.
+ * Centralized logging utility hook for DreamFactory Admin Interface
  * 
- * Replaces Angular LoggingService with React patterns for comprehensive
- * application logging and monitoring integration.
- * 
- * Features:
- * - Configurable log levels for development and production
+ * This hook provides comprehensive logging capabilities including:
+ * - Configurable log levels for development and production environments
  * - Structured logging with context, timestamps, and categorization
  * - Log persistence with automatic rotation and storage management
  * - Integration with external monitoring services
  * - Development debugging support with filtering and search
- * - Performance metrics collection and logging
+ * - Performance tracking and correlation ID management
+ * 
+ * Replaces Angular LoggingService with React patterns for the migration
+ * from Angular 16 to React 19/Next.js 15.1.
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LogLevel,
+  LogCategory,
   LogEntry,
-  LogContext,
   LogFilter,
+  LogSearchResult,
+  LogExportOptions,
   LoggerConfig,
-  LoggerHookReturn,
-  LogStorage,
-  PerformanceContext,
-  LOG_LEVEL_PRIORITY,
-  DEFAULT_LOGGER_CONFIG,
-  LOG_CATEGORIES,
-} from '../types/logging';
+  LogUserContext,
+  LogApplicationContext,
+  LogPerformanceMetrics,
+  LogErrorContext,
+  LogCorrelationContext,
+  UseLoggerReturn,
+  LogEventListener,
+  LogBatchCallback,
+  LogRotationCallback,
+} from '@/types/logging';
 
 /**
- * Generate unique ID for log entries
+ * Default logger configuration
  */
-function generateLogId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+const DEFAULT_CONFIG: LoggerConfig = {
+  level: process.env.NODE_ENV === 'development' ? LogLevel.DEBUG : LogLevel.INFO,
+  console: true,
+  storage: {
+    enabled: true,
+    maxEntries: 1000,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    storageKey: 'df-admin-logs',
+    autoRotate: true,
+    rotationInterval: 60 * 60 * 1000, // 1 hour
+  },
+  monitoring: {
+    enabled: process.env.NODE_ENV === 'production',
+    batchSize: 50,
+    transmissionInterval: 30 * 1000, // 30 seconds
+    samplingRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+    enableCorrelation: true,
+  },
+  enablePerformanceTracking: true,
+  enableUserContext: true,
+  enableAppContext: true,
+  development: {
+    verbose: true,
+    stackTrace: true,
+    sourceMap: true,
+  },
+  production: {
+    sanitize: true,
+    filterPII: true,
+    compression: false,
+  },
+};
 
 /**
- * Get current environment
+ * In-memory log storage for fast access and search
  */
-function getEnvironment(): 'development' | 'production' | 'test' {
-  if (typeof process !== 'undefined') {
-    return process.env.NODE_ENV as 'development' | 'production' | 'test' || 'development';
-  }
-  return 'development';
-}
+class LogStorage {
+  private entries: LogEntry[] = [];
+  private config: LoggerConfig['storage'];
+  private rotationTimer?: NodeJS.Timeout;
+  private rotationCallback?: LogRotationCallback;
 
-/**
- * LocalStorage-based log storage implementation
- */
-class LocalStorageLogStorage implements LogStorage {
-  private readonly storageKey = 'df-admin-logs';
-  private readonly maxSize = 5 * 1024 * 1024; // 5MB limit
-
-  async store(entry: LogEntry): Promise<void> {
-    try {
-      const existing = await this.retrieve();
-      const updated = [...existing, entry];
-      
-      // Apply rotation if needed
-      const rotated = this.applyRotation(updated);
-      
-      localStorage.setItem(this.storageKey, JSON.stringify(rotated));
-    } catch (error) {
-      // If storage fails, log to console as fallback
-      console.warn('Failed to store log entry:', error);
+  constructor(config: LoggerConfig['storage'], rotationCallback?: LogRotationCallback) {
+    this.config = config;
+    this.rotationCallback = rotationCallback;
+    
+    if (config.enabled) {
+      this.loadFromStorage();
+      this.startAutoRotation();
     }
   }
 
-  async retrieve(filter?: LogFilter): Promise<LogEntry[]> {
-    try {
-      const stored = localStorage.getItem(this.storageKey);
-      if (!stored) return [];
-      
-      const logs: LogEntry[] = JSON.parse(stored);
-      return filter ? this.applyFilter(logs, filter) : logs;
-    } catch (error) {
-      console.warn('Failed to retrieve logs:', error);
-      return [];
-    }
-  }
+  /**
+   * Add a log entry to storage
+   */
+  add(entry: LogEntry): void {
+    if (!this.config.enabled) return;
 
-  async clear(): Promise<void> {
-    localStorage.removeItem(this.storageKey);
-  }
-
-  async getStats(): Promise<{
-    count: number;
-    size: number;
-    oldestEntry?: Date;
-    newestEntry?: Date;
-  }> {
-    const logs = await this.retrieve();
-    const stored = localStorage.getItem(this.storageKey);
-    const size = stored ? new Blob([stored]).size : 0;
+    this.entries.push(entry);
     
-    const timestamps = logs.map(log => new Date(log.timestamp));
-    const oldestEntry = timestamps.length > 0 ? new Date(Math.min(...timestamps.map(d => d.getTime()))) : undefined;
-    const newestEntry = timestamps.length > 0 ? new Date(Math.max(...timestamps.map(d => d.getTime()))) : undefined;
-    
-    return {
-      count: logs.length,
-      size,
-      oldestEntry,
-      newestEntry,
-    };
-  }
-
-  async rotate(): Promise<void> {
-    const logs = await this.retrieve();
-    const rotated = this.applyRotation(logs);
-    localStorage.setItem(this.storageKey, JSON.stringify(rotated));
-  }
-
-  private applyRotation(logs: LogEntry[]): LogEntry[] {
-    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-    const maxLogs = 1000;
-    const now = Date.now();
-    
-    // Filter by age
-    const recentLogs = logs.filter(log => {
-      const logTime = new Date(log.timestamp).getTime();
-      return now - logTime < maxAge;
-    });
-    
-    // Keep only the most recent logs if we exceed the limit
-    if (recentLogs.length > maxLogs) {
-      return recentLogs
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .slice(0, maxLogs);
+    // Enforce max entries limit
+    if (this.entries.length > this.config.maxEntries) {
+      const removed = this.entries.splice(0, this.entries.length - this.config.maxEntries);
+      this.rotationCallback?.(removed);
     }
     
-    return recentLogs;
+    this.saveToStorage();
   }
 
-  private applyFilter(logs: LogEntry[], filter: LogFilter): LogEntry[] {
-    return logs.filter(log => {
-      // Level filter
-      if (filter.level) {
-        const levels = Array.isArray(filter.level) ? filter.level : [filter.level];
-        if (!levels.includes(log.level)) return false;
-      }
-      
-      // Date range filter
-      if (filter.dateRange) {
-        const logTime = new Date(log.timestamp);
-        if (logTime < filter.dateRange.start || logTime > filter.dateRange.end) {
-          return false;
-        }
-      }
-      
-      // Component filter
-      if (filter.component && log.context?.component !== filter.component) {
+  /**
+   * Search log entries with filters
+   */
+  search(filter: LogFilter, page = 1, pageSize = 50): LogSearchResult {
+    const startTime = performance.now();
+    
+    let filtered = this.entries.filter(entry => {
+      // Level filter (minimum level)
+      if (filter.level !== undefined && entry.level < filter.level) {
         return false;
       }
       
       // Category filter
-      if (filter.category && log.category !== filter.category) {
+      if (filter.categories && !filter.categories.includes(entry.category)) {
         return false;
+      }
+      
+      // Time range filter
+      if (filter.timeRange) {
+        const entryTime = new Date(entry.timestamp);
+        if (entryTime < filter.timeRange.start || entryTime > filter.timeRange.end) {
+          return false;
+        }
       }
       
       // User ID filter
-      if (filter.userId && log.context?.userId !== filter.userId) {
+      if (filter.userId && entry.userContext?.userId !== filter.userId) {
         return false;
       }
       
-      // Message content filter
-      if (filter.messageContains && !log.message.toLowerCase().includes(filter.messageContains.toLowerCase())) {
+      // Correlation ID filter
+      if (filter.correlationId && entry.correlation?.correlationId !== filter.correlationId) {
         return false;
       }
       
-      // Context filter
-      if (filter.contextFilter && log.context) {
-        for (const [key, value] of Object.entries(filter.contextFilter)) {
-          if (log.context.metadata?.[key] !== value) {
-            return false;
-          }
+      // Component filter
+      if (filter.component && entry.appContext?.component !== filter.component) {
+        return false;
+      }
+      
+      // Tags filter
+      if (filter.tags && !filter.tags.every(tag => entry.tags?.includes(tag))) {
+        return false;
+      }
+      
+      // Text search
+      if (filter.search) {
+        const searchLower = filter.search.toLowerCase();
+        if (!entry.message.toLowerCase().includes(searchLower)) {
+          return false;
         }
       }
       
       return true;
     });
+    
+    // Sort by timestamp (newest first)
+    filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const start = (page - 1) * pageSize;
+    const entries = filtered.slice(start, start + pageSize);
+    
+    const executionTime = performance.now() - startTime;
+    
+    return {
+      entries,
+      total,
+      page,
+      pageSize,
+      totalPages,
+      executionTime,
+    };
+  }
+
+  /**
+   * Export log entries
+   */
+  export(options: LogExportOptions): LogEntry[] {
+    const filter = options.filter || {};
+    const result = this.search(filter, 1, options.maxEntries || this.entries.length);
+    return result.entries;
+  }
+
+  /**
+   * Clear all log entries
+   */
+  clear(): void {
+    this.entries = [];
+    this.saveToStorage();
+  }
+
+  /**
+   * Get all entries (for internal use)
+   */
+  getAll(): LogEntry[] {
+    return [...this.entries];
+  }
+
+  /**
+   * Rotate old entries
+   */
+  rotate(): void {
+    if (!this.config.enabled) return;
+
+    const cutoffTime = Date.now() - this.config.maxAge;
+    const beforeCount = this.entries.length;
+    
+    this.entries = this.entries.filter(entry => {
+      return new Date(entry.timestamp).getTime() > cutoffTime;
+    });
+    
+    const removedCount = beforeCount - this.entries.length;
+    if (removedCount > 0) {
+      console.debug(`[Logger] Rotated ${removedCount} old log entries`);
+      this.saveToStorage();
+    }
+  }
+
+  /**
+   * Load entries from browser storage
+   */
+  private loadFromStorage(): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const stored = localStorage.getItem(this.config.storageKey);
+      if (stored) {
+        this.entries = JSON.parse(stored);
+      }
+    } catch (error) {
+      console.warn('[Logger] Failed to load from storage:', error);
+    }
+  }
+
+  /**
+   * Save entries to browser storage
+   */
+  private saveToStorage(): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+      localStorage.setItem(this.config.storageKey, JSON.stringify(this.entries));
+    } catch (error) {
+      console.warn('[Logger] Failed to save to storage:', error);
+    }
+  }
+
+  /**
+   * Start automatic rotation timer
+   */
+  private startAutoRotation(): void {
+    if (!this.config.autoRotate) return;
+
+    this.rotationTimer = setInterval(() => {
+      this.rotate();
+    }, this.config.rotationInterval);
+  }
+
+  /**
+   * Stop automatic rotation
+   */
+  destroy(): void {
+    if (this.rotationTimer) {
+      clearInterval(this.rotationTimer);
+      this.rotationTimer = undefined;
+    }
   }
 }
 
@@ -188,467 +280,568 @@ class LocalStorageLogStorage implements LogStorage {
  * External monitoring service integration
  */
 class MonitoringService {
-  private config: NonNullable<LoggerConfig['monitoring']>;
-  private queue: LogEntry[] = [];
-  private flushTimer?: NodeJS.Timeout;
+  private config: LoggerConfig['monitoring'];
+  private batchQueue: LogEntry[] = [];
+  private transmissionTimer?: NodeJS.Timeout;
+  private callback?: LogBatchCallback;
 
-  constructor(config: NonNullable<LoggerConfig['monitoring']>) {
+  constructor(config: LoggerConfig['monitoring'], callback?: LogBatchCallback) {
     this.config = config;
-    this.startFlushTimer();
-  }
-
-  async send(entry: LogEntry): Promise<void> {
-    if (!this.config.enabled || !this.config.endpoint) return;
-
-    this.queue.push(entry);
+    this.callback = callback;
     
-    if (this.queue.length >= (this.config.batchSize || 10)) {
-      await this.flush();
+    if (config.enabled) {
+      this.startBatchTransmission();
     }
   }
 
-  private async flush(): Promise<void> {
-    if (this.queue.length === 0 || !this.config.endpoint) return;
+  /**
+   * Add entry to monitoring queue
+   */
+  add(entry: LogEntry): void {
+    if (!this.config.enabled || !this.shouldSample()) return;
 
-    const batch = [...this.queue];
-    this.queue = [];
+    this.batchQueue.push(entry);
+    
+    if (this.batchQueue.length >= this.config.batchSize) {
+      this.transmitBatch();
+    }
+  }
+
+  /**
+   * Force transmission of current batch
+   */
+  flush(): void {
+    if (this.batchQueue.length > 0) {
+      this.transmitBatch();
+    }
+  }
+
+  /**
+   * Determine if entry should be sampled
+   */
+  private shouldSample(): boolean {
+    return Math.random() < this.config.samplingRate;
+  }
+
+  /**
+   * Transmit batch to monitoring service
+   */
+  private async transmitBatch(): Promise<void> {
+    if (this.batchQueue.length === 0) return;
+
+    const batch = [...this.batchQueue];
+    this.batchQueue = [];
 
     try {
-      await fetch(this.config.endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` }),
-        },
-        body: JSON.stringify({ logs: batch }),
-      });
+      if (this.callback) {
+        await this.callback(batch);
+      } else {
+        await this.defaultTransmission(batch);
+      }
     } catch (error) {
-      console.warn('Failed to send logs to monitoring service:', error);
-      // Re-queue failed logs
-      this.queue.unshift(...batch);
+      console.warn('[Logger] Failed to transmit log batch:', error);
+      // Re-queue on failure (with limit to prevent memory issues)
+      if (this.batchQueue.length < this.config.batchSize * 2) {
+        this.batchQueue.unshift(...batch.slice(0, this.config.batchSize));
+      }
     }
   }
 
-  private startFlushTimer(): void {
-    if (this.flushTimer) {
-      clearInterval(this.flushTimer);
+  /**
+   * Default transmission implementation
+   */
+  private async defaultTransmission(batch: LogEntry[]): Promise<void> {
+    if (!this.config.endpoint || !this.config.apiKey) return;
+
+    const response = await fetch(this.config.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.config.apiKey}`,
+      },
+      body: JSON.stringify({
+        logs: batch,
+        timestamp: new Date().toISOString(),
+        source: 'df-admin-interface',
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
-    this.flushTimer = setInterval(() => {
-      this.flush();
-    }, this.config.flushInterval || 30000);
   }
 
+  /**
+   * Start batch transmission timer
+   */
+  private startBatchTransmission(): void {
+    this.transmissionTimer = setInterval(() => {
+      this.transmitBatch();
+    }, this.config.transmissionInterval);
+  }
+
+  /**
+   * Stop monitoring service
+   */
   destroy(): void {
-    if (this.flushTimer) {
-      clearInterval(this.flushTimer);
+    if (this.transmissionTimer) {
+      clearInterval(this.transmissionTimer);
+      this.transmissionTimer = undefined;
     }
-    this.flush(); // Final flush
+    this.flush();
   }
 }
 
 /**
- * Performance measurement utilities
+ * Generate unique correlation ID
  */
-class PerformanceTracker {
-  private marks = new Map<string, number>();
+function generateCorrelationId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
 
-  mark(name: string): void {
-    this.marks.set(name, performance.now());
+/**
+ * Generate unique log entry ID
+ */
+function generateLogId(): string {
+  return `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Sanitize data for production logging
+ */
+function sanitizeData(data: any, config: LoggerConfig): any {
+  if (!config.production.sanitize || process.env.NODE_ENV !== 'production') {
+    return data;
   }
 
-  measure(name: string, startMark?: string): PerformanceContext | null {
-    const endTime = performance.now();
-    const startTime = startMark ? this.marks.get(startMark) : this.marks.get(name);
-    
-    if (typeof startTime !== 'number') {
-      console.warn(`Performance mark "${startMark || name}" not found`);
-      return null;
+  // PII filtering patterns
+  const piiPatterns = [
+    /password/i,
+    /token/i,
+    /secret/i,
+    /key/i,
+    /auth/i,
+    /credential/i,
+    /ssn/i,
+    /social/i,
+    /credit/i,
+    /card/i,
+  ];
+
+  function sanitizeObject(obj: any): any {
+    if (obj === null || typeof obj !== 'object') {
+      return obj;
     }
 
-    const duration = endTime - startTime;
-    
-    // Clean up the mark
-    this.marks.delete(startMark || name);
-    
-    return {
-      metric: name,
-      duration,
-      startTime,
-      endTime,
-      marks: Object.fromEntries(this.marks),
-      memory: this.getMemoryInfo(),
-    };
+    if (Array.isArray(obj)) {
+      return obj.map(sanitizeObject);
+    }
+
+    const sanitized: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (piiPatterns.some(pattern => pattern.test(key))) {
+        sanitized[key] = '[REDACTED]';
+      } else {
+        sanitized[key] = sanitizeObject(value);
+      }
+    }
+    return sanitized;
   }
 
-  private getMemoryInfo() {
-    if ('memory' in performance) {
-      const memory = (performance as any).memory;
-      return {
-        used: memory.usedJSHeapSize,
-        total: memory.totalJSHeapSize,
-      };
-    }
-    return undefined;
-  }
+  return sanitizeObject(data);
 }
 
 /**
  * Main logging hook implementation
  */
-export function useLogger(initialConfig?: Partial<LoggerConfig>): LoggerHookReturn {
+export function useLogger(): UseLoggerReturn {
   // Configuration state
-  const [config, setConfig] = useState<LoggerConfig>(() => ({
-    ...DEFAULT_LOGGER_CONFIG,
-    level: getEnvironment() === 'development' ? 'debug' : 'info',
-    performance: getEnvironment() === 'development',
-    ...initialConfig,
-  }));
+  const [config, setConfig] = useState<LoggerConfig>(DEFAULT_CONFIG);
+  
+  // Context state
+  const [userContext, setUserContextState] = useState<LogUserContext | undefined>();
+  const [appContext, setAppContextState] = useState<LogApplicationContext | undefined>();
+  
+  // Storage and monitoring services
+  const storageRef = useRef<LogStorage>();
+  const monitoringRef = useRef<MonitoringService>();
+  
+  // Performance tracking
+  const performanceTimersRef = useRef<Map<string, { start: number; operation: string }>>(new Map());
+  
+  // Event listeners
+  const listenersRef = useRef<Set<LogEventListener>>(new Set());
 
-  // In-memory logs state
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [storageStats, setStorageStats] = useState<{
-    count: number;
-    size: number;
-    oldestEntry?: Date;
-    newestEntry?: Date;
-  } | null>(null);
-
-  // Persistent storage and monitoring
-  const storage = useRef<LogStorage>(new LocalStorageLogStorage());
-  const monitoring = useRef<MonitoringService | null>(null);
-  const performance = useRef<PerformanceTracker>(new PerformanceTracker());
-  const globalContext = useRef<LogContext>({});
-
-  // Initialize monitoring service
+  // Initialize services
   useEffect(() => {
-    if (config.monitoring?.enabled) {
-      monitoring.current = new MonitoringService(config.monitoring);
-    } else {
-      monitoring.current?.destroy();
-      monitoring.current = null;
-    }
+    storageRef.current = new LogStorage(config.storage, (removedEntries) => {
+      console.debug(`[Logger] Rotated ${removedEntries.length} entries`);
+    });
+
+    monitoringRef.current = new MonitoringService(config.monitoring);
 
     return () => {
-      monitoring.current?.destroy();
+      storageRef.current?.destroy();
+      monitoringRef.current?.destroy();
     };
-  }, [config.monitoring]);
+  }, [config]);
 
-  // Load existing logs on mount
+  // Auto-detect application context
   useEffect(() => {
-    const loadLogs = async () => {
-      if (config.persistence) {
-        const storedLogs = await storage.current.retrieve();
-        setLogs(storedLogs);
-        
-        const stats = await storage.current.getStats();
-        setStorageStats(stats);
-      }
-    };
+    if (typeof window !== 'undefined' && config.enableAppContext) {
+      setAppContextState({
+        route: window.location.pathname,
+        environment: process.env.NODE_ENV || 'development',
+        version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
+        buildId: process.env.NEXT_PUBLIC_BUILD_ID || 'unknown',
+      });
+    }
+  }, [config.enableAppContext]);
 
-    loadLogs();
-  }, [config.persistence]);
-
-  // Auto-rotation timer
-  useEffect(() => {
-    if (!config.rotation) return;
-
-    const rotationTimer = setInterval(async () => {
-      await storage.current.rotate();
-      const stats = await storage.current.getStats();
-      setStorageStats(stats);
-    }, 60 * 60 * 1000); // Every hour
-
-    return () => clearInterval(rotationTimer);
-  }, [config.rotation]);
-
-  // Core logging function
-  const createLog = useCallback(async (
+  /**
+   * Create a log entry
+   */
+  const createLogEntry = useCallback((
     level: LogLevel,
+    category: LogCategory,
     message: string,
-    context?: LogContext,
-    error?: Error,
-    performanceContext?: PerformanceContext
-  ) => {
+    data?: Record<string, any>,
+    options?: Partial<LogEntry>
+  ): LogEntry => {
+    const timestamp = new Date().toISOString();
+    const id = generateLogId();
+
+    const entry: LogEntry = {
+      id,
+      timestamp,
+      level,
+      category,
+      message,
+      ...options,
+    };
+
+    // Add user context if available and enabled
+    if (config.enableUserContext && userContext) {
+      entry.userContext = userContext;
+    }
+
+    // Add application context if available and enabled
+    if (config.enableAppContext && appContext) {
+      entry.appContext = appContext;
+    }
+
+    // Add data if provided
+    if (data) {
+      entry.data = sanitizeData(data, config);
+    }
+
+    // Add correlation context if enabled
+    if (config.monitoring.enableCorrelation && !entry.correlation) {
+      entry.correlation = {
+        correlationId: generateCorrelationId(),
+      };
+    }
+
+    return entry;
+  }, [config, userContext, appContext]);
+
+  /**
+   * Process and emit log entry
+   */
+  const processLogEntry = useCallback((entry: LogEntry): void => {
     // Check if log level meets threshold
-    if (LOG_LEVEL_PRIORITY[level] < LOG_LEVEL_PRIORITY[config.level]) {
+    if (entry.level < config.level) {
       return;
     }
 
-    // Create log entry
-    const entry: LogEntry = {
-      id: generateLogId(),
-      level,
-      message,
-      timestamp: new Date().toISOString(),
-      context: { ...globalContext.current, ...context },
-      performance: performanceContext,
-      error: error ? {
-        name: error.name,
-        message: error.message,
-        stack: config.development?.enableStackTrace ? error.stack : undefined,
-        cause: error.cause,
-      } : undefined,
-      environment: getEnvironment(),
-      client: {
-        userAgent: navigator.userAgent,
-        url: window.location.href,
-        timestamp: Date.now(),
-      },
-    };
-
     // Console output
     if (config.console) {
-      const consoleMethod = level === 'debug' ? 'debug' :
-                           level === 'info' ? 'info' :
-                           level === 'warn' ? 'warn' :
-                           'error';
+      const levelNames = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL'];
+      const levelName = levelNames[entry.level];
+      const timestamp = new Date(entry.timestamp).toLocaleTimeString();
       
-      const contextStr = entry.context ? ` [${JSON.stringify(entry.context)}]` : '';
-      console[consoleMethod](`[${level.toUpperCase()}] ${message}${contextStr}`, error || '');
-    }
+      const logFn = entry.level >= LogLevel.ERROR ? console.error :
+                   entry.level >= LogLevel.WARN ? console.warn :
+                   console.log;
 
-    // Store in memory
-    setLogs(prev => {
-      const updated = [...prev, entry];
-      // Keep only maxLogs in memory
-      if (updated.length > config.maxLogs) {
-        return updated.slice(-config.maxLogs);
+      if (config.development.verbose && process.env.NODE_ENV === 'development') {
+        logFn(`[${timestamp}] [${levelName}] [${entry.category}] ${entry.message}`, entry.data || '');
+      } else {
+        logFn(`[${levelName}] ${entry.message}`);
       }
-      return updated;
+    }
+
+    // Store entry
+    storageRef.current?.add(entry);
+
+    // Send to monitoring
+    monitoringRef.current?.add(entry);
+
+    // Notify listeners
+    listenersRef.current.forEach(listener => {
+      try {
+        listener(entry);
+      } catch (error) {
+        console.warn('[Logger] Event listener error:', error);
+      }
     });
-
-    // Persist to storage
-    if (config.persistence) {
-      await storage.current.store(entry);
-      const stats = await storage.current.getStats();
-      setStorageStats(stats);
-    }
-
-    // Send to monitoring service
-    if (monitoring.current) {
-      await monitoring.current.send(entry);
-    }
   }, [config]);
 
-  // Logging methods
-  const debug = useCallback((message: string, context?: LogContext) => {
-    createLog('debug', message, { ...context, category: context?.component || LOG_CATEGORIES.SYSTEM });
-  }, [createLog]);
+  /**
+   * Generic log function
+   */
+  const log = useCallback((
+    level: LogLevel,
+    category: LogCategory,
+    message: string,
+    data?: Record<string, any>,
+    options?: Partial<LogEntry>
+  ): void => {
+    const entry = createLogEntry(level, category, message, data, options);
+    processLogEntry(entry);
+  }, [createLogEntry, processLogEntry]);
 
-  const info = useCallback((message: string, context?: LogContext) => {
-    createLog('info', message, { ...context, category: context?.component || LOG_CATEGORIES.SYSTEM });
-  }, [createLog]);
+  // Log level methods
+  const trace = useCallback((message: string, data?: Record<string, any>, options?: Partial<LogEntry>) => {
+    log(LogLevel.TRACE, options?.category || LogCategory.DEV, message, data, options);
+  }, [log]);
 
-  const warn = useCallback((message: string, context?: LogContext) => {
-    createLog('warn', message, { ...context, category: context?.component || LOG_CATEGORIES.SYSTEM });
-  }, [createLog]);
+  const debug = useCallback((message: string, data?: Record<string, any>, options?: Partial<LogEntry>) => {
+    log(LogLevel.DEBUG, options?.category || LogCategory.DEV, message, data, options);
+  }, [log]);
 
-  const error = useCallback((message: string, errorObj?: Error, context?: LogContext) => {
-    createLog('error', message, { ...context, category: LOG_CATEGORIES.ERROR }, errorObj);
-  }, [createLog]);
+  const info = useCallback((message: string, data?: Record<string, any>, options?: Partial<LogEntry>) => {
+    log(LogLevel.INFO, options?.category || LogCategory.SYSTEM, message, data, options);
+  }, [log]);
 
-  const fatal = useCallback((message: string, errorObj?: Error, context?: LogContext) => {
-    createLog('fatal', message, { ...context, category: LOG_CATEGORIES.ERROR }, errorObj);
-  }, [createLog]);
+  const warn = useCallback((message: string, data?: Record<string, any>, options?: Partial<LogEntry>) => {
+    log(LogLevel.WARN, options?.category || LogCategory.SYSTEM, message, data, options);
+  }, [log]);
 
-  const logPerformance = useCallback((metric: string, duration: number, context?: PerformanceContext) => {
-    const perfContext: PerformanceContext = {
-      metric,
-      duration,
-      startTime: context?.startTime || performance.now() - duration,
-      endTime: context?.endTime || performance.now(),
-      marks: context?.marks,
-      memory: context?.memory,
-    };
-    
-    createLog('info', `Performance: ${metric} completed in ${duration.toFixed(2)}ms`, 
-      { category: LOG_CATEGORIES.PERFORMANCE }, undefined, perfContext);
-  }, [createLog]);
+  const error = useCallback((
+    message: string,
+    error?: Error | LogErrorContext,
+    data?: Record<string, any>,
+    options?: Partial<LogEntry>
+  ) => {
+    let errorContext: LogErrorContext | undefined;
 
-  // Log retrieval and filtering
-  const getLogs = useCallback((filter?: LogFilter): LogEntry[] => {
-    if (!filter) return logs;
-    
-    return logs.filter(log => {
-      // Apply the same filtering logic as storage
-      if (filter.level) {
-        const levels = Array.isArray(filter.level) ? filter.level : [filter.level];
-        if (!levels.includes(log.level)) return false;
+    if (error) {
+      if (error instanceof Error) {
+        errorContext = {
+          name: error.name,
+          message: error.message,
+          stack: config.development.stackTrace ? error.stack : undefined,
+        };
+      } else {
+        errorContext = error;
       }
-      
-      if (filter.component && log.context?.component !== filter.component) return false;
-      if (filter.category && log.category !== filter.category) return false;
-      if (filter.userId && log.context?.userId !== filter.userId) return false;
-      if (filter.messageContains && !log.message.toLowerCase().includes(filter.messageContains.toLowerCase())) return false;
-      
-      if (filter.dateRange) {
-        const logTime = new Date(log.timestamp);
-        if (logTime < filter.dateRange.start || logTime > filter.dateRange.end) return false;
+    }
+
+    const entry = createLogEntry(
+      LogLevel.ERROR,
+      options?.category || LogCategory.SYSTEM,
+      message,
+      data,
+      { ...options, error: errorContext }
+    );
+    processLogEntry(entry);
+  }, [createLogEntry, processLogEntry, config]);
+
+  const fatal = useCallback((
+    message: string,
+    error?: Error | LogErrorContext,
+    data?: Record<string, any>,
+    options?: Partial<LogEntry>
+  ) => {
+    let errorContext: LogErrorContext | undefined;
+
+    if (error) {
+      if (error instanceof Error) {
+        errorContext = {
+          name: error.name,
+          message: error.message,
+          stack: config.development.stackTrace ? error.stack : undefined,
+        };
+      } else {
+        errorContext = error;
       }
-      
-      return true;
+    }
+
+    const entry = createLogEntry(
+      LogLevel.FATAL,
+      options?.category || LogCategory.SYSTEM,
+      message,
+      data,
+      { ...options, error: errorContext }
+    );
+    processLogEntry(entry);
+  }, [createLogEntry, processLogEntry, config]);
+
+  // Performance tracking methods
+  const startTimer = useCallback((operation: string): string => {
+    if (!config.enablePerformanceTracking) {
+      return '';
+    }
+
+    const timerId = generateLogId();
+    performanceTimersRef.current.set(timerId, {
+      start: performance.now(),
+      operation,
     });
-  }, [logs]);
+    
+    return timerId;
+  }, [config]);
 
-  // Search functionality
-  const search = useCallback((query: string, filter?: LogFilter): LogEntry[] => {
-    const searchFilter: LogFilter = {
-      ...filter,
-      messageContains: query,
+  const endTimer = useCallback((timerId: string, data?: Record<string, any>): void => {
+    if (!config.enablePerformanceTracking || !timerId) {
+      return;
+    }
+
+    const timer = performanceTimersRef.current.get(timerId);
+    if (!timer) {
+      return;
+    }
+
+    const duration = performance.now() - timer.start;
+    performanceTimersRef.current.delete(timerId);
+
+    const performanceMetrics: LogPerformanceMetrics = {
+      startTime: timer.start,
+      endTime: performance.now(),
+      duration,
     };
-    return getLogs(searchFilter);
-  }, [getLogs]);
 
-  // Clear logs
-  const clearLogs = useCallback(async () => {
-    setLogs([]);
-    if (config.persistence) {
-      await storage.current.clear();
-      setStorageStats({ count: 0, size: 0 });
-    }
-  }, [config.persistence]);
+    log(
+      LogLevel.INFO,
+      LogCategory.PERFORMANCE,
+      `Operation '${timer.operation}' completed in ${duration.toFixed(2)}ms`,
+      data,
+      { performance: performanceMetrics }
+    );
+  }, [config, log]);
 
-  // Export logs
-  const exportLogs = useCallback((format: 'json' | 'csv' = 'json'): string => {
-    if (format === 'json') {
-      return JSON.stringify(logs, null, 2);
-    }
+  // Correlation methods
+  const createCorrelation = useCallback((parentId?: string): LogCorrelationContext => {
+    return {
+      correlationId: generateCorrelationId(),
+      parentCorrelationId: parentId,
+      traceId: generateCorrelationId(),
+      spanId: generateCorrelationId(),
+    };
+  }, []);
+
+  // Context methods
+  const setUserContext = useCallback((context: LogUserContext): void => {
+    setUserContextState(context);
+  }, []);
+
+  const setAppContext = useCallback((context: LogApplicationContext): void => {
+    setAppContextState(context);
+  }, []);
+
+  // Search and export methods
+  const search = useCallback(async (
+    filter: LogFilter,
+    page = 1,
+    pageSize = 50
+  ): Promise<LogSearchResult> => {
+    return storageRef.current?.search(filter, page, pageSize) || {
+      entries: [],
+      total: 0,
+      page,
+      pageSize,
+      totalPages: 0,
+      executionTime: 0,
+    };
+  }, []);
+
+  const exportLogs = useCallback(async (options: LogExportOptions): Promise<Blob> => {
+    const entries = storageRef.current?.export(options) || [];
     
-    // CSV format
-    const headers = ['Timestamp', 'Level', 'Message', 'Component', 'Category', 'User ID'];
-    const csvRows = [
-      headers.join(','),
-      ...logs.map(log => [
-        log.timestamp,
-        log.level,
-        `"${log.message.replace(/"/g, '""')}"`, // Escape quotes
-        log.context?.component || '',
-        log.category || '',
-        log.context?.userId || '',
-      ].join(','))
-    ];
-    
-    return csvRows.join('\n');
-  }, [logs]);
+    let content: string;
+    let mimeType: string;
 
-  // Update configuration
-  const updateConfig = useCallback((newConfig: Partial<LoggerConfig>) => {
-    setConfig(prev => ({ ...prev, ...newConfig }));
-  }, []);
-
-  // Performance measurement utilities
-  const startPerformanceMeasure = useCallback((name: string) => {
-    performance.current.mark(name);
-  }, []);
-
-  const endPerformanceMeasure = useCallback((name: string) => {
-    const result = performance.current.measure(name);
-    if (result) {
-      logPerformance(name, result.duration, result);
+    switch (options.format) {
+      case 'json':
+        content = JSON.stringify(entries, null, 2);
+        mimeType = 'application/json';
+        break;
+      case 'csv':
+        const headers = ['timestamp', 'level', 'category', 'message'];
+        const csvLines = [
+          headers.join(','),
+          ...entries.map(entry => [
+            entry.timestamp,
+            entry.level,
+            entry.category,
+            `"${entry.message.replace(/"/g, '""')}"`,
+          ].join(','))
+        ];
+        content = csvLines.join('\n');
+        mimeType = 'text/csv';
+        break;
+      case 'txt':
+      default:
+        content = entries.map(entry => 
+          `[${entry.timestamp}] [${entry.level}] [${entry.category}] ${entry.message}`
+        ).join('\n');
+        mimeType = 'text/plain';
+        break;
     }
-  }, [logPerformance]);
 
-  // Global context management
-  const setGlobalContext = useCallback((context: Partial<LogContext>) => {
-    globalContext.current = { ...globalContext.current, ...context };
+    return new Blob([content], { type: mimeType });
   }, []);
 
-  const getGlobalContext = useCallback(() => globalContext.current, []);
+  // Utility methods
+  const clearLogs = useCallback((): void => {
+    storageRef.current?.clear();
+  }, []);
 
-  // Return the hook interface
-  return useMemo(() => ({
+  const getConfig = useCallback((): LoggerConfig => {
+    return config;
+  }, [config]);
+
+  const updateConfig = useCallback((newConfig: Partial<LoggerConfig>): void => {
+    setConfig(prevConfig => ({ ...prevConfig, ...newConfig }));
+  }, []);
+
+  // Memoized return object
+  const loggerReturn = useMemo((): UseLoggerReturn => ({
+    trace,
     debug,
     info,
     warn,
     error,
     fatal,
-    performance: logPerformance,
-    getLogs,
+    startTimer,
+    endTimer,
+    createCorrelation,
+    setUserContext,
+    setAppContext,
     search,
-    clearLogs,
     exportLogs,
-    config,
+    clearLogs,
+    getConfig,
     updateConfig,
-    logCount: logs.length,
-    storageStats,
-    // Additional utilities
-    startPerformanceMeasure,
-    endPerformanceMeasure,
-    setGlobalContext,
-    getGlobalContext,
   }), [
-    debug, info, warn, error, fatal, logPerformance,
-    getLogs, search, clearLogs, exportLogs,
-    config, updateConfig, logs.length, storageStats,
-    startPerformanceMeasure, endPerformanceMeasure,
-    setGlobalContext, getGlobalContext,
+    trace,
+    debug,
+    info,
+    warn,
+    error,
+    fatal,
+    startTimer,
+    endTimer,
+    createCorrelation,
+    setUserContext,
+    setAppContext,
+    search,
+    exportLogs,
+    clearLogs,
+    getConfig,
+    updateConfig,
   ]);
+
+  return loggerReturn;
 }
-
-/**
- * Higher-order component for automatic error logging
- */
-export function withErrorLogging<T extends object>(
-  Component: React.ComponentType<T>,
-  componentName?: string
-): React.ComponentType<T> {
-  return function LoggingWrapper(props: T) {
-    const logger = useLogger();
-    
-    useEffect(() => {
-      const handleError = (event: ErrorEvent) => {
-        logger.error('Uncaught error', event.error, {
-          component: componentName || Component.name,
-          category: LOG_CATEGORIES.ERROR,
-          action: 'error_boundary',
-        });
-      };
-
-      const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-        logger.error('Unhandled promise rejection', new Error(String(event.reason)), {
-          component: componentName || Component.name,
-          category: LOG_CATEGORIES.ERROR,
-          action: 'promise_rejection',
-        });
-      };
-
-      window.addEventListener('error', handleError);
-      window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
-      return () => {
-        window.removeEventListener('error', handleError);
-        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-      };
-    }, [logger]);
-
-    return <Component {...props} />;
-  };
-}
-
-/**
- * Performance measurement decorator
- */
-export function measurePerformance(metricName: string) {
-  return function <T extends (...args: any[]) => any>(
-    target: T
-  ): T {
-    return ((...args: any[]) => {
-      const start = performance.now();
-      const result = target(...args);
-      
-      if (result instanceof Promise) {
-        return result.finally(() => {
-          const duration = performance.now() - start;
-          console.log(`Performance: ${metricName} completed in ${duration.toFixed(2)}ms`);
-        });
-      } else {
-        const duration = performance.now() - start;
-        console.log(`Performance: ${metricName} completed in ${duration.toFixed(2)}ms`);
-        return result;
-      }
-    }) as T;
-  };
-}
-
-export default useLogger;
