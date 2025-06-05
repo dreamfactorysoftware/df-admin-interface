@@ -1,946 +1,743 @@
 /**
- * RelationshipForm - React Hook Form component for database relationship configuration
+ * Relationship Form Component
  * 
- * Migrated from Angular reactive forms to React Hook Form 7.57.0 with Zod schema validation
- * per React/Next.js Integration Requirements. Handles both create and edit modes with 
- * intelligent field enabling/disabling based on relationship type (belongs_to vs many_many).
+ * React Hook Form component for database relationship configuration with comprehensive 
+ * validation, dynamic field behavior, and type-safe form state management. Handles both 
+ * create and edit modes with intelligent field enabling/disabling based on relationship 
+ * type (belongs_to vs many_many).
  * 
  * Features:
- * - React Hook Form with Zod schema validators for all user inputs
- * - Real-time validation under 100ms per performance requirements
+ * - React Hook Form 7.57.0 with Zod schema validation for type-safe form handling
+ * - Real-time validation under 100ms for optimal user experience  
  * - WCAG 2.1 AA compliance through Headless UI accessible components
+ * - Dynamic field behavior based on relationship type selection
  * - Class-variance-authority for dynamic Tailwind class composition
- * - Type-safe form state management with TypeScript 5.8+
- * - Dynamic field behavior based on relationship type
- * - Comprehensive error handling and validation
+ * - Comprehensive error handling and user feedback
+ * - Loading states and async operation support
+ * - Keyboard navigation and screen reader support
+ * 
+ * @fileoverview Database relationship configuration form component
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+ / React Hook Form 7.57.0
  */
 
 'use client';
 
-import React, { useEffect, useCallback, useMemo } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import React, { useMemo, useCallback, useEffect, useState } from 'react';
+import { useForm, useWatch, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { 
-  relationshipFormSchema,
-  relationshipCreationSchema,
+
+// UI Components
+import { FormField } from '../../../components/ui/form/form-field';
+import { Select } from '../../../components/ui/select/Select';
+import { Button } from '../../../components/ui/button/button';
+import { Toggle } from '../../../components/ui/toggle/toggle';
+
+// Validation and Types
+import {
+  RelationshipSchema,
   type RelationshipFormData,
-  type RelationshipCreationFormData,
-  type BasicOption,
-  type ServiceOption,
-  type FieldOption,
-  type TableOption,
-  getDefaultRelationshipFormValues,
-  requiresJunctionTable
+  type RelationshipType,
+  type RelationshipFormValues,
+  getEnabledFields,
+  getDisabledFields,
+  getDefaultRelationshipValues,
+  getRelationshipFieldConfigs,
+  validateRelationshipForm,
+  createDebouncedValidator,
+  type RelationshipFieldConfig,
 } from './validation-schemas';
-import type { RelationshipType } from '../../types/database';
 
-// ============================================================================
-// COMPONENT PROPS AND INTERFACES
-// ============================================================================
+// Utilities
+import { cn } from '../../../lib/utils';
 
-export interface RelationshipFormProps {
-  /** Form mode - create or edit */
-  mode: 'create' | 'edit';
-  /** Initial data for edit mode */
+// Types for external integration
+interface RelationshipFormProps {
+  /** Initial relationship data for edit mode */
   initialData?: Partial<RelationshipFormData>;
-  /** Available database fields for local field selection */
-  fieldOptions: FieldOption[];
-  /** Available services for reference and junction selection */
-  serviceOptions: ServiceOption[];
-  /** Available reference tables (populated based on selected reference service) */
-  referenceTableOptions: TableOption[];
-  /** Available reference fields (populated based on selected reference table) */
-  referenceFieldOptions: FieldOption[];
-  /** Available junction tables (populated based on selected junction service) */
-  junctionTableOptions: TableOption[];
-  /** Available junction fields (populated based on selected junction table) */
-  junctionFieldOptions: FieldOption[];
-  /** Loading state for async operations */
-  isLoading?: boolean;
-  /** Callback when form is submitted successfully */
-  onSubmit: (data: RelationshipFormData) => Promise<void>;
-  /** Callback when cancel is clicked */
-  onCancel: () => void;
-  /** Callback when reference service changes (to load tables) */
-  onReferenceServiceChange: (serviceId: number) => void;
-  /** Callback when reference table changes (to load fields) */
-  onReferenceTableChange: (tableName: string, serviceId: number) => void;
-  /** Callback when junction service changes (to load tables) */
-  onJunctionServiceChange: (serviceId: number) => void;
-  /** Callback when junction table changes (to load fields) */
-  onJunctionTableChange: (tableName: string, serviceId: number) => void;
-  /** Error message to display */
-  errorMessage?: string;
-  /** Success message to display */
-  successMessage?: string;
-}
-
-// ============================================================================
-// FORM STYLING WITH CLASS-VARIANCE-AUTHORITY
-// ============================================================================
-
-const formVariants = cva(
-  'w-full max-w-4xl mx-auto bg-white rounded-lg border transition-all duration-200',
-  {
-    variants: {
-      state: {
-        idle: 'border-gray-300 shadow-sm',
-        loading: 'border-blue-500 shadow-md',
-        error: 'border-red-500 shadow-md',
-        success: 'border-green-500 shadow-md'
-      },
-      size: {
-        compact: 'p-4 space-y-4',
-        normal: 'p-6 space-y-6',
-        spacious: 'p-8 space-y-8'
-      }
-    },
-    defaultVariants: {
-      state: 'idle',
-      size: 'normal'
-    }
-  }
-);
-
-const fieldVariants = cva(
-  'transition-all duration-200',
-  {
-    variants: {
-      state: {
-        enabled: 'opacity-100',
-        disabled: 'opacity-50 pointer-events-none',
-        hidden: 'opacity-0 pointer-events-none h-0 overflow-hidden'
-      }
-    },
-    defaultVariants: {
-      state: 'enabled'
-    }
-  }
-);
-
-const inputVariants = cva(
-  'w-full px-3 py-2 border rounded-md transition-all duration-150',
-  {
-    variants: {
-      state: {
-        default: 'border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200',
-        error: 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200',
-        disabled: 'bg-gray-100 border-gray-200 cursor-not-allowed'
-      }
-    },
-    defaultVariants: {
-      state: 'default'
-    }
-  }
-);
-
-const labelVariants = cva(
-  'block text-sm font-medium mb-1',
-  {
-    variants: {
-      required: {
-        true: "after:content-['*'] after:text-red-500 after:ml-1",
-        false: ''
-      },
-      state: {
-        default: 'text-gray-700',
-        error: 'text-red-700',
-        disabled: 'text-gray-500'
-      }
-    },
-    defaultVariants: {
-      required: false,
-      state: 'default'
-    }
-  }
-);
-
-const alertVariants = cva(
-  'px-4 py-3 rounded-md border mb-4',
-  {
-    variants: {
-      type: {
-        error: 'bg-red-50 border-red-200 text-red-800',
-        success: 'bg-green-50 border-green-200 text-green-800',
-        warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-        info: 'bg-blue-50 border-blue-200 text-blue-800'
-      }
-    }
-  }
-);
-
-// ============================================================================
-// FORM FIELD COMPONENTS
-// ============================================================================
-
-interface FormFieldProps {
-  label: string;
-  name: string;
-  required?: boolean;
-  error?: string;
-  disabled?: boolean;
-  children: React.ReactNode;
-  className?: string;
-}
-
-const FormField: React.FC<FormFieldProps> = ({
-  label,
-  name,
-  required = false,
-  error,
-  disabled = false,
-  children,
-  className = ''
-}) => {
-  const fieldState = disabled ? 'disabled' : 'enabled';
-  const labelState = error ? 'error' : disabled ? 'disabled' : 'default';
-
-  return (
-    <div className={`${fieldVariants({ state: fieldState })} ${className}`}>
-      <label 
-        htmlFor={name}
-        className={labelVariants({ required, state: labelState })}
-      >
-        {label}
-      </label>
-      {children}
-      {error && (
-        <p className="mt-1 text-sm text-red-600" role="alert" id={`${name}-error`}>
-          {error}
-        </p>
-      )}
-    </div>
-  );
-};
-
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  error?: boolean;
-}
-
-const Input: React.FC<InputProps> = ({ error, disabled, className = '', ...props }) => {
-  const state = disabled ? 'disabled' : error ? 'error' : 'default';
   
-  return (
-    <input
-      className={`${inputVariants({ state })} ${className}`}
-      disabled={disabled}
-      aria-invalid={error}
-      aria-describedby={error ? `${props.name}-error` : undefined}
-      {...props}
-    />
-  );
-};
-
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  options: BasicOption[];
-  error?: boolean;
-  placeholder?: string;
-}
-
-const Select: React.FC<SelectProps> = ({ 
-  options, 
-  error, 
-  disabled, 
-  placeholder = 'Select an option...',
-  className = '',
-  ...props 
-}) => {
-  const state = disabled ? 'disabled' : error ? 'error' : 'default';
+  /** Form submission handler */
+  onSubmit: (data: RelationshipFormValues) => Promise<void> | void;
   
-  return (
-    <select
-      className={`${inputVariants({ state })} ${className}`}
-      disabled={disabled}
-      aria-invalid={error}
-      aria-describedby={error ? `${props.name}-error` : undefined}
-      {...props}
-    >
-      <option value="">{placeholder}</option>
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  );
-};
-
-interface ToggleProps {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  disabled?: boolean;
-  label: string;
-  description?: string;
-}
-
-const Toggle: React.FC<ToggleProps> = ({ 
-  checked, 
-  onChange, 
-  disabled = false, 
-  label, 
-  description 
-}) => {
-  return (
-    <div className="flex items-start space-x-3">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={`
-          relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent 
-          transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-          ${checked ? 'bg-blue-600' : 'bg-gray-200'}
-        `}
-      >
-        <span
-          className={`
-            pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 
-            transition duration-200 ease-in-out
-            ${checked ? 'translate-x-5' : 'translate-x-0'}
-          `}
-        />
-      </button>
-      <div className="flex flex-col">
-        <span className="text-sm font-medium text-gray-700">{label}</span>
-        {description && (
-          <span className="text-sm text-gray-500">{description}</span>
-        )}
-      </div>
-    </div>
-  );
-};
-
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
-  size?: 'sm' | 'md' | 'lg';
+  /** Cancel handler */
+  onCancel?: () => void;
+  
+  /** Loading state */
   loading?: boolean;
+  
+  /** Form mode */
+  mode?: 'create' | 'edit';
+  
+  /** Available database services for dropdowns */
+  availableServices?: Array<{ label: string; value: number }>;
+  
+  /** Available tables for current service */
+  availableTables?: Array<{ label: string; value: string }>;
+  
+  /** Available fields for selected table */
+  availableFields?: Array<{ label: string; value: string }>;
+  
+  /** Service ID change handler for loading tables */
+  onServiceChange?: (serviceId: number) => void;
+  
+  /** Table change handler for loading fields */
+  onTableChange?: (tableName: string) => void;
+  
+  /** Form error state */
+  error?: string;
+  
+  /** Form success state */
+  success?: string;
+  
+  /** Custom CSS classes */
+  className?: string;
+  
+  /** Accessibility props */
+  'aria-label'?: string;
+  'aria-describedby'?: string;
+  
+  /** Test identifier */
+  'data-testid'?: string;
 }
 
-const buttonVariants = cva(
-  'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none',
+/**
+ * Form section styling variants using class-variance-authority
+ * Provides consistent theme integration and accessibility compliance
+ */
+const formSectionVariants = cva(
+  [
+    "space-y-6 p-6 rounded-lg border transition-all duration-200",
+    "focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-opacity-50",
+  ],
   {
     variants: {
       variant: {
-        primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-        secondary: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500',
-        outline: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-blue-500',
-        ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
-        destructive: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
+        default: [
+          "bg-white border-gray-200 shadow-sm",
+          "dark:bg-gray-800 dark:border-gray-700",
+        ],
+        elevated: [
+          "bg-white border-gray-300 shadow-md",
+          "dark:bg-gray-800 dark:border-gray-600",
+        ],
+        outlined: [
+          "bg-transparent border-2 border-gray-300",
+          "dark:border-gray-600",
+        ],
       },
-      size: {
-        sm: 'h-8 px-3 text-sm',
-        md: 'h-10 px-4 text-sm',
-        lg: 'h-12 px-6 text-base'
-      }
+      state: {
+        default: "",
+        loading: "opacity-75 pointer-events-none",
+        error: [
+          "border-error-300 bg-error-50",
+          "dark:border-error-700 dark:bg-error-900/20",
+        ],
+        success: [
+          "border-success-300 bg-success-50", 
+          "dark:border-success-700 dark:bg-success-900/20",
+        ],
+      },
     },
     defaultVariants: {
-      variant: 'primary',
-      size: 'md'
-    }
+      variant: "default",
+      state: "default",
+    },
   }
 );
 
-const Button: React.FC<ButtonProps> = ({ 
-  variant, 
-  size, 
-  loading = false, 
-  children, 
-  className = '',
-  disabled,
-  ...props 
-}) => {
-  return (
-    <button
-      className={`${buttonVariants({ variant, size })} ${className}`}
-      disabled={disabled || loading}
-      {...props}
-    >
-      {loading && (
-        <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-          <circle 
-            className="opacity-25" 
-            cx="12" 
-            cy="12" 
-            r="10" 
-            stroke="currentColor" 
-            strokeWidth="4"
-          />
-          <path 
-            className="opacity-75" 
-            fill="currentColor" 
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-          />
-        </svg>
-      )}
-      {children}
-    </button>
-  );
-};
+/**
+ * Field group styling variants
+ * Provides consistent spacing and visual hierarchy
+ */
+const fieldGroupVariants = cva(
+  "space-y-4",
+  {
+    variants: {
+      spacing: {
+        compact: "space-y-2",
+        normal: "space-y-4", 
+        relaxed: "space-y-6",
+      },
+      layout: {
+        stack: "flex flex-col",
+        grid: "grid grid-cols-1 gap-4 md:grid-cols-2",
+        inline: "flex flex-wrap gap-4",
+      },
+    },
+    defaultVariants: {
+      spacing: "normal",
+      layout: "stack",
+    },
+  }
+);
 
-// ============================================================================
-// MAIN RELATIONSHIP FORM COMPONENT
-// ============================================================================
-
+/**
+ * Relationship Form Component
+ * 
+ * Comprehensive form component for database relationship configuration that provides
+ * real-time validation, dynamic field behavior, and enterprise-grade accessibility.
+ * Integrates seamlessly with React Hook Form and Zod for type-safe validation.
+ */
 export const RelationshipForm: React.FC<RelationshipFormProps> = ({
-  mode,
   initialData,
-  fieldOptions,
-  serviceOptions,
-  referenceTableOptions,
-  referenceFieldOptions,
-  junctionTableOptions,
-  junctionFieldOptions,
-  isLoading = false,
   onSubmit,
   onCancel,
-  onReferenceServiceChange,
-  onReferenceTableChange,
-  onJunctionServiceChange,
-  onJunctionTableChange,
-  errorMessage,
-  successMessage
+  loading = false,
+  mode = 'create',
+  availableServices = [],
+  availableTables = [],
+  availableFields = [],
+  onServiceChange,
+  onTableChange,
+  error,
+  success,
+  className,
+  'aria-label': ariaLabel,
+  'aria-describedby': ariaDescribedBy,
+  'data-testid': testId,
 }) => {
-  // ============================================================================
-  // FORM SETUP WITH REACT HOOK FORM AND ZOD VALIDATION
-  // ============================================================================
-
-  const defaultValues = useMemo(() => {
-    if (mode === 'edit' && initialData) {
-      return initialData;
-    }
-    return getDefaultRelationshipFormValues();
-  }, [mode, initialData]);
-
-  const {
-    control,
-    handleSubmit,
-    watch,
-    setValue,
-    reset,
-    formState: { 
-      errors, 
-      isSubmitting, 
-      isValid, 
-      isDirty 
-    }
-  } = useForm<RelationshipFormData>({
-    resolver: zodResolver(mode === 'create' ? relationshipCreationSchema : relationshipFormSchema),
-    defaultValues,
-    mode: 'onChange' // Enable real-time validation
+  
+  // Form state management with React Hook Form and Zod validation
+  const form = useForm<RelationshipFormData>({
+    resolver: zodResolver(RelationshipSchema),
+    defaultValues: {
+      ...getDefaultRelationshipValues('belongs_to'),
+      ...initialData,
+    },
+    mode: 'onChange', // Enable real-time validation
+    criteriaMode: 'all', // Show all validation errors
+    shouldFocusError: true, // Accessibility: focus first error field
+    delayError: 50, // Debounce validation for performance
   });
-
-  // Watch form values for dynamic behavior
-  const watchedType = watch('type');
-  const watchedRefServiceId = watch('refServiceId');
-  const watchedRefTable = watch('refTable');
-  const watchedJunctionServiceId = watch('junctionServiceId');
-  const watchedJunctionTable = watch('junctionTable');
-
-  // ============================================================================
-  // DYNAMIC FIELD BEHAVIOR BASED ON RELATIONSHIP TYPE
-  // ============================================================================
-
-  const isJunctionRequired = useMemo(() => {
-    return requiresJunctionTable(watchedType as RelationshipType);
-  }, [watchedType]);
-
-  // Reset junction fields when relationship type changes from many_many to others
-  useEffect(() => {
-    if (!isJunctionRequired) {
-      setValue('junctionServiceId', null);
-      setValue('junctionTable', null);
-      setValue('junctionField', null);
-      setValue('junctionRefField', null);
-    }
-  }, [isJunctionRequired, setValue]);
-
-  // ============================================================================
-  // DYNAMIC DATA LOADING CALLBACKS
-  // ============================================================================
-
-  const handleReferenceServiceChange = useCallback((serviceId: string) => {
-    const numericServiceId = Number(serviceId);
-    if (numericServiceId && numericServiceId !== watchedRefServiceId) {
-      setValue('refServiceId', numericServiceId);
-      setValue('refTable', '');
-      setValue('refField', '');
-      onReferenceServiceChange(numericServiceId);
-    }
-  }, [setValue, onReferenceServiceChange, watchedRefServiceId]);
-
-  const handleReferenceTableChange = useCallback((tableName: string) => {
-    if (tableName && tableName !== watchedRefTable) {
-      setValue('refTable', tableName);
-      setValue('refField', '');
-      if (watchedRefServiceId) {
-        onReferenceTableChange(tableName, watchedRefServiceId);
-      }
-    }
-  }, [setValue, onReferenceTableChange, watchedRefServiceId, watchedRefTable]);
-
-  const handleJunctionServiceChange = useCallback((serviceId: string) => {
-    const numericServiceId = Number(serviceId);
-    if (numericServiceId && numericServiceId !== watchedJunctionServiceId) {
-      setValue('junctionServiceId', numericServiceId);
-      setValue('junctionTable', '');
-      setValue('junctionField', '');
-      setValue('junctionRefField', '');
-      onJunctionServiceChange(numericServiceId);
-    }
-  }, [setValue, onJunctionServiceChange, watchedJunctionServiceId]);
-
-  const handleJunctionTableChange = useCallback((tableName: string) => {
-    if (tableName && tableName !== watchedJunctionTable) {
-      setValue('junctionTable', tableName);
-      setValue('junctionField', '');
-      setValue('junctionRefField', '');
-      if (watchedJunctionServiceId) {
-        onJunctionTableChange(tableName, watchedJunctionServiceId);
-      }
-    }
-  }, [setValue, onJunctionTableChange, watchedJunctionServiceId, watchedJunctionTable]);
-
-  // ============================================================================
-  // FORM SUBMISSION HANDLER
-  // ============================================================================
-
-  const handleFormSubmit = useCallback(async (data: RelationshipFormData) => {
-    try {
-      await onSubmit(data);
-    } catch (error) {
-      console.error('Form submission error:', error);
-      // Error handling is managed by parent component
-    }
-  }, [onSubmit]);
-
-  // ============================================================================
-  // FORM STATE DETERMINATION FOR STYLING
-  // ============================================================================
-
+  
+  const { 
+    control, 
+    handleSubmit, 
+    formState: { errors, isSubmitting, isValid, isDirty },
+    setValue,
+    clearErrors,
+    trigger,
+    reset,
+  } = form;
+  
+  // Watch relationship type for dynamic field behavior
+  const watchedType = useWatch({
+    control,
+    name: 'type',
+    defaultValue: initialData?.type || 'belongs_to',
+  });
+  
+  // Watch service IDs for dropdown dependencies
+  const watchedRefServiceId = useWatch({
+    control,
+    name: 'refServiceId',
+  });
+  
+  const watchedJunctionServiceId = useWatch({
+    control,
+    name: 'junctionServiceId',
+  });
+  
+  // Local state for loading states
+  const [isValidating, setIsValidating] = useState(false);
+  const [fieldStates, setFieldStates] = useState<Record<string, boolean>>({});
+  
+  // Debounced validator for real-time feedback under 100ms
+  const debouncedValidator = useMemo(
+    () => createDebouncedValidator(50),
+    []
+  );
+  
+  // Calculate enabled/disabled fields based on relationship type
+  const enabledFields = useMemo(
+    () => getEnabledFields(watchedType),
+    [watchedType]
+  );
+  
+  const disabledFields = useMemo(
+    () => getDisabledFields(watchedType),
+    [watchedType]
+  );
+  
+  // Get field configurations for dynamic rendering
+  const fieldConfigs = useMemo(
+    () => getRelationshipFieldConfigs(watchedType),
+    [watchedType]
+  );
+  
+  // Form section state based on validation and loading
   const formState = useMemo(() => {
-    if (isSubmitting || isLoading) return 'loading';
-    if (errorMessage) return 'error';
-    if (successMessage) return 'success';
-    return 'idle';
-  }, [isSubmitting, isLoading, errorMessage, successMessage]);
-
-  // ============================================================================
-  // RELATIONSHIP TYPE OPTIONS
-  // ============================================================================
-
-  const relationshipTypeOptions: BasicOption[] = [
-    { label: 'Belongs To', value: 'belongs_to' },
-    { label: 'Has Many', value: 'has_many' },
-    { label: 'Has One', value: 'has_one' },
-    { label: 'Many To Many', value: 'many_many' }
-  ];
-
-  // ============================================================================
-  // RENDER COMPONENT
-  // ============================================================================
-
+    if (loading || isSubmitting) return 'loading';
+    if (error) return 'error';
+    if (success) return 'success';
+    return 'default';
+  }, [loading, isSubmitting, error, success]);
+  
+  // Enhanced form submission with loading state and error handling
+  const onFormSubmit: SubmitHandler<RelationshipFormData> = useCallback(
+    async (data) => {
+      try {
+        setIsValidating(true);
+        
+        // Additional client-side validation
+        const validationResult = await debouncedValidator(data);
+        if (!validationResult.success) {
+          console.warn('Client-side validation failed:', validationResult.errors);
+        }
+        
+        // Submit form data
+        await onSubmit(data);
+        
+        // Announce success to screen readers
+        const announcement = document.createElement('div');
+        announcement.setAttribute('aria-live', 'polite');
+        announcement.setAttribute('aria-atomic', 'true');
+        announcement.className = 'sr-only';
+        announcement.textContent = `Relationship ${mode === 'create' ? 'created' : 'updated'} successfully`;
+        document.body.appendChild(announcement);
+        setTimeout(() => document.body.removeChild(announcement), 1000);
+        
+      } catch (submitError) {
+        console.error('Form submission error:', submitError);
+        
+        // Announce error to screen readers
+        const announcement = document.createElement('div');
+        announcement.setAttribute('aria-live', 'assertive');
+        announcement.setAttribute('aria-atomic', 'true');
+        announcement.className = 'sr-only';
+        announcement.textContent = 'Form submission failed. Please check the errors and try again.';
+        document.body.appendChild(announcement);
+        setTimeout(() => document.body.removeChild(announcement), 1000);
+      } finally {
+        setIsValidating(false);
+      }
+    },
+    [onSubmit, mode, debouncedValidator]
+  );
+  
+  // Handle relationship type change with field cleanup
+  const handleTypeChange = useCallback(
+    (newType: RelationshipType) => {
+      setValue('type', newType);
+      
+      // Clear junction fields if switching away from many_many
+      if (newType !== 'many_many') {
+        setValue('junctionServiceId', undefined);
+        setValue('junctionTable', undefined);
+        setValue('junctionField', undefined);
+        setValue('junctionRefField', undefined);
+        
+        // Clear errors for disabled fields
+        clearErrors(['junctionServiceId', 'junctionTable', 'junctionField', 'junctionRefField']);
+      }
+      
+      // Trigger validation for affected fields
+      trigger();
+    },
+    [setValue, clearErrors, trigger]
+  );
+  
+  // Handle service selection with dependent field updates
+  const handleServiceChange = useCallback(
+    (serviceId: number, isJunction: boolean = false) => {
+      if (isJunction) {
+        setValue('junctionServiceId', serviceId);
+        setValue('junctionTable', undefined);
+        setValue('junctionField', undefined);
+        setValue('junctionRefField', undefined);
+      } else {
+        setValue('refServiceId', serviceId);
+        setValue('refTable', undefined);
+        setValue('refField', undefined);
+      }
+      
+      // Notify parent component to load tables
+      onServiceChange?.(serviceId);
+      
+      // Trigger validation
+      trigger();
+    },
+    [setValue, onServiceChange, trigger]
+  );
+  
+  // Handle table selection with dependent field updates
+  const handleTableChange = useCallback(
+    (tableName: string, isJunction: boolean = false) => {
+      if (isJunction) {
+        setValue('junctionTable', tableName);
+        setValue('junctionField', undefined);
+        setValue('junctionRefField', undefined);
+      } else {
+        setValue('refTable', tableName);
+        setValue('refField', undefined);
+      }
+      
+      // Notify parent component to load fields
+      onTableChange?.(tableName);
+      
+      // Trigger validation
+      trigger();
+    },
+    [setValue, onTableChange, trigger]
+  );
+  
+  // Reset form to initial state
+  const handleReset = useCallback(() => {
+    reset({
+      ...getDefaultRelationshipValues(watchedType),
+      ...initialData,
+    });
+  }, [reset, watchedType, initialData]);
+  
+  // Effect to update form when initialData changes
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        ...getDefaultRelationshipValues(initialData.type || 'belongs_to'),
+        ...initialData,
+      });
+    }
+  }, [initialData, reset]);
+  
+  // Render a form field based on configuration
+  const renderFormField = useCallback(
+    (config: RelationshipFieldConfig) => {
+      const fieldName = config.name;
+      const isDisabled = disabledFields.includes(fieldName) || loading || isSubmitting;
+      const isRequired = config.required && enabledFields.includes(fieldName);
+      
+      // Common field configuration
+      const fieldConfig = {
+        label: config.label,
+        placeholder: config.placeholder,
+        helperText: config.helperText,
+        required: isRequired,
+        disabled: isDisabled,
+      };
+      
+      switch (config.type) {
+        case 'select':
+          // Get appropriate options based on field name
+          let options: Array<{ label: string; value: any }> = [];
+          
+          if (fieldName === 'type') {
+            options = config.options || [];
+          } else if (fieldName === 'refServiceId' || fieldName === 'junctionServiceId') {
+            options = availableServices;
+          } else if (fieldName === 'refTable' || fieldName === 'junctionTable') {
+            options = availableTables;
+          } else if (fieldName === 'refField' || fieldName === 'field' || 
+                     fieldName === 'junctionField' || fieldName === 'junctionRefField') {
+            options = availableFields;
+          }
+          
+          return (
+            <FormField
+              key={fieldName}
+              control={control}
+              name={fieldName}
+              config={fieldConfig}
+              rules={{ required: isRequired ? 'This field is required' : false }}
+            >
+              <Select
+                options={options}
+                placeholder={config.placeholder || `Select ${config.label.toLowerCase()}`}
+                disabled={isDisabled}
+                error={errors[fieldName]?.message}
+                loading={fieldStates[fieldName]}
+                clearable={!isRequired}
+                onChange={(value) => {
+                  // Handle specific field change logic
+                  if (fieldName === 'type') {
+                    handleTypeChange(value as RelationshipType);
+                  } else if (fieldName === 'refServiceId') {
+                    handleServiceChange(value as number, false);
+                  } else if (fieldName === 'junctionServiceId') {
+                    handleServiceChange(value as number, true);
+                  } else if (fieldName === 'refTable') {
+                    handleTableChange(value as string, false);
+                  } else if (fieldName === 'junctionTable') {
+                    handleTableChange(value as string, true);
+                  }
+                }}
+                data-testid={`${testId}-${fieldName}`}
+              />
+            </FormField>
+          );
+          
+        case 'toggle':
+          return (
+            <FormField
+              key={fieldName}
+              control={control}
+              name={fieldName}
+              config={fieldConfig}
+            >
+              <Toggle
+                disabled={isDisabled}
+                size="md"
+                variant="primary"
+                label={config.label}
+                labelPosition="right"
+                data-testid={`${testId}-${fieldName}`}
+              />
+            </FormField>
+          );
+          
+        case 'textarea':
+          // For this component, we'll use a basic textarea since we don't have a dedicated TextArea component
+          return (
+            <FormField
+              key={fieldName}
+              control={control}
+              name={fieldName}
+              config={fieldConfig}
+            >
+              <textarea
+                className={cn(
+                  "w-full px-3 py-2 border border-gray-300 rounded-md",
+                  "focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                )}
+                rows={3}
+                placeholder={config.placeholder}
+                disabled={isDisabled}
+                data-testid={`${testId}-${fieldName}`}
+              />
+            </FormField>
+          );
+          
+        default: // text input
+          return (
+            <FormField
+              key={fieldName}
+              control={control}
+              name={fieldName}
+              config={fieldConfig}
+            >
+              <input
+                type="text"
+                className={cn(
+                  "w-full px-3 py-2 border border-gray-300 rounded-md",
+                  "focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                )}
+                placeholder={config.placeholder}
+                disabled={isDisabled}
+                data-testid={`${testId}-${fieldName}`}
+              />
+            </FormField>
+          );
+      }
+    },
+    [
+      control,
+      errors,
+      disabledFields,
+      enabledFields,
+      loading,
+      isSubmitting,
+      availableServices,
+      availableTables, 
+      availableFields,
+      fieldStates,
+      handleTypeChange,
+      handleServiceChange,
+      handleTableChange,
+      testId,
+    ]
+  );
+  
+  // Group fields by category for better UX
+  const basicFields = fieldConfigs.filter(config => 
+    ['name', 'alias', 'label', 'description', 'type'].includes(config.name)
+  );
+  
+  const relationshipFields = fieldConfigs.filter(config =>
+    ['field', 'refServiceId', 'refTable', 'refField'].includes(config.name)
+  );
+  
+  const junctionFields = fieldConfigs.filter(config =>
+    config.name.startsWith('junction')
+  );
+  
+  const settingsFields = fieldConfigs.filter(config =>
+    ['alwaysFetch', 'isVirtual'].includes(config.name)
+  );
+  
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            {mode === 'create' ? 'Create' : 'Edit'} Relationship
-          </h1>
-          <p className="mt-2 text-lg text-gray-600">
-            Configure database table relationships for API generation
+    <form
+      onSubmit={handleSubmit(onFormSubmit)}
+      className={cn(
+        formSectionVariants({ 
+          variant: "default", 
+          state: formState 
+        }),
+        className
+      )}
+      aria-label={ariaLabel || `${mode} relationship form`}
+      aria-describedby={ariaDescribedBy}
+      data-testid={testId || `relationship-form-${mode}`}
+      noValidate // Use React Hook Form validation instead
+    >
+      {/* Form Header */}
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          {mode === 'create' ? 'Create Relationship' : 'Edit Relationship'}
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Configure a database relationship to enable API generation with proper data associations.
+        </p>
+      </div>
+      
+      {/* Error/Success Messages */}
+      {error && (
+        <div 
+          className="p-4 rounded-md bg-error-50 border border-error-200 dark:bg-error-900/20 dark:border-error-800"
+          role="alert"
+          aria-live="polite"
+        >
+          <p className="text-sm text-error-700 dark:text-error-300">
+            {error}
           </p>
         </div>
-
-        {/* Alert Messages */}
-        {errorMessage && (
-          <div className={alertVariants({ type: 'error' })} role="alert">
-            <strong>Error:</strong> {errorMessage}
-          </div>
-        )}
-
-        {successMessage && (
-          <div className={alertVariants({ type: 'success' })} role="alert">
-            <strong>Success:</strong> {successMessage}
-          </div>
-        )}
-
-        {/* Main Form */}
-        <form 
-          onSubmit={handleSubmit(handleFormSubmit)}
-          className={formVariants({ state: formState })}
-          noValidate
+      )}
+      
+      {success && (
+        <div 
+          className="p-4 rounded-md bg-success-50 border border-success-200 dark:bg-success-900/20 dark:border-success-800"
+          role="status"
+          aria-live="polite"
         >
-          {/* Basic Information Section */}
-          <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Basic Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Controller
-                name="name"
-                control={control}
-                render={({ field }) => (
-                  <FormField
-                    label="Relationship Name"
-                    name="name"
-                    error={errors.name?.message}
-                    disabled={mode === 'create'} // Auto-generated in create mode
-                  >
-                    <Input
-                      {...field}
-                      value={field.value || ''}
-                      placeholder="Auto-generated"
-                      disabled={mode === 'create'}
-                      error={!!errors.name}
-                    />
-                  </FormField>
-                )}
-              />
-
-              <Controller
-                name="alias"
-                control={control}
-                render={({ field }) => (
-                  <FormField
-                    label="Alias"
-                    name="alias"
-                    error={errors.alias?.message}
-                  >
-                    <Input
-                      {...field}
-                      value={field.value || ''}
-                      placeholder="Optional alias"
-                      error={!!errors.alias}
-                    />
-                  </FormField>
-                )}
-              />
-
-              <Controller
-                name="label"
-                control={control}
-                render={({ field }) => (
-                  <FormField
-                    label="Display Label"
-                    name="label"
-                    error={errors.label?.message}
-                    className="md:col-span-2"
-                  >
-                    <Input
-                      {...field}
-                      value={field.value || ''}
-                      placeholder="Human-readable label"
-                      error={!!errors.label}
-                    />
-                  </FormField>
-                )}
-              />
-
-              <Controller
-                name="description"
-                control={control}
-                render={({ field }) => (
-                  <FormField
-                    label="Description"
-                    name="description"
-                    error={errors.description?.message}
-                    className="md:col-span-2"
-                  >
-                    <textarea
-                      {...field}
-                      value={field.value || ''}
-                      placeholder="Optional description"
-                      rows={3}
-                      className={inputVariants({ 
-                        state: errors.description ? 'error' : 'default' 
-                      })}
-                    />
-                  </FormField>
-                )}
-              />
-            </div>
-          </section>
-
-          {/* Relationship Configuration Section */}
-          <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Relationship Configuration</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Controller
-                name="type"
-                control={control}
-                render={({ field }) => (
-                  <FormField
-                    label="Relationship Type"
-                    name="type"
-                    required
-                    error={errors.type?.message}
-                  >
-                    <Select
-                      {...field}
-                      options={relationshipTypeOptions}
-                      placeholder="Select relationship type"
-                      error={!!errors.type}
-                    />
-                  </FormField>
-                )}
-              />
-
-              <Controller
-                name="field"
-                control={control}
-                render={({ field }) => (
-                  <FormField
-                    label="Local Field"
-                    name="field"
-                    required
-                    error={errors.field?.message}
-                  >
-                    <Select
-                      {...field}
-                      options={fieldOptions}
-                      placeholder="Select local field"
-                      error={!!errors.field}
-                    />
-                  </FormField>
-                )}
-              />
-            </div>
-
-            {/* Relationship Options */}
-            <div className="mt-6 space-y-4">
-              <Controller
-                name="alwaysFetch"
-                control={control}
-                render={({ field }) => (
-                  <Toggle
-                    checked={field.value}
-                    onChange={field.onChange}
-                    label="Always Fetch"
-                    description="Always fetch related data with parent record"
-                  />
-                )}
-              />
-
-              <Controller
-                name="isVirtual"
-                control={control}
-                render={({ field }) => (
-                  <Toggle
-                    checked={field.value}
-                    onChange={field.onChange}
-                    disabled // Virtual relationships are standard
-                    label="Virtual Relationship"
-                    description="This is a virtual relationship (recommended)"
-                  />
-                )}
-              />
-            </div>
-          </section>
-
-          {/* Reference Configuration Section */}
-          <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Reference Configuration</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Controller
-                name="refServiceId"
-                control={control}
-                render={({ field }) => (
-                  <FormField
-                    label="Reference Service"
-                    name="refServiceId"
-                    required
-                    error={errors.refServiceId?.message}
-                  >
-                    <Select
-                      {...field}
-                      value={field.value?.toString() || ''}
-                      onChange={(e) => handleReferenceServiceChange(e.target.value)}
-                      options={serviceOptions.map(opt => ({ ...opt, value: opt.value.toString() }))}
-                      placeholder="Select service"
-                      error={!!errors.refServiceId}
-                    />
-                  </FormField>
-                )}
-              />
-
-              <Controller
-                name="refTable"
-                control={control}
-                render={({ field }) => (
-                  <FormField
-                    label="Reference Table"
-                    name="refTable"
-                    required
-                    error={errors.refTable?.message}
-                  >
-                    <Select
-                      {...field}
-                      onChange={(e) => handleReferenceTableChange(e.target.value)}
-                      options={referenceTableOptions}
-                      placeholder="Select table"
-                      disabled={!watchedRefServiceId}
-                      error={!!errors.refTable}
-                    />
-                  </FormField>
-                )}
-              />
-
-              <Controller
-                name="refField"
-                control={control}
-                render={({ field }) => (
-                  <FormField
-                    label="Reference Field"
-                    name="refField"
-                    required
-                    error={errors.refField?.message}
-                  >
-                    <Select
-                      {...field}
-                      options={referenceFieldOptions}
-                      placeholder="Select field"
-                      disabled={!watchedRefTable}
-                      error={!!errors.refField}
-                    />
-                  </FormField>
-                )}
-              />
-            </div>
-          </section>
-
-          {/* Junction Table Configuration Section (only for many_many) */}
-          {isJunctionRequired && (
-            <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Junction Table Configuration
-                <span className="ml-2 text-sm font-normal text-gray-600">
-                  (Required for Many-to-Many relationships)
-                </span>
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Controller
-                  name="junctionServiceId"
-                  control={control}
-                  render={({ field }) => (
-                    <FormField
-                      label="Junction Service"
-                      name="junctionServiceId"
-                      required={isJunctionRequired}
-                      error={errors.junctionServiceId?.message}
-                    >
-                      <Select
-                        {...field}
-                        value={field.value?.toString() || ''}
-                        onChange={(e) => handleJunctionServiceChange(e.target.value)}
-                        options={serviceOptions.map(opt => ({ ...opt, value: opt.value.toString() }))}
-                        placeholder="Select junction service"
-                        error={!!errors.junctionServiceId}
-                      />
-                    </FormField>
-                  )}
-                />
-
-                <Controller
-                  name="junctionTable"
-                  control={control}
-                  render={({ field }) => (
-                    <FormField
-                      label="Junction Table"
-                      name="junctionTable"
-                      required={isJunctionRequired}
-                      error={errors.junctionTable?.message}
-                    >
-                      <Select
-                        {...field}
-                        value={field.value || ''}
-                        onChange={(e) => handleJunctionTableChange(e.target.value)}
-                        options={junctionTableOptions}
-                        placeholder="Select junction table"
-                        disabled={!watchedJunctionServiceId}
-                        error={!!errors.junctionTable}
-                      />
-                    </FormField>
-                  )}
-                />
-
-                <Controller
-                  name="junctionField"
-                  control={control}
-                  render={({ field }) => (
-                    <FormField
-                      label="Junction Local Field"
-                      name="junctionField"
-                      required={isJunctionRequired}
-                      error={errors.junctionField?.message}
-                    >
-                      <Select
-                        {...field}
-                        value={field.value || ''}
-                        options={junctionFieldOptions}
-                        placeholder="Select junction local field"
-                        disabled={!watchedJunctionTable}
-                        error={!!errors.junctionField}
-                      />
-                    </FormField>
-                  )}
-                />
-
-                <Controller
-                  name="junctionRefField"
-                  control={control}
-                  render={({ field }) => (
-                    <FormField
-                      label="Junction Reference Field"
-                      name="junctionRefField"
-                      required={isJunctionRequired}
-                      error={errors.junctionRefField?.message}
-                    >
-                      <Select
-                        {...field}
-                        value={field.value || ''}
-                        options={junctionFieldOptions}
-                        placeholder="Select junction reference field"
-                        disabled={!watchedJunctionTable}
-                        error={!!errors.junctionRefField}
-                      />
-                    </FormField>
-                  )}
-                />
-              </div>
-            </section>
-          )}
-
-          {/* Form Actions */}
-          <section className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              loading={isSubmitting}
-              disabled={!isValid || !isDirty}
-            >
-              {mode === 'create' ? 'Create Relationship' : 'Update Relationship'}
-            </Button>
-          </section>
-        </form>
+          <p className="text-sm text-success-700 dark:text-success-300">
+            {success}
+          </p>
+        </div>
+      )}
+      
+      {/* Basic Information Section */}
+      <fieldset className="space-y-4">
+        <legend className="text-base font-medium text-gray-900 dark:text-white">
+          Basic Information
+        </legend>
+        <div className={fieldGroupVariants({ layout: "grid" })}>
+          {basicFields.map(renderFormField)}
+        </div>
+      </fieldset>
+      
+      {/* Relationship Configuration Section */}
+      <fieldset className="space-y-4">
+        <legend className="text-base font-medium text-gray-900 dark:text-white">
+          Relationship Configuration
+        </legend>
+        <div className={fieldGroupVariants({ layout: "stack" })}>
+          {relationshipFields.map(renderFormField)}
+        </div>
+      </fieldset>
+      
+      {/* Junction Table Configuration (Many-to-Many only) */}
+      {watchedType === 'many_many' && (
+        <fieldset className="space-y-4">
+          <legend className="text-base font-medium text-gray-900 dark:text-white">
+            Junction Table Configuration
+            <span className="block text-sm font-normal text-gray-600 dark:text-gray-400 mt-1">
+              Required for many-to-many relationships
+            </span>
+          </legend>
+          <div className={fieldGroupVariants({ layout: "stack" })}>
+            {junctionFields.map(renderFormField)}
+          </div>
+        </fieldset>
+      )}
+      
+      {/* Settings Section */}
+      <fieldset className="space-y-4">
+        <legend className="text-base font-medium text-gray-900 dark:text-white">
+          Settings
+        </legend>
+        <div className={fieldGroupVariants({ layout: "inline" })}>
+          {settingsFields.map(renderFormField)}
+        </div>
+      </fieldset>
+      
+      {/* Form Actions */}
+      <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          loading={isSubmitting || isValidating}
+          disabled={!isValid || !isDirty}
+          loadingText={mode === 'create' ? 'Creating...' : 'Updating...'}
+          className="order-2 sm:order-1"
+          data-testid={`${testId}-submit`}
+        >
+          {mode === 'create' ? 'Create Relationship' : 'Update Relationship'}
+        </Button>
+        
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          onClick={handleReset}
+          disabled={!isDirty || isSubmitting}
+          className="order-3 sm:order-2"
+          data-testid={`${testId}-reset`}
+        >
+          Reset
+        </Button>
+        
+        {onCancel && (
+          <Button
+            type="button"
+            variant="outline"
+            size="md"
+            onClick={onCancel}
+            disabled={isSubmitting}
+            className="order-1 sm:order-3 sm:ml-auto"
+            data-testid={`${testId}-cancel`}
+          >
+            Cancel
+          </Button>
+        )}
       </div>
-    </div>
+      
+      {/* Form Validation Summary for Screen Readers */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {Object.keys(errors).length > 0 && (
+          `Form has ${Object.keys(errors).length} validation error${Object.keys(errors).length === 1 ? '' : 's'}`
+        )}
+        {isSubmitting && 'Submitting form...'}
+        {isValidating && 'Validating form data...'}
+      </div>
+    </form>
   );
 };
 
+/**
+ * Component display name for debugging
+ */
+RelationshipForm.displayName = 'RelationshipForm';
+
+/**
+ * Export types for external usage
+ */
+export type {
+  RelationshipFormProps,
+  RelationshipFormData,
+  RelationshipFormValues,
+  RelationshipType,
+} from './validation-schemas';
+
+/**
+ * Export variant types for styling customization
+ */
+export type RelationshipFormVariants = VariantProps<typeof formSectionVariants>;
+
+/**
+ * Default export for convenient importing
+ */
 export default RelationshipForm;
-
-// ============================================================================
-// TYPE EXPORTS FOR EXTERNAL USE
-// ============================================================================
-
-export type { RelationshipFormProps };
-export type { RelationshipFormData, RelationshipCreationFormData } from './validation-schemas';
