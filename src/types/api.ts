@@ -1,702 +1,637 @@
 /**
- * Core API types for React/Next.js refactor of DreamFactory Admin Interface
+ * Core API types defining HTTP request/response patterns, generic list responses,
+ * pagination metadata, error handling structures, and authentication headers.
  * 
- * Provides comprehensive type definitions for HTTP request/response patterns,
- * pagination, error handling, authentication, and integration with modern
- * data fetching libraries (SWR/React Query) while maintaining full
- * compatibility with DreamFactory backend APIs.
+ * Provides foundation for SWR/React Query integration and Next.js API routes 
+ * with DreamFactory backend compatibility. Supports TypeScript 5.8+ with 
+ * enhanced React 19 compatibility and server component typing.
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Core API type definitions for DreamFactory admin interface
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { z } from 'zod'
+import { z } from 'zod';
 
-// =============================================================================
-// HTTP METHOD AND STATUS TYPES
-// =============================================================================
+// ============================================================================
+// HTTP Method and Status Types
+// ============================================================================
 
 /**
  * Standard HTTP methods supported by DreamFactory APIs
  */
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS'
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 
 /**
- * HTTP status codes with semantic groupings for error handling
+ * HTTP status code categories for error handling
  */
 export type HttpStatusCode = 
   | 200 | 201 | 202 | 204  // Success
   | 400 | 401 | 403 | 404 | 409 | 422  // Client errors
-  | 500 | 501 | 502 | 503 | 504  // Server errors
+  | 500 | 502 | 503 | 504;  // Server errors
+
+// ============================================================================
+// Generic API Response Structures
+// ============================================================================
 
 /**
- * Status code categories for React Error Boundary integration
+ * Base response structure for all DreamFactory API responses
+ * Compatible with existing backend response patterns
  */
-export type StatusCategory = 'success' | 'client_error' | 'server_error' | 'network_error'
-
-// =============================================================================
-// GENERIC API RESPONSE STRUCTURES
-// =============================================================================
+export interface BaseApiResponse {
+  /** Response timestamp in ISO 8601 format */
+  timestamp?: string;
+  /** Request correlation ID for debugging */
+  request_id?: string;
+}
 
 /**
- * Standard success response structure from DreamFactory APIs
- * Maintains compatibility with existing backend while adding React Query support
+ * Standard success response for simple operations
+ * Replaces Angular GenericSuccessResponse with enhanced typing
  */
-export interface ApiSuccessResponse {
-  success: boolean
+export interface ApiSuccessResponse extends BaseApiResponse {
+  success: true;
+  message?: string;
 }
 
 /**
  * Enhanced error response structure with React Error Boundary integration
- * Supports granular error handling and user-friendly error messages
+ * Provides comprehensive error information for client-side error handling
  */
-export interface ApiErrorResponse {
+export interface ApiErrorResponse extends BaseApiResponse {
+  success: false;
   error: {
-    code: string
-    message: string
-    status_code: HttpStatusCode
+    /** Error code for programmatic handling */
+    code: string;
+    /** Human-readable error message */
+    message: string;
+    /** HTTP status code */
+    status_code: HttpStatusCode;
+    /** Additional error context - supports both string and structured formats */
     context?: string | {
-      error?: Array<ValidationError>
-      resource?: Array<ApiErrorResponse>
-      details?: Record<string, unknown>
-    }
-    trace_id?: string  // For distributed tracing
-    timestamp?: string  // ISO 8601 timestamp
-  }
-}
-
-/**
- * Validation error structure for form field-level error handling
- */
-export interface ValidationError {
-  field: string
-  code: string
-  message: string
-  value?: unknown
+      /** Field-specific errors for form validation */
+      errors?: Record<string, string[]>;
+      /** Resource-specific errors for bulk operations */
+      resource?: ApiErrorResponse[];
+      /** Additional metadata */
+      [key: string]: any;
+    };
+    /** Stack trace (development only) */
+    stack?: string;
+  };
 }
 
 /**
  * Pagination metadata for list responses
- * Enhanced with React Query infinite loading support
+ * Optimized for React Query infinite queries and virtual scrolling
  */
 export interface PaginationMeta {
-  count: number
-  limit: number
-  offset: number
-  total?: number
-  has_more?: boolean  // For infinite scroll
-  next_cursor?: string  // For cursor-based pagination
-  prev_cursor?: string
+  /** Total number of items across all pages */
+  count: number;
+  /** Current page number (0-based) */
+  offset: number;
+  /** Items per page */
+  limit: number;
+  /** Whether there are more pages available */
+  has_next?: boolean;
+  /** Whether there are previous pages */
+  has_previous?: boolean;
+  /** Total number of pages */
+  page_count?: number;
+  /** Links for pagination navigation */
+  links?: {
+    first?: string;
+    last?: string;
+    next?: string;
+    previous?: string;
+  };
 }
 
 /**
- * Generic list response structure with enhanced pagination
- * Compatible with SWR/React Query data fetching patterns
+ * Generic list response structure for paginated data
+ * Enhanced with React Query compatibility and virtual scrolling support
  */
-export interface ApiListResponse<T> {
-  resource: Array<T>
-  meta: PaginationMeta
+export interface ApiListResponse<T = any> extends BaseApiResponse {
+  /** Array of resources */
+  resource: T[];
+  /** Pagination and filtering metadata */
+  meta: PaginationMeta;
 }
 
 /**
- * Generic create response with resource ID
+ * Single resource response structure
  */
-export interface ApiCreateResponse {
-  id: number | string
+export interface ApiResourceResponse<T = any> extends BaseApiResponse {
+  /** Single resource data */
+  resource: T;
 }
 
 /**
- * Generic update response with resource ID
+ * Bulk operation response for create/update operations
  */
-export interface ApiUpdateResponse {
-  id: number | string
-  updated_at?: string  // ISO 8601 timestamp
+export interface ApiBulkResponse<T = any> extends BaseApiResponse {
+  /** Array of created/updated resources with IDs */
+  resource: Array<T & { id: number | string }>;
+  /** Operation metadata */
+  meta: PaginationMeta & {
+    /** Number of successful operations */
+    success_count: number;
+    /** Number of failed operations */
+    error_count: number;
+  };
 }
 
-/**
- * Generic delete response
- */
-export interface ApiDeleteResponse extends ApiSuccessResponse {
-  id: number | string
-  deleted_at?: string  // ISO 8601 timestamp
-}
-
-// =============================================================================
-// REQUEST CONFIGURATION AND OPTIONS
-// =============================================================================
+// ============================================================================
+// Request Configuration and Parameters
+// ============================================================================
 
 /**
- * Key-value pair structure for dynamic headers and parameters
+ * Key-value pair for additional request parameters and headers
  */
 export interface KeyValuePair {
-  key: string
-  value: string | number | boolean
+  key: string;
+  value: any;
 }
 
 /**
- * Comprehensive request options supporting all DreamFactory API features
- * Optimized for modern data fetching libraries with performance considerations
+ * Comprehensive request options for API calls
+ * Enhanced with Next.js server component support and React Query integration
  */
 export interface ApiRequestOptions {
-  // Pagination and data retrieval
-  limit?: number
-  offset?: number
-  cursor?: string  // For cursor-based pagination
+  /** Show loading spinner (client-side only) */
+  showSpinner?: boolean;
   
-  // Filtering and sorting
-  filter?: string
-  sort?: string
-  search?: string
+  /** Filtering parameters */
+  filter?: string;
   
-  // Field selection and relationships
-  fields?: string | string[]
-  related?: string | string[]
-  include_count?: boolean
-  include_schema?: boolean
+  /** Sorting parameters */
+  sort?: string;
   
-  // Caching and performance
-  cache_ttl?: number  // Cache time-to-live in seconds
-  refresh?: boolean  // Force cache refresh
-  stale_while_revalidate?: boolean  // SWR pattern
+  /** Field selection for response optimization */
+  fields?: string;
   
-  // Request customization
-  headers?: Record<string, string> | KeyValuePair[]
-  params?: Record<string, unknown> | KeyValuePair[]
-  content_type?: string
+  /** Related resource inclusion */
+  related?: string;
   
-  // UI/UX options
-  show_spinner?: boolean
-  snackbar_success?: string
-  snackbar_error?: string
+  /** Maximum number of items to return */
+  limit?: number;
   
-  // Development and debugging
-  debug?: boolean
-  trace_requests?: boolean
+  /** Number of items to skip (pagination offset) */
+  offset?: number;
+  
+  /** Include total count in response */
+  includeCount?: boolean;
+  
+  /** Success notification message */
+  snackbarSuccess?: string;
+  
+  /** Error notification message */
+  snackbarError?: string;
+  
+  /** Request content type override */
+  contentType?: string;
+  
+  /** Additional query parameters */
+  additionalParams?: KeyValuePair[];
+  
+  /** Additional request headers */
+  additionalHeaders?: KeyValuePair[];
+  
+  /** Include cache control headers */
+  includeCacheControl?: boolean;
+  
+  /** Force refresh (bypass cache) */
+  refresh?: boolean;
+  
+  /** Request timeout in milliseconds */
+  timeout?: number;
+  
+  /** Abort signal for request cancellation */
+  signal?: AbortSignal;
+  
+  /** Next.js revalidation tags for ISR */
+  tags?: string[];
+  
+  /** Next.js revalidation time for SSG */
+  revalidate?: number | false;
 }
 
 /**
- * Fetch configuration extending native RequestInit for Next.js compatibility
- * Supports both client-side and server-side rendering contexts
- */
-export interface FetchConfig extends Omit<RequestInit, 'method' | 'body'> {
-  method?: HttpMethod
-  body?: string | FormData | URLSearchParams
-  timeout?: number
-  retry_count?: number
-  retry_delay?: number
-  base_url?: string
-  
-  // Next.js specific options
-  revalidate?: number | false  // ISR revalidation
-  tags?: string[]  // Cache tags for invalidation
-  server_only?: boolean  // Server components only
-}
-
-// =============================================================================
-// AUTHENTICATION AND SECURITY
-// =============================================================================
-
-/**
- * Authentication request payload for login
- */
-export interface AuthLoginRequest {
-  username?: string
-  email?: string
-  password: string
-  remember_me?: boolean
-  duration?: number  // Session duration in seconds
-}
-
-/**
- * Enhanced authentication response with comprehensive session data
- * Supports JWT tokens and Next.js middleware integration
- */
-export interface AuthLoginResponse {
-  session_token?: string
-  sessionToken?: string  // Alternative format
-  session_id?: string
-  user_id: number | string
-  user_email?: string
-  user_name?: string
-  expires_at?: string  // ISO 8601 timestamp
-  refresh_token?: string
-  roles?: string[]
-  permissions?: string[]
-  last_login?: string
-  
-  // Additional properties for flexibility
-  [key: string]: unknown
-}
-
-/**
- * Token refresh request
- */
-export interface AuthRefreshRequest {
-  refresh_token: string
-}
-
-/**
- * Authentication headers for API requests
- * Compatible with both client-side and server-side rendering
+ * Authentication headers for DreamFactory API requests
+ * Supports both session tokens and API keys with Next.js middleware integration
  */
 export interface AuthHeaders {
-  'X-DreamFactory-Session-Token'?: string
-  'Authorization'?: string  // Bearer token format
-  'X-DreamFactory-API-Key'?: string
-  'Content-Type'?: string
-  'Accept'?: string
-}
-
-/**
- * Role-based access control (RBAC) types
- */
-export interface UserRole {
-  id: number | string
-  name: string
-  description?: string
-  permissions?: Permission[]
-}
-
-export interface Permission {
-  service: string
-  resource: string
-  action: string  // GET, POST, PUT, DELETE, etc.
-  allow: boolean
-  filters?: Record<string, unknown>
-}
-
-// =============================================================================
-// SWR AND REACT QUERY INTEGRATION
-// =============================================================================
-
-/**
- * SWR configuration for consistent data fetching
- * Optimized for DreamFactory API patterns
- */
-export interface SWRConfig<T = unknown> {
-  refreshInterval?: number
-  revalidateOnFocus?: boolean
-  revalidateOnReconnect?: boolean
-  revalidateIfStale?: boolean
-  dedupingInterval?: number
-  errorRetryCount?: number
-  errorRetryInterval?: number
-  loadingTimeout?: number
-  suspense?: boolean
-  fallbackData?: T
-  keepPreviousData?: boolean
-}
-
-/**
- * React Query options for server state management
- */
-export interface QueryConfig<T = unknown> {
-  queryKey: string | string[]
-  enabled?: boolean
-  staleTime?: number
-  cacheTime?: number
-  refetchOnMount?: boolean | 'always'
-  refetchOnWindowFocus?: boolean | 'always'
-  refetchOnReconnect?: boolean | 'always'
-  refetchInterval?: number | false
-  retry?: boolean | number
-  retryDelay?: number
-  initialData?: T
-  placeholderData?: T
-  keepPreviousData?: boolean
-  suspense?: boolean
-  useErrorBoundary?: boolean
-}
-
-/**
- * Mutation configuration for React Query
- */
-export interface MutationConfig<TData = unknown, TError = ApiErrorResponse, TVariables = unknown> {
-  onMutate?: (variables: TVariables) => Promise<unknown> | unknown
-  onSuccess?: (data: TData, variables: TVariables, context: unknown) => Promise<unknown> | unknown
-  onError?: (error: TError, variables: TVariables, context: unknown) => Promise<unknown> | unknown
-  onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables, context: unknown) => Promise<unknown> | unknown
-  retry?: boolean | number
-  retryDelay?: number
-  useErrorBoundary?: boolean
-}
-
-// =============================================================================
-// ERROR HANDLING FOR REACT ERROR BOUNDARIES
-// =============================================================================
-
-/**
- * Error boundary compatible error structure
- * Provides comprehensive error context for React Error Boundary components
- */
-export interface BoundaryError extends Error {
-  name: string
-  message: string
-  stack?: string
+  /** Session token for user authentication */
+  'X-DreamFactory-Session-Token'?: string;
   
-  // API-specific error information
-  status_code?: HttpStatusCode
-  status_category?: StatusCategory
-  api_error?: ApiErrorResponse
-  request_id?: string
-  trace_id?: string
+  /** API key for application authentication */
+  'X-DreamFactory-API-Key'?: string;
   
-  // Component and context information
-  component_stack?: string
-  error_boundary?: string
-  retry_count?: number
-  timestamp?: Date
+  /** Authorization header for OAuth/JWT */
+  'Authorization'?: string;
   
-  // User-friendly information
-  user_message?: string
-  recovery_suggestions?: string[]
-  contact_support?: boolean
+  /** CSRF token for additional security */
+  'X-CSRF-Token'?: string;
 }
 
 /**
- * Error recovery actions for error boundaries
+ * Standard request headers with authentication and content type
  */
-export interface ErrorRecoveryAction {
-  label: string
-  action: () => void | Promise<void>
-  primary?: boolean
+export interface ApiHeaders extends AuthHeaders {
+  /** Content type for request body */
+  'Content-Type'?: string;
+  
+  /** Accept header for response format */
+  'Accept'?: string;
+  
+  /** Cache control directives */
+  'Cache-Control'?: string;
+  
+  /** Request correlation ID */
+  'X-Request-ID'?: string;
+  
+  /** User agent override */
+  'User-Agent'?: string;
+  
+  /** Additional custom headers */
+  [key: string]: string | undefined;
+}
+
+// ============================================================================
+// Request and Response Type Utilities
+// ============================================================================
+
+/**
+ * Generic API request configuration
+ * Optimized for fetch API and React Query mutations
+ */
+export interface ApiRequest<TData = any> {
+  /** HTTP method */
+  method: HttpMethod;
+  
+  /** Request URL (relative or absolute) */
+  url: string;
+  
+  /** Request body data */
+  data?: TData;
+  
+  /** Request headers */
+  headers?: ApiHeaders;
+  
+  /** Request options */
+  options?: ApiRequestOptions;
 }
 
 /**
- * Error boundary context for error reporting and recovery
+ * Generic API response union type for type-safe error handling
+ * Compatible with React Error Boundaries and SWR/React Query
  */
-export interface ErrorBoundaryContext {
-  error: BoundaryError
-  errorInfo?: {
-    componentStack: string
-  }
-  retry: () => void
-  reset: () => void
-  recovery_actions?: ErrorRecoveryAction[]
+export type ApiResponse<T = any> = 
+  | (ApiSuccessResponse & { data: T })
+  | (ApiResourceResponse<T>)
+  | (ApiListResponse<T>)
+  | (ApiBulkResponse<T>)
+  | ApiErrorResponse;
+
+/**
+ * Type guard to check if response is an error
+ */
+export function isApiError(response: ApiResponse): response is ApiErrorResponse {
+  return 'error' in response || ('success' in response && response.success === false);
 }
 
-// =============================================================================
-// ZOD VALIDATION SCHEMAS
-// =============================================================================
+/**
+ * Type guard to check if response is a success
+ */
+export function isApiSuccess<T>(response: ApiResponse<T>): response is Exclude<ApiResponse<T>, ApiErrorResponse> {
+  return !isApiError(response);
+}
 
 /**
- * Zod schema for HTTP status codes
+ * Type guard to check if response is a list response
  */
-export const HttpStatusCodeSchema = z.union([
-  z.literal(200), z.literal(201), z.literal(202), z.literal(204),
-  z.literal(400), z.literal(401), z.literal(403), z.literal(404), z.literal(409), z.literal(422),
-  z.literal(500), z.literal(501), z.literal(502), z.literal(503), z.literal(504)
-])
+export function isApiListResponse<T>(response: ApiResponse<T>): response is ApiListResponse<T> {
+  return 'resource' in response && Array.isArray(response.resource) && 'meta' in response;
+}
+
+// ============================================================================
+// SWR and React Query Integration Types
+// ============================================================================
 
 /**
- * Zod schema for API error responses
+ * SWR configuration options for API endpoints
+ * Optimized for DreamFactory API patterns and caching strategies
  */
-export const ApiErrorResponseSchema = z.object({
+export interface SwrOptions<T = any> {
+  /** Cache key for the request */
+  key: string | null;
+  
+  /** Fetcher function */
+  fetcher?: (url: string) => Promise<T>;
+  
+  /** Refresh interval in milliseconds */
+  refreshInterval?: number;
+  
+  /** Refresh on window focus */
+  refreshOnFocus?: boolean;
+  
+  /** Refresh on network reconnect */
+  refreshOnReconnect?: boolean;
+  
+  /** Dedupe requests with same key */
+  dedupingInterval?: number;
+  
+  /** Error retry count */
+  errorRetryCount?: number;
+  
+  /** Error retry interval */
+  errorRetryInterval?: number;
+  
+  /** Suspend on error */
+  suspense?: boolean;
+  
+  /** Revalidate on mount */
+  revalidateOnMount?: boolean;
+}
+
+/**
+ * React Query configuration for mutations
+ * Optimized for DreamFactory CRUD operations with optimistic updates
+ */
+export interface MutationOptions<TData, TVariables, TError = ApiErrorResponse> {
+  /** Mutation function */
+  mutationFn: (variables: TVariables) => Promise<TData>;
+  
+  /** Optimistic update handler */
+  onMutate?: (variables: TVariables) => Promise<any> | any;
+  
+  /** Success handler */
+  onSuccess?: (data: TData, variables: TVariables, context: any) => Promise<any> | any;
+  
+  /** Error handler */
+  onError?: (error: TError, variables: TVariables, context: any) => Promise<any> | any;
+  
+  /** Settlement handler (success or error) */
+  onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables, context: any) => Promise<any> | any;
+  
+  /** Retry configuration */
+  retry?: boolean | number | ((failureCount: number, error: TError) => boolean);
+  
+  /** Retry delay */
+  retryDelay?: number | ((retryAttempt: number) => number);
+}
+
+// ============================================================================
+// Zod Schema Validation Integration
+// ============================================================================
+
+/**
+ * Zod schema for API error response validation
+ * Provides runtime type checking for error responses
+ */
+export const ApiErrorSchema = z.object({
+  success: z.literal(false),
   error: z.object({
     code: z.string(),
     message: z.string(),
-    status_code: HttpStatusCodeSchema,
+    status_code: z.number(),
     context: z.union([
       z.string(),
       z.object({
-        error: z.array(z.object({
-          field: z.string(),
-          code: z.string(),
-          message: z.string(),
-          value: z.unknown().optional()
-        })).optional(),
-        resource: z.array(z.lazy(() => ApiErrorResponseSchema)).optional(),
-        details: z.record(z.unknown()).optional()
-      })
+        errors: z.record(z.array(z.string())).optional(),
+        resource: z.array(z.any()).optional(),
+      }).passthrough()
     ]).optional(),
-    trace_id: z.string().optional(),
-    timestamp: z.string().optional()
-  })
-})
+    stack: z.string().optional(),
+  }),
+  timestamp: z.string().optional(),
+  request_id: z.string().optional(),
+});
 
 /**
- * Zod schema for pagination metadata
+ * Zod schema for pagination metadata validation
  */
 export const PaginationMetaSchema = z.object({
-  count: z.number().min(0),
-  limit: z.number().min(1),
-  offset: z.number().min(0),
-  total: z.number().min(0).optional(),
-  has_more: z.boolean().optional(),
-  next_cursor: z.string().optional(),
-  prev_cursor: z.string().optional()
-})
+  count: z.number().int().min(0),
+  offset: z.number().int().min(0),
+  limit: z.number().int().min(1),
+  has_next: z.boolean().optional(),
+  has_previous: z.boolean().optional(),
+  page_count: z.number().int().min(0).optional(),
+  links: z.object({
+    first: z.string().optional(),
+    last: z.string().optional(),
+    next: z.string().optional(),
+    previous: z.string().optional(),
+  }).optional(),
+});
 
 /**
- * Zod schema for API request options
+ * Zod schema for list response validation
  */
-export const ApiRequestOptionsSchema = z.object({
-  limit: z.number().min(1).max(1000).optional(),
-  offset: z.number().min(0).optional(),
-  cursor: z.string().optional(),
-  filter: z.string().optional(),
-  sort: z.string().optional(),
-  search: z.string().optional(),
-  fields: z.union([z.string(), z.array(z.string())]).optional(),
-  related: z.union([z.string(), z.array(z.string())]).optional(),
-  include_count: z.boolean().optional(),
-  include_schema: z.boolean().optional(),
-  cache_ttl: z.number().min(0).optional(),
-  refresh: z.boolean().optional(),
-  stale_while_revalidate: z.boolean().optional(),
-  headers: z.union([
-    z.record(z.string()),
-    z.array(z.object({
-      key: z.string(),
-      value: z.union([z.string(), z.number(), z.boolean()])
-    }))
-  ]).optional(),
-  params: z.union([
-    z.record(z.unknown()),
-    z.array(z.object({
-      key: z.string(),
-      value: z.union([z.string(), z.number(), z.boolean()])
-    }))
-  ]).optional(),
-  content_type: z.string().optional(),
-  show_spinner: z.boolean().optional(),
-  snackbar_success: z.string().optional(),
-  snackbar_error: z.string().optional(),
-  debug: z.boolean().optional(),
-  trace_requests: z.boolean().optional()
-})
+export const ApiListResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
+  z.object({
+    resource: z.array(itemSchema),
+    meta: PaginationMetaSchema,
+    timestamp: z.string().optional(),
+    request_id: z.string().optional(),
+  });
 
 /**
- * Zod schema for authentication login request
+ * Zod schema for single resource response validation
  */
-export const AuthLoginRequestSchema = z.object({
-  username: z.string().optional(),
-  email: z.string().email().optional(),
-  password: z.string().min(1),
-  remember_me: z.boolean().optional(),
-  duration: z.number().min(1).optional()
-}).refine(
-  (data) => data.username || data.email,
-  {
-    message: "Either username or email must be provided",
-    path: ["username"]
-  }
-)
+export const ApiResourceResponseSchema = <T extends z.ZodTypeAny>(resourceSchema: T) =>
+  z.object({
+    resource: resourceSchema,
+    timestamp: z.string().optional(),
+    request_id: z.string().optional(),
+  });
+
+// ============================================================================
+// Next.js Server Component Integration
+// ============================================================================
 
 /**
- * Zod schema for authentication response
+ * Server-side fetch options for Next.js API routes and server components
+ * Supports ISR, SSG, and SSR patterns with proper caching
  */
-export const AuthLoginResponseSchema = z.object({
-  session_token: z.string().optional(),
-  sessionToken: z.string().optional(),
-  session_id: z.string().optional(),
-  user_id: z.union([z.number(), z.string()]),
-  user_email: z.string().email().optional(),
-  user_name: z.string().optional(),
-  expires_at: z.string().optional(),
-  refresh_token: z.string().optional(),
-  roles: z.array(z.string()).optional(),
-  permissions: z.array(z.string()).optional(),
-  last_login: z.string().optional()
-}).catchall(z.unknown())
-
-// =============================================================================
-// NEXT.JS SPECIFIC TYPES
-// =============================================================================
-
-/**
- * Next.js API route handler context
- */
-export interface NextApiContext {
-  req: {
-    method?: HttpMethod
-    headers: Record<string, string | string[]>
-    query: Record<string, string | string[]>
-    body?: unknown
-    cookies: Record<string, string>
-  }
-  res: {
-    status: (code: HttpStatusCode) => void
-    json: (data: unknown) => void
-    setHeader: (name: string, value: string) => void
-    redirect: (url: string) => void
-  }
-}
-
-/**
- * Server-side rendering data fetching context
- */
-export interface SSRContext {
-  req: NextApiContext['req']
-  res: NextApiContext['res']
-  query: Record<string, string | string[]>
-  params?: Record<string, string>
-  preview?: boolean
-  previewData?: unknown
-}
-
-/**
- * Static generation context for ISR
- */
-export interface StaticContext {
-  params?: Record<string, string>
-  preview?: boolean
-  previewData?: unknown
-}
-
-// =============================================================================
-// TYPE UTILITIES AND HELPERS
-// =============================================================================
-
-/**
- * Extract data type from API list response
- */
-export type ExtractListData<T> = T extends ApiListResponse<infer U> ? U : never
-
-/**
- * Extract data type from API response
- */
-export type ExtractApiData<T> = T extends { resource: infer U } 
-  ? U extends Array<infer V> ? V : U
-  : T
-
-/**
- * Create paginated response type
- */
-export type PaginatedResponse<T> = ApiListResponse<T>
-
-/**
- * Create API endpoint configuration
- */
-export interface ApiEndpoint<TRequest = unknown, TResponse = unknown> {
-  method: HttpMethod
-  path: string
-  request_schema?: z.ZodSchema<TRequest>
-  response_schema?: z.ZodSchema<TResponse>
-  auth_required?: boolean
-  permissions?: string[]
-  rate_limit?: {
-    requests: number
-    window: number  // seconds
-  }
-}
-
-/**
- * Type-safe API client configuration
- */
-export interface ApiClientConfig {
-  base_url: string
-  default_headers?: Record<string, string>
-  timeout?: number
-  retry_config?: {
-    attempts: number
-    delay: number
-    backoff_factor?: number
-  }
-  auth?: {
-    type: 'session' | 'bearer' | 'api_key'
-    token?: string
-    header_name?: string
-  }
-}
-
-// =============================================================================
-// MOCK SERVICE WORKER (MSW) TYPES
-// =============================================================================
-
-/**
- * MSW mock response configuration for development
- */
-export interface MockResponse<T = unknown> {
-  status: HttpStatusCode
-  data: T
-  delay?: number
-  headers?: Record<string, string>
-}
-
-/**
- * Mock endpoint handler configuration
- */
-export interface MockEndpoint<TRequest = unknown, TResponse = unknown> {
-  method: HttpMethod
-  path: string
-  handler: (req: TRequest) => MockResponse<TResponse> | Promise<MockResponse<TResponse>>
-  enabled?: boolean
-}
-
-/**
- * Development mock configuration
- */
-export interface MockConfig {
-  enabled: boolean
-  base_url: string
-  endpoints: MockEndpoint[]
-  default_delay?: number
-  error_rate?: number  // 0-1, percentage of requests that should fail
-}
-
-// =============================================================================
-// EXPORTS FOR EXTERNAL USE
-// =============================================================================
-
-export type {
-  // Core response types
-  ApiSuccessResponse,
-  ApiErrorResponse,
-  ValidationError,
-  PaginationMeta,
-  ApiListResponse,
-  ApiCreateResponse,
-  ApiUpdateResponse,
-  ApiDeleteResponse,
+export interface ServerFetchOptions extends Omit<ApiRequestOptions, 'showSpinner' | 'snackbarSuccess' | 'snackbarError'> {
+  /** Next.js cache behavior */
+  cache?: 'default' | 'no-store' | 'reload' | 'no-cache' | 'force-cache' | 'only-if-cached';
   
-  // Request configuration
-  KeyValuePair,
-  ApiRequestOptions,
-  FetchConfig,
+  /** Incremental Static Regeneration interval */
+  revalidate?: number | false;
   
-  // Authentication
-  AuthLoginRequest,
-  AuthLoginResponse,
-  AuthRefreshRequest,
-  AuthHeaders,
-  UserRole,
-  Permission,
+  /** Cache tags for revalidation */
+  tags?: string[];
   
-  // Data fetching
-  SWRConfig,
-  QueryConfig,
-  MutationConfig,
-  
-  // Error handling
-  BoundaryError,
-  ErrorRecoveryAction,
-  ErrorBoundaryContext,
-  
-  // Next.js integration
-  NextApiContext,
-  SSRContext,
-  StaticContext,
-  
-  // Utilities
-  ExtractListData,
-  ExtractApiData,
-  PaginatedResponse,
-  ApiEndpoint,
-  ApiClientConfig,
-  
-  // Development
-  MockResponse,
-  MockEndpoint,
-  MockConfig
+  /** Server component context */
+  context?: {
+    /** Request cookies */
+    cookies?: Record<string, string>;
+    
+    /** Request headers */
+    headers?: Record<string, string>;
+    
+    /** Dynamic route parameters */
+    params?: Record<string, string | string[]>;
+    
+    /** Search parameters */
+    searchParams?: Record<string, string | string[]>;
+  };
 }
 
-export {
-  // Validation schemas
-  HttpStatusCodeSchema,
-  ApiErrorResponseSchema,
-  PaginationMetaSchema,
-  ApiRequestOptionsSchema,
-  AuthLoginRequestSchema,
-  AuthLoginResponseSchema
+/**
+ * API route handler result for Next.js API routes
+ * Supports both success and error responses with proper HTTP status codes
+ */
+export interface ApiRouteResult<T = any> {
+  /** Response data */
+  data?: T;
+  
+  /** Error information */
+  error?: {
+    code: string;
+    message: string;
+    details?: any;
+  };
+  
+  /** HTTP status code */
+  status: HttpStatusCode;
+  
+  /** Response headers */
+  headers?: Record<string, string>;
+  
+  /** Cookies to set */
+  cookies?: Array<{
+    name: string;
+    value: string;
+    options?: {
+      httpOnly?: boolean;
+      secure?: boolean;
+      sameSite?: 'strict' | 'lax' | 'none';
+      maxAge?: number;
+      path?: string;
+      domain?: string;
+    };
+  }>;
 }
+
+// ============================================================================
+// DreamFactory Specific Types
+// ============================================================================
+
+/**
+ * DreamFactory service endpoint configuration
+ * Used for dynamic API endpoint generation and service management
+ */
+export interface DreamFactoryEndpoint {
+  /** Service name */
+  service: string;
+  
+  /** Resource path */
+  resource?: string;
+  
+  /** Resource ID */
+  id?: string | number;
+  
+  /** API version */
+  version?: 'v1' | 'v2';
+  
+  /** System vs application endpoint */
+  type?: 'system' | 'application';
+}
+
+/**
+ * DreamFactory API URL builder utility type
+ */
+export interface DreamFactoryUrlBuilder {
+  /** Build URL for system endpoints */
+  system: (resource: string, id?: string | number) => string;
+  
+  /** Build URL for application endpoints */
+  application: (service: string, resource?: string, id?: string | number) => string;
+  
+  /** Build URL for service management */
+  service: (operation: 'list' | 'create' | 'update' | 'delete', id?: string | number) => string;
+  
+  /** Build URL for schema operations */
+  schema: (service: string, table?: string, operation?: 'describe' | 'create' | 'update' | 'delete') => string;
+}
+
+// ============================================================================
+// Legacy Compatibility Types
+// ============================================================================
+
+/**
+ * Legacy compatibility for existing Angular code patterns
+ * @deprecated Use ApiErrorResponse instead
+ */
+export interface GenericErrorResponse {
+  error: {
+    code: string;
+    context: string | { error: Array<any>; resource: Array<GenericErrorResponse> };
+    message: string;
+    status_code: number;
+  };
+}
+
+/**
+ * Legacy compatibility for existing Angular code patterns
+ * @deprecated Use ApiSuccessResponse instead
+ */
+export interface GenericSuccessResponse {
+  success: boolean;
+}
+
+/**
+ * Legacy compatibility for existing Angular code patterns
+ * @deprecated Use ApiListResponse instead
+ */
+export interface GenericListResponse<T> {
+  resource: Array<T>;
+  meta: { count: number };
+}
+
+/**
+ * Legacy compatibility for existing Angular code patterns
+ * @deprecated Use ApiBulkResponse instead
+ */
+export type GenericCreateResponse = GenericListResponse<{ id: number }>;
+
+/**
+ * Legacy compatibility for existing Angular code patterns
+ * @deprecated Use ApiResourceResponse instead
+ */
+export interface GenericUpdateResponse {
+  id: number;
+}
+
+// ============================================================================
+// Type Exports for Convenience
+// ============================================================================
+
+// Re-export Zod for validation
+export { z } from 'zod';
+
+// Export common type aliases
+export type ApiError = ApiErrorResponse;
+export type ApiSuccess<T = any> = Exclude<ApiResponse<T>, ApiErrorResponse>;
+export type ListResponse<T> = ApiListResponse<T>;
+export type ResourceResponse<T> = ApiResourceResponse<T>;
+export type BulkResponse<T> = ApiBulkResponse<T>;
+
+// Export utility types
+export type ExtractResource<T> = T extends ApiListResponse<infer U> 
+  ? U 
+  : T extends ApiResourceResponse<infer U> 
+    ? U 
+    : T extends ApiBulkResponse<infer U> 
+      ? U 
+      : never;
+
+export type ExtractMeta<T> = T extends ApiListResponse<any> 
+  ? T['meta'] 
+  : T extends ApiBulkResponse<any> 
+    ? T['meta'] 
+    : never;
