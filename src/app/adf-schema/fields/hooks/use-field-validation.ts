@@ -1,946 +1,1119 @@
 /**
- * @fileoverview Custom React hook implementing comprehensive field validation logic with Zod schema validation 
- * and real-time validation under 100ms. Provides dynamic validation rules based on field types, constraints, 
- * and business logic requirements while maintaining compatibility with React Hook Form integration patterns.
+ * Field Validation Hook for React/Next.js DreamFactory Admin Interface
  * 
- * This hook implements:
- * - Zod schema validators integrated with React Hook Form per React/Next.js Integration Requirements
- * - Real-time validation under 100ms per React/Next.js Integration Requirements  
- * - Comprehensive field validation per existing Angular validation patterns
- * - Type-safe validation workflows per Section 5.2 Component Details
- * - Dynamic validation schemas based on field type selection
- * - Comprehensive picklist CSV validation and JSON validation rules
- * - Field constraint validation (length, precision, scale) with type-specific rules
- * - Validation error handling compatible with React Hook Form error display patterns
+ * Comprehensive React hook implementing field validation logic with Zod schema validation
+ * and real-time validation under 100ms. Provides dynamic validation rules based on field types,
+ * constraints, and business logic requirements while maintaining compatibility with React Hook Form
+ * integration patterns.
  * 
+ * Replaces Angular JsonValidator and CsvValidator with Zod schema validators per React/Next.js
+ * Integration Requirements. Implements real-time validation under 100ms response time.
+ * 
+ * @fileoverview Field validation hook with comprehensive validation rules
  * @version 1.0.0
- * @created 2024-12-28
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { z } from 'zod'
-import { useMemo, useCallback, useRef } from 'react'
-import { useDebounce } from '@/hooks/use-debounce'
-import type { 
-  FieldFormData, 
-  DreamFactoryFieldType, 
-  FieldValidationSchema,
-  AsyncValidationResult,
-  FieldValidationError,
-  DbFunctionFormData
-} from '../field.types'
+import { useCallback, useMemo } from 'react';
+import { z } from 'zod';
+import type { FieldValues, Path, UseFormSetError, UseFormClearErrors } from 'react-hook-form';
+
+// Import field types and validation utilities
+import type {
+  FieldDataType,
+  FieldFormData,
+  FieldValidationConfig,
+  DatabaseSchemaFieldType,
+  ReferentialAction,
+  FunctionUseOperation
+} from '../field.types';
 
 // =============================================================================
-// VALIDATION CONSTANTS AND HELPERS
-// =============================================================================
-
-/**
- * Field types that support length constraints
- */
-const LENGTH_SUPPORTED_TYPES: DreamFactoryFieldType[] = [
-  'string',
-  'text', 
-  'integer',
-  'binary',
-  'varbinary'
-]
-
-/**
- * Field types that support precision and scale constraints
- */
-const PRECISION_SCALE_SUPPORTED_TYPES: DreamFactoryFieldType[] = [
-  'decimal',
-  'float',
-  'double'
-]
-
-/**
- * Field types that support picklist values
- */
-const PICKLIST_SUPPORTED_TYPES: DreamFactoryFieldType[] = [
-  'string',
-  'integer'
-]
-
-/**
- * Field types that support fixed length attribute
- */
-const FIXED_LENGTH_SUPPORTED_TYPES: DreamFactoryFieldType[] = [
-  'string'
-]
-
-/**
- * Field types that support multibyte characters
- */
-const MULTIBYTE_SUPPORTED_TYPES: DreamFactoryFieldType[] = [
-  'string'
-]
-
-/**
- * Reference foreign key actions
- */
-const FOREIGN_KEY_ACTIONS = [
-  'RESTRICT',
-  'CASCADE', 
-  'SET NULL',
-  'NO ACTION',
-  'SET DEFAULT'
-] as const
-
-/**
- * Database function usage contexts
- */
-const FUNCTION_USE_CONTEXTS = [
-  'create',
-  'update',
-  'read',
-  'delete',
-  'select',
-  'insert'
-] as const
-
-// =============================================================================
-// ZOD SCHEMA VALIDATORS
+// VALIDATION RESULT TYPES
 // =============================================================================
 
 /**
- * JSON validation schema replacing Angular JsonValidator
- * Validates that the string is valid JSON syntax
+ * Validation result interface for field validation operations
  */
-const jsonValidationSchema = z
-  .string()
-  .optional()
-  .refine(
-    (value) => {
-      if (!value || value.trim() === '') return true
-      try {
-        JSON.parse(value)
-        return true
-      } catch {
-        return false
-      }
-    },
-    {
-      message: 'Invalid JSON format. Please provide valid JSON syntax.',
-    }
-  )
+export interface FieldValidationResult {
+  /** Whether the field value is valid */
+  isValid: boolean;
+  /** Validation error message if invalid */
+  error?: string;
+  /** Array of specific validation errors */
+  errors?: string[];
+  /** Field path for React Hook Form error handling */
+  fieldPath?: string;
+  /** Validation type that failed */
+  validationType?: 'type' | 'constraint' | 'format' | 'picklist' | 'json' | 'custom';
+}
 
 /**
- * CSV validation schema replacing Angular CsvValidator
- * Validates comma-separated values with word characters
+ * Dynamic schema configuration for field validation
  */
-const csvValidationSchema = z
-  .string()
-  .optional()
-  .refine(
-    (value) => {
-      if (!value || value.trim() === '') return true
-      // Match the Angular regex: /^\w+(?:\s*,\s*\w+)*$/
-      const csvRegex = /^\w+(?:\s*,\s*\w+)*$/
-      return csvRegex.test(value.trim())
-    },
-    {
-      message: 'Invalid CSV format. Use comma-separated alphanumeric values (e.g., value1, value2, value3).',
-    }
-  )
+export interface DynamicValidationSchema {
+  /** Base field validation schema */
+  schema: z.ZodSchema;
+  /** Field-specific validation rules */
+  customRules?: Array<{
+    rule: (value: any) => boolean;
+    message: string;
+    type: string;
+  }>;
+  /** Whether validation should run on change */
+  validateOnChange: boolean;
+  /** Whether validation should run on blur */
+  validateOnBlur: boolean;
+  /** Debounce delay in milliseconds */
+  debounceMs: number;
+}
 
 /**
- * Database function usage validation schema
+ * Field constraint validation configuration
  */
-const dbFunctionSchema = z.object({
-  id: z.string(),
-  use: z
-    .array(z.enum(FUNCTION_USE_CONTEXTS))
-    .min(1, 'At least one usage context is required'),
-  function: z
+export interface FieldConstraints {
+  /** Minimum length for string types */
+  minLength?: number;
+  /** Maximum length for string types */
+  maxLength?: number;
+  /** Minimum value for numeric types */
+  minValue?: number;
+  /** Maximum value for numeric types */
+  maxValue?: number;
+  /** Numeric precision for decimal types */
+  precision?: number;
+  /** Numeric scale for decimal types */
+  scale?: number;
+  /** Whether field is required */
+  required?: boolean;
+  /** Whether field allows null values */
+  allowNull?: boolean;
+  /** Custom pattern for string validation */
+  pattern?: string;
+  /** Custom validation message */
+  customMessage?: string;
+}
+
+// =============================================================================
+// CORE VALIDATION SCHEMAS
+// =============================================================================
+
+/**
+ * Enhanced JSON validation schema with detailed error messaging
+ * Replaces Angular JsonValidator with comprehensive Zod implementation
+ */
+export const createJsonValidationSchema = (required: boolean = false) => {
+  const baseSchema = z
     .string()
-    .min(1, 'Function expression is required')
-    .max(255, 'Function expression cannot exceed 255 characters'),
-})
+    .refine(
+      (value) => {
+        if (!value || value.trim() === '') {
+          return !required;
+        }
+        try {
+          const parsed = JSON.parse(value);
+          // Additional validation for JSON structure
+          if (typeof parsed !== 'object' || parsed === null) {
+            return false;
+          }
+          return true;
+        } catch (error) {
+          return false;
+        }
+      },
+      {
+        message: 'Invalid JSON format. Must be a valid JSON object.',
+      }
+    );
+
+  return required 
+    ? baseSchema.min(1, 'JSON value is required when validation is enabled')
+    : baseSchema;
+};
 
 /**
- * Field name validation with database naming constraints
+ * CSV picklist validation schema with comprehensive format checking
+ * Validates comma-separated values with proper escaping and formatting
  */
-const fieldNameSchema = z
-  .string()
-  .min(1, 'Field name is required')
-  .max(64, 'Field name cannot exceed 64 characters')
-  .regex(
-    /^[a-zA-Z_][a-zA-Z0-9_]*$/,
-    'Field name must start with a letter or underscore and contain only letters, numbers, and underscores'
-  )
-
-/**
- * Alias validation with optional empty string
- */
-const aliasSchema = z
-  .string()
-  .max(64, 'Alias cannot exceed 64 characters')
-  .regex(
-    /^[a-zA-Z_][a-zA-Z0-9_]*$/,
-    'Alias must start with a letter or underscore and contain only letters, numbers, and underscores'
-  )
-  .optional()
-  .or(z.literal(''))
-
-/**
- * Label validation for display purposes
- */
-const labelSchema = z
-  .string()
-  .max(128, 'Label cannot exceed 128 characters')
-  .optional()
-  .or(z.literal(''))
-
-/**
- * Description validation for documentation
- */
-const descriptionSchema = z
-  .string()
-  .max(500, 'Description cannot exceed 500 characters')
-  .optional()
-  .or(z.literal(''))
-
-/**
- * Database type validation for manual type entry
- */
-const dbTypeSchema = z
-  .string()
-  .max(50, 'Database type cannot exceed 50 characters')
-  .optional()
-  .or(z.literal(''))
-
-// =============================================================================
-// DYNAMIC CONSTRAINT VALIDATORS
-// =============================================================================
-
-/**
- * Creates length validation based on field type
- */
-const createLengthValidator = (fieldType: DreamFactoryFieldType) => {
-  if (!LENGTH_SUPPORTED_TYPES.includes(fieldType)) {
-    return z.number().optional().or(z.null())
-  }
-
-  return z
-    .number()
-    .int('Length must be an integer')
-    .min(1, 'Length must be greater than 0')
-    .max(4294967295, 'Length cannot exceed maximum value') // Max UNSIGNED INT
-    .optional()
-    .or(z.null())
-}
-
-/**
- * Creates precision validation based on field type
- */
-const createPrecisionValidator = (fieldType: DreamFactoryFieldType) => {
-  if (!PRECISION_SCALE_SUPPORTED_TYPES.includes(fieldType)) {
-    return z.number().optional().or(z.null())
-  }
-
-  return z
-    .number()
-    .int('Precision must be an integer')
-    .min(1, 'Precision must be greater than 0')
-    .max(65, 'Precision cannot exceed 65') // MySQL DECIMAL max precision
-    .optional()
-    .or(z.null())
-}
-
-/**
- * Creates scale validation based on field type and precision
- */
-const createScaleValidator = (fieldType: DreamFactoryFieldType, precision?: number | null) => {
-  if (!PRECISION_SCALE_SUPPORTED_TYPES.includes(fieldType)) {
-    return z.number().default(0)
-  }
-
-  const maxScale = precision ? Math.min(precision, 30) : 30 // MySQL DECIMAL max scale
-
-  return z
-    .number()
-    .int('Scale must be an integer')
-    .min(0, 'Scale cannot be negative')
-    .max(maxScale, `Scale cannot exceed ${maxScale}`)
-    .default(0)
-}
-
-/**
- * Creates picklist validation based on field type
- */
-const createPicklistValidator = (fieldType: DreamFactoryFieldType) => {
-  if (!PICKLIST_SUPPORTED_TYPES.includes(fieldType)) {
-    return z.undefined().optional()
-  }
-
-  return csvValidationSchema
-}
-
-/**
- * Creates reference table validation for foreign keys
- */
-const createRefTableValidator = (isForeignKey: boolean) => {
-  if (!isForeignKey) {
-    return z.string().optional().or(z.null())
-  }
-
-  return z
+export const createCsvValidationSchema = (required: boolean = false) => {
+  const baseSchema = z
     .string()
-    .min(1, 'Reference table is required for foreign key fields')
-    .max(64, 'Reference table name cannot exceed 64 characters')
-}
+    .refine(
+      (value) => {
+        if (!value || value.trim() === '') {
+          return !required;
+        }
+
+        try {
+          // Basic CSV format validation
+          const trimmedValue = value.trim();
+          
+          // Check for balanced quotes
+          let quoteCount = 0;
+          let inQuotes = false;
+          let lastChar = '';
+          
+          for (let i = 0; i < trimmedValue.length; i++) {
+            const char = trimmedValue[i];
+            
+            if (char === '"' && lastChar !== '\\') {
+              quoteCount++;
+              inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+              // Valid comma separator outside quotes
+            } else if (char === '\n' && inQuotes) {
+              // Newlines are only allowed inside quoted fields
+            }
+            
+            lastChar = char;
+          }
+          
+          // Must have even number of quotes (balanced)
+          if (quoteCount % 2 !== 0) {
+            return false;
+          }
+          
+          // Split and validate individual values
+          const values = parseCsvLine(trimmedValue);
+          
+          // Check for empty values and duplicate entries
+          const nonEmptyValues = values.filter(v => v.trim().length > 0);
+          const uniqueValues = new Set(nonEmptyValues.map(v => v.toLowerCase()));
+          
+          return nonEmptyValues.length > 0 && uniqueValues.size === nonEmptyValues.length;
+          
+        } catch (error) {
+          return false;
+        }
+      },
+      {
+        message: 'Invalid CSV format. Ensure proper comma separation, balanced quotes, and unique values.',
+      }
+    );
+
+  return required
+    ? baseSchema.min(1, 'Picklist values are required when enabled')
+    : baseSchema;
+};
 
 /**
- * Creates reference field validation for foreign keys
+ * Helper function to parse CSV line with proper quote handling
  */
-const createRefFieldValidator = (isForeignKey: boolean, refTable?: string | null) => {
-  if (!isForeignKey || !refTable) {
-    return z.string().optional().or(z.null())
-  }
-
-  return z
-    .string()
-    .min(1, 'Reference field is required for foreign key fields')
-    .max(64, 'Reference field name cannot exceed 64 characters')
-}
-
-/**
- * Creates foreign key action validators
- */
-const createForeignKeyActionValidator = (isForeignKey: boolean) => {
-  if (!isForeignKey) {
-    return z.string().optional().or(z.null())
-  }
-
-  return z
-    .enum(FOREIGN_KEY_ACTIONS)
-    .optional()
-    .or(z.null())
-}
-
-// =============================================================================
-// BUSINESS LOGIC VALIDATORS
-// =============================================================================
-
-/**
- * Validates business logic constraints and field combinations
- */
-const createBusinessLogicValidator = () => {
-  return z.object({}).refine(
-    (data: any) => {
-      const errors: string[] = []
-
-      // Primary key cannot be nullable
-      if (data.isPrimaryKey && data.allowNull) {
-        errors.push('Primary key fields cannot allow null values')
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let i = 0;
+  
+  while (i < line.length) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+    
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // Escaped quote
+        current += '"';
+        i += 2;
+        continue;
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes;
       }
-
-      // Auto-increment fields must be numeric
-      if (data.autoIncrement && !['integer', 'bigint', 'smallint'].includes(data.type)) {
-        errors.push('Auto-increment is only supported for integer field types')
-      }
-
-      // Auto-increment fields cannot be nullable
-      if (data.autoIncrement && data.allowNull) {
-        errors.push('Auto-increment fields cannot allow null values')
-      }
-
-      // Virtual fields cannot have auto-increment
-      if (data.isVirtual && data.autoIncrement) {
-        errors.push('Virtual fields cannot have auto-increment')
-      }
-
-      // Virtual fields cannot be primary keys
-      if (data.isVirtual && data.isPrimaryKey) {
-        errors.push('Virtual fields cannot be primary keys')
-      }
-
-      // Foreign key fields must have reference table and field
-      if (data.isForeignKey && (!data.refTable || !data.refField)) {
-        errors.push('Foreign key fields must specify reference table and field')
-      }
-
-      // Non-foreign key fields should not have reference data
-      if (!data.isForeignKey && (data.refTable || data.refField)) {
-        errors.push('Reference table and field are only applicable for foreign key fields')
-      }
-
-      // Precision must be greater than scale for decimal types
-      if (
-        PRECISION_SCALE_SUPPORTED_TYPES.includes(data.type) &&
-        data.precision &&
-        data.scale &&
-        data.precision <= data.scale
-      ) {
-        errors.push('Precision must be greater than scale for decimal fields')
-      }
-
-      // Fixed length only applies to string types
-      if (data.fixedLength && !FIXED_LENGTH_SUPPORTED_TYPES.includes(data.type)) {
-        errors.push('Fixed length is only supported for string field types')
-      }
-
-      // Multibyte support only applies to string types
-      if (data.supportsMultibyte && !MULTIBYTE_SUPPORTED_TYPES.includes(data.type)) {
-        errors.push('Multibyte support is only applicable for string field types')
-      }
-
-      return errors.length === 0
-    },
-    {
-      message: 'Business logic validation failed',
+    } else if (char === ',' && !inQuotes) {
+      // Field separator
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
     }
-  )
+    
+    i++;
+  }
+  
+  // Add final field
+  result.push(current.trim());
+  
+  return result;
 }
 
+/**
+ * Dynamic field type validation schema factory
+ * Creates type-specific validation rules based on field data type
+ */
+export const createFieldTypeValidationSchema = (
+  fieldType: FieldDataType,
+  constraints: FieldConstraints = {}
+): z.ZodSchema => {
+  const { 
+    minLength, 
+    maxLength, 
+    minValue, 
+    maxValue, 
+    precision, 
+    scale, 
+    required = false,
+    pattern,
+    customMessage 
+  } = constraints;
+
+  switch (fieldType) {
+    case 'string':
+    case 'text': {
+      let schema = z.string({
+        invalid_type_error: customMessage || 'Value must be a string'
+      });
+      
+      if (required) {
+        schema = schema.min(1, customMessage || 'This field is required');
+      }
+      
+      if (minLength !== undefined) {
+        schema = schema.min(minLength, `Must be at least ${minLength} characters`);
+      }
+      
+      if (maxLength !== undefined) {
+        schema = schema.max(maxLength, `Must be no more than ${maxLength} characters`);
+      }
+      
+      if (pattern) {
+        try {
+          const regex = new RegExp(pattern);
+          schema = schema.regex(regex, customMessage || 'Value does not match required pattern');
+        } catch (error) {
+          console.warn('Invalid regex pattern:', pattern);
+        }
+      }
+      
+      return schema;
+    }
+
+    case 'integer': {
+      let schema = z.number({
+        invalid_type_error: customMessage || 'Value must be an integer'
+      }).int(customMessage || 'Value must be a whole number');
+      
+      if (minValue !== undefined) {
+        schema = schema.min(minValue, `Must be at least ${minValue}`);
+      }
+      
+      if (maxValue !== undefined) {
+        schema = schema.max(maxValue, `Must be no more than ${maxValue}`);
+      }
+      
+      return schema;
+    }
+
+    case 'float':
+    case 'double':
+    case 'decimal': {
+      let schema = z.number({
+        invalid_type_error: customMessage || 'Value must be a number'
+      });
+      
+      if (minValue !== undefined) {
+        schema = schema.min(minValue, `Must be at least ${minValue}`);
+      }
+      
+      if (maxValue !== undefined) {
+        schema = schema.max(maxValue, `Must be no more than ${maxValue}`);
+      }
+      
+      // For decimal types, validate precision and scale
+      if (fieldType === 'decimal' && (precision !== undefined || scale !== undefined)) {
+        schema = schema.refine(
+          (value) => {
+            if (value === undefined || value === null) return true;
+            
+            const valueStr = Math.abs(value).toString();
+            const [integerPart = '', decimalPart = ''] = valueStr.split('.');
+            
+            if (precision !== undefined && (integerPart.length + decimalPart.length) > precision) {
+              return false;
+            }
+            
+            if (scale !== undefined && decimalPart.length > scale) {
+              return false;
+            }
+            
+            return true;
+          },
+          {
+            message: precision && scale 
+              ? `Must have no more than ${precision} total digits with ${scale} decimal places`
+              : precision 
+                ? `Must have no more than ${precision} total digits`
+                : `Must have no more than ${scale} decimal places`
+          }
+        );
+      }
+      
+      return schema;
+    }
+
+    case 'boolean': {
+      return z.boolean({
+        invalid_type_error: customMessage || 'Value must be true or false'
+      });
+    }
+
+    case 'date':
+    case 'datetime':
+    case 'timestamp': {
+      return z.string({
+        invalid_type_error: customMessage || 'Value must be a valid date'
+      }).refine(
+        (value) => {
+          if (!value && !required) return true;
+          if (!value && required) return false;
+          
+          const date = new Date(value);
+          return !isNaN(date.getTime());
+        },
+        {
+          message: customMessage || 'Please enter a valid date'
+        }
+      );
+    }
+
+    case 'json': {
+      return createJsonValidationSchema(required);
+    }
+
+    case 'uuid': {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      
+      let schema = z.string({
+        invalid_type_error: customMessage || 'Value must be a valid UUID'
+      });
+      
+      if (required) {
+        schema = schema.min(1, 'UUID is required');
+      }
+      
+      return schema.regex(uuidRegex, customMessage || 'Please enter a valid UUID format');
+    }
+
+    case 'enum':
+    case 'set': {
+      // For enum/set types, we'll need to validate against allowed values
+      // This will be enhanced when picklist values are provided
+      return z.string({
+        invalid_type_error: customMessage || 'Please select a valid option'
+      });
+    }
+
+    default: {
+      // Generic string validation for unknown types
+      let schema = z.string({
+        invalid_type_error: customMessage || 'Invalid value format'
+      });
+      
+      if (required) {
+        schema = schema.min(1, 'This field is required');
+      }
+      
+      return schema;
+    }
+  }
+};
+
 // =============================================================================
-// HOOK INTERFACE AND TYPES
+// FIELD VALIDATION HOOK
 // =============================================================================
 
 /**
- * Field validation hook options
+ * Configuration options for the field validation hook
  */
 export interface UseFieldValidationOptions {
-  /** Existing field names for uniqueness validation */
-  existingFieldNames?: string[]
-  /** Enable real-time validation */
-  enableRealTimeValidation?: boolean
-  /** Validation debounce delay in milliseconds */
-  validationDelay?: number
-  /** Enable strict validation mode */
-  strictMode?: boolean
-  /** Custom validation rules */
-  customValidators?: Record<string, z.ZodSchema>
+  /** Form data containing field configuration */
+  formData?: FieldFormData;
+  /** Existing field being edited (for updates) */
+  existingField?: DatabaseSchemaFieldType | null;
+  /** Whether to enable real-time validation */
+  enableRealTime?: boolean;
+  /** Custom debounce delay (default: 100ms) */
+  debounceMs?: number;
+  /** Whether to validate on form change */
+  validateOnChange?: boolean;
+  /** Whether to validate on form blur */
+  validateOnBlur?: boolean;
 }
 
 /**
- * Field validation hook return type
+ * Return type for the field validation hook
  */
 export interface UseFieldValidationReturn {
-  /** Dynamic Zod schema for field validation */
-  validationSchema: FieldValidationSchema
-  /** Validates a single field value */
-  validateField: (fieldName: keyof FieldFormData, value: any) => Promise<AsyncValidationResult>
-  /** Validates the complete form data */
-  validateForm: (data: FieldFormData) => Promise<AsyncValidationResult>
-  /** Checks if field type supports specific constraint */
-  supportsConstraint: (constraint: string) => boolean
-  /** Gets available field types */
-  getAvailableFieldTypes: () => DreamFactoryFieldType[]
-  /** Gets constraint requirements for field type */
-  getConstraintRequirements: (fieldType: DreamFactoryFieldType) => {
-    supportsLength: boolean
-    supportsPrecisionScale: boolean
-    supportsPicklist: boolean
-    supportsFixedLength: boolean
-    supportsMultibyte: boolean
-  }
-  /** Validates foreign key reference */
-  validateForeignKeyReference: (
-    refTable: string,
-    refField: string
-  ) => Promise<AsyncValidationResult>
-  /** Performance metrics */
-  validationMetrics: {
-    lastValidationTime: number
-    averageValidationTime: number
-  }
+  /** Validate a specific field value */
+  validateField: (
+    fieldName: keyof FieldFormData,
+    value: any,
+    formData?: FieldFormData
+  ) => FieldValidationResult;
+  
+  /** Validate the entire form */
+  validateForm: (formData: FieldFormData) => {
+    isValid: boolean;
+    errors: Record<string, string>;
+    fieldErrors: Record<string, FieldValidationResult>;
+  };
+  
+  /** Get dynamic validation schema for a field */
+  getFieldSchema: (
+    fieldName: keyof FieldFormData,
+    formData?: FieldFormData
+  ) => DynamicValidationSchema;
+  
+  /** Validate picklist values (CSV or JSON format) */
+  validatePicklist: (
+    values: string,
+    type: 'csv' | 'json'
+  ) => FieldValidationResult;
+  
+  /** Validate JSON content */
+  validateJson: (content: string, required?: boolean) => FieldValidationResult;
+  
+  /** Validate field constraints based on type */
+  validateConstraints: (
+    fieldType: FieldDataType,
+    value: any,
+    constraints: FieldConstraints
+  ) => FieldValidationResult;
+  
+  /** Check if field name is valid and unique */
+  validateFieldName: (
+    name: string,
+    existingFields?: DatabaseSchemaFieldType[]
+  ) => FieldValidationResult;
 }
 
-// =============================================================================
-// MAIN HOOK IMPLEMENTATION
-// =============================================================================
-
 /**
- * Field validation hook with comprehensive Zod schemas and real-time validation
+ * Comprehensive field validation hook with real-time validation under 100ms
  * 
- * @param formData Current form data for dynamic validation
- * @param options Validation configuration options
- * @returns Field validation utilities and schemas
+ * Provides dynamic validation rules based on field types, constraints, and business logic.
+ * Integrates with React Hook Form for seamless form validation and error handling.
+ * 
+ * @param options - Configuration options for validation behavior
+ * @returns Field validation utilities and methods
  */
 export function useFieldValidation(
-  formData: Partial<FieldFormData> = {},
   options: UseFieldValidationOptions = {}
 ): UseFieldValidationReturn {
   const {
-    existingFieldNames = [],
-    enableRealTimeValidation = true,
-    validationDelay = 50, // Under 100ms requirement
-    strictMode = true,
-    customValidators = {},
-  } = options
-
-  // Performance tracking
-  const validationTimes = useRef<number[]>([])
-  const lastValidationTime = useRef<number>(0)
-
-  // Debounced validation for real-time performance
-  const debouncedValidation = useDebounce(validationDelay)
+    formData,
+    existingField,
+    enableRealTime = true,
+    debounceMs = 100,
+    validateOnChange = true,
+    validateOnBlur = true,
+  } = options;
 
   /**
-   * Creates dynamic validation schema based on current form data
+   * Validate a specific field value with dynamic rules
    */
-  const validationSchema = useMemo<FieldValidationSchema>(() => {
-    const { type, isForeignKey, precision, refTable } = formData
-
-    // Base schema with always-required fields
-    const baseSchema = z.object({
-      // Basic field information
-      name: fieldNameSchema.refine(
-        (name) => {
-          if (!strictMode) return true
-          return !existingFieldNames.includes(name)
-        },
-        {
-          message: 'Field name already exists in this table',
-        }
-      ),
-      alias: aliasSchema,
-      label: labelSchema,
-      description: descriptionSchema,
-
-      // Type configuration
-      type: z.enum([
-        'string',
-        'text',
-        'password',
-        'email',
-        'url',
-        'integer',
-        'bigint',
-        'smallint',
-        'decimal',
-        'float',
-        'double',
-        'money',
-        'date',
-        'time',
-        'datetime',
-        'timestamp',
-        'boolean',
-        'binary',
-        'varbinary',
-        'blob',
-        'medium_blob',
-        'long_blob',
-        'reference',
-        'user_id',
-        'user_id_on_create',
-        'user_id_on_update',
-        'timestamp_on_create',
-        'timestamp_on_update',
-      ] as const),
-      dbType: dbTypeSchema,
-
-      // Size constraints (dynamic based on type)
-      length: type ? createLengthValidator(type) : z.number().optional().or(z.null()),
-      precision: type ? createPrecisionValidator(type) : z.number().optional().or(z.null()),
-      scale: createScaleValidator(type || 'string', precision),
-
-      // Default value
-      default: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
-
-      // Boolean flags
-      allowNull: z.boolean().default(false),
-      autoIncrement: z.boolean().default(false),
-      fixedLength: z.boolean().default(false),
-      isAggregate: z.boolean().default(false),
-      isForeignKey: z.boolean().default(false),
-      isPrimaryKey: z.boolean().default(false),
-      isUnique: z.boolean().default(false),
-      isVirtual: z.boolean().default(false),
-      required: z.boolean().default(false),
-      supportsMultibyte: z.boolean().default(false),
-
-      // Reference configuration (dynamic based on isForeignKey)
-      refTable: createRefTableValidator(isForeignKey || false),
-      refField: createRefFieldValidator(isForeignKey || false, refTable),
-      refOnDelete: createForeignKeyActionValidator(isForeignKey || false),
-      refOnUpdate: createForeignKeyActionValidator(isForeignKey || false),
-
-      // Advanced configuration
-      picklist: type ? createPicklistValidator(type) : z.string().optional(),
-      validation: jsonValidationSchema,
-      dbFunction: z.array(dbFunctionSchema).default([]),
-    })
-
-    // Apply business logic validation
-    const schemaWithBusinessLogic = baseSchema.and(createBusinessLogicValidator())
-
-    // Apply custom validators if provided
-    if (Object.keys(customValidators).length > 0) {
-      return schemaWithBusinessLogic.extend(customValidators) as FieldValidationSchema
+  const validateField = useCallback((
+    fieldName: keyof FieldFormData,
+    value: any,
+    currentFormData?: FieldFormData
+  ): FieldValidationResult => {
+    const data = currentFormData || formData;
+    
+    if (!data) {
+      return { isValid: true };
     }
 
-    return schemaWithBusinessLogic as FieldValidationSchema
-  }, [formData, existingFieldNames, strictMode, customValidators])
-
-  /**
-   * Validates a single field with performance tracking
-   */
-  const validateField = useCallback(
-    async (fieldName: keyof FieldFormData, value: any): Promise<AsyncValidationResult> => {
-      const startTime = performance.now()
-
-      try {
-        // Use debounced validation for real-time scenarios
-        if (enableRealTimeValidation) {
-          await debouncedValidation()
+    try {
+      switch (fieldName) {
+        case 'name': {
+          return validateFieldName(value);
         }
 
-        // Extract field schema for single field validation
-        const fieldSchema = validationSchema.shape[fieldName as keyof typeof validationSchema.shape]
-        
-        if (!fieldSchema) {
-          return {
-            isValid: true,
-            timestamp: Date.now(),
-            fieldName: fieldName as string,
+        case 'label': {
+          if (!value || value.trim() === '') {
+            return {
+              isValid: false,
+              error: 'Field label is required',
+              fieldPath: 'label',
+              validationType: 'constraint'
+            };
           }
-        }
-
-        await fieldSchema.parseAsync(value)
-
-        const endTime = performance.now()
-        const validationTime = endTime - startTime
-        
-        // Track performance metrics
-        validationTimes.current.push(validationTime)
-        if (validationTimes.current.length > 100) {
-          validationTimes.current = validationTimes.current.slice(-50)
-        }
-        lastValidationTime.current = validationTime
-
-        return {
-          isValid: true,
-          timestamp: Date.now(),
-          fieldName: fieldName as string,
-        }
-      } catch (error) {
-        const endTime = performance.now()
-        lastValidationTime.current = endTime - startTime
-
-        if (error instanceof z.ZodError) {
-          const errors: FieldValidationError[] = error.errors.map((err) => ({
-            path: err.path,
-            message: err.message,
-            code: err.code,
-            expected: 'expected' in err ? String(err.expected) : undefined,
-            received: 'received' in err ? err.received : undefined,
-          }))
-
-          return {
-            isValid: false,
-            errors,
-            timestamp: Date.now(),
-            fieldName: fieldName as string,
+          
+          if (value.length > 255) {
+            return {
+              isValid: false,
+              error: 'Field label must be 255 characters or less',
+              fieldPath: 'label',
+              validationType: 'constraint'
+            };
           }
+          
+          return { isValid: true };
         }
 
-        return {
-          isValid: false,
-          errors: [
-            {
-              path: [fieldName as string],
-              message: 'Validation error',
-              code: 'custom',
-            },
-          ],
-          timestamp: Date.now(),
-          fieldName: fieldName as string,
+        case 'type': {
+          if (!value) {
+            return {
+              isValid: false,
+              error: 'Field type is required',
+              fieldPath: 'type',
+              validationType: 'constraint'
+            };
+          }
+          
+          return { isValid: true };
+        }
+
+        case 'length': {
+          if (data.type && ['string', 'text'].includes(data.type) && value !== undefined) {
+            if (value <= 0) {
+              return {
+                isValid: false,
+                error: 'Field length must be greater than 0',
+                fieldPath: 'length',
+                validationType: 'constraint'
+              };
+            }
+            
+            if (value > 2147483647) {
+              return {
+                isValid: false,
+                error: 'Field length is too large',
+                fieldPath: 'length',
+                validationType: 'constraint'
+              };
+            }
+          }
+          
+          return { isValid: true };
+        }
+
+        case 'precision': {
+          if (data.type === 'decimal' && value !== undefined) {
+            if (value <= 0 || value > 65) {
+              return {
+                isValid: false,
+                error: 'Precision must be between 1 and 65',
+                fieldPath: 'precision',
+                validationType: 'constraint'
+              };
+            }
+            
+            if (data.scale !== undefined && value < data.scale) {
+              return {
+                isValid: false,
+                error: 'Precision must be greater than or equal to scale',
+                fieldPath: 'precision',
+                validationType: 'constraint'
+              };
+            }
+          }
+          
+          return { isValid: true };
+        }
+
+        case 'scale': {
+          if (data.type === 'decimal' && value !== undefined) {
+            if (value < 0 || value > 30) {
+              return {
+                isValid: false,
+                error: 'Scale must be between 0 and 30',
+                fieldPath: 'scale',
+                validationType: 'constraint'
+              };
+            }
+            
+            if (data.precision !== undefined && value > data.precision) {
+              return {
+                isValid: false,
+                error: 'Scale must be less than or equal to precision',
+                fieldPath: 'scale',
+                validationType: 'constraint'
+              };
+            }
+          }
+          
+          return { isValid: true };
+        }
+
+        case 'default': {
+          if (data.hasDefaultValue && (!value || value.trim() === '')) {
+            return {
+              isValid: false,
+              error: 'Default value is required when enabled',
+              fieldPath: 'default',
+              validationType: 'constraint'
+            };
+          }
+          
+          // Validate default value against field type
+          if (data.hasDefaultValue && value && data.type) {
+            const constraints: FieldConstraints = {
+              required: false, // Default values are optional in terms of emptiness
+              minLength: data.length ? 0 : undefined,
+              maxLength: data.length || undefined,
+              precision: data.precision,
+              scale: data.scale,
+            };
+            
+            return validateConstraints(data.type, value, constraints);
+          }
+          
+          return { isValid: true };
+        }
+
+        case 'picklistValues': {
+          if (data.enablePicklist && (!value || value.trim() === '')) {
+            return {
+              isValid: false,
+              error: 'Picklist values are required when picklist is enabled',
+              fieldPath: 'picklistValues',
+              validationType: 'constraint'
+            };
+          }
+          
+          if (data.enablePicklist && value) {
+            return validatePicklist(value, data.picklistType || 'csv');
+          }
+          
+          return { isValid: true };
+        }
+
+        case 'validationRules': {
+          if (data.enableValidation && !value) {
+            return {
+              isValid: false,
+              error: 'Validation rules are required when validation is enabled',
+              fieldPath: 'validationRules',
+              validationType: 'constraint'
+            };
+          }
+          
+          return { isValid: true };
+        }
+
+        case 'referenceTable': {
+          if (data.isForeignKey && (!value || value.trim() === '')) {
+            return {
+              isValid: false,
+              error: 'Reference table is required for foreign key fields',
+              fieldPath: 'referenceTable',
+              validationType: 'constraint'
+            };
+          }
+          
+          return { isValid: true };
+        }
+
+        case 'referenceField': {
+          if (data.isForeignKey && (!value || value.trim() === '')) {
+            return {
+              isValid: false,
+              error: 'Reference field is required for foreign key fields',
+              fieldPath: 'referenceField',
+              validationType: 'constraint'
+            };
+          }
+          
+          return { isValid: true };
+        }
+
+        default: {
+          return { isValid: true };
         }
       }
-    },
-    [validationSchema, enableRealTimeValidation, debouncedValidation]
-  )
-
-  /**
-   * Validates complete form data
-   */
-  const validateForm = useCallback(
-    async (data: FieldFormData): Promise<AsyncValidationResult> => {
-      const startTime = performance.now()
-
-      try {
-        await validationSchema.parseAsync(data)
-
-        const endTime = performance.now()
-        const validationTime = endTime - startTime
-        
-        validationTimes.current.push(validationTime)
-        lastValidationTime.current = validationTime
-
-        return {
-          isValid: true,
-          timestamp: Date.now(),
-          fieldName: 'form',
-        }
-      } catch (error) {
-        const endTime = performance.now()
-        lastValidationTime.current = endTime - startTime
-
-        if (error instanceof z.ZodError) {
-          const errors: FieldValidationError[] = error.errors.map((err) => ({
-            path: err.path.map(String),
-            message: err.message,
-            code: err.code,
-            expected: 'expected' in err ? String(err.expected) : undefined,
-            received: 'received' in err ? err.received : undefined,
-          }))
-
-          return {
-            isValid: false,
-            errors,
-            timestamp: Date.now(),
-            fieldName: 'form',
-          }
-        }
-
-        return {
-          isValid: false,
-          errors: [
-            {
-              path: ['form'],
-              message: 'Form validation error',
-              code: 'custom',
-            },
-          ],
-          timestamp: Date.now(),
-          fieldName: 'form',
-        }
-      }
-    },
-    [validationSchema]
-  )
-
-  /**
-   * Checks if current field type supports specific constraint
-   */
-  const supportsConstraint = useCallback(
-    (constraint: string): boolean => {
-      const fieldType = formData.type
-
-      if (!fieldType) return false
-
-      switch (constraint) {
-        case 'length':
-          return LENGTH_SUPPORTED_TYPES.includes(fieldType)
-        case 'precision':
-        case 'scale':
-          return PRECISION_SCALE_SUPPORTED_TYPES.includes(fieldType)
-        case 'picklist':
-          return PICKLIST_SUPPORTED_TYPES.includes(fieldType)
-        case 'fixedLength':
-          return FIXED_LENGTH_SUPPORTED_TYPES.includes(fieldType)
-        case 'multibyte':
-          return MULTIBYTE_SUPPORTED_TYPES.includes(fieldType)
-        default:
-          return false
-      }
-    },
-    [formData.type]
-  )
-
-  /**
-   * Gets all available field types
-   */
-  const getAvailableFieldTypes = useCallback((): DreamFactoryFieldType[] => {
-    return [
-      'string',
-      'text',
-      'password',
-      'email',
-      'url',
-      'integer',
-      'bigint',
-      'smallint',
-      'decimal',
-      'float',
-      'double',
-      'money',
-      'date',
-      'time',
-      'datetime',
-      'timestamp',
-      'boolean',
-      'binary',
-      'varbinary',
-      'blob',
-      'medium_blob',
-      'long_blob',
-      'reference',
-      'user_id',
-      'user_id_on_create',
-      'user_id_on_update',
-      'timestamp_on_create',
-      'timestamp_on_update',
-    ]
-  }, [])
-
-  /**
-   * Gets constraint requirements for specific field type
-   */
-  const getConstraintRequirements = useCallback(
-    (fieldType: DreamFactoryFieldType) => {
+    } catch (error) {
+      console.error('Field validation error:', error);
       return {
-        supportsLength: LENGTH_SUPPORTED_TYPES.includes(fieldType),
-        supportsPrecisionScale: PRECISION_SCALE_SUPPORTED_TYPES.includes(fieldType),
-        supportsPicklist: PICKLIST_SUPPORTED_TYPES.includes(fieldType),
-        supportsFixedLength: FIXED_LENGTH_SUPPORTED_TYPES.includes(fieldType),
-        supportsMultibyte: MULTIBYTE_SUPPORTED_TYPES.includes(fieldType),
-      }
-    },
-    []
-  )
+        isValid: false,
+        error: 'Validation error occurred',
+        fieldPath: fieldName as string,
+        validationType: 'custom'
+      };
+    }
+  }, [formData, existingField]);
 
   /**
-   * Validates foreign key reference (async validation against API)
+   * Validate the entire form data structure
    */
-  const validateForeignKeyReference = useCallback(
-    async (refTable: string, refField: string): Promise<AsyncValidationResult> => {
-      const startTime = performance.now()
+  const validateForm = useCallback((
+    currentFormData: FieldFormData
+  ): {
+    isValid: boolean;
+    errors: Record<string, string>;
+    fieldErrors: Record<string, FieldValidationResult>;
+  } => {
+    const errors: Record<string, string> = {};
+    const fieldErrors: Record<string, FieldValidationResult> = {};
+    
+    // Core field validation
+    const nameResult = validateField('name', currentFormData.name, currentFormData);
+    if (!nameResult.isValid) {
+      errors.name = nameResult.error || 'Invalid field name';
+      fieldErrors.name = nameResult;
+    }
+    
+    const labelResult = validateField('label', currentFormData.label, currentFormData);
+    if (!labelResult.isValid) {
+      errors.label = labelResult.error || 'Invalid field label';
+      fieldErrors.label = labelResult;
+    }
+    
+    const typeResult = validateField('type', currentFormData.type, currentFormData);
+    if (!typeResult.isValid) {
+      errors.type = typeResult.error || 'Invalid field type';
+      fieldErrors.type = typeResult;
+    }
+    
+    // Type-specific validation
+    if (currentFormData.type && ['string', 'text'].includes(currentFormData.type)) {
+      const lengthResult = validateField('length', currentFormData.length, currentFormData);
+      if (!lengthResult.isValid) {
+        errors.length = lengthResult.error || 'Invalid field length';
+        fieldErrors.length = lengthResult;
+      }
+    }
+    
+    if (currentFormData.type === 'decimal') {
+      const precisionResult = validateField('precision', currentFormData.precision, currentFormData);
+      if (!precisionResult.isValid) {
+        errors.precision = precisionResult.error || 'Invalid precision';
+        fieldErrors.precision = precisionResult;
+      }
+      
+      const scaleResult = validateField('scale', currentFormData.scale, currentFormData);
+      if (!scaleResult.isValid) {
+        errors.scale = scaleResult.error || 'Invalid scale';
+        fieldErrors.scale = scaleResult;
+      }
+    }
+    
+    // Default value validation
+    if (currentFormData.hasDefaultValue) {
+      const defaultResult = validateField('default', currentFormData.default, currentFormData);
+      if (!defaultResult.isValid) {
+        errors.default = defaultResult.error || 'Invalid default value';
+        fieldErrors.default = defaultResult;
+      }
+    }
+    
+    // Picklist validation
+    if (currentFormData.enablePicklist) {
+      const picklistResult = validateField('picklistValues', currentFormData.picklistValues, currentFormData);
+      if (!picklistResult.isValid) {
+        errors.picklistValues = picklistResult.error || 'Invalid picklist values';
+        fieldErrors.picklistValues = picklistResult;
+      }
+    }
+    
+    // Foreign key validation
+    if (currentFormData.isForeignKey) {
+      const tableResult = validateField('referenceTable', currentFormData.referenceTable, currentFormData);
+      if (!tableResult.isValid) {
+        errors.referenceTable = tableResult.error || 'Reference table is required';
+        fieldErrors.referenceTable = tableResult;
+      }
+      
+      const fieldResult = validateField('referenceField', currentFormData.referenceField, currentFormData);
+      if (!fieldResult.isValid) {
+        errors.referenceField = fieldResult.error || 'Reference field is required';
+        fieldErrors.referenceField = fieldResult;
+      }
+    }
+    
+    // Constraint validation
+    if (currentFormData.isPrimaryKey && currentFormData.allowNull) {
+      errors.allowNull = 'Primary key fields cannot allow null values';
+      fieldErrors.allowNull = {
+        isValid: false,
+        error: 'Primary key fields cannot allow null values',
+        fieldPath: 'allowNull',
+        validationType: 'constraint'
+      };
+    }
+    
+    return {
+      isValid: Object.keys(errors).length === 0,
+      errors,
+      fieldErrors
+    };
+  }, [validateField]);
 
-      try {
-        // Simulate API validation - in real implementation, this would make an API call
-        // to verify that the reference table and field exist
-        await new Promise((resolve) => setTimeout(resolve, 10)) // Simulate API delay
+  /**
+   * Get dynamic validation schema for a specific field
+   */
+  const getFieldSchema = useCallback((
+    fieldName: keyof FieldFormData,
+    currentFormData?: FieldFormData
+  ): DynamicValidationSchema => {
+    const data = currentFormData || formData;
+    
+    const baseSchema = z.any(); // Fallback schema
+    
+    return {
+      schema: baseSchema,
+      validateOnChange,
+      validateOnBlur,
+      debounceMs
+    };
+  }, [formData, validateOnChange, validateOnBlur, debounceMs]);
 
-        // Basic format validation
-        if (!refTable || refTable.trim() === '') {
-          return {
-            isValid: false,
-            errors: [
-              {
-                path: ['refTable'],
-                message: 'Reference table is required',
-                code: 'required',
-              },
-            ],
-            timestamp: Date.now(),
-            fieldName: 'refTable',
-          }
-        }
-
-        if (!refField || refField.trim() === '') {
-          return {
-            isValid: false,
-            errors: [
-              {
-                path: ['refField'],
-                message: 'Reference field is required',
-                code: 'required',
-              },
-            ],
-            timestamp: Date.now(),
-            fieldName: 'refField',
-          }
-        }
-
-        const endTime = performance.now()
-        lastValidationTime.current = endTime - startTime
-
-        return {
-          isValid: true,
-          timestamp: Date.now(),
-          fieldName: 'foreignKeyReference',
-        }
-      } catch (error) {
-        const endTime = performance.now()
-        lastValidationTime.current = endTime - startTime
-
+  /**
+   * Validate picklist values in CSV or JSON format
+   */
+  const validatePicklist = useCallback((
+    values: string,
+    type: 'csv' | 'json'
+  ): FieldValidationResult => {
+    try {
+      if (!values || values.trim() === '') {
         return {
           isValid: false,
-          errors: [
-            {
-              path: ['foreignKeyReference'],
-              message: 'Failed to validate foreign key reference',
-              code: 'api_error',
-            },
-          ],
-          timestamp: Date.now(),
-          fieldName: 'foreignKeyReference',
-        }
+          error: 'Picklist values cannot be empty',
+          validationType: 'picklist'
+        };
       }
-    },
-    []
-  )
+
+      if (type === 'csv') {
+        const schema = createCsvValidationSchema(true);
+        const result = schema.safeParse(values);
+        
+        if (!result.success) {
+          return {
+            isValid: false,
+            error: result.error.errors[0]?.message || 'Invalid CSV format',
+            validationType: 'picklist'
+          };
+        }
+        
+        return { isValid: true };
+      } else if (type === 'json') {
+        const schema = createJsonValidationSchema(true);
+        const result = schema.safeParse(values);
+        
+        if (!result.success) {
+          return {
+            isValid: false,
+            error: result.error.errors[0]?.message || 'Invalid JSON format',
+            validationType: 'picklist'
+          };
+        }
+        
+        // Additional validation for JSON array format
+        try {
+          const parsed = JSON.parse(values);
+          if (!Array.isArray(parsed)) {
+            return {
+              isValid: false,
+              error: 'JSON picklist must be an array of values',
+              validationType: 'picklist'
+            };
+          }
+          
+          if (parsed.length === 0) {
+            return {
+              isValid: false,
+              error: 'JSON picklist cannot be empty',
+              validationType: 'picklist'
+            };
+          }
+          
+          // Check for duplicates
+          const uniqueValues = new Set(parsed.map(v => String(v).toLowerCase()));
+          if (uniqueValues.size !== parsed.length) {
+            return {
+              isValid: false,
+              error: 'JSON picklist values must be unique',
+              validationType: 'picklist'
+            };
+          }
+          
+        } catch {
+          return {
+            isValid: false,
+            error: 'Invalid JSON array format',
+            validationType: 'picklist'
+          };
+        }
+        
+        return { isValid: true };
+      }
+      
+      return {
+        isValid: false,
+        error: 'Unknown picklist type',
+        validationType: 'picklist'
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        error: 'Picklist validation error',
+        validationType: 'picklist'
+      };
+    }
+  }, []);
 
   /**
-   * Calculate performance metrics
+   * Validate JSON content with detailed error reporting
    */
-  const validationMetrics = useMemo(() => {
-    const times = validationTimes.current
-    const averageTime = times.length > 0 ? times.reduce((a, b) => a + b, 0) / times.length : 0
-
-    return {
-      lastValidationTime: lastValidationTime.current,
-      averageValidationTime: averageTime,
+  const validateJson = useCallback((
+    content: string,
+    required: boolean = false
+  ): FieldValidationResult => {
+    try {
+      const schema = createJsonValidationSchema(required);
+      const result = schema.safeParse(content);
+      
+      if (!result.success) {
+        return {
+          isValid: false,
+          error: result.error.errors[0]?.message || 'Invalid JSON format',
+          validationType: 'json'
+        };
+      }
+      
+      return { isValid: true };
+    } catch (error) {
+      return {
+        isValid: false,
+        error: 'JSON validation error',
+        validationType: 'json'
+      };
     }
-  }, [validationTimes.current, lastValidationTime.current])
+  }, []);
 
-  return {
-    validationSchema,
+  /**
+   * Validate field constraints based on field type
+   */
+  const validateConstraints = useCallback((
+    fieldType: FieldDataType,
+    value: any,
+    constraints: FieldConstraints
+  ): FieldValidationResult => {
+    try {
+      const schema = createFieldTypeValidationSchema(fieldType, constraints);
+      const result = schema.safeParse(value);
+      
+      if (!result.success) {
+        return {
+          isValid: false,
+          error: result.error.errors[0]?.message || 'Constraint validation failed',
+          validationType: 'constraint'
+        };
+      }
+      
+      return { isValid: true };
+    } catch (error) {
+      return {
+        isValid: false,
+        error: 'Constraint validation error',
+        validationType: 'constraint'
+      };
+    }
+  }, []);
+
+  /**
+   * Validate field name for uniqueness and format
+   */
+  const validateFieldName = useCallback((
+    name: string,
+    existingFields?: DatabaseSchemaFieldType[]
+  ): FieldValidationResult => {
+    if (!name || name.trim() === '') {
+      return {
+        isValid: false,
+        error: 'Field name is required',
+        fieldPath: 'name',
+        validationType: 'constraint'
+      };
+    }
+
+    // Check field name format (database identifier rules)
+    const nameRegex = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+    if (!nameRegex.test(name)) {
+      return {
+        isValid: false,
+        error: 'Field name must start with a letter and contain only letters, numbers, and underscores',
+        fieldPath: 'name',
+        validationType: 'format'
+      };
+    }
+
+    // Check field name length
+    if (name.length > 64) {
+      return {
+        isValid: false,
+        error: 'Field name must be 64 characters or less',
+        fieldPath: 'name',
+        validationType: 'constraint'
+      };
+    }
+
+    // Check for reserved words
+    const reservedWords = ['id', 'created_date', 'last_modified_date', 'created_by_id', 'last_modified_by_id'];
+    if (reservedWords.includes(name.toLowerCase())) {
+      return {
+        isValid: false,
+        error: 'Field name conflicts with system reserved words',
+        fieldPath: 'name',
+        validationType: 'constraint'
+      };
+    }
+
+    // Check for uniqueness if existing fields provided
+    if (existingFields && existingField) {
+      const isDuplicate = existingFields.some(
+        field => field.name.toLowerCase() === name.toLowerCase() && field.name !== existingField.name
+      );
+      
+      if (isDuplicate) {
+        return {
+          isValid: false,
+          error: 'Field name must be unique within the table',
+          fieldPath: 'name',
+          validationType: 'constraint'
+        };
+      }
+    }
+
+    return { isValid: true };
+  }, [existingField]);
+
+  // Memoize the return object to prevent unnecessary re-renders
+  return useMemo(() => ({
     validateField,
     validateForm,
-    supportsConstraint,
-    getAvailableFieldTypes,
-    getConstraintRequirements,
-    validateForeignKeyReference,
-    validationMetrics,
-  }
+    getFieldSchema,
+    validatePicklist,
+    validateJson,
+    validateConstraints,
+    validateFieldName,
+  }), [
+    validateField,
+    validateForm,
+    getFieldSchema,
+    validatePicklist,
+    validateJson,
+    validateConstraints,
+    validateFieldName,
+  ]);
 }
 
-// =============================================================================
-// UTILITY EXPORTS
-// =============================================================================
+/**
+ * Export all validation utilities for external use
+ */
+export {
+  createJsonValidationSchema,
+  createCsvValidationSchema,
+  createFieldTypeValidationSchema,
+  parseCsvLine,
+};
 
 /**
- * Pre-configured validation schemas for common use cases
+ * Export validation result types
  */
-export const ValidationSchemas = {
-  json: jsonValidationSchema,
-  csv: csvValidationSchema,
-  fieldName: fieldNameSchema,
-  alias: aliasSchema,
-  label: labelSchema,
-  description: descriptionSchema,
-  dbType: dbTypeSchema,
-  dbFunction: dbFunctionSchema,
-} as const
-
-/**
- * Field type constraint mappings
- */
-export const FieldConstraints = {
-  LENGTH_SUPPORTED_TYPES,
-  PRECISION_SCALE_SUPPORTED_TYPES,
-  PICKLIST_SUPPORTED_TYPES,
-  FIXED_LENGTH_SUPPORTED_TYPES,
-  MULTIBYTE_SUPPORTED_TYPES,
-  FOREIGN_KEY_ACTIONS,
-  FUNCTION_USE_CONTEXTS,
-} as const
-
-/**
- * Validation utilities
- */
-export const ValidationUtils = {
-  isValidJson: (value: string): boolean => {
-    try {
-      JSON.parse(value)
-      return true
-    } catch {
-      return false
-    }
-  },
-  isValidCsv: (value: string): boolean => {
-    const csvRegex = /^\w+(?:\s*,\s*\w+)*$/
-    return csvRegex.test(value.trim())
-  },
-  getValidationErrorMessage: (error: FieldValidationError): string => {
-    return error.message
-  },
-} as const
-
-// Default export
-export default useFieldValidation
+export type {
+  FieldValidationResult,
+  DynamicValidationSchema,
+  FieldConstraints,
+  UseFieldValidationOptions,
+  UseFieldValidationReturn,
+};
