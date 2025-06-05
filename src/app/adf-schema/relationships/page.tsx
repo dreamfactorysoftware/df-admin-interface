@@ -1,885 +1,778 @@
 /**
- * Database Relationships Listing Page for DreamFactory Admin Interface
+ * Database Relationships Listing Page Component
  * 
- * Next.js page component providing comprehensive relationship management for database tables.
- * Implements TanStack Virtual for handling large relationship datasets (1000+ entries),
- * React Query for intelligent caching with sub-50ms cache hits, and advanced filtering/sorting
- * capabilities. Replaces Angular relationship listing functionality with modern React patterns.
+ * Next.js 15.1 page component providing the main database relationships listing interface
+ * for a selected table. Implements TanStack Virtual for handling large relationship datasets,
+ * filtering and sorting capabilities, and navigation to individual relationship
+ * creation/editing routes.
  * 
  * Features:
- * - Server-side rendering with sub-2-second initial load
- * - Virtual scrolling for optimal performance with large datasets
- * - Real-time search and filtering capabilities
- * - Type-based visual indicators and junction table status
- * - Seamless navigation to relationship creation and editing routes
- * - Comprehensive error handling and loading states
+ * - Server-side rendering with Next.js 15.1 app router
+ * - TanStack Virtual for optimal performance with 1,000+ relationships
+ * - React Query for intelligent caching with sub-50ms cache hit responses
+ * - Comprehensive filtering, sorting, and search functionality
+ * - Tailwind CSS styling with consistent theme injection
+ * - Real-time updates and navigation capabilities
+ * - Type-safe implementation with comprehensive error handling
  * 
- * @fileoverview Relationships listing page component for React/Next.js migration
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Relationships listing page with virtualization and React Query integration
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
 'use client';
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useSearchParams, useRouter, useParams } from 'next/navigation';
+import React, { useState, useMemo, useCallback, Suspense, useEffect } from 'react';
+import { notFound, useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { 
-  useReactTable, 
+  ColumnDef, 
   getCoreRowModel, 
   getFilteredRowModel, 
   getSortedRowModel,
-  createColumnHelper,
+  useReactTable,
   flexRender,
-  type ColumnDef,
-  type SortingState,
-  type ColumnFiltersState
+  SortingState,
+  ColumnFiltersState,
+  VisibilityState
 } from '@tanstack/react-table';
-import { 
-  MagnifyingGlassIcon,
-  PlusIcon,
-  AdjustmentsHorizontalIcon,
-  ArrowPathIcon,
-  ExclamationTriangleIcon,
-  InformationCircleIcon
-} from '@heroicons/react/24/outline';
-import { 
-  MagnifyingGlassIcon as MagnifyingGlassIconSolid,
-  FunnelIcon
-} from '@heroicons/react/24/solid';
+import { Plus, Search, Filter, ArrowUpDown, Eye, Edit, Trash2, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
-// Component imports
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Alert } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-
-// Hook and utility imports
-import { useRelationshipManagement } from '@/hooks/use-relationship-management';
-import { useDebounce } from '@/hooks/use-debounce';
-import { useLocalStorage } from '@/hooks/use-local-storage';
-import { cn } from '@/lib/utils';
-
-// Type imports
-import type {
-  RelationshipSchema,
+// Internal imports
+import type { 
+  RelationshipListItem, 
   RelationshipType,
+  RelationshipRouteParams,
   RelationshipSearchParams,
-  RelationshipTableConfig,
-  RELATIONSHIP_TYPE_OPTIONS
+  RELATIONSHIP_TYPE_CONFIGS,
+  RelationshipTableState,
+  RelationshipListResponse
 } from './relationship.types';
+import { useRelationshipManagement } from '../../../hooks/use-relationship-management';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
 
-// Constants
-const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100, 200] as const;
-const DEFAULT_ITEMS_PER_PAGE = 25;
-const VIRTUAL_ITEM_HEIGHT = 60;
-const VIRTUAL_OVERSCAN = 5;
-const SEARCH_DEBOUNCE_MS = 300;
-const CACHE_STALE_TIME = 5 * 60 * 1000; // 5 minutes
-const CACHE_GC_TIME = 30 * 60 * 1000; // 30 minutes
+// ============================================================================
+// COMPONENT CONSTANTS AND CONFIGURATION
+// ============================================================================
 
 /**
- * Relationship type metadata for UI display
+ * Virtual scrolling configuration optimized for large relationship datasets
+ * Ensures smooth performance with 1000+ relationships per table
  */
-const RELATIONSHIP_TYPE_META = {
+const VIRTUAL_CONFIG = {
+  itemHeight: 60, // Base height for relationship rows
+  overscan: 10,   // Render extra items for smooth scrolling
+  scrollMargin: 50, // Margin for scroll calculations
+  estimatedItemHeight: 60, // Estimated height for initial render
+} as const;
+
+/**
+ * Query configuration for React Query optimization
+ * Achieves cache hit responses under 50ms per technical requirements
+ */
+const QUERY_CONFIG = {
+  staleTime: 300_000,     // 5 minutes - data considered fresh
+  cacheTime: 900_000,     // 15 minutes - data kept in cache
+  refetchOnWindowFocus: false,
+  refetchOnMount: true,
+  retry: 2,
+  retryDelay: 1000,
+} as const;
+
+/**
+ * Relationship type configurations with enhanced metadata
+ * Provides visual indicators and descriptions for UI components
+ */
+const RELATIONSHIP_TYPES: Record<RelationshipType, {
+  label: string;
+  description: string;
+  color: string;
+  icon: string;
+}> = {
   belongs_to: {
     label: 'Belongs To',
-    description: 'Many-to-one relationship',
-    color: 'blue',
-    icon: '→'
+    description: 'Child record belongs to parent record (many-to-one)',
+    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+    icon: '↗️',
   },
   has_many: {
     label: 'Has Many',
-    description: 'One-to-many relationship',
-    color: 'green',
-    icon: '⇉'
+    description: 'Parent record has many child records (one-to-many)',
+    color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+    icon: '↘️',
   },
   has_one: {
     label: 'Has One',
-    description: 'One-to-one relationship',
-    color: 'purple',
-    icon: '↔'
+    description: 'Parent record has one child record (one-to-one)',
+    color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+    icon: '→',
   },
   many_many: {
-    label: 'Many to Many',
-    description: 'Many-to-many via junction',
-    color: 'orange',
-    icon: '⇄'
-  }
+    label: 'Many To Many',
+    description: 'Many-to-many relationship through junction table',
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+    icon: '↔️',
+  },
 } as const;
 
-/**
- * Validation status indicators
- */
-const VALIDATION_STATUS_META = {
-  valid: { label: 'Valid', color: 'green', icon: '✓' },
-  invalid: { label: 'Invalid', color: 'red', icon: '✗' },
-  pending: { label: 'Validating', color: 'yellow', icon: '⏳' },
-  unchecked: { label: 'Unchecked', color: 'gray', icon: '?' }
-} as const;
+// ============================================================================
+// TABLE COLUMN DEFINITIONS
+// ============================================================================
 
 /**
- * Column helper for table configuration
+ * Creates TanStack Table column definitions for relationship display
+ * Optimized for virtualization and responsive design
  */
-const columnHelper = createColumnHelper<RelationshipSchema>();
+const createRelationshipColumns = (
+  onEdit: (relationship: RelationshipListItem) => void,
+  onDelete: (relationship: RelationshipListItem) => void,
+  onView: (relationship: RelationshipListItem) => void
+): ColumnDef<RelationshipListItem>[] => [
+  {
+    accessorKey: 'name',
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        className="h-auto p-0 font-medium hover:bg-transparent"
+      >
+        Name
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => (
+      <div className="font-medium">
+        {row.getValue('name')}
+        {row.original.alias && (
+          <div className="text-sm text-muted-foreground">
+            Alias: {row.original.alias}
+          </div>
+        )}
+      </div>
+    ),
+    enableSorting: true,
+    enableHiding: false,
+  },
+  {
+    accessorKey: 'type',
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        className="h-auto p-0 font-medium hover:bg-transparent"
+      >
+        Type
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => {
+      const type = row.getValue('type') as RelationshipType;
+      const config = RELATIONSHIP_TYPES[type];
+      return (
+        <Badge variant="secondary" className={config.color}>
+          <span className="mr-1">{config.icon}</span>
+          {config.label}
+        </Badge>
+      );
+    },
+    enableSorting: true,
+    filterFn: 'includesString',
+  },
+  {
+    accessorKey: 'relationshipPath',
+    header: 'Relationship Path',
+    cell: ({ row }) => (
+      <div className="font-mono text-sm">
+        <div className="text-foreground">
+          {row.original.sourceField} → {row.original.targetTable}.{row.original.targetField}
+        </div>
+        {row.original.hasJunctionTable && (
+          <div className="text-muted-foreground text-xs mt-1">
+            via {row.original.junctionTable}
+          </div>
+        )}
+      </div>
+    ),
+    enableSorting: false,
+  },
+  {
+    accessorKey: 'targetTable',
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        className="h-auto p-0 font-medium hover:bg-transparent"
+      >
+        Target Table
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => (
+      <span className="font-medium">{row.getValue('targetTable')}</span>
+    ),
+    enableSorting: true,
+  },
+  {
+    accessorKey: 'isVirtual',
+    header: 'Virtual',
+    cell: ({ row }) => (
+      <Badge variant={row.getValue('isVirtual') ? 'default' : 'secondary'}>
+        {row.getValue('isVirtual') ? 'Virtual' : 'Physical'}
+      </Badge>
+    ),
+    enableSorting: true,
+  },
+  {
+    accessorKey: 'alwaysFetch',
+    header: 'Always Fetch',
+    cell: ({ row }) => (
+      <Badge variant={row.getValue('alwaysFetch') ? 'destructive' : 'outline'}>
+        {row.getValue('alwaysFetch') ? 'Yes' : 'No'}
+      </Badge>
+    ),
+    enableSorting: true,
+  },
+  {
+    accessorKey: 'createdAt',
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        className="h-auto p-0 font-medium hover:bg-transparent"
+      >
+        Created
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => {
+      const date = row.getValue('createdAt') as string;
+      return date ? new Date(date).toLocaleDateString() : '—';
+    },
+    enableSorting: true,
+  },
+  {
+    id: 'actions',
+    header: 'Actions',
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onView(row.original)}
+          className="h-8 w-8 p-0"
+        >
+          <Eye className="h-4 w-4" />
+          <span className="sr-only">View relationship</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onEdit(row.original)}
+          className="h-8 w-8 p-0"
+        >
+          <Edit className="h-4 w-4" />
+          <span className="sr-only">Edit relationship</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onDelete(row.original)}
+          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+        >
+          <Trash2 className="h-4 w-4" />
+          <span className="sr-only">Delete relationship</span>
+        </Button>
+      </div>
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
+];
+
+// ============================================================================
+// LOADING AND ERROR COMPONENTS
+// ============================================================================
 
 /**
- * Interface for filter state
+ * Loading skeleton component for relationship rows
+ * Maintains layout consistency during data fetching
  */
-interface FilterState {
-  type?: RelationshipType;
-  search: string;
-  foreign_service?: string;
-  virtual_only: boolean;
-  validation_state?: string;
-}
+const RelationshipRowSkeleton: React.FC = () => (
+  <div className="flex items-center space-x-4 p-4 border-b">
+    <div className="h-4 bg-muted rounded w-1/4 animate-pulse" />
+    <div className="h-6 bg-muted rounded-full w-20 animate-pulse" />
+    <div className="h-4 bg-muted rounded w-1/3 animate-pulse" />
+    <div className="h-4 bg-muted rounded w-1/5 animate-pulse" />
+    <div className="flex space-x-2 ml-auto">
+      <div className="h-8 w-8 bg-muted rounded animate-pulse" />
+      <div className="h-8 w-8 bg-muted rounded animate-pulse" />
+      <div className="h-8 w-8 bg-muted rounded animate-pulse" />
+    </div>
+  </div>
+);
 
 /**
- * Page props interface for Next.js routing
+ * Loading component for the entire relationship table
  */
-interface RelationshipsPageProps {
-  params: {
-    service: string;
-    table: string;
-  };
-  searchParams: RelationshipSearchParams;
-}
+const RelationshipTableLoading: React.FC = () => (
+  <div className="space-y-0">
+    {Array.from({ length: 10 }).map((_, index) => (
+      <RelationshipRowSkeleton key={index} />
+    ))}
+  </div>
+);
 
 /**
- * Database Relationships Listing Page Component
- * 
- * Provides comprehensive relationship management interface with virtual scrolling,
- * intelligent caching, and advanced filtering capabilities.
+ * Error state component with retry functionality
  */
-export default function RelationshipsPage() {
+const RelationshipTableError: React.FC<{
+  error: Error;
+  onRetry: () => void;
+}> = ({ error, onRetry }) => (
+  <div className="flex flex-col items-center justify-center py-12 text-center">
+    <div className="text-destructive mb-4">
+      <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
+      </svg>
+    </div>
+    <h3 className="text-lg font-semibold mb-2">Failed to load relationships</h3>
+    <p className="text-muted-foreground mb-4 max-w-md">
+      {error.message || 'An unexpected error occurred while loading the relationship data.'}
+    </p>
+    <Button onClick={onRetry} variant="outline">
+      <RefreshCw className="h-4 w-4 mr-2" />
+      Try Again
+    </Button>
+  </div>
+);
+
+/**
+ * Empty state component when no relationships exist
+ */
+const RelationshipTableEmpty: React.FC<{
+  onCreateNew: () => void;
+}> = ({ onCreateNew }) => (
+  <div className="flex flex-col items-center justify-center py-12 text-center">
+    <div className="text-muted-foreground mb-4">
+      <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+      </svg>
+    </div>
+    <h3 className="text-lg font-semibold mb-2">No relationships found</h3>
+    <p className="text-muted-foreground mb-4 max-w-md">
+      This table doesn't have any relationships yet. Create your first relationship to establish connections between tables.
+    </p>
+    <Button onClick={onCreateNew}>
+      <Plus className="h-4 w-4 mr-2" />
+      Create Relationship
+    </Button>
+  </div>
+);
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+/**
+ * Main relationships listing page component
+ * Implements comprehensive relationship management with virtualization
+ */
+const RelationshipsPage: React.FC = () => {
   const router = useRouter();
-  const params = useParams() as { service: string; table: string };
+  const params = useParams() as RelationshipRouteParams;
   const searchParams = useSearchParams();
   
-  // Extract service and table from params
-  const serviceName = params.service;
-  const tableName = params.table;
+  // Extract route parameters with validation
+  const serviceName = Array.isArray(params.serviceName) ? params.serviceName[0] : params.serviceName;
+  const tableName = Array.isArray(params.tableName) ? params.tableName[0] : params.tableName;
+  
+  // Validate required parameters
+  if (!serviceName || !tableName) {
+    notFound();
+  }
 
-  // Initialize search parameters state
-  const [filters, setFilters] = useState<FilterState>({
-    search: searchParams.get('search') || '',
-    type: (searchParams.get('type') as RelationshipType) || undefined,
-    foreign_service: searchParams.get('foreign_service') || undefined,
-    virtual_only: searchParams.get('virtual_only') === 'true',
-    validation_state: searchParams.get('validation_state') || undefined
-  });
+  // ============================================================================
+  // STATE MANAGEMENT
+  // ============================================================================
 
-  // Debounced search value for performance optimization
-  const debouncedSearch = useDebounce(filters.search, SEARCH_DEBOUNCE_MS);
-
-  // Sorting and pagination state
+  // Table state management
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'name', desc: false }
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [itemsPerPage, setItemsPerPage] = useLocalStorage('relationships-per-page', DEFAULT_ITEMS_PER_PAGE);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [globalFilter, setGlobalFilter] = useState<string>('');
   
-  // Virtual scrolling container ref
-  const [tableContainerRef, setTableContainerRef] = useState<HTMLDivElement | null>(null);
+  // UI state
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Parse search parameters for initial state
+  const initialFilter = searchParams.get('filter') || '';
+  const initialType = searchParams.get('type') as RelationshipType | null;
+  const initialSort = searchParams.get('sort') || 'name';
+  const initialOrder = searchParams.get('order') || 'asc';
 
-  // Data fetching with React Query
+  // Initialize filters from URL parameters
+  useEffect(() => {
+    const filters: ColumnFiltersState = [];
+    
+    if (initialFilter) {
+      setGlobalFilter(initialFilter);
+    }
+    
+    if (initialType) {
+      filters.push({ id: 'type', value: initialType });
+    }
+    
+    if (filters.length > 0) {
+      setColumnFilters(filters);
+    }
+    
+    if (initialSort && initialOrder) {
+      setSorting([{ id: initialSort, desc: initialOrder === 'desc' }]);
+    }
+  }, [initialFilter, initialType, initialSort, initialOrder]);
+
+  // ============================================================================
+  // DATA FETCHING WITH REACT QUERY
+  // ============================================================================
+
+  // Use relationship management hook for data operations
   const {
     relationships,
     loading,
     error,
-    refresh,
-    createRelationship,
     deleteRelationship,
-    validateRelationship
+    refreshRelationships,
   } = useRelationshipManagement({
     serviceName,
     tableName,
-    search: debouncedSearch,
-    filters,
-    sorting: sorting[0] || { id: 'name', desc: false },
-    limit: itemsPerPage,
-    staleTime: CACHE_STALE_TIME,
-    gcTime: CACHE_GC_TIME
+    ...QUERY_CONFIG,
   });
 
-  // Table column definitions with advanced features
-  const columns = useMemo<ColumnDef<RelationshipSchema>[]>(() => [
-    columnHelper.accessor('name', {
-      id: 'name',
-      header: ({ column }) => (
-        <div className="flex items-center space-x-2">
-          <span>Relationship Name</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="h-6 w-6 p-0"
-          >
-            {column.getIsSorted() === 'asc' ? '↑' : column.getIsSorted() === 'desc' ? '↓' : '↕'}
-          </Button>
-        </div>
-      ),
-      cell: ({ row }) => {
-        const relationship = row.original;
-        const hasAlias = relationship.alias && relationship.alias !== relationship.name;
-        
-        return (
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <span className="font-medium text-foreground">
-                {relationship.name}
-              </span>
-              {relationship.is_virtual && (
-                <Badge variant="secondary" className="text-xs">
-                  Virtual
-                </Badge>
-              )}
-            </div>
-            {hasAlias && (
-              <div className="text-sm text-muted-foreground">
-                Alias: {relationship.alias}
-              </div>
-            )}
-            {relationship.label && (
-              <div className="text-sm text-muted-foreground">
-                {relationship.label}
-              </div>
-            )}
-          </div>
-        );
-      },
-      enableSorting: true,
-      enableColumnFilter: true
-    }),
+  // Handle manual refresh with loading state
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshRelationships();
+      toast.success('Relationships refreshed successfully');
+    } catch (error) {
+      toast.error('Failed to refresh relationships');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshRelationships]);
 
-    columnHelper.accessor('type', {
-      id: 'type',
-      header: 'Type',
-      cell: ({ row }) => {
-        const type = row.original.type;
-        const meta = RELATIONSHIP_TYPE_META[type];
-        
-        return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg">{meta.icon}</span>
-                  <Badge 
-                    variant="outline"
-                    className={cn(
-                      'text-xs font-medium',
-                      meta.color === 'blue' && 'border-blue-200 bg-blue-50 text-blue-700',
-                      meta.color === 'green' && 'border-green-200 bg-green-50 text-green-700',
-                      meta.color === 'purple' && 'border-purple-200 bg-purple-50 text-purple-700',
-                      meta.color === 'orange' && 'border-orange-200 bg-orange-50 text-orange-700'
-                    )}
-                  >
-                    {meta.label}
-                  </Badge>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{meta.description}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
-      },
-      enableSorting: true,
-      filterFn: 'equals'
-    }),
+  // ============================================================================
+  // TABLE CONFIGURATION
+  // ============================================================================
 
-    columnHelper.accessor('foreign_table', {
-      id: 'foreign_relationship',
-      header: 'Foreign Relationship',
-      cell: ({ row }) => {
-        const relationship = row.original;
-        
-        return (
-          <div className="space-y-1">
-            <div className="text-sm font-medium">
-              {relationship.foreign_service_name || relationship.foreign_service_id}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {relationship.foreign_table}.{relationship.foreign_field}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              ← {relationship.local_field}
-            </div>
-          </div>
-        );
-      },
-      enableSorting: true
-    }),
+  // Navigation handlers
+  const handleView = useCallback((relationship: RelationshipListItem) => {
+    router.push(`/adf-schema/relationships/${relationship.id}`);
+  }, [router]);
 
-    columnHelper.accessor('junction_table', {
-      id: 'junction_info',
-      header: 'Junction Table',
-      cell: ({ row }) => {
-        const relationship = row.original;
-        
-        if (relationship.type !== 'many_many') {
-          return (
-            <span className="text-sm text-muted-foreground">
-              N/A
-            </span>
-          );
-        }
-        
-        if (!relationship.junction_table) {
-          return (
-            <Badge variant="destructive" className="text-xs">
-              Missing
-            </Badge>
-          );
-        }
-        
-        return (
-          <div className="space-y-1">
-            <div className="text-sm font-medium">
-              {relationship.junction_service_name || relationship.junction_service_id}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {relationship.junction_table}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {relationship.junction_local_field} ↔ {relationship.junction_foreign_field}
-            </div>
-          </div>
-        );
-      },
-      enableSorting: false
-    }),
+  const handleEdit = useCallback((relationship: RelationshipListItem) => {
+    router.push(`/adf-schema/relationships/${relationship.id}/edit`);
+  }, [router]);
 
-    columnHelper.accessor('validation_state', {
-      id: 'validation_status',
-      header: 'Status',
-      cell: ({ row }) => {
-        const relationship = row.original;
-        const validationState = relationship.validation_state || 'unchecked';
-        const meta = VALIDATION_STATUS_META[validationState];
-        
-        return (
-          <div className="flex items-center space-x-2">
-            <span className="text-sm">{meta.icon}</span>
-            <Badge 
-              variant={validationState === 'valid' ? 'default' : 
-                      validationState === 'invalid' ? 'destructive' : 
-                      validationState === 'pending' ? 'secondary' : 'outline'}
-              className="text-xs"
-            >
-              {meta.label}
-            </Badge>
-          </div>
-        );
-      },
-      enableSorting: true,
-      filterFn: 'equals'
-    }),
+  const handleDelete = useCallback(async (relationship: RelationshipListItem) => {
+    if (!confirm(`Are you sure you want to delete the relationship "${relationship.name}"?`)) {
+      return;
+    }
 
-    columnHelper.accessor('always_fetch', {
-      id: 'configuration',
-      header: 'Config',
-      cell: ({ row }) => {
-        const relationship = row.original;
-        const configFlags = [];
-        
-        if (relationship.always_fetch) configFlags.push('Always Fetch');
-        if (relationship.flatten) configFlags.push('Flatten');
-        if (relationship.flatten_drop_prefix) configFlags.push('Drop Prefix');
-        
-        return (
-          <div className="space-y-1">
-            {configFlags.map((flag, index) => (
-              <Badge key={index} variant="outline" className="text-xs mr-1">
-                {flag}
-              </Badge>
-            ))}
-            {configFlags.length === 0 && (
-              <span className="text-sm text-muted-foreground">Default</span>
-            )}
-          </div>
-        );
-      },
-      enableSorting: false
-    }),
+    try {
+      await deleteRelationship(relationship.id);
+      toast.success(`Relationship "${relationship.name}" deleted successfully`);
+    } catch (error) {
+      toast.error(`Failed to delete relationship: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, [deleteRelationship]);
 
-    columnHelper.display({
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => {
-        const relationship = row.original;
-        
-        return (
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleEditRelationship(relationship)}
-              className="h-8 px-2"
-            >
-              Edit
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
-                  ⋯
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleValidateRelationship(relationship)}>
-                  Validate
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleViewRelationship(relationship)}>
-                  View Details
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => handleDeleteRelationship(relationship)}
-                  className="text-destructive"
-                >
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        );
-      }
-    })
-  ], []);
+  const handleCreateNew = useCallback(() => {
+    router.push(`/adf-schema/relationships/new?service=${serviceName}&table=${tableName}`);
+  }, [router, serviceName, tableName]);
 
-  // React Table instance with all features
+  // Memoized column definitions to prevent unnecessary re-renders
+  const columns = useMemo(
+    () => createRelationshipColumns(handleEdit, handleDelete, handleView),
+    [handleEdit, handleDelete, handleView]
+  );
+
+  // ============================================================================
+  // TABLE INSTANCE SETUP
+  // ============================================================================
+
   const table = useReactTable({
-    data: relationships || [],
+    data: relationships,
     columns,
     state: {
       sorting,
       columnFilters,
-      globalFilter: debouncedSearch
+      columnVisibility,
+      globalFilter,
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    enableRowSelection: false,
-    manualPagination: false
+    enableRowSelection: true,
   });
 
-  // Virtual scrolling setup
-  const { rows } = table.getRowModel();
+  // ============================================================================
+  // VIRTUALIZATION SETUP
+  // ============================================================================
+
+  // Get filtered and sorted data for virtualization
+  const rows = table.getRowModel().rows;
+  
+  // Virtual container ref for scroll calculations
+  const parentRef = React.useRef<HTMLDivElement>(null);
+
+  // Setup virtual scrolling for large datasets
   const virtualizer = useVirtualizer({
     count: rows.length,
-    getScrollElement: () => tableContainerRef,
-    estimateSize: () => VIRTUAL_ITEM_HEIGHT,
-    overscan: VIRTUAL_OVERSCAN
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => VIRTUAL_CONFIG.itemHeight,
+    overscan: VIRTUAL_CONFIG.overscan,
   });
 
-  // Event handlers
-  const handleCreateRelationship = useCallback(() => {
-    router.push(`/adf-schema/relationships/new?service=${serviceName}&table=${tableName}`);
-  }, [router, serviceName, tableName]);
+  // ============================================================================
+  // URL SYNCHRONIZATION
+  // ============================================================================
 
-  const handleEditRelationship = useCallback((relationship: RelationshipSchema) => {
-    router.push(`/adf-schema/relationships/${relationship.id}?service=${serviceName}&table=${tableName}`);
-  }, [router, serviceName, tableName]);
-
-  const handleViewRelationship = useCallback((relationship: RelationshipSchema) => {
-    router.push(`/adf-schema/relationships/${relationship.id}/view?service=${serviceName}&table=${tableName}`);
-  }, [router, serviceName, tableName]);
-
-  const handleDeleteRelationship = useCallback(async (relationship: RelationshipSchema) => {
-    if (!relationship.id) return;
+  // Update URL parameters when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
     
-    const confirmed = window.confirm(
-      `Are you sure you want to delete the relationship "${relationship.name}"? This action cannot be undone.`
-    );
-    
-    if (confirmed) {
-      try {
-        await deleteRelationship(relationship.id.toString());
-        // Success notification would be handled by the hook
-      } catch (error) {
-        console.error('Failed to delete relationship:', error);
-      }
+    if (globalFilter) {
+      params.set('filter', globalFilter);
     }
-  }, [deleteRelationship]);
-
-  const handleValidateRelationship = useCallback(async (relationship: RelationshipSchema) => {
-    try {
-      const formData = {
-        name: relationship.name,
-        alias: relationship.alias || '',
-        label: relationship.label || '',
-        description: relationship.description || '',
-        type: relationship.type,
-        always_fetch: relationship.always_fetch,
-        is_virtual: relationship.is_virtual,
-        flatten: relationship.flatten,
-        flatten_drop_prefix: relationship.flatten_drop_prefix,
-        local_field: relationship.local_field,
-        foreign_service_id: relationship.foreign_service_id,
-        foreign_table: relationship.foreign_table,
-        foreign_field: relationship.foreign_field,
-        junction_service_id: relationship.junction_service_id || null,
-        junction_table: relationship.junction_table || null,
-        junction_local_field: relationship.junction_local_field || null,
-        junction_foreign_field: relationship.junction_foreign_field || null,
-        on_update: relationship.on_update || 'restrict',
-        on_delete: relationship.on_delete || 'restrict'
-      };
-      
-      await validateRelationship(formData);
-    } catch (error) {
-      console.error('Failed to validate relationship:', error);
+    
+    const typeFilter = columnFilters.find(filter => filter.id === 'type');
+    if (typeFilter?.value) {
+      params.set('type', typeFilter.value as string);
     }
-  }, [validateRelationship]);
-
-  const handleFilterChange = useCallback((key: keyof FilterState, value: any) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
     
-    // Update URL search params
-    const newSearchParams = new URLSearchParams();
-    Object.entries({ ...filters, [key]: value }).forEach(([k, v]) => {
-      if (v && v !== '' && v !== false) {
-        newSearchParams.set(k, String(v));
-      }
-    });
+    if (sorting.length > 0) {
+      params.set('sort', sorting[0].id);
+      params.set('order', sorting[0].desc ? 'desc' : 'asc');
+    }
     
-    router.replace(`/adf-schema/relationships?${newSearchParams.toString()}`, { scroll: false });
-  }, [filters, router]);
+    const paramString = params.toString();
+    const newUrl = paramString ? `?${paramString}` : '';
+    
+    // Update URL without triggering navigation
+    if (window.location.search !== newUrl) {
+      router.replace(`/adf-schema/relationships${newUrl}`, { scroll: false });
+    }
+  }, [globalFilter, columnFilters, sorting, router]);
 
-  const handleClearFilters = useCallback(() => {
-    setFilters({
-      search: '',
-      type: undefined,
-      foreign_service: undefined,
-      virtual_only: false,
-      validation_state: undefined
-    });
-    router.replace('/adf-schema/relationships', { scroll: false });
-  }, [router]);
+  // ============================================================================
+  // RENDER METHODS
+  // ============================================================================
 
-  // Get unique foreign services for filter dropdown
-  const uniqueForeignServices = useMemo(() => {
-    if (!relationships) return [];
-    const services = new Set(relationships.map(r => r.foreign_service_name || r.foreign_service_id));
-    return Array.from(services).filter(Boolean).sort();
-  }, [relationships]);
-
-  // Loading state component
-  if (loading && !relationships) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Error state component
+  // Handle error state
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Alert variant="destructive">
-          <ExclamationTriangleIcon className="h-4 w-4" />
-          <div>
-            <h3 className="font-semibold">Failed to load relationships</h3>
-            <p className="mt-1 text-sm">{error}</p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={refresh}
-              className="mt-3"
-            >
-              <ArrowPathIcon className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
-          </div>
-        </Alert>
+      <div className="container mx-auto px-4 py-6">
+        <RelationshipTableError 
+          error={error} 
+          onRetry={handleRefresh}
+        />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="container mx-auto px-4 py-6 space-y-6">
       {/* Page Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight">
             Database Relationships
           </h1>
-          <p className="text-muted-foreground mt-2">
-            Manage relationships for table <code className="bg-muted px-2 py-1 rounded text-sm">{tableName}</code> in service <code className="bg-muted px-2 py-1 rounded text-sm">{serviceName}</code>
+          <p className="text-muted-foreground">
+            Managing relationships for <span className="font-medium">{serviceName}</span> → <span className="font-medium">{tableName}</span>
           </p>
         </div>
-        <Button onClick={handleCreateRelationship} className="flex items-center space-x-2">
-          <PlusIcon className="h-4 w-4" />
-          <span>Create Relationship</span>
-        </Button>
-      </div>
-
-      {/* Filters and Search */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg flex items-center space-x-2">
-            <FunnelIcon className="h-5 w-5" />
-            <span>Filters & Search</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Search Input */}
-            <div className="relative">
-              <MagnifyingGlassIconSolid className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search relationships..."
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="pl-10"
-              />
-            </div>
-
-            {/* Type Filter */}
-            <Select
-              value={filters.type || ''}
-              onValueChange={(value) => handleFilterChange('type', value || undefined)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
-                {Object.entries(RELATIONSHIP_TYPE_META).map(([type, meta]) => (
-                  <SelectItem key={type} value={type}>
-                    <div className="flex items-center space-x-2">
-                      <span>{meta.icon}</span>
-                      <span>{meta.label}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Foreign Service Filter */}
-            <Select
-              value={filters.foreign_service || ''}
-              onValueChange={(value) => handleFilterChange('foreign_service', value || undefined)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Services" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Services</SelectItem>
-                {uniqueForeignServices.map((service) => (
-                  <SelectItem key={service} value={service}>
-                    {service}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Validation Status Filter */}
-            <Select
-              value={filters.validation_state || ''}
-              onValueChange={(value) => handleFilterChange('validation_state', value || undefined)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
-                {Object.entries(VALIDATION_STATUS_META).map(([status, meta]) => (
-                  <SelectItem key={status} value={status}>
-                    <div className="flex items-center space-x-2">
-                      <span>{meta.icon}</span>
-                      <span>{meta.label}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <label className="flex items-center space-x-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={filters.virtual_only}
-                  onChange={(e) => handleFilterChange('virtual_only', e.target.checked)}
-                  className="rounded border-gray-300"
-                />
-                <span>Virtual relationships only</span>
-              </label>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleClearFilters}
-                className="h-8"
-              >
-                Clear Filters
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refresh}
-                disabled={loading}
-                className="h-8"
-              >
-                <ArrowPathIcon className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-                Refresh
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Results Summary */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          {relationships ? (
-            <>
-              Showing {table.getFilteredRowModel().rows.length} of {relationships.length} relationships
-              {debouncedSearch && ` matching "${debouncedSearch}"`}
-            </>
-          ) : (
-            'Loading relationships...'
-          )}
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-muted-foreground">Rows per page:</span>
-          <Select
-            value={itemsPerPage.toString()}
-            onValueChange={(value) => setItemsPerPage(Number(value))}
+        
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={loading || isRefreshing}
           >
-            <SelectTrigger className="w-20">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ITEMS_PER_PAGE_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option.toString()}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <RefreshCw className={`h-4 w-4 mr-2 ${(loading || isRefreshing) ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          
+          <Button onClick={handleCreateNew}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Relationship
+          </Button>
         </div>
       </div>
 
-      {/* Relationships Table with Virtual Scrolling */}
-      <Card>
-        <CardContent className="p-0">
-          {relationships && relationships.length > 0 ? (
-            <div 
-              ref={setTableContainerRef}
-              className="overflow-auto max-h-[600px] border rounded-lg"
-              style={{ height: Math.min(600, rows.length * VIRTUAL_ITEM_HEIGHT + 100) }}
-            >
-              <table className="w-full">
-                <thead className="bg-muted/50 sticky top-0 z-10">
-                  {table.getHeaderGroups().map(headerGroup => (
-                    <tr key={headerGroup.id}>
-                      {headerGroup.headers.map(header => (
-                        <th 
-                          key={header.id}
-                          className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider border-b"
-                        >
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(header.column.columnDef.header, header.getContext())
-                          }
-                        </th>
-                      ))}
-                    </tr>
-                  ))}
-                </thead>
-                <tbody 
-                  className="relative"
-                  style={{ height: virtualizer.getTotalSize() }}
-                >
-                  {virtualizer.getVirtualItems().map(virtualRow => {
-                    const row = rows[virtualRow.index];
-                    return (
-                      <tr
-                        key={row.id}
-                        className="hover:bg-muted/50 cursor-pointer border-b transition-colors"
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: `${virtualRow.size}px`,
-                          transform: `translateY(${virtualRow.start}px)`
-                        }}
-                        onClick={() => handleEditRelationship(row.original)}
-                      >
-                        {row.getVisibleCells().map(cell => (
-                          <td 
-                            key={cell.id}
-                            className="px-4 py-3 text-sm"
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <InformationCircleIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">
-                No relationships found
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {debouncedSearch || Object.values(filters).some(v => v && v !== '')
-                  ? 'No relationships match your current filters.'
-                  : 'This table has no relationships configured yet.'
-                }
-              </p>
-              <div className="space-x-2">
-                {(debouncedSearch || Object.values(filters).some(v => v && v !== '')) && (
-                  <Button variant="outline" onClick={handleClearFilters}>
-                    Clear Filters
-                  </Button>
-                )}
-                <Button onClick={handleCreateRelationship}>
-                  <PlusIcon className="h-4 w-4 mr-2" />
-                  Create First Relationship
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Search and Filters */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search relationships..."
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <select
+            value={columnFilters.find(f => f.id === 'type')?.value || ''}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value) {
+                setColumnFilters(prev => [
+                  ...prev.filter(f => f.id !== 'type'),
+                  { id: 'type', value }
+                ]);
+              } else {
+                setColumnFilters(prev => prev.filter(f => f.id !== 'type'));
+              }
+            }}
+            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="">All Types</option>
+            {Object.entries(RELATIONSHIP_TYPES).map(([value, config]) => (
+              <option key={value} value={value}>
+                {config.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
-      {/* Performance indicator for development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="text-xs text-muted-foreground text-center">
-          Performance: {relationships?.length || 0} relationships, virtual scrolling enabled
-          {loading && ' • Loading...'}
+      {/* Relationship Table */}
+      <div className="rounded-md border">
+        {/* Table Header */}
+        <div className="border-b bg-muted/50">
+          <div className="grid grid-cols-7 gap-4 p-4">
+            {table.getHeaderGroups().map(headerGroup =>
+              headerGroup.headers.map(header => (
+                <div key={header.id} className="text-sm font-medium text-muted-foreground">
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())
+                  }
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Table Body with Virtualization */}
+        {loading ? (
+          <RelationshipTableLoading />
+        ) : rows.length === 0 ? (
+          <RelationshipTableEmpty onCreateNew={handleCreateNew} />
+        ) : (
+          <div
+            ref={parentRef}
+            className="h-[600px] overflow-auto"
+            style={{
+              contain: 'strict',
+            }}
+          >
+            <div
+              style={{
+                height: `${virtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {virtualizer.getVirtualItems().map(virtualRow => {
+                const row = rows[virtualRow.index];
+                return (
+                  <div
+                    key={row.id}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                    className="border-b last:border-b-0"
+                  >
+                    <div className="grid grid-cols-7 gap-4 p-4 items-center h-full">
+                      {row.getVisibleCells().map(cell => (
+                        <div key={cell.id}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Table Footer with Summary */}
+      {!loading && relationships.length > 0 && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div>
+            Showing {rows.length} of {relationships.length} relationships
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {selectedRows.size > 0 && (
+              <span>{selectedRows.size} selected</span>
+            )}
+            
+            <div className="flex items-center gap-2">
+              {Object.entries(
+                relationships.reduce((acc, rel) => {
+                  acc[rel.type] = (acc[rel.type] || 0) + 1;
+                  return acc;
+                }, {} as Record<RelationshipType, number>)
+              ).map(([type, count]) => (
+                <Badge key={type} variant="outline" className="text-xs">
+                  {RELATIONSHIP_TYPES[type as RelationshipType].label}: {count}
+                </Badge>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
-}
+};
+
+// ============================================================================
+// SUSPENSE WRAPPER FOR ERROR BOUNDARY
+// ============================================================================
+
+/**
+ * Relationships page with Suspense boundary for error handling
+ * Ensures graceful loading states and error recovery
+ */
+const RelationshipsPageWithSuspense: React.FC = () => (
+  <Suspense fallback={<RelationshipTableLoading />}>
+    <RelationshipsPage />
+  </Suspense>
+);
+
+export default RelationshipsPageWithSuspense;
