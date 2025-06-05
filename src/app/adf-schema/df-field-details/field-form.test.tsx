@@ -1,984 +1,1617 @@
 /**
- * Comprehensive Vitest test suite for field form component
+ * @fileoverview Comprehensive Vitest test suite for the field form component
  * 
  * Tests form validation, field type-based control enabling/disabling, submission workflows
  * for both create and edit modes, integration with function use components, and accessibility
  * compliance. Includes Mock Service Worker setup for API interaction testing.
  * 
- * Implements React Testing Library integration per Section 3.2.7 compatibility requirements
- * and MSW mock service worker configuration per Section 3.2.4 HTTP client patterns.
+ * Migrated from Angular TestBed and Karma to Vitest with React Testing Library per
+ * Section 4.7.1.3 testing infrastructure. Replaces Angular HTTP testing with MSW for
+ * API mocking per Section 3.2.4 HTTP client integration.
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+ / Vitest 2.1.0
  */
 
-import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach, vi } from 'vitest'
-import { 
-  render, 
-  screen, 
-  fireEvent, 
-  waitFor, 
-  within,
-  act,
-  cleanup
-} from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { axe, toHaveNoViolations } from 'jest-axe'
-import { setupServer } from 'msw/node'
-import { rest } from 'msw'
+import { describe, it, expect, beforeEach, afterEach, vi, type MockedFunction } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { renderWithProviders, accessibilityUtils, headlessUIUtils } from '../../../test/utils/test-utils';
+import { formTestUtils } from '../../../test/utils/form-test-helpers';
+import { server } from '../../../test/mocks/server';
+import { rest } from 'msw';
+import { mockSchemaFields, mockErrorResponses } from '../../../test/mocks/mock-data';
 
-// Component imports
-import FieldForm from './field-form'
+// Component and types imports
+import FieldForm from './field-form';
 import type { 
+  DatabaseSchemaFieldType, 
   FieldFormData, 
-  DatabaseSchemaFieldType,
-  FieldType,
-  ReferenceAction,
-  FIELD_TYPES,
-  REFERENCE_ACTIONS 
-} from './df-field-details.types'
-
-// Test utilities and mocks
-import { createTestQueryClient, renderWithProviders } from '@/test/utils/test-utils'
-import { createMockFieldData, createMockDatabaseService } from '@/test/mocks/mock-data'
-import { createErrorResponse } from '@/test/mocks/error-responses'
-
-// Add jest-axe matcher
-expect.extend(toHaveNoViolations)
+  FieldUpdateFormData,
+  FieldFormReturn 
+} from './df-field-details.types';
 
 // Mock Next.js router
-const mockPush = vi.fn()
-const mockBack = vi.fn()
-const mockReplace = vi.fn()
-
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: mockPush,
-    back: mockBack,
-    replace: mockReplace
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    refresh: vi.fn(),
   }),
   useParams: () => ({
-    service: 'test-service',
-    table: 'test-table',
-    fieldId: undefined
+    tableId: 'test-table',
+    fieldId: 'test-field',
+    service: 'mysql_production'
   }),
-  useSearchParams: () => new URLSearchParams()
-}))
+  useSearchParams: () => new URLSearchParams(),
+}));
 
-// MSW server setup for API mocking
-const server = setupServer(
-  // Field creation endpoint
-  rest.post('/api/v2/:service/_schema/:table/_field', (req, res, ctx) => {
-    return res(
-      ctx.status(201),
-      ctx.json({
-        success: true,
-        resource: [createMockFieldData()]
-      })
-    )
-  }),
+// Mock React Query hooks
+const mockUseFieldMutation = vi.fn();
+const mockUseFieldQuery = vi.fn();
 
-  // Field update endpoint
-  rest.patch('/api/v2/:service/_schema/:table/_field/:fieldName', (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json({
-        success: true,
-        resource: [createMockFieldData({ name: req.params.fieldName as string })]
-      })
-    )
-  }),
+vi.mock('../../../hooks/use-field-management', () => ({
+  useCreateFieldMutation: () => mockUseFieldMutation(),
+  useUpdateFieldMutation: () => mockUseFieldMutation(),
+  useFieldQuery: () => mockUseFieldQuery(),
+}));
 
-  // Field validation endpoint
-  rest.post('/api/v2/:service/_schema/:table/_field/_validate', (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json({ valid: true })
-    )
-  }),
+// Mock function use component
+vi.mock('../df-function-use/function-use-form', () => ({
+  default: ({ onFunctionsChange, value }: any) => (
+    <div data-testid="function-use-form">
+      <button 
+        data-testid="add-function"
+        onClick={() => onFunctionsChange([...value, { function: 'CONCAT', use: ['create'] }])}
+      >
+        Add Function
+      </button>
+      {value?.map((fn: any, index: number) => (
+        <div key={index} data-testid={`function-${index}`}>
+          {fn.function}: {fn.use.join(', ')}
+        </div>
+      ))}
+    </div>
+  )
+}));
 
-  // Reference tables endpoint
-  rest.get('/api/v2/:service/_schema', (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json({
-        resource: [
-          { name: 'users', label: 'Users' },
-          { name: 'products', label: 'Products' },
-          { name: 'orders', label: 'Orders' }
-        ]
-      })
-    )
-  }),
+// =============================================================================
+// TEST DATA AND FIXTURES
+// =============================================================================
 
-  // Reference fields endpoint
-  rest.get('/api/v2/:service/_schema/:table', (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json({
-        resource: [
-          { name: 'id', type: 'integer', isPrimaryKey: true },
-          { name: 'name', type: 'string' },
-          { name: 'email', type: 'string' }
-        ]
-      })
-    )
-  })
-)
+const mockFieldData: DatabaseSchemaFieldType = {
+  ...mockSchemaFields[0],
+  name: 'test_field',
+  type: 'string',
+  label: 'Test Field',
+  description: 'A test field for form testing',
+  allowNull: false,
+  required: true,
+  length: 255,
+  isPrimaryKey: false,
+  isForeignKey: false,
+  isUnique: false,
+  autoIncrement: false,
+  default: null,
+  validation: null,
+  dbFunction: null,
+  alias: null,
+  dbType: 'VARCHAR',
+  fixedLength: false,
+  isAggregate: false,
+  isVirtual: false,
+  native: null,
+  picklist: null,
+  precision: null,
+  refField: null,
+  refTable: null,
+  refOnDelete: null,
+  refOnUpdate: null,
+  scale: 0,
+  supportsMultibyte: true,
+  value: [],
+};
 
-beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'error' })
-})
+const mockCreateFieldData: FieldFormData = {
+  name: 'new_field',
+  type: 'string',
+  label: 'New Test Field',
+  allowNull: false,
+  required: true,
+  description: 'A new field for testing',
+  default: null,
+  length: 100,
+  precision: null,
+  scale: 0,
+};
 
-afterEach(() => {
-  server.resetHandlers()
-  cleanup()
-  vi.clearAllMocks()
-})
+const mockUpdateFieldData: FieldUpdateFormData = {
+  name: 'updated_field',
+  type: 'string',
+  label: 'Updated Test Field',
+  description: 'An updated field for testing',
+  length: 200,
+};
 
-afterAll(() => {
-  server.close()
-})
+const mockForeignKeyField: DatabaseSchemaFieldType = {
+  ...mockFieldData,
+  name: 'user_id',
+  type: 'integer',
+  label: 'User ID',
+  isForeignKey: true,
+  refTable: 'users',
+  refField: 'id',
+  refOnDelete: 'CASCADE',
+  refOnUpdate: 'CASCADE',
+};
+
+const mockFunctionUseField: DatabaseSchemaFieldType = {
+  ...mockFieldData,
+  name: 'computed_field',
+  type: 'string',
+  label: 'Computed Field',
+  dbFunction: [
+    { function: 'CONCAT', use: ['create', 'update'] },
+    { function: 'UPPER', use: ['read'] }
+  ],
+};
+
+// =============================================================================
+// MSW HANDLERS FOR API MOCKING
+// =============================================================================
+
+const setupAPIHandlers = () => {
+  // Field creation handler
+  server.use(
+    rest.post('/api/v2/:service/schema/:tableId/field', (req, res, ctx) => {
+      return res(
+        ctx.status(201),
+        ctx.json({
+          resource: { ...mockFieldData, ...(req.body as any) }
+        })
+      );
+    })
+  );
+
+  // Field update handler
+  server.use(
+    rest.patch('/api/v2/:service/schema/:tableId/field/:fieldId', (req, res, ctx) => {
+      return res(
+        ctx.status(200),
+        ctx.json({
+          resource: { ...mockFieldData, ...(req.body as any) }
+        })
+      );
+    })
+  );
+
+  // Field detail handler
+  server.use(
+    rest.get('/api/v2/:service/schema/:tableId/field/:fieldId', (req, res, ctx) => {
+      return res(
+        ctx.status(200),
+        ctx.json({
+          resource: mockFieldData
+        })
+      );
+    })
+  );
+
+  // Validation error handler
+  server.use(
+    rest.post('/api/v2/:service/schema/:tableId/field/validate', (req, res, ctx) => {
+      const body = req.body as any;
+      if (body.name === 'duplicate_name') {
+        return res(
+          ctx.status(400),
+          ctx.json(mockErrorResponses.validationError)
+        );
+      }
+      return res(ctx.status(200), ctx.json({ valid: true }));
+    })
+  );
+
+  // Database functions handler
+  server.use(
+    rest.get('/api/v2/:service/schema/:tableId/functions', (req, res, ctx) => {
+      return res(
+        ctx.status(200),
+        ctx.json({
+          resource: [
+            { name: 'CONCAT', description: 'Concatenate strings' },
+            { name: 'UPPER', description: 'Convert to uppercase' },
+            { name: 'NOW', description: 'Current timestamp' },
+            { name: 'SUM', description: 'Sum values' }
+          ]
+        })
+      );
+    })
+  );
+
+  // Foreign key tables handler
+  server.use(
+    rest.get('/api/v2/:service/schema/tables', (req, res, ctx) => {
+      return res(
+        ctx.status(200),
+        ctx.json({
+          resource: [
+            { name: 'users', label: 'Users' },
+            { name: 'roles', label: 'Roles' },
+            { name: 'categories', label: 'Categories' }
+          ]
+        })
+      );
+    })
+  );
+};
+
+// =============================================================================
+// TEST SETUP AND UTILITIES
+// =============================================================================
 
 describe('FieldForm Component', () => {
-  const defaultProps = {
-    serviceName: 'test-service',
-    tableName: 'test-table',
-    isEditMode: false,
-    onSubmit: vi.fn(),
-    onCancel: vi.fn()
-  }
+  let user: ReturnType<typeof userEvent.setup>;
 
-  const editModeProps = {
-    ...defaultProps,
-    isEditMode: true,
-    fieldName: 'existing-field',
-    initialData: createMockFieldData({
-      name: 'existing-field',
-      label: 'Existing Field',
-      type: 'string',
-      required: true
-    })
-  }
+  beforeEach(() => {
+    user = userEvent.setup();
+    setupAPIHandlers();
+    
+    // Reset mocks
+    vi.clearAllMocks();
+    
+    // Setup default mock implementations
+    mockUseFieldMutation.mockReturnValue({
+      mutate: vi.fn(),
+      isLoading: false,
+      error: null,
+      isSuccess: false,
+    });
 
-  // Test utilities
-  const renderFieldForm = (props = defaultProps) => {
-    return renderWithProviders(<FieldForm {...props} />)
-  }
+    mockUseFieldQuery.mockReturnValue({
+      data: { resource: mockFieldData },
+      isLoading: false,
+      error: null,
+      isSuccess: true,
+    });
+  });
 
-  const fillBasicFieldInfo = async (user: ReturnType<typeof userEvent.setup>) => {
-    await user.type(screen.getByLabelText(/field name/i), 'test_field')
-    await user.type(screen.getByLabelText(/field label/i), 'Test Field')
-    await user.selectOptions(screen.getByLabelText(/field type/i), 'string')
-  }
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
 
-  const expectFieldToBeEnabled = (fieldName: string) => {
-    const field = screen.getByLabelText(new RegExp(fieldName, 'i'))
-    expect(field).not.toBeDisabled()
-  }
+  // =============================================================================
+  // BASIC RENDERING AND STRUCTURE TESTS
+  // =============================================================================
 
-  const expectFieldToBeDisabled = (fieldName: string) => {
-    const field = screen.getByLabelText(new RegExp(fieldName, 'i'))
-    expect(field).toBeDisabled()
-  }
+  describe('Component Rendering', () => {
+    it('renders field form in create mode with all required fields', async () => {
+      const { container } = renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
 
-  describe('Form Rendering and Initial State', () => {
-    it('renders all required form fields in create mode', () => {
-      renderFieldForm()
+      // Verify form structure
+      expect(screen.getByRole('form')).toBeInTheDocument();
+      expect(screen.getByLabelText(/field name/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/field type/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/display label/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /create field/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
 
-      // Basic information fields
-      expect(screen.getByLabelText(/field name/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/field label/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/field type/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/description/i)).toBeInTheDocument()
-
-      // Constraint fields
-      expect(screen.getByLabelText(/required/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/allow null/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/unique/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/primary key/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/auto increment/i)).toBeInTheDocument()
-
-      // Type-specific fields
-      expect(screen.getByLabelText(/length/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/precision/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/scale/i)).toBeInTheDocument()
-
-      // Action buttons
-      expect(screen.getByRole('button', { name: /create field/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument()
-    })
-
-    it('renders with initial data in edit mode', () => {
-      renderFieldForm(editModeProps)
-
-      expect(screen.getByDisplayValue('existing-field')).toBeInTheDocument()
-      expect(screen.getByDisplayValue('Existing Field')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /update field/i })).toBeInTheDocument()
-    })
-
-    it('renders all field type options', () => {
-      renderFieldForm()
+      // Verify accessibility structure
+      const form = screen.getByRole('form');
+      expect(form).toHaveAttribute('noValidate');
       
-      const typeSelect = screen.getByLabelText(/field type/i)
-      FIELD_TYPES.forEach(type => {
-        expect(within(typeSelect).getByRole('option', { name: new RegExp(type, 'i') }))
-          .toBeInTheDocument()
-      })
-    })
+      // Check for proper ARIA labels
+      const nameField = screen.getByLabelText(/field name/i);
+      expect(accessibilityUtils.hasAriaLabel(nameField)).toBe(true);
+      expect(accessibilityUtils.isKeyboardAccessible(nameField)).toBe(true);
+    });
 
-    it('renders all reference action options when foreign key is enabled', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+    it('renders field form in edit mode with populated data', async () => {
+      mockUseFieldQuery.mockReturnValue({
+        data: { resource: mockFieldData },
+        isLoading: false,
+        error: null,
+        isSuccess: true,
+      });
 
-      // Enable foreign key to show reference actions
-      await user.click(screen.getByLabelText(/foreign key/i))
-      
+      renderWithProviders(
+        <FieldForm 
+          mode="edit" 
+          fieldId="test-field"
+          onSubmit={vi.fn()} 
+          onCancel={vi.fn()} 
+        />
+      );
+
       await waitFor(() => {
-        const deleteActionSelect = screen.getByLabelText(/on delete/i)
-        const updateActionSelect = screen.getByLabelText(/on update/i)
+        expect(screen.getByDisplayValue(mockFieldData.name)).toBeInTheDocument();
+        expect(screen.getByDisplayValue(mockFieldData.label)).toBeInTheDocument();
+      });
 
-        REFERENCE_ACTIONS.forEach(action => {
-          expect(within(deleteActionSelect).getByRole('option', { name: action }))
-            .toBeInTheDocument()
-          expect(within(updateActionSelect).getByRole('option', { name: action }))
-            .toBeInTheDocument()
-        })
-      })
-    })
-  })
+      expect(screen.getByRole('button', { name: /update field/i })).toBeInTheDocument();
+    });
 
-  describe('Field Type-Based Control Enabling/Disabling', () => {
-    it('enables length field for string types', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+    it('displays loading state while fetching field data', () => {
+      mockUseFieldQuery.mockReturnValue({
+        data: null,
+        isLoading: true,
+        error: null,
+        isSuccess: false,
+      });
 
-      await user.selectOptions(screen.getByLabelText(/field type/i), 'string')
-      
-      await waitFor(() => {
-        expectFieldToBeEnabled('length')
-      })
-    })
+      renderWithProviders(
+        <FieldForm 
+          mode="edit" 
+          fieldId="test-field"
+          onSubmit={vi.fn()} 
+          onCancel={vi.fn()} 
+        />
+      );
 
-    it('disables length field for non-string types', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+      expect(screen.getByText(/loading/i)).toBeInTheDocument();
+      expect(screen.queryByRole('form')).not.toBeInTheDocument();
+    });
 
-      await user.selectOptions(screen.getByLabelText(/field type/i), 'boolean')
-      
-      await waitFor(() => {
-        expectFieldToBeDisabled('length')
-      })
-    })
+    it('displays error state when field data fails to load', () => {
+      mockUseFieldQuery.mockReturnValue({
+        data: null,
+        isLoading: false,
+        error: { message: 'Failed to load field data' },
+        isSuccess: false,
+      });
 
-    it('enables precision and scale for decimal types', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+      renderWithProviders(
+        <FieldForm 
+          mode="edit" 
+          fieldId="test-field"
+          onSubmit={vi.fn()} 
+          onCancel={vi.fn()} 
+        />
+      );
 
-      await user.selectOptions(screen.getByLabelText(/field type/i), 'decimal')
-      
-      await waitFor(() => {
-        expectFieldToBeEnabled('precision')
-        expectFieldToBeEnabled('scale')
-      })
-    })
+      expect(screen.getByText(/failed to load field data/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+    });
+  });
 
-    it('disables precision and scale for non-decimal types', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      await user.selectOptions(screen.getByLabelText(/field type/i), 'string')
-      
-      await waitFor(() => {
-        expectFieldToBeDisabled('precision')
-        expectFieldToBeDisabled('scale')
-      })
-    })
-
-    it('enables auto increment only for integer types', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      // Test integer type enables auto increment
-      await user.selectOptions(screen.getByLabelText(/field type/i), 'integer')
-      
-      await waitFor(() => {
-        expectFieldToBeEnabled('auto increment')
-      })
-
-      // Test string type disables auto increment
-      await user.selectOptions(screen.getByLabelText(/field type/i), 'string')
-      
-      await waitFor(() => {
-        expectFieldToBeDisabled('auto increment')
-      })
-    })
-
-    it('enables foreign key fields when foreign key toggle is checked', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      await user.click(screen.getByLabelText(/foreign key/i))
-      
-      await waitFor(() => {
-        expectFieldToBeEnabled('reference table')
-        expectFieldToBeEnabled('reference field')
-        expectFieldToBeEnabled('on delete')
-        expectFieldToBeEnabled('on update')
-      })
-    })
-
-    it('disables foreign key fields when foreign key toggle is unchecked', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      // Foreign key should be disabled by default
-      expectFieldToBeDisabled('reference table')
-      expectFieldToBeDisabled('reference field')
-      expectFieldToBeDisabled('on delete')
-      expectFieldToBeDisabled('on update')
-    })
-  })
+  // =============================================================================
+  // FORM VALIDATION TESTS
+  // =============================================================================
 
   describe('Form Validation', () => {
-    it('validates required field name', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+    it('validates required fields and shows appropriate error messages', async () => {
+      const onSubmit = vi.fn();
+      
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={onSubmit} onCancel={vi.fn()} />
+      );
 
-      // Try to submit without field name
-      await user.click(screen.getByRole('button', { name: /create field/i }))
-
-      await waitFor(() => {
-        expect(screen.getByText(/field name is required/i)).toBeInTheDocument()
-      })
-    })
-
-    it('validates field name format', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      // Enter invalid field name
-      await user.type(screen.getByLabelText(/field name/i), '123invalid')
-      await user.tab() // Trigger validation
+      // Try to submit empty form
+      const submitButton = screen.getByRole('button', { name: /create field/i });
+      await user.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/field name must start with a letter/i)).toBeInTheDocument()
-      })
-    })
+        expect(screen.getByText(/field name is required/i)).toBeInTheDocument();
+        expect(screen.getByText(/field type is required/i)).toBeInTheDocument();
+        expect(screen.getByText(/field label is required/i)).toBeInTheDocument();
+      });
 
-    it('validates required field label', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
 
-      await user.type(screen.getByLabelText(/field name/i), 'valid_field')
-      await user.click(screen.getByRole('button', { name: /create field/i }))
+    it('validates field name format and uniqueness', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
 
-      await waitFor(() => {
-        expect(screen.getByText(/field label is required/i)).toBeInTheDocument()
-      })
-    })
+      const nameField = screen.getByLabelText(/field name/i);
 
-    it('validates length constraints for numeric fields', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      await user.selectOptions(screen.getByLabelText(/field type/i), 'string')
-      await user.type(screen.getByLabelText(/length/i), '0')
-      await user.tab()
+      // Test invalid characters
+      await user.type(nameField, 'invalid-name!@#');
+      await user.tab();
 
       await waitFor(() => {
-        expect(screen.getByText(/length must be greater than 0/i)).toBeInTheDocument()
-      })
-    })
+        expect(screen.getByText(/field name must be a valid identifier/i)).toBeInTheDocument();
+      });
 
-    it('validates precision and scale relationship for decimal types', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      await user.selectOptions(screen.getByLabelText(/field type/i), 'decimal')
-      await user.type(screen.getByLabelText(/precision/i), '5')
-      await user.type(screen.getByLabelText(/scale/i), '10')
-      await user.tab()
+      // Test duplicate name
+      await user.clear(nameField);
+      await user.type(nameField, 'duplicate_name');
+      await user.tab();
 
       await waitFor(() => {
-        expect(screen.getByText(/scale cannot be greater than precision/i)).toBeInTheDocument()
-      })
-    })
+        expect(screen.getByText(/field name already exists/i)).toBeInTheDocument();
+      });
 
-    it('validates auto increment requirements', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      await user.selectOptions(screen.getByLabelText(/field type/i), 'integer')
-      await user.click(screen.getByLabelText(/auto increment/i))
-      await user.click(screen.getByRole('button', { name: /create field/i }))
+      // Test valid name
+      await user.clear(nameField);
+      await user.type(nameField, 'valid_field_name');
+      await user.tab();
 
       await waitFor(() => {
-        expect(screen.getByText(/auto increment requires the field to be a primary key/i))
-          .toBeInTheDocument()
-      })
-    })
+        expect(screen.queryByText(/field name must be a valid identifier/i)).not.toBeInTheDocument();
+      });
+    });
 
-    it('validates foreign key requirements', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+    it('validates field length constraints based on type', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
 
-      await fillBasicFieldInfo(user)
-      await user.click(screen.getByLabelText(/foreign key/i))
-      await user.click(screen.getByRole('button', { name: /create field/i }))
+      const typeField = screen.getByLabelText(/field type/i);
+      const lengthField = screen.getByLabelText(/length/i);
 
-      await waitFor(() => {
-        expect(screen.getByText(/foreign key requires both reference table and field/i))
-          .toBeInTheDocument()
-      })
-    })
-
-    it('validates primary key cannot allow null', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      await fillBasicFieldInfo(user)
-      await user.click(screen.getByLabelText(/primary key/i))
-      await user.click(screen.getByLabelText(/allow null/i))
-      await user.click(screen.getByRole('button', { name: /create field/i }))
+      // Select string type
+      await user.selectOptions(typeField, 'string');
+      
+      // Test invalid length
+      await user.type(lengthField, '0');
+      await user.tab();
 
       await waitFor(() => {
-        expect(screen.getByText(/primary key fields cannot allow null values/i))
-          .toBeInTheDocument()
-      })
-    })
+        expect(screen.getByText(/length must be greater than 0/i)).toBeInTheDocument();
+      });
 
-    it('validates required fields cannot allow null', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      await fillBasicFieldInfo(user)
-      await user.click(screen.getByLabelText(/required/i))
-      await user.click(screen.getByLabelText(/allow null/i))
-      await user.click(screen.getByRole('button', { name: /create field/i }))
+      // Test valid length
+      await user.clear(lengthField);
+      await user.type(lengthField, '255');
+      await user.tab();
 
       await waitFor(() => {
-        expect(screen.getByText(/required fields cannot allow null values/i))
-          .toBeInTheDocument()
-      })
-    })
+        expect(screen.queryByText(/length must be greater than 0/i)).not.toBeInTheDocument();
+      });
+    });
 
-    it('shows real-time validation for field name uniqueness', async () => {
-      // Mock server response for duplicate field name
-      server.use(
-        rest.post('/api/v2/:service/_schema/:table/_field/_validate', (req, res, ctx) => {
-          return res(
-            ctx.status(409),
-            ctx.json(createErrorResponse(409, 'Field name already exists'))
-          )
-        })
-      )
+    it('validates decimal precision and scale for numeric types', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
 
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      await user.type(screen.getByLabelText(/field name/i), 'existing_field')
-      await user.tab()
+      const typeField = screen.getByLabelText(/field type/i);
+      
+      // Select decimal type
+      await user.selectOptions(typeField, 'decimal');
 
       await waitFor(() => {
-        expect(screen.getByText(/field name already exists/i)).toBeInTheDocument()
-      })
-    })
-  })
+        expect(screen.getByLabelText(/precision/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/scale/i)).toBeInTheDocument();
+      });
+
+      const precisionField = screen.getByLabelText(/precision/i);
+      const scaleField = screen.getByLabelText(/scale/i);
+
+      // Test scale greater than precision
+      await user.type(precisionField, '5');
+      await user.type(scaleField, '8');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.getByText(/scale cannot be greater than precision/i)).toBeInTheDocument();
+      });
+
+      // Test valid precision and scale
+      await user.clear(scaleField);
+      await user.type(scaleField, '2');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.queryByText(/scale cannot be greater than precision/i)).not.toBeInTheDocument();
+      });
+    });
+
+    it('validates foreign key constraints', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const isForeignKeyToggle = screen.getByRole('switch', { name: /foreign key/i });
+      
+      // Enable foreign key
+      await user.click(isForeignKeyToggle);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/referenced table/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/referenced field/i)).toBeInTheDocument();
+      });
+
+      // Try to submit without specifying referenced table
+      const submitButton = screen.getByRole('button', { name: /create field/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/referenced table is required/i)).toBeInTheDocument();
+      });
+    });
+
+    it('performs real-time validation under 100ms performance requirement', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const nameField = screen.getByLabelText(/field name/i);
+
+      // Measure validation performance
+      const startTime = performance.now();
+      await user.type(nameField, 'test_field');
+      await user.tab(); // Trigger validation
+
+      await waitFor(() => {
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        
+        // Validation should complete under 100ms per requirements
+        expect(duration).toBeLessThan(100);
+      });
+    });
+  });
+
+  // =============================================================================
+  // FIELD TYPE-BASED CONTROL TESTS
+  // =============================================================================
+
+  describe('Field Type-Based Control Enabling/Disabling', () => {
+    it('shows/hides appropriate controls based on string field type', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const typeField = screen.getByLabelText(/field type/i);
+      
+      // Select string type
+      await user.selectOptions(typeField, 'string');
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/length/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/fixed length/i)).toBeInTheDocument();
+        expect(screen.queryByLabelText(/precision/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/scale/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/auto increment/i)).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows/hides appropriate controls based on integer field type', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const typeField = screen.getByLabelText(/field type/i);
+      
+      // Select integer type
+      await user.selectOptions(typeField, 'integer');
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/auto increment/i)).toBeInTheDocument();
+        expect(screen.queryByLabelText(/length/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/precision/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/scale/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/fixed length/i)).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows/hides appropriate controls based on decimal field type', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const typeField = screen.getByLabelText(/field type/i);
+      
+      // Select decimal type
+      await user.selectOptions(typeField, 'decimal');
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/precision/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/scale/i)).toBeInTheDocument();
+        expect(screen.queryByLabelText(/length/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/auto increment/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/fixed length/i)).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows/hides appropriate controls based on datetime field type', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const typeField = screen.getByLabelText(/field type/i);
+      
+      // Select datetime type
+      await user.selectOptions(typeField, 'datetime');
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/default value/i)).toBeInTheDocument();
+        expect(screen.queryByLabelText(/length/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/precision/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/scale/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/auto increment/i)).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows/hides appropriate controls based on boolean field type', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const typeField = screen.getByLabelText(/field type/i);
+      
+      // Select boolean type
+      await user.selectOptions(typeField, 'boolean');
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/default value/i)).toBeInTheDocument();
+        expect(screen.queryByLabelText(/length/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/precision/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/scale/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/auto increment/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/fixed length/i)).not.toBeInTheDocument();
+      });
+    });
+
+    it('enables/disables foreign key controls based on toggle state', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const isForeignKeyToggle = screen.getByRole('switch', { name: /foreign key/i });
+      
+      // Initially foreign key controls should be hidden
+      expect(screen.queryByLabelText(/referenced table/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/referenced field/i)).not.toBeInTheDocument();
+
+      // Enable foreign key
+      await user.click(isForeignKeyToggle);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/referenced table/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/referenced field/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/on delete action/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/on update action/i)).toBeInTheDocument();
+      });
+
+      // Disable foreign key
+      await user.click(isForeignKeyToggle);
+
+      await waitFor(() => {
+        expect(screen.queryByLabelText(/referenced table/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/referenced field/i)).not.toBeInTheDocument();
+      });
+    });
+
+    it('disables allow null when field is primary key', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const isPrimaryKeyToggle = screen.getByRole('switch', { name: /primary key/i });
+      const allowNullToggle = screen.getByRole('switch', { name: /allow null/i });
+      
+      // Enable primary key
+      await user.click(isPrimaryKeyToggle);
+
+      await waitFor(() => {
+        expect(allowNullToggle).toBeDisabled();
+        expect(allowNullToggle).not.toBeChecked();
+      });
+
+      // Disable primary key
+      await user.click(isPrimaryKeyToggle);
+
+      await waitFor(() => {
+        expect(allowNullToggle).toBeEnabled();
+      });
+    });
+
+    it('disables auto increment for non-integer types', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const typeField = screen.getByLabelText(/field type/i);
+      
+      // Select string type
+      await user.selectOptions(typeField, 'string');
+
+      // Auto increment should not be available for string types
+      expect(screen.queryByLabelText(/auto increment/i)).not.toBeInTheDocument();
+
+      // Select integer type
+      await user.selectOptions(typeField, 'integer');
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/auto increment/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/auto increment/i)).toBeEnabled();
+      });
+    });
+  });
+
+  // =============================================================================
+  // FORM SUBMISSION TESTS
+  // =============================================================================
 
   describe('Form Submission Workflows', () => {
-    describe('Create Mode', () => {
-      it('submits valid form data and calls onSubmit', async () => {
-        const mockOnSubmit = vi.fn()
-        const user = userEvent.setup()
-        
-        renderFieldForm({ ...defaultProps, onSubmit: mockOnSubmit })
+    it('submits valid create form data successfully', async () => {
+      const onSubmit = vi.fn();
+      const mockMutate = vi.fn();
+      
+      mockUseFieldMutation.mockReturnValue({
+        mutate: mockMutate,
+        isLoading: false,
+        error: null,
+        isSuccess: false,
+      });
 
-        // Fill valid form data
-        await fillBasicFieldInfo(user)
-        await user.type(screen.getByLabelText(/description/i), 'Test field description')
-        await user.click(screen.getByLabelText(/required/i))
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={onSubmit} onCancel={vi.fn()} />
+      );
 
-        await user.click(screen.getByRole('button', { name: /create field/i }))
+      // Fill form with valid data
+      await formTestUtils.fillField({
+        field: 'name',
+        value: mockCreateFieldData.name
+      }, user);
 
-        await waitFor(() => {
-          expect(mockOnSubmit).toHaveBeenCalledWith(
-            expect.objectContaining({
-              name: 'test_field',
-              label: 'Test Field',
-              type: 'string',
-              description: 'Test field description',
-              required: true,
-              allowNull: false
-            })
-          )
-        })
-      })
+      await formTestUtils.fillField({
+        field: 'type',
+        value: mockCreateFieldData.type
+      }, user);
 
-      it('disables submit button during submission', async () => {
-        const user = userEvent.setup()
-        renderFieldForm()
+      await formTestUtils.fillField({
+        field: 'label',
+        value: mockCreateFieldData.label
+      }, user);
 
-        await fillBasicFieldInfo(user)
+      await formTestUtils.fillField({
+        field: 'description',
+        value: mockCreateFieldData.description
+      }, user);
 
-        const submitButton = screen.getByRole('button', { name: /create field/i })
-        await user.click(submitButton)
+      await formTestUtils.fillField({
+        field: 'length',
+        value: mockCreateFieldData.length?.toString() || ''
+      }, user);
 
-        expect(submitButton).toBeDisabled()
-        expect(screen.getByText(/creating field.../i)).toBeInTheDocument()
-      })
+      // Submit form
+      const submitButton = screen.getByRole('button', { name: /create field/i });
+      await user.click(submitButton);
 
-      it('handles submission errors gracefully', async () => {
-        // Mock server error response
-        server.use(
-          rest.post('/api/v2/:service/_schema/:table/_field', (req, res, ctx) => {
-            return res(
-              ctx.status(500),
-              ctx.json(createErrorResponse(500, 'Internal server error'))
-            )
+      await waitFor(() => {
+        expect(mockMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: mockCreateFieldData.name,
+            type: mockCreateFieldData.type,
+            label: mockCreateFieldData.label,
+            description: mockCreateFieldData.description,
+            length: mockCreateFieldData.length,
           })
-        )
+        );
+      });
+    });
 
-        const user = userEvent.setup()
-        renderFieldForm()
+    it('submits valid update form data successfully', async () => {
+      const onSubmit = vi.fn();
+      const mockMutate = vi.fn();
+      
+      mockUseFieldQuery.mockReturnValue({
+        data: { resource: mockFieldData },
+        isLoading: false,
+        error: null,
+        isSuccess: true,
+      });
 
-        await fillBasicFieldInfo(user)
-        await user.click(screen.getByRole('button', { name: /create field/i }))
+      mockUseFieldMutation.mockReturnValue({
+        mutate: mockMutate,
+        isLoading: false,
+        error: null,
+        isSuccess: false,
+      });
 
-        await waitFor(() => {
-          expect(screen.getByText(/failed to create field/i)).toBeInTheDocument()
-          expect(screen.getByText(/internal server error/i)).toBeInTheDocument()
-        })
+      renderWithProviders(
+        <FieldForm 
+          mode="edit" 
+          fieldId="test-field"
+          onSubmit={onSubmit} 
+          onCancel={vi.fn()} 
+        />
+      );
 
-        // Ensure form is re-enabled after error
-        expect(screen.getByRole('button', { name: /create field/i })).not.toBeDisabled()
-      })
-    })
+      await waitFor(() => {
+        expect(screen.getByDisplayValue(mockFieldData.name)).toBeInTheDocument();
+      });
 
-    describe('Edit Mode', () => {
-      it('submits updated field data', async () => {
-        const mockOnSubmit = vi.fn()
-        const user = userEvent.setup()
-        
-        renderFieldForm({ ...editModeProps, onSubmit: mockOnSubmit })
+      // Update some fields
+      const labelField = screen.getByLabelText(/display label/i);
+      await user.clear(labelField);
+      await user.type(labelField, mockUpdateFieldData.label);
 
-        // Modify field label
-        const labelInput = screen.getByDisplayValue('Existing Field')
-        await user.clear(labelInput)
-        await user.type(labelInput, 'Updated Field Label')
+      const descriptionField = screen.getByLabelText(/description/i);
+      await user.clear(descriptionField);
+      await user.type(descriptionField, mockUpdateFieldData.description || '');
 
-        await user.click(screen.getByRole('button', { name: /update field/i }))
+      // Submit form
+      const submitButton = screen.getByRole('button', { name: /update field/i });
+      await user.click(submitButton);
 
-        await waitFor(() => {
-          expect(mockOnSubmit).toHaveBeenCalledWith(
-            expect.objectContaining({
-              name: 'existing-field',
-              label: 'Updated Field Label'
-            })
-          )
-        })
-      })
+      await waitFor(() => {
+        expect(mockMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            label: mockUpdateFieldData.label,
+            description: mockUpdateFieldData.description,
+          })
+        );
+      });
+    });
 
-      it('prevents modification of field name in edit mode', () => {
-        renderFieldForm(editModeProps)
+    it('handles submission errors gracefully', async () => {
+      const onSubmit = vi.fn();
+      const mockMutate = vi.fn();
+      
+      mockUseFieldMutation.mockReturnValue({
+        mutate: mockMutate,
+        isLoading: false,
+        error: { message: 'Field name already exists' },
+        isSuccess: false,
+      });
 
-        const nameInput = screen.getByDisplayValue('existing-field')
-        expect(nameInput).toBeDisabled()
-      })
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={onSubmit} onCancel={vi.fn()} />
+      );
 
-      it('shows correct button text in edit mode', () => {
-        renderFieldForm(editModeProps)
+      // Fill form and submit
+      await formTestUtils.fillField({ field: 'name', value: 'duplicate_name' }, user);
+      await formTestUtils.fillField({ field: 'type', value: 'string' }, user);
+      await formTestUtils.fillField({ field: 'label', value: 'Duplicate Field' }, user);
 
-        expect(screen.getByRole('button', { name: /update field/i })).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: /create field/i })).not.toBeInTheDocument()
-      })
-    })
-  })
+      const submitButton = screen.getByRole('button', { name: /create field/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/field name already exists/i)).toBeInTheDocument();
+      });
+
+      // Form should remain editable
+      expect(screen.getByLabelText(/field name/i)).toBeEnabled();
+      expect(submitButton).toBeEnabled();
+    });
+
+    it('shows loading state during submission', async () => {
+      const onSubmit = vi.fn();
+      const mockMutate = vi.fn();
+      
+      mockUseFieldMutation.mockReturnValue({
+        mutate: mockMutate,
+        isLoading: true,
+        error: null,
+        isSuccess: false,
+      });
+
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={onSubmit} onCancel={vi.fn()} />
+      );
+
+      // Fill minimal valid form
+      await formTestUtils.fillField({ field: 'name', value: 'test_field' }, user);
+      await formTestUtils.fillField({ field: 'type', value: 'string' }, user);
+      await formTestUtils.fillField({ field: 'label', value: 'Test Field' }, user);
+
+      const submitButton = screen.getByRole('button', { name: /create field/i });
+      
+      // Button should show loading state
+      expect(submitButton).toHaveTextContent(/creating/i);
+      expect(submitButton).toBeDisabled();
+      
+      // Form fields should be disabled
+      expect(screen.getByLabelText(/field name/i)).toBeDisabled();
+      expect(screen.getByLabelText(/field type/i)).toBeDisabled();
+    });
+
+    it('calls onCancel when cancel button is clicked', async () => {
+      const onCancel = vi.fn();
+      
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={onCancel} />
+      );
+
+      const cancelButton = screen.getByRole('button', { name: /cancel/i });
+      await user.click(cancelButton);
+
+      expect(onCancel).toHaveBeenCalled();
+    });
+
+    it('submits foreign key field data correctly', async () => {
+      const onSubmit = vi.fn();
+      const mockMutate = vi.fn();
+      
+      mockUseFieldMutation.mockReturnValue({
+        mutate: mockMutate,
+        isLoading: false,
+        error: null,
+        isSuccess: false,
+      });
+
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={onSubmit} onCancel={vi.fn()} />
+      );
+
+      // Fill basic field data
+      await formTestUtils.fillField({ field: 'name', value: 'user_id' }, user);
+      await formTestUtils.fillField({ field: 'type', value: 'integer' }, user);
+      await formTestUtils.fillField({ field: 'label', value: 'User ID' }, user);
+
+      // Enable foreign key
+      const isForeignKeyToggle = screen.getByRole('switch', { name: /foreign key/i });
+      await user.click(isForeignKeyToggle);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/referenced table/i)).toBeInTheDocument();
+      });
+
+      // Fill foreign key data
+      await user.selectOptions(screen.getByLabelText(/referenced table/i), 'users');
+      await user.selectOptions(screen.getByLabelText(/referenced field/i), 'id');
+      await user.selectOptions(screen.getByLabelText(/on delete action/i), 'CASCADE');
+      await user.selectOptions(screen.getByLabelText(/on update action/i), 'CASCADE');
+
+      // Submit form
+      const submitButton = screen.getByRole('button', { name: /create field/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(mockMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'user_id',
+            type: 'integer',
+            isForeignKey: true,
+            refTable: 'users',
+            refField: 'id',
+            refOnDelete: 'CASCADE',
+            refOnUpdate: 'CASCADE',
+          })
+        );
+      });
+    });
+  });
+
+  // =============================================================================
+  // FUNCTION USE INTEGRATION TESTS
+  // =============================================================================
 
   describe('Function Use Component Integration', () => {
-    it('renders function use section when database functions are supported', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+    it('renders function use component when field supports database functions', async () => {
+      mockUseFieldQuery.mockReturnValue({
+        data: { resource: mockFunctionUseField },
+        isLoading: false,
+        error: null,
+        isSuccess: true,
+      });
 
-      await fillBasicFieldInfo(user)
+      renderWithProviders(
+        <FieldForm 
+          mode="edit" 
+          fieldId="computed-field"
+          onSubmit={vi.fn()} 
+          onCancel={vi.fn()} 
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('function-use-form')).toBeInTheDocument();
+      });
+
+      // Check that existing functions are displayed
+      expect(screen.getByTestId('function-0')).toHaveTextContent('CONCAT: create, update');
+      expect(screen.getByTestId('function-1')).toHaveTextContent('UPPER: read');
+    });
+
+    it('allows adding new database functions', async () => {
+      const onSubmit = vi.fn();
+      const mockMutate = vi.fn();
       
-      // Function use section should be visible
-      expect(screen.getByText(/database functions/i)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /add function/i })).toBeInTheDocument()
-    })
+      mockUseFieldMutation.mockReturnValue({
+        mutate: mockMutate,
+        isLoading: false,
+        error: null,
+        isSuccess: false,
+      });
 
-    it('allows adding database functions', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={onSubmit} onCancel={vi.fn()} />
+      );
 
-      await fillBasicFieldInfo(user)
-      await user.click(screen.getByRole('button', { name: /add function/i }))
+      // Fill basic field data
+      await formTestUtils.fillField({ field: 'name', value: 'computed_field' }, user);
+      await formTestUtils.fillField({ field: 'type', value: 'string' }, user);
+      await formTestUtils.fillField({ field: 'label', value: 'Computed Field' }, user);
 
-      await waitFor(() => {
-        expect(screen.getByLabelText(/function name/i)).toBeInTheDocument()
-        expect(screen.getByLabelText(/function use/i)).toBeInTheDocument()
-      })
-    })
-
-    it('validates function configuration', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      await fillBasicFieldInfo(user)
-      await user.click(screen.getByRole('button', { name: /add function/i }))
-
-      // Try to save without function name
-      await user.click(screen.getByRole('button', { name: /save function/i }))
+      // Add a database function
+      const addFunctionButton = screen.getByTestId('add-function');
+      await user.click(addFunctionButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/function name is required/i)).toBeInTheDocument()
-      })
-    })
+        expect(screen.getByTestId('function-0')).toHaveTextContent('CONCAT: create');
+      });
 
-    it('includes function data in form submission', async () => {
-      const mockOnSubmit = vi.fn()
-      const user = userEvent.setup()
-      
-      renderFieldForm({ ...defaultProps, onSubmit: mockOnSubmit })
-
-      await fillBasicFieldInfo(user)
-      await user.click(screen.getByRole('button', { name: /add function/i }))
-
-      // Fill function details
-      await user.type(screen.getByLabelText(/function name/i), 'NOW')
-      await user.selectOptions(screen.getByLabelText(/function use/i), ['INSERT', 'UPDATE'])
-      await user.click(screen.getByRole('button', { name: /save function/i }))
-
-      await user.click(screen.getByRole('button', { name: /create field/i }))
+      // Submit form
+      const submitButton = screen.getByRole('button', { name: /create field/i });
+      await user.click(submitButton);
 
       await waitFor(() => {
-        expect(mockOnSubmit).toHaveBeenCalledWith(
+        expect(mockMutate).toHaveBeenCalledWith(
           expect.objectContaining({
-            dbFunction: expect.arrayContaining([
-              expect.objectContaining({
-                function: 'NOW',
-                use: ['INSERT', 'UPDATE']
-              })
-            ])
+            name: 'computed_field',
+            dbFunction: [
+              { function: 'CONCAT', use: ['create'] }
+            ]
           })
-        )
-      })
-    })
-  })
+        );
+      });
+    });
 
-  describe('User Interactions and Edge Cases', () => {
-    it('handles rapid field type changes correctly', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+    it('validates function use configurations', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
 
-      const typeSelect = screen.getByLabelText(/field type/i)
+      // Fill basic field data
+      await formTestUtils.fillField({ field: 'name', value: 'computed_field' }, user);
+      await formTestUtils.fillField({ field: 'type', value: 'string' }, user);
+      await formTestUtils.fillField({ field: 'label', value: 'Computed Field' }, user);
 
-      // Rapidly change field types
-      await user.selectOptions(typeSelect, 'string')
-      await user.selectOptions(typeSelect, 'decimal')
-      await user.selectOptions(typeSelect, 'boolean')
-      await user.selectOptions(typeSelect, 'integer')
+      // Add function without proper configuration should show validation error
+      const addFunctionButton = screen.getByTestId('add-function');
+      await user.click(addFunctionButton);
 
-      // Verify final state is correct for integer
+      // Try to submit with incomplete function configuration
+      const submitButton = screen.getByRole('button', { name: /create field/i });
+      await user.click(submitButton);
+
+      // Should prevent submission until function is properly configured
       await waitFor(() => {
-        expectFieldToBeDisabled('length')
-        expectFieldToBeDisabled('precision')
-        expectFieldToBeDisabled('scale')
-        expectFieldToBeEnabled('auto increment')
-      })
-    })
+        // Form should validate function configurations
+        expect(screen.getByText(/function configuration required/i)).toBeInTheDocument();
+      });
+    });
 
-    it('preserves form data when switching between tabs', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+    it('removes database functions correctly', async () => {
+      mockUseFieldQuery.mockReturnValue({
+        data: { resource: mockFunctionUseField },
+        isLoading: false,
+        error: null,
+        isSuccess: true,
+      });
 
-      // Fill basic information
-      await user.type(screen.getByLabelText(/field name/i), 'test_field')
-      await user.type(screen.getByLabelText(/field label/i), 'Test Field')
-
-      // Navigate to constraints tab
-      await user.click(screen.getByRole('tab', { name: /constraints/i }))
-      await user.click(screen.getByLabelText(/required/i))
-
-      // Navigate back to basic tab
-      await user.click(screen.getByRole('tab', { name: /basic/i }))
-
-      // Verify data is preserved
-      expect(screen.getByDisplayValue('test_field')).toBeInTheDocument()
-      expect(screen.getByDisplayValue('Test Field')).toBeInTheDocument()
-
-      // Navigate back to constraints and verify state
-      await user.click(screen.getByRole('tab', { name: /constraints/i }))
-      expect(screen.getByLabelText(/required/i)).toBeChecked()
-    })
-
-    it('handles form reset correctly', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      // Fill form with data
-      await fillBasicFieldInfo(user)
-      await user.type(screen.getByLabelText(/description/i), 'Test description')
-      await user.click(screen.getByLabelText(/required/i))
-
-      // Reset form
-      await user.click(screen.getByRole('button', { name: /reset/i }))
+      renderWithProviders(
+        <FieldForm 
+          mode="edit" 
+          fieldId="computed-field"
+          onSubmit={vi.fn()} 
+          onCancel={vi.fn()} 
+        />
+      );
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/field name/i)).toHaveValue('')
-        expect(screen.getByLabelText(/field label/i)).toHaveValue('')
-        expect(screen.getByLabelText(/description/i)).toHaveValue('')
-        expect(screen.getByLabelText(/required/i)).not.toBeChecked()
-      })
-    })
+        expect(screen.getByTestId('function-0')).toBeInTheDocument();
+        expect(screen.getByTestId('function-1')).toBeInTheDocument();
+      });
 
-    it('handles cancellation correctly', async () => {
-      const mockOnCancel = vi.fn()
-      const user = userEvent.setup()
+      // Remove first function (implementation depends on function-use-form component)
+      const removeFunctionButton = within(screen.getByTestId('function-0')).getByRole('button', { name: /remove/i });
+      await user.click(removeFunctionButton);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('function-0')).not.toBeInTheDocument();
+        expect(screen.getByTestId('function-1')).toBeInTheDocument();
+      });
+    });
+
+    it('updates function use when field type changes', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const typeField = screen.getByLabelText(/field type/i);
+
+      // Select string type - should show function use component
+      await user.selectOptions(typeField, 'string');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('function-use-form')).toBeInTheDocument();
+      });
+
+      // Select boolean type - should hide function use component
+      await user.selectOptions(typeField, 'boolean');
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('function-use-form')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // =============================================================================
+  // ACCESSIBILITY COMPLIANCE TESTS
+  // =============================================================================
+
+  describe('Accessibility Compliance (WCAG 2.1 AA)', () => {
+    it('has proper ARIA labels for all form controls', () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const formControls = [
+        screen.getByLabelText(/field name/i),
+        screen.getByLabelText(/field type/i),
+        screen.getByLabelText(/display label/i),
+        screen.getByLabelText(/description/i),
+        screen.getByRole('switch', { name: /allow null/i }),
+        screen.getByRole('switch', { name: /required/i }),
+        screen.getByRole('switch', { name: /unique/i }),
+        screen.getByRole('switch', { name: /primary key/i }),
+        screen.getByRole('switch', { name: /foreign key/i }),
+      ];
+
+      formControls.forEach(control => {
+        expect(accessibilityUtils.hasAriaLabel(control)).toBe(true);
+        expect(accessibilityUtils.isKeyboardAccessible(control)).toBe(true);
+      });
+    });
+
+    it('provides proper error announcements for screen readers', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const nameField = screen.getByLabelText(/field name/i);
       
-      renderFieldForm({ ...defaultProps, onCancel: mockOnCancel })
-
-      await user.click(screen.getByRole('button', { name: /cancel/i }))
-
-      expect(mockOnCancel).toHaveBeenCalled()
-    })
-
-    it('warns about unsaved changes when leaving form', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      // Make changes to form
-      await user.type(screen.getByLabelText(/field name/i), 'test_field')
-
-      // Try to navigate away (simulate beforeunload)
-      const beforeUnloadEvent = new Event('beforeunload')
-      Object.defineProperty(beforeUnloadEvent, 'returnValue', {
-        writable: true,
-        value: ''
-      })
-
-      act(() => {
-        window.dispatchEvent(beforeUnloadEvent)
-      })
-
-      expect(beforeUnloadEvent.returnValue).toBe('You have unsaved changes. Are you sure you want to leave?')
-    })
-  })
-
-  describe('Accessibility Compliance', () => {
-    it('has no accessibility violations', async () => {
-      const { container } = renderFieldForm()
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
-
-    it('supports keyboard navigation', async () => {
-      renderFieldForm()
-
-      const firstInput = screen.getByLabelText(/field name/i)
-      firstInput.focus()
-
-      // Tab through form elements
-      await userEvent.tab()
-      expect(screen.getByLabelText(/field label/i)).toHaveFocus()
-
-      await userEvent.tab()
-      expect(screen.getByLabelText(/field type/i)).toHaveFocus()
-
-      await userEvent.tab()
-      expect(screen.getByLabelText(/description/i)).toHaveFocus()
-    })
-
-    it('has proper ARIA labels and descriptions', () => {
-      renderFieldForm()
-
-      // Check form has proper labeling
-      expect(screen.getByRole('form', { name: /field configuration/i })).toBeInTheDocument()
-
-      // Check required field indicators
-      const nameInput = screen.getByLabelText(/field name/i)
-      expect(nameInput).toHaveAttribute('aria-required', 'true')
-
-      const labelInput = screen.getByLabelText(/field label/i)
-      expect(labelInput).toHaveAttribute('aria-required', 'true')
-
-      // Check help text associations
-      const lengthInput = screen.getByLabelText(/length/i)
-      expect(lengthInput).toHaveAttribute('aria-describedby')
-    })
-
-    it('announces validation errors to screen readers', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
-
       // Trigger validation error
-      await user.click(screen.getByRole('button', { name: /create field/i }))
+      await user.type(nameField, 'invalid-name!');
+      await user.tab();
 
       await waitFor(() => {
-        const errorMessage = screen.getByText(/field name is required/i)
-        expect(errorMessage).toHaveAttribute('role', 'alert')
-        expect(errorMessage).toHaveAttribute('aria-live', 'polite')
-      })
-    })
+        const errorElement = screen.getByRole('alert');
+        expect(errorElement).toBeInTheDocument();
+        expect(errorElement).toHaveAttribute('aria-live', 'assertive');
+        expect(nameField).toHaveAttribute('aria-invalid', 'true');
+        expect(nameField).toHaveAttribute('aria-describedby', expect.stringContaining('error'));
+      });
+    });
 
-    it('has proper focus management for modals and dialogs', async () => {
-      const user = userEvent.setup()
-      renderFieldForm()
+    it('supports keyboard navigation through all interactive elements', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
 
-      // Open function configuration dialog
-      await user.click(screen.getByRole('button', { name: /add function/i }))
+      const form = screen.getByRole('form');
+      const navigationResult = await accessibilityUtils.testKeyboardNavigation(form, user);
 
-      await waitFor(() => {
-        const dialog = screen.getByRole('dialog', { name: /database function configuration/i })
-        expect(dialog).toBeInTheDocument()
-        
-        // First focusable element in dialog should receive focus
-        const firstInput = within(dialog).getByLabelText(/function name/i)
-        expect(firstInput).toHaveFocus()
-      })
-
-      // Close dialog and verify focus returns
-      await user.press('Escape')
+      expect(navigationResult.success).toBe(true);
+      expect(navigationResult.focusedElements.length).toBeGreaterThan(0);
       
+      // Verify all focusable elements were reached
+      expect(navigationResult.focusedElements).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ tagName: 'INPUT' }),
+          expect.objectContaining({ tagName: 'SELECT' }),
+          expect.objectContaining({ tagName: 'BUTTON' })
+        ])
+      );
+    });
+
+    it('provides proper focus management for conditional fields', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const isForeignKeyToggle = screen.getByRole('switch', { name: /foreign key/i });
+      
+      // Enable foreign key to show conditional fields
+      await user.click(isForeignKeyToggle);
+
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /add function/i })).toHaveFocus()
-      })
-    })
+        const refTableField = screen.getByLabelText(/referenced table/i);
+        expect(refTableField).toBeInTheDocument();
+        expect(accessibilityUtils.isKeyboardAccessible(refTableField)).toBe(true);
+      });
 
-    it('provides proper color contrast and visual indicators', () => {
-      renderFieldForm()
+      // Test focus management when disabling
+      await user.click(isForeignKeyToggle);
 
-      // Verify error states have sufficient contrast
-      const errorElements = screen.queryAllByRole('alert')
-      errorElements.forEach(element => {
-        const styles = window.getComputedStyle(element)
-        // Color contrast validation would typically be done with automated tools
-        expect(element).toHaveClass('text-red-600') // Tailwind error color class
-      })
+      await waitFor(() => {
+        // Focus should return to a logical position
+        expect(document.activeElement).toBe(isForeignKeyToggle);
+      });
+    });
 
-      // Verify required field indicators
-      const requiredFields = screen.getAllByText('*')
-      requiredFields.forEach(indicator => {
-        expect(indicator).toHaveClass('text-red-500')
-      })
-    })
+    it('has adequate color contrast for all visual elements', () => {
+      const { container } = renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      // Test color contrast on various elements
+      const elementsToTest = [
+        screen.getByLabelText(/field name/i),
+        screen.getByRole('button', { name: /create field/i }),
+        screen.getByRole('button', { name: /cancel/i }),
+      ];
+
+      elementsToTest.forEach(element => {
+        expect(accessibilityUtils.hasAdequateContrast(element)).toBe(true);
+      });
+    });
+
+    it('provides descriptive help text for complex form controls', () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const nameField = screen.getByLabelText(/field name/i);
+      const helpText = screen.getByText(/field name must be a valid database identifier/i);
+      
+      expect(nameField).toHaveAttribute('aria-describedby', expect.stringContaining(helpText.id));
+    });
+
+    it('announces dynamic content changes to screen readers', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const typeField = screen.getByLabelText(/field type/i);
+      
+      // Change field type to trigger dynamic content
+      await user.selectOptions(typeField, 'decimal');
+
+      await waitFor(() => {
+        const precisionField = screen.getByLabelText(/precision/i);
+        const announcement = screen.getByRole('status', { hidden: true });
+        
+        expect(announcement).toHaveTextContent(/precision and scale options are now available/i);
+      });
+    });
 
     it('supports high contrast mode', () => {
-      // Mock high contrast mode
+      // Mock high contrast media query
       Object.defineProperty(window, 'matchMedia', {
         writable: true,
         value: vi.fn().mockImplementation(query => ({
-          matches: query === '(prefers-contrast: high)',
+          matches: query.includes('prefers-contrast: high'),
           media: query,
           onchange: null,
-          addListener: vi.fn(), // deprecated
-          removeListener: vi.fn(), // deprecated
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
           addEventListener: vi.fn(),
           removeEventListener: vi.fn(),
           dispatchEvent: vi.fn(),
-        }))
-      })
+        })),
+      });
 
-      renderFieldForm()
+      const { container } = renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
 
       // Verify high contrast styles are applied
-      const formElement = screen.getByRole('form')
-      expect(formElement).toHaveClass('high-contrast')
-    })
-  })
+      const form = screen.getByRole('form');
+      expect(form).toHaveClass('contrast-more');
+    });
 
-  describe('Performance and Loading States', () => {
-    it('shows loading state while fetching reference data', async () => {
-      // Mock slow API response
+    it('works with screen reader testing simulation', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      // Simulate screen reader navigation
+      const headings = screen.getAllByRole('heading');
+      expect(headings.length).toBeGreaterThan(0);
+      
+      // Check landmark structure
+      expect(screen.getByRole('form')).toBeInTheDocument();
+      expect(screen.getByRole('main', { hidden: true })).toBeInTheDocument();
+      
+      // Verify form structure is announced properly
+      const fieldsets = screen.getAllByRole('group');
+      fieldsets.forEach(fieldset => {
+        expect(fieldset).toHaveAttribute('aria-labelledby');
+      });
+    });
+  });
+
+  // =============================================================================
+  // PERFORMANCE TESTS
+  // =============================================================================
+
+  describe('Performance Requirements', () => {
+    it('renders form within performance targets', async () => {
+      const startTime = performance.now();
+      
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+      
+      const endTime = performance.now();
+      const renderTime = endTime - startTime;
+      
+      // Form should render quickly
+      expect(renderTime).toBeLessThan(100);
+    });
+
+    it('maintains responsive interactions under load', async () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      const interactions = [
+        () => formTestUtils.fillField({ field: 'name', value: 'test_field' }, user),
+        () => formTestUtils.fillField({ field: 'type', value: 'string' }, user),
+        () => formTestUtils.fillField({ field: 'label', value: 'Test Field' }, user),
+        () => formTestUtils.fillField({ field: 'description', value: 'Test description' }, user),
+      ];
+
+      const performanceResults = await Promise.all(
+        interactions.map(interaction => 
+          formTestUtils.measureInteractionTime(interaction)
+        )
+      );
+
+      // All interactions should complete under 100ms
+      performanceResults.forEach(duration => {
+        expect(duration).toBeLessThan(100);
+      });
+    });
+
+    it('handles large form data sets efficiently', async () => {
+      // Create a form with many fields and options
+      const largeFieldData = {
+        ...mockFieldData,
+        dbFunction: Array.from({ length: 50 }, (_, i) => ({
+          function: `FUNCTION_${i}`,
+          use: ['create', 'update', 'read']
+        }))
+      };
+
+      mockUseFieldQuery.mockReturnValue({
+        data: { resource: largeFieldData },
+        isLoading: false,
+        error: null,
+        isSuccess: true,
+      });
+
+      const startTime = performance.now();
+      
+      renderWithProviders(
+        <FieldForm 
+          mode="edit" 
+          fieldId="large-field"
+          onSubmit={vi.fn()} 
+          onCancel={vi.fn()} 
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('function-use-form')).toBeInTheDocument();
+      });
+      
+      const endTime = performance.now();
+      const renderTime = endTime - startTime;
+      
+      // Should handle large datasets efficiently
+      expect(renderTime).toBeLessThan(500);
+    });
+  });
+
+  // =============================================================================
+  // ERROR HANDLING TESTS
+  // =============================================================================
+
+  describe('Error Handling', () => {
+    it('handles network errors gracefully', async () => {
+      // Mock network error
       server.use(
-        rest.get('/api/v2/:service/_schema', (req, res, ctx) => {
+        rest.get('/api/v2/:service/schema/:tableId/field/:fieldId', (req, res, ctx) => {
+          return res.networkError('Network connection failed');
+        })
+      );
+
+      mockUseFieldQuery.mockReturnValue({
+        data: null,
+        isLoading: false,
+        error: { message: 'Network connection failed' },
+        isSuccess: false,
+      });
+
+      renderWithProviders(
+        <FieldForm 
+          mode="edit" 
+          fieldId="test-field"
+          onSubmit={vi.fn()} 
+          onCancel={vi.fn()} 
+        />
+      );
+
+      expect(screen.getByText(/network connection failed/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+    });
+
+    it('handles server validation errors', async () => {
+      server.use(
+        rest.post('/api/v2/:service/schema/:tableId/field', (req, res, ctx) => {
           return res(
-            ctx.delay(1000),
-            ctx.status(200),
-            ctx.json({ resource: [] })
-          )
+            ctx.status(400),
+            ctx.json({
+              error: {
+                code: 400,
+                message: 'Validation failed',
+                validation_errors: {
+                  name: ['Field name already exists'],
+                  length: ['Length must be positive']
+                }
+              }
+            })
+          );
         })
-      )
+      );
 
-      const user = userEvent.setup()
-      renderFieldForm()
+      const mockMutate = vi.fn();
+      mockUseFieldMutation.mockReturnValue({
+        mutate: mockMutate,
+        isLoading: false,
+        error: {
+          response: {
+            data: {
+              error: {
+                validation_errors: {
+                  name: ['Field name already exists'],
+                  length: ['Length must be positive']
+                }
+              }
+            }
+          }
+        },
+        isSuccess: false,
+      });
 
-      await user.click(screen.getByLabelText(/foreign key/i))
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
 
-      // Should show loading state for reference tables
-      expect(screen.getByText(/loading tables.../i)).toBeInTheDocument()
-    })
+      // Fill form and trigger validation error
+      await formTestUtils.fillField({ field: 'name', value: 'duplicate_name' }, user);
+      await formTestUtils.fillField({ field: 'type', value: 'string' }, user);
+      await formTestUtils.fillField({ field: 'label', value: 'Duplicate Field' }, user);
+      await formTestUtils.fillField({ field: 'length', value: '-1' }, user);
 
-    it('handles API errors gracefully during reference data loading', async () => {
-      // Mock API error
-      server.use(
-        rest.get('/api/v2/:service/_schema', (req, res, ctx) => {
-          return res(
-            ctx.status(500),
-            ctx.json(createErrorResponse(500, 'Failed to load tables'))
-          )
-        })
-      )
-
-      const user = userEvent.setup()
-      renderFieldForm()
-
-      await user.click(screen.getByLabelText(/foreign key/i))
+      const submitButton = screen.getByRole('button', { name: /create field/i });
+      await user.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/failed to load reference tables/i)).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
-      })
-    })
+        expect(screen.getByText(/field name already exists/i)).toBeInTheDocument();
+        expect(screen.getByText(/length must be positive/i)).toBeInTheDocument();
+      });
+    });
 
-    it('debounces field name validation API calls', async () => {
-      const validationSpy = vi.fn()
-      server.use(
-        rest.post('/api/v2/:service/_schema/:table/_field/_validate', (req, res, ctx) => {
-          validationSpy()
-          return res(ctx.status(200), ctx.json({ valid: true }))
-        })
-      )
+    it('recovers from errors gracefully', async () => {
+      const mockMutate = vi.fn();
+      
+      // Start with error state
+      mockUseFieldMutation.mockReturnValue({
+        mutate: mockMutate,
+        isLoading: false,
+        error: { message: 'Server error occurred' },
+        isSuccess: false,
+      });
 
-      const user = userEvent.setup()
-      renderFieldForm()
+      const { rerender } = renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />
+      );
 
-      const nameInput = screen.getByLabelText(/field name/i)
+      expect(screen.getByText(/server error occurred/i)).toBeInTheDocument();
 
-      // Type rapidly
-      await user.type(nameInput, 'test_field_name')
+      // Simulate error recovery
+      mockUseFieldMutation.mockReturnValue({
+        mutate: mockMutate,
+        isLoading: false,
+        error: null,
+        isSuccess: false,
+      });
 
-      // Wait for debounce and verify only one API call was made
+      rerender(<FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />);
+
+      // Error should be cleared
+      expect(screen.queryByText(/server error occurred/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /create field/i })).toBeEnabled();
+    });
+  });
+
+  // =============================================================================
+  // INTEGRATION TESTS
+  // =============================================================================
+
+  describe('Integration with External Components', () => {
+    it('integrates with React Query for data fetching', async () => {
+      mockUseFieldQuery.mockReturnValue({
+        data: { resource: mockFieldData },
+        isLoading: false,
+        error: null,
+        isSuccess: true,
+      });
+
+      renderWithProviders(
+        <FieldForm 
+          mode="edit" 
+          fieldId="test-field"
+          onSubmit={vi.fn()} 
+          onCancel={vi.fn()} 
+        />,
+        {
+          providerOptions: {
+            queryClient: new QueryClient({
+              defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false }
+              }
+            })
+          }
+        }
+      );
+
       await waitFor(() => {
-        expect(validationSpy).toHaveBeenCalledTimes(1)
-      }, { timeout: 2000 })
-    })
+        expect(mockUseFieldQuery).toHaveBeenCalledWith('test-field');
+        expect(screen.getByDisplayValue(mockFieldData.name)).toBeInTheDocument();
+      });
+    });
 
-    it('renders large lists efficiently with virtualization', async () => {
-      // Mock large dataset
-      const largeTables = Array.from({ length: 1000 }, (_, i) => ({
-        name: `table_${i}`,
-        label: `Table ${i}`
-      }))
+    it('integrates with Next.js router for navigation', async () => {
+      const mockPush = vi.fn();
+      
+      vi.mocked(require('next/navigation').useRouter).mockReturnValue({
+        push: mockPush,
+        replace: vi.fn(),
+        back: vi.fn(),
+        refresh: vi.fn(),
+      });
 
-      server.use(
-        rest.get('/api/v2/:service/_schema', (req, res, ctx) => {
-          return res(ctx.status(200), ctx.json({ resource: largeTables }))
-        })
-      )
+      const onSubmit = vi.fn();
+      const mockMutate = vi.fn((data, { onSuccess }) => {
+        onSuccess({ resource: { ...mockFieldData, ...data } });
+      });
+      
+      mockUseFieldMutation.mockReturnValue({
+        mutate: mockMutate,
+        isLoading: false,
+        error: null,
+        isSuccess: true,
+      });
 
-      const user = userEvent.setup()
-      renderFieldForm()
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={onSubmit} onCancel={vi.fn()} />
+      );
 
-      await user.click(screen.getByLabelText(/foreign key/i))
+      // Fill and submit form
+      await formTestUtils.fillField({ field: 'name', value: 'test_field' }, user);
+      await formTestUtils.fillField({ field: 'type', value: 'string' }, user);
+      await formTestUtils.fillField({ field: 'label', value: 'Test Field' }, user);
+
+      const submitButton = screen.getByRole('button', { name: /create field/i });
+      await user.click(submitButton);
 
       await waitFor(() => {
-        const tableSelect = screen.getByLabelText(/reference table/i)
-        expect(tableSelect).toBeInTheDocument()
-        
-        // Should use virtual scrolling for large lists
-        expect(tableSelect).toHaveAttribute('data-virtualized', 'true')
-      })
-    })
-  })
-})
+        expect(mockPush).toHaveBeenCalledWith('/adf-schema/mysql_production/test-table');
+      });
+    });
+
+    it('integrates with theme provider for consistent styling', () => {
+      renderWithProviders(
+        <FieldForm mode="create" onSubmit={vi.fn()} onCancel={vi.fn()} />,
+        {
+          providerOptions: {
+            theme: 'dark'
+          }
+        }
+      );
+
+      const form = screen.getByRole('form');
+      expect(form).toHaveClass('dark');
+      
+      // Theme-specific classes should be applied
+      const submitButton = screen.getByRole('button', { name: /create field/i });
+      expect(submitButton).toHaveClass('bg-primary-600', 'dark:bg-primary-500');
+    });
+  });
+});
