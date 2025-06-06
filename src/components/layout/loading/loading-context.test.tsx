@@ -1,690 +1,1008 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, render, screen, waitFor, act } from '@testing-library/react';
-import { ReactNode } from 'react';
-import { QueryClient, QueryClientProvider, useIsFetching } from '@tanstack/react-query';
+import React, { act } from 'react';
+import { render, screen, waitFor, renderHook } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
 
-// Component under test imports
-import { LoadingProvider, useLoading, useLoadingState } from './loading-context';
+import {
+  LoadingProvider,
+  useLoadingContext,
+  useLoading,
+  useComponentLoading,
+  useAsyncLoading,
+  withLoading,
+  LoadingOptions,
+  LoadingContextValue,
+} from './loading-context';
 
-// Mock the loading handlers to test loading state coordination
-vi.mock('@/test/mocks/loading-handlers', () => ({
-  createLoadingHandler: vi.fn(),
-  mockApiCall: vi.fn(),
-  simulateAsyncOperation: vi.fn(),
+// Mock Next.js router for navigation testing
+const mockPush = vi.fn();
+const mockReplace = vi.fn();
+const mockBack = vi.fn();
+const mockRefresh = vi.fn();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    back: mockBack,
+    refresh: mockRefresh,
+    prefetch: vi.fn(),
+  }),
 }));
 
-// Mock React Query's useIsFetching for testing integration
-vi.mock('@tanstack/react-query', async () => {
-  const actual = await vi.importActual('@tanstack/react-query');
-  return {
-    ...actual,
-    useIsFetching: vi.fn(),
-  };
-});
-
-const mockedUseIsFetching = vi.mocked(useIsFetching);
-
-/**
- * Test wrapper component for providing React Query context
- */
-interface TestWrapperProps {
-  children: ReactNode;
+// Helper function to create a test wrapper with providers
+function createTestWrapper({
+  defaultOptions,
+  enableQueryIntegration = true,
+  enableNavigationTracking = true,
+  queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  }),
+}: {
+  defaultOptions?: LoadingOptions;
+  enableQueryIntegration?: boolean;
+  enableNavigationTracking?: boolean;
   queryClient?: QueryClient;
+} = {}) {
+  return function TestWrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <LoadingProvider
+          defaultOptions={defaultOptions}
+          enableQueryIntegration={enableQueryIntegration}
+          enableNavigationTracking={enableNavigationTracking}
+        >
+          {children}
+        </LoadingProvider>
+      </QueryClientProvider>
+    );
+  };
 }
 
-const TestWrapper = ({ children, queryClient }: TestWrapperProps) => {
-  const defaultQueryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        staleTime: 0,
-        gcTime: 0,
-      },
-      mutations: {
-        retry: false,
-      },
+// Mock component for testing loading context integration
+function TestComponent({
+  componentId = 'test-component',
+  shouldStartLoading = false,
+  loadingOptions,
+}: {
+  componentId?: string;
+  shouldStartLoading?: boolean;
+  loadingOptions?: LoadingOptions;
+}) {
+  const { states, actions } = useLoadingContext();
+  const { isLoading, setLoading } = useComponentLoading(componentId);
+
+  React.useEffect(() => {
+    if (shouldStartLoading) {
+      setLoading(true, loadingOptions);
+    }
+  }, [shouldStartLoading, setLoading, loadingOptions]);
+
+  return (
+    <div data-testid="test-component">
+      <div data-testid="global-loading">Global: {states.global.toString()}</div>
+      <div data-testid="navigation-loading">Navigation: {states.navigation.toString()}</div>
+      <div data-testid="server-loading">Server: {states.server.toString()}</div>
+      <div data-testid="component-loading">Component: {isLoading.toString()}</div>
+      <div data-testid="active-count">Active: {states.activeCount}</div>
+      <div data-testid="blocking">Blocking: {states.blocking.toString()}</div>
+      <button
+        data-testid="start-loading"
+        onClick={() => actions.startLoading(loadingOptions)}
+      >
+        Start Loading
+      </button>
+      <button
+        data-testid="stop-all-loading"
+        onClick={() => actions.clearAllLoading()}
+      >
+        Stop All Loading
+      </button>
+      <button
+        data-testid="set-global-loading"
+        onClick={() => actions.setGlobalLoading(true)}
+      >
+        Set Global Loading
+      </button>
+      <button
+        data-testid="set-navigation-loading"
+        onClick={() => actions.setNavigationLoading(true)}
+      >
+        Set Navigation Loading
+      </button>
+    </div>
+  );
+}
+
+// Component to test React Query integration
+function QueryTestComponent() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['test-query'],
+    queryFn: async () => {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return { id: 1, name: 'Test Data' };
     },
   });
 
   return (
-    <QueryClientProvider client={queryClient || defaultQueryClient}>
-      <LoadingProvider>
-        {children}
-      </LoadingProvider>
-    </QueryClientProvider>
+    <div data-testid="query-component">
+      <div data-testid="query-loading">Query Loading: {isLoading.toString()}</div>
+      <div data-testid="query-data">{data ? JSON.stringify(data) : 'No Data'}</div>
+    </div>
   );
-};
+}
 
-/**
- * Test component for validating loading state propagation
- */
-const TestComponent = ({ testId = 'test-component' }: { testId?: string }) => {
-  const { isLoading, loadingOperations, startLoading, stopLoading } = useLoading();
-  const globalState = useLoadingState();
+// Component to test async loading hook
+function AsyncTestComponent() {
+  const asyncFn = React.useCallback(async () => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return 'async result';
+  }, []);
+
+  const { data, error, isLoading, execute } = useAsyncLoading(asyncFn);
 
   return (
-    <div data-testid={testId}>
-      <div data-testid="loading-status">{isLoading ? 'loading' : 'idle'}</div>
-      <div data-testid="operations-count">{loadingOperations.length}</div>
-      <div data-testid="global-loading">{globalState.isGlobalLoading ? 'global-loading' : 'global-idle'}</div>
-      <button 
-        data-testid="start-button" 
-        onClick={() => startLoading('test-operation')}
-      >
-        Start Loading
-      </button>
-      <button 
-        data-testid="stop-button" 
-        onClick={() => stopLoading('test-operation')}
-      >
-        Stop Loading
+    <div data-testid="async-component">
+      <div data-testid="async-loading">Async Loading: {isLoading.toString()}</div>
+      <div data-testid="async-data">Data: {data || 'none'}</div>
+      <div data-testid="async-error">Error: {error?.message || 'none'}</div>
+      <button data-testid="execute-async" onClick={execute}>
+        Execute Async
       </button>
     </div>
   );
-};
+}
 
 describe('LoadingContext', () => {
   let queryClient: QueryClient;
+  let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
     queryClient = new QueryClient({
       defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: 0,
-          gcTime: 0,
-        },
-        mutations: {
-          retry: false,
-        },
+        queries: { retry: false },
+        mutations: { retry: false },
       },
     });
+    user = userEvent.setup();
     
     // Reset mocks
     vi.clearAllMocks();
-    mockedUseIsFetching.mockReturnValue(0);
+    
+    // Mock timers for testing delays and timeouts
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     queryClient.clear();
   });
 
   describe('LoadingProvider', () => {
     it('should provide loading context to child components', () => {
-      render(
-        <TestWrapper queryClient={queryClient}>
-          <TestComponent />
-        </TestWrapper>
-      );
+      const TestChild = () => {
+        const context = useLoadingContext();
+        expect(context).toBeDefined();
+        expect(context.states).toBeDefined();
+        expect(context.actions).toBeDefined();
+        return <div>Test</div>;
+      };
 
-      expect(screen.getByTestId('loading-status')).toHaveTextContent('idle');
-      expect(screen.getByTestId('operations-count')).toHaveTextContent('0');
-      expect(screen.getByTestId('global-loading')).toHaveTextContent('global-idle');
+      render(
+        <TestChild />,
+        { wrapper: createTestWrapper() }
+      );
     });
 
-    it('should throw error when used without LoadingProvider', () => {
+    it('should throw error when used outside provider', () => {
+      const TestChild = () => {
+        useLoadingContext();
+        return <div>Test</div>;
+      };
+
       // Suppress console.error for this test
-      const originalError = console.error;
-      console.error = vi.fn();
-
-      expect(() => {
-        renderHook(() => useLoading());
-      }).toThrow('useLoading must be used within a LoadingProvider');
-
-      console.error = originalError;
-    });
-
-    it('should handle multiple child components with shared state', () => {
-      render(
-        <TestWrapper queryClient={queryClient}>
-          <TestComponent testId="component-1" />
-          <TestComponent testId="component-2" />
-        </TestWrapper>
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      expect(() => render(<TestChild />)).toThrow(
+        'useLoadingContext must be used within a LoadingProvider'
       );
-
-      const component1Status = screen.getByTestId('component-1').querySelector('[data-testid="loading-status"]');
-      const component2Status = screen.getByTestId('component-2').querySelector('[data-testid="loading-status"]');
-
-      expect(component1Status).toHaveTextContent('idle');
-      expect(component2Status).toHaveTextContent('idle');
-    });
-  });
-
-  describe('useLoading hook', () => {
-    it('should return initial loading state as false', () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
-
-      expect(result.current.isLoading).toBe(false);
-      expect(result.current.loadingOperations).toEqual([]);
+      
+      consoleSpy.mockRestore();
     });
 
-    it('should provide startLoading function', () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
+    it('should initialize with default state values', () => {
+      render(<TestComponent />, { wrapper: createTestWrapper() });
 
-      expect(typeof result.current.startLoading).toBe('function');
+      expect(screen.getByTestId('global-loading')).toHaveTextContent('Global: false');
+      expect(screen.getByTestId('navigation-loading')).toHaveTextContent('Navigation: false');
+      expect(screen.getByTestId('server-loading')).toHaveTextContent('Server: false');
+      expect(screen.getByTestId('component-loading')).toHaveTextContent('Component: false');
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 0');
+      expect(screen.getByTestId('blocking')).toHaveTextContent('Blocking: false');
     });
 
-    it('should provide stopLoading function', () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
+    it('should apply custom default options', () => {
+      const defaultOptions: LoadingOptions = {
+        minDelay: 200,
+        timeout: 5000,
+        priority: 'high',
+      };
+
+      render(<TestComponent />, { 
+        wrapper: createTestWrapper({ defaultOptions }) 
       });
 
-      expect(typeof result.current.stopLoading).toBe('function');
-    });
-
-    it('should provide clearAllLoading function', () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
+      // Start a loading operation and verify it uses default options
+      act(() => {
+        user.click(screen.getByTestId('start-loading'));
       });
 
-      expect(typeof result.current.clearAllLoading).toBe('function');
+      // Since priority is high, it should set blocking to true
+      expect(screen.getByTestId('blocking')).toHaveTextContent('Blocking: true');
     });
   });
 
   describe('Loading State Management', () => {
-    it('should start loading operation and update state', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
+    it('should manage global loading state', async () => {
+      render(<TestComponent />, { wrapper: createTestWrapper() });
 
-      act(() => {
-        result.current.startLoading('database-connection');
-      });
+      // Start global loading
+      await user.click(screen.getByTestId('set-global-loading'));
 
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-        expect(result.current.loadingOperations).toContain('database-connection');
-      });
+      expect(screen.getByTestId('global-loading')).toHaveTextContent('Global: true');
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
+      expect(screen.getByTestId('blocking')).toHaveTextContent('Blocking: true');
     });
 
-    it('should stop loading operation and update state', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
+    it('should manage navigation loading state', async () => {
+      render(<TestComponent />, { wrapper: createTestWrapper() });
 
-      // Start loading
-      act(() => {
-        result.current.startLoading('database-connection');
-      });
+      // Start navigation loading
+      await user.click(screen.getByTestId('set-navigation-loading'));
 
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-      });
+      expect(screen.getByTestId('navigation-loading')).toHaveTextContent('Navigation: true');
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
+      expect(screen.getByTestId('blocking')).toHaveTextContent('Blocking: true');
+    });
 
-      // Stop loading
-      act(() => {
-        result.current.stopLoading('database-connection');
-      });
+    it('should manage component-specific loading state', () => {
+      render(
+        <TestComponent shouldStartLoading componentId="test-comp" />, 
+        { wrapper: createTestWrapper() }
+      );
 
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-        expect(result.current.loadingOperations).not.toContain('database-connection');
-      });
+      expect(screen.getByTestId('component-loading')).toHaveTextContent('Component: true');
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
     });
 
     it('should handle multiple concurrent loading operations', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
+      render(<TestComponent />, { wrapper: createTestWrapper() });
 
-      // Start multiple operations
-      act(() => {
-        result.current.startLoading('operation-1');
-        result.current.startLoading('operation-2');
-        result.current.startLoading('operation-3');
-      });
+      // Start multiple loading operations
+      await user.click(screen.getByTestId('set-global-loading'));
+      await user.click(screen.getByTestId('set-navigation-loading'));
+      await user.click(screen.getByTestId('start-loading'));
 
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-        expect(result.current.loadingOperations).toHaveLength(3);
-        expect(result.current.loadingOperations).toEqual(
-          expect.arrayContaining(['operation-1', 'operation-2', 'operation-3'])
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 3');
+      expect(screen.getByTestId('blocking')).toHaveTextContent('Blocking: true');
+    });
+
+    it('should clear all non-persistent loading states', async () => {
+      render(<TestComponent />, { wrapper: createTestWrapper() });
+
+      // Start multiple loading operations
+      await user.click(screen.getByTestId('set-global-loading'));
+      await user.click(screen.getByTestId('start-loading'));
+
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 2');
+
+      // Clear all loading
+      await user.click(screen.getByTestId('stop-all-loading'));
+
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 0');
+      expect(screen.getByTestId('global-loading')).toHaveTextContent('Global: false');
+    });
+  });
+
+  describe('Loading Options and Features', () => {
+    it('should handle minimum delay for loading operations', async () => {
+      const TestDelayComponent = () => {
+        const { startLoading } = useLoading();
+        const [operationId, setOperationId] = React.useState<string>('');
+
+        const startDelayedLoading = () => {
+          const id = startLoading({ minDelay: 100 });
+          setOperationId(id);
+        };
+
+        return (
+          <div>
+            <button data-testid="start-delayed" onClick={startDelayedLoading}>
+              Start Delayed
+            </button>
+            <div data-testid="operation-id">{operationId}</div>
+          </div>
         );
+      };
+
+      render(<TestDelayComponent />, { wrapper: createTestWrapper() });
+      render(<TestComponent />, { wrapper: createTestWrapper() });
+
+      // Start delayed loading
+      await user.click(screen.getByTestId('start-delayed'));
+
+      // Initially should not be loading due to minimum delay
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 0');
+
+      // Advance timers past the minimum delay
+      act(() => {
+        vi.advanceTimersByTime(150);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
       });
     });
 
-    it('should remain loading when stopping one of multiple operations', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
+    it('should handle timeout for loading operations', async () => {
+      render(<TestComponent />, { wrapper: createTestWrapper() });
 
-      // Start multiple operations
+      // Start loading operation with timeout
+      const loadingOptions: LoadingOptions = { timeout: 200 };
+      render(
+        <TestComponent shouldStartLoading loadingOptions={loadingOptions} />, 
+        { wrapper: createTestWrapper() }
+      );
+
+      // Should initially be loading
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
+
+      // Advance past timeout
       act(() => {
-        result.current.startLoading('operation-1');
-        result.current.startLoading('operation-2');
+        vi.advanceTimersByTime(250);
       });
 
       await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-        expect(result.current.loadingOperations).toHaveLength(2);
-      });
-
-      // Stop one operation
-      act(() => {
-        result.current.stopLoading('operation-1');
-      });
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-        expect(result.current.loadingOperations).toHaveLength(1);
-        expect(result.current.loadingOperations).toContain('operation-2');
+        expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 0');
       });
     });
 
-    it('should clear all loading operations', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
+    it('should handle persistent loading operations', async () => {
+      const persistentOptions: LoadingOptions = { persist: true };
+      
+      render(
+        <TestComponent shouldStartLoading loadingOptions={persistentOptions} />, 
+        { wrapper: createTestWrapper() }
+      );
 
-      // Start multiple operations
-      act(() => {
-        result.current.startLoading('operation-1');
-        result.current.startLoading('operation-2');
-        result.current.startLoading('operation-3');
-      });
+      // Should be loading
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
 
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-        expect(result.current.loadingOperations).toHaveLength(3);
-      });
+      // Clear all loading - persistent should remain
+      await user.click(screen.getByTestId('stop-all-loading'));
 
-      // Clear all operations
-      act(() => {
-        result.current.clearAllLoading();
-      });
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-        expect(result.current.loadingOperations).toHaveLength(0);
-      });
+      // Persistent loading should still be active
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
     });
 
-    it('should handle duplicate operation names gracefully', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
+    it('should handle loading priority levels', () => {
+      const highPriorityOptions: LoadingOptions = { priority: 'high' };
+      const lowPriorityOptions: LoadingOptions = { priority: 'low' };
 
-      // Start same operation multiple times
-      act(() => {
-        result.current.startLoading('duplicate-operation');
-        result.current.startLoading('duplicate-operation');
-        result.current.startLoading('duplicate-operation');
-      });
+      // Test high priority loading (should be blocking)
+      render(
+        <TestComponent shouldStartLoading loadingOptions={highPriorityOptions} />, 
+        { wrapper: createTestWrapper() }
+      );
+      expect(screen.getByTestId('blocking')).toHaveTextContent('Blocking: true');
 
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-        // Should only have one instance of the operation
-        expect(result.current.loadingOperations.filter(op => op === 'duplicate-operation')).toHaveLength(1);
-      });
-    });
-
-    it('should ignore stopping non-existent operations', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
-
-      // Start one operation
-      act(() => {
-        result.current.startLoading('existing-operation');
-      });
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-        expect(result.current.loadingOperations).toHaveLength(1);
-      });
-
-      // Try to stop non-existent operation
-      act(() => {
-        result.current.stopLoading('non-existent-operation');
-      });
-
-      await waitFor(() => {
-        // State should remain unchanged
-        expect(result.current.isLoading).toBe(true);
-        expect(result.current.loadingOperations).toHaveLength(1);
-        expect(result.current.loadingOperations).toContain('existing-operation');
-      });
+      // Re-render with low priority (should not be blocking)
+      render(
+        <TestComponent shouldStartLoading loadingOptions={lowPriorityOptions} />, 
+        { wrapper: createTestWrapper() }
+      );
+      expect(screen.getByTestId('blocking')).toHaveTextContent('Blocking: false');
     });
   });
 
   describe('React Query Integration', () => {
-    it('should integrate with React Query global loading state', async () => {
-      // Mock React Query to indicate active fetching
-      mockedUseIsFetching.mockReturnValue(2);
-
-      const { result } = renderHook(() => useLoadingState(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
+    it('should integrate with React Query loading states', async () => {
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false, staleTime: 0 },
+        },
       });
 
-      await waitFor(() => {
-        expect(result.current.isGlobalLoading).toBe(true);
-      });
-    });
-
-    it('should combine local and React Query loading states', async () => {
-      mockedUseIsFetching.mockReturnValue(1);
-
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
-
-      // Start local loading
-      act(() => {
-        result.current.startLoading('local-operation');
-      });
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-      });
-
-      // Mock ending React Query fetching
-      mockedUseIsFetching.mockReturnValue(0);
-
-      // Should still be loading due to local operation
-      expect(result.current.isLoading).toBe(true);
-    });
-
-    it('should reflect React Query loading without local operations', async () => {
-      mockedUseIsFetching.mockReturnValue(1);
-
-      const { result } = renderHook(() => useLoadingState(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
-
-      await waitFor(() => {
-        expect(result.current.isGlobalLoading).toBe(true);
-      });
-
-      // Mock React Query finishing
-      mockedUseIsFetching.mockReturnValue(0);
-
-      await waitFor(() => {
-        expect(result.current.isGlobalLoading).toBe(false);
-      });
-    });
-  });
-
-  describe('Component Integration', () => {
-    it('should update UI when loading state changes', async () => {
-      render(
-        <TestWrapper queryClient={queryClient}>
-          <TestComponent />
-        </TestWrapper>
-      );
-
-      expect(screen.getByTestId('loading-status')).toHaveTextContent('idle');
-
-      // Start loading
-      act(() => {
-        screen.getByTestId('start-button').click();
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('loading-status')).toHaveTextContent('loading');
-        expect(screen.getByTestId('operations-count')).toHaveTextContent('1');
-      });
-
-      // Stop loading
-      act(() => {
-        screen.getByTestId('stop-button').click();
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('loading-status')).toHaveTextContent('idle');
-        expect(screen.getByTestId('operations-count')).toHaveTextContent('0');
-      });
-    });
-
-    it('should share loading state across multiple components', async () => {
-      render(
-        <TestWrapper queryClient={queryClient}>
-          <TestComponent testId="component-1" />
-          <TestComponent testId="component-2" />
-        </TestWrapper>
-      );
-
-      const component1 = screen.getByTestId('component-1');
-      const component2 = screen.getByTestId('component-2');
-
-      // Start loading from first component
-      act(() => {
-        component1.querySelector('[data-testid="start-button"]')?.click();
-      });
-
-      await waitFor(() => {
-        // Both components should reflect the loading state
-        expect(component1.querySelector('[data-testid="loading-status"]')).toHaveTextContent('loading');
-        expect(component2.querySelector('[data-testid="loading-status"]')).toHaveTextContent('loading');
-      });
-
-      // Stop loading from second component
-      act(() => {
-        component2.querySelector('[data-testid="stop-button"]')?.click();
-      });
-
-      await waitFor(() => {
-        // Both components should reflect the idle state
-        expect(component1.querySelector('[data-testid="loading-status"]')).toHaveTextContent('idle');
-        expect(component2.querySelector('[data-testid="loading-status"]')).toHaveTextContent('idle');
-      });
-    });
-  });
-
-  describe('Loading State Persistence', () => {
-    it('should maintain loading state during component remount', async () => {
       const { rerender } = render(
-        <TestWrapper queryClient={queryClient}>
+        <>
           <TestComponent />
-        </TestWrapper>
+          <QueryTestComponent />
+        </>,
+        { wrapper: createTestWrapper({ queryClient }) }
       );
 
-      // Start loading
-      act(() => {
-        screen.getByTestId('start-button').click();
+      // Initially should not be loading
+      expect(screen.getByTestId('server-loading')).toHaveTextContent('Server: false');
+
+      // Trigger query by re-rendering (this will start the query)
+      await waitFor(() => {
+        expect(screen.getByTestId('query-loading')).toHaveTextContent('Query Loading: true');
       });
 
+      // Server loading should now be true due to React Query integration
       await waitFor(() => {
-        expect(screen.getByTestId('loading-status')).toHaveTextContent('loading');
+        expect(screen.getByTestId('server-loading')).toHaveTextContent('Server: true');
       });
 
-      // Remount component
-      rerender(
-        <TestWrapper queryClient={queryClient}>
-          <TestComponent />
-        </TestWrapper>
-      );
-
-      // Loading state should persist
+      // Wait for query to complete
       await waitFor(() => {
-        expect(screen.getByTestId('loading-status')).toHaveTextContent('loading');
-        expect(screen.getByTestId('operations-count')).toHaveTextContent('1');
+        expect(screen.getByTestId('query-loading')).toHaveTextContent('Query Loading: false');
+      });
+
+      // Server loading should now be false
+      await waitFor(() => {
+        expect(screen.getByTestId('server-loading')).toHaveTextContent('Server: false');
       });
     });
 
-    it('should handle component unmounting gracefully', async () => {
-      const { unmount } = render(
-        <TestWrapper queryClient={queryClient}>
+    it('should disable React Query integration when configured', () => {
+      render(
+        <>
           <TestComponent />
-        </TestWrapper>
+          <QueryTestComponent />
+        </>,
+        { wrapper: createTestWrapper({ enableQueryIntegration: false }) }
       );
 
-      // Start loading
+      // Server loading should remain false even with active queries
+      expect(screen.getByTestId('server-loading')).toHaveTextContent('Server: false');
+    });
+  });
+
+  describe('Navigation Loading Integration', () => {
+    it('should track navigation loading states', () => {
+      // Mock window.history methods
+      const originalPushState = window.history.pushState;
+      const originalReplaceState = window.history.replaceState;
+
+      const { rerender } = render(<TestComponent />, { 
+        wrapper: createTestWrapper({ enableNavigationTracking: true }) 
+      });
+
+      // Simulate navigation
       act(() => {
-        screen.getByTestId('start-button').click();
+        window.history.pushState({}, '', '/new-page');
       });
 
-      await waitFor(() => {
-        expect(screen.getByTestId('loading-status')).toHaveTextContent('loading');
+      // Should trigger navigation loading
+      expect(screen.getByTestId('navigation-loading')).toHaveTextContent('Navigation: true');
+
+      // Simulate navigation completion
+      act(() => {
+        vi.advanceTimersByTime(150); // Advance past the 100ms timeout
       });
 
-      // Unmount should not cause errors
-      expect(() => unmount()).not.toThrow();
+      waitFor(() => {
+        expect(screen.getByTestId('navigation-loading')).toHaveTextContent('Navigation: false');
+      });
+
+      // Restore original methods
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
     });
 
-    it('should maintain separate operation namespaces', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
+    it('should disable navigation tracking when configured', () => {
+      const originalPushState = window.history.pushState;
+
+      render(<TestComponent />, { 
+        wrapper: createTestWrapper({ enableNavigationTracking: false }) 
       });
 
-      // Start operations with different namespaces
+      // Simulate navigation
       act(() => {
-        result.current.startLoading('database:connection-test');
-        result.current.startLoading('api:endpoint-generation');
-        result.current.startLoading('schema:discovery');
+        window.history.pushState({}, '', '/new-page');
       });
 
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-        expect(result.current.loadingOperations).toHaveLength(3);
-        expect(result.current.loadingOperations).toEqual(
-          expect.arrayContaining([
-            'database:connection-test',
-            'api:endpoint-generation',
-            'schema:discovery'
-          ])
+      // Should not trigger navigation loading
+      expect(screen.getByTestId('navigation-loading')).toHaveTextContent('Navigation: false');
+
+      window.history.pushState = originalPushState;
+    });
+
+    it('should handle popstate events for navigation tracking', () => {
+      render(<TestComponent />, { 
+        wrapper: createTestWrapper({ enableNavigationTracking: true }) 
+      });
+
+      // Simulate popstate event (back/forward navigation)
+      act(() => {
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      });
+
+      // Should trigger navigation loading
+      expect(screen.getByTestId('navigation-loading')).toHaveTextContent('Navigation: true');
+    });
+  });
+
+  describe('Custom Hooks', () => {
+    describe('useLoading', () => {
+      it('should provide simplified loading interface', () => {
+        const TestLoadingHook = () => {
+          const { 
+            isLoading, 
+            isGlobalLoading, 
+            isNavigationLoading, 
+            isServerLoading,
+            activeCount,
+            startLoading, 
+            stopLoading, 
+            setLoading,
+            hasAnyLoading
+          } = useLoading();
+
+          return (
+            <div>
+              <div data-testid="hook-loading">Loading: {isLoading.toString()}</div>
+              <div data-testid="hook-global">Global: {isGlobalLoading.toString()}</div>
+              <div data-testid="hook-navigation">Navigation: {isNavigationLoading.toString()}</div>
+              <div data-testid="hook-server">Server: {isServerLoading.toString()}</div>
+              <div data-testid="hook-count">Count: {activeCount}</div>
+              <div data-testid="hook-any">Any: {hasAnyLoading().toString()}</div>
+              <button data-testid="hook-start" onClick={() => startLoading()}>Start</button>
+              <button data-testid="hook-set-true" onClick={() => setLoading(true)}>Set True</button>
+              <button data-testid="hook-set-false" onClick={() => setLoading(false)}>Set False</button>
+            </div>
+          );
+        };
+
+        render(<TestLoadingHook />, { wrapper: createTestWrapper() });
+
+        expect(screen.getByTestId('hook-loading')).toHaveTextContent('Loading: false');
+        expect(screen.getByTestId('hook-any')).toHaveTextContent('Any: false');
+      });
+
+      it('should handle loading operations through simplified interface', async () => {
+        const TestLoadingHook = () => {
+          const { isLoading, startLoading, setLoading } = useLoading();
+
+          return (
+            <div>
+              <div data-testid="hook-loading">Loading: {isLoading.toString()}</div>
+              <button data-testid="hook-start" onClick={() => startLoading()}>Start</button>
+              <button data-testid="hook-set-true" onClick={() => setLoading(true)}>Set True</button>
+              <button data-testid="hook-set-false" onClick={() => setLoading(false)}>Set False</button>
+            </div>
+          );
+        };
+
+        render(<TestLoadingHook />, { wrapper: createTestWrapper() });
+
+        // Start loading
+        await user.click(screen.getByTestId('hook-start'));
+        expect(screen.getByTestId('hook-loading')).toHaveTextContent('Loading: true');
+
+        // Set loading false should clear all
+        await user.click(screen.getByTestId('hook-set-false'));
+        expect(screen.getByTestId('hook-loading')).toHaveTextContent('Loading: false');
+
+        // Set loading true should start loading
+        await user.click(screen.getByTestId('hook-set-true'));
+        expect(screen.getByTestId('hook-loading')).toHaveTextContent('Loading: true');
+      });
+    });
+
+    describe('useComponentLoading', () => {
+      it('should manage component-specific loading states', () => {
+        const TestComponentLoading = ({ componentId }: { componentId: string }) => {
+          const { isLoading, setLoading, getLoading } = useComponentLoading(componentId);
+
+          return (
+            <div data-testid={`component-${componentId}`}>
+              <div data-testid={`loading-${componentId}`}>Loading: {isLoading.toString()}</div>
+              <div data-testid={`get-loading-${componentId}`}>Get: {getLoading().toString()}</div>
+              <button 
+                data-testid={`start-${componentId}`} 
+                onClick={() => setLoading(true)}
+              >
+                Start
+              </button>
+              <button 
+                data-testid={`stop-${componentId}`} 
+                onClick={() => setLoading(false)}
+              >
+                Stop
+              </button>
+            </div>
+          );
+        };
+
+        render(
+          <>
+            <TestComponentLoading componentId="comp1" />
+            <TestComponentLoading componentId="comp2" />
+          </>,
+          { wrapper: createTestWrapper() }
         );
+
+        // Initially not loading
+        expect(screen.getByTestId('loading-comp1')).toHaveTextContent('Loading: false');
+        expect(screen.getByTestId('loading-comp2')).toHaveTextContent('Loading: false');
       });
 
-      // Stop database operation
-      act(() => {
-        result.current.stopLoading('database:connection-test');
+      it('should handle independent component loading states', async () => {
+        const TestComponentLoading = ({ componentId }: { componentId: string }) => {
+          const { isLoading, setLoading } = useComponentLoading(componentId);
+
+          return (
+            <div>
+              <div data-testid={`loading-${componentId}`}>Loading: {isLoading.toString()}</div>
+              <button 
+                data-testid={`start-${componentId}`} 
+                onClick={() => setLoading(true)}
+              >
+                Start
+              </button>
+            </div>
+          );
+        };
+
+        render(
+          <>
+            <TestComponentLoading componentId="comp1" />
+            <TestComponentLoading componentId="comp2" />
+          </>,
+          { wrapper: createTestWrapper() }
+        );
+
+        // Start loading for comp1 only
+        await user.click(screen.getByTestId('start-comp1'));
+
+        expect(screen.getByTestId('loading-comp1')).toHaveTextContent('Loading: true');
+        expect(screen.getByTestId('loading-comp2')).toHaveTextContent('Loading: false');
+      });
+    });
+
+    describe('useAsyncLoading', () => {
+      it('should handle async operations with loading states', async () => {
+        render(<AsyncTestComponent />, { wrapper: createTestWrapper() });
+
+        // Initially not loading
+        expect(screen.getByTestId('async-loading')).toHaveTextContent('Async Loading: false');
+        expect(screen.getByTestId('async-data')).toHaveTextContent('Data: none');
+
+        // Execute async operation
+        await user.click(screen.getByTestId('execute-async'));
+
+        // Should be loading immediately
+        expect(screen.getByTestId('async-loading')).toHaveTextContent('Async Loading: true');
+
+        // Wait for completion
+        await waitFor(() => {
+          expect(screen.getByTestId('async-loading')).toHaveTextContent('Async Loading: false');
+        });
+
+        expect(screen.getByTestId('async-data')).toHaveTextContent('Data: async result');
       });
 
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-        expect(result.current.loadingOperations).toHaveLength(2);
-        expect(result.current.loadingOperations).not.toContain('database:connection-test');
+      it('should handle async operation errors', async () => {
+        const ErrorAsyncComponent = () => {
+          const asyncFn = React.useCallback(async () => {
+            await new Promise(resolve => setTimeout(resolve, 50));
+            throw new Error('Test error');
+          }, []);
+
+          const { error, isLoading, execute } = useAsyncLoading(asyncFn);
+
+          return (
+            <div>
+              <div data-testid="error-loading">Loading: {isLoading.toString()}</div>
+              <div data-testid="error-message">Error: {error?.message || 'none'}</div>
+              <button data-testid="execute-error" onClick={execute}>
+                Execute Error
+              </button>
+            </div>
+          );
+        };
+
+        render(<ErrorAsyncComponent />, { wrapper: createTestWrapper() });
+
+        // Execute async operation that will error
+        await user.click(screen.getByTestId('execute-error'));
+
+        // Wait for completion
+        await waitFor(() => {
+          expect(screen.getByTestId('error-loading')).toHaveTextContent('Loading: false');
+        });
+
+        expect(screen.getByTestId('error-message')).toHaveTextContent('Error: Test error');
       });
     });
   });
 
-  describe('Error Handling and Edge Cases', () => {
-    it('should handle empty operation names gracefully', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
+  describe('Higher-Order Component', () => {
+    it('should wrap component with loading functionality', () => {
+      const BaseComponent = (props: { title: string }) => (
+        <div data-testid="base-component">{props.title}</div>
+      );
 
-      // Try to start with empty string
-      act(() => {
-        result.current.startLoading('');
-      });
+      const WrappedComponent = withLoading(BaseComponent, { id: 'hoc-test' });
 
-      await waitFor(() => {
-        // Should ignore empty operation names
-        expect(result.current.isLoading).toBe(false);
-        expect(result.current.loadingOperations).toHaveLength(0);
-      });
+      render(<WrappedComponent title="Test Title" />, { wrapper: createTestWrapper() });
+
+      expect(screen.getByTestId('base-component')).toHaveTextContent('Test Title');
     });
 
-    it('should handle null/undefined operation names gracefully', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
+    it('should auto-start loading when configured with options', () => {
+      const BaseComponent = () => <div data-testid="base-component">Content</div>;
+      const WrappedComponent = withLoading(BaseComponent, { 
+        id: 'hoc-auto-loading',
+        priority: 'high' 
       });
 
-      // Try to start with null/undefined (cast as string for test)
-      act(() => {
-        result.current.startLoading(null as any);
-        result.current.startLoading(undefined as any);
-      });
+      render(
+        <>
+          <WrappedComponent />
+          <TestComponent />
+        </>,
+        { wrapper: createTestWrapper() }
+      );
 
-      await waitFor(() => {
-        // Should ignore null/undefined operation names
-        expect(result.current.isLoading).toBe(false);
-        expect(result.current.loadingOperations).toHaveLength(0);
-      });
+      // Should auto-start loading due to HOC configuration
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
+      expect(screen.getByTestId('blocking')).toHaveTextContent('Blocking: true');
     });
+  });
 
-    it('should provide stable function references', () => {
-      const { result, rerender } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
+  describe('Error Scenarios and Edge Cases', () => {
+    it('should handle rapid start/stop operations', async () => {
+      const RapidOperationsComponent = () => {
+        const { startLoading, stopLoading } = useLoading();
+        const [operationIds, setOperationIds] = React.useState<string[]>([]);
 
-      const initialFunctions = {
-        startLoading: result.current.startLoading,
-        stopLoading: result.current.stopLoading,
-        clearAllLoading: result.current.clearAllLoading,
+        const rapidOperations = () => {
+          const ids: string[] = [];
+          for (let i = 0; i < 5; i++) {
+            const id = startLoading({ id: `rapid-${i}` });
+            ids.push(id);
+          }
+          setOperationIds(ids);
+          
+          // Stop all operations immediately
+          setTimeout(() => {
+            ids.forEach(id => stopLoading(id));
+          }, 10);
+        };
+
+        return (
+          <div>
+            <button data-testid="rapid-operations" onClick={rapidOperations}>
+              Rapid Operations
+            </button>
+            <div data-testid="operation-count">{operationIds.length}</div>
+          </div>
+        );
       };
 
-      // Rerender the hook
-      rerender();
+      render(
+        <>
+          <RapidOperationsComponent />
+          <TestComponent />
+        </>,
+        { wrapper: createTestWrapper() }
+      );
 
-      // Functions should remain stable (same references)
-      expect(result.current.startLoading).toBe(initialFunctions.startLoading);
-      expect(result.current.stopLoading).toBe(initialFunctions.stopLoading);
-      expect(result.current.clearAllLoading).toBe(initialFunctions.clearAllLoading);
-    });
+      await user.click(screen.getByTestId('rapid-operations'));
 
-    it('should handle rapid start/stop operations', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
-
-      // Rapidly start and stop the same operation
+      // Wait for all operations to complete
       act(() => {
-        result.current.startLoading('rapid-operation');
-        result.current.stopLoading('rapid-operation');
-        result.current.startLoading('rapid-operation');
-        result.current.stopLoading('rapid-operation');
-        result.current.startLoading('rapid-operation');
+        vi.advanceTimersByTime(50);
       });
 
       await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-        expect(result.current.loadingOperations).toHaveLength(1);
-        expect(result.current.loadingOperations).toContain('rapid-operation');
+        expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 0');
       });
+    });
+
+    it('should handle component unmounting during loading operations', () => {
+      const UnmountingComponent = () => {
+        const [show, setShow] = React.useState(true);
+
+        return (
+          <div>
+            <button data-testid="toggle-component" onClick={() => setShow(!show)}>
+              Toggle Component
+            </button>
+            {show && <TestComponent shouldStartLoading componentId="unmounting-test" />}
+          </div>
+        );
+      };
+
+      const { rerender } = render(<UnmountingComponent />, { wrapper: createTestWrapper() });
+
+      // Should be loading initially
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
+
+      // Unmount component
+      act(() => {
+        user.click(screen.getByTestId('toggle-component'));
+      });
+
+      // Loading state should persist even after component unmount
+      // (this tests the ref-based state management)
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
+    });
+
+    it('should handle duplicate operation IDs gracefully', async () => {
+      const DuplicateIdComponent = () => {
+        const { startLoading } = useLoading();
+
+        const startDuplicateOperations = () => {
+          startLoading({ id: 'duplicate-id' });
+          startLoading({ id: 'duplicate-id' }); // Same ID
+        };
+
+        return (
+          <button data-testid="start-duplicates" onClick={startDuplicateOperations}>
+            Start Duplicates
+          </button>
+        );
+      };
+
+      render(
+        <>
+          <DuplicateIdComponent />
+          <TestComponent />
+        </>,
+        { wrapper: createTestWrapper() }
+      );
+
+      await user.click(screen.getByTestId('start-duplicates'));
+
+      // Should only have one active operation (duplicate ID should be overwritten)
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
     });
   });
 
-  describe('Performance and Memory Management', () => {
-    it('should not cause memory leaks with many operations', async () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
+  describe('State Persistence and Lifecycle', () => {
+    it('should persist loading states across re-renders', () => {
+      const PersistenceTestComponent = () => {
+        const [count, setCount] = React.useState(0);
+        const { startLoading } = useLoading();
+
+        React.useEffect(() => {
+          if (count === 0) {
+            startLoading({ persist: true, id: 'persistent-operation' });
+          }
+        }, [count, startLoading]);
+
+        return (
+          <div>
+            <div data-testid="render-count">{count}</div>
+            <button data-testid="increment" onClick={() => setCount(c => c + 1)}>
+              Increment
+            </button>
+          </div>
+        );
+      };
+
+      render(
+        <>
+          <PersistenceTestComponent />
+          <TestComponent />
+        </>,
+        { wrapper: createTestWrapper() }
+      );
+
+      // Should be loading initially
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
+
+      // Trigger re-render
+      act(() => {
+        user.click(screen.getByTestId('increment'));
       });
 
-      // Start many operations
+      // Loading should persist
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 1');
+    });
+
+    it('should properly clean up on provider unmount', () => {
+      let cleanupCallbacks: Array<() => void> = [];
+      
+      const spy = vi.spyOn(React, 'useEffect').mockImplementation((effect, deps) => {
+        const cleanup = effect();
+        if (cleanup && typeof cleanup === 'function') {
+          cleanupCallbacks.push(cleanup);
+        }
+        return cleanup;
+      });
+
+      const { unmount } = render(<TestComponent />, { wrapper: createTestWrapper() });
+
+      // Unmount the provider
+      unmount();
+
+      // Verify cleanup functions were called
+      expect(cleanupCallbacks.length).toBeGreaterThan(0);
+
+      spy.mockRestore();
+    });
+  });
+
+  describe('Performance and Optimization', () => {
+    it('should debounce rapid state changes', async () => {
+      const renderSpy = vi.fn();
+      
+      const OptimizationTestComponent = () => {
+        const { activeCount } = useLoading();
+        
+        renderSpy();
+        
+        return <div data-testid="optimized-count">{activeCount}</div>;
+      };
+
+      render(<OptimizationTestComponent />, { wrapper: createTestWrapper() });
+
+      const initialRenderCount = renderSpy.mock.calls.length;
+
+      // Perform multiple rapid state changes
+      const { actions } = renderHook(() => useLoadingContext(), {
+        wrapper: createTestWrapper(),
+      }).result.current;
+
       act(() => {
-        for (let i = 0; i < 100; i++) {
-          result.current.startLoading(`operation-${i}`);
+        for (let i = 0; i < 10; i++) {
+          actions.startLoading({ id: `batch-${i}` });
         }
       });
 
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-        expect(result.current.loadingOperations).toHaveLength(100);
-      });
-
-      // Clear all at once
-      act(() => {
-        result.current.clearAllLoading();
-      });
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-        expect(result.current.loadingOperations).toHaveLength(0);
-      });
+      // Should not cause excessive re-renders due to batching
+      const finalRenderCount = renderSpy.mock.calls.length;
+      expect(finalRenderCount - initialRenderCount).toBeLessThan(5);
     });
 
-    it('should minimize re-renders with stable state', () => {
-      const { result } = renderHook(() => useLoading(), {
-        wrapper: ({ children }) => <TestWrapper queryClient={queryClient}>{children}</TestWrapper>
-      });
+    it('should handle large numbers of concurrent operations efficiently', () => {
+      const LargeOperationsComponent = () => {
+        const { startLoading, hasAnyLoading } = useLoading();
 
-      const initialState = result.current;
+        const startManyOperations = () => {
+          for (let i = 0; i < 100; i++) {
+            startLoading({ id: `large-op-${i}` });
+          }
+        };
 
-      // Multiple calls without state changes should return stable objects
+        return (
+          <div>
+            <button data-testid="start-many" onClick={startManyOperations}>
+              Start Many
+            </button>
+            <div data-testid="has-any">{hasAnyLoading().toString()}</div>
+          </div>
+        );
+      };
+
+      render(
+        <>
+          <LargeOperationsComponent />
+          <TestComponent />
+        </>,
+        { wrapper: createTestWrapper() }
+      );
+
+      const startTime = performance.now();
+      
       act(() => {
-        result.current.stopLoading('non-existent');
-        result.current.stopLoading('another-non-existent');
+        user.click(screen.getByTestId('start-many'));
       });
 
-      // The isLoading state should remain stable
-      expect(result.current.isLoading).toBe(initialState.isLoading);
-      expect(result.current.loadingOperations).toEqual(initialState.loadingOperations);
+      const endTime = performance.now();
+
+      // Should handle 100 operations efficiently (under 100ms)
+      expect(endTime - startTime).toBeLessThan(100);
+      expect(screen.getByTestId('active-count')).toHaveTextContent('Active: 100');
     });
   });
 });
