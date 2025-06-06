@@ -1,106 +1,131 @@
 /**
  * Database Connection Test Hook
  * 
- * Custom React hook that handles database connection testing using SWR for intelligent caching 
- * and automatic retries. Implements real-time connection validation with configurable timeout 
- * and error handling, providing connection status state management and test result data for 
- * React components.
+ * Custom React hook that handles database connection testing using SWR for intelligent 
+ * caching and automatic retries. Implements real-time connection validation with configurable 
+ * timeout and error handling, providing connection status state management and test result 
+ * data for React components.
  * 
- * @fileoverview SWR-powered connection testing hook for database services
+ * Features:
+ * - Real-time connection validation under 5 seconds per F-001-RQ-002
+ * - SWR for connection testing and caching with automatic retry
+ * - Support for multi-database types (MySQL, PostgreSQL, Oracle, MongoDB, Snowflake)
+ * - TypeScript 5.8+ interface definitions for type safety
+ * - Connection testing API integration with /{serviceName}/_table endpoint
+ * - Exponential backoff retry logic for failed connections
+ * - Connection state management for loading, success, error, and idle states
+ * 
+ * @fileoverview Connection test hook migrated from Angular HTTP to SWR-powered React hook
  * @version 1.0.0
- * @since 2024-01-01
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useRef, useState, useMemo } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
-import type { 
-  DatabaseConfig, 
-  ConnectionTestResult, 
-  ConnectionTestStatus, 
-  ApiErrorResponse,
-  ConnectionMetadata 
-} from '../types';
+import { useMutation } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
 import { 
   CONNECTION_TIMEOUTS, 
-  CONNECTION_RETRY_CONFIG, 
-  DATABASE_SERVICE_ENDPOINTS,
-  DATABASE_SERVICE_SWR_CONFIG,
-  DATABASE_ERROR_MESSAGES 
+  DATABASE_SERVICE_SWR_CONFIG, 
+  ERROR_CONFIG,
+  API_ENDPOINTS 
 } from '../constants';
+import type {
+  DatabaseConnectionFormData,
+  ConnectionTestResult,
+  ConnectionTestStatus,
+  ConnectionTestInput,
+  UseConnectionTestReturn,
+  DatabaseService,
+  ApiErrorResponse
+} from '../types';
 
 // =============================================================================
-// TYPES AND INTERFACES
+// HOOK CONFIGURATION AND TYPES
 // =============================================================================
 
 /**
- * Connection test hook configuration options
+ * Connection test hook options for customization
  */
 export interface UseConnectionTestOptions {
-  /** Enable automatic retry on failure */
-  enableRetry?: boolean;
-  /** Maximum number of retry attempts */
+  /** Service to test (for existing services) */
+  service?: DatabaseService;
+  
+  /** Connection configuration to test (for new services) */
+  config?: DatabaseConnectionFormData;
+  
+  /** Test timeout in milliseconds (default: 5000ms per F-001-RQ-002) */
+  timeout?: number;
+  
+  /** Skip cache and force new test */
+  skipCache?: boolean;
+  
+  /** Auto-test on mount */
+  autoTest?: boolean;
+  
+  /** Auto-test on config change */
+  autoTestOnChange?: boolean;
+  
+  /** Test debounce delay in milliseconds */
+  debounceDelay?: number;
+  
+  /** Maximum retry attempts */
   maxRetries?: number;
-  /** Initial retry delay in milliseconds */
+  
+  /** Base retry delay in milliseconds */
   retryDelay?: number;
-  /** Retry backoff multiplier */
-  backoffMultiplier?: number;
-  /** Connection timeout in milliseconds */
-  timeout?: number;
-  /** Enable SWR caching */
-  enableCache?: boolean;
-  /** SWR cache key prefix */
-  cacheKeyPrefix?: string;
-  /** Callback for successful connection tests */
-  onSuccess?: (result: ConnectionTestResult) => void;
-  /** Callback for failed connection tests */
-  onError?: (error: ApiErrorResponse) => void;
+  
+  /** Enable test history tracking */
+  enableHistory?: boolean;
+  
+  /** Maximum history entries to maintain */
+  maxHistory?: number;
+  
+  /** Test success callback */
+  onTestSuccess?: (result: ConnectionTestResult) => void;
+  
+  /** Test error callback */
+  onTestError?: (error: string, result?: ConnectionTestResult) => void;
+  
+  /** Test start callback */
+  onTestStart?: () => void;
+  
+  /** Test complete callback (success or error) */
+  onTestComplete?: (result: ConnectionTestResult) => void;
 }
 
 /**
- * Connection test hook return interface
+ * Internal connection test state management
  */
-export interface UseConnectionTestReturn {
-  /** Execute connection test with provided config */
-  testConnection: (config: DatabaseConfig) => Promise<ConnectionTestResult>;
-  /** Current connection test result */
-  result: ConnectionTestResult | null;
-  /** Loading state indicator */
-  isLoading: boolean;
-  /** Error state */
-  error: ApiErrorResponse | null;
-  /** Current connection test status */
+interface ConnectionTestState {
+  /** Current test status */
   status: ConnectionTestStatus;
-  /** Reset hook state */
-  reset: () => void;
-  /** Retry last failed connection test */
-  retry: () => Promise<ConnectionTestResult | null>;
-  /** Cancel ongoing connection test */
-  cancel: () => void;
-  /** Test duration in milliseconds */
-  testDuration: number | null;
-  /** Number of retry attempts made */
-  retryCount: number;
+  
+  /** Test start timestamp */
+  startTime: number | null;
+  
+  /** Test end timestamp */
+  endTime: number | null;
+  
+  /** Current retry attempt */
+  retryAttempt: number;
+  
+  /** Test cancellation flag */
+  cancelled: boolean;
+  
+  /** Abort controller for cancellation */
+  abortController: AbortController | null;
 }
 
 /**
- * Connection test request payload
+ * Connection test history entry
  */
-interface ConnectionTestRequest {
-  config: DatabaseConfig;
-  timeout?: number;
-  validateSchema?: boolean;
-}
-
-/**
- * Connection test response from API
- */
-interface ConnectionTestResponse {
-  success: boolean;
-  message: string;
-  details?: string;
-  metadata?: ConnectionMetadata;
-  errorCode?: string;
-  testDuration: number;
+interface ConnectionTestHistoryEntry extends ConnectionTestResult {
+  /** Test execution timestamp */
+  timestamp: string;
+  
+  /** Test configuration used */
+  testConfig: ConnectionTestInput;
 }
 
 // =============================================================================
@@ -108,573 +133,569 @@ interface ConnectionTestResponse {
 // =============================================================================
 
 /**
- * Creates a unique cache key for connection test results
+ * Generate SWR cache key for connection test
  */
-const createCacheKey = (config: DatabaseConfig, prefix = 'connection-test'): string => {
-  const configHash = btoa(JSON.stringify({
-    driver: config.driver,
-    host: config.host,
-    port: config.port,
-    database: config.database,
-    username: config.username,
-    // Exclude password from cache key for security
-    ssl: config.ssl?.enabled,
-    options: config.options
-  }));
+function generateCacheKey(
+  serviceId?: number, 
+  config?: DatabaseConnectionFormData,
+  skipCache?: boolean
+): string | null {
+  // Return null for no caching when skipCache is true
+  if (skipCache) return null;
   
-  return `${prefix}:${configHash}`;
-};
-
-/**
- * Validates database configuration before testing
- */
-const validateConnectionConfig = (config: DatabaseConfig): string | null => {
-  if (!config.driver) {
-    return 'Database driver is required';
+  if (serviceId) {
+    return `connection-test-service-${serviceId}`;
   }
   
-  if (!config.host && config.driver !== 'sqlite') {
-    return 'Host is required for this database type';
-  }
-  
-  if (!config.database) {
-    return 'Database name is required';
-  }
-  
-  if (!config.username && config.driver !== 'sqlite') {
-    return 'Username is required for this database type';
+  if (config) {
+    // Create a stable cache key based on connection parameters
+    const cacheKey = {
+      type: config.type,
+      host: config.host,
+      port: config.port,
+      database: config.database,
+      username: config.username,
+      // Don't include password in cache key for security
+    };
+    return `connection-test-config-${btoa(JSON.stringify(cacheKey))}`;
   }
   
   return null;
-};
+}
 
 /**
- * Implements exponential backoff delay calculation
+ * Validate connection test input
  */
-const calculateBackoffDelay = (
-  attempt: number, 
-  baseDelay: number, 
-  multiplier: number, 
-  maxDelay: number
-): number => {
-  const delay = baseDelay * Math.pow(multiplier, attempt);
-  return Math.min(delay, maxDelay);
-};
-
-/**
- * Creates an AbortController with timeout
- */
-const createTimeoutController = (timeoutMs: number): AbortController => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort('Connection test timeout');
-  }, timeoutMs);
+function validateTestInput(
+  serviceId?: number,
+  config?: DatabaseConnectionFormData
+): { isValid: boolean; error?: string } {
+  if (!serviceId && !config) {
+    return { 
+      isValid: false, 
+      error: 'Either serviceId or config must be provided for connection testing' 
+    };
+  }
   
-  // Clear timeout if request completes normally
-  controller.signal.addEventListener('abort', () => {
-    clearTimeout(timeoutId);
-  });
-  
-  return controller;
-};
-
-// =============================================================================
-// API CLIENT FUNCTIONS
-// =============================================================================
-
-/**
- * Executes connection test via DreamFactory API
- */
-const executeConnectionTest = async (
-  config: DatabaseConfig, 
-  options: { timeout?: number; signal?: AbortSignal } = {}
-): Promise<ConnectionTestResponse> => {
-  const startTime = Date.now();
-  const timeout = options.timeout || CONNECTION_TIMEOUTS.CONNECTION_TEST;
-  
-  // Create request payload
-  const requestPayload: ConnectionTestRequest = {
-    config,
-    timeout,
-    validateSchema: false // Just test connection, not full schema
-  };
-  
-  try {
-    // Test connection by attempting to list tables (minimal operation)
-    // Using the /{serviceName}/_table endpoint pattern per requirements
-    const testServiceName = `test-${Date.now()}`;
-    const testEndpoint = `${DATABASE_SERVICE_ENDPOINTS.BASE_URL}/${testServiceName}/_table`;
-    
-    // For connection testing, we use the service test endpoint instead
-    const response = await fetch(DATABASE_SERVICE_ENDPOINTS.SERVICE_TEST, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(requestPayload),
-      signal: options.signal
-    });
-    
-    const testDuration = Date.now() - startTime;
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+  if (config) {
+    // Basic validation for required fields
+    if (!config.type) {
+      return { isValid: false, error: 'Database type is required' };
     }
     
-    const responseData = await response.json();
+    if (!config.host) {
+      return { isValid: false, error: 'Host is required' };
+    }
     
-    // Transform response to match expected format
-    const result: ConnectionTestResponse = {
+    if (!config.database) {
+      return { isValid: false, error: 'Database name is required' };
+    }
+    
+    if (!config.username) {
+      return { isValid: false, error: 'Username is required' };
+    }
+    
+    if (!config.password) {
+      return { isValid: false, error: 'Password is required' };
+    }
+  }
+  
+  return { isValid: true };
+}
+
+/**
+ * Create connection test input from options
+ */
+function createTestInput(
+  serviceId?: number,
+  config?: DatabaseConnectionFormData,
+  timeout: number = CONNECTION_TIMEOUTS.CONNECTION_TEST
+): ConnectionTestInput {
+  return {
+    serviceId,
+    config,
+    timeout,
+    skipCache: false
+  };
+}
+
+/**
+ * Calculate exponential backoff delay
+ */
+function calculateRetryDelay(attempt: number, baseDelay: number): number {
+  return Math.min(baseDelay * Math.pow(2, attempt), 30000); // Max 30 seconds
+}
+
+// =============================================================================
+// CONNECTION TEST FETCHER FUNCTION
+// =============================================================================
+
+/**
+ * SWR fetcher function for connection testing
+ * Implements the /{serviceName}/_table endpoint pattern per F-001 specification
+ */
+async function connectionTestFetcher([key, testInput]: [string, ConnectionTestInput]): Promise<ConnectionTestResult> {
+  const { serviceId, config, timeout = CONNECTION_TIMEOUTS.CONNECTION_TEST } = testInput;
+  
+  try {
+    const startTime = Date.now();
+    
+    let response: any;
+    
+    if (serviceId) {
+      // Test existing service by attempting to fetch table list
+      // Uses /{serviceName}/_table endpoint per API specification
+      response = await apiClient.get(
+        `/${serviceId}/_table?limit=1`,
+        { 
+          timeout,
+          retries: 0 // No automatic retries in fetcher, handled by hook
+        }
+      );
+    } else if (config) {
+      // Test new service configuration via connection test endpoint
+      response = await apiClient.post(
+        API_ENDPOINTS.connectionTest,
+        testInput,
+        { 
+          timeout,
+          retries: 0
+        }
+      );
+    } else {
+      throw new Error('Invalid test configuration');
+    }
+    
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
+    // Validate that connection test met the 5-second requirement
+    if (duration > CONNECTION_TIMEOUTS.CONNECTION_TEST) {
+      console.warn(
+        `Connection test exceeded ${CONNECTION_TIMEOUTS.CONNECTION_TEST}ms requirement: ${duration}ms`
+      );
+    }
+    
+    // Construct successful test result
+    const result: ConnectionTestResult = {
       success: true,
-      message: responseData.message || 'Connection successful',
-      details: responseData.details,
-      metadata: responseData.metadata,
-      testDuration
+      status: 'success',
+      message: 'Connection test successful',
+      duration,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        responseTime: duration,
+        endpoint: serviceId ? `/${serviceId}/_table` : API_ENDPOINTS.connectionTest,
+        method: serviceId ? 'GET' : 'POST',
+        statusCode: 200
+      }
     };
     
     return result;
     
   } catch (error: any) {
-    const testDuration = Date.now() - startTime;
+    const endTime = Date.now();
+    const duration = endTime - Date.now();
     
-    // Handle different error types
-    if (error.name === 'AbortError' || error.message.includes('timeout')) {
-      throw {
-        success: false,
-        message: DATABASE_ERROR_MESSAGES.connection.timeout,
-        errorCode: 'CONNECTION_TIMEOUT',
-        testDuration
-      } as ConnectionTestResponse;
+    // Handle different types of connection errors
+    let errorMessage = 'Connection test failed';
+    let errorCode = 'CONNECTION_ERROR';
+    
+    if (error.name === 'AbortError') {
+      errorMessage = 'Connection test was cancelled';
+      errorCode = 'TEST_CANCELLED';
+    } else if (error.message?.includes('timeout')) {
+      errorMessage = 'Connection test timed out';
+      errorCode = ERROR_CONFIG.connectionErrors.timeoutErrorCode;
+    } else if (error.message?.includes('authentication') || error.message?.includes('auth')) {
+      errorMessage = 'Authentication failed';
+      errorCode = ERROR_CONFIG.connectionErrors.authErrorCode;
+    } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+      errorMessage = 'Network error occurred';
+      errorCode = ERROR_CONFIG.connectionErrors.networkErrorCode;
+    } else if (error.message) {
+      errorMessage = error.message;
     }
     
-    if (error.message.includes('ECONNREFUSED') || error.message.includes('connect ECONNREFUSED')) {
-      throw {
-        success: false,
-        message: DATABASE_ERROR_MESSAGES.connection.refused,
-        errorCode: 'CONNECTION_REFUSED',
-        testDuration
-      } as ConnectionTestResponse;
-    }
-    
-    if (error.message.includes('authentication') || error.message.includes('auth')) {
-      throw {
-        success: false,
-        message: DATABASE_ERROR_MESSAGES.connection.authentication,
-        errorCode: 'AUTHENTICATION_FAILED',
-        testDuration
-      } as ConnectionTestResponse;
-    }
-    
-    if (error.message.includes('database') && error.message.includes('not found')) {
-      throw {
-        success: false,
-        message: DATABASE_ERROR_MESSAGES.connection.database,
-        errorCode: 'DATABASE_NOT_FOUND',
-        testDuration
-      } as ConnectionTestResponse;
-    }
-    
-    // Generic error
-    throw {
+    // Construct failed test result
+    const result: ConnectionTestResult = {
       success: false,
-      message: error.message || DATABASE_ERROR_MESSAGES.connection.unknown,
-      details: error.stack,
-      errorCode: 'UNKNOWN_ERROR',
-      testDuration
-    } as ConnectionTestResponse;
+      status: 'error',
+      message: errorMessage,
+      error: {
+        code: errorCode,
+        message: errorMessage,
+        details: error
+      },
+      duration,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        responseTime: duration,
+        endpoint: serviceId ? `/${serviceId}/_table` : API_ENDPOINTS.connectionTest,
+        method: serviceId ? 'GET' : 'POST',
+        statusCode: error.status || 0
+      }
+    };
+    
+    // Don't throw error, return failed result for proper SWR handling
+    return result;
   }
-};
+}
 
 // =============================================================================
 // MAIN HOOK IMPLEMENTATION
 // =============================================================================
 
 /**
- * Database Connection Test Hook
+ * Custom React hook for database connection testing
  * 
- * Provides real-time database connection testing with SWR caching, automatic retries,
- * and comprehensive error handling. Optimized for sub-5-second connection validation
- * per F-001-RQ-002 functional requirements.
+ * Provides comprehensive connection testing capabilities with SWR caching,
+ * automatic retries, and state management. Supports both existing services
+ * and new configuration testing.
  * 
- * @param options - Configuration options for the hook behavior
- * @returns Hook interface with connection testing capabilities
+ * @param options - Configuration options for the hook
+ * @returns Hook interface with test functions and state
  */
-export const useConnectionTest = (
-  options: UseConnectionTestOptions = {}
-): UseConnectionTestReturn => {
-  // Destructure options with defaults
+export function useConnectionTest(options: UseConnectionTestOptions = {}): UseConnectionTestReturn {
   const {
-    enableRetry = true,
-    maxRetries = CONNECTION_RETRY_CONFIG.maxRetries,
-    retryDelay = CONNECTION_RETRY_CONFIG.retryDelay,
-    backoffMultiplier = CONNECTION_RETRY_CONFIG.backoffMultiplier,
+    service,
+    config,
     timeout = CONNECTION_TIMEOUTS.CONNECTION_TEST,
-    enableCache = true,
-    cacheKeyPrefix = 'connection-test',
-    onSuccess,
-    onError
+    skipCache = false,
+    autoTest = false,
+    autoTestOnChange = false,
+    debounceDelay = 1000,
+    maxRetries = ERROR_CONFIG.connectionErrors.retryAttempts,
+    retryDelay = ERROR_CONFIG.connectionErrors.retryDelay,
+    enableHistory = false,
+    maxHistory = 10,
+    onTestSuccess,
+    onTestError,
+    onTestStart,
+    onTestComplete
   } = options;
   
-  // Local state management
-  const [status, setStatus] = useState<ConnectionTestStatus>('idle');
-  const [result, setResult] = useState<ConnectionTestResult | null>(null);
-  const [error, setError] = useState<ApiErrorResponse | null>(null);
-  const [testDuration, setTestDuration] = useState<number | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
+  // =============================================================================
+  // STATE MANAGEMENT
+  // =============================================================================
   
-  // Refs for managing async operations
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const lastConfigRef = useRef<DatabaseConfig | null>(null);
+  const [state, setState] = useState<ConnectionTestState>({
+    status: 'idle',
+    startTime: null,
+    endTime: null,
+    retryAttempt: 0,
+    cancelled: false,
+    abortController: null
+  });
   
-  // SWR configuration
+  const [history, setHistory] = useState<ConnectionTestHistoryEntry[]>([]);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
   const { mutate } = useSWRConfig();
   
-  /**
-   * Resets all hook state to initial values
-   */
-  const reset = useCallback(() => {
-    setStatus('idle');
-    setResult(null);
-    setError(null);
-    setTestDuration(null);
-    setRetryCount(0);
-    
-    // Cancel any ongoing request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort('Reset called');
-      abortControllerRef.current = null;
-    }
-    
-    lastConfigRef.current = null;
-  }, []);
+  // =============================================================================
+  // SWR CONFIGURATION
+  // =============================================================================
   
-  /**
-   * Cancels ongoing connection test
-   */
-  const cancel = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort('User cancelled');
-      abortControllerRef.current = null;
-    }
-    
-    setStatus('idle');
-  }, []);
+  const serviceId = service?.id;
+  const testInput = useMemo(() => createTestInput(serviceId, config, timeout), [serviceId, config, timeout]);
+  const cacheKey = useMemo(() => generateCacheKey(serviceId, config, skipCache), [serviceId, config, skipCache]);
+  const swrKey = cacheKey ? [cacheKey, testInput] : null;
   
-  /**
-   * Executes connection test with retry logic
-   */
-  const executeTestWithRetry = useCallback(async (
-    config: DatabaseConfig,
-    attempt = 0
-  ): Promise<ConnectionTestResponse> => {
-    try {
-      // Create abort controller with timeout
-      const controller = createTimeoutController(timeout);
-      abortControllerRef.current = controller;
-      
-      const response = await executeConnectionTest(config, {
-        timeout,
-        signal: controller.signal
-      });
-      
-      return response;
-      
-    } catch (error: any) {
-      // If retry is enabled and we haven't exceeded max attempts
-      if (enableRetry && attempt < maxRetries && error.errorCode !== 'USER_CANCELLED') {
-        const delay = calculateBackoffDelay(attempt, retryDelay, backoffMultiplier, CONNECTION_RETRY_CONFIG.maxRetryDelay);
-        
-        // Wait for backoff delay
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-        // Increment retry count
-        setRetryCount(prev => prev + 1);
-        
-        // Retry the connection test
-        return executeTestWithRetry(config, attempt + 1);
-      }
-      
-      // Max retries exceeded or retry disabled
-      throw error;
-    }
-  }, [enableRetry, maxRetries, retryDelay, backoffMultiplier, timeout]);
-  
-  /**
-   * Main connection test function
-   */
-  const testConnection = useCallback(async (config: DatabaseConfig): Promise<ConnectionTestResult> => {
-    // Validate configuration
-    const validationError = validateConnectionConfig(config);
-    if (validationError) {
-      const error: ApiErrorResponse = {
-        error: {
-          code: 400,
-          message: validationError,
-          context: 'configuration_validation'
-        }
-      };
-      setError(error);
-      setStatus('error');
-      onError?.(error);
-      throw error;
-    }
-    
-    // Reset state for new test
-    setError(null);
-    setResult(null);
-    setRetryCount(0);
-    setStatus('testing');
-    
-    // Store config for retry functionality
-    lastConfigRef.current = config;
-    
-    const startTime = Date.now();
-    
-    try {
-      const response = await executeTestWithRetry(config);
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-      
-      // Create successful result
-      const testResult: ConnectionTestResult = {
-        success: true,
-        message: response.message,
-        details: response.details,
-        testDuration: duration,
-        timestamp: new Date().toISOString(),
-        metadata: response.metadata
-      };
-      
-      // Update state
-      setResult(testResult);
-      setStatus('success');
-      setTestDuration(duration);
-      
-      // Update cache if enabled
-      if (enableCache) {
-        const cacheKey = createCacheKey(config, cacheKeyPrefix);
-        mutate(cacheKey, testResult, false);
-      }
-      
-      // Trigger success callback
-      onSuccess?.(testResult);
-      
-      return testResult;
-      
-    } catch (error: any) {
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-      
-      // Create error result
-      const apiError: ApiErrorResponse = {
-        error: {
-          code: error.errorCode === 'CONNECTION_TIMEOUT' ? 408 : 500,
-          message: error.message || DATABASE_ERROR_MESSAGES.connection.unknown,
-          context: error.errorCode || 'unknown_error',
-          details: error.details ? [error.details] : undefined
-        }
-      };
-      
-      const testResult: ConnectionTestResult = {
-        success: false,
-        message: error.message || DATABASE_ERROR_MESSAGES.connection.unknown,
-        details: error.details,
-        testDuration: duration,
-        timestamp: new Date().toISOString(),
-        errorCode: error.errorCode
-      };
-      
-      // Update state
-      setError(apiError);
-      setResult(testResult);
-      setStatus('error');
-      setTestDuration(duration);
-      
-      // Trigger error callback
-      onError?.(apiError);
-      
-      throw testResult;
-    } finally {
-      // Clean up abort controller
-      abortControllerRef.current = null;
-    }
-  }, [executeTestWithRetry, enableCache, cacheKeyPrefix, mutate, onSuccess, onError]);
-  
-  /**
-   * Retries the last failed connection test
-   */
-  const retry = useCallback(async (): Promise<ConnectionTestResult | null> => {
-    if (!lastConfigRef.current) {
-      return null;
-    }
-    
-    return testConnection(lastConfigRef.current);
-  }, [testConnection]);
-  
-  // Cleanup on unmount
-  React.useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort('Component unmounted');
-      }
-    };
-  }, []);
-  
-  return {
-    testConnection,
-    result,
-    isLoading: status === 'testing',
-    error,
-    status,
-    reset,
-    retry,
-    cancel,
-    testDuration,
-    retryCount
+  // Configure SWR with connection test specific settings
+  const swrConfig = {
+    ...DATABASE_SERVICE_SWR_CONFIG.connectionTest,
+    revalidateOnMount: autoTest,
+    revalidateOnFocus: false, // Manual testing only
+    revalidateOnReconnect: false,
+    shouldRetryOnError: false, // Handle retries manually
+    dedupingInterval: 1000, // 1 second deduplication
   };
-};
-
-// =============================================================================
-// ADDITIONAL HOOKS FOR SPECIFIC USE CASES
-// =============================================================================
-
-/**
- * Hook for testing connection with SWR caching
- * Provides cached connection test results with automatic revalidation
- */
-export const useConnectionTestWithCache = (
-  config: DatabaseConfig | null,
-  options: UseConnectionTestOptions & { 
-    enabled?: boolean;
-    refreshInterval?: number;
-  } = {}
-) => {
-  const { enabled = true, refreshInterval = 0, ...hookOptions } = options;
   
-  const cacheKey = config ? createCacheKey(config, options.cacheKeyPrefix) : null;
-  
-  const { testConnection, ...hookReturn } = useConnectionTest(hookOptions);
-  
-  // SWR for cached results
-  const { data, error, isLoading, mutate } = useSWR(
-    enabled && cacheKey ? cacheKey : null,
-    () => config ? testConnection(config) : null,
-    {
-      ...DATABASE_SERVICE_SWR_CONFIG.connectionTest,
-      refreshInterval,
-      revalidateOnFocus: false,
-      dedupingInterval: 5000, // 5 second deduplication
-      shouldRetryOnError: false // Handle retries in the hook
-    }
+  // SWR hook for connection testing
+  const { 
+    data: result, 
+    error: swrError, 
+    isLoading, 
+    isValidating,
+    mutate: mutateTest 
+  } = useSWR(
+    swrKey,
+    connectionTestFetcher,
+    swrConfig
   );
   
-  return {
-    ...hookReturn,
-    data,
-    error: error || hookReturn.error,
-    isLoading: isLoading || hookReturn.isLoading,
-    mutate,
-    testConnection
-  };
-};
-
-/**
- * Hook for batch connection testing
- * Tests multiple database configurations concurrently
- */
-export const useBatchConnectionTest = (options: UseConnectionTestOptions = {}) => {
-  const [results, setResults] = useState<Map<string, ConnectionTestResult>>(new Map());
-  const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<Map<string, ApiErrorResponse>>(new Map());
+  // =============================================================================
+  // RETRY LOGIC WITH REACT QUERY MUTATION
+  // =============================================================================
   
-  const { testConnection } = useConnectionTest(options);
-  
-  const testMultipleConnections = useCallback(async (
-    configs: Array<{ id: string; config: DatabaseConfig }>
-  ): Promise<Map<string, ConnectionTestResult>> => {
-    setIsLoading(true);
-    setResults(new Map());
-    setErrors(new Map());
-    
-    const testPromises = configs.map(async ({ id, config }) => {
-      try {
-        const result = await testConnection(config);
-        return { id, result, error: null };
-      } catch (error) {
-        return { id, result: null, error: error as ConnectionTestResult };
+  const connectionTestMutation = useMutation({
+    mutationFn: async (input: ConnectionTestInput): Promise<ConnectionTestResult> => {
+      const validation = validateTestInput(input.serviceId, input.config);
+      if (!validation.isValid) {
+        throw new Error(validation.error);
       }
-    });
-    
-    try {
-      const responses = await Promise.allSettled(testPromises);
-      const newResults = new Map<string, ConnectionTestResult>();
-      const newErrors = new Map<string, ApiErrorResponse>();
       
-      responses.forEach((response, index) => {
-        const { id } = configs[index];
+      return connectionTestFetcher([generateCacheKey(input.serviceId, input.config) || 'manual-test', input]);
+    },
+    retry: false, // Handle retries manually for better control
+    onMutate: () => {
+      onTestStart?.();
+      setState(prev => ({
+        ...prev,
+        status: 'testing',
+        startTime: Date.now(),
+        endTime: null,
+        cancelled: false,
+        abortController: new AbortController()
+      }));
+    },
+    onSuccess: (result: ConnectionTestResult) => {
+      setState(prev => ({
+        ...prev,
+        status: result.success ? 'success' : 'error',
+        endTime: Date.now(),
+        retryAttempt: 0,
+        abortController: null
+      }));
+      
+      // Add to history if enabled
+      if (enableHistory) {
+        const historyEntry: ConnectionTestHistoryEntry = {
+          ...result,
+          timestamp: new Date().toISOString(),
+          testConfig: testInput
+        };
         
-        if (response.status === 'fulfilled') {
-          const { result, error } = response.value;
-          if (result) {
-            newResults.set(id, result);
-          }
-          if (error) {
-            newErrors.set(id, {
-              error: {
-                code: 500,
-                message: error.message,
-                context: 'batch_test_error'
-              }
-            });
-          }
-        } else {
-          newErrors.set(id, {
-            error: {
-              code: 500,
-              message: response.reason?.message || 'Unknown error',
-              context: 'batch_test_failure'
-            }
-          });
+        setHistory(prev => {
+          const newHistory = [historyEntry, ...prev];
+          return newHistory.slice(0, maxHistory);
+        });
+      }
+      
+      // Update SWR cache if using cached key
+      if (cacheKey) {
+        mutate([cacheKey, testInput], result, false);
+      }
+      
+      // Trigger callbacks
+      if (result.success) {
+        onTestSuccess?.(result);
+      } else {
+        onTestError?.(result.message, result);
+      }
+      onTestComplete?.(result);
+    },
+    onError: (error: Error) => {
+      setState(prev => ({
+        ...prev,
+        status: 'error',
+        endTime: Date.now(),
+        abortController: null
+      }));
+      
+      onTestError?.(error.message);
+      onTestComplete?.({
+        success: false,
+        status: 'error',
+        message: error.message,
+        duration: Date.now() - (state.startTime || Date.now()),
+        timestamp: new Date().toISOString(),
+        error: {
+          code: 'MUTATION_ERROR',
+          message: error.message,
+          details: error
         }
       });
-      
-      setResults(newResults);
-      setErrors(newErrors);
-      
-      return newResults;
-      
-    } finally {
-      setIsLoading(false);
     }
-  }, [testConnection]);
+  });
+  
+  // =============================================================================
+  // CONNECTION TEST FUNCTION WITH RETRY LOGIC
+  // =============================================================================
+  
+  const testConnection = useCallback(async (
+    overrideConfig?: DatabaseConnectionFormData
+  ): Promise<ConnectionTestResult> => {
+    // Clear any existing debounce timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    const configToTest = overrideConfig || config;
+    const input = createTestInput(serviceId, configToTest, timeout);
+    
+    // Validate input
+    const validation = validateTestInput(input.serviceId, input.config);
+    if (!validation.isValid) {
+      const errorResult: ConnectionTestResult = {
+        success: false,
+        status: 'error',
+        message: validation.error!,
+        duration: 0,
+        timestamp: new Date().toISOString(),
+        error: {
+          code: ERROR_CONFIG.connectionErrors.configErrorCode,
+          message: validation.error!,
+          details: null
+        }
+      };
+      
+      onTestError?.(validation.error!);
+      return errorResult;
+    }
+    
+    // Reset retry attempt counter
+    setState(prev => ({ ...prev, retryAttempt: 0 }));
+    
+    // Retry logic with exponential backoff
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        setState(prev => ({ ...prev, retryAttempt: attempt }));
+        
+        const result = await connectionTestMutation.mutateAsync(input);
+        return result;
+        
+      } catch (error: any) {
+        lastError = error;
+        
+        // Don't retry on the last attempt
+        if (attempt < maxRetries) {
+          const delay = calculateRetryDelay(attempt, retryDelay);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    // All retries failed
+    const errorResult: ConnectionTestResult = {
+      success: false,
+      status: 'error',
+      message: lastError?.message || 'Connection test failed after retries',
+      duration: Date.now() - (state.startTime || Date.now()),
+      timestamp: new Date().toISOString(),
+      error: {
+        code: 'MAX_RETRIES_EXCEEDED',
+        message: `Connection test failed after ${maxRetries} retries`,
+        details: lastError
+      }
+    };
+    
+    return errorResult;
+    
+  }, [serviceId, config, timeout, maxRetries, retryDelay, connectionTestMutation, state.startTime, onTestError]);
+  
+  // =============================================================================
+  // DEBOUNCED TEST FUNCTION
+  // =============================================================================
+  
+  const testConnectionDebounced = useCallback((
+    overrideConfig?: DatabaseConnectionFormData
+  ): Promise<ConnectionTestResult> => {
+    return new Promise((resolve, reject) => {
+      // Clear existing timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      
+      // Set new timeout
+      debounceTimeoutRef.current = setTimeout(async () => {
+        try {
+          const result = await testConnection(overrideConfig);
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      }, debounceDelay);
+    });
+  }, [testConnection, debounceDelay]);
+  
+  // =============================================================================
+  // CANCELLATION FUNCTION
+  // =============================================================================
+  
+  const cancel = useCallback(() => {
+    if (state.abortController) {
+      state.abortController.abort();
+    }
+    
+    setState(prev => ({
+      ...prev,
+      status: 'idle',
+      cancelled: true,
+      abortController: null
+    }));
+    
+    connectionTestMutation.reset();
+  }, [state.abortController, connectionTestMutation]);
+  
+  // =============================================================================
+  // HISTORY MANAGEMENT
+  // =============================================================================
+  
+  const clearHistory = useCallback(() => {
+    setHistory([]);
+  }, []);
+  
+  const retry = useCallback(async (): Promise<ConnectionTestResult> => {
+    if (!result || result.success) {
+      throw new Error('Cannot retry successful test');
+    }
+    
+    return testConnection();
+  }, [result, testConnection]);
+  
+  // =============================================================================
+  // DERIVED STATE
+  // =============================================================================
+  
+  const isTesting = isLoading || isValidating || connectionTestMutation.isPending || state.status === 'testing';
+  const canCancel = isTesting && !state.cancelled;
+  const canRetry = result && !result.success && !isTesting;
+  const duration = state.startTime && state.endTime ? state.endTime - state.startTime : null;
+  const error = swrError || (result && !result.success ? new Error(result.message) : null);
+  
+  // =============================================================================
+  // RETURN HOOK INTERFACE
+  // =============================================================================
   
   return {
-    testMultipleConnections,
-    results,
-    errors,
-    isLoading
+    // Core test function
+    testConnection,
+    
+    // Test state
+    isTesting,
+    result: result || null,
+    error,
+    
+    // History management
+    history: enableHistory ? history : [],
+    clearHistory,
+    
+    // Cancellation
+    cancel,
+    canCancel,
+    
+    // Test duration
+    duration,
+    
+    // Retry functionality
+    retry,
+    canRetry,
+    retryCount: state.retryAttempt,
+    
+    // Debounced test function
+    testConnectionDebounced
   };
-};
+}
 
 // =============================================================================
-// EXPORTS
+// EXPORT TYPES AND UTILITIES
 // =============================================================================
 
+export type { UseConnectionTestOptions, ConnectionTestHistoryEntry };
+export { generateCacheKey, validateTestInput, calculateRetryDelay };
+
+// Default export
 export default useConnectionTest;
-
-// Export types for external use
-export type {
-  UseConnectionTestOptions,
-  UseConnectionTestReturn,
-  ConnectionTestRequest,
-  ConnectionTestResponse
-};
-
-// Export utility functions
-export {
-  createCacheKey,
-  validateConnectionConfig,
-  calculateBackoffDelay
-};
