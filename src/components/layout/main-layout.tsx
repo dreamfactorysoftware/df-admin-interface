@@ -1,454 +1,634 @@
+/**
+ * Main Layout Component for DreamFactory Admin Interface
+ * 
+ * Root layout component that provides the main application shell structure with
+ * sidebar navigation, header toolbar, and content area. Integrates theme provider,
+ * authentication state, and responsive layout containers using Tailwind CSS.
+ * 
+ * Replaces Angular Material-based layout structure with React 19 server components
+ * and Next.js app router patterns, providing enhanced performance and accessibility.
+ * 
+ * Features:
+ * - React 19 functional component with enhanced concurrent features
+ * - Responsive sidebar navigation with Zustand state management  
+ * - Header toolbar with global search and user controls
+ * - Theme provider integration with system preference detection
+ * - Error boundary with graceful fallback handling
+ * - Suspense wrappers for improved loading states
+ * - WCAG 2.1 AA compliance with accessible navigation
+ * - Performance optimized with React.memo and useCallback
+ * - Server-side rendering compatibility
+ * 
+ * @fileoverview Main application layout shell component
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
+ */
+
 'use client';
 
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { 
+  Suspense, 
+  useEffect, 
+  useCallback, 
+  useMemo,
+  useState,
+  type ReactNode 
+} from 'react';
+import { usePathname } from 'next/navigation';
 import { ErrorBoundary } from 'react-error-boundary';
-import { Transition } from '@headlessui/react';
-import { cn } from '@/lib/utils';
+import { Toaster } from 'sonner';
 
-// Import layout components
+// Layout components
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 
-// Type definitions for props and context
-interface MainLayoutProps {
-  children: React.ReactNode;
-  className?: string;
-}
+// Custom hooks
+import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/hooks/use-auth';
+
+// Store management
+import { useAppStore, useSidebar, useBreakpointStore } from '@/stores/app-store';
+
+// Utilities
+import { cn } from '@/lib/utils';
+import type { BreakpointState } from '@/types/layout';
+
+// =============================================================================
+// ERROR BOUNDARY FALLBACK COMPONENT
+// =============================================================================
 
 /**
- * Theme context type definition - matches expected interface from use-theme hook
+ * Error fallback component for graceful error handling.
+ * Provides user-friendly error display with recovery options.
  */
-interface ThemeContextType {
-  theme: 'light' | 'dark' | 'system';
-  resolvedTheme: 'light' | 'dark';
-  setTheme: (theme: 'light' | 'dark' | 'system') => void;
+interface ErrorFallbackProps {
+  error: Error;
+  resetErrorBoundary: () => void;
 }
 
-/**
- * App store interface - matches expected interface from app-store
- */
-interface AppStore {
-  sidebarCollapsed: boolean;
-  setSidebarCollapsed: (collapsed: boolean) => void;
-  globalLoading: boolean;
-  setGlobalLoading: (loading: boolean) => void;
-  theme: 'light' | 'dark' | 'system';
-  setTheme: (theme: 'light' | 'dark' | 'system') => void;
-}
-
-/**
- * Error boundary fallback component
- * Provides user-friendly error display with recovery options
- */
-function ErrorFallback({ 
+const ErrorFallback: React.FC<ErrorFallbackProps> = ({ 
   error, 
   resetErrorBoundary 
-}: { 
-  error: Error; 
-  resetErrorBoundary: () => void;
-}) {
-  useEffect(() => {
-    // Log error to monitoring service in production
-    console.error('Layout Error:', error);
-  }, [error]);
-
+}) => {
   return (
     <div 
-      className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"
+      className="flex min-h-screen flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 px-4"
       role="alert"
-      aria-labelledby="error-title"
-      aria-describedby="error-description"
+      aria-live="assertive"
     >
-      <div className="max-w-md w-full mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+      <div className="w-full max-w-md rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 shadow-lg">
         <div className="flex items-center space-x-3 mb-4">
           <div className="flex-shrink-0">
             <svg 
               className="h-8 w-8 text-red-500" 
               fill="none" 
               viewBox="0 0 24 24" 
+              strokeWidth={1.5} 
               stroke="currentColor"
               aria-hidden="true"
             >
               <path 
                 strokeLinecap="round" 
                 strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" 
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" 
               />
             </svg>
           </div>
-          <div>
-            <h1 
-              id="error-title"
-              className="text-lg font-semibold text-gray-900 dark:text-white"
-            >
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Application Error
-            </h1>
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Something went wrong in the admin interface
+            </p>
           </div>
         </div>
         
-        <p 
-          id="error-description"
-          className="text-gray-600 dark:text-gray-400 mb-6"
-        >
-          Something went wrong while loading the application. Please try refreshing the page or contact support if the problem persists.
-        </p>
+        <div className="mb-4 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
+          <h3 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
+            Error Details
+          </h3>
+          <p className="text-sm text-red-700 dark:text-red-300 font-mono">
+            {error.message || 'An unexpected error occurred'}
+          </p>
+        </div>
         
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex space-x-3">
           <button
+            type="button"
             onClick={resetErrorBoundary}
-            className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200 min-h-[44px]"
-            aria-label="Try to recover from error"
+            className={cn(
+              "flex-1 rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white",
+              "hover:bg-primary-700 focus-visible:outline focus-visible:outline-2",
+              "focus-visible:outline-offset-2 focus-visible:outline-primary-600",
+              "transition-colors duration-200"
+            )}
           >
-            <svg 
-              className="h-4 w-4 mr-2" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
-              />
-            </svg>
             Try Again
           </button>
-          
           <button
+            type="button"
             onClick={() => window.location.reload()}
-            className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200 min-h-[44px]"
-            aria-label="Reload the page"
+            className={cn(
+              "flex-1 rounded-md bg-gray-600 px-3 py-2 text-sm font-semibold text-white",
+              "hover:bg-gray-700 focus-visible:outline focus-visible:outline-2",
+              "focus-visible:outline-offset-2 focus-visible:outline-gray-600",
+              "transition-colors duration-200"
+            )}
           >
-            <svg 
-              className="h-4 w-4 mr-2" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
-              />
-            </svg>
             Reload Page
           </button>
         </div>
-        
-        {process.env.NODE_ENV === 'development' && (
-          <details className="mt-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
-            <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-              Error Details (Development)
-            </summary>
-            <pre className="mt-2 text-xs text-gray-600 dark:text-gray-400 overflow-auto">
-              {error.message}
-              {error.stack && '\n\n' + error.stack}
-            </pre>
-          </details>
-        )}
       </div>
     </div>
   );
-}
+};
 
 /**
- * Loading fallback component
- * Displays during suspense loading states
+ * Loading skeleton component for layout initialization.
+ * Provides visual feedback during component loading.
  */
-function LoadingFallback() {
+const LayoutSkeleton: React.FC = () => {
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"
-      role="status"
-      aria-label="Loading application"
-    >
-      <div className="flex flex-col items-center space-y-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
-        <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">
-          Loading DreamFactory Console...
-        </p>
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Sidebar Skeleton */}
+      <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4 space-y-4">
+        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-6 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+      
+      {/* Main Content Skeleton */}
+      <div className="flex-1 flex flex-col">
+        {/* Header Skeleton */}
+        <div className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 flex items-center justify-between">
+          <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="flex space-x-4">
+            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+          </div>
+        </div>
+        
+        {/* Content Skeleton */}
+        <div className="flex-1 p-6">
+          <div className="space-y-4">
+            <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-4 w-full bg-gray-100 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-4 w-3/4 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" />
+          </div>
+        </div>
       </div>
     </div>
   );
-}
+};
+
+// =============================================================================
+// RESPONSIVE BREAKPOINT HOOK
+// =============================================================================
 
 /**
- * Placeholder hook implementations
- * These will be replaced by actual implementations when dependency files are created
+ * Custom hook for managing responsive breakpoint detection.
+ * Provides real-time breakpoint state for layout adaptation.
  */
-function useTheme(): ThemeContextType {
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+const useResponsiveBreakpoints = () => {
+  const { setBreakpoint } = useBreakpointStore();
+  const [mounted, setMounted] = useState(false);
 
-  // Detect system theme preference
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
+  const updateBreakpoint = useCallback(() => {
+    if (typeof window === 'undefined') return;
 
-    const handleChange = (e: MediaQueryListEvent) => {
-      setResolvedTheme(e.matches ? 'dark' : 'light');
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // Determine active breakpoint
+    let activeBreakpoint: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' = 'xs';
+    if (width >= 1536) activeBreakpoint = '2xl';
+    else if (width >= 1280) activeBreakpoint = 'xl';
+    else if (width >= 1024) activeBreakpoint = 'lg';
+    else if (width >= 768) activeBreakpoint = 'md';
+    else if (width >= 640) activeBreakpoint = 'sm';
+
+    // Determine screen size category
+    let screenSize: 'mobile' | 'tablet' | 'desktop' | 'wide' = 'mobile';
+    if (width >= 1280) screenSize = 'wide';
+    else if (width >= 1024) screenSize = 'desktop';
+    else if (width >= 768) screenSize = 'tablet';
+
+    const breakpointState: BreakpointState = {
+      activeBreakpoint,
+      screenSize,
+      width,
+      height,
+      breakpoints: {
+        xs: width >= 0,
+        sm: width >= 640,
+        md: width >= 768,
+        lg: width >= 1024,
+        xl: width >= 1280,
+        '2xl': width >= 1536,
+      },
+      isMobile: width < 768,
+      isTablet: width >= 768 && width < 1024,
+      isDesktop: width >= 1024,
+      isSmallScreen: width < 768,
+      isLargeScreen: width >= 1024,
     };
 
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
+    setBreakpoint(breakpointState);
+  }, [setBreakpoint]);
 
-  // Update resolved theme when theme changes
   useEffect(() => {
-    if (theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
-    } else {
-      setResolvedTheme(theme);
-    }
-  }, [theme]);
+    setMounted(true);
+    updateBreakpoint();
 
-  return {
-    theme,
-    resolvedTheme,
-    setTheme
-  };
-}
+    // Add resize listener with debouncing
+    let timeoutId: NodeJS.Timeout;
+    const handleResize = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(updateBreakpoint, 150);
+    };
 
-function useAppStore(): AppStore {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [globalLoading, setGlobalLoading] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeoutId);
+    };
+  }, [updateBreakpoint]);
 
-  return {
-    sidebarCollapsed,
-    setSidebarCollapsed,
-    globalLoading,
-    setGlobalLoading,
-    theme,
-    setTheme
-  };
-}
+  return mounted;
+};
+
+// =============================================================================
+// LAYOUT THEME INTEGRATION
+// =============================================================================
 
 /**
- * Skip link component for accessibility
- * Allows keyboard users to skip to main content
+ * Custom hook for managing layout-specific theme behavior.
+ * Integrates with global theme system and applies layout-specific styles.
  */
-function SkipLink() {
-  return (
-    <a
-      href="#main-content"
-      className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium z-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-    >
-      Skip to main content
-    </a>
-  );
+const useLayoutTheme = () => {
+  const { resolvedTheme, mounted } = useTheme();
+  
+  useEffect(() => {
+    if (!mounted) return;
+    
+    // Apply theme-specific meta tags
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute(
+        'content',
+        resolvedTheme === 'dark' ? '#111827' : '#ffffff'
+      );
+    }
+    
+    // Apply theme to document for consistent styling
+    document.documentElement.setAttribute('data-theme', resolvedTheme);
+  }, [resolvedTheme, mounted]);
+
+  return { resolvedTheme, mounted };
+};
+
+// =============================================================================
+// MAIN LAYOUT COMPONENT INTERFACE
+// =============================================================================
+
+/**
+ * Main layout component props interface.
+ */
+interface MainLayoutProps {
+  /** Child components to render in the main content area */
+  children: ReactNode;
+  
+  /** Additional CSS class name for the layout container */
+  className?: string;
+  
+  /** Whether to show the header toolbar */
+  showHeader?: boolean;
+  
+  /** Whether to show the sidebar navigation */
+  showSidebar?: boolean;
+  
+  /** Whether to enable keyboard shortcuts */
+  enableKeyboardShortcuts?: boolean;
+  
+  /** Custom error boundary configuration */
+  errorBoundaryConfig?: {
+    onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+    fallback?: React.ComponentType<ErrorFallbackProps>;
+  };
+  
+  /** Loading state override */
+  isLoading?: boolean;
 }
+
+// =============================================================================
+// MAIN LAYOUT COMPONENT IMPLEMENTATION
+// =============================================================================
 
 /**
  * Main Layout Component
  * 
- * Root layout component that provides the main application shell structure with 
- * sidebar navigation, header toolbar, and content area. Integrates theme provider, 
- * authentication state, and responsive layout containers using Tailwind CSS.
+ * Root layout shell that provides the complete application structure including
+ * responsive sidebar navigation, header toolbar, theme integration, and content area.
  * 
- * Features:
- * - Responsive flexbox layout with sidebar and main content area
- * - Theme-aware styling with dark/light mode support
- * - Accessibility features including skip links and ARIA landmarks
- * - Error boundary and suspense wrappers for better error handling
- * - Mobile-responsive behavior with collapsible sidebar
- * - WCAG 2.1 AA compliance with proper focus management
- * - Smooth transitions and animations
- * - Server-side rendering compatibility
+ * @param props Layout configuration and children
+ * @returns Main application layout structure
  * 
- * Replaces Angular Material-based layout structure with React 19 server components
- * and Next.js app router patterns for enhanced performance and maintainability.
+ * @example
+ * ```tsx
+ * function App() {
+ *   return (
+ *     <MainLayout showHeader showSidebar enableKeyboardShortcuts>
+ *       <DashboardPage />
+ *     </MainLayout>
+ *   );
+ * }
+ * ```
  */
-export function MainLayout({ children, className }: MainLayoutProps) {
-  const { resolvedTheme } = useTheme();
-  const { sidebarCollapsed, globalLoading } = useAppStore();
-  const [mounted, setMounted] = useState(false);
+export const MainLayout: React.FC<MainLayoutProps> = React.memo(({
+  children,
+  className,
+  showHeader = true,
+  showSidebar = true,
+  enableKeyboardShortcuts = true,
+  errorBoundaryConfig = {},
+  isLoading = false,
+}) => {
+  // =============================================================================
+  // HOOKS AND STATE MANAGEMENT
+  // =============================================================================
 
-  // Prevent hydration mismatch by mounting after client-side hydration
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const pathname = usePathname();
+  const { user, isAuthenticated } = useAuth();
+  const { sidebar, setSidebar } = useSidebar();
+  const { resolvedTheme, mounted: themeMounted } = useLayoutTheme();
+  const breakpointMounted = useResponsiveBreakpoints();
 
-  // Apply theme class to document root
+  // Loading states
+  const [layoutReady, setLayoutReady] = useState(false);
+
+  // =============================================================================
+  // RESPONSIVE SIDEBAR MANAGEMENT
+  // =============================================================================
+
+  /**
+   * Update sidebar state based on screen size changes.
+   * Handles responsive behavior for mobile and desktop layouts.
+   */
+  const updateSidebarForBreakpoint = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    const width = window.innerWidth;
+    const isMobile = width < 768;
+    const isTablet = width >= 768 && width < 1024;
+
+    setSidebar({
+      isOverlay: isMobile,
+      isOpen: isMobile ? false : true,
+      isCollapsed: isTablet ? true : sidebar.isCollapsed,
+    });
+  }, [setSidebar, sidebar.isCollapsed]);
+
   useEffect(() => {
-    if (mounted) {
-      const root = document.documentElement;
-      root.classList.remove('light', 'dark');
-      root.classList.add(resolvedTheme);
-      
-      // Update meta theme-color for mobile browsers
-      const themeColorMeta = document.querySelector('meta[name="theme-color"]');
-      if (themeColorMeta) {
-        themeColorMeta.setAttribute(
-          'content', 
-          resolvedTheme === 'dark' ? '#111827' : '#ffffff'
-        );
-      }
+    updateSidebarForBreakpoint();
+  }, [updateSidebarForBreakpoint]);
+
+  // =============================================================================
+  // LAYOUT INITIALIZATION
+  // =============================================================================
+
+  /**
+   * Handle layout initialization once all dependencies are ready.
+   */
+  useEffect(() => {
+    if (themeMounted && breakpointMounted) {
+      // Small delay to ensure smooth initialization
+      const timer = setTimeout(() => setLayoutReady(true), 100);
+      return () => clearTimeout(timer);
     }
-  }, [resolvedTheme, mounted]);
+  }, [themeMounted, breakpointMounted]);
 
-  // Handle keyboard navigation
+  // =============================================================================
+  // KEYBOARD SHORTCUTS
+  // =============================================================================
+
+  /**
+   * Global keyboard shortcut handling for layout navigation.
+   */
   useEffect(() => {
+    if (!enableKeyboardShortcuts) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Allow ESC to close sidebar on mobile
-      if (event.key === 'Escape' && !sidebarCollapsed && window.innerWidth < 1024) {
-        const { setSidebarCollapsed } = useAppStore();
-        setSidebarCollapsed(true);
+      // Sidebar toggle (Alt + S)
+      if (event.altKey && event.key === 's') {
+        event.preventDefault();
+        setSidebar({ isOpen: !sidebar.isOpen });
+      }
+
+      // Collapse toggle (Alt + C)
+      if (event.altKey && event.key === 'c') {
+        event.preventDefault();
+        setSidebar({ isCollapsed: !sidebar.isCollapsed });
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [sidebarCollapsed]);
+  }, [enableKeyboardShortcuts, sidebar.isOpen, sidebar.isCollapsed, setSidebar]);
 
-  // Prevent hydration mismatch
-  if (!mounted) {
-    return <LoadingFallback />;
+  // =============================================================================
+  // MEMOIZED VALUES
+  // =============================================================================
+
+  /**
+   * Compute main content area styles based on sidebar state.
+   */
+  const mainContentStyles = useMemo(() => {
+    const baseStyles = "flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out";
+    
+    if (!showSidebar) {
+      return cn(baseStyles, "ml-0");
+    }
+
+    // No margin adjustment needed as sidebar is handled by flex layout
+    return baseStyles;
+  }, [showSidebar]);
+
+  /**
+   * Compute layout container classes with theme and responsive support.
+   */
+  const layoutClasses = useMemo(() => {
+    return cn(
+      "flex h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100",
+      "transition-colors duration-200",
+      // High contrast mode support
+      "supports-[forced-colors:active]:bg-[Canvas] supports-[forced-colors:active]:text-[CanvasText]",
+      className
+    );
+  }, [className]);
+
+  // =============================================================================
+  // ERROR BOUNDARY CONFIGURATION
+  // =============================================================================
+
+  const errorBoundaryProps = {
+    FallbackComponent: errorBoundaryConfig.fallback || ErrorFallback,
+    onError: errorBoundaryConfig.onError || ((error: Error, errorInfo: React.ErrorInfo) => {
+      console.error('Layout Error:', error, errorInfo);
+      // In production, this would send to error tracking service
+    }),
+    onReset: () => {
+      // Reset any error state if needed
+      window.location.reload();
+    },
+  };
+
+  // =============================================================================
+  // LOADING STATE HANDLING
+  // =============================================================================
+
+  if (isLoading || !layoutReady) {
+    return <LayoutSkeleton />;
   }
 
+  // =============================================================================
+  // MAIN RENDER
+  // =============================================================================
+
   return (
-    <ErrorBoundary
-      FallbackComponent={ErrorFallback}
-      onReset={() => {
-        // Clear any error state and refresh
-        window.location.reload();
-      }}
-      onError={(error) => {
-        // Log error to monitoring service
-        console.error('Main Layout Error:', error);
-      }}
-    >
-      <div className={cn(
-        "min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300",
-        className
-      )}>
-        {/* Skip link for accessibility */}
-        <SkipLink />
-
-        {/* Global loading overlay */}
-        <Transition
-          show={globalLoading}
-          enter="transition-opacity duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="transition-opacity duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
+    <ErrorBoundary {...errorBoundaryProps}>
+      <div className={layoutClasses}>
+        {/* Skip to main content link for accessibility */}
+        <a
+          href="#main-content"
+          className={cn(
+            "sr-only focus:not-sr-only absolute top-4 left-4 z-50",
+            "bg-primary-600 text-white px-4 py-2 rounded-md",
+            "focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+          )}
         >
-          <div 
-            className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center"
-            role="status"
-            aria-label="Loading"
-          >
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-xl">
-              <div className="flex items-center space-x-3">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600" />
-                <span className="text-gray-900 dark:text-white font-medium">
-                  Processing...
-                </span>
-              </div>
-            </div>
-          </div>
-        </Transition>
+          Skip to main content
+        </a>
 
-        {/* Main application layout */}
-        <div className="flex h-screen overflow-hidden">
-          {/* Sidebar Navigation */}
-          <Suspense 
-            fallback={
-              <div className="w-80 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 animate-pulse" />
-            }
-          >
-            <ErrorBoundary
-              FallbackComponent={({ error, resetErrorBoundary }) => (
-                <div className="w-80 bg-red-50 dark:bg-red-900/20 border-r border-red-200 dark:border-red-800 p-4">
-                  <p className="text-red-700 dark:text-red-300 text-sm">
-                    Navigation error
-                  </p>
-                  <button
-                    onClick={resetErrorBoundary}
-                    className="mt-2 text-xs text-red-600 dark:text-red-400 underline"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-            >
-              <Sidebar />
-            </ErrorBoundary>
+        {/* Sidebar Navigation */}
+        {showSidebar && isAuthenticated && (
+          <Suspense fallback={
+            <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 animate-pulse" />
+          }>
+            <Sidebar />
           </Suspense>
+        )}
 
-          {/* Main Content Area */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Header Toolbar */}
-            <Suspense 
-              fallback={
-                <div className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 animate-pulse" />
-              }
-            >
-              <ErrorBoundary
-                FallbackComponent={({ error, resetErrorBoundary }) => (
-                  <div className="h-16 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 flex items-center px-4">
-                    <p className="text-red-700 dark:text-red-300 text-sm">
-                      Header error
-                    </p>
-                    <button
-                      onClick={resetErrorBoundary}
-                      className="ml-2 text-xs text-red-600 dark:text-red-400 underline"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-              >
-                <Header />
-              </ErrorBoundary>
+        {/* Main Content Area */}
+        <div className={mainContentStyles}>
+          {/* Header Toolbar */}
+          {showHeader && (
+            <Suspense fallback={
+              <div className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 animate-pulse" />
+            }>
+              <Header 
+                showMobileToggle={showSidebar}
+                enableKeyboardShortcuts={enableKeyboardShortcuts}
+              />
             </Suspense>
+          )}
 
-            {/* Main Content */}
-            <main 
-              id="main-content"
-              className="flex-1 overflow-auto bg-white dark:bg-gray-900 focus:outline-none"
-              role="main"
-              aria-label="Main content"
-              tabIndex={-1}
-            >
-              <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-7xl">
-                <Suspense fallback={<LoadingFallback />}>
-                  <ErrorBoundary
-                    FallbackComponent={ErrorFallback}
-                    onReset={() => {
-                      // Reset any error state
-                      window.location.reload();
-                    }}
-                  >
-                    {children}
-                  </ErrorBoundary>
-                </Suspense>
+          {/* Page Content */}
+          <main 
+            id="main-content"
+            className={cn(
+              "flex-1 overflow-auto",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+              // Ensure proper scrolling behavior
+              "overscroll-behavior-y-contain"
+            )}
+            role="main"
+            aria-label="Main content area"
+            tabIndex={-1}
+          >
+            <Suspense fallback={
+              <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
               </div>
-            </main>
-          </div>
+            }>
+              {children}
+            </Suspense>
+          </main>
         </div>
 
-        {/* Focus trap for modals and overlays */}
-        <div id="modal-root" />
-        
-        {/* Accessibility announcements */}
-        <div 
-          id="announcement-region"
-          aria-live="polite"
-          aria-atomic="true"
-          className="sr-only"
+        {/* Global Toast Notifications */}
+        <Toaster
+          position="top-right"
+          expand={true}
+          richColors
+          closeButton
+          toastOptions={{
+            duration: 5000,
+            className: cn(
+              "border border-gray-200 dark:border-gray-700",
+              "bg-white dark:bg-gray-800",
+              "text-gray-900 dark:text-gray-100"
+            ),
+          }}
         />
       </div>
     </ErrorBoundary>
   );
-}
+});
+
+MainLayout.displayName = 'MainLayout';
+
+// =============================================================================
+// LAYOUT VARIANTS
+// =============================================================================
+
+/**
+ * Minimal layout variant without sidebar.
+ * Useful for authentication pages and standalone views.
+ */
+export const MinimalLayout: React.FC<Omit<MainLayoutProps, 'showSidebar'>> = React.memo((props) => (
+  <MainLayout {...props} showSidebar={false} />
+));
+
+MinimalLayout.displayName = 'MinimalLayout';
+
+/**
+ * Compact layout variant with collapsed sidebar by default.
+ * Useful for data-intensive pages that need more horizontal space.
+ */
+export const CompactLayout: React.FC<MainLayoutProps> = React.memo((props) => {
+  const { setSidebar } = useSidebar();
+  
+  useEffect(() => {
+    setSidebar({ isCollapsed: true });
+  }, [setSidebar]);
+
+  return <MainLayout {...props} />;
+});
+
+CompactLayout.displayName = 'CompactLayout';
+
+/**
+ * Full-screen layout variant without header or sidebar.
+ * Useful for immersive interfaces like data visualization or reports.
+ */
+export const FullScreenLayout: React.FC<Omit<MainLayoutProps, 'showHeader' | 'showSidebar'>> = React.memo((props) => (
+  <MainLayout {...props} showHeader={false} showSidebar={false} />
+));
+
+FullScreenLayout.displayName = 'FullScreenLayout';
+
+// =============================================================================
+// DEFAULT EXPORT
+// =============================================================================
 
 export default MainLayout;
+
+// =============================================================================
+// TYPE EXPORTS
+// =============================================================================
+
+export type { MainLayoutProps };
