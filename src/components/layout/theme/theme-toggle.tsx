@@ -1,441 +1,628 @@
 'use client';
 
-import React, { useState, useEffect, useContext, createContext } from 'react';
+/**
+ * Theme Toggle Component for DreamFactory Admin Interface
+ * 
+ * Accessible React 19 component that provides user interface for switching between
+ * light, dark, and system theme preferences. Converts Angular Material slide toggle
+ * to React component using Headless UI Switch with proper ARIA labeling, keyboard
+ * navigation, and visual feedback. Integrates with theme context for state management
+ * and user preference persistence.
+ * 
+ * Features:
+ * - Headless UI 2.0+ Switch component for unstyled accessible toggle control
+ * - Three-state theme selection supporting light, dark, and system preferences
+ * - WCAG 2.1 AA compliance with proper ARIA labels and keyboard navigation
+ * - Visual feedback for current theme state with appropriate icons and styling
+ * - Integration with theme context provider for state management and persistence
+ * - Responsive design with mobile-optimized touch targets (minimum 44x44px)
+ * - Focus-visible states for keyboard accessibility per modern standards
+ * - Smooth transitions and animations for enhanced user experience
+ * 
+ * @version 1.0.0
+ * @since React 19.0.0
+ */
+
+import React, { useState, useCallback, useMemo } from 'react';
 import { Switch } from '@headlessui/react';
 import { 
   SunIcon, 
   MoonIcon, 
   ComputerDesktopIcon,
-  CheckIcon
+  CheckIcon 
 } from '@heroicons/react/24/outline';
-import { cn } from '@/lib/utils';
-import type { ThemeMode, ResolvedTheme, UseThemeReturn } from '@/types/theme';
+import { 
+  SunIcon as SunIconSolid, 
+  MoonIcon as MoonIconSolid, 
+  ComputerDesktopIcon as ComputerDesktopIconSolid 
+} from '@heroicons/react/24/solid';
+import { useTheme } from './theme-provider';
+import { ThemeMode, ResolvedTheme } from '@/types/theme';
 
 /**
- * Theme Context for React 19 with comprehensive state management
- * Provides theme state and controls throughout the application
+ * Theme option configuration interface
  */
-interface ThemeContextState {
-  theme: ThemeMode;
-  resolvedTheme: ResolvedTheme;
-  systemTheme: ResolvedTheme;
-  setTheme: (theme: ThemeMode) => void;
-  mounted: boolean;
+interface ThemeOption {
+  /** Theme mode identifier */
+  mode: ThemeMode;
+  /** Display label for the theme option */
+  label: string;
+  /** Icon component for outline state */
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  /** Icon component for solid state */
+  iconSolid: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  /** Accessible description for screen readers */
+  description: string;
+  /** Keyboard shortcut hint */
+  shortcut?: string;
 }
 
-const ThemeContext = createContext<ThemeContextState | undefined>(undefined);
-
 /**
- * Custom hook for accessing theme context with proper error handling
- * Throws descriptive error if used outside provider
- */
-export const useTheme = (): UseThemeReturn => {
-  const context = useContext(ThemeContext);
-  
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider. Ensure component is wrapped with theme context.');
-  }
-
-  return {
-    ...context,
-    toggleTheme: () => {
-      const nextTheme = context.theme === 'light' ? 'dark' : 'light';
-      context.setTheme(nextTheme);
-    },
-    resetToSystem: () => context.setTheme('system'),
-    isTheme: (mode: ThemeMode) => context.theme === mode,
-    isResolvedTheme: (mode: ResolvedTheme) => context.resolvedTheme === mode,
-    getSystemTheme: () => context.systemTheme,
-    isThemeSupported: () => typeof window !== 'undefined' && window.matchMedia,
-    isValidTheme: (theme: string): theme is ThemeMode => 
-      ['light', 'dark', 'system'].includes(theme),
-    getAccessibleColors: (theme: ResolvedTheme) => ({
-      text: theme === 'dark' ? '#f8fafc' : '#0f172a',
-      background: theme === 'dark' ? '#0f172a' : '#ffffff',
-      primary: '#6366f1',
-      secondary: theme === 'dark' ? '#64748b' : '#475569',
-    }),
-    applyTheme: (theme: ResolvedTheme, selector = ':root') => {
-      const element = document.querySelector(selector);
-      if (element) {
-        element.classList.remove('light', 'dark');
-        element.classList.add(theme);
-        element.setAttribute('data-theme', theme);
-      }
-    },
-    removeTheme: (selector = ':root') => {
-      const element = document.querySelector(selector);
-      if (element) {
-        element.classList.remove('light', 'dark');
-        element.removeAttribute('data-theme');
-      }
-    },
-    getContrastRatio: () => 4.5, // Minimum WCAG AA compliance
-    meetsAccessibilityStandards: () => true, // Implementation placeholder
-  };
-};
-
-/**
- * Theme Provider component with React 19 optimizations
- * Manages global theme state and system preference detection
- */
-interface ThemeProviderProps {
-  children: React.ReactNode;
-  defaultTheme?: ThemeMode;
-  storageKey?: string;
-  enableSystem?: boolean;
-}
-
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({
-  children,
-  defaultTheme = 'system',
-  storageKey = 'df-admin-theme',
-  enableSystem = true,
-}) => {
-  const [theme, setThemeState] = useState<ThemeMode>(defaultTheme);
-  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>('light');
-  const [mounted, setMounted] = useState(false);
-
-  // Detect system theme preference with proper cleanup
-  useEffect(() => {
-    if (!enableSystem || typeof window === 'undefined') return;
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
-
-    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
-      setSystemTheme(e.matches ? 'dark' : 'light');
-    };
-
-    mediaQuery.addEventListener('change', handleSystemThemeChange);
-    return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
-  }, [enableSystem]);
-
-  // Load persisted theme preference
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      const stored = localStorage.getItem(storageKey) as ThemeMode;
-      if (stored && ['dark', 'light', 'system'].includes(stored)) {
-        setThemeState(stored);
-      }
-    } catch (error) {
-      console.warn('Failed to load theme preference from localStorage:', error);
-    }
-    
-    setMounted(true);
-  }, [storageKey]);
-
-  // Apply theme to document with accessibility considerations
-  const resolvedTheme = theme === 'system' ? systemTheme : theme;
-
-  useEffect(() => {
-    if (!mounted || typeof window === 'undefined') return;
-
-    const root = document.documentElement;
-    
-    // Apply theme classes for Tailwind CSS
-    root.classList.remove('light', 'dark');
-    root.classList.add(resolvedTheme);
-    
-    // Set data attribute for additional CSS hooks
-    root.setAttribute('data-theme', resolvedTheme);
-    
-    // Update meta theme-color for mobile browsers
-    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeColorMeta) {
-      themeColorMeta.setAttribute(
-        'content', 
-        resolvedTheme === 'dark' ? '#0f172a' : '#ffffff'
-      );
-    }
-
-    // Update CSS custom properties for theme variables
-    const style = root.style;
-    if (resolvedTheme === 'dark') {
-      style.setProperty('--theme-background', '#0f172a');
-      style.setProperty('--theme-foreground', '#f8fafc');
-      style.setProperty('--theme-primary', '#6366f1');
-      style.setProperty('--theme-border', '#374151');
-    } else {
-      style.setProperty('--theme-background', '#ffffff');
-      style.setProperty('--theme-foreground', '#0f172a');
-      style.setProperty('--theme-primary', '#6366f1');
-      style.setProperty('--theme-border', '#e5e7eb');
-    }
-  }, [resolvedTheme, mounted]);
-
-  const setTheme = (newTheme: ThemeMode) => {
-    try {
-      localStorage.setItem(storageKey, newTheme);
-      setThemeState(newTheme);
-    } catch (error) {
-      console.warn('Failed to save theme preference to localStorage:', error);
-      setThemeState(newTheme);
-    }
-  };
-
-  // Prevent hydration mismatch by not rendering until mounted
-  if (!mounted) {
-    return <div suppressHydrationWarning>{children}</div>;
-  }
-
-  const contextValue: ThemeContextState = {
-    theme,
-    resolvedTheme,
-    systemTheme,
-    setTheme,
-    mounted,
-  };
-
-  return (
-    <ThemeContext.Provider value={contextValue}>
-      {children}
-    </ThemeContext.Provider>
-  );
-};
-
-/**
- * Theme options configuration with accessibility metadata
- */
-const THEME_OPTIONS = [
-  {
-    value: 'light' as const,
-    label: 'Light Mode',
-    icon: SunIcon,
-    description: 'Use light theme for better visibility in bright environments',
-    ariaLabel: 'Switch to light theme',
-  },
-  {
-    value: 'dark' as const,
-    label: 'Dark Mode', 
-    icon: MoonIcon,
-    description: 'Use dark theme for reduced eye strain in low light',
-    ariaLabel: 'Switch to dark theme',
-  },
-  {
-    value: 'system' as const,
-    label: 'System',
-    icon: ComputerDesktopIcon,
-    description: 'Automatically match your system theme preference',
-    ariaLabel: 'Use system theme preference',
-  },
-] as const;
-
-/**
- * ThemeToggle Component Props Interface
+ * Theme toggle component props interface
  */
 interface ThemeToggleProps {
-  /** Optional CSS class name for additional styling */
+  /** Additional CSS class names */
   className?: string;
-  /** Show labels alongside icons for enhanced accessibility */
+  /** Size variant for different layouts */
+  size?: 'sm' | 'md' | 'lg';
+  /** Layout variant */
+  variant?: 'switch' | 'dropdown' | 'buttons';
+  /** Whether to show labels alongside icons */
   showLabels?: boolean;
-  /** Compact mode for space-constrained layouts */
-  compact?: boolean;
-  /** Custom ARIA label for the toggle group */
+  /** Whether to show system theme option */
+  enableSystem?: boolean;
+  /** Custom aria-label for the toggle */
   ariaLabel?: string;
-  /** Position of the toggle component for screen readers */
-  ariaDescribedBy?: string;
+  /** Whether to disable the toggle */
+  disabled?: boolean;
+  /** Callback for theme change events */
+  onThemeChange?: (theme: ThemeMode) => void;
 }
 
 /**
- * ThemeToggle Component
- * 
- * Accessible theme toggle component using Headless UI Switch with three-state support.
- * Converts Angular Material mat-slide-toggle to React implementation with enhanced
- * accessibility features and WCAG 2.1 AA compliance.
- * 
- * Features:
- * - Three-state theme selection (light, dark, system)
- * - WCAG 2.1 AA compliant with proper ARIA labeling
- * - Keyboard navigation support with focus-visible states
- * - Mobile-optimized 44x44px minimum touch targets
- * - Visual feedback with appropriate icons and animations
- * - Screen reader announcements for state changes
- * 
- * @example
- * ```tsx
- * <ThemeProvider>
- *   <ThemeToggle showLabels compact ariaLabel="Application theme selector" />
- * </ThemeProvider>
- * ```
+ * Theme option configurations with accessibility metadata
  */
-export const ThemeToggle: React.FC<ThemeToggleProps> = ({
-  className,
-  showLabels = false,
-  compact = false,
-  ariaLabel = 'Theme selection',
-  ariaDescribedBy,
-}) => {
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const [announcement, setAnnouncement] = useState<string>('');
+const THEME_OPTIONS: ThemeOption[] = [
+  {
+    mode: 'light',
+    label: 'Light',
+    icon: SunIcon,
+    iconSolid: SunIconSolid,
+    description: 'Switch to light theme with bright backgrounds and dark text',
+    shortcut: 'L',
+  },
+  {
+    mode: 'dark',
+    label: 'Dark',
+    icon: MoonIcon,
+    iconSolid: MoonIconSolid,
+    description: 'Switch to dark theme with dark backgrounds and light text',
+    shortcut: 'D',
+  },
+  {
+    mode: 'system',
+    label: 'System',
+    icon: ComputerDesktopIcon,
+    iconSolid: ComputerDesktopIconSolid,
+    description: 'Use system preference to automatically switch between light and dark themes',
+    shortcut: 'S',
+  },
+];
 
-  // Handle theme change with accessibility announcements
-  const handleThemeChange = (newTheme: ThemeMode) => {
+/**
+ * Hook for theme toggle logic and keyboard shortcuts
+ */
+function useThemeToggleLogic(onThemeChange?: (theme: ThemeMode) => void) {
+  const { theme, setTheme, resolvedTheme, systemTheme } = useTheme();
+
+  /**
+   * Handle theme change with callback support
+   */
+  const handleThemeChange = useCallback((newTheme: ThemeMode) => {
     setTheme(newTheme);
-    
-    // Create announcement for screen readers
-    const option = THEME_OPTIONS.find(opt => opt.value === newTheme);
-    if (option) {
-      const message = `Theme changed to ${option.label}. ${option.description}`;
-      setAnnouncement(message);
-      
-      // Clear announcement after screen readers have time to read it
-      setTimeout(() => setAnnouncement(''), 1000);
+    onThemeChange?.(newTheme);
+  }, [setTheme, onThemeChange]);
+
+  /**
+   * Cycle to next theme in sequence
+   */
+  const cycleTheme = useCallback(() => {
+    const currentIndex = THEME_OPTIONS.findIndex(option => option.mode === theme);
+    const nextIndex = (currentIndex + 1) % THEME_OPTIONS.length;
+    const nextTheme = THEME_OPTIONS[nextIndex].mode;
+    handleThemeChange(nextTheme);
+  }, [theme, handleThemeChange]);
+
+  /**
+   * Handle keyboard shortcuts
+   */
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    // Handle Space/Enter for activation
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      cycleTheme();
+      return;
     }
+
+    // Handle theme-specific shortcuts (Alt + L/D/S)
+    if (event.altKey) {
+      const shortcutTheme = THEME_OPTIONS.find(
+        option => option.shortcut?.toLowerCase() === event.key.toLowerCase()
+      );
+      
+      if (shortcutTheme) {
+        event.preventDefault();
+        handleThemeChange(shortcutTheme.mode);
+      }
+    }
+  }, [cycleTheme, handleThemeChange]);
+
+  /**
+   * Get current theme status for UI state
+   */
+  const themeStatus = useMemo(() => {
+    const currentOption = THEME_OPTIONS.find(option => option.mode === theme);
+    const isSystemTheme = theme === 'system';
+    
+    return {
+      currentOption,
+      resolvedTheme,
+      systemTheme,
+      isSystemTheme,
+      effectiveIcon: isSystemTheme 
+        ? (systemTheme === 'dark' ? MoonIconSolid : SunIconSolid)
+        : currentOption?.iconSolid || SunIconSolid,
+    };
+  }, [theme, resolvedTheme, systemTheme]);
+
+  return {
+    theme,
+    handleThemeChange,
+    cycleTheme,
+    handleKeyDown,
+    themeStatus,
+  };
+}
+
+/**
+ * Switch variant component using Headless UI Switch
+ */
+function ThemeSwitchVariant({ 
+  size = 'md', 
+  showLabels = false, 
+  ariaLabel,
+  disabled = false,
+  onThemeChange,
+  className = ''
+}: Omit<ThemeToggleProps, 'variant'>) {
+  const { theme, cycleTheme, handleKeyDown, themeStatus } = useThemeToggleLogic(onThemeChange);
+
+  // Size configuration
+  const sizeConfig = {
+    sm: {
+      container: 'h-9 min-w-[44px]',
+      switch: 'h-7 w-12',
+      thumb: 'h-5 w-5',
+      icon: 'h-3 w-3',
+      label: 'text-sm',
+    },
+    md: {
+      container: 'h-11 min-w-[44px]',
+      switch: 'h-8 w-14',
+      thumb: 'h-6 w-6',
+      icon: 'h-4 w-4',
+      label: 'text-base',
+    },
+    lg: {
+      container: 'h-12 min-w-[48px]',
+      switch: 'h-10 w-16',
+      thumb: 'h-8 w-8',
+      icon: 'h-5 w-5',
+      label: 'text-lg',
+    },
   };
 
-  // Keyboard navigation handler
-  const handleKeyDown = (event: React.KeyboardEvent, themeValue: ThemeMode) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      handleThemeChange(themeValue);
-    }
-  };
+  const config = sizeConfig[size];
+  const IconComponent = themeStatus.effectiveIcon;
 
   return (
     <div 
-      className={cn(
-        'theme-toggle-container',
-        compact ? 'space-y-1' : 'space-y-2',
-        className
-      )}
-      role="radiogroup"
-      aria-label={ariaLabel}
-      aria-describedby={ariaDescribedBy}
+      className={`flex items-center space-x-3 ${config.container} ${className}`}
+      role="group"
+      aria-labelledby="theme-toggle-label"
     >
-      {/* Screen reader announcement region */}
-      <div 
-        aria-live="polite" 
-        aria-atomic="true" 
+      {showLabels && (
+        <span 
+          id="theme-toggle-label"
+          className={`font-medium text-gray-700 dark:text-gray-300 ${config.label}`}
+        >
+          Theme
+        </span>
+      )}
+      
+      <Switch
+        checked={theme !== 'light'}
+        onChange={cycleTheme}
+        onKeyDown={handleKeyDown}
+        disabled={disabled}
+        className={`
+          relative inline-flex items-center ${config.switch} rounded-full
+          transition-colors duration-200 ease-in-out
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2
+          disabled:opacity-50 disabled:cursor-not-allowed
+          ${theme === 'light' 
+            ? 'bg-gray-200 dark:bg-gray-700' 
+            : theme === 'dark'
+            ? 'bg-gray-800 dark:bg-gray-900'
+            : 'bg-gradient-to-r from-gray-200 to-gray-800 dark:from-gray-700 dark:to-gray-900'
+          }
+        `}
+        aria-label={
+          ariaLabel || 
+          `Theme toggle. Current theme: ${themeStatus.currentOption?.label}. ${themeStatus.currentOption?.description}`
+        }
+        aria-describedby="theme-toggle-description"
+      >
+        <span
+          className={`
+            ${config.thumb}
+            transform rounded-full transition-all duration-200 ease-in-out
+            flex items-center justify-center
+            bg-white dark:bg-gray-100 shadow-lg
+            ${theme === 'light' 
+              ? 'translate-x-1' 
+              : theme === 'dark'
+              ? `translate-x-${size === 'sm' ? '5' : size === 'md' ? '6' : '7'}`
+              : `translate-x-${size === 'sm' ? '3' : size === 'md' ? '4' : '5'}`
+            }
+          `}
+        >
+          <IconComponent
+            className={`${config.icon} ${
+              theme === 'light' 
+                ? 'text-yellow-500' 
+                : theme === 'dark'
+                ? 'text-blue-500'
+                : 'text-purple-500'
+            }`}
+            aria-hidden="true"
+          />
+        </span>
+      </Switch>
+
+      <span 
+        id="theme-toggle-description" 
         className="sr-only"
       >
-        {announcement}
-      </div>
+        Press Space or Enter to cycle through theme options. 
+        Use Alt+L for light, Alt+D for dark, or Alt+S for system theme.
+        {themeStatus.isSystemTheme && 
+          ` System preference is currently ${themeStatus.systemTheme}.`
+        }
+      </span>
+    </div>
+  );
+}
 
-      {/* Theme option buttons */}
-      <div className={cn(
-        'flex',
-        compact ? 'gap-1' : 'gap-2',
-        showLabels ? 'flex-col sm:flex-row' : 'flex-row'
-      )}>
-        {THEME_OPTIONS.map((option) => {
-          const isSelected = theme === option.value;
-          const IconComponent = option.icon;
-          
-          return (
-            <Switch
-              key={option.value}
-              checked={isSelected}
-              onChange={() => handleThemeChange(option.value)}
-              onKeyDown={(event) => handleKeyDown(event, option.value)}
-              className={cn(
-                // Base styles with WCAG 2.1 AA compliance
-                'relative inline-flex items-center justify-center',
-                'rounded-lg border-2 transition-all duration-200',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-                
-                // Minimum touch target size (44x44px)
-                compact ? 'min-h-[44px] min-w-[44px] p-2' : 'min-h-[48px] min-w-[48px] p-3',
-                
-                // Selected state styling
-                isSelected
-                  ? cn(
-                      'bg-primary-600 border-primary-600 text-white',
-                      'hover:bg-primary-700 hover:border-primary-700',
-                      'active:bg-primary-800 active:border-primary-800'
-                    )
-                  : cn(
-                      'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600',
-                      'text-gray-700 dark:text-gray-300',
-                      'hover:bg-gray-50 dark:hover:bg-gray-700',
-                      'hover:border-gray-400 dark:hover:border-gray-500',
-                      'active:bg-gray-100 dark:active:bg-gray-600'
-                    ),
-                
-                // Label spacing adjustments
-                showLabels && (compact ? 'flex-col gap-1' : 'flex-col gap-2')
-              )}
-              role="radio"
-              aria-checked={isSelected}
-              aria-label={option.ariaLabel}
-              tabIndex={0}
-            >
-              {/* Icon with proper sizing and accessibility */}
-              <IconComponent 
-                className={cn(
-                  'flex-shrink-0',
-                  compact ? 'h-5 w-5' : 'h-6 w-6',
-                  'transition-transform duration-200',
-                  isSelected && 'scale-110'
-                )}
-                aria-hidden="true"
-              />
-              
-              {/* Check indicator for selected state */}
-              {isSelected && (
-                <CheckIcon 
-                  className={cn(
-                    'absolute top-1 right-1',
-                    'h-3 w-3 text-white',
-                    'drop-shadow-sm'
-                  )}
-                  aria-hidden="true"
-                />
-              )}
-              
-              {/* Optional labels for enhanced accessibility */}
-              {showLabels && (
-                <span className={cn(
-                  'text-xs font-medium',
-                  compact ? 'mt-1' : 'mt-2',
-                  'transition-colors duration-200'
-                )}>
-                  {option.label}
-                </span>
-              )}
-              
-              {/* Tooltip/description for screen readers */}
-              <span className="sr-only">
-                {option.description}
-              </span>
-            </Switch>
-          );
-        })}
-      </div>
+/**
+ * Dropdown variant for more explicit theme selection
+ */
+function ThemeDropdownVariant({ 
+  size = 'md', 
+  showLabels = true, 
+  enableSystem = true,
+  ariaLabel,
+  disabled = false,
+  onThemeChange,
+  className = ''
+}: Omit<ThemeToggleProps, 'variant'>) {
+  const { theme, handleThemeChange, themeStatus } = useThemeToggleLogic(onThemeChange);
+  const [isOpen, setIsOpen] = useState(false);
 
-      {/* Current resolved theme indicator for debugging */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          Current: {theme} → {resolvedTheme}
+  const availableOptions = enableSystem ? THEME_OPTIONS : THEME_OPTIONS.filter(opt => opt.mode !== 'system');
+
+  const sizeConfig = {
+    sm: {
+      button: 'h-9 px-3 text-sm',
+      icon: 'h-4 w-4',
+      menu: 'text-sm',
+    },
+    md: {
+      button: 'h-11 px-4 text-base',
+      icon: 'h-5 w-5',
+      menu: 'text-base',
+    },
+    lg: {
+      button: 'h-12 px-5 text-lg',
+      icon: 'h-6 w-6',
+      menu: 'text-lg',
+    },
+  };
+
+  const config = sizeConfig[size];
+
+  return (
+    <div className={`relative ${className}`}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`
+          ${config.button}
+          min-w-[44px] inline-flex items-center justify-between
+          bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600
+          rounded-md shadow-sm
+          text-gray-700 dark:text-gray-300
+          hover:bg-gray-50 dark:hover:bg-gray-700
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2
+          disabled:opacity-50 disabled:cursor-not-allowed
+          transition-colors duration-200
+        `}
+        aria-label={ariaLabel || 'Select theme preference'}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+      >
+        <div className="flex items-center space-x-2">
+          <themeStatus.effectiveIcon 
+            className={`${config.icon} ${
+              theme === 'light' 
+                ? 'text-yellow-500' 
+                : theme === 'dark'
+                ? 'text-blue-500'
+                : 'text-purple-500'
+            }`}
+            aria-hidden="true"
+          />
+          {showLabels && (
+            <span className="font-medium">
+              {themeStatus.currentOption?.label}
+            </span>
+          )}
         </div>
+        
+        <svg 
+          className={`${config.icon} text-gray-400 transform transition-transform duration-200 ${
+            isOpen ? 'rotate-180' : ''
+          }`}
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div 
+          className={`
+            absolute top-full left-0 mt-2 w-48 z-50
+            bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700
+            rounded-md shadow-lg ring-1 ring-black ring-opacity-5
+            ${config.menu}
+          `}
+          role="listbox"
+          aria-label="Theme options"
+        >
+          <div className="py-1">
+            {availableOptions.map((option) => (
+              <button
+                key={option.mode}
+                onClick={() => {
+                  handleThemeChange(option.mode);
+                  setIsOpen(false);
+                }}
+                className={`
+                  w-full text-left px-4 py-2 flex items-center justify-between
+                  transition-colors duration-150
+                  ${theme === option.mode
+                    ? 'bg-primary-50 dark:bg-primary-900 text-primary-700 dark:text-primary-300'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }
+                `}
+                role="option"
+                aria-selected={theme === option.mode}
+                aria-describedby={`theme-option-${option.mode}-description`}
+              >
+                <div className="flex items-center space-x-3">
+                  <option.icon 
+                    className={`${config.icon} ${
+                      option.mode === 'light' 
+                        ? 'text-yellow-500' 
+                        : option.mode === 'dark'
+                        ? 'text-blue-500'
+                        : 'text-purple-500'
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <div>
+                    <div className="font-medium">{option.label}</div>
+                    <div 
+                      id={`theme-option-${option.mode}-description`}
+                      className="text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      {option.description}
+                    </div>
+                  </div>
+                </div>
+                
+                {theme === option.mode && (
+                  <CheckIcon 
+                    className={`${config.icon} text-primary-600 dark:text-primary-400`}
+                    aria-hidden="true"
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Click outside handler */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
       )}
     </div>
   );
-};
+}
 
-// Default export for convenience
+/**
+ * Button group variant for explicit theme selection
+ */
+function ThemeButtonsVariant({ 
+  size = 'md', 
+  showLabels = false, 
+  enableSystem = true,
+  ariaLabel,
+  disabled = false,
+  onThemeChange,
+  className = ''
+}: Omit<ThemeToggleProps, 'variant'>) {
+  const { theme, handleThemeChange } = useThemeToggleLogic(onThemeChange);
+
+  const availableOptions = enableSystem ? THEME_OPTIONS : THEME_OPTIONS.filter(opt => opt.mode !== 'system');
+
+  const sizeConfig = {
+    sm: {
+      button: 'h-9 w-9 text-sm',
+      icon: 'h-4 w-4',
+    },
+    md: {
+      button: 'h-11 w-11 text-base',
+      icon: 'h-5 w-5',
+    },
+    lg: {
+      button: 'h-12 w-12 text-lg',
+      icon: 'h-6 w-6',
+    },
+  };
+
+  const config = sizeConfig[size];
+
+  return (
+    <div 
+      className={`flex items-center ${className}`}
+      role="group"
+      aria-label={ariaLabel || 'Theme selection buttons'}
+    >
+      {availableOptions.map((option, index) => {
+        const isSelected = theme === option.mode;
+        const IconComponent = isSelected ? option.iconSolid : option.icon;
+        
+        return (
+          <button
+            key={option.mode}
+            onClick={() => handleThemeChange(option.mode)}
+            disabled={disabled}
+            className={`
+              ${config.button}
+              inline-flex items-center justify-center
+              transition-all duration-200
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2
+              disabled:opacity-50 disabled:cursor-not-allowed
+              ${index === 0 ? 'rounded-l-md' : ''}
+              ${index === availableOptions.length - 1 ? 'rounded-r-md' : ''}
+              ${index > 0 ? '-ml-px' : ''}
+              ${isSelected
+                ? 'bg-primary-600 text-white border border-primary-600 z-10'
+                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }
+            `}
+            aria-label={`${option.label} theme`}
+            aria-pressed={isSelected}
+            title={option.description}
+          >
+            <IconComponent 
+              className={`${config.icon} ${
+                isSelected 
+                  ? 'text-white' 
+                  : option.mode === 'light' 
+                  ? 'text-yellow-500' 
+                  : option.mode === 'dark'
+                  ? 'text-blue-500'
+                  : 'text-purple-500'
+              }`}
+              aria-hidden="true"
+            />
+            {showLabels && (
+              <span className="ml-2 font-medium">
+                {option.label}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Main Theme Toggle Component
+ * 
+ * Provides accessible theme switching interface with multiple variants and
+ * comprehensive WCAG 2.1 AA compliance. Integrates with theme context for
+ * state management and persistence.
+ * 
+ * @param props - Theme toggle configuration options
+ * @returns Accessible theme toggle component
+ * 
+ * @example
+ * ```tsx
+ * // Switch variant (default)
+ * <ThemeToggle />
+ * 
+ * // Dropdown variant with labels
+ * <ThemeToggle variant="dropdown" showLabels={true} />
+ * 
+ * // Button group variant
+ * <ThemeToggle variant="buttons" size="lg" />
+ * 
+ * // With custom callback
+ * <ThemeToggle 
+ *   onThemeChange={(theme) => console.log('Theme changed to:', theme)}
+ *   ariaLabel="Application theme selector"
+ * />
+ * ```
+ */
+export function ThemeToggle({
+  variant = 'switch',
+  size = 'md',
+  showLabels = false,
+  enableSystem = true,
+  className = '',
+  ariaLabel,
+  disabled = false,
+  onThemeChange,
+}: ThemeToggleProps) {
+  const commonProps = {
+    size,
+    showLabels,
+    enableSystem,
+    ariaLabel,
+    disabled,
+    onThemeChange,
+    className,
+  };
+
+  switch (variant) {
+    case 'dropdown':
+      return <ThemeDropdownVariant {...commonProps} />;
+    case 'buttons':
+      return <ThemeButtonsVariant {...commonProps} />;
+    case 'switch':
+    default:
+      return <ThemeSwitchVariant {...commonProps} />;
+  }
+}
+
+// Export component variants for specific use cases
+export { ThemeSwitchVariant, ThemeDropdownVariant, ThemeButtonsVariant };
+
+// Export types for external usage
+export type { ThemeToggleProps, ThemeOption };
+
+// Default export
 export default ThemeToggle;
-
-/**
- * Compact Theme Toggle Preset
- * Pre-configured variant for toolbar and navigation areas
- */
-export const CompactThemeToggle: React.FC<Omit<ThemeToggleProps, 'compact'>> = (props) => (
-  <ThemeToggle {...props} compact />
-);
-
-/**
- * Labeled Theme Toggle Preset  
- * Pre-configured variant with labels for settings pages
- */
-export const LabeledThemeToggle: React.FC<Omit<ThemeToggleProps, 'showLabels'>> = (props) => (
-  <ThemeToggle {...props} showLabels />
-);
-
-/**
- * Type exports for external use
- */
-export type { ThemeToggleProps, ThemeContextState };
