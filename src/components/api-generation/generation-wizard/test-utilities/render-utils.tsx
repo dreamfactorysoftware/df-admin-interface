@@ -1,828 +1,1025 @@
 /**
- * React Testing Library render utilities and custom providers for wizard component testing.
+ * @fileoverview React Testing Library Render Utilities for API Generation Wizard
  * 
- * Provides reusable render functions with wizard context, React Query client, MSW integration,
- * and routing setup for consistent component testing environment across the API generation wizard test suite.
+ * Provides comprehensive testing utilities and custom providers for wizard component testing.
+ * Implements reusable render functions with wizard context, React Query client, MSW integration,
+ * and Next.js routing setup for consistent component testing environment across the API
+ * generation wizard test suite.
  * 
- * Implements React/Next.js Integration Requirements for React Testing Library component testing patterns,
- * supporting F-003: REST API Endpoint Generation wizard component testing with state management validation
- * and F-006: API Documentation and Testing with comprehensive component testing automation.
- * 
- * Key features:
- * - Custom render function with wizard context provider and React Query client setup
- * - MSW integration for realistic API interaction testing during component tests
- * - Next.js router mocking and navigation utilities for wizard step testing
+ * Key Features:
+ * - Custom render function with WizardProvider context and React Query client setup
+ * - Next.js router mocking and navigation simulation utilities
+ * - MSW integration helpers for realistic API interaction testing
  * - Wizard state management testing utilities and step navigation simulation
- * - Comprehensive provider wrapper for isolated component testing environment
+ * - Mock data factories for consistent test data generation
+ * - Accessibility testing utilities supporting WCAG 2.1 AA compliance
+ * 
+ * Supports:
+ * - F-003: REST API Endpoint Generation wizard component testing with state management validation
+ * - F-006: API Documentation and Testing with comprehensive component testing automation
+ * - React/Next.js Integration Requirements for React Testing Library component testing patterns
+ * - Section 4.4.2.2 Enhanced Testing Pipeline requiring React component testing with Testing Library best practices
+ * 
+ * @module WizardRenderUtils
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+
  */
 
 import React, { ReactElement, ReactNode } from 'react';
-import { render, RenderOptions, RenderResult } from '@testing-library/react';
+import { render, RenderOptions, RenderResult, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { WizardProvider, WIZARD_STEPS, type WizardStep } from '../wizard-provider';
-import { type WizardState, type DatabaseTable, type EndpointConfiguration } from '../types';
+import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import userEvent, { UserEvent } from '@testing-library/user-event';
+import { vi, MockedFunction } from 'vitest';
 
-// Mock Next.js router for testing environment
-jest.mock('next/navigation', () => ({
-  useRouter: jest.fn(),
-  usePathname: jest.fn(() => '/api-connections/database/test-service/generate'),
-  useSearchParams: jest.fn(() => new URLSearchParams()),
-  notFound: jest.fn(),
-}));
+// Internal imports
+import { WizardProvider, useWizard } from '../wizard-provider';
+import { 
+  WizardState, 
+  WizardStep, 
+  WizardActions, 
+  DatabaseTable, 
+  EndpointConfiguration, 
+  GenerationResult,
+  OpenAPISpec,
+  WizardStepInfo,
+  TableSelectionData,
+  EndpointConfigurationData,
+  GenerationPreviewData,
+  SecurityConfigurationData,
+  ServiceSelectionData
+} from '../types';
+import { 
+  createTestQueryClient,
+  createMockWizardState,
+  createMockDatabaseTable,
+  createMockEndpointConfiguration,
+  mswServer,
+  testQueryClient
+} from './test-setup';
 
-// ============================================================================
-// Testing Utilities and Mock Data
-// ============================================================================
-
-/**
- * Default mock router implementation for wizard testing
- */
-export const createMockRouter = (overrides: Partial<ReturnType<typeof useRouter>> = {}) => ({
-  push: jest.fn(),
-  replace: jest.fn(),
-  back: jest.fn(),
-  forward: jest.fn(),
-  refresh: jest.fn(),
-  prefetch: jest.fn(),
-  ...overrides,
-});
-
-/**
- * Default test wizard state for consistent testing
- */
-export const defaultTestWizardState: Partial<WizardState> = {
-  currentStep: WIZARD_STEPS.TABLE_SELECTION,
-  completedSteps: new Set<WizardStep>(),
-  isNavigationLocked: false,
-  serviceId: 'test-mysql-service',
-  serviceName: 'Test MySQL Database',
-  databaseType: 'mysql',
-  availableTables: [],
-  selectedTables: new Map(),
-  tableSearchQuery: '',
-  endpointConfigurations: new Map(),
-  globalConfiguration: {
-    httpMethods: {
-      GET: true,
-      POST: true,
-      PUT: true,
-      PATCH: false,
-      DELETE: false,
-    },
-    enablePagination: true,
-    enableFiltering: true,
-    enableSorting: true,
-    maxPageSize: 100,
-    customFields: [],
-    securityRules: [],
-  },
-  generationProgress: {
-    currentStep: 0,
-    completedSteps: [],
-    isGenerating: false,
-    error: null,
-    generatedEndpoints: [],
-  },
-  openApiPreview: {
-    specification: null,
-    isValid: false,
-    validationErrors: [],
-    lastUpdated: null,
-  },
-};
+// =============================================================================
+// TYPES AND INTERFACES
+// =============================================================================
 
 /**
- * Sample database tables for testing table selection and configuration
+ * Enhanced render options for wizard component testing
  */
-export const mockDatabaseTables: DatabaseTable[] = [
-  {
-    id: 'users',
-    name: 'users',
-    label: 'User Accounts',
-    description: 'Application user accounts and authentication data',
-    fields: [
-      {
-        id: 'id',
-        name: 'id',
-        type: 'integer',
-        nullable: false,
-        primaryKey: true,
-      },
-      {
-        id: 'email',
-        name: 'email',
-        type: 'string',
-        nullable: false,
-        primaryKey: false,
-      },
-      {
-        id: 'created_at',
-        name: 'created_at',
-        type: 'timestamp',
-        nullable: false,
-        primaryKey: false,
-      },
-    ],
-    relationships: [],
-    selected: false,
-  },
-  {
-    id: 'products',
-    name: 'products',
-    label: 'Product Catalog',
-    description: 'E-commerce product information and inventory',
-    fields: [
-      {
-        id: 'id',
-        name: 'id',
-        type: 'integer',
-        nullable: false,
-        primaryKey: true,
-      },
-      {
-        id: 'name',
-        name: 'name',
-        type: 'string',
-        nullable: false,
-        primaryKey: false,
-      },
-      {
-        id: 'price',
-        name: 'price',
-        type: 'decimal',
-        nullable: false,
-        primaryKey: false,
-      },
-      {
-        id: 'user_id',
-        name: 'user_id',
-        type: 'integer',
-        nullable: false,
-        primaryKey: false,
-        foreignKey: {
-          table: 'users',
-          field: 'id',
-        },
-      },
-    ],
-    relationships: [
-      {
-        id: 'products_user_fk',
-        type: 'many-to-one',
-        fromTable: 'products',
-        toTable: 'users',
-        fromField: 'user_id',
-        toField: 'id',
-      },
-    ],
-    selected: false,
-  },
-  {
-    id: 'orders',
-    name: 'orders',
-    label: 'Customer Orders',
-    description: 'Order management and tracking data',
-    fields: [
-      {
-        id: 'id',
-        name: 'id',
-        type: 'integer',
-        nullable: false,
-        primaryKey: true,
-      },
-      {
-        id: 'user_id',
-        name: 'user_id',
-        type: 'integer',
-        nullable: false,
-        primaryKey: false,
-        foreignKey: {
-          table: 'users',
-          field: 'id',
-        },
-      },
-      {
-        id: 'total_amount',
-        name: 'total_amount',
-        type: 'decimal',
-        nullable: false,
-        primaryKey: false,
-      },
-      {
-        id: 'status',
-        name: 'status',
-        type: 'string',
-        nullable: false,
-        primaryKey: false,
-      },
-    ],
-    relationships: [
-      {
-        id: 'orders_user_fk',
-        type: 'many-to-one',
-        fromTable: 'orders',
-        toTable: 'users',
-        fromField: 'user_id',
-        toField: 'id',
-      },
-    ],
-    selected: false,
-  },
-];
-
-/**
- * Sample endpoint configurations for testing configuration workflow
- */
-export const mockEndpointConfigurations: EndpointConfiguration[] = [
-  {
-    httpMethods: {
-      GET: true,
-      POST: true,
-      PUT: true,
-      PATCH: false,
-      DELETE: false,
-    },
-    enablePagination: true,
-    enableFiltering: true,
-    enableSorting: true,
-    maxPageSize: 50,
-    customFields: ['created_at', 'updated_at'],
-    securityRules: [
-      {
-        id: 'authenticated_users_only',
-        method: 'GET',
-        roles: ['authenticated'],
-        conditions: 'user.is_authenticated = true',
-        enabled: true,
-      },
-    ],
-  },
-];
-
-/**
- * Sample OpenAPI specification for testing preview functionality
- */
-export const mockOpenAPISpec = {
-  openapi: '3.0.3',
-  info: {
-    title: 'Test Database API',
-    version: '1.0.0',
-    description: 'Generated API for test MySQL database',
-  },
-  servers: [
-    {
-      url: 'https://localhost:8080/api/v2',
-      description: 'Development server',
-    },
-  ],
-  paths: {
-    '/test-mysql-service/users': {
-      get: {
-        operationId: 'getUsers',
-        summary: 'Retrieve user records',
-        tags: ['users'],
-        parameters: [
-          {
-            name: 'limit',
-            in: 'query',
-            description: 'Number of records to return',
-            required: false,
-            schema: {
-              type: 'integer',
-              minimum: 1,
-              maximum: 100,
-              default: 25,
-            },
-          },
-        ],
-        responses: {
-          '200': {
-            description: 'Successful response',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    resource: {
-                      type: 'array',
-                      items: {
-                        $ref: '#/components/schemas/User',
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      post: {
-        operationId: 'createUser',
-        summary: 'Create new user record',
-        tags: ['users'],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                $ref: '#/components/schemas/UserInput',
-              },
-            },
-          },
-        },
-        responses: {
-          '201': {
-            description: 'User created successfully',
-            content: {
-              'application/json': {
-                schema: {
-                  $ref: '#/components/schemas/User',
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  },
-  components: {
-    schemas: {
-      User: {
-        type: 'object',
-        required: ['id', 'email'],
-        properties: {
-          id: {
-            type: 'integer',
-            description: 'User ID',
-          },
-          email: {
-            type: 'string',
-            format: 'email',
-            description: 'User email address',
-          },
-          created_at: {
-            type: 'string',
-            format: 'date-time',
-            description: 'Record creation timestamp',
-          },
-        },
-      },
-      UserInput: {
-        type: 'object',
-        required: ['email'],
-        properties: {
-          email: {
-            type: 'string',
-            format: 'email',
-            description: 'User email address',
-          },
-        },
-      },
-    },
-    securitySchemes: {
-      ApiKeyAuth: {
-        type: 'apiKey',
-        in: 'header',
-        name: 'X-DreamFactory-Api-Key',
-      },
-    },
-  },
-  security: [
-    {
-      ApiKeyAuth: [],
-    },
-  ],
-  tags: [
-    {
-      name: 'users',
-      description: 'User management operations',
-    },
-  ],
-};
-
-// ============================================================================
-// React Query Test Client Configuration
-// ============================================================================
-
-/**
- * Creates a React Query client configured for testing environment
- * with disabled retries and minimal cache times for predictable test behavior
- */
-export const createTestQueryClient = (): QueryClient => {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        // Disable retries in test environment for predictable behavior
-        retry: false,
-        // Disable cache time for fresh data in each test
-        cacheTime: 0,
-        staleTime: 0,
-        // Disable refetching to prevent test interference
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-      },
-      mutations: {
-        // Disable retries for mutations as well
-        retry: false,
-      },
-    },
-    // Disable error logging during tests to keep console clean
-    logger: {
-      log: () => {},
-      warn: () => {},
-      error: () => {},
-    },
-  });
-};
-
-// ============================================================================
-// Custom Render Function with Providers
-// ============================================================================
-
-/**
- * Props for configuring the test render environment
- */
-export interface RenderWithProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
-  /** Initial wizard state for testing specific scenarios */
+export interface WizardRenderOptions extends Omit<RenderOptions, 'wrapper'> {
+  /** Initial wizard state for testing */
   initialWizardState?: Partial<WizardState>;
-  /** Service context for wizard provider */
-  serviceContext?: {
-    serviceId: string;
-    serviceName: string;
-    databaseType: string;
-  };
-  /** Custom React Query client (uses test client by default) */
+  
+  /** Service name for wizard context */
+  serviceName?: string;
+  
+  /** Custom React Query client */
   queryClient?: QueryClient;
-  /** Custom router mock for navigation testing */
-  routerMock?: Partial<ReturnType<typeof useRouter>>;
-  /** Whether to include MSW server integration */
-  enableMSW?: boolean;
+  
+  /** Initial route path for Next.js router */
+  initialRoute?: string;
+  
+  /** Custom router implementation */
+  router?: Partial<MockAppRouter>;
+  
+  /** Whether to suppress console errors during test */
+  suppressErrors?: boolean;
+  
+  /** Additional providers to wrap around the component */
+  additionalProviders?: React.FC<{ children: ReactNode }>[];
+  
+  /** Test user configuration */
+  user?: {
+    advanceTimers?: boolean;
+    delay?: number | null;
+  };
 }
 
 /**
- * Comprehensive test wrapper component that provides all necessary context
- * for wizard component testing including React Query, router, and wizard state
+ * Enhanced render result with wizard-specific utilities
  */
-export const TestWrapper: React.FC<{
-  children: ReactNode;
-  options: RenderWithProvidersOptions;
-}> = ({ children, options }) => {
-  const {
-    queryClient = createTestQueryClient(),
-    serviceContext = {
-      serviceId: 'test-mysql-service',
-      serviceName: 'Test MySQL Database',
-      databaseType: 'mysql',
+export interface WizardRenderResult extends RenderResult {
+  /** User event instance for interactions */
+  user: UserEvent;
+  
+  /** Mock router utilities */
+  router: MockAppRouter;
+  
+  /** Query client instance */
+  queryClient: QueryClient;
+  
+  /** Wizard state access utilities */
+  wizard: {
+    /** Get current wizard state */
+    getState: () => WizardState;
+    
+    /** Get current wizard actions */
+    getActions: () => WizardActions;
+    
+    /** Navigate to specific step */
+    goToStep: (step: WizardStep) => Promise<void>;
+    
+    /** Trigger next step navigation */
+    nextStep: () => Promise<void>;
+    
+    /** Trigger previous step navigation */
+    previousStep: () => Promise<void>;
+    
+    /** Update wizard state */
+    updateState: (updates: Partial<WizardState>) => void;
+    
+    /** Reset wizard to initial state */
+    reset: () => void;
+  };
+  
+  /** Utility functions for testing */
+  utils: {
+    /** Wait for wizard state to update */
+    waitForStateUpdate: (predicate: (state: WizardState) => boolean, timeout?: number) => Promise<void>;
+    
+    /** Wait for loading to complete */
+    waitForLoading: (timeout?: number) => Promise<void>;
+    
+    /** Wait for queries to complete */
+    waitForQueries: (timeout?: number) => Promise<void>;
+    
+    /** Simulate API response delay */
+    simulateApiDelay: (ms?: number) => Promise<void>;
+    
+    /** Validate accessibility compliance */
+    validateAccessibility: () => void;
+  };
+}
+
+/**
+ * Mock Next.js App Router interface
+ */
+export interface MockAppRouter {
+  /** Current pathname */
+  pathname: string;
+  
+  /** Navigation function */
+  push: MockedFunction<(href: string, options?: any) => void>;
+  
+  /** Replace function */
+  replace: MockedFunction<(href: string, options?: any) => void>;
+  
+  /** Go back function */
+  back: MockedFunction<() => void>;
+  
+  /** Go forward function */
+  forward: MockedFunction<() => void>;
+  
+  /** Refresh function */
+  refresh: MockedFunction<() => void>;
+  
+  /** Prefetch function */
+  prefetch: MockedFunction<(href: string) => Promise<void>>;
+  
+  /** Set pathname for testing */
+  setPathname: (path: string) => void;
+  
+  /** Get navigation history */
+  getHistory: () => string[];
+  
+  /** Clear navigation history */
+  clearHistory: () => void;
+}
+
+/**
+ * Test wizard data factory options
+ */
+export interface WizardTestDataOptions {
+  /** Number of mock tables to generate */
+  tableCount?: number;
+  
+  /** Service name to use */
+  serviceName?: string;
+  
+  /** Whether to include complex table relationships */
+  includeRelationships?: boolean;
+  
+  /** Whether to include endpoint configurations */
+  includeEndpointConfigs?: boolean;
+  
+  /** Current wizard step */
+  currentStep?: WizardStep;
+  
+  /** Whether to include generated OpenAPI spec */
+  includeGeneratedSpec?: boolean;
+}
+
+/**
+ * Step navigation test utilities
+ */
+export interface StepNavigationUtils {
+  /** Click next button and wait for navigation */
+  clickNext: () => Promise<void>;
+  
+  /** Click previous button and wait for navigation */
+  clickPrevious: () => Promise<void>;
+  
+  /** Click step indicator and wait for navigation */
+  clickStep: (step: WizardStep) => Promise<void>;
+  
+  /** Verify current step is active */
+  expectCurrentStep: (step: WizardStep) => void;
+  
+  /** Verify step can be navigated to */
+  expectStepAccessible: (step: WizardStep) => void;
+  
+  /** Verify step is completed */
+  expectStepCompleted: (step: WizardStep) => void;
+  
+  /** Get all step indicators */
+  getStepIndicators: () => HTMLElement[];
+  
+  /** Get step progress percentage */
+  getProgress: () => number;
+}
+
+// =============================================================================
+// MOCK ROUTER IMPLEMENTATION
+// =============================================================================
+
+/**
+ * Creates a mock Next.js App Router for testing
+ */
+function createMockRouter(initialRoute = '/'): MockAppRouter {
+  let currentPathname = initialRoute;
+  const history: string[] = [initialRoute];
+  
+  const mockRouter: MockAppRouter = {
+    pathname: currentPathname,
+    push: vi.fn((href: string) => {
+      currentPathname = href;
+      history.push(href);
+      mockRouter.pathname = href;
+    }),
+    replace: vi.fn((href: string) => {
+      currentPathname = href;
+      if (history.length > 0) {
+        history[history.length - 1] = href;
+      } else {
+        history.push(href);
+      }
+      mockRouter.pathname = href;
+    }),
+    back: vi.fn(() => {
+      if (history.length > 1) {
+        history.pop();
+        currentPathname = history[history.length - 1];
+        mockRouter.pathname = currentPathname;
+      }
+    }),
+    forward: vi.fn(() => {
+      // Mock implementation - in real tests you might track forward history
+    }),
+    refresh: vi.fn(),
+    prefetch: vi.fn().mockResolvedValue(undefined),
+    setPathname: (path: string) => {
+      currentPathname = path;
+      mockRouter.pathname = path;
     },
+    getHistory: () => [...history],
+    clearHistory: () => {
+      history.length = 0;
+      history.push(initialRoute);
+      currentPathname = initialRoute;
+      mockRouter.pathname = initialRoute;
+    }
+  };
+  
+  return mockRouter;
+}
+
+// =============================================================================
+// WIZARD TEST DATA FACTORIES
+// =============================================================================
+
+/**
+ * Creates comprehensive mock wizard state for testing
+ */
+export function createWizardTestData(options: WizardTestDataOptions = {}): WizardState {
+  const {
+    tableCount = 3,
+    serviceName = 'test-database-service',
+    includeRelationships = true,
+    includeEndpointConfigs = true,
+    currentStep = 'table-selection',
+    includeGeneratedSpec = false
   } = options;
+  
+  // Generate mock tables
+  const availableTables: DatabaseTable[] = Array.from({ length: tableCount }, (_, index) => 
+    createMockDatabaseTable({
+      name: `table_${index + 1}`,
+      label: `Table ${index + 1}`,
+      description: `Mock table ${index + 1} for testing`,
+      rowCount: 100 * (index + 1),
+      fields: [
+        {
+          name: 'id',
+          dbType: 'integer',
+          type: 'integer' as const,
+          isNullable: false,
+          isPrimaryKey: true,
+          isForeignKey: false,
+          isUnique: true,
+          isAutoIncrement: true,
+          description: 'Primary key'
+        },
+        {
+          name: 'name',
+          dbType: 'varchar',
+          type: 'string' as const,
+          length: 255,
+          isNullable: false,
+          isPrimaryKey: false,
+          isForeignKey: false,
+          isUnique: false,
+          description: 'Name field'
+        },
+        {
+          name: 'created_at',
+          dbType: 'timestamp',
+          type: 'timestamp' as const,
+          isNullable: false,
+          isPrimaryKey: false,
+          isForeignKey: false,
+          isUnique: false,
+          description: 'Creation timestamp'
+        },
+        ...(includeRelationships && index > 0 ? [{
+          name: `table_${index}_id`,
+          dbType: 'integer',
+          type: 'integer' as const,
+          isNullable: true,
+          isPrimaryKey: false,
+          isForeignKey: true,
+          isUnique: false,
+          description: `Reference to table ${index}`
+        }] : [])
+      ],
+      primaryKey: ['id'],
+      foreignKeys: includeRelationships && index > 0 ? [{
+        name: `fk_table_${index + 1}_table_${index}`,
+        field: `table_${index}_id`,
+        referencedTable: `table_${index}`,
+        referencedField: 'id',
+        onDelete: 'CASCADE' as const,
+        onUpdate: 'CASCADE' as const
+      }] : []
+    })
+  );
+  
+  // Select first two tables by default
+  const selectedTables = availableTables.slice(0, Math.min(2, tableCount));
+  
+  // Generate endpoint configurations if requested
+  const endpointConfigurations: EndpointConfiguration[] = includeEndpointConfigs 
+    ? selectedTables.map(table => createMockEndpointConfiguration({
+        tableName: table.name,
+        basePath: `/${table.name.toLowerCase()}`,
+        enabledMethods: ['GET', 'POST', 'PUT', 'DELETE'] as const
+      }))
+    : [];
+  
+  // Generate mock OpenAPI spec if requested
+  const generatedSpec: OpenAPISpec | undefined = includeGeneratedSpec ? {
+    openapi: '3.0.3',
+    info: {
+      title: `${serviceName} API`,
+      version: '1.0.0',
+      description: 'Mock API specification for testing'
+    },
+    servers: [{
+      url: `http://localhost/api/v2/${serviceName}`,
+      description: 'Test server'
+    }],
+    paths: selectedTables.reduce((paths, table) => {
+      paths[`/${table.name}`] = {
+        get: {
+          operationId: `get${table.name}`,
+          summary: `Get ${table.label}`,
+          tags: [table.name],
+          responses: {
+            '200': {
+              description: 'Successful response',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      resource: {
+                        type: 'array',
+                        items: { $ref: `#/components/schemas/${table.name}` }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      };
+      return paths;
+    }, {} as any),
+    components: {
+      schemas: selectedTables.reduce((schemas, table) => {
+        schemas[table.name] = {
+          type: 'object',
+          properties: table.fields.reduce((props, field) => {
+            props[field.name] = {
+              type: field.type === 'integer' ? 'integer' : 'string',
+              description: field.description || field.name
+            };
+            return props;
+          }, {} as any),
+          required: table.fields.filter(f => !f.isNullable).map(f => f.name)
+        };
+        return schemas;
+      }, {} as any),
+      securitySchemes: {
+        ApiKeyAuth: {
+          type: 'apiKey' as const,
+          in: 'header' as const,
+          name: 'X-DreamFactory-API-Key'
+        }
+      }
+    },
+    security: [{ ApiKeyAuth: [] }],
+    tags: selectedTables.map(table => ({
+      name: table.name,
+      description: table.description || `${table.label} operations`
+    }))
+  } : undefined;
+  
+  return createMockWizardState({
+    currentStep,
+    serviceName,
+    availableTables,
+    selectedTables,
+    endpointConfigurations,
+    generatedSpec,
+    generationStatus: includeGeneratedSpec ? 'completed' as const : 'idle' as const
+  });
+}
 
-  // Setup router mock if provided
-  if (options.routerMock) {
-    const mockRouter = createMockRouter(options.routerMock);
-    (useRouter as jest.Mock).mockReturnValue(mockRouter);
-  }
+/**
+ * Creates mock service selection data
+ */
+export function createMockServiceSelectionData(overrides: Partial<ServiceSelectionData> = {}): ServiceSelectionData {
+  return {
+    selectedService: {
+      id: 1,
+      name: 'test-database',
+      label: 'Test Database',
+      description: 'Mock database service for testing',
+      type: 'mysql',
+      is_active: true,
+      config: {
+        host: 'localhost',
+        port: 3306,
+        database: 'test_db',
+        username: 'test_user'
+      },
+      created_date: '2024-01-01T00:00:00Z',
+      last_modified_date: '2024-01-01T00:00:00Z'
+    },
+    availableServices: [
+      {
+        id: 1,
+        name: 'test-database',
+        label: 'Test Database',
+        description: 'Mock database service for testing',
+        type: 'mysql',
+        is_active: true,
+        config: {},
+        created_date: '2024-01-01T00:00:00Z',
+        last_modified_date: '2024-01-01T00:00:00Z'
+      },
+      {
+        id: 2,
+        name: 'test-postgres',
+        label: 'Test PostgreSQL',
+        description: 'Mock PostgreSQL service for testing',
+        type: 'postgresql',
+        is_active: true,
+        config: {},
+        created_date: '2024-01-01T00:00:00Z',
+        last_modified_date: '2024-01-01T00:00:00Z'
+      }
+    ],
+    loading: false,
+    error: null,
+    connectionTest: null,
+    testingConnection: false,
+    filter: {
+      activeOnly: true,
+      recentFirst: true
+    },
+    createNewService: false,
+    newServiceConfig: null,
+    ...overrides
+  };
+}
 
+/**
+ * Creates mock table selection data
+ */
+export function createMockTableSelectionData(overrides: Partial<TableSelectionData> = {}): TableSelectionData {
+  const availableTables = [
+    createMockDatabaseTable({ name: 'users', label: 'Users', rowCount: 1250 }),
+    createMockDatabaseTable({ name: 'orders', label: 'Orders', rowCount: 5678 }),
+    createMockDatabaseTable({ name: 'products', label: 'Products', rowCount: 892 })
+  ];
+  
+  return {
+    availableTables,
+    selectedTables: [],
+    loading: false,
+    error: null,
+    lastDiscovered: new Date().toISOString(),
+    filter: {
+      searchTerm: '',
+      primaryKeyOnly: false,
+      foreignKeyOnly: false,
+      hideSystemTables: true,
+      hideEmptyTables: false,
+      minRowCount: undefined,
+      maxRowCount: undefined,
+      categories: [],
+      tags: []
+    },
+    bulkSelection: {
+      selectAll: false,
+      selectAllFields: false,
+      bulkOperationInProgress: false
+    },
+    tableMetadata: new Map(),
+    refreshing: false,
+    totalTables: availableTables.length,
+    pagination: {
+      currentPage: 1,
+      pageSize: 50,
+      totalItems: availableTables.length,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPreviousPage: false
+    },
+    ...overrides
+  };
+}
+
+// =============================================================================
+// PROVIDER WRAPPER COMPONENT
+// =============================================================================
+
+/**
+ * Test provider wrapper with all necessary contexts
+ */
+interface TestProvidersProps {
+  children: ReactNode;
+  queryClient: QueryClient;
+  router: MockAppRouter;
+  initialWizardState?: Partial<WizardState>;
+  serviceName: string;
+}
+
+function TestProviders({ 
+  children, 
+  queryClient, 
+  router, 
+  initialWizardState,
+  serviceName 
+}: TestProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
-      <WizardProvider
-        serviceId={serviceContext.serviceId}
-        serviceName={serviceContext.serviceName}
-        databaseType={serviceContext.databaseType}
-      >
-        {children}
-      </WizardProvider>
+      <AppRouterContext.Provider value={router}>
+        <PathnameContext.Provider value={router.pathname}>
+          <WizardProvider 
+            serviceName={serviceName} 
+            initialState={initialWizardState}
+          >
+            {children}
+          </WizardProvider>
+        </PathnameContext.Provider>
+      </AppRouterContext.Provider>
     </QueryClientProvider>
   );
-};
+}
+
+// =============================================================================
+// MAIN RENDER FUNCTION
+// =============================================================================
 
 /**
- * Enhanced render function that wraps components with all necessary providers
- * for wizard testing, including React Query, wizard context, and routing mocks
+ * Enhanced render function for wizard components
+ * 
+ * Provides comprehensive testing setup with wizard context, React Query client,
+ * Next.js router mocking, and MSW integration for realistic component testing.
  * 
  * @param ui - React component to render
- * @param options - Configuration options for the test environment
- * @returns RenderResult with additional testing utilities
+ * @param options - Enhanced render options with wizard-specific configuration
+ * @returns Enhanced render result with wizard testing utilities
  */
-export const renderWithProviders = (
+export function renderWizard(
   ui: ReactElement,
-  options: RenderWithProvidersOptions = {}
-): RenderResult & {
-  /** Access to the React Query client for cache inspection */
-  queryClient: QueryClient;
-  /** Mock router functions for navigation testing */
-  routerMock: ReturnType<typeof createMockRouter>;
-  /** Rerender with different options */
-  rerenderWithOptions: (newOptions: RenderWithProvidersOptions) => void;
-} => {
-  const queryClient = options.queryClient || createTestQueryClient();
-  const routerMock = createMockRouter(options.routerMock);
+  options: WizardRenderOptions = {}
+): WizardRenderResult {
+  const {
+    initialWizardState,
+    serviceName = 'test-service',
+    queryClient = createTestQueryClient(),
+    initialRoute = '/api-connections/database/test-service/generate',
+    router: customRouter,
+    suppressErrors = true,
+    additionalProviders = [],
+    user: userOptions = {},
+    ...renderOptions
+  } = options;
   
-  // Setup router mock
-  (useRouter as jest.Mock).mockReturnValue(routerMock);
-
-  const wrapper = ({ children }: { children: ReactNode }) => (
-    <TestWrapper options={{ ...options, queryClient }}>
-      {children}
-    </TestWrapper>
-  );
-
-  const renderResult = render(ui, {
-    wrapper,
-    ...options,
+  // Create mock router
+  const router = customRouter || createMockRouter(initialRoute);
+  
+  // Set up error suppression if requested
+  let originalError: typeof console.error;
+  if (suppressErrors) {
+    originalError = console.error;
+    console.error = vi.fn();
+  }
+  
+  // Create user event instance
+  const user = userEvent.setup({
+    advanceTimers: userOptions.advanceTimers,
+    delay: userOptions.delay
   });
-
-  // Enhanced rerender function that allows updating options
-  const rerenderWithOptions = (newOptions: RenderWithProvidersOptions) => {
-    const newWrapper = ({ children }: { children: ReactNode }) => (
-      <TestWrapper options={{ ...options, ...newOptions, queryClient }}>
+  
+  // Compose all providers
+  const AllProviders = ({ children }: { children: ReactNode }) => {
+    let wrapped = (
+      <TestProviders
+        queryClient={queryClient}
+        router={router}
+        initialWizardState={initialWizardState}
+        serviceName={serviceName}
+      >
         {children}
-      </TestWrapper>
+      </TestProviders>
     );
     
-    renderResult.rerender(
-      React.cloneElement(ui, {}, ui.props.children)
-    );
+    // Apply additional providers from outside to inside
+    for (const Provider of additionalProviders.reverse()) {
+      wrapped = <Provider>{wrapped}</Provider>;
+    }
+    
+    return wrapped;
   };
-
+  
+  // Render component with providers
+  const renderResult = render(ui, {
+    wrapper: AllProviders,
+    ...renderOptions
+  });
+  
+  // Create wizard state access utilities
+  let currentWizardState: WizardState;
+  let currentWizardActions: WizardActions;
+  
+  // Helper component to capture wizard context
+  function WizardContextCapture() {
+    const { state, actions } = useWizard();
+    currentWizardState = state;
+    currentWizardActions = actions;
+    return null;
+  }
+  
+  // Render the context capture component to get current state
+  render(<WizardContextCapture />, { wrapper: AllProviders });
+  
+  // Create wizard utilities
+  const wizard = {
+    getState: () => currentWizardState,
+    getActions: () => currentWizardActions,
+    
+    goToStep: async (step: WizardStep) => {
+      currentWizardActions.goToStep(step);
+      await waitFor(() => {
+        render(<WizardContextCapture />, { wrapper: AllProviders });
+        expect(currentWizardState.currentStep).toBe(step);
+      });
+    },
+    
+    nextStep: async () => {
+      const success = await currentWizardActions.nextStep();
+      if (success) {
+        await waitFor(() => {
+          render(<WizardContextCapture />, { wrapper: AllProviders });
+          // State should have changed
+        });
+      }
+    },
+    
+    previousStep: () => {
+      currentWizardActions.previousStep();
+      render(<WizardContextCapture />, { wrapper: AllProviders });
+    },
+    
+    updateState: (updates: Partial<WizardState>) => {
+      currentWizardActions.updateState(updates);
+      render(<WizardContextCapture />, { wrapper: AllProviders });
+    },
+    
+    reset: () => {
+      currentWizardActions.reset();
+      render(<WizardContextCapture />, { wrapper: AllProviders });
+    }
+  };
+  
+  // Create utility functions
+  const utils = {
+    waitForStateUpdate: async (predicate: (state: WizardState) => boolean, timeout = 5000) => {
+      await waitFor(
+        () => {
+          render(<WizardContextCapture />, { wrapper: AllProviders });
+          expect(predicate(currentWizardState)).toBe(true);
+        },
+        { timeout }
+      );
+    },
+    
+    waitForLoading: async (timeout = 5000) => {
+      await waitFor(
+        () => {
+          render(<WizardContextCapture />, { wrapper: AllProviders });
+          expect(currentWizardState.loading).toBe(false);
+        },
+        { timeout }
+      );
+    },
+    
+    waitForQueries: async (timeout = 5000) => {
+      await waitFor(
+        () => {
+          expect(queryClient.isFetching()).toBe(0);
+          expect(queryClient.isMutating()).toBe(0);
+        },
+        { timeout }
+      );
+    },
+    
+    simulateApiDelay: async (ms = 100) => {
+      await new Promise(resolve => setTimeout(resolve, ms));
+    },
+    
+    validateAccessibility: () => {
+      // Check for required ARIA attributes on interactive elements
+      const interactiveElements = renderResult.container.querySelectorAll(
+        'button, input, select, textarea, [role="button"], [role="tab"]'
+      );
+      
+      interactiveElements.forEach((element) => {
+        if (element.tagName === 'BUTTON' && !element.getAttribute('aria-label') && !element.textContent?.trim()) {
+          throw new Error('Button elements must have accessible names');
+        }
+        
+        if (['INPUT', 'SELECT', 'TEXTAREA'].includes(element.tagName)) {
+          const id = element.getAttribute('id');
+          const ariaLabel = element.getAttribute('aria-label');
+          const ariaLabelledBy = element.getAttribute('aria-labelledby');
+          
+          if (!ariaLabel && !ariaLabelledBy && (!id || !renderResult.container.querySelector(`label[for="${id}"]`))) {
+            throw new Error('Form controls must have associated labels');
+          }
+        }
+      });
+    }
+  };
+  
+  // Clean up error suppression
+  const cleanup = renderResult.unmount;
+  renderResult.unmount = () => {
+    if (suppressErrors && originalError) {
+      console.error = originalError;
+    }
+    cleanup();
+  };
+  
   return {
     ...renderResult,
+    user,
+    router,
     queryClient,
-    routerMock,
-    rerenderWithOptions,
+    wizard,
+    utils
   };
-};
+}
 
-// ============================================================================
-// Wizard-Specific Testing Utilities
-// ============================================================================
+// =============================================================================
+// STEP NAVIGATION UTILITIES
+// =============================================================================
 
 /**
- * Utility functions for wizard state management and navigation testing
+ * Creates step navigation utilities for wizard testing
  */
-export const wizardTestUtils = {
-  /**
-   * Simulate wizard step navigation
-   */
-  navigateToStep: (step: WizardStep, routerMock?: ReturnType<typeof createMockRouter>) => {
-    const router = routerMock || createMockRouter();
+export function createStepNavigationUtils(renderResult: WizardRenderResult): StepNavigationUtils {
+  const { user, wizard, utils } = renderResult;
+  
+  return {
+    clickNext: async () => {
+      const nextButton = screen.getByRole('button', { name: /next|continue|proceed/i });
+      await user.click(nextButton);
+      await utils.waitForStateUpdate(state => !state.loading);
+    },
     
-    switch (step) {
-      case WIZARD_STEPS.TABLE_SELECTION:
-        router.push('/api-connections/database/test-service/generate?step=tables');
-        break;
-      case WIZARD_STEPS.ENDPOINT_CONFIGURATION:
-        router.push('/api-connections/database/test-service/generate?step=endpoints');
-        break;
-      case WIZARD_STEPS.SECURITY_CONFIGURATION:
-        router.push('/api-connections/database/test-service/generate?step=security');
-        break;
-      case WIZARD_STEPS.PREVIEW_AND_GENERATE:
-        router.push('/api-connections/database/test-service/generate?step=preview');
-        break;
-    }
-  },
-
-  /**
-   * Create mock wizard state for specific step testing
-   */
-  createMockStateForStep: (step: WizardStep): Partial<WizardState> => {
-    const baseState = { ...defaultTestWizardState };
+    clickPrevious: async () => {
+      const prevButton = screen.getByRole('button', { name: /previous|back/i });
+      await user.click(prevButton);
+      await utils.waitForStateUpdate(state => !state.loading);
+    },
     
-    switch (step) {
-      case WIZARD_STEPS.TABLE_SELECTION:
-        return {
-          ...baseState,
-          currentStep: step,
-          availableTables: mockDatabaseTables,
-        };
-        
-      case WIZARD_STEPS.ENDPOINT_CONFIGURATION:
-        const selectedTables = new Map();
-        selectedTables.set('users', { ...mockDatabaseTables[0], selected: true });
-        selectedTables.set('products', { ...mockDatabaseTables[1], selected: true });
-        
-        return {
-          ...baseState,
-          currentStep: step,
-          availableTables: mockDatabaseTables,
-          selectedTables,
-          completedSteps: new Set([WIZARD_STEPS.TABLE_SELECTION]),
-        };
-        
-      case WIZARD_STEPS.SECURITY_CONFIGURATION:
-        const selectedTablesWithConfig = new Map();
-        selectedTablesWithConfig.set('users', { ...mockDatabaseTables[0], selected: true });
-        
-        const endpointConfigs = new Map();
-        endpointConfigs.set('users', mockEndpointConfigurations[0]);
-        
-        return {
-          ...baseState,
-          currentStep: step,
-          selectedTables: selectedTablesWithConfig,
-          endpointConfigurations: endpointConfigs,
-          completedSteps: new Set([
-            WIZARD_STEPS.TABLE_SELECTION,
-            WIZARD_STEPS.ENDPOINT_CONFIGURATION,
-          ]),
-        };
-        
-      case WIZARD_STEPS.PREVIEW_AND_GENERATE:
-        return {
-          ...baseState,
-          currentStep: step,
-          selectedTables: new Map([['users', { ...mockDatabaseTables[0], selected: true }]]),
-          endpointConfigurations: new Map([['users', mockEndpointConfigurations[0]]]),
-          openApiPreview: {
-            specification: mockOpenAPISpec,
-            isValid: true,
-            validationErrors: [],
-            lastUpdated: new Date(),
-          },
-          completedSteps: new Set([
-            WIZARD_STEPS.TABLE_SELECTION,
-            WIZARD_STEPS.ENDPOINT_CONFIGURATION,
-            WIZARD_STEPS.SECURITY_CONFIGURATION,
-          ]),
-        };
-        
-      default:
-        return baseState;
+    clickStep: async (step: WizardStep) => {
+      const stepButton = screen.getByRole('button', { name: new RegExp(step.replace('-', ' '), 'i') });
+      await user.click(stepButton);
+      await utils.waitForStateUpdate(state => state.currentStep === step);
+    },
+    
+    expectCurrentStep: (step: WizardStep) => {
+      const state = wizard.getState();
+      expect(state.currentStep).toBe(step);
+      
+      // Verify UI reflects current step
+      const activeStepElement = screen.getByRole('button', { 
+        name: new RegExp(step.replace('-', ' '), 'i'),
+        current: true
+      });
+      expect(activeStepElement).toBeInTheDocument();
+    },
+    
+    expectStepAccessible: (step: WizardStep) => {
+      const stepButton = screen.getByRole('button', { name: new RegExp(step.replace('-', ' '), 'i') });
+      expect(stepButton).toBeEnabled();
+      expect(stepButton).not.toHaveAttribute('aria-disabled', 'true');
+    },
+    
+    expectStepCompleted: (step: WizardStep) => {
+      const stepElement = screen.getByRole('button', { name: new RegExp(step.replace('-', ' '), 'i') });
+      expect(stepElement).toHaveAttribute('data-completed', 'true');
+      // Look for completion indicator (checkmark, etc.)
+      expect(within(stepElement).getByLabelText(/completed|done|finished/i)).toBeInTheDocument();
+    },
+    
+    getStepIndicators: () => {
+      return screen.getAllByRole('button', { name: /table selection|endpoint configuration|generation preview/i });
+    },
+    
+    getProgress: () => {
+      const progressBar = screen.getByRole('progressbar');
+      const ariaNow = progressBar.getAttribute('aria-valuenow');
+      return ariaNow ? parseInt(ariaNow, 10) : 0;
     }
-  },
+  };
+}
 
-  /**
-   * Simulate table selection interactions
-   */
-  simulateTableSelection: (tables: DatabaseTable[]) => {
-    return tables.map(table => ({ ...table, selected: true }));
-  },
-
-  /**
-   * Simulate generation progress updates
-   */
-  simulateGenerationProgress: (progress: number, currentOperation?: string) => {
-    return {
-      currentStep: progress,
-      completedSteps: Array.from({ length: Math.floor(progress / 25) }, (_, i) => i),
-      isGenerating: progress < 100,
-      error: null,
-      generatedEndpoints: progress === 100 ? [
-        '/api/v2/test-mysql-service/users',
-        '/api/v2/test-mysql-service/products',
-      ] : [],
-      currentOperation,
-    };
-  },
-
-  /**
-   * Wait for wizard step completion
-   */
-  waitForStepCompletion: async (step: WizardStep) => {
-    // This would be used with waitFor from testing-library
-    // to wait for specific wizard state changes
-    return new Promise<void>((resolve) => {
-      setTimeout(resolve, 100); // Simulate async step completion
-    });
-  },
-};
-
-// ============================================================================
-// MSW Integration Utilities
-// ============================================================================
+// =============================================================================
+// MSW TESTING UTILITIES
+// =============================================================================
 
 /**
- * MSW setup utilities for realistic API testing
+ * MSW testing utilities for wizard component tests
  */
-export const mswTestUtils = {
+export const mswUtils = {
   /**
-   * Configure MSW handlers for wizard API endpoints
+   * Simulate API error for testing error states
    */
-  setupWizardHandlers: () => {
-    // This would integrate with MSW handlers defined in msw-handlers.ts
-    // The actual MSW setup would be imported and configured here
-    return {
-      enableMocks: () => {
-        // Enable MSW for wizard testing
-      },
-      disableMocks: () => {
-        // Disable MSW after tests
-      },
-      resetHandlers: () => {
-        // Reset handlers between tests
-      },
-    };
+  simulateApiError: (endpoint: string, status: number, message: string) => {
+    mswServer.use(
+      // @ts-ignore - MSW types
+      window.msw.http.get(endpoint, () => {
+        return new Response(JSON.stringify({ error: { message } }), { status });
+      })
+    );
   },
-
+  
   /**
-   * Mock successful API responses for wizard workflow
+   * Simulate slow API response for testing loading states
    */
-  mockSuccessfulWorkflow: () => {
-    return {
-      tableDiscovery: mockDatabaseTables,
-      schemaValidation: { valid: true, errors: [] },
-      endpointGeneration: mockOpenAPISpec,
-      generationResult: {
-        success: true,
-        serviceId: 123,
-        endpointUrls: [
-          '/api/v2/test-mysql-service/users',
-          '/api/v2/test-mysql-service/products',
-        ],
-        openApiSpec: mockOpenAPISpec,
-        statistics: {
-          tablesProcessed: 2,
-          endpointsGenerated: 6,
-          schemasCreated: 4,
-          generationDuration: 2500,
-          specificationSize: 12450,
-        },
-        warnings: [],
-        timestamp: new Date(),
-      },
-    };
+  simulateSlowResponse: (endpoint: string, delay: number) => {
+    mswServer.use(
+      // @ts-ignore - MSW types
+      window.msw.http.get(endpoint, async () => {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return new Response(JSON.stringify({ resource: [] }));
+      })
+    );
   },
-
+  
   /**
-   * Mock error scenarios for testing error handling
+   * Reset MSW handlers to default state
    */
-  mockErrorScenarios: () => {
-    return {
-      connectionError: {
-        error: 'Database connection failed',
-        details: 'Unable to connect to MySQL server at localhost:3306',
-      },
-      schemaError: {
-        error: 'Schema discovery failed',
-        details: 'Permission denied for table introspection',
-      },
-      generationError: {
-        error: 'API generation failed',
-        details: 'Duplicate endpoint paths detected',
-      },
-    };
+  resetHandlers: () => {
+    mswServer.resetHandlers();
   },
+  
+  /**
+   * Get request history for verification
+   */
+  getRequestHistory: () => {
+    // This would need to be implemented based on your MSW setup
+    // You might need to track requests in a global variable
+    return [];
+  }
 };
 
-// ============================================================================
-// Assertion Helpers
-// ============================================================================
+// =============================================================================
+// ACCESSIBILITY TESTING UTILITIES
+// =============================================================================
 
 /**
- * Custom assertions for wizard component testing
+ * Comprehensive accessibility validation for wizard components
  */
-export const wizardAssertions = {
-  /**
-   * Assert wizard is at specific step
-   */
-  expectWizardStep: (step: WizardStep) => {
-    // This would be used with testing-library queries
-    // to assert the current wizard step state
-  },
+export function validateWizardAccessibility(container: HTMLElement): void {
+  // Check for proper heading hierarchy
+  const headings = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+  
+  if (headings.length > 1) {
+    for (let i = 1; i < headings.length; i++) {
+      const currentLevel = parseInt(headings[i].tagName[1], 10);
+      const previousLevel = parseInt(headings[i - 1].tagName[1], 10);
+      
+      if (currentLevel > previousLevel + 1) {
+        throw new Error(`Heading hierarchy violation: ${headings[i - 1].tagName} followed by ${headings[i].tagName}`);
+      }
+    }
+  }
+  
+  // Check for proper ARIA landmarks
+  const main = container.querySelector('main, [role="main"]');
+  if (!main && container.querySelector('form, [role="form"]')) {
+    console.warn('Consider wrapping form content in a main landmark');
+  }
+  
+  // Check for proper focus management
+  const focusableElements = container.querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  );
+  
+  if (focusableElements.length === 0) {
+    console.warn('No focusable elements found - ensure interactive content is keyboard accessible');
+  }
+  
+  // Check for proper error announcements
+  const errorElements = container.querySelectorAll('[role="alert"], [aria-live="assertive"]');
+  const errorMessages = container.querySelectorAll('.error, [data-error], .invalid');
+  
+  if (errorMessages.length > 0 && errorElements.length === 0) {
+    console.warn('Error messages found but no ARIA live regions for screen reader announcements');
+  }
+  
+  // Check for proper loading announcements
+  const loadingElements = container.querySelectorAll('[role="status"], [aria-live="polite"]');
+  const spinners = container.querySelectorAll('[data-loading], .spinner, .loading');
+  
+  if (spinners.length > 0 && loadingElements.length === 0) {
+    console.warn('Loading indicators found but no ARIA live regions for screen reader announcements');
+  }
+}
 
-  /**
-   * Assert tables are selected correctly
-   */
-  expectTablesSelected: (expectedTables: string[]) => {
-    // Assert selected table state matches expectations
-  },
+// =============================================================================
+// CONVENIENCE EXPORTS
+// =============================================================================
 
-  /**
-   * Assert endpoint configuration is valid
-   */
-  expectValidEndpointConfig: (tableId: string, config: Partial<EndpointConfiguration>) => {
-    // Assert endpoint configuration matches expected values
-  },
+/**
+ * Default export with all utilities
+ */
+const wizardRenderUtils = {
+  renderWizard,
+  createWizardTestData,
+  createMockServiceSelectionData,
+  createMockTableSelectionData,
+  createStepNavigationUtils,
+  validateWizardAccessibility,
+  mswUtils,
+  createMockRouter
+} as const;
 
-  /**
-   * Assert OpenAPI preview is generated
-   */
-  expectOpenAPIPreview: (expectedSpec: Partial<typeof mockOpenAPISpec>) => {
-    // Assert OpenAPI specification preview content
-  },
+export default wizardRenderUtils;
 
-  /**
-   * Assert generation completed successfully
-   */
-  expectGenerationSuccess: (expectedEndpoints: string[]) => {
-    // Assert successful API generation with expected endpoints
-  },
+// Export all utilities for named imports
+export {
+  renderWizard as render,
+  createWizardTestData as createTestData,
+  createStepNavigationUtils as createStepUtils,
+  validateWizardAccessibility as validateA11y,
+  mswUtils
 };
 
-// Export default render function for convenience
-export { renderWithProviders as render };
-
-// Re-export testing library utilities for convenience
-export * from '@testing-library/react';
-export { userEvent } from '@testing-library/user-event';
-
-// Export types for use in test files
+// Export types for external use
 export type {
-  RenderWithProvidersOptions,
-  DatabaseTable,
-  EndpointConfiguration,
-  WizardStep,
-  WizardState,
+  WizardRenderOptions,
+  WizardRenderResult,
+  MockAppRouter,
+  WizardTestDataOptions,
+  StepNavigationUtils
 };
