@@ -1,811 +1,884 @@
 /**
- * Select Component Utilities
+ * Select Component Utility Functions
  * 
  * Pure utility functions for select components including option filtering, value transformation,
- * group processing, and accessibility helpers. Optimized for performance with large option lists
- * (1000+ items) and WCAG 2.1 AA compliance.
+ * group processing, and accessibility helpers. Provides optimized functions for common select
+ * operations and data manipulation, supporting Angular to React migration patterns.
  * 
- * @module SelectUtils
+ * Features:
+ * - Fuzzy search with performance optimization for large datasets (1000+ items)
+ * - Complex value transformations from Angular component migration (arrays, bitmasks, strings)
+ * - Option grouping and normalization for hierarchical data structures
+ * - WCAG 2.1 AA compliance helpers for screen readers and keyboard navigation
+ * - Selection validation for constraints and limits
+ * 
+ * @fileoverview Select utility functions for DreamFactory Admin Interface
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { cn } from '@/lib/utils';
-
-// ============================================================================
-// Types (inferred from Angular patterns and requirements)
-// ============================================================================
-
-export interface SelectOption<T = any> {
-  value: T;
-  label: string;
-  description?: string;
-  icon?: string;
-  disabled?: boolean;
-  group?: string;
-  altValue?: string; // For HTTP verb transformations
-  metadata?: Record<string, any>;
-}
-
-export interface SelectGroup {
-  label: string;
-  options: SelectOption[];
-  disabled?: boolean;
-}
-
-export interface FilterOptions {
-  caseSensitive?: boolean;
-  fuzzySearch?: boolean;
-  maxResults?: number;
-  searchFields?: ('label' | 'description' | 'value')[];
-}
-
-export interface ValidationConstraints {
-  required?: boolean;
-  minSelections?: number;
-  maxSelections?: number;
-  allowedValues?: any[];
-  customValidator?: (value: any) => string | null;
-}
-
-export interface AccessibilityAttributes {
-  'aria-label'?: string;
-  'aria-labelledby'?: string;
-  'aria-describedby'?: string;
-  'aria-expanded'?: boolean;
-  'aria-selected'?: boolean;
-  'aria-activedescendant'?: string;
-  'aria-invalid'?: boolean;
-  'aria-required'?: boolean;
-  'aria-disabled'?: boolean;
-  role?: string;
-}
-
-// ============================================================================
-// Option Filtering and Search
-// ============================================================================
+import { debounce } from '../../../lib/utils';
+import type {
+  SelectOption,
+  OptionGroup,
+  SelectValue,
+  BitmaskValue,
+  ValueTransform,
+  AnySelectProps,
+  MultiSelectProps
+} from './types';
 
 /**
- * Filters options based on search query with fuzzy search support
- * Optimized for large datasets (1000+ options) using efficient string matching
+ * Fuzzy search configuration for option filtering
+ */
+interface FuzzySearchOptions {
+  /** Threshold for fuzzy match (0-1, lower = more strict) */
+  threshold?: number;
+  /** Include matches in description field */
+  includeDescription?: boolean;
+  /** Include matches in search keywords */
+  includeKeywords?: boolean;
+  /** Case sensitive matching */
+  caseSensitive?: boolean;
+  /** Maximum results to return (performance optimization) */
+  maxResults?: number;
+  /** Minimum query length before filtering */
+  minQueryLength?: number;
+}
+
+/**
+ * Selection validation configuration
+ */
+interface ValidationOptions {
+  /** Minimum number of selections required */
+  minSelections?: number;
+  /** Maximum number of selections allowed */
+  maxSelections?: number;
+  /** Custom validation function */
+  customValidator?: (value: SelectValue) => boolean | string;
+  /** Validation messages */
+  messages?: {
+    minSelections?: string;
+    maxSelections?: string;
+    custom?: string;
+  };
+}
+
+/**
+ * Performance-optimized client-side option filtering with fuzzy search support.
+ * 
+ * Features:
+ * - Fuzzy matching algorithm for flexible search
+ * - Search in labels, descriptions, and keywords
+ * - Virtual scrolling optimization for large datasets
+ * - Debounced search for improved UX
+ * - Highlighting match fragments
  * 
  * @param options - Array of options to filter
  * @param query - Search query string
- * @param filterOptions - Configuration options for filtering
- * @returns Filtered array of options
+ * @param config - Fuzzy search configuration
+ * @returns Filtered and scored options array
  */
-export function filterOptions<T>(
+export function filterOptions<T = SelectValue>(
   options: SelectOption<T>[],
   query: string,
-  filterOptions: FilterOptions = {}
+  config: FuzzySearchOptions = {}
 ): SelectOption<T>[] {
-  if (!query || query.trim() === '') {
-    return options.slice(0, filterOptions.maxResults);
-  }
-
   const {
+    threshold = 0.3,
+    includeDescription = true,
+    includeKeywords = true,
     caseSensitive = false,
-    fuzzySearch = true,
     maxResults = 100,
-    searchFields = ['label', 'description', 'value']
-  } = filterOptions;
+    minQueryLength = 0
+  } = config;
+
+  // Early return for empty query or short queries
+  if (!query.trim() || query.length < minQueryLength) {
+    return options.slice(0, maxResults);
+  }
 
   const normalizedQuery = caseSensitive ? query : query.toLowerCase();
-  const results: Array<{ option: SelectOption<T>; score: number }> = [];
+  const queryWords = normalizedQuery.split(/\s+/).filter(word => word.length > 0);
 
-  for (const option of options) {
-    if (option.disabled) continue;
+  /**
+   * Calculate fuzzy match score for a string against query words
+   * @param text - Text to match against
+   * @param boost - Score boost multiplier (for labels vs descriptions)
+   * @returns Match score (0-1, higher is better match)
+   */
+  const calculateMatchScore = (text: string, boost: number = 1): number => {
+    if (!text) return 0;
+    
+    const normalizedText = caseSensitive ? text : text.toLowerCase();
+    let totalScore = 0;
+    let matchedWords = 0;
 
-    let bestScore = 0;
-
-    for (const field of searchFields) {
-      const fieldValue = String(option[field] || '');
-      const normalizedValue = caseSensitive ? fieldValue : fieldValue.toLowerCase();
-
-      let score = 0;
-
+    for (const word of queryWords) {
       // Exact match gets highest score
-      if (normalizedValue === normalizedQuery) {
-        score = 100;
-      }
-      // Starts with query gets high score
-      else if (normalizedValue.startsWith(normalizedQuery)) {
-        score = 80;
-      }
-      // Contains query gets medium score
-      else if (normalizedValue.includes(normalizedQuery)) {
-        score = 60;
-      }
-      // Fuzzy search for partial matches
-      else if (fuzzySearch && fuzzyMatch(normalizedValue, normalizedQuery)) {
-        score = 40;
+      if (normalizedText.includes(word)) {
+        totalScore += 1.0 * boost;
+        matchedWords++;
+        continue;
       }
 
-      bestScore = Math.max(bestScore, score);
+      // Fuzzy match using simple character matching
+      let maxCharScore = 0;
+      for (let i = 0; i <= normalizedText.length - word.length; i++) {
+        const textSegment = normalizedText.slice(i, i + word.length);
+        let charMatches = 0;
+        
+        for (let j = 0; j < word.length; j++) {
+          if (textSegment[j] === word[j]) charMatches++;
+        }
+        
+        const charScore = charMatches / word.length;
+        maxCharScore = Math.max(maxCharScore, charScore);
+      }
+
+      if (maxCharScore >= threshold) {
+        totalScore += maxCharScore * boost * 0.7; // Fuzzy match penalty
+        matchedWords++;
+      }
     }
 
-    if (bestScore > 0) {
-      results.push({ option, score: bestScore });
-    }
+    // Return average score weighted by matched word percentage
+    const wordMatchRatio = matchedWords / queryWords.length;
+    return wordMatchRatio >= threshold ? (totalScore / queryWords.length) * wordMatchRatio : 0;
+  };
 
-    // Early exit if we have enough high-quality results
-    if (results.length >= maxResults * 2) {
-      break;
-    }
-  }
+  /**
+   * Score and filter options based on search query
+   */
+  const scoredOptions = options
+    .map(option => {
+      let score = 0;
+      let matches: string[] = [];
 
-  // Sort by score (descending) and return options
-  return results
+      // Score label (highest priority)
+      const labelScore = calculateMatchScore(option.label, 2.0);
+      if (labelScore > 0) {
+        score += labelScore;
+        matches.push('label');
+      }
+
+      // Score description (medium priority)
+      if (includeDescription && option.description) {
+        const descScore = calculateMatchScore(option.description, 1.0);
+        if (descScore > 0) {
+          score += descScore;
+          matches.push('description');
+        }
+      }
+
+      // Score search keywords (medium priority)
+      if (includeKeywords && option.searchKeywords) {
+        const keywordScore = option.searchKeywords.reduce(
+          (acc, keyword) => acc + calculateMatchScore(keyword, 1.2),
+          0
+        ) / option.searchKeywords.length;
+        if (keywordScore > 0) {
+          score += keywordScore;
+          matches.push('keywords');
+        }
+      }
+
+      // Score metadata values (low priority)
+      if (option.metadata) {
+        const metadataScore = Object.values(option.metadata)
+          .filter(value => typeof value === 'string')
+          .reduce((acc, value) => acc + calculateMatchScore(value as string, 0.5), 0);
+        if (metadataScore > 0) {
+          score += metadataScore;
+          matches.push('metadata');
+        }
+      }
+
+      return {
+        option: {
+          ...option,
+          // Add match metadata for highlighting
+          _matchInfo: {
+            score,
+            matches,
+            query: normalizedQuery
+          }
+        },
+        score
+      };
+    })
+    .filter(item => item.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, maxResults)
-    .map(result => result.option);
+    .map(item => item.option);
+
+  return scoredOptions;
 }
 
 /**
- * Simple fuzzy matching algorithm for partial string matches
- * @param text - Text to search within
- * @param pattern - Pattern to search for
- * @returns Boolean indicating if pattern fuzzy matches text
+ * Create a debounced version of filterOptions for real-time search
+ * @param delay - Debounce delay in milliseconds
+ * @returns Debounced filter function
  */
-function fuzzyMatch(text: string, pattern: string): boolean {
-  let textIndex = 0;
-  let patternIndex = 0;
-
-  while (textIndex < text.length && patternIndex < pattern.length) {
-    if (text[textIndex] === pattern[patternIndex]) {
-      patternIndex++;
-    }
-    textIndex++;
-  }
-
-  return patternIndex === pattern.length;
-}
-
-// ============================================================================
-// Value Transformation Functions
-// ============================================================================
-
-/**
- * Transforms HTTP verb array to bitmask (Angular df-verb-picker pattern)
- * @param verbs - Array of HTTP verb strings
- * @returns Bitmask number representing selected verbs
- */
-export function verbArrayToBitmask(verbs: string[]): number {
-  const verbValues: Record<string, number> = {
-    'GET': 1,
-    'POST': 2,
-    'PUT': 4,
-    'PATCH': 8,
-    'DELETE': 16
-  };
-
-  return verbs.reduce((mask, verb) => mask | (verbValues[verb] || 0), 0);
+export function createDebouncedFilter<T = SelectValue>(delay: number = 300) {
+  return debounce(filterOptions<T>, delay);
 }
 
 /**
- * Transforms bitmask to HTTP verb array (Angular df-verb-picker pattern)
- * @param bitmask - Bitmask number representing selected verbs
- * @returns Array of HTTP verb strings
- */
-export function bitmaskToVerbArray(bitmask: number): string[] {
-  const verbMap = [
-    { value: 1, verb: 'GET' },
-    { value: 2, verb: 'POST' },
-    { value: 4, verb: 'PUT' },
-    { value: 8, verb: 'PATCH' },
-    { value: 16, verb: 'DELETE' }
-  ];
-
-  return verbMap
-    .filter(item => (bitmask & item.value) === item.value)
-    .map(item => item.verb);
-}
-
-/**
- * Transforms array values to comma-separated string
- * @param values - Array of values to join
- * @param separator - Separator string (default: ',')
- * @returns Comma-separated string
- */
-export function arrayToString<T>(values: T[], separator: string = ','): string {
-  return values.map(val => String(val)).join(separator);
-}
-
-/**
- * Transforms comma-separated string to array
- * @param value - Comma-separated string
- * @param separator - Separator string (default: ',')
- * @returns Array of trimmed string values
- */
-export function stringToArray(value: string, separator: string = ','): string[] {
-  if (!value || typeof value !== 'string') return [];
-  return value.split(separator).map(item => item.trim()).filter(Boolean);
-}
-
-/**
- * Generic value transformer for different select types
- * @param value - Input value to transform
- * @param fromType - Source value type
- * @param toType - Target value type
+ * Transform value between different types for complex form handling.
+ * Supports Angular migration patterns including array/bitmask conversions.
+ * 
+ * @param value - Value to transform
+ * @param transform - Transformation configuration
  * @returns Transformed value
  */
-export function transformValue(
-  value: any,
-  fromType: 'string' | 'array' | 'bitmask' | 'object',
-  toType: 'string' | 'array' | 'bitmask' | 'object'
-): any {
-  if (fromType === toType) return value;
-
-  // Handle null/undefined values
-  if (value == null) {
-    switch (toType) {
-      case 'array': return [];
-      case 'string': return '';
-      case 'bitmask': return 0;
-      case 'object': return null;
-      default: return value;
-    }
+export function transformValue<TInput = any, TOutput = any>(
+  value: TInput,
+  transform: ValueTransform<TInput, TOutput>
+): TOutput {
+  try {
+    return transform.toFormValue(value);
+  } catch (error) {
+    console.warn('Value transformation failed:', error);
+    return value as unknown as TOutput;
   }
-
-  // Transform from array
-  if (fromType === 'array' && Array.isArray(value)) {
-    switch (toType) {
-      case 'string': return arrayToString(value);
-      case 'bitmask': return verbArrayToBitmask(value);
-      case 'object': return { values: value };
-      default: return value;
-    }
-  }
-
-  // Transform from string
-  if (fromType === 'string' && typeof value === 'string') {
-    switch (toType) {
-      case 'array': return stringToArray(value);
-      case 'bitmask': return verbArrayToBitmask(stringToArray(value));
-      case 'object': return { value };
-      default: return value;
-    }
-  }
-
-  // Transform from bitmask
-  if (fromType === 'bitmask' && typeof value === 'number') {
-    switch (toType) {
-      case 'array': return bitmaskToVerbArray(value);
-      case 'string': return arrayToString(bitmaskToVerbArray(value));
-      case 'object': return { bitmask: value, verbs: bitmaskToVerbArray(value) };
-      default: return value;
-    }
-  }
-
-  // Transform from object
-  if (fromType === 'object' && typeof value === 'object') {
-    switch (toType) {
-      case 'string': return value?.value || String(value);
-      case 'array': return value?.values || [value];
-      case 'bitmask': return value?.bitmask || 0;
-      default: return value;
-    }
-  }
-
-  return value;
-}
-
-// ============================================================================
-// Option Processing and Grouping
-// ============================================================================
-
-/**
- * Normalizes option object structure for consistent processing
- * @param option - Raw option data (string, number, or object)
- * @returns Normalized SelectOption object
- */
-export function normalizeOption<T>(option: T | SelectOption<T>): SelectOption<T> {
-  // Already normalized
-  if (typeof option === 'object' && option != null && 'value' in option && 'label' in option) {
-    return option as SelectOption<T>;
-  }
-
-  // Primitive value
-  if (typeof option === 'string' || typeof option === 'number' || typeof option === 'boolean') {
-    return {
-      value: option as T,
-      label: String(option)
-    };
-  }
-
-  // Object without proper structure
-  if (typeof option === 'object' && option != null) {
-    const obj = option as any;
-    return {
-      value: obj.value ?? obj.id ?? option,
-      label: obj.label ?? obj.name ?? obj.title ?? String(obj.value ?? obj.id ?? option),
-      description: obj.description ?? obj.desc,
-      icon: obj.icon,
-      disabled: obj.disabled ?? false,
-      group: obj.group ?? obj.category,
-      altValue: obj.altValue,
-      metadata: obj.metadata
-    };
-  }
-
-  // Fallback
-  return {
-    value: option as T,
-    label: String(option)
-  };
 }
 
 /**
- * Groups options by their group property
- * @param options - Array of options to group
- * @param ungroupedLabel - Label for ungrouped options (default: 'Other')
- * @returns Array of grouped options
+ * Reverse transform value from form value to display value
+ * @param value - Form value to transform back
+ * @param transform - Transformation configuration
+ * @returns Display value
  */
-export function groupOptions<T>(
+export function reverseTransformValue<TInput = any, TOutput = any>(
+  value: TOutput,
+  transform: ValueTransform<TInput, TOutput>
+): TInput {
+  try {
+    return transform.toDisplayValue(value);
+  } catch (error) {
+    console.warn('Reverse value transformation failed:', error);
+    return value as unknown as TInput;
+  }
+}
+
+/**
+ * Common value transformations for Angular migration patterns
+ */
+export const valueTransforms = {
+  /**
+   * Transform array of strings to comma-separated string
+   */
+  arrayToString: {
+    toFormValue: (value: string[]): string => Array.isArray(value) ? value.join(',') : '',
+    toDisplayValue: (value: string): string[] => value ? value.split(',').map(s => s.trim()) : [],
+    validate: (value: string): boolean => typeof value === 'string'
+  } as ValueTransform<string[], string>,
+
+  /**
+   * Transform array of numbers to comma-separated string
+   */
+  numberArrayToString: {
+    toFormValue: (value: number[]): string => Array.isArray(value) ? value.join(',') : '',
+    toDisplayValue: (value: string): number[] => 
+      value ? value.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)) : [],
+    validate: (value: string): boolean => typeof value === 'string'
+  } as ValueTransform<number[], string>,
+
+  /**
+   * Transform bitmask to array of selected bit positions
+   */
+  bitmaskToArray: {
+    toFormValue: (value: BitmaskValue): number[] => value.selectedBits || [],
+    toDisplayValue: (value: number[]): BitmaskValue => ({
+      value: value.reduce((mask, bit) => mask | (1 << bit), 0),
+      selectedBits: value,
+      labels: {}
+    }),
+    validate: (value: number[]): boolean => Array.isArray(value) && value.every(n => typeof n === 'number')
+  } as ValueTransform<BitmaskValue, number[]>,
+
+  /**
+   * Transform boolean to string for form inputs
+   */
+  booleanToString: {
+    toFormValue: (value: boolean): string => value ? 'true' : 'false',
+    toDisplayValue: (value: string): boolean => value === 'true',
+    validate: (value: string): boolean => value === 'true' || value === 'false'
+  } as ValueTransform<boolean, string>,
+
+  /**
+   * Transform object to JSON string
+   */
+  objectToJson: {
+    toFormValue: (value: any): string => JSON.stringify(value),
+    toDisplayValue: (value: string): any => {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    },
+    validate: (value: string): boolean => {
+      try {
+        JSON.parse(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  } as ValueTransform<any, string>
+};
+
+/**
+ * Organize flat options array into labeled groups for hierarchical display.
+ * 
+ * @param options - Options to group
+ * @param groupFn - Function to determine group for each option
+ * @param sortGroups - Whether to sort groups alphabetically
+ * @returns Array of option groups
+ */
+export function groupOptions<T = SelectValue>(
   options: SelectOption<T>[],
-  ungroupedLabel: string = 'Other'
-): SelectGroup[] {
-  const groups = new Map<string, SelectOption<T>[]>();
+  groupFn: (option: SelectOption<T>) => string | null,
+  sortGroups: boolean = true
+): OptionGroup<T>[] {
+  const groupMap = new Map<string, SelectOption<T>[]>();
   const ungrouped: SelectOption<T>[] = [];
 
+  // Group options
   for (const option of options) {
-    if (option.group) {
-      if (!groups.has(option.group)) {
-        groups.set(option.group, []);
-      }
-      groups.get(option.group)!.push(option);
-    } else {
+    const groupKey = groupFn(option);
+    
+    if (groupKey === null) {
       ungrouped.push(option);
+      continue;
     }
+
+    if (!groupMap.has(groupKey)) {
+      groupMap.set(groupKey, []);
+    }
+    groupMap.get(groupKey)!.push(option);
   }
 
-  const result: SelectGroup[] = [];
+  // Create group objects
+  const groups: OptionGroup<T>[] = [];
+  
+  // Sort group keys if requested
+  const groupKeys = Array.from(groupMap.keys());
+  if (sortGroups) {
+    groupKeys.sort();
+  }
 
-  // Add grouped options
-  for (const [groupLabel, groupOptions] of groups.entries()) {
-    result.push({
-      label: groupLabel,
-      options: groupOptions
+  // Build group objects
+  for (const groupKey of groupKeys) {
+    const groupOptions = groupMap.get(groupKey)!;
+    
+    // Sort options within group by sortOrder then label
+    groupOptions.sort((a, b) => {
+      if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+        return a.sortOrder - b.sortOrder;
+      }
+      if (a.sortOrder !== undefined) return -1;
+      if (b.sortOrder !== undefined) return 1;
+      return a.label.localeCompare(b.label);
+    });
+
+    groups.push({
+      id: groupKey.toLowerCase().replace(/\s+/g, '-'),
+      label: groupKey,
+      options: groupOptions,
+      disabled: groupOptions.every(opt => opt.disabled)
     });
   }
 
-  // Add ungrouped options if any
+  // Add ungrouped options as separate group if any exist
   if (ungrouped.length > 0) {
-    result.push({
-      label: ungroupedLabel,
+    ungrouped.sort((a, b) => {
+      if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+        return a.sortOrder - b.sortOrder;
+      }
+      if (a.sortOrder !== undefined) return -1;
+      if (b.sortOrder !== undefined) return 1;
+      return a.label.localeCompare(b.label);
+    });
+
+    groups.push({
+      id: 'ungrouped',
+      label: 'Other',
       options: ungrouped
     });
   }
 
-  return result;
+  return groups;
 }
 
 /**
- * Flattens grouped options back to a single array
- * @param groups - Array of grouped options
- * @returns Flattened array of options
+ * Normalize option object to ensure consistent structure.
+ * Useful for handling options from various data sources.
+ * 
+ * @param input - Raw option data
+ * @param labelKey - Key to use for label (default: 'label')
+ * @param valueKey - Key to use for value (default: 'value')
+ * @returns Normalized SelectOption
  */
-export function flattenGroups<T>(groups: SelectGroup[]): SelectOption<T>[] {
-  return groups.flatMap(group => group.options);
+export function normalizeOption<T = SelectValue>(
+  input: any,
+  labelKey: string = 'label',
+  valueKey: string = 'value'
+): SelectOption<T> {
+  // Handle primitive values
+  if (typeof input === 'string' || typeof input === 'number' || typeof input === 'boolean') {
+    return {
+      value: input as T,
+      label: String(input),
+      disabled: false
+    };
+  }
+
+  // Handle null/undefined
+  if (input == null) {
+    return {
+      value: null as T,
+      label: '',
+      disabled: true
+    };
+  }
+
+  // Handle object input
+  const option: SelectOption<T> = {
+    value: input[valueKey] as T,
+    label: String(input[labelKey] || input[valueKey] || ''),
+    disabled: Boolean(input.disabled),
+  };
+
+  // Add optional properties if present
+  if (input.description) option.description = String(input.description);
+  if (input.icon) option.icon = input.icon;
+  if (input.group) option.group = String(input.group);
+  if (input.metadata) option.metadata = input.metadata;
+  if (input.className) option.className = String(input.className);
+  if (input.searchKeywords) option.searchKeywords = Array.isArray(input.searchKeywords) 
+    ? input.searchKeywords.map(String) 
+    : [String(input.searchKeywords)];
+  if (typeof input.sortOrder === 'number') option.sortOrder = input.sortOrder;
+
+  return option;
 }
 
-// ============================================================================
-// Option Helper Functions
-// ============================================================================
-
 /**
- * Gets the display label for an option
- * @param option - Option object or value
+ * Extract label from option or value.
+ * Handles both SelectOption objects and primitive values.
+ * 
+ * @param optionOrValue - Option object or primitive value
+ * @param options - Array of options to search in (if value is primitive)
  * @returns Display label string
  */
-export function getOptionLabel<T>(option: T | SelectOption<T>): string {
-  if (typeof option === 'object' && option != null && 'label' in option) {
-    return (option as SelectOption<T>).label;
+export function getOptionLabel<T = SelectValue>(
+  optionOrValue: SelectOption<T> | T,
+  options?: SelectOption<T>[]
+): string {
+  // Handle SelectOption object
+  if (optionOrValue && typeof optionOrValue === 'object' && 'label' in optionOrValue) {
+    return (optionOrValue as SelectOption<T>).label;
   }
-  return String(option);
+
+  // Handle primitive value - search in options array
+  if (options) {
+    const foundOption = options.find(opt => opt.value === optionOrValue);
+    if (foundOption) {
+      return foundOption.label;
+    }
+  }
+
+  // Fallback to string conversion
+  return String(optionOrValue ?? '');
 }
 
 /**
- * Gets the value from an option
- * @param option - Option object or value
+ * Extract value from option.
+ * 
+ * @param option - Option object
  * @returns Option value
  */
-export function getOptionValue<T>(option: T | SelectOption<T>): T {
-  if (typeof option === 'object' && option != null && 'value' in option) {
-    return (option as SelectOption<T>).value;
-  }
-  return option as T;
+export function getOptionValue<T = SelectValue>(option: SelectOption<T>): T {
+  return option.value;
 }
 
 /**
- * Finds option by value
- * @param options - Array of options to search
- * @param value - Value to find
+ * Find option by value in options array.
+ * 
+ * @param value - Value to search for
+ * @param options - Array of options to search in
  * @returns Found option or undefined
  */
-export function findOptionByValue<T>(
-  options: SelectOption<T>[],
-  value: T
+export function findOptionByValue<T = SelectValue>(
+  value: T,
+  options: SelectOption<T>[]
 ): SelectOption<T> | undefined {
-  return options.find(option => option.value === value);
-}
-
-/**
- * Checks if option is selected
- * @param option - Option to check
- * @param selectedValues - Array of selected values or single value
- * @returns Boolean indicating if option is selected
- */
-export function isOptionSelected<T>(
-  option: SelectOption<T>,
-  selectedValues: T | T[]
-): boolean {
-  if (Array.isArray(selectedValues)) {
-    return selectedValues.includes(option.value);
-  }
-  return option.value === selectedValues;
-}
-
-// ============================================================================
-// Accessibility Helpers
-// ============================================================================
-
-/**
- * Generates ARIA attributes for select components
- * @param config - Configuration object for ARIA attributes
- * @returns ARIA attributes object
- */
-export function generateAriaAttributes(config: {
-  label?: string;
-  labelledBy?: string;
-  describedBy?: string;
-  expanded?: boolean;
-  selected?: boolean;
-  activeDescendant?: string;
-  invalid?: boolean;
-  required?: boolean;
-  disabled?: boolean;
-  role?: string;
-}): AccessibilityAttributes {
-  const attrs: AccessibilityAttributes = {};
-
-  if (config.label) attrs['aria-label'] = config.label;
-  if (config.labelledBy) attrs['aria-labelledby'] = config.labelledBy;
-  if (config.describedBy) attrs['aria-describedby'] = config.describedBy;
-  if (config.expanded !== undefined) attrs['aria-expanded'] = config.expanded;
-  if (config.selected !== undefined) attrs['aria-selected'] = config.selected;
-  if (config.activeDescendant) attrs['aria-activedescendant'] = config.activeDescendant;
-  if (config.invalid !== undefined) attrs['aria-invalid'] = config.invalid;
-  if (config.required !== undefined) attrs['aria-required'] = config.required;
-  if (config.disabled !== undefined) attrs['aria-disabled'] = config.disabled;
-  if (config.role) attrs.role = config.role;
-
-  return attrs;
-}
-
-/**
- * Generates unique IDs for select component elements
- * @param baseId - Base ID string
- * @returns Object with generated IDs for various elements
- */
-export function generateSelectIds(baseId: string) {
-  return {
-    select: baseId,
-    label: `${baseId}-label`,
-    description: `${baseId}-description`,
-    error: `${baseId}-error`,
-    listbox: `${baseId}-listbox`,
-    option: (index: number) => `${baseId}-option-${index}`,
-    group: (index: number) => `${baseId}-group-${index}`
-  };
-}
-
-/**
- * Creates screen reader announcement for selection changes
- * @param selectedCount - Number of selected items
- * @param totalCount - Total number of available items
- * @param itemLabel - Label for individual items (default: 'item')
- * @returns Announcement string for screen readers
- */
-export function createSelectionAnnouncement(
-  selectedCount: number,
-  totalCount: number,
-  itemLabel: string = 'item'
-): string {
-  if (selectedCount === 0) {
-    return `No ${itemLabel}s selected`;
-  }
-  
-  if (selectedCount === 1) {
-    return `1 ${itemLabel} selected`;
-  }
-  
-  return `${selectedCount} ${itemLabel}s selected out of ${totalCount}`;
-}
-
-/**
- * Gets accessible name for option element
- * @param option - Option object
- * @param index - Option index
- * @param isSelected - Whether option is selected
- * @returns Accessible name string
- */
-export function getAccessibleOptionName<T>(
-  option: SelectOption<T>,
-  index: number,
-  isSelected: boolean
-): string {
-  let name = option.label;
-  
-  if (option.description) {
-    name += `, ${option.description}`;
-  }
-  
-  if (isSelected) {
-    name += ', selected';
-  }
-  
-  if (option.disabled) {
-    name += ', disabled';
-  }
-  
-  return name;
-}
-
-// ============================================================================
-// Validation Functions
-// ============================================================================
-
-/**
- * Validates selection against constraints
- * @param value - Selected value(s)
- * @param constraints - Validation constraints
- * @returns Validation error message or null if valid
- */
-export function validateSelection<T>(
-  value: T | T[] | null | undefined,
-  constraints: ValidationConstraints
-): string | null {
-  const {
-    required = false,
-    minSelections = 0,
-    maxSelections = Infinity,
-    allowedValues,
-    customValidator
-  } = constraints;
-
-  // Check required
-  if (required && (value == null || (Array.isArray(value) && value.length === 0))) {
-    return 'Selection is required';
-  }
-
-  // If no value and not required, validation passes
-  if (value == null || (Array.isArray(value) && value.length === 0)) {
-    return null;
-  }
-
-  const values = Array.isArray(value) ? value : [value];
-
-  // Check minimum selections
-  if (values.length < minSelections) {
-    return `At least ${minSelections} selection${minSelections !== 1 ? 's' : ''} required`;
-  }
-
-  // Check maximum selections
-  if (values.length > maxSelections) {
-    return `Maximum ${maxSelections} selection${maxSelections !== 1 ? 's' : ''} allowed`;
-  }
-
-  // Check allowed values
-  if (allowedValues && allowedValues.length > 0) {
-    const invalidValues = values.filter(v => !allowedValues.includes(v));
-    if (invalidValues.length > 0) {
-      return `Invalid selection: ${invalidValues.join(', ')}`;
+  return options.find(option => {
+    // Handle object comparison
+    if (typeof value === 'object' && value !== null && typeof option.value === 'object' && option.value !== null) {
+      return JSON.stringify(value) === JSON.stringify(option.value);
     }
-  }
+    
+    // Handle primitive comparison
+    return option.value === value;
+  });
+}
 
-  // Custom validation
-  if (customValidator) {
-    const customError = customValidator(value);
-    if (customError) {
-      return customError;
+/**
+ * Get multiple options by values array.
+ * 
+ * @param values - Array of values to find
+ * @param options - Array of options to search in
+ * @returns Array of found options
+ */
+export function findOptionsByValues<T = SelectValue>(
+  values: T[],
+  options: SelectOption<T>[]
+): SelectOption<T>[] {
+  if (!Array.isArray(values)) return [];
+  
+  return values
+    .map(value => findOptionByValue(value, options))
+    .filter((option): option is SelectOption<T> => option !== undefined);
+}
+
+/**
+ * WCAG 2.1 AA accessibility helpers for screen readers and keyboard navigation
+ */
+export const accessibilityHelpers = {
+  /**
+   * Generate ARIA attributes for select component
+   * @param props - Select component props
+   * @returns Object with ARIA attributes
+   */
+  getSelectAriaAttributes<T = SelectValue>(props: AnySelectProps<T>) {
+    const attributes: Record<string, any> = {
+      'aria-required': props.required || false,
+      'aria-invalid': props['aria-invalid'] || false,
+      'aria-disabled': props.disabled || false,
+    };
+
+    if (props['aria-describedby']) {
+      attributes['aria-describedby'] = props['aria-describedby'];
     }
+
+    if (props.placeholder) {
+      attributes['aria-placeholder'] = props.placeholder;
+    }
+
+    return attributes;
+  },
+
+  /**
+   * Generate announcement for screen readers when option is selected
+   * @param option - Selected option
+   * @param totalOptions - Total number of options
+   * @returns Announcement string
+   */
+  announceSelection<T = SelectValue>(
+    option: SelectOption<T>,
+    totalOptions: number
+  ): string {
+    return `Selected ${option.label}. ${totalOptions} options available.`;
+  },
+
+  /**
+   * Generate announcement for multi-select changes
+   * @param selectedCount - Number of selected options
+   * @param totalOptions - Total number of options
+   * @param lastAction - Last action performed ('selected' | 'deselected')
+   * @param optionLabel - Label of the option that was acted upon
+   * @returns Announcement string
+   */
+  announceMultiSelection(
+    selectedCount: number,
+    totalOptions: number,
+    lastAction: 'selected' | 'deselected',
+    optionLabel: string
+  ): string {
+    const action = lastAction === 'selected' ? 'Added' : 'Removed';
+    return `${action} ${optionLabel}. ${selectedCount} of ${totalOptions} options selected.`;
+  },
+
+  /**
+   * Generate announcement for search results
+   * @param resultCount - Number of search results
+   * @param query - Search query
+   * @returns Announcement string
+   */
+  announceSearchResults(resultCount: number, query: string): string {
+    if (resultCount === 0) {
+      return `No results found for "${query}".`;
+    }
+    return `${resultCount} results found for "${query}".`;
+  },
+
+  /**
+   * Generate live region announcement for loading states
+   * @param isLoading - Whether component is loading
+   * @param message - Custom loading message
+   * @returns Announcement string
+   */
+  announceLoading(isLoading: boolean, message?: string): string {
+    if (isLoading) {
+      return message || 'Loading options...';
+    }
+    return 'Options loaded.';
+  },
+
+  /**
+   * Get keyboard navigation instructions for screen readers
+   * @param isMultiSelect - Whether this is a multi-select component
+   * @returns Instructions string
+   */
+  getKeyboardInstructions(isMultiSelect: boolean = false): string {
+    const baseInstructions = 'Use arrow keys to navigate options, Enter to select';
+    
+    if (isMultiSelect) {
+      return `${baseInstructions}, Space to toggle selection, Escape to close`;
+    }
+    
+    return `${baseInstructions}, Escape to close`;
   }
-
-  return null;
-}
+};
 
 /**
- * Checks if selection has reached maximum limit
- * @param currentSelection - Current selected values
- * @param maxSelections - Maximum allowed selections
- * @returns Boolean indicating if limit is reached
+ * Validate selection based on constraints and rules.
+ * 
+ * @param value - Current selection value
+ * @param options - Available options
+ * @param validation - Validation configuration
+ * @returns Validation result with success flag and error message
  */
-export function isSelectionLimitReached<T>(
-  currentSelection: T[],
-  maxSelections: number
-): boolean {
-  return currentSelection.length >= maxSelections;
-}
-
-/**
- * Gets remaining selection slots
- * @param currentSelection - Current selected values
- * @param maxSelections - Maximum allowed selections
- * @returns Number of remaining slots
- */
-export function getRemainingSelections<T>(
-  currentSelection: T[],
-  maxSelections: number
-): number {
-  return Math.max(0, maxSelections - currentSelection.length);
-}
-
-// ============================================================================
-// Performance Optimization Helpers
-// ============================================================================
-
-/**
- * Creates a memoized version of option filtering for performance
- * @param options - Array of options
- * @param filterFn - Custom filter function
- * @returns Memoized filter function
- */
-export function createMemoizedFilter<T>(
+export function validateSelection<T = SelectValue>(
+  value: T | T[],
   options: SelectOption<T>[],
-  filterFn?: (option: SelectOption<T>, query: string) => boolean
-) {
-  const cache = new Map<string, SelectOption<T>[]>();
-  
-  return (query: string, filterOptions?: FilterOptions): SelectOption<T>[] => {
-    const cacheKey = `${query}:${JSON.stringify(filterOptions)}`;
+  validation: ValidationOptions = {}
+): { isValid: boolean; error?: string } {
+  const {
+    minSelections,
+    maxSelections,
+    customValidator,
+    messages = {}
+  } = validation;
+
+  // Handle array values (multi-select)
+  if (Array.isArray(value)) {
+    const selectionCount = value.length;
+
+    // Check minimum selections
+    if (minSelections !== undefined && selectionCount < minSelections) {
+      return {
+        isValid: false,
+        error: messages.minSelections || `Please select at least ${minSelections} option${minSelections !== 1 ? 's' : ''}.`
+      };
+    }
+
+    // Check maximum selections
+    if (maxSelections !== undefined && selectionCount > maxSelections) {
+      return {
+        isValid: false,
+        error: messages.maxSelections || `Please select no more than ${maxSelections} option${maxSelections !== 1 ? 's' : ''}.`
+      };
+    }
+
+    // Validate each selected value exists in options
+    for (const val of value) {
+      const option = findOptionByValue(val, options);
+      if (!option) {
+        return {
+          isValid: false,
+          error: `Selected value "${val}" is not available in options.`
+        };
+      }
+      
+      if (option.disabled) {
+        return {
+          isValid: false,
+          error: `Option "${option.label}" is disabled and cannot be selected.`
+        };
+      }
+    }
+  } else {
+    // Handle single value
+    if (value !== null && value !== undefined) {
+      const option = findOptionByValue(value, options);
+      
+      if (!option) {
+        return {
+          isValid: false,
+          error: `Selected value "${value}" is not available in options.`
+        };
+      }
+      
+      if (option.disabled) {
+        return {
+          isValid: false,
+          error: `Option "${option.label}" is disabled and cannot be selected.`
+        };
+      }
+    }
+
+    // Check minimum for single select (basically required field)
+    if (minSelections && minSelections > 0 && (value === null || value === undefined)) {
+      return {
+        isValid: false,
+        error: messages.minSelections || 'This field is required.'
+      };
+    }
+  }
+
+  // Run custom validation if provided
+  if (customValidator) {
+    const customResult = customValidator(value);
     
-    if (cache.has(cacheKey)) {
-      return cache.get(cacheKey)!;
+    if (typeof customResult === 'string') {
+      return {
+        isValid: false,
+        error: customResult
+      };
     }
     
-    const result = filterFn 
-      ? options.filter(option => filterFn(option, query))
-      : filterOptions(options, query, filterOptions);
-    
-    // Limit cache size to prevent memory leaks
-    if (cache.size > 100) {
-      const firstKey = cache.keys().next().value;
-      cache.delete(firstKey);
+    if (!customResult) {
+      return {
+        isValid: false,
+        error: messages.custom || 'Selection is not valid.'
+      };
     }
-    
-    cache.set(cacheKey, result);
-    return result;
-  };
+  }
+
+  return { isValid: true };
 }
 
 /**
- * Debounces option filtering for better performance with large datasets
- * @param filterFn - Filter function to debounce
- * @param delay - Debounce delay in milliseconds (default: 300ms)
- * @returns Debounced filter function
+ * Check if option can be selected based on current state and constraints.
+ * 
+ * @param option - Option to check
+ * @param currentValue - Current selection value
+ * @param maxSelections - Maximum allowed selections (for multi-select)
+ * @returns Whether option can be selected
  */
-export function debounceFilter<T>(
-  filterFn: (query: string) => SelectOption<T>[],
-  delay: number = 300
-) {
-  let timeoutId: NodeJS.Timeout;
-  let lastResolve: ((value: SelectOption<T>[]) => void) | null = null;
-  
-  return (query: string): Promise<SelectOption<T>[]> => {
-    return new Promise((resolve) => {
-      // Cancel previous timeout and resolve
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+export function canSelectOption<T = SelectValue>(
+  option: SelectOption<T>,
+  currentValue: T | T[],
+  maxSelections?: number
+): boolean {
+  // Option is disabled
+  if (option.disabled) {
+    return false;
+  }
+
+  // For multi-select, check if we're at max capacity and option isn't already selected
+  if (Array.isArray(currentValue) && maxSelections !== undefined) {
+    const isAlreadySelected = currentValue.some(val => {
+      if (typeof val === 'object' && val !== null && typeof option.value === 'object' && option.value !== null) {
+        return JSON.stringify(val) === JSON.stringify(option.value);
       }
-      
-      // If there's a pending resolve, resolve it with empty array
-      if (lastResolve) {
-        lastResolve([]);
-      }
-      
-      lastResolve = resolve;
-      
-      timeoutId = setTimeout(() => {
-        const result = filterFn(query);
-        resolve(result);
-        lastResolve = null;
-      }, delay);
+      return val === option.value;
     });
+    
+    if (!isAlreadySelected && currentValue.length >= maxSelections) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Utility for performance optimization with large option lists.
+ * Creates virtual scrolling window for options.
+ * 
+ * @param options - All options
+ * @param startIndex - Start index of visible window
+ * @param windowSize - Number of options to show in window
+ * @returns Windowed options with metadata
+ */
+export function createVirtualWindow<T = SelectValue>(
+  options: SelectOption<T>[],
+  startIndex: number,
+  windowSize: number
+): {
+  items: SelectOption<T>[];
+  totalCount: number;
+  startIndex: number;
+  endIndex: number;
+  hasMore: boolean;
+} {
+  const endIndex = Math.min(startIndex + windowSize, options.length);
+  const items = options.slice(startIndex, endIndex);
+  
+  return {
+    items,
+    totalCount: options.length,
+    startIndex,
+    endIndex,
+    hasMore: endIndex < options.length
   };
 }
 
-// ============================================================================
-// CSS Class Utilities
-// ============================================================================
-
 /**
- * Generates CSS classes for select component states
- * @param config - State configuration
- * @returns Merged CSS class string
+ * Default configurations for common select use cases
  */
-export function getSelectStateClasses(config: {
-  isOpen?: boolean;
-  isDisabled?: boolean;
-  hasError?: boolean;
-  isFocused?: boolean;
-  size?: 'sm' | 'md' | 'lg';
-  variant?: 'default' | 'outlined' | 'filled';
-}): string {
-  const {
-    isOpen = false,
-    isDisabled = false,
-    hasError = false,
-    isFocused = false,
-    size = 'md',
-    variant = 'default'
-  } = config;
+export const defaultConfigurations = {
+  /** Basic select with minimal features */
+  basic: {
+    searchable: false,
+    clearable: false,
+    maxResults: 50
+  },
 
-  return cn(
-    // Base classes
-    'relative inline-flex items-center justify-between rounded-md border transition-colors duration-200',
-    'focus-within:ring-2 focus-within:ring-offset-2',
-    
-    // Size variants
-    {
-      'h-9 px-3 text-sm': size === 'sm',
-      'h-11 px-4 text-base': size === 'md',
-      'h-13 px-5 text-lg': size === 'lg'
-    },
-    
-    // Style variants
-    {
-      'bg-white border-gray-300 focus-within:border-primary-500 focus-within:ring-primary-500/20': 
-        variant === 'default' && !hasError,
-      'bg-transparent border-2 border-gray-300 focus-within:border-primary-500 focus-within:ring-primary-500/20': 
-        variant === 'outlined' && !hasError,
-      'bg-gray-50 border-gray-200 focus-within:bg-white focus-within:border-primary-500 focus-within:ring-primary-500/20': 
-        variant === 'filled' && !hasError
-    },
-    
-    // State classes
-    {
-      'border-red-500 focus-within:border-red-500 focus-within:ring-red-500/20': hasError,
-      'opacity-50 cursor-not-allowed': isDisabled,
-      'ring-2 ring-primary-500/20': isFocused && !hasError,
-      'border-primary-500': isOpen && !hasError
-    },
-    
-    // Dark mode support
-    'dark:bg-gray-900 dark:border-gray-600 dark:focus-within:border-primary-400',
-    'dark:focus-within:ring-primary-400/20'
-  );
-}
-
-/**
- * Generates CSS classes for option elements
- * @param config - Option state configuration
- * @returns Merged CSS class string
- */
-export function getOptionClasses(config: {
-  isSelected?: boolean;
-  isHighlighted?: boolean;
-  isDisabled?: boolean;
-  isGrouped?: boolean;
-}): string {
-  const {
-    isSelected = false,
-    isHighlighted = false,
-    isDisabled = false,
-    isGrouped = false
-  } = config;
-
-  return cn(
-    // Base classes
-    'relative cursor-pointer select-none py-2 px-3 text-sm transition-colors duration-150',
-    
-    // Indent for grouped options
-    { 'pl-6': isGrouped },
-    
-    // State classes
-    {
-      'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300': isSelected && !isDisabled,
-      'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100': isHighlighted && !isSelected && !isDisabled,
-      'text-gray-400 cursor-not-allowed dark:text-gray-600': isDisabled,
-      'text-gray-900 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-800': !isSelected && !isHighlighted && !isDisabled
+  /** Database field select with search and performance optimization */
+  database: {
+    searchable: true,
+    clearable: true,
+    maxResults: 100,
+    fuzzySearch: {
+      threshold: 0.3,
+      includeDescription: true,
+      includeKeywords: true,
+      minQueryLength: 2
     }
-  );
-}
+  },
+
+  /** Large dataset optimization for 1000+ options */
+  largeDataset: {
+    searchable: true,
+    clearable: true,
+    maxResults: 50,
+    fuzzySearch: {
+      threshold: 0.4,
+      includeDescription: false,
+      includeKeywords: true,
+      minQueryLength: 3
+    },
+    virtualScrolling: {
+      windowSize: 50,
+      itemHeight: 40
+    }
+  },
+
+  /** Multi-select with validation */
+  multiSelect: {
+    searchable: true,
+    clearable: true,
+    maxResults: 100,
+    validation: {
+      maxSelections: 10,
+      messages: {
+        maxSelections: 'Maximum 10 selections allowed'
+      }
+    }
+  }
+};
+
+/**
+ * Export all utility functions and configurations
+ */
+export {
+  type FuzzySearchOptions,
+  type ValidationOptions
+};
