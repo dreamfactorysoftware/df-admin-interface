@@ -1,20 +1,60 @@
 {
-  "$schema": "../../schemas/translation-schema.json",
-  "_metadata": {
-    "version": "1.0.0",
-    "locale": "en",
-    "direction": "ltr",
-    "lastModified": "2024-12-19T00:00:00.000Z",
-    "framework": "next.js",
-    "ssrOptimized": true
-  },
-  "cache": "Cache",
-  "overview": "Cache Overview",
-  "flushService": "Flush {serviceName} Cache",
-  "flushCache": "Flush Cache",
+  "title": "Cache",
+  "subtitle": "Cache Overview",
   "description": "Flush system-wide cache or per-service caches. Use the cache clearing buttons below to refresh any changes made to your system configuration values.",
-  "flushSystemCache": "Flush System-Wide Cache",
-  "perServiceCaches": "Per-Service Caches",
-  "serviceCacheFlushed": "Service cache flushed.",
-  "systemCacheFlushed": "System-wide cache flushed."
+  "labels": {
+    "enabled": "Cache Enabled",
+    "driver": "Cache Driver",
+    "prefix": "Cache Prefix",
+    "ttl": "Time to Live (TTL)",
+    "tags": "Cache Tags",
+    "compression": "Compression",
+    "serialization": "Serialization"
+  },
+  "drivers": {
+    "file": "File System",
+    "database": "Database",
+    "redis": "Redis",
+    "memcached": "Memcached",
+    "array": "Array (Memory)"
+  },
+  "actions": {
+    "clear": "Clear Cache",
+    "flush": "Flush Cache",
+    "stats": "Cache Statistics",
+    "test": "Test Cache"
+  },
+  "stats": {
+    "hits": "Cache Hits",
+    "misses": "Cache Misses",
+    "ratio": "Hit Ratio",
+    "size": "Cache Size",
+    "keys": "Total Keys"
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "minLength": "Minimum length is {length} characters",
+    "maxLength": "Maximum length is {length} characters",
+    "pattern": "Please enter a valid format",
+    "numeric": "Please enter a valid number",
+    "url": "Please enter a valid URL",
+    "custom": "Validation failed"
+  },
+  "messages": {
+    "cleared": "Cache cleared successfully",
+    "flushed": "Cache flushed successfully",
+    "testSuccess": "Cache test completed successfully",
+    "testError": "Cache test failed"
+  },
+  "legacy": {
+    "cache": "Cache",
+    "overview": "Cache Overview",
+    "flushService": "Flush {serviceName} Cache",
+    "flushCache": "Flush Cache",
+    "flushSystemCache": "Flush System-Wide Cache",
+    "perServiceCaches": "Per-Service Caches",
+    "serviceCacheFlushed": "Service cache flushed.",
+    "systemCacheFlushed": "System-wide cache flushed."
+  }
 }
