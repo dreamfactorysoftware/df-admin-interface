@@ -1,573 +1,947 @@
 /**
- * Custom React hooks for HTTP verb picker component functionality
- * Provides comprehensive verb selection logic, form integration, keyboard navigation,
- * and theme support for the DreamFactory Admin Interface verb picker component.
+ * Custom React hooks for HTTP verb picker component
  * 
- * @fileoverview Replaces Angular df-verb-picker reactive patterns with React hooks
- * that integrate with React Hook Form, SWR/React Query caching, and Next.js middleware.
+ * Provides comprehensive hook collection for verb selection state management,
+ * bitmask transformations, React Hook Form integration, keyboard navigation,
+ * and theme integration. Optimized for React 19 concurrent features with
+ * proper dependency arrays and performance optimization.
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useFormContext, type FieldValues, type Path } from 'react-hook-form';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
+import { useController, type UseControllerProps, type FieldPath, type FieldValues } from 'react-hook-form';
 import {
   type HttpVerb,
-  type VerbPickerMode,
-  type VerbValue,
   type VerbOption,
+  type VerbPickerMode,
+  type VerbPickerAnyValue,
+  type VerbValidationResult,
+  type ConfigSchema,
+  type UseVerbPickerReturn,
+  type UseVerbTransformReturn,
+  type VerbPickerKeyboardHandlers,
+  type ThemeVariant,
+} from './types';
+import {
   convertBitmaskToVerbs,
   convertVerbsToBitmask,
+  convertVerbToBitmask,
+  convertBitmaskToVerb,
   transformValue,
   generateVerbOptions,
+  generateVerbOptionsFromSchema,
   validateVerbSelection,
   getSelectedVerbs,
   isVerbSelected,
-  toggleVerb,
-  HTTP_VERB_BITMASKS,
+  toggleVerbSelection,
+  formatVerbDisplay,
 } from './utils';
-import { useTheme } from '../../../hooks/useTheme';
 
-// Hook interface types for comprehensive verb picker functionality
-interface VerbPickerState {
-  selectedValue: VerbValue | undefined;
-  isValid: boolean;
-  isDirty: boolean;
-  isTouched: boolean;
-  error?: string;
-}
-
-interface VerbPickerActions {
-  setValue: (value: VerbValue | undefined) => void;
-  toggleVerb: (verb: HttpVerb) => void;
-  clearSelection: () => void;
-  markAsTouched: () => void;
-  validate: () => boolean;
-}
-
-interface VerbKeyboardNavigation {
-  focusedIndex: number;
-  setFocusedIndex: (index: number) => void;
-  handleKeyDown: (event: React.KeyboardEvent) => void;
-  moveFocus: (direction: 'up' | 'down' | 'home' | 'end') => void;
-}
-
-interface VerbTransformOptions {
-  fromMode: VerbPickerMode;
-  toMode: VerbPickerMode;
-  value: VerbValue | undefined;
-}
-
-interface VerbValidationOptions {
-  required?: boolean;
-  mode: VerbPickerMode;
-  customValidator?: (value: VerbValue | undefined) => { isValid: boolean; error?: string };
-}
-
-interface VerbOptionsConfig {
-  includeLabels?: boolean;
-  customTranslations?: Record<string, string>;
-  filterVerbs?: HttpVerb[];
-}
-
-interface ThemeModeState {
-  isDark: boolean;
-  theme: 'light' | 'dark' | 'system';
-  toggleTheme: () => void;
-  setTheme: (theme: 'light' | 'dark' | 'system') => void;
-}
+// ============================================================================
+// Core Selection State Management Hook
+// ============================================================================
 
 /**
- * Core verb picker hook for selection state management
- * Provides comprehensive state management with mode-specific value handling,
- * validation, and reactive updates matching Angular ControlValueAccessor behavior.
+ * Primary hook for verb picker selection state management
  * 
- * @param initialValue - Initial verb selection value
+ * Provides comprehensive state management for HTTP verb selection with support
+ * for different modes (single, multiple, numeric). Handles value transformations,
+ * selection logic, and provides optimized methods for common operations.
+ * 
  * @param mode - Selection mode (verb, verb_multiple, number)
- * @param options - Configuration options including validation
- * @returns Verb picker state and actions
+ * @param initialValue - Initial selected value(s)
+ * @param onChange - Change callback for external integration
+ * @param options - Additional configuration options
+ * 
+ * @example
+ * ```typescript
+ * const {
+ *   value,
+ *   setValue,
+ *   selectedOptions,
+ *   toggle,
+ *   clear,
+ *   isSelected
+ * } = useVerbPicker('verb_multiple', ['GET', 'POST']);
+ * ```
  */
 export function useVerbPicker(
-  initialValue: VerbValue | undefined = undefined,
-  mode: VerbPickerMode = 'verb',
-  options: VerbValidationOptions = { required: false, mode }
-): VerbPickerState & VerbPickerActions {
-  const [selectedValue, setSelectedValue] = useState<VerbValue | undefined>(initialValue);
-  const [isDirty, setIsDirty] = useState(false);
-  const [isTouched, setIsTouched] = useState(false);
-  const [error, setError] = useState<string | undefined>();
+  mode: VerbPickerMode = 'verb_multiple',
+  initialValue?: VerbPickerAnyValue,
+  onChange?: (value: VerbPickerAnyValue) => void,
+  options: {
+    verbOptions?: VerbOption[];
+    maxSelections?: number;
+    minSelections?: number;
+  } = {}
+): UseVerbPickerReturn {
+  const { verbOptions = generateVerbOptions(), maxSelections, minSelections } = options;
 
-  // Memoized validation result
-  const validationResult = useMemo(() => {
-    const baseValidation = validateVerbSelection(selectedValue, mode, options.required);
+  // Initialize state with proper type handling
+  const [internalValue, setInternalValue] = useState<VerbPickerAnyValue>(() => {
+    if (initialValue !== undefined) {
+      return initialValue;
+    }
     
-    if (!baseValidation.isValid) {
-      return baseValidation;
+    // Set appropriate default based on mode
+    switch (mode) {
+      case 'verb':
+        return null;
+      case 'verb_multiple':
+        return [];
+      case 'number':
+        return 0;
+      default:
+        return null;
     }
+  });
 
-    // Run custom validation if provided
-    if (options.customValidator) {
-      return options.customValidator(selectedValue);
-    }
-
-    return baseValidation;
-  }, [selectedValue, mode, options.required, options.customValidator]);
-
-  const isValid = validationResult.isValid;
-
-  // Update error state when validation changes
+  // Update internal value when initialValue changes
   useEffect(() => {
-    setError(validationResult.error);
-  }, [validationResult.error]);
-
-  // Action handlers with proper state management
-  const setValue = useCallback((value: VerbValue | undefined) => {
-    setSelectedValue(value);
-    setIsDirty(true);
-  }, []);
-
-  const toggleVerbSelection = useCallback((verb: HttpVerb) => {
-    const newValue = toggleVerb(selectedValue, mode, verb);
-    setValue(newValue);
-  }, [selectedValue, mode, setValue]);
-
-  const clearSelection = useCallback(() => {
-    setValue(undefined);
-  }, [setValue]);
-
-  const markAsTouched = useCallback(() => {
-    setIsTouched(true);
-  }, []);
-
-  const validate = useCallback(() => {
-    markAsTouched();
-    return isValid;
-  }, [isValid, markAsTouched]);
-
-  return {
-    selectedValue,
-    isValid,
-    isDirty,
-    isTouched,
-    error,
-    setValue,
-    toggleVerb: toggleVerbSelection,
-    clearSelection,
-    markAsTouched,
-    validate,
-  };
-}
-
-/**
- * Value transformation hook for bitmask conversions
- * Handles conversion between different verb picker modes with comprehensive
- * bitmask operations (1=GET, 2=POST, 4=PUT, 8=PATCH, 16=DELETE).
- * 
- * @param options - Transformation configuration
- * @returns Transformed value and transformation utilities
- */
-export function useVerbTransform(options: VerbTransformOptions) {
-  const { fromMode, toMode, value } = options;
-
-  // Memoized transformation result
-  const transformedValue = useMemo(() => {
-    return transformValue(value, fromMode, toMode);
-  }, [value, fromMode, toMode]);
-
-  // Utility functions for common transformations
-  const toBitmask = useCallback((verbs: HttpVerb[]) => {
-    return convertVerbsToBitmask(verbs);
-  }, []);
-
-  const fromBitmask = useCallback((bitmask: number) => {
-    return convertBitmaskToVerbs(bitmask);
-  }, []);
-
-  const getVerbBitmask = useCallback((verb: HttpVerb) => {
-    return HTTP_VERB_BITMASKS[verb] || 0;
-  }, []);
-
-  const isVerbInBitmask = useCallback((bitmask: number, verb: HttpVerb) => {
-    const verbValue = HTTP_VERB_BITMASKS[verb];
-    return verbValue ? (bitmask & verbValue) === verbValue : false;
-  }, []);
-
-  return {
-    transformedValue,
-    toBitmask,
-    fromBitmask,
-    getVerbBitmask,
-    isVerbInBitmask,
-    originalValue: value,
-    hasChanged: transformedValue !== value,
-  };
-}
-
-/**
- * React Hook Form integration hook for validation and form state management
- * Provides seamless integration with React Hook Form including validation,
- * error handling, and form state synchronization.
- * 
- * @param name - Form field name
- * @param mode - Selection mode for validation rules
- * @param options - Validation configuration options
- * @returns Form integration state and handlers
- */
-export function useVerbValidation<T extends FieldValues>(
-  name: Path<T>,
-  mode: VerbPickerMode,
-  options: VerbValidationOptions = { required: false, mode }
-) {
-  const formContext = useFormContext<T>();
-  const hasFormContext = !!formContext;
-
-  // Form field state and methods when form context is available
-  const formField = hasFormContext ? formContext.register(name, {
-    required: options.required ? 'Verb selection is required' : false,
-    validate: (value) => {
-      const validation = validateVerbSelection(value, mode, options.required);
-      if (!validation.isValid) {
-        return validation.error;
-      }
-
-      // Run custom validation if provided
-      if (options.customValidator) {
-        const customResult = options.customValidator(value);
-        if (!customResult.isValid) {
-          return customResult.error;
-        }
-      }
-
-      return true;
+    if (initialValue !== undefined) {
+      setInternalValue(initialValue);
     }
-  }) : null;
+  }, [initialValue]);
 
-  const fieldState = hasFormContext ? formContext.getFieldState(name) : null;
-  const fieldValue = hasFormContext ? formContext.getValues(name) : undefined;
+  // Memoized selected verbs for performance
+  const selectedVerbs = useMemo(() => 
+    getSelectedVerbs(internalValue, mode),
+    [internalValue, mode]
+  );
 
-  // Form action handlers
-  const setValue = useCallback((value: VerbValue | undefined) => {
-    if (hasFormContext) {
-      formContext.setValue(name, value as any, { shouldValidate: true, shouldDirty: true });
-    }
-  }, [hasFormContext, formContext, name]);
+  // Memoized selected options for UI rendering
+  const selectedOptions = useMemo(() => 
+    verbOptions.filter(option => 
+      selectedVerbs.includes(option.altValue)
+    ),
+    [verbOptions, selectedVerbs]
+  );
 
-  const trigger = useCallback(() => {
-    if (hasFormContext) {
-      return formContext.trigger(name);
-    }
-    return Promise.resolve(true);
-  }, [hasFormContext, formContext, name]);
+  // Check if any options are selected
+  const hasSelection = selectedVerbs.length > 0;
 
-  const clearErrors = useCallback(() => {
-    if (hasFormContext) {
-      formContext.clearErrors(name);
-    }
-  }, [hasFormContext, formContext, name]);
-
-  // Selected verbs for current value
-  const selectedVerbs = useMemo(() => {
-    return getSelectedVerbs(fieldValue, mode);
-  }, [fieldValue, mode]);
-
-  return {
-    ...formField,
-    value: fieldValue,
-    selectedVerbs,
-    error: fieldState?.error?.message,
-    isDirty: fieldState?.isDirty || false,
-    isTouched: fieldState?.isTouched || false,
-    isValid: !fieldState?.error,
-    setValue,
-    trigger,
-    clearErrors,
-    hasFormContext,
-  };
-}
-
-/**
- * Verb options hook for verb list management with internationalization support
- * Generates verb options with proper labeling, filtering, and translation support.
- * 
- * @param config - Options configuration including translations and filtering
- * @returns Verb options and management utilities
- */
-export function useVerbOptions(config: VerbOptionsConfig = {}) {
-  const {
-    includeLabels = true,
-    customTranslations = {},
-    filterVerbs,
-  } = config;
-
-  // Translation function with custom overrides
-  const translateVerb = useCallback((key: string) => {
-    if (customTranslations[key]) {
-      return customTranslations[key];
-    }
-
-    // Default translations matching Angular implementation
-    const defaultTranslations = {
-      'verbs.get': 'GET',
-      'verbs.post': 'POST',
-      'verbs.put': 'PUT',
-      'verbs.patch': 'PATCH',
-      'verbs.delete': 'DELETE',
-    };
-
-    return defaultTranslations[key as keyof typeof defaultTranslations] || key;
-  }, [customTranslations]);
-
-  // Memoized verb options with filtering and translation
-  const verbOptions = useMemo(() => {
-    const allOptions = generateVerbOptions(includeLabels ? translateVerb : undefined);
+  // Optimized setValue function with validation
+  const setValue = useCallback((newValue: VerbPickerAnyValue) => {
+    // Validate selection count constraints
+    const newVerbs = getSelectedVerbs(newValue, mode);
     
-    if (filterVerbs && filterVerbs.length > 0) {
-      return allOptions.filter(option => filterVerbs.includes(option.altValue));
+    if (maxSelections !== undefined && newVerbs.length > maxSelections) {
+      return; // Reject if exceeds maximum
+    }
+    
+    if (minSelections !== undefined && newVerbs.length < minSelections) {
+      // Allow setting to meet minimum requirement
+    }
+    
+    setInternalValue(newValue);
+    onChange?.(newValue);
+  }, [mode, maxSelections, minSelections, onChange]);
+
+  // Clear all selections
+  const clear = useCallback(() => {
+    const emptyValue = mode === 'verb_multiple' ? [] : 
+                     mode === 'number' ? 0 : null;
+    setValue(emptyValue);
+  }, [mode, setValue]);
+
+  // Select all available options (multiple mode only)
+  const selectAll = useCallback(() => {
+    if (mode !== 'verb_multiple') return;
+    
+    const allVerbs = verbOptions.map(option => option.altValue);
+    const limitedVerbs = maxSelections 
+      ? allVerbs.slice(0, maxSelections)
+      : allVerbs;
+    
+    setValue(limitedVerbs);
+  }, [mode, verbOptions, maxSelections, setValue]);
+
+  // Toggle specific verb selection
+  const toggle = useCallback((verb: HttpVerb) => {
+    const newValue = toggleVerbSelection(internalValue, verb, mode);
+    setValue(newValue);
+  }, [internalValue, mode, setValue]);
+
+  // Check if specific verb is selected
+  const isSelected = useCallback((verb: HttpVerb) => 
+    isVerbSelected(internalValue, verb, mode),
+    [internalValue, mode]
+  );
+
+  return {
+    value: internalValue,
+    setValue,
+    selectedOptions,
+    hasSelection,
+    clear,
+    selectAll,
+    toggle,
+    isSelected,
+  };
+}
+
+// ============================================================================
+// Value Transformation Hook
+// ============================================================================
+
+/**
+ * Hook for HTTP verb value transformations and bitmask operations
+ * 
+ * Provides utilities for converting between different value formats:
+ * single verbs, verb arrays, and numeric bitmasks. Optimized with
+ * memoization for frequent transformation operations.
+ * 
+ * @example
+ * ```typescript
+ * const { transform, bitmaskToVerbs, verbsToBitmask } = useVerbTransform();
+ * 
+ * const verbs = bitmaskToVerbs(3); // ['GET', 'POST']
+ * const bitmask = verbsToBitmask(['GET', 'POST']); // 3
+ * ```
+ */
+export function useVerbTransform(): UseVerbTransformReturn {
+  // Memoized transformation function
+  const transform = useCallback((options: {
+    value: VerbPickerAnyValue;
+    fromMode: VerbPickerMode;
+    toMode: VerbPickerMode;
+  }) => {
+    const { value, fromMode, toMode } = options;
+    return transformValue(value, fromMode, toMode);
+  }, []);
+
+  // Memoized bitmask conversion functions for performance
+  const bitmaskToVerbs = useCallback((bitmask: number): HttpVerb[] => 
+    convertBitmaskToVerbs(bitmask), []
+  );
+
+  const verbsToBitmask = useCallback((verbs: HttpVerb[]): number => 
+    convertVerbsToBitmask(verbs), []
+  );
+
+  const verbToBitmask = useCallback((verb: HttpVerb): number => 
+    convertVerbToBitmask(verb), []
+  );
+
+  const bitmaskToVerb = useCallback((bitmask: number): HttpVerb | null => 
+    convertBitmaskToVerb(bitmask), []
+  );
+
+  return {
+    transform,
+    bitmaskToVerbs,
+    verbsToBitmask,
+    verbToBitmask,
+    bitmaskToVerb,
+  };
+}
+
+// ============================================================================
+// React Hook Form Integration Hook
+// ============================================================================
+
+/**
+ * Hook for integrating verb picker with React Hook Form
+ * 
+ * Provides seamless integration with React Hook Form including validation,
+ * error handling, and form state management. Supports all picker modes
+ * with proper type safety and performance optimization.
+ * 
+ * @param name - Field name for form integration
+ * @param control - React Hook Form control instance
+ * @param rules - Validation rules
+ * @param mode - Picker mode for value handling
+ * @param options - Additional validation options
+ * 
+ * @example
+ * ```typescript
+ * const {
+ *   field,
+ *   fieldState,
+ *   validate,
+ *   isValid,
+ *   error
+ * } = useVerbValidation('httpMethods', control, {
+ *   required: 'Please select at least one HTTP method'
+ * });
+ * ```
+ */
+export function useVerbValidation<
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+>(
+  name: TName,
+  control?: UseControllerProps<TFieldValues, TName>['control'],
+  rules?: UseControllerProps<TFieldValues, TName>['rules'],
+  mode: VerbPickerMode = 'verb_multiple',
+  options: {
+    required?: boolean;
+    maxSelections?: number;
+    minSelections?: number;
+    allowedVerbs?: HttpVerb[];
+    customValidator?: (value: VerbPickerAnyValue) => VerbValidationResult;
+  } = {}
+) {
+  const {
+    required = false,
+    maxSelections,
+    minSelections,
+    allowedVerbs,
+    customValidator,
+  } = options;
+
+  // React Hook Form controller integration
+  const {
+    field,
+    fieldState,
+  } = useController({
+    name,
+    control,
+    rules: {
+      ...rules,
+      validate: (value: VerbPickerAnyValue) => {
+        // Custom validator takes precedence
+        if (customValidator) {
+          const result = customValidator(value);
+          return result.isValid || result.error || 'Invalid selection';
+        }
+
+        // Standard validation
+        const result = validateVerbSelection(value, mode, {
+          required,
+          maxSelections,
+          minSelections,
+          allowedVerbs,
+          fieldName: name,
+        });
+
+        return result.isValid || result.error || 'Invalid selection';
+      },
+    },
+  });
+
+  // Manual validation function for external use
+  const validate = useCallback((value: VerbPickerAnyValue): VerbValidationResult => {
+    if (customValidator) {
+      return customValidator(value);
     }
 
-    return allOptions;
-  }, [includeLabels, translateVerb, filterVerbs]);
+    return validateVerbSelection(value, mode, {
+      required,
+      maxSelections,
+      minSelections,
+      allowedVerbs,
+      fieldName: name,
+    });
+  }, [customValidator, mode, required, maxSelections, minSelections, allowedVerbs, name]);
 
-  // Helper functions
-  const getOptionByVerb = useCallback((verb: HttpVerb) => {
-    return verbOptions.find(option => option.altValue === verb);
+  // Computed validation state
+  const isValid = !fieldState.error;
+  const error = fieldState.error?.message;
+
+  return {
+    field,
+    fieldState,
+    validate,
+    isValid,
+    error,
+  };
+}
+
+// ============================================================================
+// Verb Options Management Hook
+// ============================================================================
+
+/**
+ * Hook for managing verb options with internationalization support
+ * 
+ * Generates and manages verb options for the picker component with support
+ * for custom labels, filtering, and schema-based configuration. Includes
+ * memoization for performance optimization.
+ * 
+ * @param schema - Configuration schema for options
+ * @param customLabels - Custom labels for verbs
+ * @param includedVerbs - Subset of verbs to include
+ * @param i18nLabels - Internationalized labels (future extension)
+ * 
+ * @example
+ * ```typescript
+ * const { verbOptions, updateLabels, filterOptions } = useVerbOptions({
+ *   customLabels: { GET: 'Retrieve', POST: 'Create' }
+ * });
+ * ```
+ */
+export function useVerbOptions(
+  schema?: Partial<ConfigSchema>,
+  customLabels?: Partial<Record<HttpVerb, string>>,
+  includedVerbs?: HttpVerb[],
+  i18nLabels?: Partial<Record<HttpVerb, string>>
+) {
+  // State for dynamic label updates
+  const [labels, setLabels] = useState<Partial<Record<HttpVerb, string>>>(
+    () => ({ ...customLabels, ...i18nLabels })
+  );
+
+  // Memoized verb options generation
+  const verbOptions = useMemo(() => {
+    if (schema) {
+      const schemaOptions = generateVerbOptionsFromSchema(schema);
+      
+      // Apply custom labels if provided
+      if (labels && Object.keys(labels).length > 0) {
+        return schemaOptions.map(option => ({
+          ...option,
+          label: labels[option.altValue] || option.label,
+        }));
+      }
+      
+      return schemaOptions;
+    }
+
+    return generateVerbOptions(labels, includedVerbs);
+  }, [schema, labels, includedVerbs]);
+
+  // Update labels dynamically
+  const updateLabels = useCallback((newLabels: Partial<Record<HttpVerb, string>>) => {
+    setLabels(prev => ({ ...prev, ...newLabels }));
+  }, []);
+
+  // Filter options based on criteria
+  const filterOptions = useCallback((
+    predicate: (option: VerbOption) => boolean
+  ): VerbOption[] => {
+    return verbOptions.filter(predicate);
   }, [verbOptions]);
 
-  const getOptionByValue = useCallback((value: number) => {
-    return verbOptions.find(option => option.value === value);
-  }, [verbOptions]);
-
-  const isVerbAvailable = useCallback((verb: HttpVerb) => {
-    return verbOptions.some(option => option.altValue === verb);
-  }, [verbOptions]);
+  // Get display text for selected verbs
+  const getDisplayText = useCallback((
+    verbs: HttpVerb[],
+    separator: string = ', '
+  ): string => {
+    return formatVerbDisplay(verbs, labels, separator);
+  }, [labels]);
 
   return {
     verbOptions,
-    getOptionByVerb,
-    getOptionByValue,
-    isVerbAvailable,
-    translateVerb,
-    totalOptions: verbOptions.length,
+    updateLabels,
+    filterOptions,
+    getDisplayText,
+    labels,
   };
 }
 
+// ============================================================================
+// Keyboard Navigation Hook
+// ============================================================================
+
 /**
- * Keyboard navigation hook for consistent keyboard interactions
- * Provides arrow key navigation, enter/escape handling, and focus management
- * matching accessibility standards and Angular Material keyboard patterns.
+ * Hook for handling keyboard navigation in verb picker component
+ * 
+ * Implements comprehensive keyboard interaction patterns including arrow key
+ * navigation, Enter/Space for selection, and Escape for closing. Optimized
+ * for accessibility and performance with proper event handling.
  * 
  * @param verbOptions - Available verb options for navigation
- * @param onSelection - Callback when a verb is selected
- * @param onEscape - Callback when escape is pressed
- * @returns Keyboard navigation state and handlers
+ * @param onSelect - Selection callback
+ * @param onClose - Close callback for dropdown
+ * @param onOpen - Open callback for dropdown
+ * @param isOpen - Current open state
+ * 
+ * @example
+ * ```typescript
+ * const {
+ *   focusedIndex,
+ *   handleKeyDown,
+ *   resetFocus,
+ *   focusNext,
+ *   focusPrevious
+ * } = useVerbKeyboard(verbOptions, handleSelect, handleClose);
+ * ```
  */
 export function useVerbKeyboard(
   verbOptions: VerbOption[],
-  onSelection?: (verb: HttpVerb) => void,
-  onEscape?: () => void
-): VerbKeyboardNavigation {
-  const [focusedIndex, setFocusedIndex] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
+  onSelect?: (verb: HttpVerb) => void,
+  onClose?: () => void,
+  onOpen?: () => void,
+  isOpen?: boolean
+) {
+  // Track focused option index
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+  
+  // Reset focus when options change or component closes
+  useEffect(() => {
+    if (!isOpen) {
+      setFocusedIndex(-1);
+    }
+  }, [isOpen]);
 
-  // Clamp focused index to valid range
-  const clampedFocusedIndex = useMemo(() => {
-    return Math.max(0, Math.min(focusedIndex, verbOptions.length - 1));
-  }, [focusedIndex, verbOptions.length]);
-
-  // Update focused index with clamping
-  const updateFocusedIndex = useCallback((newIndex: number) => {
-    const clampedIndex = Math.max(0, Math.min(newIndex, verbOptions.length - 1));
-    setFocusedIndex(clampedIndex);
+  // Navigate to next option
+  const focusNext = useCallback(() => {
+    setFocusedIndex(prev => {
+      const next = prev + 1;
+      return next >= verbOptions.length ? 0 : next;
+    });
   }, [verbOptions.length]);
 
-  // Movement functions
-  const moveFocus = useCallback((direction: 'up' | 'down' | 'home' | 'end') => {
-    switch (direction) {
-      case 'up':
-        updateFocusedIndex(clampedFocusedIndex - 1);
-        break;
-      case 'down':
-        updateFocusedIndex(clampedFocusedIndex + 1);
-        break;
-      case 'home':
-        updateFocusedIndex(0);
-        break;
-      case 'end':
-        updateFocusedIndex(verbOptions.length - 1);
-        break;
-    }
-  }, [clampedFocusedIndex, updateFocusedIndex, verbOptions.length]);
+  // Navigate to previous option
+  const focusPrevious = useCallback(() => {
+    setFocusedIndex(prev => {
+      const previous = prev - 1;
+      return previous < 0 ? verbOptions.length - 1 : previous;
+    });
+  }, [verbOptions.length]);
 
-  // Keyboard event handler
+  // Reset focus to first option
+  const resetFocus = useCallback(() => {
+    setFocusedIndex(0);
+  }, []);
+
+  // Comprehensive keyboard event handler
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
     switch (event.key) {
-      case 'ArrowUp':
-        event.preventDefault();
-        moveFocus('up');
-        break;
       case 'ArrowDown':
         event.preventDefault();
-        moveFocus('down');
+        if (!isOpen) {
+          onOpen?.();
+          resetFocus();
+        } else {
+          focusNext();
+        }
         break;
-      case 'Home':
+
+      case 'ArrowUp':
         event.preventDefault();
-        moveFocus('home');
+        if (!isOpen) {
+          onOpen?.();
+          setFocusedIndex(verbOptions.length - 1);
+        } else {
+          focusPrevious();
+        }
         break;
-      case 'End':
-        event.preventDefault();
-        moveFocus('end');
-        break;
+
       case 'Enter':
       case ' ':
         event.preventDefault();
-        if (verbOptions[clampedFocusedIndex] && onSelection) {
-          onSelection(verbOptions[clampedFocusedIndex].altValue);
+        if (isOpen && focusedIndex >= 0 && focusedIndex < verbOptions.length) {
+          const selectedOption = verbOptions[focusedIndex];
+          onSelect?.(selectedOption.altValue);
+        } else if (!isOpen) {
+          onOpen?.();
+          resetFocus();
         }
         break;
+
       case 'Escape':
         event.preventDefault();
-        if (onEscape) {
-          onEscape();
+        if (isOpen) {
+          onClose?.();
+          setFocusedIndex(-1);
+        }
+        break;
+
+      case 'Home':
+        if (isOpen) {
+          event.preventDefault();
+          setFocusedIndex(0);
+        }
+        break;
+
+      case 'End':
+        if (isOpen) {
+          event.preventDefault();
+          setFocusedIndex(verbOptions.length - 1);
+        }
+        break;
+
+      case 'Tab':
+        // Allow tab to close dropdown naturally
+        if (isOpen) {
+          onClose?.();
+        }
+        break;
+
+      default:
+        // Handle character navigation for first letter matching
+        if (event.key.length === 1 && isOpen) {
+          const char = event.key.toLowerCase();
+          const matchIndex = verbOptions.findIndex(option =>
+            option.altValue.toLowerCase().startsWith(char)
+          );
+          
+          if (matchIndex >= 0) {
+            event.preventDefault();
+            setFocusedIndex(matchIndex);
+          }
         }
         break;
     }
-  }, [moveFocus, clampedFocusedIndex, verbOptions, onSelection, onEscape]);
+  }, [
+    isOpen,
+    focusedIndex,
+    verbOptions,
+    onSelect,
+    onClose,
+    onOpen,
+    focusNext,
+    focusPrevious,
+    resetFocus,
+  ]);
 
-  // Reset focus when options change
-  useEffect(() => {
-    if (verbOptions.length > 0 && clampedFocusedIndex >= verbOptions.length) {
-      setFocusedIndex(verbOptions.length - 1);
-    }
-  }, [verbOptions.length, clampedFocusedIndex]);
+  // Get currently focused option
+  const focusedOption = useMemo(() => {
+    return focusedIndex >= 0 && focusedIndex < verbOptions.length
+      ? verbOptions[focusedIndex]
+      : null;
+  }, [focusedIndex, verbOptions]);
 
   return {
-    focusedIndex: clampedFocusedIndex,
-    setFocusedIndex: updateFocusedIndex,
+    focusedIndex,
+    focusedOption,
     handleKeyDown,
-    moveFocus,
+    resetFocus,
+    focusNext,
+    focusPrevious,
+    setFocusedIndex,
   };
 }
 
-/**
- * Theme mode hook for dark/light theme switching integration
- * Provides convenient access to theme state and controls specifically
- * for verb picker styling and theme-aware component behavior.
- * 
- * @returns Theme state and controls
- */
-export function useThemeMode(): ThemeModeState {
-  const { theme, setTheme, isDark } = useTheme();
-
-  const toggleTheme = useCallback(() => {
-    setTheme(isDark ? 'light' : 'dark');
-  }, [isDark, setTheme]);
-
-  const setThemeMode = useCallback((newTheme: 'light' | 'dark' | 'system') => {
-    setTheme(newTheme);
-  }, [setTheme]);
-
-  return {
-    isDark,
-    theme,
-    toggleTheme,
-    setTheme: setThemeMode,
-  };
-}
+// ============================================================================
+// Theme Integration Hook
+// ============================================================================
 
 /**
- * Composite hook that combines all verb picker functionality
- * Provides a convenient interface for components that need complete
- * verb picker functionality with form integration and keyboard support.
+ * Hook for theme integration with verb picker component
  * 
- * @param name - Form field name (optional)
- * @param initialValue - Initial selection value
- * @param mode - Selection mode
- * @param options - Configuration options
- * @returns Complete verb picker functionality
+ * Provides theme-aware styling and dark mode support using Tailwind CSS
+ * and system preferences. Includes optimized class generation and theme
+ * switching capabilities.
+ * 
+ * @param variant - Theme variant (light, dark, system)
+ * @param customTheme - Custom theme configuration
+ * 
+ * @example
+ * ```typescript
+ * const {
+ *   theme,
+ *   isDark,
+ *   toggleTheme,
+ *   getThemeClasses
+ * } = useThemeMode('system');
+ * ```
  */
-export function useCompleteVerbPicker<T extends FieldValues>(
-  name?: Path<T>,
-  initialValue?: VerbValue,
-  mode: VerbPickerMode = 'verb',
-  options: VerbValidationOptions & VerbOptionsConfig = { required: false, mode }
+export function useThemeMode(
+  variant: ThemeVariant = 'system',
+  customTheme?: Record<string, string>
 ) {
-  // Core state management
-  const picker = useVerbPicker(initialValue, mode, options);
+  // Track current theme preference
+  const [theme, setTheme] = useState<ThemeVariant>(variant);
   
-  // Form integration (optional)
-  const formIntegration = name ? useVerbValidation(name, mode, options) : null;
-  
-  // Verb options and utilities
-  const verbOptions = useVerbOptions(options);
-  
-  // Keyboard navigation
-  const keyboard = useVerbKeyboard(
-    verbOptions.verbOptions,
-    (verb: HttpVerb) => {
-      if (formIntegration) {
-        const currentSelected = getSelectedVerbs(formIntegration.value, mode);
-        const newValue = toggleVerb(formIntegration.value, mode, verb);
-        formIntegration.setValue(newValue);
-      } else {
-        picker.toggleVerb(verb);
-      }
-    },
-    () => {
-      // Handle escape - could close dropdown or clear selection
-      if (formIntegration) {
-        formIntegration.clearErrors();
-      }
+  // Track system preference
+  const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(false);
+
+  // Initialize system preference detection
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      setSystemPrefersDark(mediaQuery.matches);
+      
+      const handleChange = (e: MediaQueryListEvent) => {
+        setSystemPrefersDark(e.matches);
+      };
+      
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
     }
-  );
-  
-  // Theme integration
-  const theme = useThemeMode();
+  }, []);
 
-  // Helper to check if a verb is selected
-  const isSelected = useCallback((verb: HttpVerb) => {
-    const currentValue = formIntegration ? formIntegration.value : picker.selectedValue;
-    return isVerbSelected(currentValue, mode, verb);
-  }, [formIntegration, picker.selectedValue, mode]);
+  // Determine if dark mode is active
+  const isDark = useMemo(() => {
+    switch (theme) {
+      case 'dark':
+        return true;
+      case 'light':
+        return false;
+      case 'system':
+        return systemPrefersDark;
+      default:
+        return false;
+    }
+  }, [theme, systemPrefersDark]);
 
-  // Combined value and state
-  const currentValue = formIntegration ? formIntegration.value : picker.selectedValue;
-  const selectedVerbs = getSelectedVerbs(currentValue, mode);
-  const isValid = formIntegration ? formIntegration.isValid : picker.isValid;
-  const error = formIntegration ? formIntegration.error : picker.error;
+  // Toggle theme between light and dark
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      switch (prev) {
+        case 'light':
+          return 'dark';
+        case 'dark':
+          return 'light';
+        case 'system':
+          return systemPrefersDark ? 'light' : 'dark';
+        default:
+          return 'light';
+      }
+    });
+  }, [systemPrefersDark]);
+
+  // Set specific theme
+  const setThemeMode = useCallback((newTheme: ThemeVariant) => {
+    setTheme(newTheme);
+  }, []);
+
+  // Generate theme-aware CSS classes
+  const getThemeClasses = useCallback((
+    baseClasses: string,
+    lightClasses?: string,
+    darkClasses?: string
+  ): string => {
+    const classes = [baseClasses];
+    
+    if (isDark && darkClasses) {
+      classes.push(darkClasses);
+    } else if (!isDark && lightClasses) {
+      classes.push(lightClasses);
+    }
+    
+    return classes.join(' ');
+  }, [isDark]);
+
+  // Predefined theme classes for verb picker components
+  const themeClasses = useMemo(() => ({
+    container: getThemeClasses(
+      'border rounded-lg transition-colors duration-200',
+      'border-gray-300 bg-white text-gray-900',
+      'border-gray-600 bg-gray-800 text-gray-100'
+    ),
+    option: getThemeClasses(
+      'px-3 py-2 cursor-pointer transition-colors duration-150',
+      'hover:bg-gray-100 focus:bg-gray-100',
+      'hover:bg-gray-700 focus:bg-gray-700'
+    ),
+    selectedOption: getThemeClasses(
+      'px-3 py-2 cursor-pointer transition-colors duration-150',
+      'bg-blue-100 text-blue-900 hover:bg-blue-200',
+      'bg-blue-800 text-blue-100 hover:bg-blue-700'
+    ),
+    input: getThemeClasses(
+      'border rounded px-3 py-2 transition-colors duration-200',
+      'border-gray-300 bg-white text-gray-900 focus:border-blue-500',
+      'border-gray-600 bg-gray-800 text-gray-100 focus:border-blue-400'
+    ),
+    error: getThemeClasses(
+      'text-sm mt-1',
+      'text-red-600',
+      'text-red-400'
+    ),
+  }), [getThemeClasses]);
 
   return {
-    // Current state
-    value: currentValue,
-    selectedVerbs,
-    isValid,
-    error,
-    isDirty: formIntegration ? formIntegration.isDirty : picker.isDirty,
-    isTouched: formIntegration ? formIntegration.isTouched : picker.isTouched,
+    theme,
+    isDark,
+    systemPrefersDark,
+    toggleTheme,
+    setThemeMode,
+    getThemeClasses,
+    themeClasses,
+  };
+}
+
+// ============================================================================
+// Composite Hook for Complete Integration
+// ============================================================================
+
+/**
+ * Composite hook combining all verb picker functionality
+ * 
+ * Provides a single hook interface that combines selection state, validation,
+ * keyboard navigation, and theme integration. Simplifies component implementation
+ * while maintaining full access to individual hook capabilities.
+ * 
+ * @param config - Complete configuration object
+ * 
+ * @example
+ * ```typescript
+ * const verbPicker = useVerbPickerComplete({
+ *   mode: 'verb_multiple',
+ *   name: 'httpMethods',
+ *   control: formControl,
+ *   rules: { required: 'Selection required' },
+ *   schema: fieldSchema,
+ *   theme: 'system'
+ * });
+ * ```
+ */
+export function useVerbPickerComplete<
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+>(config: {
+  // Core configuration
+  mode?: VerbPickerMode;
+  initialValue?: VerbPickerAnyValue;
+  onChange?: (value: VerbPickerAnyValue) => void;
+  
+  // React Hook Form integration
+  name?: TName;
+  control?: UseControllerProps<TFieldValues, TName>['control'];
+  rules?: UseControllerProps<TFieldValues, TName>['rules'];
+  
+  // Options and validation
+  schema?: Partial<ConfigSchema>;
+  verbOptions?: VerbOption[];
+  maxSelections?: number;
+  minSelections?: number;
+  required?: boolean;
+  allowedVerbs?: HttpVerb[];
+  
+  // UI configuration
+  theme?: ThemeVariant;
+  customLabels?: Partial<Record<HttpVerb, string>>;
+  
+  // Event handlers
+  onOpen?: () => void;
+  onClose?: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+}) {
+  const {
+    mode = 'verb_multiple',
+    initialValue,
+    onChange,
+    name,
+    control,
+    rules,
+    schema,
+    verbOptions: customVerbOptions,
+    maxSelections,
+    minSelections,
+    required = false,
+    allowedVerbs,
+    theme = 'system',
+    customLabels,
+    onOpen,
+    onClose,
+    onFocus,
+    onBlur,
+  } = config;
+
+  // Generate verb options
+  const { verbOptions } = useVerbOptions(schema, customLabels);
+  const finalVerbOptions = customVerbOptions || verbOptions;
+
+  // Core selection state
+  const picker = useVerbPicker(mode, initialValue, onChange, {
+    verbOptions: finalVerbOptions,
+    maxSelections,
+    minSelections,
+  });
+
+  // Value transformation utilities
+  const transform = useVerbTransform();
+
+  // Form integration (if form context provided)
+  const validation = name && control ? useVerbValidation(
+    name,
+    control,
+    rules,
+    mode,
+    {
+      required,
+      maxSelections,
+      minSelections,
+      allowedVerbs,
+    }
+  ) : null;
+
+  // Keyboard navigation
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const handleOpen = useCallback(() => {
+    setIsOpen(true);
+    onOpen?.();
+  }, [onOpen]);
+  
+  const handleClose = useCallback(() => {
+    setIsOpen(false);
+    onClose?.();
+  }, [onClose]);
+
+  const keyboard = useVerbKeyboard(
+    finalVerbOptions,
+    picker.toggle,
+    handleClose,
+    handleOpen,
+    isOpen
+  );
+
+  // Theme integration
+  const themeMode = useThemeMode(theme);
+
+  // Unified event handlers
+  const handleFocus = useCallback(() => {
+    onFocus?.();
+    validation?.field.onBlur(); // Notify form of focus
+  }, [onFocus, validation]);
+
+  const handleBlur = useCallback(() => {
+    onBlur?.();
+    validation?.field.onBlur(); // Notify form of blur
+  }, [onBlur, validation]);
+
+  // Combined value for form integration
+  const formValue = validation?.field.value ?? picker.value;
+
+  return {
+    // Core state and actions
+    ...picker,
+    value: formValue,
     
-    // Actions
-    setValue: formIntegration ? formIntegration.setValue : picker.setValue,
-    toggleVerb: (verb: HttpVerb) => {
-      const newValue = toggleVerb(currentValue, mode, verb);
-      if (formIntegration) {
-        formIntegration.setValue(newValue);
-      } else {
-        picker.setValue(newValue);
-      }
-    },
-    clearSelection: formIntegration ? () => formIntegration.setValue(undefined) : picker.clearSelection,
-    validate: formIntegration ? formIntegration.trigger : () => Promise.resolve(picker.validate()),
+    // Transform utilities
+    ...transform,
     
-    // Utilities
-    isSelected,
-    verbOptions: verbOptions.verbOptions,
-    getOptionByVerb: verbOptions.getOptionByVerb,
+    // Validation state
+    validation,
+    isValid: validation?.isValid ?? true,
+    error: validation?.error,
     
-    // Keyboard support
+    // Keyboard navigation
     keyboard,
+    isOpen,
+    setIsOpen,
     
     // Theme support
-    theme,
+    theme: themeMode,
     
-    // Form integration
-    hasFormContext: !!formIntegration,
-    formField: formIntegration,
+    // Verb options
+    verbOptions: finalVerbOptions,
+    
+    // Event handlers
+    handleFocus,
+    handleBlur,
+    handleOpen,
+    handleClose,
+    
+    // Component props helpers
+    getInputProps: () => ({
+      value: formValue,
+      onChange: (value: VerbPickerAnyValue) => {
+        picker.setValue(value);
+        validation?.field.onChange(value);
+      },
+      onFocus: handleFocus,
+      onBlur: handleBlur,
+      onKeyDown: keyboard.handleKeyDown,
+      'aria-expanded': isOpen,
+      'aria-haspopup': 'listbox' as const,
+      'aria-invalid': validation ? !validation.isValid : false,
+    }),
+    
+    getOptionProps: (option: VerbOption, index: number) => ({
+      key: option.value,
+      onClick: () => picker.toggle(option.altValue),
+      onMouseEnter: () => keyboard.setFocusedIndex(index),
+      'aria-selected': picker.isSelected(option.altValue),
+      tabIndex: -1,
+      role: 'option',
+      id: `verb-option-${option.value}`,
+    }),
   };
 }
