@@ -1,432 +1,665 @@
 /**
  * Utility functions for HTTP verb picker operations
- * Provides pure functions for verb selection logic, bitmask conversions,
- * value transformations, and validation helpers.
+ * 
+ * Provides pure functions for HTTP verb selection logic including bitmask conversions,
+ * value transformations, option generation, and validation helpers. Optimized for
+ * tree-shaking and performance with proper TypeScript typing.
  */
 
-// HTTP verb type definitions matching Angular implementation
-export type HttpVerb = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+import {
+  type HttpVerb,
+  type VerbOption,
+  type VerbPickerMode,
+  type VerbPickerAnyValue,
+  type VerbValidationResult,
+  type ConfigSchema,
+  VERB_BITMASKS,
+} from './types';
+import { cn } from '@/lib/utils';
 
-// HTTP verb bitmask values matching Angular df-verb-picker implementation
-export const HTTP_VERB_BITMASKS = {
-  GET: 1,
-  POST: 2,
-  PUT: 4,
-  PATCH: 8,
-  DELETE: 16,
-} as const;
-
-// Verb option interface matching Angular implementation
-export interface VerbOption {
-  value: number;
-  altValue: HttpVerb;
-  label: string;
-}
-
-// Selection mode types
-export type VerbPickerMode = 'verb' | 'verb_multiple' | 'number';
-
-// Value types for different selection modes
-export type VerbValue = HttpVerb | HttpVerb[] | number;
+// ============================================================================
+// Constants and Configuration
+// ============================================================================
 
 /**
- * Converts a numeric bitmask to an array of HTTP verbs
- * Matches Angular writeValue logic for 'number' type
- * @param bitmask - Numeric bitmask representing selected verbs
- * @returns Array of selected HTTP verbs
+ * Default HTTP verb labels for internationalization
+ * Can be overridden by i18n system
+ */
+export const DEFAULT_VERB_LABELS: Record<HttpVerb, string> = {
+  GET: 'GET',
+  POST: 'POST',
+  PUT: 'PUT',
+  PATCH: 'PATCH',
+  DELETE: 'DELETE',
+} as const;
+
+/**
+ * Reverse mapping from bitmask values to HTTP verbs
+ * Optimized for constant-time lookups
+ */
+export const BITMASK_TO_VERB: Record<number, HttpVerb> = {
+  [VERB_BITMASKS.GET]: 'GET',
+  [VERB_BITMASKS.POST]: 'POST',
+  [VERB_BITMASKS.PUT]: 'PUT',
+  [VERB_BITMASKS.PATCH]: 'PATCH',
+  [VERB_BITMASKS.DELETE]: 'DELETE',
+} as const;
+
+/**
+ * All supported HTTP verbs in consistent order
+ */
+export const ALL_HTTP_VERBS: readonly HttpVerb[] = [
+  'GET',
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE',
+] as const;
+
+/**
+ * Maximum valid bitmask value (all verbs combined)
+ * Used for validation: 1 + 2 + 4 + 8 + 16 = 31
+ */
+export const MAX_BITMASK_VALUE = 31;
+
+// ============================================================================
+// Bitmask Conversion Functions
+// ============================================================================
+
+/**
+ * Convert a numeric bitmask value to an array of HTTP verbs
+ * 
+ * Performs bitwise operations to extract individual verb flags from
+ * a combined bitmask value. Optimized for performance with early returns.
+ * 
+ * @param bitmask - Numeric bitmask value representing combined verbs
+ * @returns Array of HTTP verbs corresponding to set bits
+ * 
+ * @example
+ * ```typescript
+ * convertBitmaskToVerbs(3) // Returns ['GET', 'POST'] (1 + 2)
+ * convertBitmaskToVerbs(12) // Returns ['PUT', 'PATCH'] (4 + 8)
+ * convertBitmaskToVerbs(0) // Returns []
+ * ```
  */
 export function convertBitmaskToVerbs(bitmask: number): HttpVerb[] {
-  if (!bitmask || typeof bitmask !== 'number') {
+  // Input validation
+  if (!Number.isInteger(bitmask) || bitmask < 0 || bitmask > MAX_BITMASK_VALUE) {
     return [];
   }
 
-  const selectedVerbs: HttpVerb[] = [];
-  
-  // Check each verb bitmask value
-  for (const [verb, value] of Object.entries(HTTP_VERB_BITMASKS)) {
-    if ((bitmask & value) === value) {
-      selectedVerbs.push(verb as HttpVerb);
+  const verbs: HttpVerb[] = [];
+
+  // Use bitwise operations for efficient extraction
+  for (const verb of ALL_HTTP_VERBS) {
+    const verbBitmask = VERB_BITMASKS[verb];
+    if ((bitmask & verbBitmask) === verbBitmask) {
+      verbs.push(verb);
     }
   }
-  
-  return selectedVerbs;
+
+  return verbs;
 }
 
 /**
- * Converts an array of HTTP verbs to a numeric bitmask
- * Matches Angular registerOnChange logic for 'number' type
- * @param verbs - Array of HTTP verbs to convert
- * @returns Numeric bitmask representing the verbs
+ * Convert an array of HTTP verbs to a numeric bitmask value
+ * 
+ * Combines individual verb bitmasks using bitwise OR operations.
+ * Handles duplicate verbs gracefully and maintains consistent ordering.
+ * 
+ * @param verbs - Array of HTTP verbs to combine
+ * @returns Numeric bitmask value representing combined verbs
+ * 
+ * @example
+ * ```typescript
+ * convertVerbsToBitmask(['GET', 'POST']) // Returns 3 (1 + 2)
+ * convertVerbsToBitmask(['PUT', 'PATCH']) // Returns 12 (4 + 8)
+ * convertVerbsToBitmask([]) // Returns 0
+ * ```
  */
 export function convertVerbsToBitmask(verbs: HttpVerb[]): number {
-  if (!Array.isArray(verbs) || verbs.length === 0) {
+  // Input validation
+  if (!Array.isArray(verbs)) {
     return 0;
   }
 
-  return verbs.reduce((bitmask, verb) => {
-    const verbValue = HTTP_VERB_BITMASKS[verb];
-    return verbValue ? bitmask | verbValue : bitmask;
-  }, 0);
+  let bitmask = 0;
+
+  // Use Set to automatically handle duplicates
+  const uniqueVerbs = new Set(verbs);
+  
+  for (const verb of uniqueVerbs) {
+    if (verb in VERB_BITMASKS) {
+      bitmask |= VERB_BITMASKS[verb];
+    }
+  }
+
+  return bitmask;
 }
 
 /**
- * Transforms value between different verb picker modes
- * Provides comprehensive value conversion matching Angular ControlValueAccessor behavior
+ * Convert a single HTTP verb to its bitmask value
+ * 
+ * @param verb - HTTP verb to convert
+ * @returns Numeric bitmask value for the verb
+ * 
+ * @example
+ * ```typescript
+ * convertVerbToBitmask('GET') // Returns 1
+ * convertVerbToBitmask('DELETE') // Returns 16
+ * ```
+ */
+export function convertVerbToBitmask(verb: HttpVerb): number {
+  return VERB_BITMASKS[verb] || 0;
+}
+
+/**
+ * Convert a bitmask value to a single HTTP verb
+ * 
+ * Returns the first valid verb if bitmask represents multiple verbs.
+ * Used primarily for single-verb selection modes.
+ * 
+ * @param bitmask - Numeric bitmask value
+ * @returns Single HTTP verb or null if invalid
+ * 
+ * @example
+ * ```typescript
+ * convertBitmaskToVerb(1) // Returns 'GET'
+ * convertBitmaskToVerb(3) // Returns 'GET' (first valid verb)
+ * convertBitmaskToVerb(0) // Returns null
+ * ```
+ */
+export function convertBitmaskToVerb(bitmask: number): HttpVerb | null {
+  const verbs = convertBitmaskToVerbs(bitmask);
+  return verbs.length > 0 ? verbs[0] : null;
+}
+
+// ============================================================================
+// Value Transformation Functions
+// ============================================================================
+
+/**
+ * Transform values between different verb picker modes
+ * 
+ * Handles conversion between single verb, multiple verbs, and numeric
+ * bitmask representations. Maintains type safety and validation.
+ * 
  * @param value - Input value to transform
- * @param fromMode - Source mode type
- * @param toMode - Target mode type
+ * @param fromMode - Source mode of the input value
+ * @param toMode - Target mode for transformation
  * @returns Transformed value in target mode format
+ * 
+ * @example
+ * ```typescript
+ * transformValue('GET', 'verb', 'number') // Returns 1
+ * transformValue(['GET', 'POST'], 'verb_multiple', 'number') // Returns 3
+ * transformValue(3, 'number', 'verb_multiple') // Returns ['GET', 'POST']
+ * ```
  */
 export function transformValue(
-  value: VerbValue | undefined,
+  value: VerbPickerAnyValue,
   fromMode: VerbPickerMode,
   toMode: VerbPickerMode
-): VerbValue | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  // Same mode, return as-is
+): VerbPickerAnyValue {
+  // Early return if modes are the same
   if (fromMode === toMode) {
     return value;
   }
 
-  // Convert from different modes
-  switch (fromMode) {
-    case 'number':
-      if (typeof value === 'number') {
-        const verbs = convertBitmaskToVerbs(value);
-        if (toMode === 'verb') {
-          return verbs.length > 0 ? verbs[0] : undefined;
-        }
-        if (toMode === 'verb_multiple') {
-          return verbs;
-        }
-      }
-      break;
-
-    case 'verb':
-      if (typeof value === 'string') {
-        if (toMode === 'number') {
-          return HTTP_VERB_BITMASKS[value as HttpVerb] || 0;
-        }
-        if (toMode === 'verb_multiple') {
-          return [value as HttpVerb];
-        }
-      }
-      break;
-
-    case 'verb_multiple':
-      if (Array.isArray(value)) {
-        if (toMode === 'number') {
-          return convertVerbsToBitmask(value as HttpVerb[]);
-        }
-        if (toMode === 'verb') {
-          return value.length > 0 ? value[0] : undefined;
-        }
-      }
-      break;
+  // Handle null/undefined values
+  if (value == null) {
+    switch (toMode) {
+      case 'verb':
+        return null;
+      case 'verb_multiple':
+        return [];
+      case 'number':
+        return 0;
+      default:
+        return null;
+    }
   }
 
-  return undefined;
+  // Convert to intermediate verb array format
+  let verbArray: HttpVerb[];
+
+  switch (fromMode) {
+    case 'verb':
+      verbArray = typeof value === 'string' && value in VERB_BITMASKS ? [value as HttpVerb] : [];
+      break;
+    case 'verb_multiple':
+      verbArray = Array.isArray(value) ? value.filter(v => v in VERB_BITMASKS) : [];
+      break;
+    case 'number':
+      verbArray = typeof value === 'number' ? convertBitmaskToVerbs(value) : [];
+      break;
+    default:
+      verbArray = [];
+  }
+
+  // Convert from verb array to target format
+  switch (toMode) {
+    case 'verb':
+      return verbArray.length > 0 ? verbArray[0] : null;
+    case 'verb_multiple':
+      return verbArray;
+    case 'number':
+      return convertVerbsToBitmask(verbArray);
+    default:
+      return null;
+  }
 }
 
+// ============================================================================
+// Option Generation Functions
+// ============================================================================
+
 /**
- * Generates verb options with internationalization support
- * Creates the standard verb options array matching Angular implementation
- * @param translate - Translation function for verb labels
- * @returns Array of verb options with translated labels
+ * Generate verb options for picker component with internationalization support
+ * 
+ * Creates standardized option objects with proper labels, values, and alt values.
+ * Supports custom label overrides and maintains consistent ordering.
+ * 
+ * @param customLabels - Optional custom labels for verbs
+ * @param includedVerbs - Optional subset of verbs to include
+ * @returns Array of formatted verb options
+ * 
+ * @example
+ * ```typescript
+ * generateVerbOptions() // Returns all verbs with default labels
+ * generateVerbOptions({ GET: 'Retrieve' }) // Custom label for GET
+ * generateVerbOptions({}, ['GET', 'POST']) // Only GET and POST options
+ * ```
  */
 export function generateVerbOptions(
-  translate?: (key: string) => string
+  customLabels?: Partial<Record<HttpVerb, string>>,
+  includedVerbs?: HttpVerb[]
 ): VerbOption[] {
-  const defaultTranslate = (key: string) => {
-    const verbMap = {
-      'verbs.get': 'GET',
-      'verbs.post': 'POST', 
-      'verbs.put': 'PUT',
-      'verbs.patch': 'PATCH',
-      'verbs.delete': 'DELETE',
-    };
-    return verbMap[key as keyof typeof verbMap] || key;
-  };
+  const verbs = includedVerbs || ALL_HTTP_VERBS;
+  const labels = { ...DEFAULT_VERB_LABELS, ...customLabels };
 
-  const translateFn = translate || defaultTranslate;
-
-  return [
-    {
-      value: HTTP_VERB_BITMASKS.GET,
-      altValue: 'GET',
-      label: translateFn('verbs.get'),
-    },
-    {
-      value: HTTP_VERB_BITMASKS.POST,
-      altValue: 'POST',
-      label: translateFn('verbs.post'),
-    },
-    {
-      value: HTTP_VERB_BITMASKS.PUT,
-      altValue: 'PUT',
-      label: translateFn('verbs.put'),
-    },
-    {
-      value: HTTP_VERB_BITMASKS.PATCH,
-      altValue: 'PATCH',
-      label: translateFn('verbs.patch'),
-    },
-    {
-      value: HTTP_VERB_BITMASKS.DELETE,
-      altValue: 'DELETE',
-      label: translateFn('verbs.delete'),
-    },
-  ];
+  return verbs.map(verb => ({
+    value: VERB_BITMASKS[verb],
+    altValue: verb,
+    label: labels[verb] || verb,
+  }));
 }
 
 /**
- * Validates verb selection based on constraints and mode
- * @param value - Selected verb value to validate
- * @param mode - Selection mode for validation rules
- * @param required - Whether selection is required
- * @returns Validation result with error message if invalid
+ * Generate verb options from configuration schema
+ * 
+ * Extracts verb options from field schema configuration, supporting
+ * custom labels and constraints defined in the schema.
+ * 
+ * @param schema - Configuration schema for the field
+ * @returns Array of verb options based on schema
  */
-export function validateVerbSelection(
-  value: VerbValue | undefined,
-  mode: VerbPickerMode,
-  required = false
-): { isValid: boolean; error?: string } {
-  // Check required validation
-  if (required) {
-    if (!value) {
-      return { isValid: false, error: 'Verb selection is required' };
-    }
-
-    if (mode === 'verb_multiple' && Array.isArray(value) && value.length === 0) {
-      return { isValid: false, error: 'At least one verb must be selected' };
-    }
-
-    if (mode === 'number' && typeof value === 'number' && value === 0) {
-      return { isValid: false, error: 'At least one verb must be selected' };
-    }
+export function generateVerbOptionsFromSchema(schema?: Partial<ConfigSchema>): VerbOption[] {
+  if (!schema) {
+    return generateVerbOptions();
   }
 
-  // Validate value type matches mode
-  switch (mode) {
-    case 'verb':
-      if (value && typeof value !== 'string') {
-        return { isValid: false, error: 'Single verb must be a string value' };
-      }
-      if (value && !Object.keys(HTTP_VERB_BITMASKS).includes(value as string)) {
-        return { isValid: false, error: 'Invalid HTTP verb selected' };
-      }
-      break;
+  // Extract custom labels from schema
+  const customLabels = schema.labels as Partial<Record<HttpVerb, string>> | undefined;
+  
+  // Extract allowed verbs from schema constraints
+  const allowedVerbs = schema.allowedVerbs as HttpVerb[] | undefined;
 
-    case 'verb_multiple':
-      if (value && !Array.isArray(value)) {
-        return { isValid: false, error: 'Multiple verbs must be an array' };
-      }
-      if (Array.isArray(value)) {
-        const invalidVerbs = value.filter(v => !Object.keys(HTTP_VERB_BITMASKS).includes(v));
-        if (invalidVerbs.length > 0) {
-          return { isValid: false, error: `Invalid HTTP verbs: ${invalidVerbs.join(', ')}` };
-        }
-      }
-      break;
+  return generateVerbOptions(customLabels, allowedVerbs);
+}
 
-    case 'number':
-      if (value && typeof value !== 'number') {
-        return { isValid: false, error: 'Bitmask value must be a number' };
-      }
-      if (typeof value === 'number' && (value < 0 || value > 31)) {
-        return { isValid: false, error: 'Bitmask value must be between 0 and 31' };
-      }
-      break;
+// ============================================================================
+// Validation Functions
+// ============================================================================
+
+/**
+ * Validate verb selection based on constraints and mode
+ * 
+ * Performs comprehensive validation including required field checking,
+ * selection count limits, and allowed verb constraints.
+ * 
+ * @param value - Current value to validate
+ * @param mode - Picker mode for validation rules
+ * @param options - Validation options and constraints
+ * @returns Validation result with error details
+ * 
+ * @example
+ * ```typescript
+ * validateVerbSelection([], 'verb_multiple', { required: true })
+ * // Returns { isValid: false, error: 'Selection is required' }
+ * 
+ * validateVerbSelection(['GET', 'POST'], 'verb_multiple', { maxSelections: 1 })
+ * // Returns { isValid: false, error: 'Maximum 1 selection allowed' }
+ * ```
+ */
+export function validateVerbSelection(
+  value: VerbPickerAnyValue,
+  mode: VerbPickerMode,
+  options: {
+    required?: boolean;
+    maxSelections?: number;
+    minSelections?: number;
+    allowedVerbs?: HttpVerb[];
+    fieldName?: string;
+  } = {}
+): VerbValidationResult {
+  const {
+    required = false,
+    maxSelections,
+    minSelections,
+    allowedVerbs,
+    fieldName = 'verbs',
+  } = options;
+
+  // Convert value to consistent format for validation
+  const verbs = getSelectedVerbs(value, mode);
+
+  // Check required field
+  if (required && verbs.length === 0) {
+    return {
+      isValid: false,
+      error: 'Selection is required',
+      field: fieldName,
+    };
+  }
+
+  // Check minimum selections
+  if (minSelections !== undefined && verbs.length < minSelections) {
+    return {
+      isValid: false,
+      error: `Minimum ${minSelections} selection${minSelections === 1 ? '' : 's'} required`,
+      field: fieldName,
+    };
+  }
+
+  // Check maximum selections
+  if (maxSelections !== undefined && verbs.length > maxSelections) {
+    return {
+      isValid: false,
+      error: `Maximum ${maxSelections} selection${maxSelections === 1 ? '' : 's'} allowed`,
+      field: fieldName,
+    };
+  }
+
+  // Check allowed verbs constraint
+  if (allowedVerbs) {
+    const invalidVerbs = verbs.filter(verb => !allowedVerbs.includes(verb));
+    if (invalidVerbs.length > 0) {
+      return {
+        isValid: false,
+        error: `Invalid verb${invalidVerbs.length === 1 ? '' : 's'}: ${invalidVerbs.join(', ')}`,
+        field: fieldName,
+      };
+    }
   }
 
   return { isValid: true };
 }
 
 /**
- * Extracts selected verbs from component state value
- * Normalizes different value formats to consistent verb array
- * @param value - Component value in any format
- * @param mode - Selection mode for interpretation
- * @returns Array of selected HTTP verbs
+ * Validate if a combination of HTTP verbs is logically valid
+ * 
+ * Checks for common anti-patterns and incompatible verb combinations
+ * based on REST API best practices.
+ * 
+ * @param verbs - Array of HTTP verbs to validate
+ * @returns Validation result with specific combination errors
+ * 
+ * @example
+ * ```typescript
+ * isValidVerbCombination(['GET', 'DELETE']) // Valid combination
+ * isValidVerbCombination(['POST', 'PUT', 'PATCH']) // Potentially redundant
+ * ```
+ */
+export function isValidVerbCombination(verbs: HttpVerb[]): VerbValidationResult {
+  if (verbs.length === 0) {
+    return { isValid: true };
+  }
+
+  // Check for potentially redundant combinations
+  const hasPost = verbs.includes('POST');
+  const hasPut = verbs.includes('PUT');
+  const hasPatch = verbs.includes('PATCH');
+
+  if (hasPost && hasPut && hasPatch) {
+    return {
+      isValid: false,
+      error: 'Having POST, PUT, and PATCH together may be redundant',
+    };
+  }
+
+  // All combinations are technically valid for HTTP
+  return { isValid: true };
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Extract selected verbs from component state or value
+ * 
+ * Normalizes different value formats (single verb, array, bitmask)
+ * into a consistent array of HTTP verbs for processing.
+ * 
+ * @param value - Current component value
+ * @param mode - Component mode for interpretation
+ * @returns Array of currently selected HTTP verbs
+ * 
+ * @example
+ * ```typescript
+ * getSelectedVerbs('GET', 'verb') // Returns ['GET']
+ * getSelectedVerbs(['GET', 'POST'], 'verb_multiple') // Returns ['GET', 'POST']
+ * getSelectedVerbs(3, 'number') // Returns ['GET', 'POST']
+ * ```
  */
 export function getSelectedVerbs(
-  value: VerbValue | undefined,
+  value: VerbPickerAnyValue,
   mode: VerbPickerMode
 ): HttpVerb[] {
-  if (!value) {
+  if (value == null) {
     return [];
   }
 
   switch (mode) {
     case 'verb':
-      return typeof value === 'string' ? [value as HttpVerb] : [];
-
+      return typeof value === 'string' && value in VERB_BITMASKS ? [value as HttpVerb] : [];
     case 'verb_multiple':
-      return Array.isArray(value) ? value as HttpVerb[] : [];
-
+      return Array.isArray(value) ? value.filter(v => v in VERB_BITMASKS) : [];
     case 'number':
       return typeof value === 'number' ? convertBitmaskToVerbs(value) : [];
-
     default:
       return [];
   }
 }
 
 /**
- * Formats verb display for consistent presentation
- * Provides formatted verb labels for UI display
+ * Format verb labels for consistent display
+ * 
+ * Applies consistent formatting rules for verb labels including
+ * capitalization, spacing, and localization support.
+ * 
  * @param verbs - Array of HTTP verbs to format
- * @param mode - Display mode for formatting
+ * @param customLabels - Optional custom label mappings
+ * @param separator - Separator for multiple verbs
  * @returns Formatted display string
+ * 
+ * @example
+ * ```typescript
+ * formatVerbDisplay(['GET', 'POST']) // Returns 'GET, POST'
+ * formatVerbDisplay(['GET'], { GET: 'Retrieve' }) // Returns 'Retrieve'
+ * formatVerbDisplay(['GET', 'POST'], {}, ' | ') // Returns 'GET | POST'
+ * ```
  */
 export function formatVerbDisplay(
   verbs: HttpVerb[],
-  mode: 'short' | 'long' = 'short'
+  customLabels?: Partial<Record<HttpVerb, string>>,
+  separator: string = ', '
 ): string {
   if (verbs.length === 0) {
-    return 'None selected';
+    return '';
   }
 
-  if (mode === 'short') {
-    return verbs.join(', ');
-  }
-
-  if (verbs.length === 1) {
-    return `${verbs[0]} method`;
-  }
-
-  if (verbs.length <= 3) {
-    return `${verbs.join(', ')} methods`;
-  }
-
-  return `${verbs.length} methods selected`;
+  const labels = { ...DEFAULT_VERB_LABELS, ...customLabels };
+  
+  return verbs
+    .map(verb => labels[verb] || verb)
+    .join(separator);
 }
 
 /**
- * Validates if a combination of HTTP verbs is logically valid
- * Checks for reasonable verb combinations and patterns
- * @param verbs - Array of HTTP verbs to validate
- * @returns Whether the combination is valid
+ * Check if a specific verb is selected in the current value
+ * 
+ * Efficiently determines selection state for individual verbs
+ * across different picker modes and value formats.
+ * 
+ * @param value - Current picker value
+ * @param verb - HTTP verb to check
+ * @param mode - Picker mode for interpretation
+ * @returns Whether the verb is currently selected
+ * 
+ * @example
+ * ```typescript
+ * isVerbSelected('GET', 'GET', 'verb') // Returns true
+ * isVerbSelected(['GET', 'POST'], 'POST', 'verb_multiple') // Returns true
+ * isVerbSelected(3, 'POST', 'number') // Returns true (bitmask includes POST)
+ * ```
  */
-export function isValidVerbCombination(verbs: HttpVerb[]): boolean {
-  if (verbs.length === 0) {
-    return true; // Empty selection is valid
-  }
-
-  if (verbs.length === 1) {
-    return true; // Single verb is always valid
-  }
-
-  // Check for reasonable combinations
-  const hasReadOnly = verbs.includes('GET');
-  const hasWriteOperations = verbs.some(verb => ['POST', 'PUT', 'PATCH', 'DELETE'].includes(verb));
-
-  // GET + write operations is a common pattern
-  if (hasReadOnly && hasWriteOperations) {
-    return true;
-  }
-
-  // Multiple write operations without GET is also valid
-  if (!hasReadOnly && hasWriteOperations) {
-    return true;
-  }
-
-  // Only GET is valid
-  if (hasReadOnly && !hasWriteOperations) {
-    return true;
-  }
-
-  return true; // Allow all combinations by default
-}
-
-/**
- * Gets the numeric bitmask value from any verb picker value
- * Utility for converting any verb value format to bitmask
- * @param value - Verb value in any format
- * @param mode - Current selection mode
- * @returns Numeric bitmask representation
- */
-export function getVerbBitmask(
-  value: VerbValue | undefined,
+export function isVerbSelected(
+  value: VerbPickerAnyValue,
+  verb: HttpVerb,
   mode: VerbPickerMode
-): number {
-  if (!value) {
-    return 0;
+): boolean {
+  if (value == null || !(verb in VERB_BITMASKS)) {
+    return false;
   }
 
   switch (mode) {
-    case 'number':
-      return typeof value === 'number' ? value : 0;
-
     case 'verb':
-      return typeof value === 'string' ? (HTTP_VERB_BITMASKS[value as HttpVerb] || 0) : 0;
-
+      return value === verb;
     case 'verb_multiple':
-      return Array.isArray(value) ? convertVerbsToBitmask(value as HttpVerb[]) : 0;
+      return Array.isArray(value) && value.includes(verb);
+    case 'number':
+      return typeof value === 'number' && (value & VERB_BITMASKS[verb]) === VERB_BITMASKS[verb];
+    default:
+      return false;
+  }
+}
+
+/**
+ * Toggle selection state of a specific verb
+ * 
+ * Adds or removes a verb from the current selection based on
+ * current state and picker mode constraints.
+ * 
+ * @param currentValue - Current picker value
+ * @param verb - HTTP verb to toggle
+ * @param mode - Picker mode for operation
+ * @returns New value with toggled verb selection
+ * 
+ * @example
+ * ```typescript
+ * toggleVerbSelection('GET', 'POST', 'verb') // Returns 'POST'
+ * toggleVerbSelection(['GET'], 'POST', 'verb_multiple') // Returns ['GET', 'POST']
+ * toggleVerbSelection(1, 'POST', 'number') // Returns 3 (1 + 2)
+ * ```
+ */
+export function toggleVerbSelection(
+  currentValue: VerbPickerAnyValue,
+  verb: HttpVerb,
+  mode: VerbPickerMode
+): VerbPickerAnyValue {
+  if (!(verb in VERB_BITMASKS)) {
+    return currentValue;
+  }
+
+  const isSelected = isVerbSelected(currentValue, verb, mode);
+
+  switch (mode) {
+    case 'verb':
+      // In single mode, selecting a new verb replaces the current one
+      // Deselecting returns null
+      return isSelected ? null : verb;
+
+    case 'verb_multiple': {
+      const currentVerbs = getSelectedVerbs(currentValue, mode);
+      if (isSelected) {
+        return currentVerbs.filter(v => v !== verb);
+      } else {
+        return [...currentVerbs, verb];
+      }
+    }
+
+    case 'number': {
+      const currentBitmask = typeof currentValue === 'number' ? currentValue : 0;
+      const verbBitmask = VERB_BITMASKS[verb];
+      if (isSelected) {
+        return currentBitmask & ~verbBitmask; // Remove verb using bitwise AND with NOT
+      } else {
+        return currentBitmask | verbBitmask; // Add verb using bitwise OR
+      }
+    }
 
     default:
-      return 0;
+      return currentValue;
   }
 }
 
 /**
- * Checks if a specific verb is selected in the current value
- * @param value - Current verb picker value
- * @param mode - Selection mode
- * @param targetVerb - Verb to check for selection
- * @returns Whether the target verb is selected
+ * Get all possible verb combinations for a given maximum selection count
+ * 
+ * Generates all valid combinations of HTTP verbs up to the specified limit.
+ * Useful for testing and validation scenarios.
+ * 
+ * @param maxCount - Maximum number of verbs in each combination
+ * @param allowedVerbs - Optional subset of verbs to use
+ * @returns Array of all possible verb combinations
  */
-export function isVerbSelected(
-  value: VerbValue | undefined,
-  mode: VerbPickerMode,
-  targetVerb: HttpVerb
-): boolean {
-  const selectedVerbs = getSelectedVerbs(value, mode);
-  return selectedVerbs.includes(targetVerb);
+export function getVerbCombinations(
+  maxCount: number = ALL_HTTP_VERBS.length,
+  allowedVerbs: HttpVerb[] = [...ALL_HTTP_VERBS]
+): HttpVerb[][] {
+  const combinations: HttpVerb[][] = [];
+  const verbs = allowedVerbs.filter(v => v in VERB_BITMASKS);
+
+  function generateCombinations(
+    startIndex: number,
+    currentCombination: HttpVerb[],
+    remainingCount: number
+  ): void {
+    if (remainingCount === 0 || startIndex >= verbs.length) {
+      if (currentCombination.length > 0) {
+        combinations.push([...currentCombination]);
+      }
+      return;
+    }
+
+    // Include current verb
+    currentCombination.push(verbs[startIndex]);
+    generateCombinations(startIndex + 1, currentCombination, remainingCount - 1);
+    currentCombination.pop();
+
+    // Exclude current verb
+    generateCombinations(startIndex + 1, currentCombination, remainingCount);
+  }
+
+  generateCombinations(0, [], maxCount);
+  return combinations;
 }
 
 /**
- * Toggles a specific verb in the current selection
- * Provides immutable verb selection toggle functionality
- * @param value - Current verb picker value
- * @param mode - Selection mode
- * @param targetVerb - Verb to toggle
- * @returns New value with verb toggled
+ * Create a verb picker value validator function
+ * 
+ * Returns a configured validator function for use with form libraries
+ * like React Hook Form. Encapsulates validation logic with preset options.
+ * 
+ * @param validationOptions - Preset validation options
+ * @returns Configured validator function
  */
-export function toggleVerb(
-  value: VerbValue | undefined,
-  mode: VerbPickerMode,
-  targetVerb: HttpVerb
-): VerbValue | undefined {
-  const selectedVerbs = getSelectedVerbs(value, mode);
-  const isSelected = selectedVerbs.includes(targetVerb);
-
-  if (mode === 'verb') {
-    // Single mode: select if different, clear if same
-    return isSelected ? undefined : targetVerb;
-  }
-
-  if (mode === 'verb_multiple') {
-    if (isSelected) {
-      return selectedVerbs.filter(verb => verb !== targetVerb);
-    } else {
-      return [...selectedVerbs, targetVerb];
-    }
-  }
-
-  if (mode === 'number') {
-    const currentBitmask = getVerbBitmask(value, mode);
-    const targetBitmask = HTTP_VERB_BITMASKS[targetVerb];
-    
-    if (isSelected) {
-      return currentBitmask & ~targetBitmask; // Remove verb from bitmask
-    } else {
-      return currentBitmask | targetBitmask; // Add verb to bitmask
-    }
-  }
-
-  return value;
+export function createVerbValidator(
+  validationOptions: Parameters<typeof validateVerbSelection>[2] = {}
+) {
+  return (value: VerbPickerAnyValue, mode: VerbPickerMode = 'verb_multiple') => {
+    return validateVerbSelection(value, mode, validationOptions);
+  };
 }
