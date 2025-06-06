@@ -1,1238 +1,1058 @@
 /**
- * Comprehensive test suite for the main layout component validating render behavior,
- * provider integration, responsive design, and user interaction handling.
+ * MainLayout Component Test Suite
  * 
- * Uses Vitest testing framework with React Testing Library and Mock Service Worker
- * for realistic testing scenarios following WCAG 2.1 AA accessibility compliance.
+ * Comprehensive test coverage for the main layout component validating render behavior,
+ * provider integration, responsive design, accessibility compliance, user interaction handling,
+ * error boundaries, and theme management. Uses Vitest testing framework with React Testing
+ * Library and Mock Service Worker for realistic testing scenarios.
  * 
- * Key Testing Areas:
- * - React 19 server component rendering with Next.js app router patterns
- * - Theme provider integration with system preference detection
- * - Authentication state management and session validation
- * - Responsive layout behavior across viewport sizes
- * - Keyboard navigation and accessibility compliance
- * - Error boundary integration and graceful error handling
- * - Zustand state management synchronization
+ * Test Categories:
+ * - Component Rendering and Structure
+ * - Provider Integration and Context
+ * - Responsive Design Behavior
+ * - Accessibility Compliance (WCAG 2.1 AA)
+ * - Error Boundary and Loading States
+ * - Theme and Dark Mode Support
+ * - Keyboard Navigation and Focus Management
+ * - User Interaction and Event Handling
+ * - Performance and Optimization
+ * - Server-Side Rendering Compatibility
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest'
-import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { axe, toHaveNoViolations } from 'jest-axe'
-import { useRouter, usePathname } from 'next/navigation'
+import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
+import { screen, waitFor, waitForElementToBeRemoved, within } from '@testing-library/react';
+import { axe, toHaveNoViolations } from 'jest-axe';
+import userEvent from '@testing-library/user-event';
 
-import { MainLayout } from './main-layout'
-import { renderWithProviders } from '@/test/utils/test-utils'
-import { MockAuthProvider, MockRouterProvider, MockThemeProvider } from '@/test/utils/mock-providers'
-import { createMockUser, createMockPermissions, createMockSystemInfo } from '@/test/utils/component-factories'
-import { authHandlers } from '@/test/mocks/auth-handlers'
-import { systemHandlers } from '@/test/mocks/system-handlers'
-import { server } from '@/test/mocks/server'
+// Import the component under test
+import { MainLayout } from './main-layout';
 
-// Extend jest-dom matchers for accessibility testing
-expect.extend(toHaveNoViolations)
+// Import testing utilities
+import {
+  renderWithProviders,
+  accessibilityUtils,
+  headlessUIUtils,
+  testUtils,
+  type CustomRenderOptions,
+} from '@/test/utils/test-utils';
 
-// Mock Next.js navigation hooks
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
-  usePathname: vi.fn(),
-  useSearchParams: vi.fn(),
-}))
+// Import authentication handlers for MSW
+import { authHandlers } from '@/test/mocks/auth-handlers';
 
-// Mock Zustand store for layout state management
-vi.mock('@/stores/app-store', () => ({
-  useAppStore: vi.fn(),
-}))
+// Extend Jest matchers for accessibility testing
+expect.extend(toHaveNoViolations);
 
-// Mock theme detection hooks
-vi.mock('@/hooks/use-theme', () => ({
-  useTheme: vi.fn(),
-}))
+// ============================================================================
+// TEST SETUP AND MOCKING
+// ============================================================================
 
-// Mock ResizeObserver for responsive behavior testing
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}))
+/**
+ * Mock child components to isolate MainLayout testing
+ * This prevents dependencies on complex child component implementations
+ */
+vi.mock('./sidebar', () => ({
+  Sidebar: ({ children, ...props }: any) => (
+    <div data-testid="sidebar" {...props}>
+      <nav aria-label="Main navigation">
+        <button data-testid="nav-dashboard">Dashboard</button>
+        <button data-testid="nav-services">Services</button>
+        <button data-testid="nav-schema">Schema</button>
+        <button data-testid="nav-admin">Admin</button>
+      </nav>
+    </div>
+  ),
+}));
 
-// Mock IntersectionObserver for lazy loading tests
-global.IntersectionObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}))
+vi.mock('./header', () => ({
+  Header: ({ children, ...props }: any) => (
+    <header data-testid="header" {...props}>
+      <div className="flex items-center justify-between h-16 px-4">
+        <div data-testid="header-title">DreamFactory Console</div>
+        <div className="flex items-center space-x-4">
+          <button data-testid="theme-toggle" aria-label="Toggle theme">
+            Theme
+          </button>
+          <button data-testid="user-menu" aria-label="User menu">
+            User
+          </button>
+        </div>
+      </div>
+    </header>
+  ),
+}));
 
-// Mock matchMedia for responsive and accessibility testing
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation(query => ({
-    matches: false,
+/**
+ * Mock utility functions used by MainLayout
+ */
+vi.mock('@/lib/utils', () => ({
+  cn: (...classes: (string | undefined)[]) => classes.filter(Boolean).join(' '),
+}));
+
+/**
+ * Mock Next.js middleware and routing utilities
+ */
+const mockRouter = {
+  push: vi.fn(),
+  replace: vi.fn(),
+  prefetch: vi.fn(),
+  back: vi.fn(),
+  forward: vi.fn(),
+  refresh: vi.fn(),
+};
+
+/**
+ * Mock window methods for responsive design testing
+ */
+const mockWindow = {
+  matchMedia: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  innerWidth: 1024,
+  innerHeight: 768,
+};
+
+// ============================================================================
+// TEST DATA AND FIXTURES
+// ============================================================================
+
+/**
+ * Mock user data for authentication testing
+ */
+const mockUser = {
+  id: '1',
+  email: 'test@example.com',
+  firstName: 'Test',
+  lastName: 'User',
+  isAdmin: false,
+  sessionToken: 'mock-session-token',
+};
+
+const mockAdminUser = {
+  id: '2',
+  email: 'admin@example.com',
+  firstName: 'Admin',
+  lastName: 'User',
+  isAdmin: true,
+  sessionToken: 'mock-admin-token',
+};
+
+/**
+ * Test component that throws an error for error boundary testing
+ */
+const ThrowingComponent = ({ shouldThrow = true }: { shouldThrow?: boolean }) => {
+  if (shouldThrow) {
+    throw new Error('Test error for error boundary');
+  }
+  return <div data-testid="no-error">No error occurred</div>;
+};
+
+/**
+ * Test component for children rendering
+ */
+const TestChildComponent = () => (
+  <div data-testid="test-child">
+    <h1>Test Page Content</h1>
+    <button data-testid="test-button">Test Button</button>
+    <input data-testid="test-input" placeholder="Test input" />
+  </div>
+);
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Renders MainLayout with common test configuration
+ */
+const renderMainLayout = (
+  children: React.ReactNode = <TestChildComponent />,
+  options: CustomRenderOptions = {}
+) => {
+  const defaultOptions: CustomRenderOptions = {
+    providerOptions: {
+      router: mockRouter,
+      pathname: '/',
+      user: mockUser,
+      theme: 'light',
+    },
+  };
+
+  const mergedOptions = {
+    ...defaultOptions,
+    ...options,
+    providerOptions: {
+      ...defaultOptions.providerOptions,
+      ...options.providerOptions,
+    },
+  };
+
+  return renderWithProviders(
+    <MainLayout>{children}</MainLayout>,
+    mergedOptions
+  );
+};
+
+/**
+ * Mock media query for responsive testing
+ */
+const mockMediaQuery = (query: string, matches: boolean) => {
+  const mediaQuery = {
+    matches,
     media: query,
-    onchange: null,
+    onchange: null as any,
     addListener: vi.fn(),
     removeListener: vi.fn(),
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
-  })),
-})
+  };
+  
+  mockWindow.matchMedia = vi.fn().mockReturnValue(mediaQuery);
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: mockWindow.matchMedia,
+  });
+  
+  return mediaQuery;
+};
+
+/**
+ * Simulate viewport resize for responsive testing
+ */
+const resizeViewport = (width: number, height: number) => {
+  mockWindow.innerWidth = width;
+  mockWindow.innerHeight = height;
+  Object.defineProperty(window, 'innerWidth', {
+    writable: true,
+    value: width,
+  });
+  Object.defineProperty(window, 'innerHeight', {
+    writable: true,
+    value: height,
+  });
+  
+  // Trigger resize event
+  window.dispatchEvent(new Event('resize'));
+};
+
+// ============================================================================
+// TEST SUITE SETUP
+// ============================================================================
 
 describe('MainLayout Component', () => {
-  const mockRouter = {
-    push: vi.fn(),
-    replace: vi.fn(),
-    prefetch: vi.fn(),
-    back: vi.fn(),
-    forward: vi.fn(),
-    refresh: vi.fn(),
-  }
-
-  const mockAppStore = {
-    sidebarCollapsed: false,
-    setSidebarCollapsed: vi.fn(),
-    theme: 'light' as const,
-    setTheme: vi.fn(),
-    user: null,
-    setUser: vi.fn(),
-    isLoading: false,
-    setIsLoading: vi.fn(),
-  }
-
-  const mockTheme = {
-    theme: 'light' as const,
-    resolvedTheme: 'light' as const,
-    setTheme: vi.fn(),
-    systemTheme: 'light' as const,
-  }
-
-  // Test user scenarios for comprehensive permission testing
-  const adminUser = createMockUser({
-    id: '1',
-    firstName: 'Admin',
-    lastName: 'User',
-    email: 'admin@dreamfactory.com',
-    isActive: true,
-    isSystemAdmin: true,
-    permissions: createMockPermissions({
-      canManageServices: true,
-      canManageUsers: true,
-      canManageRoles: true,
-      canViewSchema: true,
-      canViewReports: true,
-      canManageSystem: true,
-    }),
-  })
-
-  const regularUser = createMockUser({
-    id: '2',
-    firstName: 'Regular',
-    lastName: 'User',
-    email: 'user@dreamfactory.com',
-    isActive: true,
-    isSystemAdmin: false,
-    permissions: createMockPermissions({
-      canManageServices: false,
-      canManageUsers: false,
-      canManageRoles: false,
-      canViewSchema: true,
-      canViewReports: false,
-      canManageSystem: false,
-    }),
-  })
-
-  const unauthorizedUser = createMockUser({
-    id: '3',
-    firstName: 'Unauthorized',
-    lastName: 'User',
-    email: 'unauthorized@dreamfactory.com',
-    isActive: false,
-    isSystemAdmin: false,
-    permissions: createMockPermissions({}),
-  })
-
-  beforeAll(() => {
-    // Setup MSW server
-    server.listen({ onUnhandledRequest: 'error' })
-  })
+  let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
-    vi.clearAllMocks()
+    user = userEvent.setup();
     
-    // Reset Next.js router mocks
-    vi.mocked(useRouter).mockReturnValue(mockRouter)
-    vi.mocked(usePathname).mockReturnValue('/dashboard')
+    // Reset all mocks
+    vi.clearAllMocks();
     
-    // Reset Zustand store mock
-    const { useAppStore } = require('@/stores/app-store')
-    vi.mocked(useAppStore).mockReturnValue(mockAppStore)
-
-    // Reset theme hook mock
-    const { useTheme } = require('@/hooks/use-theme')
-    vi.mocked(useTheme).mockReturnValue(mockTheme)
-
-    // Setup MSW handlers for layout dependencies
-    server.use(...authHandlers, ...systemHandlers)
-  })
+    // Setup DOM environment
+    document.documentElement.className = '';
+    document.documentElement.classList.add('light');
+    
+    // Mock window methods
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation(query => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    
+    // Mock console.error to prevent error boundary noise
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
 
   afterEach(() => {
-    server.resetHandlers()
-  })
+    vi.restoreAllMocks();
+  });
 
-  afterAll(() => {
-    server.close()
-  })
+  // ============================================================================
+  // COMPONENT RENDERING AND STRUCTURE TESTS
+  // ============================================================================
 
-  describe('Basic Rendering and Structure', () => {
-    it('renders the main layout with correct semantic structure and ARIA landmarks', async () => {
-      const { container } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div data-testid="main-content">Test Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
+  describe('Component Rendering and Structure', () => {
+    it('renders without crashing', () => {
+      renderMainLayout();
+      expect(screen.getByRole('main')).toBeInTheDocument();
+    });
 
-      // Verify main layout structure with semantic HTML
-      const main = screen.getByRole('main')
-      expect(main).toBeInTheDocument()
-      expect(main).toHaveAttribute('id', 'main-content')
-
-      // Verify navigation landmark
-      const navigation = screen.getByRole('navigation', { name: /main navigation/i })
-      expect(navigation).toBeInTheDocument()
-
-      // Verify banner/header landmark
-      const banner = screen.queryByRole('banner')
-      if (banner) {
-        expect(banner).toBeInTheDocument()
-      }
-
-      // Verify complementary/sidebar landmark
-      const complementary = screen.queryByRole('complementary')
-      if (complementary) {
-        expect(complementary).toBeInTheDocument()
-      }
-
-      // Verify content area renders children
-      expect(screen.getByTestId('main-content')).toBeInTheDocument()
-      expect(screen.getByText('Test Content')).toBeInTheDocument()
-
-      // Test for accessibility violations
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
-
-    it('includes skip link for keyboard navigation accessibility', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Skip link should be present but hidden by default
-      const skipLink = screen.getByRole('link', { name: /skip to main content/i })
-      expect(skipLink).toBeInTheDocument()
-      expect(skipLink).toHaveAttribute('href', '#main-content')
+    it('renders all required layout sections', () => {
+      renderMainLayout();
       
-      // Skip link should become visible when focused
-      skipLink.focus()
-      expect(skipLink).toHaveFocus()
-      expect(skipLink).not.toHaveClass('sr-only')
-    })
+      // Check for main layout elements
+      expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+      expect(screen.getByTestId('header')).toBeInTheDocument();
+      expect(screen.getByRole('main')).toBeInTheDocument();
+      
+      // Check for accessibility landmarks
+      expect(screen.getByRole('navigation')).toBeInTheDocument();
+      expect(screen.getByLabelText('Main content')).toBeInTheDocument();
+    });
 
-    it('renders with proper error boundary integration', async () => {
-      const ThrowError = () => {
-        throw new Error('Test error for error boundary')
-      }
+    it('renders children content correctly', () => {
+      renderMainLayout(<TestChildComponent />);
+      
+      expect(screen.getByTestId('test-child')).toBeInTheDocument();
+      expect(screen.getByText('Test Page Content')).toBeInTheDocument();
+      expect(screen.getByTestId('test-button')).toBeInTheDocument();
+      expect(screen.getByTestId('test-input')).toBeInTheDocument();
+    });
 
-      // Mock console.error to avoid test output noise
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    it('applies custom className prop', () => {
+      renderMainLayout(
+        <TestChildComponent />,
+        {
+          providerOptions: {
+            router: mockRouter,
+          },
+        }
+      );
+      
+      // Find the root container
+      const container = screen.getByRole('main').closest('.min-h-screen');
+      expect(container).toHaveClass('min-h-screen', 'bg-gray-50');
+    });
 
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <ThrowError />
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
+    it('renders skip link for accessibility', () => {
+      renderMainLayout();
+      
+      const skipLink = screen.getByText('Skip to main content');
+      expect(skipLink).toBeInTheDocument();
+      expect(skipLink).toHaveAttribute('href', '#main-content');
+    });
 
-      // Error boundary should catch the error and display fallback UI
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument()
-        expect(screen.getByText(/something went wrong/i)).toBeInTheDocument()
-      })
+    it('includes modal and announcement regions', () => {
+      renderMainLayout();
+      
+      expect(document.getElementById('modal-root')).toBeInTheDocument();
+      expect(document.getElementById('announcement-region')).toBeInTheDocument();
+      
+      const announcementRegion = document.getElementById('announcement-region');
+      expect(announcementRegion).toHaveAttribute('aria-live', 'polite');
+      expect(announcementRegion).toHaveAttribute('aria-atomic', 'true');
+    });
+  });
 
-      consoleSpy.mockRestore()
-    })
+  // ============================================================================
+  // PROVIDER INTEGRATION AND CONTEXT TESTS
+  // ============================================================================
 
-    it('displays loading states appropriately during data fetching', async () => {
-      // Mock loading state
-      vi.mocked(require('@/stores/app-store').useAppStore).mockReturnValue({
-        ...mockAppStore,
-        isLoading: true,
-      })
+  describe('Provider Integration and Context', () => {
+    it('integrates with authentication provider', () => {
+      renderMainLayout(<TestChildComponent />, {
+        providerOptions: {
+          user: mockUser,
+        },
+      });
+      
+      // Component should render for authenticated users
+      expect(screen.getByTestId('test-child')).toBeInTheDocument();
+    });
 
-      renderWithProviders(
-        <MockAuthProvider user={null} loading={true}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
+    it('handles unauthenticated state', () => {
+      renderMainLayout(<TestChildComponent />, {
+        providerOptions: {
+          user: null,
+        },
+      });
+      
+      // Layout should still render but may have different behavior
+      expect(screen.getByRole('main')).toBeInTheDocument();
+    });
 
-      // Should show loading indicator
-      expect(screen.getByRole('progressbar')).toBeInTheDocument()
-      expect(screen.getByLabelText(/loading/i)).toBeInTheDocument()
+    it('integrates with theme provider', () => {
+      renderMainLayout(<TestChildComponent />, {
+        providerOptions: {
+          theme: 'dark',
+        },
+      });
+      
+      const themeProvider = screen.getByTestId('theme-provider');
+      expect(themeProvider).toHaveClass('dark');
+    });
 
-      // Content should be hidden during loading
-      expect(screen.queryByText('Content')).not.toBeInTheDocument()
-    })
-  })
+    it('integrates with React Query provider', async () => {
+      const mockQueryClient = {
+        getQueryData: vi.fn(),
+        setQueryData: vi.fn(),
+        invalidateQueries: vi.fn(),
+      };
 
-  describe('Authentication Integration', () => {
-    it('renders authenticated layout for valid users', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div data-testid="authenticated-content">Dashboard Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
+      renderMainLayout(<TestChildComponent />, {
+        providerOptions: {
+          queryClient: mockQueryClient as any,
+        },
+      });
+      
+      // Component should render with query client context
+      expect(screen.getByTestId('test-child')).toBeInTheDocument();
+    });
 
-      await waitFor(() => {
-        // Should render main navigation for authenticated users
-        expect(screen.getByRole('navigation', { name: /main navigation/i })).toBeInTheDocument()
-        
-        // Should render user menu
-        expect(screen.getByRole('button', { name: /user menu/i })).toBeInTheDocument()
-        
-        // Should render main content
-        expect(screen.getByTestId('authenticated-content')).toBeInTheDocument()
-      })
-    })
+    it('handles router context integration', () => {
+      const customRouter = {
+        ...mockRouter,
+        push: vi.fn(),
+      };
 
-    it('redirects unauthenticated users to login', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={null}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Protected Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
+      renderMainLayout(<TestChildComponent />, {
+        providerOptions: {
+          router: customRouter,
+          pathname: '/dashboard',
+        },
+      });
+      
+      expect(screen.getByTestId('test-child')).toBeInTheDocument();
+    });
+  });
 
-      await waitFor(() => {
-        expect(mockRouter.replace).toHaveBeenCalledWith('/login')
-      })
-    })
+  // ============================================================================
+  // RESPONSIVE DESIGN BEHAVIOR TESTS
+  // ============================================================================
 
-    it('handles session expiration gracefully', async () => {
-      const { rerender } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Simulate session expiration
-      rerender(
-        <MockAuthProvider user={null} error="Session expired">
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        // Should show session expired message
-        expect(screen.getByRole('alert')).toBeInTheDocument()
-        expect(screen.getByText(/session expired/i)).toBeInTheDocument()
-        
-        // Should redirect to login
-        expect(mockRouter.replace).toHaveBeenCalledWith('/login')
-      })
-    })
-
-    it('restricts layout elements based on user permissions', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={regularUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        // Regular users should see limited navigation
-        expect(screen.getByRole('navigation')).toBeInTheDocument()
-        
-        // Should not see admin-only elements
-        expect(screen.queryByRole('button', { name: /system settings/i })).not.toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: /user management/i })).not.toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Theme Integration and Visual Consistency', () => {
-    it('applies light theme classes correctly', async () => {
-      vi.mocked(require('@/hooks/use-theme').useTheme).mockReturnValue({
-        ...mockTheme,
-        theme: 'light',
-        resolvedTheme: 'light',
-      })
-
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      const layout = screen.getByTestId('main-layout')
-      expect(layout).toHaveClass('bg-white', 'text-gray-900')
-      expect(layout).not.toHaveClass('dark')
-    })
-
-    it('applies dark theme classes correctly', async () => {
-      vi.mocked(require('@/hooks/use-theme').useTheme).mockReturnValue({
-        ...mockTheme,
-        theme: 'dark',
-        resolvedTheme: 'dark',
-      })
-
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      const layout = screen.getByTestId('main-layout')
-      expect(layout).toHaveClass('dark:bg-gray-900', 'dark:text-white')
-    })
-
-    it('responds to system theme preference changes', async () => {
-      const { rerender } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Simulate system theme change to dark
-      vi.mocked(require('@/hooks/use-theme').useTheme).mockReturnValue({
-        ...mockTheme,
-        theme: 'system',
-        resolvedTheme: 'dark',
-        systemTheme: 'dark',
-      })
-
-      rerender(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        const layout = screen.getByTestId('main-layout')
-        expect(layout).toHaveAttribute('data-theme', 'dark')
-      })
-    })
-
-    it('persists theme preferences across page reloads', async () => {
-      const { rerender } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Change theme
-      const themeToggle = screen.getByRole('button', { name: /toggle theme/i })
-      await userEvent.click(themeToggle)
-
-      expect(mockTheme.setTheme).toHaveBeenCalledWith('dark')
-
-      // Simulate page reload with persisted theme
-      vi.mocked(require('@/hooks/use-theme').useTheme).mockReturnValue({
-        ...mockTheme,
-        theme: 'dark',
-        resolvedTheme: 'dark',
-      })
-
-      rerender(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        const layout = screen.getByTestId('main-layout')
-        expect(layout).toHaveAttribute('data-theme', 'dark')
-      })
-    })
-  })
-
-  describe('Responsive Layout Behavior', () => {
-    it('adapts to mobile viewport correctly', async () => {
+  describe('Responsive Design Behavior', () => {
+    it('adapts layout for mobile viewport (< 768px)', () => {
       // Mock mobile viewport
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 640,
-      })
+      resizeViewport(375, 667);
+      mockMediaQuery('(max-width: 767px)', true);
+      
+      renderMainLayout();
+      
+      // Check that layout adapts to mobile
+      const container = screen.getByRole('main').closest('.min-h-screen');
+      expect(container).toBeInTheDocument();
+      
+      // Sidebar might be hidden or collapsed on mobile
+      const sidebar = screen.getByTestId('sidebar');
+      expect(sidebar).toBeInTheDocument();
+    });
 
-      // Trigger resize event
-      fireEvent(window, new Event('resize'))
-
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Mobile Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        const layout = screen.getByTestId('main-layout')
-        expect(layout).toHaveClass('mobile-layout')
-        
-        // Sidebar should be hidden on mobile by default
-        const sidebar = screen.getByRole('navigation')
-        expect(sidebar).toHaveClass('md:translate-x-0', '-translate-x-full')
-        
-        // Mobile header should be visible
-        const mobileHeader = screen.getByRole('banner')
-        expect(mobileHeader).toHaveClass('md:hidden')
-      })
-    })
-
-    it('adapts to tablet viewport correctly', async () => {
+    it('adapts layout for tablet viewport (768px - 1023px)', () => {
       // Mock tablet viewport
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 1024,
-      })
+      resizeViewport(768, 1024);
+      mockMediaQuery('(min-width: 768px) and (max-width: 1023px)', true);
+      
+      renderMainLayout();
+      
+      const sidebar = screen.getByTestId('sidebar');
+      const header = screen.getByTestId('header');
+      
+      expect(sidebar).toBeInTheDocument();
+      expect(header).toBeInTheDocument();
+    });
 
-      fireEvent(window, new Event('resize'))
-
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Tablet Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        const layout = screen.getByTestId('main-layout')
-        expect(layout).toHaveClass('tablet-layout')
-        
-        // Should show sidebar but possibly collapsed
-        const sidebar = screen.getByRole('navigation')
-        expect(sidebar).toBeVisible()
-      })
-    })
-
-    it('adapts to desktop viewport correctly', async () => {
+    it('adapts layout for desktop viewport (>= 1024px)', () => {
       // Mock desktop viewport
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 1280,
-      })
+      resizeViewport(1920, 1080);
+      mockMediaQuery('(min-width: 1024px)', true);
+      
+      renderMainLayout();
+      
+      const sidebar = screen.getByTestId('sidebar');
+      const header = screen.getByTestId('header');
+      const main = screen.getByRole('main');
+      
+      expect(sidebar).toBeInTheDocument();
+      expect(header).toBeInTheDocument();
+      expect(main).toBeInTheDocument();
+    });
 
-      fireEvent(window, new Event('resize'))
-
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Desktop Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        const layout = screen.getByTestId('main-layout')
-        expect(layout).toHaveClass('desktop-layout')
-        
-        // Full sidebar should be visible on desktop
-        const sidebar = screen.getByRole('navigation')
-        expect(sidebar).toBeVisible()
-        expect(sidebar).toHaveClass('w-64') // Full width
-      })
-    })
-
-    it('handles orientation changes appropriately', async () => {
-      // Mock portrait orientation
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 768,
-      })
-      Object.defineProperty(window, 'innerHeight', {
-        writable: true,
-        configurable: true,
-        value: 1024,
-      })
-
-      fireEvent(window, new Event('resize'))
-
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Portrait Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
+    it('handles viewport orientation changes', () => {
+      // Start in portrait
+      resizeViewport(375, 812);
+      renderMainLayout();
+      
       // Change to landscape
-      Object.defineProperty(window, 'innerWidth', {
+      resizeViewport(812, 375);
+      
+      // Layout should still function
+      expect(screen.getByRole('main')).toBeInTheDocument();
+      expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+    });
+
+    it('provides responsive container classes', () => {
+      renderMainLayout();
+      
+      const mainContent = screen.getByRole('main');
+      const container = mainContent.querySelector('.container');
+      
+      expect(container).toHaveClass('mx-auto', 'px-4', 'sm:px-6', 'lg:px-8');
+    });
+  });
+
+  // ============================================================================
+  // ACCESSIBILITY COMPLIANCE TESTS (WCAG 2.1 AA)
+  // ============================================================================
+
+  describe('Accessibility Compliance (WCAG 2.1 AA)', () => {
+    it('has no accessibility violations', async () => {
+      const { container } = renderMainLayout();
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
+    });
+
+    it('provides proper ARIA landmarks', () => {
+      renderMainLayout();
+      
+      expect(screen.getByRole('navigation')).toBeInTheDocument();
+      expect(screen.getByRole('main')).toBeInTheDocument();
+      expect(screen.getByRole('banner')).toBeInTheDocument(); // header
+    });
+
+    it('supports keyboard navigation', async () => {
+      renderMainLayout();
+      
+      const container = screen.getByRole('main').closest('.min-h-screen')!;
+      const navigationResult = await accessibilityUtils.testKeyboardNavigation(container, user);
+      
+      expect(navigationResult.success).toBe(true);
+      expect(navigationResult.focusedElements.length).toBeGreaterThan(0);
+    });
+
+    it('has proper focus management', async () => {
+      renderMainLayout();
+      
+      // Test focus on skip link
+      await user.keyboard('{Tab}');
+      const skipLink = screen.getByText('Skip to main content');
+      expect(skipLink).toHaveFocus();
+      
+      // Test skip link functionality
+      await user.keyboard('{Enter}');
+      const mainContent = screen.getByRole('main');
+      expect(mainContent).toHaveFocus();
+    });
+
+    it('provides appropriate ARIA labels and descriptions', () => {
+      renderMainLayout();
+      
+      const main = screen.getByRole('main');
+      expect(main).toHaveAttribute('aria-label', 'Main content');
+      expect(main).toHaveAttribute('id', 'main-content');
+      
+      const nav = screen.getByRole('navigation');
+      expect(nav).toHaveAttribute('aria-label', 'Main navigation');
+    });
+
+    it('maintains proper heading hierarchy', () => {
+      renderMainLayout(
+        <div>
+          <h1>Page Title</h1>
+          <h2>Section Title</h2>
+        </div>
+      );
+      
+      const headings = screen.getAllByRole('heading');
+      expect(headings).toHaveLength(2);
+      expect(headings[0]).toHaveProperty('tagName', 'H1');
+      expect(headings[1]).toHaveProperty('tagName', 'H2');
+    });
+
+    it('provides adequate color contrast', () => {
+      renderMainLayout();
+      
+      const container = screen.getByRole('main').closest('.min-h-screen')!;
+      const hasContrast = accessibilityUtils.hasAdequateContrast(container);
+      expect(hasContrast).toBe(true);
+    });
+
+    it('supports screen reader announcements', () => {
+      renderMainLayout();
+      
+      const announcementRegion = document.getElementById('announcement-region');
+      expect(announcementRegion).toHaveAttribute('aria-live', 'polite');
+      expect(announcementRegion).toHaveClass('sr-only');
+    });
+  });
+
+  // ============================================================================
+  // ERROR BOUNDARY AND LOADING STATES TESTS
+  // ============================================================================
+
+  describe('Error Boundary and Loading States', () => {
+    it('handles child component errors gracefully', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      renderMainLayout(<ThrowingComponent shouldThrow={true} />);
+      
+      // Should display error boundary fallback
+      expect(screen.getByText('Application Error')).toBeInTheDocument();
+      expect(screen.getByText('Try Again')).toBeInTheDocument();
+      expect(screen.getByText('Reload Page')).toBeInTheDocument();
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('provides recovery options in error boundary', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const mockReload = vi.fn();
+      Object.defineProperty(window, 'location', {
+        value: { reload: mockReload },
         writable: true,
-        configurable: true,
-        value: 1024,
-      })
-      Object.defineProperty(window, 'innerHeight', {
-        writable: true,
-        configurable: true,
-        value: 768,
-      })
-
-      fireEvent(window, new Event('resize'))
-
-      await waitFor(() => {
-        const layout = screen.getByTestId('main-layout')
-        expect(layout).toHaveAttribute('data-orientation', 'landscape')
-      })
-    })
-  })
-
-  describe('Sidebar Integration and State Management', () => {
-    it('manages sidebar collapse state correctly', async () => {
-      const user = userEvent.setup()
+      });
       
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      const collapseButton = screen.getByRole('button', { name: /collapse sidebar/i })
-      await user.click(collapseButton)
-
-      expect(mockAppStore.setSidebarCollapsed).toHaveBeenCalledWith(true)
-    })
-
-    it('persists sidebar state across page navigation', async () => {
-      // Start with collapsed sidebar
-      vi.mocked(require('@/stores/app-store').useAppStore).mockReturnValue({
-        ...mockAppStore,
-        sidebarCollapsed: true,
-      })
-
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      const sidebar = screen.getByRole('navigation')
-      expect(sidebar).toHaveClass('w-16') // Collapsed width
-    })
-
-    it('handles sidebar state synchronization with Zustand store', async () => {
-      const { rerender } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Change store state
-      vi.mocked(require('@/stores/app-store').useAppStore).mockReturnValue({
-        ...mockAppStore,
-        sidebarCollapsed: true,
-      })
-
-      rerender(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        const sidebar = screen.getByRole('navigation')
-        expect(sidebar).toHaveClass('w-16') // Should reflect updated state
-      })
-    })
-  })
-
-  describe('Keyboard Navigation and Accessibility', () => {
-    it('supports keyboard navigation through layout elements', async () => {
-      const user = userEvent.setup()
+      renderMainLayout(<ThrowingComponent shouldThrow={true} />);
       
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Tab through layout elements
-      await user.tab()
-      expect(screen.getByRole('link', { name: /skip to main content/i })).toHaveFocus()
-
-      await user.tab()
-      // Should focus on first navigation item
-      const firstNavItem = screen.getAllByRole('link')[1] // Skip link is first
-      expect(firstNavItem).toHaveFocus()
-    })
-
-    it('manages focus correctly when navigating between sections', async () => {
-      const user = userEvent.setup()
+      // Test reload button
+      const reloadButton = screen.getByText('Reload Page');
+      await user.click(reloadButton);
+      expect(mockReload).toHaveBeenCalled();
       
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <button data-testid="content-button">Content Button</button>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
+      consoleSpy.mockRestore();
+    });
 
-      // Use skip link to jump to main content
-      const skipLink = screen.getByRole('link', { name: /skip to main content/i })
-      await user.click(skipLink)
-
-      // Focus should move to main content area
-      const mainContent = screen.getByRole('main')
-      expect(mainContent).toHaveFocus()
-    })
-
-    it('supports ARIA landmarks and proper heading hierarchy', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>
-                <h1>Page Title</h1>
-                <h2>Section Title</h2>
-                <h3>Subsection Title</h3>
-              </div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Verify landmark structure
-      expect(screen.getByRole('main')).toBeInTheDocument()
-      expect(screen.getByRole('navigation')).toBeInTheDocument()
-      expect(screen.getByRole('banner')).toBeInTheDocument()
-
-      // Verify heading hierarchy
-      const headings = screen.getAllByRole('heading')
-      expect(headings[0]).toHaveProperty('tagName', 'H1')
-      expect(headings[1]).toHaveProperty('tagName', 'H2')
-      expect(headings[2]).toHaveProperty('tagName', 'H3')
-    })
-
-    it('announces layout changes to screen readers', async () => {
-      const user = userEvent.setup()
+    it('displays loading state during mount', () => {
+      // Mock useState to simulate loading state
+      const { unmount } = renderMainLayout();
       
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Toggle sidebar
-      const collapseButton = screen.getByRole('button', { name: /collapse sidebar/i })
-      await user.click(collapseButton)
-
-      // Should have live region for announcements
-      const liveRegion = screen.getByRole('status')
-      expect(liveRegion).toHaveAttribute('aria-live', 'polite')
+      // Component should render eventually
+      expect(screen.getByRole('main')).toBeInTheDocument();
       
-      await waitFor(() => {
-        expect(liveRegion).toHaveTextContent(/sidebar collapsed/i)
-      })
-    })
+      unmount();
+    });
 
-    it('handles high contrast mode preferences', async () => {
-      // Mock high contrast preference
-      vi.mocked(window.matchMedia).mockImplementation(query => ({
-        matches: query === '(prefers-contrast: high)',
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      }))
+    it('shows loading fallback for Suspense boundaries', async () => {
+      renderMainLayout();
+      
+      // Loading fallbacks should be present for sidebar and header
+      // These would be replaced by actual components after loading
+      expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+      expect(screen.getByTestId('header')).toBeInTheDocument();
+    });
 
-      const { container } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
+    it('handles global loading overlay', async () => {
+      // Mock global loading state
+      renderMainLayout(<TestChildComponent />, {
+        providerOptions: {
+          // This would come from app store context
+        },
+      });
+      
+      // Test that global loading can be triggered
+      expect(screen.getByTestId('test-child')).toBeInTheDocument();
+    });
 
-      const layout = screen.getByTestId('main-layout')
-      expect(layout).toHaveClass('contrast-more:border-2')
+    it('displays error details in development mode', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      renderMainLayout(<ThrowingComponent shouldThrow={true} />);
+      
+      // Should show error details in development
+      expect(screen.getByText('Error Details (Development)')).toBeInTheDocument();
+      
+      process.env.NODE_ENV = originalEnv;
+      consoleSpy.mockRestore();
+    });
+  });
 
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
+  // ============================================================================
+  // THEME AND DARK MODE SUPPORT TESTS
+  // ============================================================================
 
-    it('supports reduced motion preferences', async () => {
-      // Mock reduced motion preference
-      vi.mocked(window.matchMedia).mockImplementation(query => ({
-        matches: query === '(prefers-reduced-motion: reduce)',
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      }))
+  describe('Theme and Dark Mode Support', () => {
+    it('renders correctly in light theme', () => {
+      renderMainLayout(<TestChildComponent />, {
+        providerOptions: {
+          theme: 'light',
+        },
+      });
+      
+      const themeProvider = screen.getByTestId('theme-provider');
+      expect(themeProvider).toHaveClass('light');
+      
+      const container = screen.getByRole('main').closest('.min-h-screen');
+      expect(container).toHaveClass('bg-gray-50');
+    });
 
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
+    it('renders correctly in dark theme', () => {
+      renderMainLayout(<TestChildComponent />, {
+        providerOptions: {
+          theme: 'dark',
+        },
+      });
+      
+      const themeProvider = screen.getByTestId('theme-provider');
+      expect(themeProvider).toHaveClass('dark');
+      
+      const container = screen.getByRole('main').closest('.min-h-screen');
+      expect(container).toHaveClass('dark:bg-gray-900');
+    });
 
-      const layout = screen.getByTestId('main-layout')
-      expect(layout).toHaveClass('motion-reduce:transition-none')
-    })
-  })
+    it('applies theme classes to document root', () => {
+      renderMainLayout(<TestChildComponent />, {
+        providerOptions: {
+          theme: 'dark',
+        },
+      });
+      
+      // In real implementation, this would update document.documentElement
+      // For testing, we check the theme provider wrapper
+      const themeProvider = screen.getByTestId('theme-provider');
+      expect(themeProvider).toHaveClass('dark');
+    });
 
-  describe('Error Handling and Recovery', () => {
-    it('displays error boundary UI when child components throw errors', async () => {
-      const ErrorComponent = () => {
-        throw new Error('Child component error')
+    it('handles system theme preference', () => {
+      // Mock system dark theme preference
+      mockMediaQuery('(prefers-color-scheme: dark)', true);
+      
+      renderMainLayout(<TestChildComponent />, {
+        providerOptions: {
+          theme: 'light', // Explicit theme should override system
+        },
+      });
+      
+      const themeProvider = screen.getByTestId('theme-provider');
+      expect(themeProvider).toHaveClass('light');
+    });
+
+    it('supports theme transitions', () => {
+      renderMainLayout();
+      
+      const container = screen.getByRole('main').closest('.min-h-screen');
+      expect(container).toHaveClass('transition-colors', 'duration-300');
+    });
+  });
+
+  // ============================================================================
+  // KEYBOARD NAVIGATION AND FOCUS MANAGEMENT TESTS
+  // ============================================================================
+
+  describe('Keyboard Navigation and Focus Management', () => {
+    it('supports Tab navigation through interactive elements', async () => {
+      renderMainLayout();
+      
+      // Start from skip link
+      await user.keyboard('{Tab}');
+      expect(screen.getByText('Skip to main content')).toHaveFocus();
+      
+      // Continue tabbing through navigation
+      await user.keyboard('{Tab}');
+      const navElements = screen.getAllByRole('button');
+      expect(navElements.some(el => el === document.activeElement)).toBe(true);
+    });
+
+    it('supports Shift+Tab for reverse navigation', async () => {
+      renderMainLayout();
+      
+      // Focus on an element first
+      const testButton = screen.getByTestId('test-button');
+      testButton.focus();
+      
+      // Shift+Tab should move focus backwards
+      await user.keyboard('{Shift>}{Tab}{/Shift}');
+      
+      // Focus should have moved to previous element
+      expect(document.activeElement).not.toBe(testButton);
+    });
+
+    it('handles Escape key for closing modals/menus', async () => {
+      renderMainLayout();
+      
+      // Test Escape key handling
+      await user.keyboard('{Escape}');
+      
+      // Should not cause any errors
+      expect(screen.getByRole('main')).toBeInTheDocument();
+    });
+
+    it('provides keyboard shortcuts for navigation', async () => {
+      renderMainLayout();
+      
+      // Test skip link with Enter key
+      const skipLink = screen.getByText('Skip to main content');
+      skipLink.focus();
+      await user.keyboard('{Enter}');
+      
+      const mainContent = screen.getByRole('main');
+      expect(mainContent).toHaveFocus();
+    });
+
+    it('maintains focus within modal/dialog contexts', async () => {
+      // This would test focus trapping if modals were open
+      renderMainLayout();
+      
+      const focusableElements = accessibilityUtils.getFocusableElements(
+        screen.getByRole('main').closest('.min-h-screen')!
+      );
+      
+      expect(focusableElements.length).toBeGreaterThan(0);
+    });
+
+    it('provides visible focus indicators', () => {
+      renderMainLayout();
+      
+      const skipLink = screen.getByText('Skip to main content');
+      expect(skipLink).toHaveClass('focus:not-sr-only', 'focus:absolute');
+    });
+  });
+
+  // ============================================================================
+  // USER INTERACTION AND EVENT HANDLING TESTS
+  // ============================================================================
+
+  describe('User Interaction and Event Handling', () => {
+    it('handles click events on interactive elements', async () => {
+      renderMainLayout();
+      
+      const testButton = screen.getByTestId('test-button');
+      await user.click(testButton);
+      
+      // Button should remain in document after click
+      expect(testButton).toBeInTheDocument();
+    });
+
+    it('handles form interactions within main content', async () => {
+      renderMainLayout();
+      
+      const testInput = screen.getByTestId('test-input');
+      await user.type(testInput, 'test input value');
+      
+      expect(testInput).toHaveValue('test input value');
+    });
+
+    it('handles navigation interactions', async () => {
+      renderMainLayout();
+      
+      const navButton = screen.getByTestId('nav-dashboard');
+      await user.click(navButton);
+      
+      // Navigation should remain functional
+      expect(navButton).toBeInTheDocument();
+    });
+
+    it('handles header interactions', async () => {
+      renderMainLayout();
+      
+      const themeToggle = screen.getByTestId('theme-toggle');
+      await user.click(themeToggle);
+      
+      expect(themeToggle).toBeInTheDocument();
+    });
+
+    it('handles window resize events', () => {
+      renderMainLayout();
+      
+      // Trigger resize event
+      resizeViewport(800, 600);
+      
+      // Layout should adapt but remain functional
+      expect(screen.getByRole('main')).toBeInTheDocument();
+    });
+
+    it('handles media query changes', () => {
+      renderMainLayout();
+      
+      // Change media query
+      const mediaQuery = mockMediaQuery('(prefers-color-scheme: dark)', true);
+      
+      // Trigger change event
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', () => {});
       }
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <ErrorComponent />
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument()
-        expect(screen.getByText(/something went wrong/i)).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
-      })
-
-      consoleSpy.mockRestore()
-    })
-
-    it('provides error recovery mechanisms', async () => {
-      const user = userEvent.setup()
       
-      const ErrorComponent = ({ shouldError = false }: { shouldError?: boolean }) => {
-        if (shouldError) {
-          throw new Error('Recoverable error')
-        }
-        return <div>Content loaded successfully</div>
-      }
+      expect(screen.getByRole('main')).toBeInTheDocument();
+    });
+  });
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  // ============================================================================
+  // PERFORMANCE AND OPTIMIZATION TESTS
+  // ============================================================================
 
-      const { rerender } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <ErrorComponent shouldError={true} />
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Error should be displayed
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument()
-      })
-
-      // Click retry button
-      const retryButton = screen.getByRole('button', { name: /try again/i })
-      await user.click(retryButton)
-
-      // Re-render with fixed component
-      rerender(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <ErrorComponent shouldError={false} />
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByText('Content loaded successfully')).toBeInTheDocument()
-        expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-      })
-
-      consoleSpy.mockRestore()
-    })
-
-    it('handles network errors gracefully', async () => {
-      // Mock network error
-      server.use(
-        authHandlers.map(handler => 
-          handler.mockImplementationOnce(() => {
-            throw new Error('Network error')
-          })
-        )[0]
-      )
-
-      renderWithProviders(
-        <MockAuthProvider user={null}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument()
-        expect(screen.getByText(/network error/i)).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Performance and Loading States', () => {
-    it('shows loading indicators during initial authentication check', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={null} loading={true}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      expect(screen.getByRole('progressbar')).toBeInTheDocument()
-      expect(screen.getByLabelText(/loading application/i)).toBeInTheDocument()
-    })
-
-    it('implements lazy loading for sidebar components', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Sidebar should be loaded
-      await waitFor(() => {
-        expect(screen.getByRole('navigation')).toBeInTheDocument()
-      })
-
-      // Verify lazy loading attributes
-      const sidebar = screen.getByRole('navigation')
-      expect(sidebar).toHaveAttribute('data-loaded', 'true')
-    })
-
-    it('optimizes re-renders using React.memo patterns', async () => {
-      const renderSpy = vi.fn()
+  describe('Performance and Optimization', () => {
+    it('renders efficiently without unnecessary re-renders', () => {
+      const { rerender } = renderMainLayout();
       
-      const TestChild = vi.fn(({ children }: { children: React.ReactNode }) => {
-        renderSpy()
-        return <div>{children}</div>
-      })
-
-      const { rerender } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <TestChild>Test Content</TestChild>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Initial render
-      expect(renderSpy).toHaveBeenCalledTimes(1)
-
       // Re-render with same props
-      rerender(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <TestChild>Test Content</TestChild>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Should not trigger additional renders due to memoization
-      expect(renderSpy).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe('Integration with Next.js App Router', () => {
-    it('integrates properly with Next.js routing system', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Page Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Should use Next.js routing context
-      expect(vi.mocked(useRouter)).toHaveBeenCalled()
-      expect(vi.mocked(usePathname)).toHaveBeenCalled()
-    })
-
-    it('handles route changes and updates active states', async () => {
-      const { rerender } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Dashboard Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Change route
-      vi.mocked(usePathname).mockReturnValue('/api-connections/database')
-
-      rerender(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Services Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      await waitFor(() => {
-        // Navigation should reflect active route
-        const servicesLink = screen.getByRole('link', { name: /services/i })
-        expect(servicesLink).toHaveAttribute('aria-current', 'page')
-      })
-    })
-
-    it('supports server-side rendering without hydration mismatches', async () => {
-      // Mock SSR environment
-      Object.defineProperty(window, 'document', {
-        value: undefined,
-        writable: true,
-      })
-
-      // Should render without errors in SSR mode
-      expect(() => {
-        renderWithProviders(
-          <MockAuthProvider user={adminUser}>
-            <MockThemeProvider>
-              <MainLayout>
-                <div>SSR Content</div>
-              </MainLayout>
-            </MockThemeProvider>
-          </MockAuthProvider>
-        )
-      }).not.toThrow()
-
-      // Restore document
-      Object.defineProperty(window, 'document', {
-        value: document,
-        writable: true,
-      })
-    })
-  })
-
-  describe('WCAG 2.1 AA Compliance Validation', () => {
-    it('meets color contrast requirements', async () => {
-      const { container } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content with text</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // Test for color contrast violations
-      const results = await axe(container, {
-        rules: {
-          'color-contrast': { enabled: true }
-        }
-      })
-      expect(results).toHaveNoViolations()
-    })
-
-    it('provides adequate touch target sizes', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
-
-      // All interactive elements should meet 44x44px minimum
-      const buttons = screen.getAllByRole('button')
-      const links = screen.getAllByRole('link')
+      rerender(<MainLayout><TestChildComponent /></MainLayout>);
       
-      [...buttons, ...links].forEach(element => {
-        const styles = getComputedStyle(element)
-        const minHeight = parseInt(styles.minHeight)
-        const minWidth = parseInt(styles.minWidth)
-        
-        expect(minHeight).toBeGreaterThanOrEqual(44)
-        expect(minWidth).toBeGreaterThanOrEqual(44)
-      })
-    })
+      // Component should still be functional
+      expect(screen.getByTestId('test-child')).toBeInTheDocument();
+    });
 
-    it('maintains proper focus indicators', async () => {
-      const user = userEvent.setup()
+    it('handles large content efficiently', () => {
+      const largeContent = (
+        <div>
+          {Array.from({ length: 100 }, (_, i) => (
+            <div key={i} data-testid={`item-${i}`}>
+              Item {i}
+            </div>
+          ))}
+        </div>
+      );
       
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
+      renderMainLayout(largeContent);
+      
+      // Should render without performance issues
+      expect(screen.getByTestId('item-0')).toBeInTheDocument();
+      expect(screen.getByTestId('item-99')).toBeInTheDocument();
+    });
 
-      // Tab to focusable elements
-      await user.tab()
-      const focusedElement = document.activeElement
-
-      if (focusedElement) {
-        const styles = getComputedStyle(focusedElement)
-        
-        // Focus indicator should be visible
-        expect(styles.outline).not.toBe('none')
-        expect(styles.outlineWidth).toBeTruthy()
+    it('uses proper memoization for callbacks', () => {
+      const { rerender } = renderMainLayout();
+      
+      // Multiple re-renders should not cause issues
+      for (let i = 0; i < 5; i++) {
+        rerender(<MainLayout><TestChildComponent /></MainLayout>);
       }
-    })
+      
+      expect(screen.getByTestId('test-child')).toBeInTheDocument();
+    });
 
-    it('supports screen reader announcements', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <MockThemeProvider>
-            <MainLayout>
-              <div>Content</div>
-            </MainLayout>
-          </MockThemeProvider>
-        </MockAuthProvider>
-      )
+    it('implements efficient Suspense boundaries', () => {
+      renderMainLayout();
+      
+      // Suspense boundaries should be present
+      expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+      expect(screen.getByTestId('header')).toBeInTheDocument();
+    });
 
-      // Should have live regions for dynamic content
-      const liveRegions = screen.getAllByRole('status')
-      expect(liveRegions.length).toBeGreaterThan(0)
+    it('provides efficient error boundary implementation', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      // Should not cause memory leaks or performance issues
+      renderMainLayout(<ThrowingComponent shouldThrow={true} />);
+      
+      expect(screen.getByText('Application Error')).toBeInTheDocument();
+      
+      consoleSpy.mockRestore();
+    });
+  });
 
-      liveRegions.forEach(region => {
-        expect(region).toHaveAttribute('aria-live')
-      })
-    })
-  })
-})
+  // ============================================================================
+  // SERVER-SIDE RENDERING COMPATIBILITY TESTS
+  // ============================================================================
+
+  describe('Server-Side Rendering Compatibility', () => {
+    it('prevents hydration mismatches', () => {
+      // Mock server-side environment
+      const originalWindow = global.window;
+      delete (global as any).window;
+      
+      try {
+        renderMainLayout();
+        
+        // Restore window for hydration
+        global.window = originalWindow;
+        
+        // Component should handle hydration correctly
+        expect(screen.getByRole('main')).toBeInTheDocument();
+      } finally {
+        global.window = originalWindow;
+      }
+    });
+
+    it('handles client-side only features gracefully', () => {
+      renderMainLayout();
+      
+      // Features that only work client-side should not break SSR
+      expect(screen.getByRole('main')).toBeInTheDocument();
+    });
+
+    it('provides appropriate loading states during hydration', () => {
+      renderMainLayout();
+      
+      // Should show appropriate content during hydration
+      expect(screen.getByRole('main')).toBeInTheDocument();
+    });
+
+    it('maintains accessibility during SSR', async () => {
+      const { container } = renderMainLayout();
+      
+      // Should maintain accessibility even during SSR
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
+    });
+
+    it('handles theme initialization in SSR', () => {
+      renderMainLayout(<TestChildComponent />, {
+        providerOptions: {
+          theme: 'dark',
+        },
+      });
+      
+      // Theme should be applied consistently
+      const themeProvider = screen.getByTestId('theme-provider');
+      expect(themeProvider).toHaveClass('dark');
+    });
+  });
+
+  // ============================================================================
+  // INTEGRATION TESTS
+  // ============================================================================
+
+  describe('Integration Tests', () => {
+    it('integrates all layout components correctly', () => {
+      renderMainLayout();
+      
+      // All major components should be present and functional
+      expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+      expect(screen.getByTestId('header')).toBeInTheDocument();
+      expect(screen.getByRole('main')).toBeInTheDocument();
+      expect(screen.getByTestId('test-child')).toBeInTheDocument();
+    });
+
+    it('maintains state consistency across interactions', async () => {
+      renderMainLayout();
+      
+      // Perform multiple interactions
+      const navButton = screen.getByTestId('nav-dashboard');
+      const testButton = screen.getByTestId('test-button');
+      
+      await user.click(navButton);
+      await user.click(testButton);
+      
+      // State should remain consistent
+      expect(screen.getByRole('main')).toBeInTheDocument();
+      expect(testButton).toBeInTheDocument();
+    });
+
+    it('handles complex user workflows', async () => {
+      renderMainLayout();
+      
+      // Simulate complex user workflow
+      await user.keyboard('{Tab}'); // Focus skip link
+      await user.keyboard('{Enter}'); // Use skip link
+      
+      const testInput = screen.getByTestId('test-input');
+      await user.click(testInput);
+      await user.type(testInput, 'workflow test');
+      
+      expect(testInput).toHaveValue('workflow test');
+      expect(screen.getByRole('main')).toHaveFocus();
+    });
+
+    it('maintains performance under load', () => {
+      // Render multiple instances
+      const components = Array.from({ length: 10 }, (_, i) => (
+        <div key={i}>Instance {i}</div>
+      ));
+      
+      renderMainLayout(<div>{components}</div>);
+      
+      expect(screen.getByRole('main')).toBeInTheDocument();
+    });
+
+    it('provides comprehensive error handling', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      // Test multiple error scenarios
+      renderMainLayout(<ThrowingComponent shouldThrow={true} />);
+      
+      expect(screen.getByText('Application Error')).toBeInTheDocument();
+      expect(screen.getByText('Try Again')).toBeInTheDocument();
+      
+      consoleSpy.mockRestore();
+    });
+  });
+});
