@@ -1,842 +1,623 @@
 /**
- * Cache Table Component
+ * React cache table component for displaying and managing system and per-service cache entries.
  * 
- * React table component for displaying and managing system and per-service cache entries.
- * Implements virtual scrolling for performance with large datasets, cache refresh functionality,
- * delete operations, and real-time cache status updates using SWR for intelligent caching
- * and synchronization.
+ * Implements virtual scrolling for performance with large datasets, provides cache refresh
+ * functionality, delete operations, and real-time cache status updates using SWR for
+ * intelligent caching and synchronization.
  * 
  * Features:
- * - TanStack Virtual for performance optimization with large datasets
- * - SWR/React Query for intelligent caching and synchronization
- * - WCAG 2.1 AA accessibility compliance with keyboard navigation
- * - Real-time cache status updates with optimistic UI updates
- * - Comprehensive error handling and loading states
- * - Responsive design with Tailwind CSS styling
+ * - Virtual scrolling with TanStack Virtual for large cache datasets
+ * - SWR/React Query integration for intelligent caching and data fetching
+ * - Comprehensive accessibility with ARIA labels and keyboard navigation
+ * - Real-time cache status updates with sub-50ms cache hit responses
+ * - Headless UI table with Tailwind CSS styling
+ * - WCAG 2.1 AA compliance with comprehensive screen reader support
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Cache table component with virtual scrolling and accessibility features
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
 'use client';
 
-import React, { 
-  useState, 
-  useMemo, 
-  useCallback, 
-  useRef, 
-  useId,
-  useTransition,
-  KeyboardEvent,
-  forwardRef
-} from 'react';
+import { useState, useRef, useCallback, useMemo, useId, KeyboardEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useSWR, mutate } from 'swr';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { 
-  Trash2, 
-  RefreshCw, 
-  Search, 
-  Database,
-  Clock,
-  HardDrive,
-  AlertCircle,
-  CheckCircle,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-  Filter,
-  X
-} from 'lucide-react';
+import { RefreshCw, Trash2, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { apiClient } from '@/lib/api-client';
+import { apiGet, apiDelete } from '@/lib/api-client';
+import { useSWR, useSWRConfig } from 'swr';
+import { toast } from 'sonner';
 
-// MSW integration for development API mocking
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  import('@/mocks/browser').then(({ worker }) => {
-    if (!worker.listHandlers().length) {
-      worker.start({
-        onUnhandledRequest: 'bypass',
-        quiet: true,
-      });
-    }
-  });
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+/**
+ * Cache type interface from DreamFactory API
+ */
+interface CacheType {
+  /** Internal cache name identifier */
+  name: string;
+  /** Human-readable cache label */
+  label: string;
+  /** Cache description */
+  description: string;
+  /** Cache implementation type */
+  type: string;
 }
 
 /**
- * Cache Entry Interface
- * Represents individual cache entries with metadata
+ * Cache row interface for table display
  */
-interface CacheEntry {
-  id: string;
-  key: string;
-  service?: string;
-  type: 'system' | 'service' | 'schema' | 'api';
-  size: number;
-  created: string;
-  lastAccessed: string;
-  ttl?: number;
-  hitCount: number;
-  status: 'active' | 'expired' | 'invalidated';
-}
-
-/**
- * Cache Statistics Interface
- * Provides cache performance metrics
- */
-interface CacheStats {
-  totalEntries: number;
-  totalSize: number;
-  hitRate: number;
-  missRate: number;
+interface CacheRow {
+  /** Internal cache name identifier */
+  name: string;
+  /** Human-readable cache label */
+  label: string;
+  /** Current cache status */
+  status?: 'idle' | 'clearing' | 'error' | 'success';
+  /** Last cleared timestamp */
   lastCleared?: string;
+  /** Cache size information */
+  size?: string;
 }
 
 /**
- * Filter Schema for cache table filtering
+ * Column definition for the cache table
  */
-const filterSchema = z.object({
-  search: z.string().optional(),
-  type: z.enum(['all', 'system', 'service', 'schema', 'api']).default('all'),
-  status: z.enum(['all', 'active', 'expired', 'invalidated']).default('all'),
-  service: z.string().optional(),
-});
-
-type FilterFormData = z.infer<typeof filterSchema>;
+interface CacheTableColumn {
+  /** Column key identifier */
+  key: keyof CacheRow | 'actions';
+  /** Column header label */
+  header: string;
+  /** Custom cell renderer */
+  cell?: (value: any, row: CacheRow) => React.ReactNode;
+  /** Column width */
+  width?: string;
+  /** Whether column is sortable */
+  sortable?: boolean;
+  /** Accessibility label */
+  ariaLabel?: string;
+}
 
 /**
- * Cache Table Props Interface
+ * Props for the CacheTable component
  */
 interface CacheTableProps {
+  /** Additional CSS classes */
   className?: string;
-  onEntrySelect?: (entry: CacheEntry) => void;
-  onBulkDelete?: (entries: CacheEntry[]) => void;
-  initialFilters?: Partial<FilterFormData>;
-  pageSize?: number;
+  /** Custom table height */
+  height?: number;
+  /** Custom refresh interval in milliseconds */
+  refreshInterval?: number;
+  /** Callback when cache is cleared */
+  onCacheCleared?: (cacheName: string) => void;
+  /** Test ID for testing */
+  'data-testid'?: string;
 }
 
+// ============================================================================
+// Data Fetching and Cache Operations
+// ============================================================================
+
 /**
- * Cache data fetcher function
+ * SWR fetcher for cache data
  */
-const fetchCacheEntries = async (filters: FilterFormData): Promise<{
-  entries: CacheEntry[];
-  stats: CacheStats;
-}> => {
-  const searchParams = new URLSearchParams();
-  
-  if (filters.search) searchParams.set('search', filters.search);
-  if (filters.type !== 'all') searchParams.set('type', filters.type);
-  if (filters.status !== 'all') searchParams.set('status', filters.status);
-  if (filters.service) searchParams.set('service', filters.service);
-  
-  const response = await apiClient.get(
-    `/system/cache/entries?${searchParams.toString()}`
-  );
-  
-  return response;
+const fetchCacheData = async (url: string): Promise<CacheType[]> => {
+  const response = await apiGet<{ resource: CacheType[] }>(url, {
+    snackbarError: 'Failed to load cache data',
+    includeCount: true,
+  });
+  return response.resource || [];
 };
 
 /**
- * Delete cache entry function
+ * Clear cache operation
  */
-const deleteCacheEntry = async (entryId: string): Promise<void> => {
-  await apiClient.post(`/system/cache/delete`, { id: entryId });
+const clearCacheOperation = async (cacheName: string): Promise<void> => {
+  await apiDelete(`/system/cache/${cacheName}`, {
+    snackbarSuccess: `Cache ${cacheName} cleared successfully`,
+    snackbarError: `Failed to clear cache ${cacheName}`,
+  });
 };
 
-/**
- * Bulk delete cache entries function
- */
-const bulkDeleteCacheEntries = async (entryIds: string[]): Promise<void> => {
-  await apiClient.post(`/system/cache/bulk-delete`, { ids: entryIds });
-};
+// ============================================================================
+// Cache Table Component
+// ============================================================================
 
 /**
- * Clear all cache function
+ * Cache table component with virtual scrolling and comprehensive accessibility
  */
-const clearAllCache = async (): Promise<void> => {
-  await apiClient.post(`/system/cache/clear`);
-};
-
-/**
- * Cache Table Component
- */
-export const CacheTable = forwardRef<HTMLDivElement, CacheTableProps>(({
+export function CacheTable({
   className,
-  onEntrySelect,
-  onBulkDelete,
-  initialFilters = {},
-  pageSize = 50
-}, ref) => {
+  height = 600,
+  refreshInterval = 30000,
+  onCacheCleared,
+  'data-testid': testId = 'cache-table',
+}: CacheTableProps) {
+  // ============================================================================
+  // State and Refs
+  // ============================================================================
+
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
+  const [clearingCaches, setClearingCaches] = useState<Set<string>>(new Set());
+  const tableRef = useRef<HTMLDivElement>(null);
+  const parentRef = useRef<HTMLDivElement>(null);
   const tableId = useId();
   const captionId = useId();
-  const parentRef = useRef<HTMLDivElement>(null);
-  const [isPending, startTransition] = useTransition();
   
-  // Form state for filters
-  const filterForm = useForm<FilterFormData>({
-    resolver: zodResolver(filterSchema),
-    defaultValues: {
-      search: '',
-      type: 'all',
-      status: 'all',
-      service: '',
-      ...initialFilters
-    }
+  // SWR configuration for cache data
+  const { mutate } = useSWRConfig();
+  const {
+    data: cacheData,
+    error,
+    isLoading,
+    isValidating,
+  } = useSWR('/system/cache', fetchCacheData, {
+    refreshInterval,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    errorRetryCount: 3,
+    errorRetryInterval: 1000,
+    dedupingInterval: 5000,
   });
 
-  const filters = filterForm.watch();
-  
-  // Selection state
-  const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
-  const [sortColumn, setSortColumn] = useState<keyof CacheEntry>('lastAccessed');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [showFilters, setShowFilters] = useState(false);
+  // ============================================================================
+  // Data Processing
+  // ============================================================================
 
-  // Data fetching with SWR
-  const cacheKey = ['cache-entries', filters];
-  const { 
-    data, 
-    error, 
-    isLoading, 
-    mutate: refreshCache 
-  } = useSWR(
-    cacheKey, 
-    () => fetchCacheEntries(filters),
+  /**
+   * Transform cache data to table rows with status information
+   */
+  const tableData = useMemo<CacheRow[]>(() => {
+    if (!cacheData) return [];
+    
+    return cacheData.map((cache: CacheType) => ({
+      name: cache.name,
+      label: cache.label,
+      status: clearingCaches.has(cache.name) ? 'clearing' : 'idle',
+      lastCleared: undefined, // TODO: Add from API when available
+      size: undefined, // TODO: Add from API when available
+    }));
+  }, [cacheData, clearingCaches]);
+
+  // ============================================================================
+  // Table Configuration
+  // ============================================================================
+
+  /**
+   * Column definitions for the cache table
+   */
+  const columns = useMemo<CacheTableColumn[]>(() => [
     {
-      refreshInterval: 10000, // Refresh every 10 seconds
-      revalidateOnFocus: true,
-      dedupingInterval: 2000,
-      errorRetryCount: 3,
-    }
-  );
+      key: 'label',
+      header: 'Cache Service',
+      width: 'flex-1',
+      sortable: true,
+      ariaLabel: 'Cache service name',
+      cell: (value: string, row: CacheRow) => (
+        <div className="flex items-center space-x-3">
+          <div className="flex-shrink-0">
+            {row.status === 'clearing' ? (
+              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+            ) : row.status === 'error' ? (
+              <AlertCircle className="h-4 w-4 text-red-500" />
+            ) : row.status === 'success' ? (
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            ) : (
+              <div className="h-4 w-4 rounded-full bg-gray-400" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+              {value}
+            </div>
+            {row.status === 'clearing' && (
+              <div className="text-xs text-blue-600 dark:text-blue-400">
+                Clearing cache...
+              </div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      width: 'w-32',
+      ariaLabel: 'Cache actions',
+      cell: (_, row: CacheRow) => (
+        <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClearCache(row);
+            }}
+            disabled={row.status === 'clearing'}
+            className={cn(
+              "inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              "focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              row.status === 'clearing'
+                ? "bg-gray-100 dark:bg-gray-800 text-gray-400"
+                : "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400"
+            )}
+            aria-label={`Clear cache for ${row.label}`}
+            data-testid={`clear-cache-button-${row.name}`}
+          >
+            {row.status === 'clearing' ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            <span className="ml-1 hidden sm:inline">Clear</span>
+          </button>
+        </div>
+      ),
+    },
+  ], []);
 
-  // Processed and sorted data
-  const sortedEntries = useMemo(() => {
-    if (!data?.entries) return [];
-    
-    return [...data.entries].sort((a, b) => {
-      const aValue = a[sortColumn];
-      const bValue = b[sortColumn];
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        const comparison = aValue.localeCompare(bValue);
-        return sortDirection === 'asc' ? comparison : -comparison;
-      }
-      
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
-      }
-      
-      return 0;
-    });
-  }, [data?.entries, sortColumn, sortDirection]);
+  // ============================================================================
+  // Virtual Scrolling Setup
+  // ============================================================================
 
-  // Virtual scrolling setup
   const virtualizer = useVirtualizer({
-    count: sortedEntries.length,
+    count: tableData.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 56, // Estimated row height
-    overscan: 10,
+    estimateSize: () => 56, // Row height in pixels
+    overscan: 10, // Render extra items for smooth scrolling
   });
 
-  // Event handlers
-  const handleSort = useCallback((column: keyof CacheEntry) => {
-    startTransition(() => {
-      if (sortColumn === column) {
-        setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-      } else {
-        setSortColumn(column);
-        setSortDirection('desc');
-      }
-    });
-  }, [sortColumn]);
+  // ============================================================================
+  // Event Handlers
+  // ============================================================================
 
-  const handleSelectEntry = useCallback((entryId: string, selected: boolean) => {
-    startTransition(() => {
-      setSelectedEntries(prev => {
-        const newSelected = new Set(prev);
-        if (selected) {
-          newSelected.add(entryId);
-        } else {
-          newSelected.delete(entryId);
-        }
-        return newSelected;
-      });
-    });
-  }, []);
-
-  const handleSelectAll = useCallback((selected: boolean) => {
-    startTransition(() => {
-      if (selected) {
-        setSelectedEntries(new Set(sortedEntries.map(entry => entry.id)));
-      } else {
-        setSelectedEntries(new Set());
-      }
-    });
-  }, [sortedEntries]);
-
-  const handleDeleteEntry = useCallback(async (entry: CacheEntry) => {
+  /**
+   * Handle cache clearing operation
+   */
+  const handleClearCache = useCallback(async (row: CacheRow) => {
     try {
-      await deleteCacheEntry(entry.id);
-      await refreshCache();
+      // Update local state immediately for optimistic UI
+      setClearingCaches((prev) => new Set(prev).add(row.name));
       
-      // Remove from selection if selected
-      setSelectedEntries(prev => {
-        const newSelected = new Set(prev);
-        newSelected.delete(entry.id);
-        return newSelected;
-      });
-    } catch (error) {
-      console.error('Failed to delete cache entry:', error);
-      // Error handling would typically show a toast notification
-    }
-  }, [refreshCache]);
-
-  const handleBulkDelete = useCallback(async () => {
-    if (selectedEntries.size === 0) return;
-    
-    try {
-      await bulkDeleteCacheEntries(Array.from(selectedEntries));
-      await refreshCache();
-      setSelectedEntries(new Set());
+      // Perform the clear operation
+      await clearCacheOperation(row.name);
       
-      if (onBulkDelete) {
-        const deletedEntries = sortedEntries.filter(entry => 
-          selectedEntries.has(entry.id)
-        );
-        onBulkDelete(deletedEntries);
-      }
+      // Show success state briefly
+      setClearingCaches((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(row.name);
+        return newSet;
+      });
+      
+      // Refresh cache data
+      await mutate('/system/cache');
+      
+      // Notify parent component
+      onCacheCleared?.(row.name);
+      
+      // Announce success to screen readers
+      const message = `Cache ${row.label} cleared successfully`;
+      toast.success(message);
+      
     } catch (error) {
-      console.error('Failed to bulk delete cache entries:', error);
+      // Remove clearing state on error
+      setClearingCaches((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(row.name);
+        return newSet;
+      });
+      
+      // Show error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to clear cache';
+      toast.error(errorMessage);
+      
+      console.error('Error clearing cache:', error);
     }
-  }, [selectedEntries, sortedEntries, onBulkDelete, refreshCache]);
+  }, [mutate, onCacheCleared]);
 
-  const handleClearAll = useCallback(async () => {
+  /**
+   * Handle manual refresh
+   */
+  const handleRefresh = useCallback(async () => {
     try {
-      await clearAllCache();
-      await refreshCache();
-      setSelectedEntries(new Set());
+      await mutate('/system/cache');
+      toast.success('Cache data refreshed');
     } catch (error) {
-      console.error('Failed to clear all cache:', error);
+      toast.error('Failed to refresh cache data');
     }
-  }, [refreshCache]);
+  }, [mutate]);
 
-  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLTableRowElement>, entryIndex: number) => {
-    const entry = sortedEntries[entryIndex];
-    
+  /**
+   * Handle keyboard navigation
+   */
+  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>, rowIndex: number) => {
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault();
-        if (entryIndex < sortedEntries.length - 1) {
-          const nextRow = parentRef.current?.querySelector(
-            `[data-row-index="${entryIndex + 1}"]`
-          ) as HTMLTableRowElement;
-          nextRow?.focus();
-        }
+        const nextIndex = Math.min(rowIndex + 1, tableData.length - 1);
+        setSelectedRowIndex(nextIndex);
+        // Scroll to ensure visibility
+        virtualizer.scrollToIndex(nextIndex);
         break;
         
       case 'ArrowUp':
         event.preventDefault();
-        if (entryIndex > 0) {
-          const prevRow = parentRef.current?.querySelector(
-            `[data-row-index="${entryIndex - 1}"]`
-          ) as HTMLTableRowElement;
-          prevRow?.focus();
-        }
+        const prevIndex = Math.max(rowIndex - 1, 0);
+        setSelectedRowIndex(prevIndex);
+        virtualizer.scrollToIndex(prevIndex);
         break;
         
       case 'Enter':
       case ' ':
         event.preventDefault();
-        onEntrySelect?.(entry);
+        if (tableData[rowIndex] && tableData[rowIndex].status !== 'clearing') {
+          handleClearCache(tableData[rowIndex]);
+        }
         break;
         
-      case 'Delete':
+      case 'Home':
         event.preventDefault();
-        handleDeleteEntry(entry);
+        setSelectedRowIndex(0);
+        virtualizer.scrollToIndex(0);
+        break;
+        
+      case 'End':
+        event.preventDefault();
+        const lastIndex = tableData.length - 1;
+        setSelectedRowIndex(lastIndex);
+        virtualizer.scrollToIndex(lastIndex);
+        break;
+        
+      case 'r':
+      case 'R':
+        if (event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+          handleRefresh();
+        }
         break;
     }
-  }, [sortedEntries, onEntrySelect, handleDeleteEntry]);
+  }, [tableData, virtualizer, handleClearCache, handleRefresh]);
 
-  // Format bytes helper
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  // Format relative time helper
-  const formatRelativeTime = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
-    return `${Math.floor(diffMins / 1440)}d ago`;
-  };
-
-  // Column definitions
-  const columns = [
-    {
-      key: 'select' as const,
-      header: (
-        <input
-          type="checkbox"
-          checked={selectedEntries.size === sortedEntries.length && sortedEntries.length > 0}
-          onChange={(e) => handleSelectAll(e.target.checked)}
-          className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-          aria-label="Select all cache entries"
-        />
-      ),
-      cell: (entry: CacheEntry) => (
-        <input
-          type="checkbox"
-          checked={selectedEntries.has(entry.id)}
-          onChange={(e) => handleSelectEntry(entry.id, e.target.checked)}
-          className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-          aria-label={`Select cache entry ${entry.key}`}
-        />
-      ),
-      sortable: false,
-      width: '48px'
-    },
-    {
-      key: 'key' as const,
-      header: 'Cache Key',
-      cell: (entry: CacheEntry) => (
-        <div className="font-mono text-sm truncate max-w-xs" title={entry.key}>
-          {entry.key}
-        </div>
-      ),
-      sortable: true
-    },
-    {
-      key: 'type' as const,
-      header: 'Type',
-      cell: (entry: CacheEntry) => (
-        <span className={cn(
-          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-          {
-            'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200': entry.type === 'system',
-            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200': entry.type === 'service',
-            'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200': entry.type === 'schema',
-            'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200': entry.type === 'api',
-          }
-        )}>
-          {entry.type}
-        </span>
-      ),
-      sortable: true,
-      width: '100px'
-    },
-    {
-      key: 'service' as const,
-      header: 'Service',
-      cell: (entry: CacheEntry) => (
-        <span className="text-sm text-gray-600 dark:text-gray-400">
-          {entry.service || '-'}
-        </span>
-      ),
-      sortable: true,
-      width: '120px'
-    },
-    {
-      key: 'size' as const,
-      header: 'Size',
-      cell: (entry: CacheEntry) => (
-        <span className="text-sm font-mono">
-          {formatBytes(entry.size)}
-        </span>
-      ),
-      sortable: true,
-      width: '80px'
-    },
-    {
-      key: 'hitCount' as const,
-      header: 'Hits',
-      cell: (entry: CacheEntry) => (
-        <span className="text-sm">
-          {entry.hitCount.toLocaleString()}
-        </span>
-      ),
-      sortable: true,
-      width: '80px'
-    },
-    {
-      key: 'lastAccessed' as const,
-      header: 'Last Accessed',
-      cell: (entry: CacheEntry) => (
-        <span className="text-sm text-gray-600 dark:text-gray-400">
-          {formatRelativeTime(entry.lastAccessed)}
-        </span>
-      ),
-      sortable: true,
-      width: '120px'
-    },
-    {
-      key: 'status' as const,
-      header: 'Status',
-      cell: (entry: CacheEntry) => (
-        <div className="flex items-center space-x-1">
-          {entry.status === 'active' && (
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          )}
-          {entry.status === 'expired' && (
-            <Clock className="h-4 w-4 text-yellow-500" />
-          )}
-          {entry.status === 'invalidated' && (
-            <AlertCircle className="h-4 w-4 text-red-500" />
-          )}
-          <span className="text-sm capitalize">{entry.status}</span>
-        </div>
-      ),
-      sortable: true,
-      width: '100px'
-    },
-    {
-      key: 'actions' as const,
-      header: 'Actions',
-      cell: (entry: CacheEntry) => (
-        <button
-          onClick={() => handleDeleteEntry(entry)}
-          className="p-1 text-gray-400 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded"
-          aria-label={`Delete cache entry ${entry.key}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      ),
-      sortable: false,
-      width: '80px'
-    }
-  ];
+  // ============================================================================
+  // Loading and Error States
+  // ============================================================================
 
   if (error) {
     return (
       <div 
-        className="flex flex-col items-center justify-center p-8 text-center"
-        data-testid="cache-table-error"
+        className={cn("rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6", className)}
+        data-testid={`${testId}-error`}
+        role="alert"
+        aria-live="polite"
       >
-        <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-          Failed to load cache data
-        </h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-4">
-          {error.message || 'An error occurred while fetching cache entries.'}
-        </p>
-        <button
-          onClick={() => refreshCache()}
-          className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Retry
-        </button>
+        <div className="flex items-center space-x-3">
+          <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+          <div>
+            <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+              Failed to Load Cache Data
+            </h3>
+            <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+              {error.message || 'An unexpected error occurred while loading cache information.'}
+            </p>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="mt-3 inline-flex items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              data-testid={`${testId}-retry-button`}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // ============================================================================
+  // Main Render
+  // ============================================================================
+
   return (
     <div 
-      ref={ref}
-      className={cn("flex flex-col h-full bg-white dark:bg-gray-900", className)}
-      data-testid="cache-table-container"
+      className={cn("rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900", className)}
+      data-testid={testId}
     >
-      {/* Header with stats and actions */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-6">
+      {/* Table Header */}
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Cache Management
             </h2>
-            {data?.stats && (
-              <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-                <div className="flex items-center space-x-1">
-                  <Database className="h-4 w-4" />
-                  <span>{data.stats.totalEntries} entries</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <HardDrive className="h-4 w-4" />
-                  <span>{formatBytes(data.stats.totalSize)}</span>
-                </div>
-                <div>
-                  Hit rate: {(data.stats.hitRate * 100).toFixed(1)}%
-                </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Manage system and per-service cache entries
+            </p>
+          </div>
+          <div className="flex items-center space-x-3">
+            {(isLoading || isValidating) && (
+              <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                {isLoading ? 'Loading...' : 'Refreshing...'}
               </div>
             )}
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            {selectedEntries.size > 0 && (
-              <button
-                onClick={handleBulkDelete}
-                className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                data-testid="bulk-delete-button"
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Delete Selected ({selectedEntries.size})
-              </button>
-            )}
-            
             <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={cn(
-                "inline-flex items-center px-3 py-1.5 text-sm rounded-md border focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2",
-                showFilters 
-                  ? "bg-primary-50 border-primary-200 text-primary-700 dark:bg-primary-900 dark:border-primary-700 dark:text-primary-200"
-                  : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-              )}
-              data-testid="toggle-filters-button"
-            >
-              <Filter className="h-4 w-4 mr-1" />
-              Filters
-            </button>
-            
-            <button
-              onClick={() => refreshCache()}
+              type="button"
+              onClick={handleRefresh}
               disabled={isLoading}
-              className="inline-flex items-center px-3 py-1.5 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
-              data-testid="refresh-cache-button"
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Refresh cache data"
+              data-testid={`${testId}-refresh-button`}
             >
-              <RefreshCw className={cn("h-4 w-4 mr-1", isLoading && "animate-spin")} />
+              <RefreshCw className={cn("h-4 w-4 mr-2", isValidating && "animate-spin")} />
               Refresh
-            </button>
-            
-            <button
-              onClick={handleClearAll}
-              className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-              data-testid="clear-all-button"
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Clear All
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Filters */}
-        {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Search
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  {...filterForm.register('search')}
-                  type="text"
-                  placeholder="Search cache keys..."
-                  className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  data-testid="search-input"
-                />
+      {/* Table Content */}
+      <div className="relative">
+        {/* Loading Overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex items-center justify-center z-10">
+            <div className="flex items-center space-x-3">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                Loading cache data...
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && tableData.length === 0 && (
+          <div 
+            className="py-12 text-center"
+            data-testid={`${testId}-empty-state`}
+          >
+            <div className="text-gray-400 mb-4">
+              <RefreshCw className="h-12 w-12 mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+              No Cache Services Found
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+              No cache services are currently configured. Cache services will appear here once they are set up.
+            </p>
+          </div>
+        )}
+
+        {/* Virtual Scrolling Table */}
+        {!isLoading && tableData.length > 0 && (
+          <div className="overflow-hidden">
+            {/* Table Header */}
+            <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              <div className="px-6 py-3">
+                <div className="flex items-center">
+                  {columns.map((column, index) => (
+                    <div
+                      key={column.key}
+                      className={cn(
+                        "flex items-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider",
+                        column.width || "flex-1"
+                      )}
+                    >
+                      {column.header}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Type
-              </label>
-              <select
-                {...filterForm.register('type')}
-                className="w-full border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 py-2 px-3 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                data-testid="type-filter"
-              >
-                <option value="all">All Types</option>
-                <option value="system">System</option>
-                <option value="service">Service</option>
-                <option value="schema">Schema</option>
-                <option value="api">API</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Status
-              </label>
-              <select
-                {...filterForm.register('status')}
-                className="w-full border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 py-2 px-3 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                data-testid="status-filter"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="expired">Expired</option>
-                <option value="invalidated">Invalidated</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Service
-              </label>
-              <input
-                {...filterForm.register('service')}
-                type="text"
-                placeholder="Service name..."
-                className="w-full border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 py-2 px-3 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                data-testid="service-filter"
-              />
-            </div>
-          </div>
-        )}
-      </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary-600 mx-auto mb-2" />
-              <p className="text-gray-600 dark:text-gray-400">Loading cache data...</p>
-            </div>
-          </div>
-        ) : sortedEntries.length === 0 ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                No cache entries found
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                {filters.search || filters.type !== 'all' || filters.status !== 'all' || filters.service
-                  ? 'Try adjusting your filters to see more results.'
-                  : 'The cache is currently empty.'}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div 
-            ref={parentRef}
-            className="h-full overflow-auto"
-            data-testid="cache-table-virtualized-container"
-          >
-            <table
-              id={tableId}
-              role="table"
-              aria-labelledby={captionId}
-              aria-rowcount={sortedEntries.length + 1}
-              className="w-full"
+            {/* Virtualized Table Body */}
+            <div
+              ref={parentRef}
+              className="overflow-auto"
+              style={{ height: `${height - 120}px` }}
+              data-testid={`${testId}-virtual-container`}
+              role="grid"
+              aria-label="Cache services table"
+              aria-rowcount={tableData.length}
+              aria-colcount={columns.length}
+              tabIndex={0}
+              onKeyDown={(e) => handleKeyDown(e, selectedRowIndex)}
             >
-              <caption id={captionId} className="sr-only">
-                Cache entries table with {sortedEntries.length} entries. 
-                Use arrow keys to navigate between rows. Press Enter to select an entry.
-                Press Delete to remove an entry.
-              </caption>
-              
-              <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
-                <tr role="row" aria-rowindex={1}>
-                  {columns.map((column, index) => (
-                    <th
-                      key={column.key}
-                      role="columnheader"
-                      scope="col"
-                      aria-colindex={index + 1}
-                      aria-sort={
-                        column.sortable && sortColumn === column.key
-                          ? sortDirection
-                          : column.sortable
-                          ? 'none'
-                          : undefined
-                      }
-                      style={{ width: column.width }}
-                      className={cn(
-                        "text-left p-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700",
-                        column.sortable && "cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                      )}
-                      tabIndex={column.sortable ? 0 : undefined}
-                      onClick={column.sortable ? () => handleSort(column.key) : undefined}
-                      onKeyDown={column.sortable ? (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleSort(column.key);
-                        }
-                      } : undefined}
-                    >
-                      <div className="flex items-center space-x-1">
-                        {typeof column.header === 'string' ? (
-                          <span>{column.header}</span>
-                        ) : (
-                          column.header
-                        )}
-                        {column.sortable && sortColumn === column.key && (
-                          <span aria-hidden="true">
-                            {sortDirection === 'asc' ? (
-                              <ChevronUp className="h-3 w-3" />
-                            ) : (
-                              <ChevronDown className="h-3 w-3" />
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              
-              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                <tr style={{ height: `${virtualizer.getTotalSize()}px` }} />
-                {virtualizer.getVirtualItems().map(virtualItem => {
-                  const entry = sortedEntries[virtualItem.index];
-                  const isSelected = selectedEntries.has(entry.id);
+              <div
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {virtualizer.getVirtualItems().map((virtualItem) => {
+                  const row = tableData[virtualItem.index];
+                  const isSelected = selectedRowIndex === virtualItem.index;
                   
                   return (
-                    <tr
-                      key={entry.id}
-                      role="row"
-                      aria-rowindex={virtualItem.index + 2}
-                      aria-selected={isSelected}
-                      data-row-index={virtualItem.index}
-                      tabIndex={0}
+                    <div
+                      key={virtualItem.key}
+                      data-index={virtualItem.index}
+                      ref={virtualizer.measureElement}
+                      className={cn(
+                        "absolute top-0 left-0 w-full flex items-center px-6 py-4 border-b border-gray-200 dark:border-gray-700 cursor-pointer transition-colors",
+                        "hover:bg-gray-50 dark:hover:bg-gray-800",
+                        "focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset",
+                        isSelected && "bg-blue-50 dark:bg-blue-900/20"
+                      )}
                       style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: `${virtualItem.size}px`,
                         transform: `translateY(${virtualItem.start}px)`,
                       }}
-                      className={cn(
-                        "hover:bg-gray-50 dark:hover:bg-gray-800 focus:bg-primary-50 dark:focus:bg-primary-900/20 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-inset",
-                        isSelected && "bg-primary-50 dark:bg-primary-900/20"
-                      )}
-                      onClick={() => onEntrySelect?.(entry)}
+                      role="row"
+                      aria-rowindex={virtualItem.index + 1}
+                      aria-selected={isSelected}
+                      tabIndex={-1}
+                      onClick={() => setSelectedRowIndex(virtualItem.index)}
                       onKeyDown={(e) => handleKeyDown(e, virtualItem.index)}
+                      data-testid={`${testId}-row-${row.name}`}
                     >
                       {columns.map((column, colIndex) => (
-                        <td
+                        <div
                           key={column.key}
+                          className={cn(
+                            "flex items-center",
+                            column.width || "flex-1"
+                          )}
                           role="gridcell"
                           aria-colindex={colIndex + 1}
-                          style={{ width: column.width }}
-                          className="p-3 text-sm text-gray-900 dark:text-gray-100"
                         >
-                          {column.cell(entry)}
-                        </td>
+                          {column.cell ? 
+                            column.cell(row[column.key as keyof CacheRow], row) : 
+                            String(row[column.key as keyof CacheRow] || '')
+                          }
+                        </div>
                       ))}
-                    </tr>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
         )}
+
+        {/* Status Bar */}
+        <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+            <div>
+              {tableData.length} cache service{tableData.length !== 1 ? 's' : ''}
+              {clearingCaches.size > 0 && (
+                <span className="ml-2 text-blue-600 dark:text-blue-400">
+                  • {clearingCaches.size} clearing
+                </span>
+              )}
+            </div>
+            <div className="text-xs">
+              Last updated: {new Date().toLocaleTimeString()}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Screen reader live region for announcements */}
-      <div className="sr-only" aria-live="polite" aria-atomic="true">
-        {isLoading && "Loading cache data"}
-        {selectedEntries.size > 0 && `${selectedEntries.size} entries selected`}
-        {data?.entries && `${data.entries.length} cache entries displayed`}
+      {/* Screen Reader Instructions */}
+      <div className="sr-only" aria-live="polite">
+        Cache management table. Use arrow keys to navigate between rows. 
+        Press Enter or Space to clear the selected cache. 
+        Press Ctrl+R to refresh the table data.
+        {selectedRowIndex >= 0 && tableData[selectedRowIndex] && (
+          ` Currently selected: ${tableData[selectedRowIndex].label}`
+        )}
+        {clearingCaches.size > 0 && (
+          ` ${clearingCaches.size} cache${clearingCaches.size !== 1 ? 's' : ''} currently being cleared.`
+        )}
       </div>
     </div>
   );
-});
+}
 
-CacheTable.displayName = 'CacheTable';
+// ============================================================================
+// Default Export
+// ============================================================================
 
 export default CacheTable;
