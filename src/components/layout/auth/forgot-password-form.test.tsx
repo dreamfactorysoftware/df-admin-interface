@@ -1,838 +1,1353 @@
 /**
- * @fileoverview Vitest test suite for forgot password form component
- * 
- * This test suite validates the two-step password reset workflow, security question handling,
- * and system configuration integration. Tests cover both email and username-based systems
- * with comprehensive API interaction testing using Mock Service Worker.
- * 
- * Test Coverage:
- * - Dynamic form field switching based on login attribute configuration
- * - Two-step workflow: initial request and security question forms
- * - API integration with mocked password reset endpoints
- * - Form validation for email/username format and required fields
- * - Error handling for API failures and invalid input scenarios
- * - User interaction flows including form submission and navigation
- * - Accessibility compliance with WCAG 2.1 AA standards
+ * @vitest-environment jsdom
  */
 
-import { describe, it, expect, beforeEach, vi, beforeAll, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { userEvent } from '@testing-library/user-event'
-import { axe, toHaveNoViolations } from 'jest-axe'
-import { http, HttpResponse } from 'msw'
-import { server } from '../../../test/mocks/server'
-import { renderWithProviders } from '../../../test/utils/test-utils'
-import { createMockSystemConfig, createMockPasswordResetResponse, createMockSecurityQuestionResponse } from '../../../test/utils/component-factories'
-import { mockAuthErrorResponse } from '../../../test/mocks/error-responses'
-import ForgotPasswordForm from './forgot-password-form'
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { QueryClient } from '@tanstack/react-query';
+import { server } from '@/test/mocks/server';
+import { authHandlers, authTestUtils } from '@/test/mocks/auth-handlers';
+import { errorScenarios } from '@/test/mocks/error-responses';
+import { renderWithProviders, accessibilityUtils, testUtils } from '@/test/utils/test-utils';
+import { ForgotPasswordForm } from './forgot-password-form';
+import { http, HttpResponse } from 'msw';
 
-// Extend Jest DOM matchers for accessibility testing
-expect.extend(toHaveNoViolations)
+/**
+ * Comprehensive Vitest test suite for ForgotPasswordForm component
+ * 
+ * Tests the two-step password reset workflow including:
+ * - Dynamic form field switching based on system configuration
+ * - Initial password reset request form
+ * - Security question form when required by backend
+ * - API integration with password reset endpoints
+ * - Form validation for email/username formats
+ * - Error handling for API failures and invalid inputs
+ * - User interaction flows and navigation
+ * - WCAG 2.1 AA accessibility compliance
+ * 
+ * Migrated from Angular Karma/Jasmine to Vitest with React Testing Library
+ * Uses MSW for realistic API mocking and comprehensive error scenario testing
+ */
+
+// ============================================================================
+// TEST SETUP AND CONFIGURATION
+// ============================================================================
 
 /**
  * Mock Next.js router for navigation testing
  */
-const mockPush = vi.fn()
-const mockBack = vi.fn()
+const mockPush = vi.fn();
+const mockRouter = {
+  push: mockPush,
+  replace: vi.fn(),
+  prefetch: vi.fn(),
+  back: vi.fn(),
+  forward: vi.fn(),
+  refresh: vi.fn(),
+};
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    back: mockBack,
-    replace: vi.fn(),
-    refresh: vi.fn(),
-  }),
-  useSearchParams: () => new URLSearchParams(),
-  usePathname: () => '/auth/forgot-password',
-}))
+  useRouter: () => mockRouter,
+}));
 
 /**
- * Mock system configuration hook for testing dynamic form behavior
+ * Mock system configuration hook for dynamic form testing
  */
-const mockSystemConfig = vi.fn()
-vi.mock('../../../hooks/use-system-config', () => ({
-  useSystemConfig: () => mockSystemConfig(),
-}))
+const mockSystemConfig = {
+  authentication: {
+    loginAttribute: 'email', // Default to email-based login
+  },
+};
+
+const mockUseSystemConfig = vi.fn(() => ({
+  data: mockSystemConfig,
+  isLoading: false,
+  error: null,
+}));
+
+vi.mock('@/hooks/use-system-config', () => ({
+  useSystemConfig: mockUseSystemConfig,
+}));
 
 /**
- * Mock authentication hook for password reset operations
+ * Mock authentication hook for login testing
  */
-const mockForgotPassword = vi.fn()
-const mockSubmitSecurityQuestions = vi.fn()
-vi.mock('../../../hooks/use-auth', () => ({
-  useAuth: () => ({
-    forgotPassword: mockForgotPassword,
-    submitSecurityQuestions: mockSubmitSecurityQuestions,
+const mockLogin = vi.fn();
+const mockUseAuth = vi.fn(() => ({
+  login: mockLogin,
+  logout: vi.fn(),
+  user: null,
+  isAuthenticated: false,
+  loading: false,
+}));
+
+vi.mock('@/hooks/use-auth', () => ({
+  useAuth: mockUseAuth,
+}));
+
+/**
+ * Mock environment variables for API key
+ */
+const originalEnv = process.env;
+beforeAll(() => {
+  process.env.NEXT_PUBLIC_API_KEY = 'test-api-key';
+});
+
+afterAll(() => {
+  process.env = originalEnv;
+});
+
+// ============================================================================
+// TEST UTILITIES AND HELPERS
+// ============================================================================
+
+/**
+ * Creates a fresh query client for each test to ensure test isolation
+ */
+const createTestQueryClient = () => new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      gcTime: 0,
+    },
+    mutations: {
+      retry: false,
+    },
+  },
+});
+
+/**
+ * Custom render function with all necessary providers
+ */
+const renderForgotPasswordForm = (
+  systemConfig = mockSystemConfig,
+  queryClient = createTestQueryClient()
+) => {
+  // Update mock to return the provided config
+  mockUseSystemConfig.mockReturnValue({
+    data: systemConfig,
     isLoading: false,
     error: null,
-  }),
-}))
+  });
 
-describe('ForgotPasswordForm', () => {
-  let user: ReturnType<typeof userEvent.setup>
+  return renderWithProviders(<ForgotPasswordForm />, {
+    providerOptions: {
+      queryClient,
+      router: mockRouter,
+      pathname: '/forgot-password',
+    },
+  });
+};
 
-  beforeAll(() => {
-    // Configure MSW server for API mocking
-    server.listen({ onUnhandledRequest: 'error' })
-  })
+/**
+ * Test data factory for form inputs
+ */
+const testData = {
+  validEmails: [
+    'test@example.com',
+    'user.name@domain.co.uk',
+    'admin+test@company.org',
+  ],
+  invalidEmails: [
+    'invalid-email',
+    '@domain.com',
+    'user@',
+    'user@.com',
+    '',
+  ],
+  validUsernames: [
+    'testuser',
+    'admin123',
+    'user.name',
+    'test_user',
+  ],
+  invalidUsernames: [
+    '',
+    '   ',
+  ],
+  validPasswords: [
+    'SecurePassword123!@#',
+    'AnotherValidPassword2024',
+    'ComplexP@ssw0rd!',
+  ],
+  securityQuestions: [
+    'What is your mother\'s maiden name?',
+    'What was the name of your first pet?',
+    'In which city were you born?',
+  ],
+  securityAnswers: [
+    'Smith',
+    'Fluffy',
+    'New York',
+  ],
+};
 
-  beforeEach(() => {
-    // Set up user event instance for realistic user interactions
-    user = userEvent.setup()
+// ============================================================================
+// MSW SERVER SETUP FOR API TESTING
+// ============================================================================
+
+beforeAll(() => {
+  // Start MSW server with auth handlers
+  server.listen({ onUnhandledRequest: 'error' });
+});
+
+afterEach(() => {
+  // Reset handlers and clear mocks after each test
+  server.resetHandlers();
+  vi.clearAllMocks();
+  mockPush.mockClear();
+  mockLogin.mockClear();
+});
+
+afterAll(() => {
+  // Clean up MSW server
+  server.close();
+});
+
+// ============================================================================
+// COMPONENT RENDERING TESTS
+// ============================================================================
+
+describe('ForgotPasswordForm - Component Rendering', () => {
+  it('renders the forgot password form with correct initial state', () => {
+    renderForgotPasswordForm();
+
+    // Check main heading
+    expect(screen.getByRole('heading', { name: /reset password/i })).toBeInTheDocument();
     
-    // Reset all mocks before each test
-    vi.clearAllMocks()
-    mockPush.mockClear()
-    mockBack.mockClear()
+    // Check description text
+    expect(screen.getByText(/enter your email to receive reset instructions/i)).toBeInTheDocument();
     
-    // Default system configuration for email-based authentication
-    mockSystemConfig.mockReturnValue({
-      data: createMockSystemConfig({ loginAttribute: 'email' }),
+    // Check form elements are present
+    expect(screen.getByRole('form')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /request password reset/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /back to login/i })).toBeInTheDocument();
+  });
+
+  it('renders email input field when system uses email authentication', () => {
+    const emailConfig = {
+      authentication: { loginAttribute: 'email' },
+    };
+    renderForgotPasswordForm(emailConfig);
+
+    // Should have email input
+    const emailInput = screen.getByLabelText(/email address/i);
+    expect(emailInput).toBeInTheDocument();
+    expect(emailInput).toHaveAttribute('type', 'email');
+    expect(emailInput).toHaveAttribute('placeholder', 'Enter your email address');
+    expect(emailInput).toHaveAttribute('autoComplete', 'email');
+
+    // Should not have username input
+    expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument();
+  });
+
+  it('renders username input field when system uses username authentication', () => {
+    const usernameConfig = {
+      authentication: { loginAttribute: 'username' },
+    };
+    renderForgotPasswordForm(usernameConfig);
+
+    // Should have username input
+    const usernameInput = screen.getByLabelText(/username/i);
+    expect(usernameInput).toBeInTheDocument();
+    expect(usernameInput).toHaveAttribute('type', 'text');
+    expect(usernameInput).toHaveAttribute('placeholder', 'Enter your username');
+    expect(usernameInput).toHaveAttribute('autoComplete', 'username');
+
+    // Should not have email input
+    expect(screen.queryByLabelText(/email address/i)).not.toBeInTheDocument();
+
+    // Description should mention username
+    expect(screen.getByText(/enter your username to receive reset instructions/i)).toBeInTheDocument();
+  });
+
+  it('does not render security question form initially', () => {
+    renderForgotPasswordForm();
+
+    // Security question form should not be visible initially
+    expect(screen.queryByLabelText(/security question/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/security answer/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/new password/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/confirm password/i)).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// DYNAMIC FORM FIELD TESTING
+// ============================================================================
+
+describe('ForgotPasswordForm - Dynamic Form Fields', () => {
+  it('switches form field based on system configuration changes', () => {
+    const { rerender } = renderForgotPasswordForm({
+      authentication: { loginAttribute: 'email' },
+    });
+
+    // Initially should show email field
+    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument();
+
+    // Update system config to use username
+    mockUseSystemConfig.mockReturnValue({
+      data: { authentication: { loginAttribute: 'username' } },
       isLoading: false,
       error: null,
-    })
-  })
+    });
 
-  afterEach(() => {
-    // Reset MSW request handlers after each test
-    server.resetHandlers()
-  })
+    rerender(<ForgotPasswordForm />);
 
-  describe('Component Rendering and Accessibility', () => {
-    it('should render forgot password form with proper accessibility structure', async () => {
-      const { container } = renderWithProviders(<ForgotPasswordForm />)
+    // Should now show username field
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/email address/i)).not.toBeInTheDocument();
+  });
 
-      // Verify main form elements are present
-      expect(screen.getByRole('form', { name: /forgot password/i })).toBeInTheDocument()
-      expect(screen.getByText(/forgot your password/i)).toBeInTheDocument()
-      expect(screen.getByText(/enter your email address/i)).toBeInTheDocument()
-      
-      // Verify form controls have proper accessibility attributes
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      expect(emailInput).toHaveAttribute('type', 'email')
-      expect(emailInput).toHaveAttribute('required')
-      expect(emailInput).toHaveAttribute('aria-describedby')
-      
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
-      expect(submitButton).toBeInTheDocument()
-      expect(submitButton).toHaveAttribute('type', 'submit')
+  it('defaults to email field when system config is not available', () => {
+    mockUseSystemConfig.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: null,
+    });
 
-      // Verify back to login link
-      const backLink = screen.getByRole('link', { name: /back to login/i })
-      expect(backLink).toBeInTheDocument()
+    renderForgotPasswordForm();
 
-      // Run accessibility audit
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
+    // Should default to email field
+    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument();
+  });
 
-    it('should have proper form labels and ARIA attributes', () => {
-      renderWithProviders(<ForgotPasswordForm />)
+  it('handles system config loading state gracefully', () => {
+    mockUseSystemConfig.mockReturnValue({
+      data: null,
+      isLoading: true,
+      error: null,
+    });
 
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      const label = screen.getByText(/email address/i)
-      
-      // Verify label association
-      expect(emailInput).toHaveAttribute('id')
-      expect(label).toHaveAttribute('for', emailInput.getAttribute('id'))
-      
-      // Verify ARIA attributes for error messaging
-      expect(emailInput).toHaveAttribute('aria-describedby')
-      expect(emailInput).toHaveAttribute('aria-invalid', 'false')
-    })
+    renderForgotPasswordForm();
 
-    it('should display loading state correctly', () => {
-      // Mock loading state
-      mockForgotPassword.mockReturnValue({
-        mutate: vi.fn(),
-        isPending: true,
-        error: null,
-      })
+    // Should still render the form with default email field
+    expect(screen.getByRole('form')).toBeInTheDocument();
+    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
+  });
+});
 
-      renderWithProviders(<ForgotPasswordForm />)
+// ============================================================================
+// FORM VALIDATION TESTING
+// ============================================================================
 
-      const submitButton = screen.getByRole('button', { name: /sending/i })
-      expect(submitButton).toBeDisabled()
-      expect(submitButton).toHaveAttribute('aria-busy', 'true')
-    })
-  })
+describe('ForgotPasswordForm - Form Validation', () => {
+  describe('Email Validation', () => {
+    beforeEach(() => {
+      renderForgotPasswordForm({
+        authentication: { loginAttribute: 'email' },
+      });
+    });
 
-  describe('Dynamic Form Field Configuration', () => {
-    it('should display email input when system is configured for email authentication', () => {
-      mockSystemConfig.mockReturnValue({
-        data: createMockSystemConfig({ loginAttribute: 'email' }),
-        isLoading: false,
-        error: null,
-      })
+    it('requires email field to be filled', async () => {
+      const user = userEvent.setup();
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
 
-      renderWithProviders(<ForgotPasswordForm />)
+      // Try to submit without entering email
+      await user.click(submitButton);
 
-      expect(screen.getByRole('textbox', { name: /email address/i })).toBeInTheDocument()
-      expect(screen.getByText(/enter your email address/i)).toBeInTheDocument()
-      expect(screen.queryByRole('textbox', { name: /username/i })).not.toBeInTheDocument()
-    })
-
-    it('should display username input when system is configured for username authentication', () => {
-      mockSystemConfig.mockReturnValue({
-        data: createMockSystemConfig({ loginAttribute: 'username' }),
-        isLoading: false,
-        error: null,
-      })
-
-      renderWithProviders(<ForgotPasswordForm />)
-
-      expect(screen.getByRole('textbox', { name: /username/i })).toBeInTheDocument()
-      expect(screen.getByText(/enter your username/i)).toBeInTheDocument()
-      expect(screen.queryByRole('textbox', { name: /email address/i })).not.toBeInTheDocument()
-    })
-
-    it('should handle system configuration loading state', () => {
-      mockSystemConfig.mockReturnValue({
-        data: null,
-        isLoading: true,
-        error: null,
-      })
-
-      renderWithProviders(<ForgotPasswordForm />)
-
-      // Should show loading skeleton or disabled state
-      expect(screen.getByRole('form')).toHaveAttribute('aria-busy', 'true')
-    })
-
-    it('should handle system configuration error state', () => {
-      mockSystemConfig.mockReturnValue({
-        data: null,
-        isLoading: false,
-        error: new Error('Failed to load configuration'),
-      })
-
-      renderWithProviders(<ForgotPasswordForm />)
-
-      expect(screen.getByText(/unable to load system configuration/i)).toBeInTheDocument()
-    })
-  })
-
-  describe('Form Validation', () => {
-    it('should validate email format when in email mode', async () => {
-      mockSystemConfig.mockReturnValue({
-        data: createMockSystemConfig({ loginAttribute: 'email' }),
-        isLoading: false,
-        error: null,
-      })
-
-      renderWithProviders(<ForgotPasswordForm />)
-
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
-
-      // Test invalid email format
-      await user.type(emailInput, 'invalid-email')
-      await user.click(submitButton)
-
+      // Should show validation error
       await waitFor(() => {
-        expect(screen.getByText(/please enter a valid email address/i)).toBeInTheDocument()
-      })
+        expect(screen.getByText(/email is required/i)).toBeInTheDocument();
+      });
+    });
 
-      // Verify ARIA attributes updated for error state
-      expect(emailInput).toHaveAttribute('aria-invalid', 'true')
-      expect(emailInput).toHaveAttribute('aria-describedby')
-    })
+    it.each(testData.invalidEmails)('validates email format for invalid email: %s', async (invalidEmail) => {
+      const user = userEvent.setup();
+      const emailInput = screen.getByLabelText(/email address/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
 
-    it('should validate username format when in username mode', async () => {
-      mockSystemConfig.mockReturnValue({
-        data: createMockSystemConfig({ loginAttribute: 'username' }),
-        isLoading: false,
-        error: null,
-      })
+      // Enter invalid email and submit
+      await user.clear(emailInput);
+      await user.type(emailInput, invalidEmail);
+      await user.click(submitButton);
 
-      renderWithProviders(<ForgotPasswordForm />)
-
-      const usernameInput = screen.getByRole('textbox', { name: /username/i })
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
-
-      // Test empty username
-      await user.click(submitButton)
-
+      // Should show email format validation error
       await waitFor(() => {
-        expect(screen.getByText(/username is required/i)).toBeInTheDocument()
-      })
+        expect(screen.getByText(/please enter a valid email address/i)).toBeInTheDocument();
+      });
+    });
 
-      // Test username with invalid characters
-      await user.type(usernameInput, 'user@name!')
-      await user.click(submitButton)
+    it.each(testData.validEmails)('accepts valid email format: %s', async (validEmail) => {
+      const user = userEvent.setup();
+      const emailInput = screen.getByLabelText(/email address/i);
 
+      // Enter valid email
+      await user.clear(emailInput);
+      await user.type(emailInput, validEmail);
+
+      // Should not show validation error
       await waitFor(() => {
-        expect(screen.getByText(/username contains invalid characters/i)).toBeInTheDocument()
-      })
-    })
+        expect(screen.queryByText(/please enter a valid email address/i)).not.toBeInTheDocument();
+      });
+    });
+  });
 
-    it('should require field to be filled before submission', async () => {
-      renderWithProviders(<ForgotPasswordForm />)
+  describe('Username Validation', () => {
+    beforeEach(() => {
+      renderForgotPasswordForm({
+        authentication: { loginAttribute: 'username' },
+      });
+    });
 
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
+    it('requires username field to be filled', async () => {
+      const user = userEvent.setup();
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+      // Try to submit without entering username
+      await user.click(submitButton);
+
+      // Should show validation error
+      await waitFor(() => {
+        expect(screen.getByText(/username is required/i)).toBeInTheDocument();
+      });
+    });
+
+    it.each(testData.invalidUsernames)('validates username is not empty: "%s"', async (invalidUsername) => {
+      const user = userEvent.setup();
+      const usernameInput = screen.getByLabelText(/username/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+      // Enter invalid username and submit
+      await user.clear(usernameInput);
+      await user.type(usernameInput, invalidUsername);
+      await user.click(submitButton);
+
+      // Should show validation error
+      await waitFor(() => {
+        expect(screen.getByText(/username is required/i)).toBeInTheDocument();
+      });
+    });
+
+    it.each(testData.validUsernames)('accepts valid username: %s', async (validUsername) => {
+      const user = userEvent.setup();
+      const usernameInput = screen.getByLabelText(/username/i);
+
+      // Enter valid username
+      await user.clear(usernameInput);
+      await user.type(usernameInput, validUsername);
+
+      // Should not show validation error
+      await waitFor(() => {
+        expect(screen.queryByText(/username is required/i)).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Security Question Form Validation', () => {
+    beforeEach(() => {
+      // Setup form in security question mode
+      renderForgotPasswordForm();
+    });
+
+    const setupSecurityQuestionForm = async () => {
+      const user = userEvent.setup();
       
-      // Try to submit empty form
-      await user.click(submitButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/email address is required/i)).toBeInTheDocument()
-      })
-    })
-
-    it('should clear validation errors when user starts typing', async () => {
-      renderWithProviders(<ForgotPasswordForm />)
-
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
-
-      // Trigger validation error
-      await user.click(submitButton)
-      await waitFor(() => {
-        expect(screen.getByText(/email address is required/i)).toBeInTheDocument()
-      })
-
-      // Start typing to clear error
-      await user.type(emailInput, 'test@example.com')
-      
-      await waitFor(() => {
-        expect(screen.queryByText(/email address is required/i)).not.toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('API Integration - Initial Password Reset Request', () => {
-    it('should successfully submit password reset request for email', async () => {
-      const mockMutation = {
-        mutate: vi.fn(),
-        isPending: false,
-        error: null,
-        isSuccess: false,
-      }
-      mockForgotPassword.mockReturnValue(mockMutation)
-
-      // Mock successful API response
+      // Mock API to return security question
       server.use(
         http.post('/api/v2/user/password', () => {
-          return HttpResponse.json(createMockPasswordResetResponse({ requiresSecurityQuestions: false }))
+          return HttpResponse.json({
+            securityQuestion: testData.securityQuestions[0],
+          });
         })
-      )
+      );
 
-      renderWithProviders(<ForgotPasswordForm />)
+      // Submit initial form to trigger security question
+      const emailInput = screen.getByLabelText(/email address/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
 
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
+      await user.type(emailInput, testData.validEmails[0]);
+      await user.click(submitButton);
 
-      // Fill and submit form
-      await user.type(emailInput, 'test@example.com')
-      await user.click(submitButton)
+      // Wait for security question form to appear
+      await waitFor(() => {
+        expect(screen.getByLabelText(/security question/i)).toBeInTheDocument();
+      });
 
-      // Verify mutation was called with correct data
-      expect(mockMutation.mutate).toHaveBeenCalledWith({
-        identifier: 'test@example.com',
-        type: 'email',
-      })
-    })
+      return user;
+    };
 
-    it('should successfully submit password reset request for username', async () => {
-      mockSystemConfig.mockReturnValue({
-        data: createMockSystemConfig({ loginAttribute: 'username' }),
-        isLoading: false,
-        error: null,
-      })
+    it('validates security answer is required', async () => {
+      const user = await setupSecurityQuestionForm();
+      const resetButton = screen.getByRole('button', { name: /reset password/i });
 
-      const mockMutation = {
-        mutate: vi.fn(),
-        isPending: false,
-        error: null,
-        isSuccess: false,
-      }
-      mockForgotPassword.mockReturnValue(mockMutation)
-
-      renderWithProviders(<ForgotPasswordForm />)
-
-      const usernameInput = screen.getByRole('textbox', { name: /username/i })
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
-
-      // Fill and submit form
-      await user.type(usernameInput, 'testuser')
-      await user.click(submitButton)
-
-      // Verify mutation was called with correct data
-      expect(mockMutation.mutate).toHaveBeenCalledWith({
-        identifier: 'testuser',
-        type: 'username',
-      })
-    })
-
-    it('should display success message when password reset link is sent', async () => {
-      const mockMutation = {
-        mutate: vi.fn((_, { onSuccess }) => {
-          onSuccess(createMockPasswordResetResponse({ requiresSecurityQuestions: false }))
-        }),
-        isPending: false,
-        error: null,
-        isSuccess: true,
-      }
-      mockForgotPassword.mockReturnValue(mockMutation)
-
-      renderWithProviders(<ForgotPasswordForm />)
-
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
-
-      await user.type(emailInput, 'test@example.com')
-      await user.click(submitButton)
+      // Try to submit without security answer
+      await user.click(resetButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/password reset link has been sent/i)).toBeInTheDocument()
-        expect(screen.getByText(/check your email/i)).toBeInTheDocument()
-      })
-    })
-  })
+        expect(screen.getByText(/security answer is required/i)).toBeInTheDocument();
+      });
+    });
 
-  describe('Two-Step Workflow - Security Questions', () => {
-    it('should display security questions form when required by backend', async () => {
-      const mockMutation = {
-        mutate: vi.fn((_, { onSuccess }) => {
-          onSuccess(createMockPasswordResetResponse({ 
-            requiresSecurityQuestions: true,
-            securityQuestions: [
-              { question: 'What was your first pet\'s name?', id: 'q1' },
-              { question: 'What city were you born in?', id: 'q2' }
-            ]
-          }))
-        }),
-        isPending: false,
-        error: null,
-        isSuccess: false,
-      }
-      mockForgotPassword.mockReturnValue(mockMutation)
+    it('validates new password is required', async () => {
+      const user = await setupSecurityQuestionForm();
+      const resetButton = screen.getByRole('button', { name: /reset password/i });
 
-      renderWithProviders(<ForgotPasswordForm />)
+      // Enter security answer but not password
+      const securityAnswerInput = screen.getByLabelText(/security answer/i);
+      await user.type(securityAnswerInput, testData.securityAnswers[0]);
+      await user.click(resetButton);
 
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
+      await waitFor(() => {
+        expect(screen.getByText(/password must be at least 16 characters long/i)).toBeInTheDocument();
+      });
+    });
+
+    it('validates password confirmation matches', async () => {
+      const user = await setupSecurityQuestionForm();
+      
+      const securityAnswerInput = screen.getByLabelText(/security answer/i);
+      const newPasswordInput = screen.getByLabelText(/new password/i);
+      const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+      const resetButton = screen.getByRole('button', { name: /reset password/i });
+
+      // Enter mismatched passwords
+      await user.type(securityAnswerInput, testData.securityAnswers[0]);
+      await user.type(newPasswordInput, testData.validPasswords[0]);
+      await user.type(confirmPasswordInput, testData.validPasswords[1]);
+      await user.click(resetButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/passwords don't match/i)).toBeInTheDocument();
+      });
+    });
+
+    it('validates password meets minimum length requirement', async () => {
+      const user = await setupSecurityQuestionForm();
+      
+      const newPasswordInput = screen.getByLabelText(/new password/i);
+      const resetButton = screen.getByRole('button', { name: /reset password/i });
+
+      // Enter short password
+      await user.type(newPasswordInput, 'short');
+      await user.click(resetButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/password must be at least 16 characters long/i)).toBeInTheDocument();
+      });
+    });
+  });
+});
+
+// ============================================================================
+// API INTEGRATION TESTING
+// ============================================================================
+
+describe('ForgotPasswordForm - API Integration', () => {
+  describe('Initial Password Reset Request', () => {
+    it('successfully submits password reset request with email', async () => {
+      const user = userEvent.setup();
+      renderForgotPasswordForm({
+        authentication: { loginAttribute: 'email' },
+      });
+
+      const emailInput = screen.getByLabelText(/email address/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+      // Enter email and submit
+      await user.type(emailInput, testData.validEmails[0]);
+      await user.click(submitButton);
+
+      // Should show loading state
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /sending/i })).toBeInTheDocument();
+      });
+
+      // Should show success message
+      await waitFor(() => {
+        expect(screen.getByText(/password reset instructions have been sent to your email address/i)).toBeInTheDocument();
+      }, { timeout: 5000 });
+    });
+
+    it('successfully submits password reset request with username', async () => {
+      const user = userEvent.setup();
+      renderForgotPasswordForm({
+        authentication: { loginAttribute: 'username' },
+      });
+
+      const usernameInput = screen.getByLabelText(/username/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+      // Enter username and submit
+      await user.type(usernameInput, testData.validUsernames[0]);
+      await user.click(submitButton);
+
+      // Should show loading state
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /sending/i })).toBeInTheDocument();
+      });
+
+      // Should show success message
+      await waitFor(() => {
+        expect(screen.getByText(/password reset instructions have been sent to your email address/i)).toBeInTheDocument();
+      }, { timeout: 5000 });
+    });
+
+    it('handles API error responses gracefully', async () => {
+      const user = userEvent.setup();
+      
+      // Mock API to return error
+      server.use(
+        http.post('/api/v2/user/password', () => {
+          return HttpResponse.json(
+            { error: { message: 'Service temporarily unavailable' } },
+            { status: 500 }
+          );
+        })
+      );
+
+      renderForgotPasswordForm();
+
+      const emailInput = screen.getByLabelText(/email address/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+      await user.type(emailInput, testData.validEmails[0]);
+      await user.click(submitButton);
+
+      // Should show error message
+      await waitFor(() => {
+        expect(screen.getByText(/service temporarily unavailable/i)).toBeInTheDocument();
+      }, { timeout: 5000 });
+    });
+
+    it('handles network errors appropriately', async () => {
+      const user = userEvent.setup();
+      
+      // Mock network error
+      server.use(
+        http.post('/api/v2/user/password', () => {
+          return HttpResponse.error();
+        })
+      );
+
+      renderForgotPasswordForm();
+
+      const emailInput = screen.getByLabelText(/email address/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+      await user.type(emailInput, testData.validEmails[0]);
+      await user.click(submitButton);
+
+      // Should show network error message
+      await waitFor(() => {
+        expect(screen.getByText(/failed to fetch/i)).toBeInTheDocument();
+      }, { timeout: 5000 });
+    });
+  });
+
+  describe('Two-Step Workflow with Security Question', () => {
+    it('transitions to security question form when required by backend', async () => {
+      const user = userEvent.setup();
+      
+      // Mock API to return security question
+      server.use(
+        http.post('/api/v2/user/password', () => {
+          return HttpResponse.json({
+            securityQuestion: testData.securityQuestions[0],
+          });
+        })
+      );
+
+      renderForgotPasswordForm();
+
+      const emailInput = screen.getByLabelText(/email address/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
 
       // Submit initial form
-      await user.type(emailInput, 'test@example.com')
-      await user.click(submitButton)
+      await user.type(emailInput, testData.validEmails[0]);
+      await user.click(submitButton);
 
-      // Verify security questions form is displayed
+      // Should transition to security question form
       await waitFor(() => {
-        expect(screen.getByText(/security questions/i)).toBeInTheDocument()
-        expect(screen.getByText(/what was your first pet's name/i)).toBeInTheDocument()
-        expect(screen.getByText(/what city were you born in/i)).toBeInTheDocument()
-      })
+        expect(screen.getByLabelText(/security question/i)).toBeInTheDocument();
+        expect(screen.getByDisplayValue(testData.securityQuestions[0])).toBeInTheDocument();
+        expect(screen.getByLabelText(/security answer/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/new password/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
+      });
 
-      // Verify form has proper accessibility structure
-      const securityForm = screen.getByRole('form', { name: /security questions/i })
-      expect(securityForm).toBeInTheDocument()
-
-      const answerInputs = screen.getAllByRole('textbox')
-      expect(answerInputs).toHaveLength(2)
-      answerInputs.forEach(input => {
-        expect(input).toHaveAttribute('required')
-        expect(input).toHaveAttribute('aria-describedby')
-      })
-    })
-
-    it('should validate security question answers', async () => {
-      // Set up initial state with security questions
-      const mockMutation = {
-        mutate: vi.fn((_, { onSuccess }) => {
-          onSuccess(createMockPasswordResetResponse({ 
-            requiresSecurityQuestions: true,
-            securityQuestions: [
-              { question: 'What was your first pet\'s name?', id: 'q1' }
-            ]
-          }))
-        }),
-        isPending: false,
-        error: null,
-        isSuccess: false,
-      }
-      mockForgotPassword.mockReturnValue(mockMutation)
-
-      renderWithProviders(<ForgotPasswordForm />)
-
-      // Submit initial form to reach security questions
-      await user.type(screen.getByRole('textbox', { name: /email address/i }), 'test@example.com')
-      await user.click(screen.getByRole('button', { name: /send reset link/i }))
-
-      await waitFor(() => {
-        expect(screen.getByText(/security questions/i)).toBeInTheDocument()
-      })
-
-      // Try to submit without answers
-      const securitySubmitButton = screen.getByRole('button', { name: /submit answers/i })
-      await user.click(securitySubmitButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/please answer all security questions/i)).toBeInTheDocument()
-      })
-    })
-
-    it('should successfully submit security question answers', async () => {
-      // Mock the security questions submission
-      const mockSecurityMutation = {
-        mutate: vi.fn(),
-        isPending: false,
-        error: null,
-        isSuccess: false,
-      }
-      mockSubmitSecurityQuestions.mockReturnValue(mockSecurityMutation)
-
-      // Set up initial state with security questions
-      const mockMutation = {
-        mutate: vi.fn((_, { onSuccess }) => {
-          onSuccess(createMockPasswordResetResponse({ 
-            requiresSecurityQuestions: true,
-            securityQuestions: [
-              { question: 'What was your first pet\'s name?', id: 'q1' }
-            ],
-            sessionToken: 'temp-session-123'
-          }))
-        }),
-        isPending: false,
-        error: null,
-        isSuccess: false,
-      }
-      mockForgotPassword.mockReturnValue(mockMutation)
-
-      renderWithProviders(<ForgotPasswordForm />)
-
-      // Submit initial form to reach security questions
-      await user.type(screen.getByRole('textbox', { name: /email address/i }), 'test@example.com')
-      await user.click(screen.getByRole('button', { name: /send reset link/i }))
-
-      await waitFor(() => {
-        expect(screen.getByText(/security questions/i)).toBeInTheDocument()
-      })
-
-      // Fill and submit security answers
-      const answerInput = screen.getByRole('textbox')
-      await user.type(answerInput, 'Fluffy')
+      // Should update description text
+      expect(screen.getByText(/answer your security question to reset your password/i)).toBeInTheDocument();
       
-      const submitButton = screen.getByRole('button', { name: /submit answers/i })
-      await user.click(submitButton)
+      // Should hide initial form
+      expect(screen.queryByLabelText(/email address/i)).not.toBeInTheDocument();
+    });
 
-      // Verify security answers submission
-      expect(mockSecurityMutation.mutate).toHaveBeenCalledWith({
-        sessionToken: 'temp-session-123',
-        answers: [
-          { questionId: 'q1', answer: 'Fluffy' }
-        ]
-      })
-    })
-
-    it('should show success message after completing security questions', async () => {
-      const mockSecurityMutation = {
-        mutate: vi.fn((_, { onSuccess }) => {
-          onSuccess(createMockSecurityQuestionResponse())
-        }),
-        isPending: false,
-        error: null,
-        isSuccess: true,
-      }
-      mockSubmitSecurityQuestions.mockReturnValue(mockSecurityMutation)
-
-      // Set up with completed security questions flow
-      renderWithProviders(<ForgotPasswordForm />)
+    it('successfully completes password reset with security question', async () => {
+      const user = userEvent.setup();
       
-      // Simulate successful security questions completion
-      fireEvent.click(screen.getByRole('button', { name: /submit answers/i }))
-
-      await waitFor(() => {
-        expect(screen.getByText(/password reset link has been sent/i)).toBeInTheDocument()
-        expect(screen.getByText(/check your email for reset instructions/i)).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Error Handling', () => {
-    it('should display error message for API failures', async () => {
-      const mockMutation = {
-        mutate: vi.fn((_, { onError }) => {
-          onError(new Error('Network error'))
-        }),
-        isPending: false,
-        error: new Error('Network error'),
-        isSuccess: false,
-      }
-      mockForgotPassword.mockReturnValue(mockMutation)
-
-      renderWithProviders(<ForgotPasswordForm />)
-
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
-
-      await user.type(emailInput, 'test@example.com')
-      await user.click(submitButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/an error occurred while processing your request/i)).toBeInTheDocument()
-      })
-
-      // Verify error has proper accessibility attributes
-      const errorMessage = screen.getByRole('alert')
-      expect(errorMessage).toBeInTheDocument()
-      expect(errorMessage).toHaveAttribute('aria-live', 'assertive')
-    })
-
-    it('should display specific error message for invalid email/username', async () => {
-      const mockMutation = {
-        mutate: vi.fn((_, { onError }) => {
-          onError(mockAuthErrorResponse(404, 'User not found'))
-        }),
-        isPending: false,
-        error: mockAuthErrorResponse(404, 'User not found'),
-        isSuccess: false,
-      }
-      mockForgotPassword.mockReturnValue(mockMutation)
-
-      renderWithProviders(<ForgotPasswordForm />)
-
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
-
-      await user.type(emailInput, 'nonexistent@example.com')
-      await user.click(submitButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/no account found with that email address/i)).toBeInTheDocument()
-      })
-    })
-
-    it('should handle security questions API errors', async () => {
-      const mockSecurityMutation = {
-        mutate: vi.fn((_, { onError }) => {
-          onError(mockAuthErrorResponse(400, 'Invalid security answers'))
-        }),
-        isPending: false,
-        error: mockAuthErrorResponse(400, 'Invalid security answers'),
-        isSuccess: false,
-      }
-      mockSubmitSecurityQuestions.mockReturnValue(mockSecurityMutation)
-
-      // Simulate being in security questions state
-      renderWithProviders(<ForgotPasswordForm />)
-      
-      await waitFor(() => {
-        expect(screen.getByText(/security answers are incorrect/i)).toBeInTheDocument()
-      })
-    })
-
-    it('should allow retry after API error', async () => {
-      let attemptCount = 0
-      const mockMutation = {
-        mutate: vi.fn((_, { onError, onSuccess }) => {
-          attemptCount++
-          if (attemptCount === 1) {
-            onError(new Error('Network error'))
+      // Mock initial request to return security question
+      server.use(
+        http.post('/api/v2/user/password', ({ request }) => {
+          const url = new URL(request.url);
+          const reset = url.searchParams.get('reset');
+          
+          if (reset === 'false') {
+            // First request - return security question
+            return HttpResponse.json({
+              securityQuestion: testData.securityQuestions[0],
+            });
           } else {
-            onSuccess(createMockPasswordResetResponse({ requiresSecurityQuestions: false }))
+            // Second request - successful reset
+            return HttpResponse.json({
+              success: true,
+              message: 'Password has been reset successfully.',
+            });
           }
-        }),
-        isPending: false,
-        error: attemptCount === 1 ? new Error('Network error') : null,
-        isSuccess: attemptCount > 1,
-      }
-      mockForgotPassword.mockReturnValue(mockMutation)
+        })
+      );
 
-      renderWithProviders(<ForgotPasswordForm />)
-
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
-
-      // First attempt - should fail
-      await user.type(emailInput, 'test@example.com')
-      await user.click(submitButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/an error occurred/i)).toBeInTheDocument()
-      })
-
-      // Retry button should be available
-      const retryButton = screen.getByRole('button', { name: /try again/i })
-      expect(retryButton).toBeInTheDocument()
-
-      // Second attempt - should succeed
-      await user.click(retryButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/password reset link has been sent/i)).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('User Navigation and Interaction', () => {
-    it('should navigate back to login when back link is clicked', async () => {
-      renderWithProviders(<ForgotPasswordForm />)
-
-      const backLink = screen.getByRole('link', { name: /back to login/i })
-      await user.click(backLink)
-
-      expect(mockBack).toHaveBeenCalled()
-    })
-
-    it('should handle keyboard navigation correctly', async () => {
-      renderWithProviders(<ForgotPasswordForm />)
-
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      const submitButton = screen.getByRole('button', { name: /send reset link/i })
-      const backLink = screen.getByRole('link', { name: /back to login/i })
-
-      // Test tab navigation
-      await user.tab()
-      expect(emailInput).toHaveFocus()
-
-      await user.tab()
-      expect(submitButton).toHaveFocus()
-
-      await user.tab()
-      expect(backLink).toHaveFocus()
-
-      // Test form submission with Enter key
-      emailInput.focus()
-      await user.type(emailInput, 'test@example.com')
-      await user.keyboard('{Enter}')
-
-      // Should trigger form submission
-      expect(mockForgotPassword().mutate).toHaveBeenCalled()
-    })
-
-    it('should maintain focus management during state transitions', async () => {
-      const mockMutation = {
-        mutate: vi.fn((_, { onSuccess }) => {
-          onSuccess(createMockPasswordResetResponse({ 
-            requiresSecurityQuestions: true,
-            securityQuestions: [
-              { question: 'What was your first pet\'s name?', id: 'q1' }
-            ]
-          }))
-        }),
-        isPending: false,
-        error: null,
-        isSuccess: false,
-      }
-      mockForgotPassword.mockReturnValue(mockMutation)
-
-      renderWithProviders(<ForgotPasswordForm />)
-
-      // Submit initial form
-      await user.type(screen.getByRole('textbox', { name: /email address/i }), 'test@example.com')
-      await user.click(screen.getByRole('button', { name: /send reset link/i }))
-
-      // Focus should move to first security question
-      await waitFor(() => {
-        const firstQuestionInput = screen.getByRole('textbox')
-        expect(firstQuestionInput).toHaveFocus()
-      })
-    })
-  })
-
-  describe('Component State Management', () => {
-    it('should maintain form state during configuration loading', () => {
-      // Start with loading configuration
-      mockSystemConfig.mockReturnValue({
-        data: null,
-        isLoading: true,
-        error: null,
-      })
-
-      const { rerender } = renderWithProviders(<ForgotPasswordForm />)
-
-      // Form should be disabled during loading
-      expect(screen.getByRole('form')).toHaveAttribute('aria-busy', 'true')
-
-      // Configuration loads
-      mockSystemConfig.mockReturnValue({
-        data: createMockSystemConfig({ loginAttribute: 'email' }),
-        isLoading: false,
-        error: null,
-      })
-
-      rerender(<ForgotPasswordForm />)
-
-      // Form should now be available
-      expect(screen.getByRole('form')).not.toHaveAttribute('aria-busy')
-      expect(screen.getByRole('textbox', { name: /email address/i })).toBeInTheDocument()
-    })
-
-    it('should reset form state when switching between steps', async () => {
-      const mockMutation = {
-        mutate: vi.fn((_, { onSuccess }) => {
-          onSuccess(createMockPasswordResetResponse({ 
-            requiresSecurityQuestions: true,
-            securityQuestions: [
-              { question: 'What was your first pet\'s name?', id: 'q1' }
-            ]
-          }))
-        }),
-        isPending: false,
-        error: null,
-        isSuccess: false,
-      }
-      mockForgotPassword.mockReturnValue(mockMutation)
-
-      renderWithProviders(<ForgotPasswordForm />)
+      renderForgotPasswordForm();
 
       // Complete initial form
-      await user.type(screen.getByRole('textbox', { name: /email address/i }), 'test@example.com')
-      await user.click(screen.getByRole('button', { name: /send reset link/i }))
+      const emailInput = screen.getByLabelText(/email address/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
 
-      // Should transition to security questions
+      await user.type(emailInput, testData.validEmails[0]);
+      await user.click(submitButton);
+
+      // Wait for security question form
       await waitFor(() => {
-        expect(screen.getByText(/security questions/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/security question/i)).toBeInTheDocument();
+      });
+
+      // Complete security question form
+      const securityAnswerInput = screen.getByLabelText(/security answer/i);
+      const newPasswordInput = screen.getByLabelText(/new password/i);
+      const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+      const resetButton = screen.getByRole('button', { name: /reset password/i });
+
+      await user.type(securityAnswerInput, testData.securityAnswers[0]);
+      await user.type(newPasswordInput, testData.validPasswords[0]);
+      await user.type(confirmPasswordInput, testData.validPasswords[0]);
+      await user.click(resetButton);
+
+      // Should show loading state
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /resetting/i })).toBeInTheDocument();
+      });
+
+      // Should attempt automatic login and navigate
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenCalledWith({
+          email: testData.validEmails[0],
+          password: testData.validPasswords[0],
+        });
+      }, { timeout: 5000 });
+    });
+
+    it('handles automatic login failure gracefully', async () => {
+      const user = userEvent.setup();
+      
+      // Mock login to fail
+      mockLogin.mockRejectedValue(new Error('Invalid credentials'));
+      
+      // Mock password reset to succeed
+      server.use(
+        http.post('/api/v2/user/password', ({ request }) => {
+          const url = new URL(request.url);
+          const reset = url.searchParams.get('reset');
+          
+          if (reset === 'false') {
+            return HttpResponse.json({
+              securityQuestion: testData.securityQuestions[0],
+            });
+          } else {
+            return HttpResponse.json({
+              success: true,
+              message: 'Password has been reset successfully.',
+            });
+          }
+        })
+      );
+
+      renderForgotPasswordForm();
+
+      // Complete both forms
+      const emailInput = screen.getByLabelText(/email address/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+      await user.type(emailInput, testData.validEmails[0]);
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/security question/i)).toBeInTheDocument();
+      });
+
+      const securityAnswerInput = screen.getByLabelText(/security answer/i);
+      const newPasswordInput = screen.getByLabelText(/new password/i);
+      const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+      const resetButton = screen.getByRole('button', { name: /reset password/i });
+
+      await user.type(securityAnswerInput, testData.securityAnswers[0]);
+      await user.type(newPasswordInput, testData.validPasswords[0]);
+      await user.type(confirmPasswordInput, testData.validPasswords[0]);
+      await user.click(resetButton);
+
+      // Should redirect to login page when auto-login fails
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/login');
+      }, { timeout: 5000 });
+    });
+  });
+
+  describe('API Fallback Behavior', () => {
+    it('falls back to admin endpoint when user endpoint fails', async () => {
+      const user = userEvent.setup();
+      
+      // Mock user endpoint to fail, admin endpoint to succeed
+      server.use(
+        http.post('/api/v2/user/password', () => {
+          return HttpResponse.json(
+            { error: { message: 'User not found' } },
+            { status: 404 }
+          );
+        }),
+        http.post('/api/v2/system/admin/password', () => {
+          return HttpResponse.json({
+            success: true,
+            message: 'Password reset instructions have been sent to your email address.',
+          });
+        })
+      );
+
+      renderForgotPasswordForm();
+
+      const emailInput = screen.getByLabelText(/email address/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+      await user.type(emailInput, testData.validEmails[0]);
+      await user.click(submitButton);
+
+      // Should eventually show success message from admin endpoint
+      await waitFor(() => {
+        expect(screen.getByText(/password reset instructions have been sent to your email address/i)).toBeInTheDocument();
+      }, { timeout: 5000 });
+    });
+  });
+});
+
+// ============================================================================
+// USER INTERACTION TESTING
+// ============================================================================
+
+describe('ForgotPasswordForm - User Interactions', () => {
+  it('handles form submission with Enter key', async () => {
+    const user = userEvent.setup();
+    renderForgotPasswordForm();
+
+    const emailInput = screen.getByLabelText(/email address/i);
+    
+    // Enter email and press Enter
+    await user.type(emailInput, testData.validEmails[0]);
+    await user.keyboard('{Enter}');
+
+    // Should submit the form
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /sending/i })).toBeInTheDocument();
+    });
+  });
+
+  it('navigates back to login when back button is clicked', async () => {
+    const user = userEvent.setup();
+    renderForgotPasswordForm();
+
+    const backButton = screen.getByRole('button', { name: /back to login/i });
+    await user.click(backButton);
+
+    expect(mockPush).toHaveBeenCalledWith('/login');
+  });
+
+  it('clears error message when form is resubmitted', async () => {
+    const user = userEvent.setup();
+    
+    // Mock API to return error first, then success
+    let callCount = 0;
+    server.use(
+      http.post('/api/v2/user/password', () => {
+        callCount++;
+        if (callCount === 1) {
+          return HttpResponse.json(
+            { error: { message: 'Service temporarily unavailable' } },
+            { status: 500 }
+          );
+        } else {
+          return HttpResponse.json({
+            success: true,
+            message: 'Password reset instructions have been sent to your email address.',
+          });
+        }
       })
+    );
 
-      // Go back to initial form (if back button exists)
-      const backButton = screen.queryByRole('button', { name: /back/i })
-      if (backButton) {
-        await user.click(backButton)
+    renderForgotPasswordForm();
+
+    const emailInput = screen.getByLabelText(/email address/i);
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+    // First submission - should show error
+    await user.type(emailInput, testData.validEmails[0]);
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/service temporarily unavailable/i)).toBeInTheDocument();
+    });
+
+    // Second submission - should clear error and show success
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/service temporarily unavailable/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/password reset instructions have been sent to your email address/i)).toBeInTheDocument();
+    }, { timeout: 5000 });
+  });
+
+  it('maintains form data when switching between error states', async () => {
+    const user = userEvent.setup();
+    renderForgotPasswordForm();
+
+    const emailInput = screen.getByLabelText(/email address/i);
+    const testEmail = testData.validEmails[0];
+
+    // Enter email
+    await user.type(emailInput, testEmail);
+
+    // Submit with invalid data to trigger client-side validation
+    await user.clear(emailInput);
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
+    await user.click(submitButton);
+
+    // Should show validation error
+    await waitFor(() => {
+      expect(screen.getByText(/email is required/i)).toBeInTheDocument();
+    });
+
+    // Re-enter email
+    await user.type(emailInput, testEmail);
+
+    // Should clear validation error and maintain email value
+    await waitFor(() => {
+      expect(screen.queryByText(/email is required/i)).not.toBeInTheDocument();
+      expect(emailInput).toHaveValue(testEmail);
+    });
+  });
+});
+
+// ============================================================================
+// ERROR HANDLING TESTING
+// ============================================================================
+
+describe('ForgotPasswordForm - Error Scenarios', () => {
+  it('displays appropriate error for invalid email/username', async () => {
+    const user = userEvent.setup();
+    
+    // Mock API to return invalid credentials error
+    server.use(
+      http.post('/api/v2/user/password', () => {
+        return HttpResponse.json(
+          { error: { message: 'Invalid email or password' } },
+          { status: 401 }
+        );
+      })
+    );
+
+    renderForgotPasswordForm();
+
+    const emailInput = screen.getByLabelText(/email address/i);
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+    await user.type(emailInput, testData.validEmails[0]);
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/invalid email or password/i)).toBeInTheDocument();
+    }, { timeout: 5000 });
+  });
+
+  it('displays appropriate error for API key issues', async () => {
+    const user = userEvent.setup();
+    
+    // Mock API to return API key error
+    server.use(
+      http.post('/api/v2/user/password', () => {
+        return HttpResponse.json(
+          { error: { message: 'API key required' } },
+          { status: 401 }
+        );
+      })
+    );
+
+    renderForgotPasswordForm();
+
+    const emailInput = screen.getByLabelText(/email address/i);
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+    await user.type(emailInput, testData.validEmails[0]);
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/api key required/i)).toBeInTheDocument();
+    }, { timeout: 5000 });
+  });
+
+  it('handles malformed API responses gracefully', async () => {
+    const user = userEvent.setup();
+    
+    // Mock API to return malformed response
+    server.use(
+      http.post('/api/v2/user/password', () => {
+        return new HttpResponse('invalid json', { status: 200 });
+      })
+    );
+
+    renderForgotPasswordForm();
+
+    const emailInput = screen.getByLabelText(/email address/i);
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+    await user.type(emailInput, testData.validEmails[0]);
+    await user.click(submitButton);
+
+    // Should handle parsing error gracefully
+    await waitFor(() => {
+      expect(screen.getByText(/unexpected token/i)).toBeInTheDocument();
+    }, { timeout: 5000 });
+  });
+
+  it('displays specific error for security question validation failures', async () => {
+    const user = userEvent.setup();
+    
+    // Setup security question form
+    server.use(
+      http.post('/api/v2/user/password', ({ request }) => {
+        const url = new URL(request.url);
+        const reset = url.searchParams.get('reset');
         
-        // Initial form should be reset
-        const emailInput = screen.getByRole('textbox', { name: /email address/i })
-        expect(emailInput).toHaveValue('')
-      }
-    })
-  })
+        if (reset === 'false') {
+          return HttpResponse.json({
+            securityQuestion: testData.securityQuestions[0],
+          });
+        } else {
+          return HttpResponse.json(
+            { error: { message: 'Invalid security answer' } },
+            { status: 401 }
+          );
+        }
+      })
+    );
 
-  describe('Performance and Optimization', () => {
-    it('should not re-render unnecessarily during typing', async () => {
-      const renderSpy = vi.fn()
-      const TestWrapper = () => {
-        renderSpy()
-        return <ForgotPasswordForm />
-      }
+    renderForgotPasswordForm();
 
-      renderWithProviders(<TestWrapper />)
+    // Complete initial form
+    const emailInput = screen.getByLabelText(/email address/i);
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
 
-      const initialRenderCount = renderSpy.mock.calls.length
+    await user.type(emailInput, testData.validEmails[0]);
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/security question/i)).toBeInTheDocument();
+    });
+
+    // Submit security question form with invalid answer
+    const securityAnswerInput = screen.getByLabelText(/security answer/i);
+    const newPasswordInput = screen.getByLabelText(/new password/i);
+    const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+    const resetButton = screen.getByRole('button', { name: /reset password/i });
+
+    await user.type(securityAnswerInput, 'wrong answer');
+    await user.type(newPasswordInput, testData.validPasswords[0]);
+    await user.type(confirmPasswordInput, testData.validPasswords[0]);
+    await user.click(resetButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/invalid security answer/i)).toBeInTheDocument();
+    }, { timeout: 5000 });
+  });
+});
+
+// ============================================================================
+// ACCESSIBILITY TESTING
+// ============================================================================
+
+describe('ForgotPasswordForm - Accessibility Compliance', () => {
+  it('provides proper ARIA labels for all form elements', () => {
+    renderForgotPasswordForm();
+
+    // Check all form inputs have proper labels
+    const emailInput = screen.getByLabelText(/email address/i);
+    expect(accessibilityUtils.hasAriaLabel(emailInput)).toBe(true);
+
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
+    expect(accessibilityUtils.hasAriaLabel(submitButton)).toBe(true);
+
+    const backButton = screen.getByRole('button', { name: /back to login/i });
+    expect(accessibilityUtils.hasAriaLabel(backButton)).toBe(true);
+  });
+
+  it('ensures all interactive elements are keyboard accessible', () => {
+    renderForgotPasswordForm();
+
+    const form = screen.getByRole('form');
+    const focusableElements = accessibilityUtils.getFocusableElements(form);
+
+    // Should have at least email input and submit button
+    expect(focusableElements.length).toBeGreaterThanOrEqual(2);
+
+    // Each element should be keyboard accessible
+    focusableElements.forEach((element) => {
+      expect(accessibilityUtils.isKeyboardAccessible(element)).toBe(true);
+    });
+  });
+
+  it('provides proper error announcements for screen readers', async () => {
+    const user = userEvent.setup();
+    renderForgotPasswordForm();
+
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+    // Submit form without email to trigger validation error
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      const errorMessage = screen.getByText(/email is required/i);
+      expect(errorMessage).toBeInTheDocument();
       
-      // Type in the input field
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
-      await user.type(emailInput, 'test@example.com')
+      // Error should be associated with form field
+      const emailInput = screen.getByLabelText(/email address/i);
+      expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+    });
+  });
 
-      // Should not cause excessive re-renders
-      const finalRenderCount = renderSpy.mock.calls.length
-      expect(finalRenderCount - initialRenderCount).toBeLessThan(5)
-    })
+  it('maintains focus management during form transitions', async () => {
+    const user = userEvent.setup();
+    
+    // Mock API to return security question
+    server.use(
+      http.post('/api/v2/user/password', () => {
+        return HttpResponse.json({
+          securityQuestion: testData.securityQuestions[0],
+        });
+      })
+    );
 
-    it('should debounce validation during rapid typing', async () => {
-      renderWithProviders(<ForgotPasswordForm />)
+    renderForgotPasswordForm();
 
-      const emailInput = screen.getByRole('textbox', { name: /email address/i })
+    const emailInput = screen.getByLabelText(/email address/i);
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+    // Submit initial form
+    await user.type(emailInput, testData.validEmails[0]);
+    await user.click(submitButton);
+
+    // Wait for security question form
+    await waitFor(() => {
+      expect(screen.getByLabelText(/security question/i)).toBeInTheDocument();
+    });
+
+    // Focus should be managed appropriately
+    const securityQuestionInput = screen.getByLabelText(/security question/i);
+    expect(document.activeElement).toBe(securityQuestionInput);
+  });
+
+  it('supports keyboard navigation through all form elements', async () => {
+    const user = userEvent.setup();
+    renderForgotPasswordForm();
+
+    const form = screen.getByRole('form');
+    const navigationResult = await accessibilityUtils.testKeyboardNavigation(form, user);
+
+    expect(navigationResult.success).toBe(true);
+    expect(navigationResult.focusedElements.length).toBeGreaterThan(0);
+  });
+
+  it('provides appropriate contrast and visual indicators', () => {
+    renderForgotPasswordForm();
+
+    const form = screen.getByRole('form');
+    const interactiveElements = accessibilityUtils.getFocusableElements(form);
+
+    // All interactive elements should have adequate contrast
+    interactiveElements.forEach((element) => {
+      expect(accessibilityUtils.hasAdequateContrast(element)).toBe(true);
+    });
+  });
+
+  describe('Security Question Form Accessibility', () => {
+    const setupSecurityQuestionForm = async () => {
+      const user = userEvent.setup();
       
-      // Rapidly type invalid email
-      await user.type(emailInput, 'invalid')
-      
-      // Validation should not run immediately
-      expect(screen.queryByText(/please enter a valid email address/i)).not.toBeInTheDocument()
-      
-      // Wait for debounce
+      server.use(
+        http.post('/api/v2/user/password', () => {
+          return HttpResponse.json({
+            securityQuestion: testData.securityQuestions[0],
+          });
+        })
+      );
+
+      renderForgotPasswordForm();
+
+      const emailInput = screen.getByLabelText(/email address/i);
+      const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+      await user.type(emailInput, testData.validEmails[0]);
+      await user.click(submitButton);
+
       await waitFor(() => {
-        expect(screen.getByText(/please enter a valid email address/i)).toBeInTheDocument()
-      }, { timeout: 1000 })
-    })
-  })
-})
+        expect(screen.getByLabelText(/security question/i)).toBeInTheDocument();
+      });
+
+      return user;
+    };
+
+    it('provides proper labels for security question form fields', async () => {
+      await setupSecurityQuestionForm();
+
+      // Check all security form fields have proper labels
+      const securityQuestionInput = screen.getByLabelText(/security question/i);
+      const securityAnswerInput = screen.getByLabelText(/security answer/i);
+      const newPasswordInput = screen.getByLabelText(/new password/i);
+      const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+
+      expect(accessibilityUtils.hasAriaLabel(securityQuestionInput)).toBe(true);
+      expect(accessibilityUtils.hasAriaLabel(securityAnswerInput)).toBe(true);
+      expect(accessibilityUtils.hasAriaLabel(newPasswordInput)).toBe(true);
+      expect(accessibilityUtils.hasAriaLabel(confirmPasswordInput)).toBe(true);
+    });
+
+    it('marks security question field as readonly appropriately', async () => {
+      await setupSecurityQuestionForm();
+
+      const securityQuestionInput = screen.getByLabelText(/security question/i);
+      expect(securityQuestionInput).toHaveAttribute('readOnly');
+      expect(securityQuestionInput).toHaveClass('bg-gray-50');
+    });
+
+    it('provides appropriate autocomplete attributes for password fields', async () => {
+      await setupSecurityQuestionForm();
+
+      const newPasswordInput = screen.getByLabelText(/new password/i);
+      const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+
+      expect(newPasswordInput).toHaveAttribute('autoComplete', 'new-password');
+      expect(confirmPasswordInput).toHaveAttribute('autoComplete', 'new-password');
+    });
+  });
+});
+
+// ============================================================================
+// LOADING STATES AND PERFORMANCE
+// ============================================================================
+
+describe('ForgotPasswordForm - Loading States', () => {
+  it('displays loading state during form submission', async () => {
+    const user = userEvent.setup();
+    
+    // Mock API with delay
+    server.use(
+      http.post('/api/v2/user/password', async () => {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return HttpResponse.json({
+          success: true,
+          message: 'Password reset instructions have been sent to your email address.',
+        });
+      })
+    );
+
+    renderForgotPasswordForm();
+
+    const emailInput = screen.getByLabelText(/email address/i);
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+    await user.type(emailInput, testData.validEmails[0]);
+    await user.click(submitButton);
+
+    // Should show loading state
+    expect(screen.getByRole('button', { name: /sending/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled();
+  });
+
+  it('disables form elements during submission', async () => {
+    const user = userEvent.setup();
+    
+    // Mock API with delay
+    server.use(
+      http.post('/api/v2/user/password', async () => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return HttpResponse.json({
+          success: true,
+          message: 'Password reset instructions have been sent to your email address.',
+        });
+      })
+    );
+
+    renderForgotPasswordForm();
+
+    const emailInput = screen.getByLabelText(/email address/i);
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+    await user.type(emailInput, testData.validEmails[0]);
+    await user.click(submitButton);
+
+    // Submit button should be disabled during submission
+    expect(submitButton).toBeDisabled();
+  });
+
+  it('shows appropriate loading state for security question form', async () => {
+    const user = userEvent.setup();
+    
+    // Setup security question form first
+    server.use(
+      http.post('/api/v2/user/password', ({ request }) => {
+        const url = new URL(request.url);
+        const reset = url.searchParams.get('reset');
+        
+        if (reset === 'false') {
+          return HttpResponse.json({
+            securityQuestion: testData.securityQuestions[0],
+          });
+        } else {
+          return new Promise(resolve => {
+            setTimeout(() => {
+              resolve(HttpResponse.json({
+                success: true,
+                message: 'Password has been reset successfully.',
+              }));
+            }, 1000);
+          });
+        }
+      })
+    );
+
+    renderForgotPasswordForm();
+
+    // Get to security question form
+    const emailInput = screen.getByLabelText(/email address/i);
+    const submitButton = screen.getByRole('button', { name: /request password reset/i });
+
+    await user.type(emailInput, testData.validEmails[0]);
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/security question/i)).toBeInTheDocument();
+    });
+
+    // Complete security question form
+    const securityAnswerInput = screen.getByLabelText(/security answer/i);
+    const newPasswordInput = screen.getByLabelText(/new password/i);
+    const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+    const resetButton = screen.getByRole('button', { name: /reset password/i });
+
+    await user.type(securityAnswerInput, testData.securityAnswers[0]);
+    await user.type(newPasswordInput, testData.validPasswords[0]);
+    await user.type(confirmPasswordInput, testData.validPasswords[0]);
+    await user.click(resetButton);
+
+    // Should show loading state for password reset
+    expect(screen.getByRole('button', { name: /resetting/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /resetting/i })).toBeDisabled();
+  });
+});
