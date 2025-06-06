@@ -1,607 +1,739 @@
 'use client';
 
-import React, { Fragment, useCallback, useState } from 'react';
-import { Menu, Transition, Dialog } from '@headlessui/react';
-import { 
-  MenuIcon, 
-  SearchIcon, 
-  LanguagesIcon, 
-  UserIcon, 
-  ChevronDownIcon,
-  BellIcon,
-  X
-} from 'lucide-react';
-import Link from 'next/link';
-import Image from 'next/image';
+import React, { useState, useCallback, useEffect, useMemo, Fragment } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { Menu, Transition } from '@headlessui/react';
 import { useForm } from 'react-hook-form';
+import {
+  Search,
+  Menu as MenuIcon,
+  X,
+  Bell,
+  Globe,
+  ChevronDownIcon,
+  Settings,
+  HelpCircle,
+  Zap,
+  Database,
+  Users,
+  Shield,
+  FileText,
+  Cog,
+  Check,
+} from 'lucide-react';
+
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
+import { useSearch } from '@/hooks/use-search';
+import { useAppStore } from '@/stores/app-store';
+import { SearchDialog } from '@/components/layout/search/search-dialog';
+import { ThemeToggle } from '@/components/layout/theme/theme-toggle';
+import { UserMenu } from '@/components/layout/user-menu';
 
-// Types - Based on technical specifications and patterns
-interface User {
-  id: string;
+/**
+ * Language option interface for the language switcher
+ */
+interface LanguageOption {
+  code: string;
   name: string;
-  email: string;
-  avatar?: string;
-  initials?: string;
-  isRootAdmin?: boolean;
-  isSysAdmin?: boolean;
-  roleId?: string;
+  nativeName: string;
+  flag: string;
+  rtl?: boolean;
 }
 
-interface AuthContext {
-  user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  logout: () => Promise<void>;
+/**
+ * Available languages for the admin interface
+ * Expandable list supporting internationalization
+ */
+const AVAILABLE_LANGUAGES: LanguageOption[] = [
+  {
+    code: 'en',
+    name: 'English',
+    nativeName: 'English',
+    flag: '🇺🇸',
+  },
+  {
+    code: 'es',
+    name: 'Spanish',
+    nativeName: 'Español',
+    flag: '🇪🇸',
+  },
+  {
+    code: 'fr',
+    name: 'French',
+    nativeName: 'Français',
+    flag: '🇫🇷',
+  },
+  {
+    code: 'de',
+    name: 'German',
+    nativeName: 'Deutsch',
+    flag: '🇩🇪',
+  },
+  {
+    code: 'zh',
+    name: 'Chinese',
+    nativeName: '中文',
+    flag: '🇨🇳',
+  },
+  {
+    code: 'ja',
+    name: 'Japanese',
+    nativeName: '日本語',
+    flag: '🇯🇵',
+  },
+];
+
+/**
+ * Quick actions available in the header for efficient navigation
+ */
+interface QuickAction {
+  id: string;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  url: string;
+  keyboardShortcut?: string;
+  requiresPermission?: string;
 }
 
+const QUICK_ACTIONS: QuickAction[] = [
+  {
+    id: 'new-service',
+    label: 'New Database Service',
+    description: 'Create a new database connection',
+    icon: Database,
+    url: '/api-connections/database/create',
+    keyboardShortcut: 'Ctrl+Shift+D',
+    requiresPermission: 'services.create',
+  },
+  {
+    id: 'new-user',
+    label: 'New User',
+    description: 'Add a new system user',
+    icon: Users,
+    url: '/adf-users/create',
+    keyboardShortcut: 'Ctrl+Shift+U',
+    requiresPermission: 'users.create',
+  },
+  {
+    id: 'new-role',
+    label: 'New Role',
+    description: 'Create a new user role',
+    icon: Shield,
+    url: '/api-security/roles/create',
+    requiresPermission: 'roles.create',
+  },
+  {
+    id: 'api-docs',
+    label: 'API Documentation',
+    description: 'View generated API documentation',
+    icon: FileText,
+    url: '/adf-api-docs',
+    keyboardShortcut: 'Ctrl+Shift+A',
+  },
+  {
+    id: 'system-settings',
+    label: 'System Settings',
+    description: 'Configure system-wide settings',
+    icon: Cog,
+    url: '/system-settings',
+    keyboardShortcut: 'Ctrl+,',
+    requiresPermission: 'system.config',
+  },
+];
+
+/**
+ * Form interface for quick search input
+ */
 interface SearchFormData {
-  query: string;
+  searchQuery: string;
 }
 
-interface AppState {
-  theme: 'light' | 'dark' | 'system';
-  sidebarCollapsed: boolean;
-  setSidebarCollapsed: (collapsed: boolean) => void;
-  notifications: Array<{
-    id: string;
-    title: string;
-    message: string;
-    type: 'info' | 'warning' | 'error' | 'success';
-    timestamp: Date;
-    read: boolean;
-  }>;
-  unreadNotificationCount: number;
-}
+/**
+ * Language switcher hook for managing locale preferences
+ */
+const useLanguage = () => {
+  const [currentLanguage, setCurrentLanguage] = useState<string>('en');
 
-interface License {
-  msg: string;
-  type: string;
-  expired?: boolean;
-}
-
-// Hook placeholders - These would be implemented in the actual dependency files
-const useAuth = (): AuthContext => {
-  // Placeholder implementation - would come from src/hooks/use-auth.ts
-  const user: User = {
-    id: '1',
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    avatar: '',
-    initials: 'JD',
-    isRootAdmin: true
-  };
-
-  return {
-    user,
-    isLoading: false,
-    isAuthenticated: !!user,
-    logout: async () => {
-      // Logout implementation
-      localStorage.removeItem('auth-token');
-      window.location.href = '/login';
+  // Load language preference from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('df-admin-language');
+    if (stored && AVAILABLE_LANGUAGES.find(lang => lang.code === stored)) {
+      setCurrentLanguage(stored);
     }
-  };
-};
-
-const useSearch = () => {
-  // Placeholder implementation - would come from src/hooks/use-search.ts
-  return {
-    searchQuery: '',
-    results: [],
-    isSearching: false,
-    performSearch: (query: string) => {
-      console.log('Performing search for:', query);
-    },
-    openSearchDialog: () => {
-      console.log('Opening search dialog');
-    }
-  };
-};
-
-const useAppStore = (): AppState => {
-  // Placeholder implementation - would come from src/stores/app-store.ts
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  
-  return {
-    theme: 'system',
-    sidebarCollapsed,
-    setSidebarCollapsed,
-    notifications: [
-      {
-        id: '1',
-        title: 'System Update',
-        message: 'DreamFactory has been updated to version 5.0',
-        type: 'info',
-        timestamp: new Date(),
-        read: false
-      }
-    ],
-    unreadNotificationCount: 1
-  };
-};
-
-const useBreakpoint = () => {
-  // Placeholder implementation - would come from src/hooks/use-breakpoint.ts
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
-  
-  React.useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 768px)');
-    setIsSmallScreen(mediaQuery.matches);
-    
-    const handler = (e: MediaQueryListEvent) => setIsSmallScreen(e.matches);
-    mediaQuery.addEventListener('change', handler);
-    
-    return () => mediaQuery.removeEventListener('change', handler);
   }, []);
-  
-  return { isSmallScreen };
-};
 
-const useLicense = (): { license: License | null; isLoading: boolean } => {
-  // Placeholder implementation - would come from src/hooks/use-license.ts
+  // Update language preference
+  const changeLanguage = useCallback((languageCode: string) => {
+    setCurrentLanguage(languageCode);
+    localStorage.setItem('df-admin-language', languageCode);
+    
+    // In a real implementation, this would trigger i18n reload
+    // For now, we'll just update the state
+    // i18n.changeLanguage(languageCode);
+  }, []);
+
+  const currentLanguageData = useMemo(() => 
+    AVAILABLE_LANGUAGES.find(lang => lang.code === currentLanguage) || AVAILABLE_LANGUAGES[0]
+  , [currentLanguage]);
+
   return {
-    license: null,
-    isLoading: false
+    currentLanguage,
+    currentLanguageData,
+    availableLanguages: AVAILABLE_LANGUAGES,
+    changeLanguage,
   };
-};
-
-// Component placeholders - These would be imported from actual dependency files
-const ThemeToggle: React.FC = () => {
-  // Placeholder - would come from src/components/layout/theme/theme-toggle.tsx
-  return (
-    <button
-      type="button"
-      className="inline-flex items-center justify-center rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
-      aria-label="Toggle theme"
-    >
-      <div className="h-5 w-5 rounded-full bg-gradient-to-tr from-yellow-400 via-orange-500 to-purple-600" />
-    </button>
-  );
-};
-
-const SearchDialog: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
-  // Placeholder - would come from src/components/layout/search/search-dialog.tsx
-  return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black bg-opacity-25" />
-        </Transition.Child>
-
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all dark:bg-gray-800">
-                <Dialog.Title className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-                  Global Search
-                </Dialog.Title>
-                <div className="mt-4">
-                  <input
-                    type="text"
-                    placeholder="Search for services, tables, or documentation..."
-                    className="w-full rounded-md border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    className="inline-flex justify-center rounded-md border border-transparent bg-primary-100 px-4 py-2 text-sm font-medium text-primary-900 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:bg-primary-900 dark:text-primary-100 dark:hover:bg-primary-800"
-                    onClick={onClose}
-                  >
-                    Close
-                  </button>
-                </div>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </div>
-      </Dialog>
-    </Transition>
-  );
-};
-
-const UserMenu: React.FC = () => {
-  // Placeholder - would come from src/components/layout/user-menu.tsx
-  const { user, logout } = useAuth();
-  
-  if (!user) return null;
-
-  return (
-    <Menu as="div" className="relative inline-block text-left">
-      {({ open }) => (
-        <>
-          <Menu.Button className="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors duration-150">
-            <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary-500 text-white text-sm font-medium mr-2">
-              {user.initials || <UserIcon className="h-4 w-4" />}
-            </div>
-            <span className="hidden sm:block">{user.name}</span>
-            <ChevronDownIcon className="ml-2 h-4 w-4" />
-          </Menu.Button>
-
-          <Transition
-            as={Fragment}
-            enter="transition ease-out duration-100"
-            enterFrom="transform opacity-0 scale-95"
-            enterTo="transform opacity-100 scale-100"
-            leave="transition ease-in duration-75"
-            leaveFrom="transform opacity-100 scale-100"
-            leaveTo="transform opacity-0 scale-95"
-          >
-            <Menu.Items className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-800 dark:ring-gray-700">
-              <div className="py-1">
-                <Menu.Item>
-                  {({ active }) => (
-                    <Link
-                      href="/profile"
-                      className={cn(
-                        'block px-4 py-2 text-sm text-gray-700 dark:text-gray-300',
-                        active && 'bg-gray-100 dark:bg-gray-700'
-                      )}
-                    >
-                      Profile Settings
-                    </Link>
-                  )}
-                </Menu.Item>
-                <Menu.Item>
-                  {({ active }) => (
-                    <button
-                      onClick={logout}
-                      className={cn(
-                        'block w-full px-4 py-2 text-left text-sm text-red-700 dark:text-red-400',
-                        active && 'bg-red-50 dark:bg-red-900/20'
-                      )}
-                    >
-                      Sign Out
-                    </button>
-                  )}
-                </Menu.Item>
-              </div>
-            </Menu.Items>
-          </Transition>
-        </>
-      )}
-    </Menu>
-  );
 };
 
 /**
- * Header Component
- * 
- * Top application header with toolbar containing logo, global search, language switcher,
- * theme toggle, user profile menu, and notification center. Provides responsive design
- * and integrates with global application state for user session management and preferences.
- * 
- * Features:
- * - Logo with navigation to dashboard
- * - Global search functionality with debounced input and modal dialog integration
- * - Language switcher dropdown for internationalization support
- * - Theme toggle for light/dark/system mode switching
- * - User profile menu with logout functionality and session management
- * - Notification center with unread count indicator
- * - Responsive toolbar behavior with mobile-optimized layout
- * - License expiration notification banner
- * - Sidebar toggle for mobile navigation
- * 
- * Converts Angular Material mat-toolbar to modern React implementation using:
- * - Tailwind CSS for styling and responsive design
- * - Headless UI for accessible dropdown components
- * - React Hook Form for search input management
- * - Lucide React for consistent iconography
- * - Next.js Link components for optimized navigation
+ * Notification system hook (mock implementation)
+ * In a real application, this would connect to a notification service
  */
-export const Header: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
-  const { openSearchDialog } = useSearch();
-  const { setSidebarCollapsed, notifications, unreadNotificationCount } = useAppStore();
-  const { isSmallScreen } = useBreakpoint();
-  const { license } = useLicense();
-  
-  // Local state for UI interactions
-  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
-  const [availableLanguages] = useState(['en', 'es', 'fr', 'de', 'ja', 'zh']);
-  const [currentLanguage, setCurrentLanguage] = useState('en');
+const useNotifications = () => {
+  const [notifications] = useState([
+    {
+      id: '1',
+      title: 'Database Connection Established',
+      message: 'Successfully connected to production MySQL database',
+      timestamp: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
+      type: 'success' as const,
+      read: false,
+    },
+    {
+      id: '2',
+      title: 'Schema Discovery Complete',
+      message: '127 tables discovered in the e-commerce database',
+      timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
+      type: 'info' as const,
+      read: false,
+    },
+    {
+      id: '3',
+      title: 'API Generation Warning',
+      message: 'Large table detected (1M+ rows). Consider adding pagination.',
+      timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+      type: 'warning' as const,
+      read: true,
+    },
+  ]);
 
-  // React Hook Form for search input
-  const { register, handleSubmit, watch } = useForm<SearchFormData>({
-    defaultValues: { query: '' }
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  return {
+    notifications,
+    unreadCount,
+    markAsRead: () => {}, // Mock function
+    markAllAsRead: () => {}, // Mock function
+  };
+};
+
+/**
+ * Header component props interface
+ */
+interface HeaderProps {
+  /** Additional CSS class name */
+  className?: string;
+  /** Whether to show the mobile menu toggle */
+  showMobileToggle?: boolean;
+  /** Whether to show the logo */
+  showLogo?: boolean;
+  /** Whether to show quick actions */
+  showQuickActions?: boolean;
+  /** Whether to enable keyboard shortcuts */
+  enableKeyboardShortcuts?: boolean;
+}
+
+/**
+ * Top application header component for DreamFactory Admin Interface.
+ * 
+ * Provides comprehensive navigation and utility functions including:
+ * - Brand logo and navigation toggle for mobile layouts
+ * - Global search functionality with keyboard shortcuts (Cmd/Ctrl+K)
+ * - Language switching with localStorage persistence
+ * - Theme toggle integration with global theme context
+ * - User profile menu with authentication status
+ * - Notification center with real-time updates
+ * - Quick action shortcuts for common tasks
+ * - Responsive design with mobile-optimized layout
+ * - WCAG 2.1 AA compliance with proper ARIA attributes
+ * 
+ * Converts Angular Material mat-toolbar to modern React/Tailwind implementation
+ * with enhanced accessibility and performance optimizations.
+ * 
+ * @component
+ * @example
+ * ```tsx
+ * // Basic header usage in layout
+ * <Header 
+ *   showMobileToggle 
+ *   showQuickActions 
+ *   enableKeyboardShortcuts 
+ * />
+ * ```
+ * 
+ * @example
+ * ```tsx
+ * // Minimal header for authentication pages
+ * <Header 
+ *   showLogo={false}
+ *   showQuickActions={false}
+ *   className="border-b-0"
+ * />
+ * ```
+ */
+export function Header({
+  className,
+  showMobileToggle = true,
+  showLogo = true,
+  showQuickActions = true,
+  enableKeyboardShortcuts = true,
+}: HeaderProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user, isAuthenticated, hasPermission } = useAuth();
+  const { searchOpen, toggleSearch, searchQuery } = useAppStore();
+  const { currentLanguageData, availableLanguages, changeLanguage } = useLanguage();
+  const { notifications, unreadCount } = useNotifications();
+  const { sidebar, toggleSidebar } = useAppStore();
+
+  // Form handling for quick search input
+  const searchForm = useForm<SearchFormData>({
+    defaultValues: {
+      searchQuery: searchQuery || '',
+    },
   });
 
-  const searchQuery = watch('query');
+  const { watch, setValue, handleSubmit } = searchForm;
+  const currentSearchQuery = watch('searchQuery');
 
-  /**
-   * Handle sidebar toggle for mobile navigation
-   */
-  const handleSidebarToggle = useCallback(() => {
-    setSidebarCollapsed(prev => !prev);
-  }, [setSidebarCollapsed]);
+  // Filter quick actions based on user permissions
+  const availableActions = useMemo(() => {
+    if (!isAuthenticated || !user) return [];
+    
+    return QUICK_ACTIONS.filter(action => {
+      if (!action.requiresPermission) return true;
+      return hasPermission(action.requiresPermission);
+    });
+  }, [isAuthenticated, user, hasPermission]);
 
-  /**
-   * Handle search form submission
-   * Opens search dialog with current query
-   */
-  const onSearchSubmit = useCallback((data: SearchFormData) => {
-    if (data.query.trim()) {
-      openSearchDialog();
-      setIsSearchDialogOpen(true);
+  // Handle quick search submission
+  const handleQuickSearch = useCallback((data: SearchFormData) => {
+    if (data.searchQuery.trim()) {
+      // Open global search with the query
+      useAppStore.getState().setSearchQuery(data.searchQuery.trim());
+      toggleSearch();
     }
-  }, [openSearchDialog]);
+  }, [toggleSearch]);
 
-  /**
-   * Handle search icon click
-   * Opens search dialog directly
-   */
-  const handleSearchClick = useCallback(() => {
-    setIsSearchDialogOpen(true);
-  }, []);
+  // Handle global keyboard shortcuts
+  useEffect(() => {
+    if (!enableKeyboardShortcuts) return;
 
-  /**
-   * Handle language change
-   * Updates current language and persists to localStorage
-   */
-  const handleLanguageChange = useCallback((language: string) => {
-    setCurrentLanguage(language);
-    localStorage.setItem('language', language);
-    // In real implementation, this would trigger i18n language change
-    console.log('Language changed to:', language);
-  }, []);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Global search shortcut (Cmd/Ctrl+K)
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        toggleSearch();
+        return;
+      }
 
-  /**
-   * Generate language display name
-   */
-  const getLanguageDisplayName = useCallback((langCode: string): string => {
-    const languageNames: Record<string, string> = {
-      en: 'English',
-      es: 'Español',
-      fr: 'Français',
-      de: 'Deutsch',
-      ja: '日本語',
-      zh: '中文'
+      // Quick action shortcuts
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey) {
+        const action = availableActions.find(a => 
+          a.keyboardShortcut === `${event.ctrlKey ? 'Ctrl' : 'Cmd'}+Shift+${event.key.toUpperCase()}`
+        );
+        if (action) {
+          event.preventDefault();
+          router.push(action.url);
+          return;
+        }
+      }
+
+      // Settings shortcut (Cmd/Ctrl+,)
+      if ((event.metaKey || event.ctrlKey) && event.key === ',') {
+        if (hasPermission('system.config')) {
+          event.preventDefault();
+          router.push('/system-settings');
+        }
+      }
     };
-    return languageNames[langCode] || langCode.toUpperCase();
-  }, []);
 
-  // Don't render if not authenticated
-  if (!isAuthenticated) {
-    return null;
-  }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [enableKeyboardShortcuts, toggleSearch, availableActions, router, hasPermission]);
+
+  // Handle quick action selection
+  const handleQuickAction = useCallback((action: QuickAction) => {
+    router.push(action.url);
+  }, [router]);
+
+  // Handle notification click
+  const handleNotificationClick = useCallback(() => {
+    // In a real implementation, this would open a notification panel
+    console.log('Notifications clicked');
+  }, []);
 
   return (
     <>
-      {/* License expiration banner */}
-      {license && (license.msg === 'Expired' || license.msg === 'Unknown') && (
-        <div className="bg-red-600 text-white px-4 py-2 text-sm font-medium text-center">
-          License Expired - Please contact your administrator to renew your license
-        </div>
-      )}
-
-      {/* Main header toolbar */}
-      <header className="bg-white shadow-sm border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700 sticky top-0 z-40">
-        <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
-          {/* Left section: Menu toggle and Logo */}
-          <div className="flex items-center space-x-4">
-            {/* Sidebar toggle button */}
-            <button
-              type="button"
-              onClick={handleSidebarToggle}
-              className="inline-flex items-center justify-center rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors duration-150"
-              aria-label="Toggle navigation menu"
-            >
-              <MenuIcon className="h-6 w-6" />
-            </button>
-
-            {/* Logo */}
-            <Link
-              href="/"
-              className="flex items-center space-x-2 text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors duration-150"
-            >
-              <Image
-                src="/assets/img/logo.png"
-                alt="DreamFactory Logo"
-                width={32}
-                height={32}
-                className="h-8 w-auto"
-                priority
-              />
-              <span className="hidden sm:block text-xl font-semibold">
-                DreamFactory
-              </span>
-            </Link>
-          </div>
-
-          {/* Center section: Search bar */}
-          <div className="flex-1 max-w-lg mx-4">
-            <form onSubmit={handleSubmit(onSearchSubmit)} className="relative">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <SearchIcon className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  {...register('query')}
-                  type="text"
-                  placeholder="Search for services, tables, or documentation..."
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 text-gray-900 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500 transition-colors duration-150"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSubmit(onSearchSubmit)();
-                    }
-                  }}
-                />
-                {/* Search button for mobile */}
-                <button
-                  type="button"
-                  onClick={handleSearchClick}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center sm:hidden"
-                >
-                  <SearchIcon className="h-5 w-5 text-gray-400" />
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Right section: Controls and user menu */}
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            {/* Language switcher - only show if multiple languages available */}
-            {availableLanguages.length > 1 && (
-              <Menu as="div" className="relative inline-block text-left">
-                {({ open }) => (
-                  <>
-                    <Menu.Button
-                      className="inline-flex items-center justify-center rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors duration-150"
-                      aria-label="Change language"
-                    >
-                      <LanguagesIcon className="h-5 w-5" />
-                      <span className="sr-only">Change language</span>
-                    </Menu.Button>
-
-                    <Transition
-                      as={Fragment}
-                      enter="transition ease-out duration-100"
-                      enterFrom="transform opacity-0 scale-95"
-                      enterTo="transform opacity-100 scale-100"
-                      leave="transition ease-in duration-75"
-                      leaveFrom="transform opacity-100 scale-100"
-                      leaveTo="transform opacity-0 scale-95"
-                    >
-                      <Menu.Items className="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-800 dark:ring-gray-700">
-                        <div className="py-1">
-                          {availableLanguages.map((lang) => (
-                            <Menu.Item key={lang}>
-                              {({ active }) => (
-                                <button
-                                  onClick={() => handleLanguageChange(lang)}
-                                  className={cn(
-                                    'block w-full px-4 py-2 text-left text-sm transition-colors duration-150',
-                                    currentLanguage === lang
-                                      ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300'
-                                      : 'text-gray-700 dark:text-gray-300',
-                                    active && currentLanguage !== lang && 'bg-gray-100 dark:bg-gray-700'
-                                  )}
-                                >
-                                  {getLanguageDisplayName(lang)}
-                                  {currentLanguage === lang && (
-                                    <span className="ml-2 text-primary-600 dark:text-primary-400">✓</span>
-                                  )}
-                                </button>
-                              )}
-                            </Menu.Item>
-                          ))}
-                        </div>
-                      </Menu.Items>
-                    </Transition>
-                  </>
+      {/* Main Header */}
+      <header 
+        className={cn(
+          'sticky top-0 z-40 w-full border-b border-gray-200 dark:border-gray-800',
+          'bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/95',
+          'dark:bg-gray-900/95 dark:supports-[backdrop-filter]:bg-gray-900/95',
+          'transition-colors duration-200',
+          className
+        )}
+        role="banner"
+        aria-label="Main navigation header"
+      >
+        <div className="mx-auto flex h-16 max-w-8xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          {/* Left Section: Logo and Mobile Toggle */}
+          <div className="flex items-center gap-4">
+            {/* Mobile Sidebar Toggle */}
+            {showMobileToggle && (
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className={cn(
+                  'inline-flex items-center justify-center rounded-md p-2',
+                  'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100',
+                  'hover:bg-gray-100 dark:hover:bg-gray-800',
+                  'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                  'lg:hidden', // Only show on mobile/tablet
+                  'transition-colors duration-200'
                 )}
-              </Menu>
+                aria-label={sidebar.isOpen ? 'Close sidebar' : 'Open sidebar'}
+                aria-expanded={sidebar.isOpen}
+              >
+                {sidebar.isOpen ? (
+                  <X className="h-5 w-5" aria-hidden="true" />
+                ) : (
+                  <MenuIcon className="h-5 w-5" aria-hidden="true" />
+                )}
+              </button>
             )}
 
-            {/* Notifications */}
-            <Menu as="div" className="relative inline-block text-left">
-              {({ open }) => (
-                <>
-                  <Menu.Button
-                    className="relative inline-flex items-center justify-center rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors duration-150"
-                    aria-label="View notifications"
-                  >
-                    <BellIcon className="h-5 w-5" />
-                    {unreadNotificationCount > 0 && (
-                      <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-xs text-white flex items-center justify-center">
-                        {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
-                      </span>
-                    )}
-                  </Menu.Button>
+            {/* Brand Logo */}
+            {showLogo && (
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={() => router.push('/')}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-2 py-1',
+                    'text-gray-900 dark:text-gray-100',
+                    'hover:bg-gray-100 dark:hover:bg-gray-800',
+                    'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                    'transition-colors duration-200'
+                  )}
+                  aria-label="Go to DreamFactory dashboard"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-600">
+                    <Zap className="h-5 w-5 text-white" aria-hidden="true" />
+                  </div>
+                  <div className="hidden sm:block">
+                    <span className="text-lg font-semibold tracking-tight">
+                      DreamFactory
+                    </span>
+                    <span className="ml-2 rounded-md bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-800 dark:bg-primary-900/20 dark:text-primary-300">
+                      Admin
+                    </span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
 
-                  <Transition
-                    as={Fragment}
-                    enter="transition ease-out duration-100"
-                    enterFrom="transform opacity-0 scale-95"
-                    enterTo="transform opacity-100 scale-100"
-                    leave="transition ease-in duration-75"
-                    leaveFrom="transform opacity-100 scale-100"
-                    leaveTo="transform opacity-0 scale-95"
-                  >
-                    <Menu.Items className="absolute right-0 z-50 mt-2 w-80 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-gray-800 dark:ring-gray-700">
-                      <div className="py-1">
-                        <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
-                          <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                            Notifications
-                          </h3>
-                        </div>
-                        {notifications.length > 0 ? (
-                          notifications.slice(0, 5).map((notification) => (
-                            <Menu.Item key={notification.id}>
-                              {({ active }) => (
-                                <div
-                                  className={cn(
-                                    'px-4 py-3 border-b border-gray-50 dark:border-gray-700/50 last:border-b-0',
-                                    active && 'bg-gray-50 dark:bg-gray-700'
-                                  )}
-                                >
-                                  <div className="flex items-start space-x-3">
-                                    <div className={cn(
-                                      'flex-shrink-0 w-2 h-2 rounded-full mt-2',
-                                      notification.type === 'error' && 'bg-red-500',
-                                      notification.type === 'warning' && 'bg-yellow-500',
-                                      notification.type === 'success' && 'bg-green-500',
-                                      notification.type === 'info' && 'bg-blue-500'
-                                    )} />
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                        {notification.title}
-                                      </p>
-                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                        {notification.message}
-                                      </p>
-                                    </div>
+          {/* Center Section: Search and Quick Actions */}
+          <div className="flex flex-1 items-center justify-center px-4 sm:px-6 lg:max-w-2xl lg:px-8">
+            {/* Quick Search Bar */}
+            <div className="w-full max-w-lg">
+              <form onSubmit={handleSubmit(handleQuickSearch)} className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <Search className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                </div>
+                <input
+                  type="search"
+                  placeholder="Search services, databases, users... (⌘K)"
+                  className={cn(
+                    'block w-full rounded-lg border border-gray-300 dark:border-gray-700',
+                    'bg-white dark:bg-gray-900',
+                    'py-2 pl-10 pr-12 text-sm',
+                    'placeholder:text-gray-500 dark:placeholder:text-gray-400',
+                    'text-gray-900 dark:text-gray-100',
+                    'focus:border-primary-500 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                    'transition-colors duration-200'
+                  )}
+                  value={currentSearchQuery}
+                  onChange={(e) => setValue('searchQuery', e.target.value)}
+                  onFocus={toggleSearch}
+                  aria-label="Global search input"
+                  autoComplete="off"
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                  <kbd className="hidden sm:inline-flex h-5 min-w-5 items-center justify-center rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 px-1 font-mono text-xs text-gray-500 dark:text-gray-400">
+                    ⌘K
+                  </kbd>
+                </div>
+              </form>
+            </div>
+
+            {/* Quick Actions (Desktop Only) */}
+            {showQuickActions && availableActions.length > 0 && (
+              <Menu as="div" className="relative ml-4 hidden lg:block">
+                <Menu.Button
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-700',
+                    'bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium',
+                    'text-gray-700 dark:text-gray-300',
+                    'hover:bg-gray-50 dark:hover:bg-gray-800',
+                    'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                    'transition-colors duration-200'
+                  )}
+                  aria-label="Quick actions menu"
+                >
+                  <Zap className="h-4 w-4" aria-hidden="true" />
+                  <span className="sr-only sm:not-sr-only">Quick</span>
+                  <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />
+                </Menu.Button>
+
+                <Transition
+                  as={Fragment}
+                  enter="transition ease-out duration-100"
+                  enterFrom="transform opacity-0 scale-95"
+                  enterTo="transform opacity-100 scale-100"
+                  leave="transition ease-in duration-75"
+                  leaveFrom="transform opacity-100 scale-100"
+                  leaveTo="transform opacity-0 scale-95"
+                >
+                  <Menu.Items className="absolute right-0 z-10 mt-2 w-80 origin-top-right rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    <div className="p-4">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                        Quick Actions
+                      </h3>
+                      <div className="space-y-1">
+                        {availableActions.map((action) => (
+                          <Menu.Item key={action.id}>
+                            {({ active }) => (
+                              <button
+                                onClick={() => handleQuickAction(action)}
+                                className={cn(
+                                  'group flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm',
+                                  'transition-colors duration-150',
+                                  active
+                                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                    : 'text-gray-700 dark:text-gray-300'
+                                )}
+                              >
+                                <action.icon className="h-4 w-4" aria-hidden="true" />
+                                <div className="flex-1 text-left">
+                                  <div className="font-medium">{action.label}</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    {action.description}
                                   </div>
                                 </div>
-                              )}
-                            </Menu.Item>
-                          ))
-                        ) : (
-                          <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                            No new notifications
-                          </div>
-                        )}
+                                {action.keyboardShortcut && (
+                                  <kbd className="hidden group-hover:inline-flex h-5 min-w-5 items-center justify-center rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 px-1 font-mono text-xs text-gray-500 dark:text-gray-400">
+                                    {action.keyboardShortcut.replace('Ctrl', '⌘')}
+                                  </kbd>
+                                )}
+                              </button>
+                            )}
+                          </Menu.Item>
+                        ))}
                       </div>
-                    </Menu.Items>
-                  </Transition>
-                </>
-              )}
+                    </div>
+                  </Menu.Items>
+                </Transition>
+              </Menu>
+            )}
+          </div>
+
+          {/* Right Section: Controls and User Menu */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Language Switcher */}
+            <Menu as="div" className="relative">
+              <Menu.Button
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-lg p-2',
+                  'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100',
+                  'hover:bg-gray-100 dark:hover:bg-gray-800',
+                  'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                  'transition-colors duration-200'
+                )}
+                aria-label={`Current language: ${currentLanguageData.name}. Click to change language`}
+              >
+                <Globe className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline text-sm font-medium">
+                  {currentLanguageData.flag} {currentLanguageData.code.toUpperCase()}
+                </span>
+                <ChevronDownIcon className="h-3 w-3" aria-hidden="true" />
+              </Menu.Button>
+
+              <Transition
+                as={Fragment}
+                enter="transition ease-out duration-100"
+                enterFrom="transform opacity-0 scale-95"
+                enterTo="transform opacity-100 scale-100"
+                leave="transition ease-in duration-75"
+                leaveFrom="transform opacity-100 scale-100"
+                leaveTo="transform opacity-0 scale-95"
+              >
+                <Menu.Items className="absolute right-0 z-10 mt-2 w-64 origin-top-right rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <div className="p-4">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                      Language
+                    </h3>
+                    <div className="space-y-1">
+                      {availableLanguages.map((language) => (
+                        <Menu.Item key={language.code}>
+                          {({ active }) => (
+                            <button
+                              onClick={() => changeLanguage(language.code)}
+                              className={cn(
+                                'group flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm',
+                                'transition-colors duration-150',
+                                active
+                                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                  : 'text-gray-700 dark:text-gray-300',
+                                language.code === currentLanguageData.code && 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                              )}
+                            >
+                              <span className="text-lg" aria-hidden="true">
+                                {language.flag}
+                              </span>
+                              <div className="flex-1 text-left">
+                                <div className="font-medium">{language.name}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {language.nativeName}
+                                </div>
+                              </div>
+                              {language.code === currentLanguageData.code && (
+                                <Check className="h-4 w-4 text-primary-600 dark:text-primary-400" aria-hidden="true" />
+                              )}
+                            </button>
+                          )}
+                        </Menu.Item>
+                      ))}
+                    </div>
+                  </div>
+                </Menu.Items>
+              </Transition>
             </Menu>
 
-            {/* Theme toggle */}
-            <ThemeToggle />
+            {/* Theme Toggle */}
+            <ThemeToggle 
+              className="hidden sm:block"
+              compact
+              ariaLabel="Theme preference toggle"
+            />
 
-            {/* User menu */}
-            <UserMenu />
+            {/* Notifications */}
+            <button
+              type="button"
+              onClick={handleNotificationClick}
+              className={cn(
+                'relative inline-flex items-center rounded-lg p-2',
+                'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100',
+                'hover:bg-gray-100 dark:hover:bg-gray-800',
+                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                'transition-colors duration-200'
+              )}
+              aria-label={`Notifications. ${unreadCount} unread notifications`}
+            >
+              <Bell className="h-4 w-4" aria-hidden="true" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs font-medium text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                  <span className="sr-only">unread notifications</span>
+                </span>
+              )}
+            </button>
+
+            {/* Help */}
+            <button
+              type="button"
+              onClick={() => router.push('/help')}
+              className={cn(
+                'inline-flex items-center rounded-lg p-2',
+                'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100',
+                'hover:bg-gray-100 dark:hover:bg-gray-800',
+                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                'transition-colors duration-200'
+              )}
+              aria-label="Help and documentation"
+            >
+              <HelpCircle className="h-4 w-4" aria-hidden="true" />
+            </button>
+
+            {/* Settings (Admin Only) */}
+            {hasPermission('system.config') && (
+              <button
+                type="button"
+                onClick={() => router.push('/system-settings')}
+                className={cn(
+                  'hidden sm:inline-flex items-center rounded-lg p-2',
+                  'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100',
+                  'hover:bg-gray-100 dark:hover:bg-gray-800',
+                  'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                  'transition-colors duration-200'
+                )}
+                aria-label="System settings"
+              >
+                <Settings className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
+
+            {/* User Menu */}
+            {isAuthenticated && user ? (
+              <UserMenu showUserName={false} placement="bottom-end" />
+            ) : (
+              <button
+                type="button"
+                onClick={() => router.push('/login')}
+                className={cn(
+                  'rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white',
+                  'hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                  'transition-colors duration-200'
+                )}
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Search dialog */}
-      <SearchDialog 
-        isOpen={isSearchDialogOpen} 
-        onClose={() => setIsSearchDialogOpen(false)} 
+      {/* Global Search Dialog */}
+      <SearchDialog
+        open={searchOpen}
+        onClose={toggleSearch}
+        initialQuery={searchQuery}
+        placeholder="Search databases, services, schemas, users..."
+        enableShortcuts={enableKeyboardShortcuts}
       />
     </>
   );
-};
+}
 
+/**
+ * Compact header variant for constrained layouts
+ */
+export const CompactHeader: React.FC<Omit<HeaderProps, 'showQuickActions'>> = (props) => (
+  <Header {...props} showQuickActions={false} />
+);
+
+/**
+ * Mobile-optimized header variant
+ */
+export const MobileHeader: React.FC<HeaderProps> = (props) => (
+  <Header {...props} showQuickActions={false} enableKeyboardShortcuts={false} />
+);
+
+// Default export
 export default Header;
+
+// Export types for external use
+export type { HeaderProps, LanguageOption, QuickAction };
