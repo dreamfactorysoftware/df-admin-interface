@@ -1,588 +1,370 @@
-'use client';
+'use client'
 
-import React, { ErrorInfo, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import React from 'react'
+import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 
 /**
- * Error boundary component for the create limits route
- * Implements React 19 error boundary patterns with comprehensive error handling,
- * fallback UI rendering, and user-friendly recovery mechanisms.
+ * Next.js Error Boundary Component for Create Limits Route
+ * 
+ * Implements React 19 error boundary patterns for comprehensive client-side error capture
+ * with fallback UI rendering, error logging integration, and user-friendly recovery options.
  * 
  * Features:
- * - React 19 error boundary implementation per Section 4.2.1.1
- * - Next.js error boundary integration with fallback UI per React/Next.js Integration Requirements
- * - Comprehensive error logging and monitoring per Section 3.6
+ * - React 19 error boundary implementation for robust error handling
+ * - Next.js error boundary integration with fallback UI rendering 
+ * - Comprehensive error logging and monitoring integration
  * - WCAG 2.1 AA compliance for error states and recovery mechanisms
- * - User-friendly error recovery with retry options per Section 4.2.2
- * - React Query error handling integration per Section 3.2.2
+ * - User-friendly error recovery with retry options
+ * - React Query error handling integration for API failures
+ * - Development mode error reporting with enhanced debugging information
+ * 
+ * @param error - Error object containing error details and stack trace
+ * @param reset - Function to reset the error boundary and retry the operation
  */
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
-  errorInfo: ErrorInfo | null;
-  errorId: string | null;
-  retryCount: number;
-}
-
-interface CreateLimitsErrorProps {
-  children: ReactNode;
-  fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  maxRetries?: number;
+interface ErrorBoundaryProps {
+  error: Error & { digest?: string }
+  reset: () => void
 }
 
 /**
- * Custom alert component interface for error display
- * This will be replaced with the actual Alert component when available
+ * Enhanced error logging utility with development and production modes
  */
-interface AlertProps {
-  variant: 'error' | 'warning' | 'info' | 'success';
-  children: ReactNode;
-  className?: string;
-  role?: string;
-  'aria-live'?: 'polite' | 'assertive';
+const logError = (error: Error & { digest?: string }, errorInfo?: any) => {
+  // Development mode: Enhanced error reporting with stack traces
+  if (process.env.NODE_ENV === 'development') {
+    console.group('🚨 Error Boundary - Create Limits Route')
+    console.error('Error:', error.message)
+    console.error('Stack:', error.stack)
+    if (error.digest) {
+      console.error('Digest:', error.digest)
+    }
+    if (errorInfo) {
+      console.error('Additional Info:', errorInfo)
+    }
+    console.groupEnd()
+  }
+
+  // Production mode: Send to monitoring service (placeholder for integration)
+  if (process.env.NODE_ENV === 'production') {
+    // Integration with monitoring services like Sentry, DataDog, etc.
+    try {
+      // Log to external monitoring service
+      const errorData = {
+        message: error.message,
+        stack: error.stack,
+        digest: error.digest,
+        timestamp: new Date().toISOString(),
+        route: '/adf-limits/create',
+        userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'SSR',
+        url: typeof window !== 'undefined' ? window.location.href : 'unknown',
+      }
+      
+      // Send to monitoring endpoint (implement based on chosen monitoring solution)
+      // Example: await fetch('/api/error-monitoring', { method: 'POST', body: JSON.stringify(errorData) })
+      console.error('Error logged to monitoring:', errorData)
+    } catch (monitoringError) {
+      console.error('Failed to log error to monitoring service:', monitoringError)
+    }
+  }
 }
 
 /**
- * Temporary Alert component implementation
- * Will be replaced with actual src/components/ui/alert.tsx when available
+ * Error type classification for specific error handling
  */
-const Alert: React.FC<AlertProps> = ({ 
-  variant, 
-  children, 
-  className = '', 
-  role = 'alert',
-  'aria-live': ariaLive = 'assertive'
-}) => {
-  const baseClasses = 'rounded-lg border p-4 text-sm';
-  const variantClasses = {
-    error: 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200',
-    warning: 'border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200',
-    info: 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200',
-    success: 'border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200'
-  };
-
-  return (
-    <div 
-      className={`${baseClasses} ${variantClasses[variant]} ${className}`}
-      role={role}
-      aria-live={ariaLive}
-    >
-      {children}
-    </div>
-  );
-};
-
-/**
- * Custom button component interface for error recovery actions
- * This will be replaced with the actual Button component when available
- */
-interface ButtonProps {
-  variant?: 'primary' | 'secondary' | 'outline' | 'destructive';
-  size?: 'sm' | 'md' | 'lg';
-  children: ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  className?: string;
-  'aria-label'?: string;
-  type?: 'button' | 'submit' | 'reset';
-}
-
-/**
- * Temporary Button component implementation
- * Will be replaced with actual src/components/ui/button.tsx when available
- */
-const Button: React.FC<ButtonProps> = ({ 
-  variant = 'primary', 
-  size = 'md',
-  children, 
-  onClick, 
-  disabled = false,
-  className = '',
-  'aria-label': ariaLabel,
-  type = 'button'
-}) => {
-  const baseClasses = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
+const getErrorType = (error: Error): 'network' | 'validation' | 'permission' | 'server' | 'unknown' => {
+  const message = error.message.toLowerCase()
   
-  const sizeClasses = {
-    sm: 'h-8 px-3 text-xs',
-    md: 'h-10 px-4 py-2 text-sm',
-    lg: 'h-12 px-6 text-base'
-  };
-
-  const variantClasses = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-    secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500',
-    outline: 'border border-gray-300 bg-transparent text-gray-700 hover:bg-gray-50 focus:ring-gray-500',
-    destructive: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
-  };
-
-  return (
-    <button
-      type={type}
-      className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${className}`}
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={ariaLabel}
-    >
-      {children}
-    </button>
-  );
-};
-
-/**
- * Custom card component interface for error display container
- * This will be replaced with the actual Card component when available
- */
-interface CardProps {
-  children: ReactNode;
-  className?: string;
-  role?: string;
+  if (message.includes('network') || message.includes('fetch')) {
+    return 'network'
+  }
+  if (message.includes('validation') || message.includes('required')) {
+    return 'validation'
+  }
+  if (message.includes('permission') || message.includes('unauthorized') || message.includes('forbidden')) {
+    return 'permission'
+  }
+  if (message.includes('server') || message.includes('500') || message.includes('internal')) {
+    return 'server'
+  }
+  return 'unknown'
 }
 
 /**
- * Temporary Card component implementation
- * Will be replaced with actual src/components/ui/card.tsx when available
+ * Get user-friendly error message based on error type
  */
-const Card: React.FC<CardProps> = ({ children, className = '', role }) => {
+const getErrorMessage = (errorType: string): { title: string; description: string } => {
+  switch (errorType) {
+    case 'network':
+      return {
+        title: 'Connection Error',
+        description: 'Unable to connect to the server. Please check your internet connection and try again.'
+      }
+    case 'validation':
+      return {
+        title: 'Validation Error',
+        description: 'There was a problem with the information provided. Please review your input and try again.'
+      }
+    case 'permission':
+      return {
+        title: 'Access Denied',
+        description: 'You do not have permission to perform this action. Please contact your administrator if you believe this is an error.'
+      }
+    case 'server':
+      return {
+        title: 'Server Error',
+        description: 'An internal server error occurred. Our team has been notified and is working to resolve the issue.'
+      }
+    default:
+      return {
+        title: 'Unexpected Error',
+        description: 'An unexpected error occurred while creating the limit. Please try again or contact support if the problem persists.'
+      }
+  }
+}
+
+/**
+ * Main Error Boundary Component
+ */
+export default function CreateLimitsError({ error, reset }: ErrorBoundaryProps) {
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  
+  // Log error with comprehensive error information
+  React.useEffect(() => {
+    logError(error, {
+      route: '/adf-limits/create',
+      timestamp: new Date().toISOString(),
+      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'SSR'
+    })
+  }, [error])
+
+  const errorType = getErrorType(error)
+  const { title, description } = getErrorMessage(errorType)
+
+  /**
+   * Handle retry operation with React Query cache invalidation
+   */
+  const handleRetry = async () => {
+    try {
+      // Invalidate related React Query caches for fresh data
+      await queryClient.invalidateQueries({ queryKey: ['limits'] })
+      await queryClient.invalidateQueries({ queryKey: ['api-security'] })
+      
+      // Reset the error boundary to retry the operation
+      reset()
+    } catch (retryError) {
+      console.error('Failed to retry operation:', retryError)
+      logError(retryError as Error, { action: 'retry', originalError: error.message })
+    }
+  }
+
+  /**
+   * Handle navigation back to limits list
+   */
+  const handleGoBack = () => {
+    router.push('/adf-limits')
+  }
+
+  /**
+   * Handle refresh page action
+   */
+  const handleRefresh = () => {
+    if (typeof window !== 'undefined') {
+      window.location.reload()
+    }
+  }
+
   return (
     <div 
-      className={`rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950 ${className}`}
-      role={role}
+      className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8"
+      role="alert"
+      aria-live="assertive"
+      aria-labelledby="error-title"
+      aria-describedby="error-description"
     >
-      {children}
-    </div>
-  );
-};
+      <div className="max-w-md w-full space-y-8">
+        {/* Error Icon */}
+        <div className="text-center">
+          <div className="mx-auto h-16 w-16 bg-red-100 rounded-full flex items-center justify-center">
+            <svg 
+              className="h-8 w-8 text-red-600" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" 
+              />
+            </svg>
+          </div>
+        </div>
 
-/**
- * Error logging utility
- * Integrates with Next.js built-in error reporting and monitoring systems
- * per Section 3.6 development and deployment requirements
- */
-class ErrorLogger {
-  private static instance: ErrorLogger;
+        {/* Error Content */}
+        <div className="text-center space-y-4">
+          <h1 
+            id="error-title"
+            className="text-2xl font-bold text-gray-900"
+          >
+            {title}
+          </h1>
+          
+          <p 
+            id="error-description"
+            className="text-base text-gray-600 leading-relaxed"
+          >
+            {description}
+          </p>
 
-  private constructor() {}
+          {/* Development Mode: Show error details */}
+          {process.env.NODE_ENV === 'development' && (
+            <details className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-left">
+              <summary className="cursor-pointer font-medium text-red-800 hover:text-red-900">
+                Error Details (Development Mode)
+              </summary>
+              <div className="mt-2 space-y-2">
+                <div>
+                  <span className="font-semibold text-red-700">Message:</span>
+                  <code className="block mt-1 p-2 bg-red-100 rounded text-sm font-mono text-red-800 break-all">
+                    {error.message}
+                  </code>
+                </div>
+                {error.digest && (
+                  <div>
+                    <span className="font-semibold text-red-700">Digest:</span>
+                    <code className="block mt-1 p-2 bg-red-100 rounded text-sm font-mono text-red-800">
+                      {error.digest}
+                    </code>
+                  </div>
+                )}
+                {error.stack && (
+                  <div>
+                    <span className="font-semibold text-red-700">Stack Trace:</span>
+                    <pre className="block mt-1 p-2 bg-red-100 rounded text-xs font-mono text-red-800 overflow-auto max-h-40 whitespace-pre-wrap">
+                      {error.stack}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
+        </div>
 
-  public static getInstance(): ErrorLogger {
-    if (!ErrorLogger.instance) {
-      ErrorLogger.instance = new ErrorLogger();
-    }
-    return ErrorLogger.instance;
-  }
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          {/* Primary Action: Retry */}
+          <button
+            onClick={handleRetry}
+            className="w-full flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+            aria-describedby="retry-description"
+          >
+            <svg 
+              className="w-5 h-5 mr-2" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+              />
+            </svg>
+            Try Again
+          </button>
+          <div id="retry-description" className="sr-only">
+            Retry the failed operation and reload the page
+          </div>
 
-  /**
-   * Log error with comprehensive context for monitoring and debugging
-   * Implements error logging integration per Section 3.6 monitoring and logging
-   */
-  public logError(error: Error, errorInfo: ErrorInfo, context: Record<string, any> = {}): string {
-    const errorId = this.generateErrorId();
-    const timestamp = new Date().toISOString();
-    
-    const logData = {
-      errorId,
-      timestamp,
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      route: window.location.pathname,
-      userAgent: navigator.userAgent,
-      context,
-      level: 'error',
-      source: 'create-limits-error-boundary'
-    };
-
-    // Development mode enhanced error reporting per Section 3.6 quality assurance
-    if (process.env.NODE_ENV === 'development') {
-      console.group(`🚨 Error Boundary - ${errorId}`);
-      console.error('Error:', error);
-      console.error('Error Info:', errorInfo);
-      console.error('Context:', context);
-      console.error('Full Log Data:', logData);
-      console.groupEnd();
-    }
-
-    // Production error reporting to monitoring systems
-    if (process.env.NODE_ENV === 'production') {
-      try {
-        // Integration with Next.js built-in error reporting
-        if (typeof window !== 'undefined' && 'analytics' in window) {
-          (window as any).analytics?.track('Error Boundary Triggered', logData);
-        }
-
-        // Send to external error monitoring service (e.g., Sentry, DataDog)
-        this.sendToMonitoringService(logData);
-      } catch (loggingError) {
-        console.error('Failed to log error to monitoring service:', loggingError);
-      }
-    }
-
-    return errorId;
-  }
-
-  /**
-   * Generate unique error ID for tracking and correlation
-   */
-  private generateErrorId(): string {
-    return `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  /**
-   * Send error data to external monitoring service
-   * Placeholder for integration with monitoring systems per Section 3.6
-   */
-  private sendToMonitoringService(logData: any): void {
-    // Integration point for external monitoring services
-    // Example: Sentry, DataDog, New Relic, CloudWatch, etc.
-    if (process.env.NEXT_PUBLIC_MONITORING_ENDPOINT) {
-      fetch(process.env.NEXT_PUBLIC_MONITORING_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(logData),
-      }).catch(err => {
-        console.error('Failed to send error to monitoring service:', err);
-      });
-    }
-  }
-}
-
-/**
- * Main error boundary component for create limits route
- * Implements React 19 error boundary patterns per Section 4.2.1.1 error boundary implementation
- */
-export default class CreateLimitsError extends React.Component<CreateLimitsErrorProps, ErrorBoundaryState> {
-  private errorLogger: ErrorLogger;
-  private retryTimeout: NodeJS.Timeout | null = null;
-
-  constructor(props: CreateLimitsErrorProps) {
-    super(props);
-    
-    this.state = {
-      hasError: false,
-      error: null,
-      errorInfo: null,
-      errorId: null,
-      retryCount: 0
-    };
-
-    this.errorLogger = ErrorLogger.getInstance();
-  }
-
-  /**
-   * React error boundary lifecycle method
-   * Captures errors during render, lifecycle methods, and constructors
-   */
-  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
-    return {
-      hasError: true,
-      error
-    };
-  }
-
-  /**
-   * Handle error with comprehensive logging and monitoring
-   * Implements comprehensive error logging per Section 3.6 monitoring and logging
-   */
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    const errorId = this.errorLogger.logError(error, errorInfo, {
-      route: '/adf-limits/create',
-      retryCount: this.state.retryCount,
-      component: 'CreateLimitsError',
-      timestamp: new Date().toISOString()
-    });
-
-    this.setState({
-      errorInfo,
-      errorId
-    });
-
-    // Call custom error handler if provided
-    if (this.props.onError) {
-      this.props.onError(error, errorInfo);
-    }
-
-    // Clear any existing retry timeout
-    if (this.retryTimeout) {
-      clearTimeout(this.retryTimeout);
-    }
-  }
-
-  /**
-   * Cleanup on component unmount
-   */
-  componentWillUnmount(): void {
-    if (this.retryTimeout) {
-      clearTimeout(this.retryTimeout);
-    }
-  }
-
-  /**
-   * Handle retry action with rate limiting
-   * Implements user-friendly error recovery per Section 4.2.2 form validation flow
-   */
-  private handleRetry = (): void => {
-    const maxRetries = this.props.maxRetries || 3;
-    
-    if (this.state.retryCount >= maxRetries) {
-      return;
-    }
-
-    // Clear React Query cache for fresh data on retry
-    // Integration with React Query error handling per Section 3.2.2
-    if (typeof window !== 'undefined') {
-      const queryClient = (window as any).__REACT_QUERY_CLIENT__;
-      if (queryClient) {
-        queryClient.invalidateQueries({ queryKey: ['limits'] });
-        queryClient.removeQueries({ queryKey: ['limits', 'create'] });
-      }
-    }
-
-    this.setState(prevState => ({
-      hasError: false,
-      error: null,
-      errorInfo: null,
-      errorId: null,
-      retryCount: prevState.retryCount + 1
-    }));
-
-    // Log retry attempt
-    this.errorLogger.logError(
-      new Error('User initiated retry'), 
-      { componentStack: 'Retry attempt' } as ErrorInfo,
-      {
-        retryCount: this.state.retryCount + 1,
-        previousErrorId: this.state.errorId,
-        route: '/adf-limits/create'
-      }
-    );
-  };
-
-  /**
-   * Navigate back to limits list
-   */
-  private handleGoBack = (): void => {
-    if (typeof window !== 'undefined') {
-      window.history.back();
-    }
-  };
-
-  /**
-   * Navigate to limits list page
-   */
-  private handleGoToLimitsList = (): void => {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/adf-limits';
-    }
-  };
-
-  /**
-   * Render error fallback UI with accessibility compliance
-   * Implements WCAG 2.1 AA compliance per Section 3.2.6 UI component architecture
-   */
-  private renderErrorFallback(): ReactNode {
-    const { error, errorId, retryCount } = this.state;
-    const maxRetries = this.props.maxRetries || 3;
-    const canRetry = retryCount < maxRetries;
-    
-    return (
-      <div 
-        className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900"
-        role="main"
-        aria-labelledby="error-title"
-        aria-describedby="error-description"
-      >
-        <Card className="w-full max-w-2xl p-6" role="region">
-          <div className="text-center space-y-6">
-            {/* Error Icon with accessibility */}
-            <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
-              <svg
-                className="w-8 h-8 text-red-600 dark:text-red-400"
-                fill="none"
-                stroke="currentColor"
+          {/* Secondary Actions */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={handleGoBack}
+              className="flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+              aria-describedby="back-description"
+            >
+              <svg 
+                className="w-4 h-4 mr-2" 
+                fill="none" 
+                stroke="currentColor" 
                 viewBox="0 0 24 24"
-                role="img"
-                aria-label="Error icon"
+                aria-hidden="true"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18" 
                 />
               </svg>
+              Go Back
+            </button>
+            <div id="back-description" className="sr-only">
+              Return to the limits list page
             </div>
 
-            {/* Error Title */}
-            <div className="space-y-2">
-              <h1 
-                id="error-title"
-                className="text-2xl font-bold text-gray-900 dark:text-gray-100"
-              >
-                Unable to Create Limit
-              </h1>
-              <p 
-                id="error-description"
-                className="text-gray-600 dark:text-gray-400"
-              >
-                An unexpected error occurred while trying to create a new limit. 
-                Please try again or contact support if the problem persists.
-              </p>
-            </div>
-
-            {/* Error Details for Development */}
-            {process.env.NODE_ENV === 'development' && error && (
-              <Alert variant="error" className="text-left">
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Development Error Details:</h3>
-                  <p className="text-sm font-mono break-all">{error.message}</p>
-                  {errorId && (
-                    <p className="text-xs text-gray-500">Error ID: {errorId}</p>
-                  )}
-                </div>
-              </Alert>
-            )}
-
-            {/* Error ID for Production */}
-            {process.env.NODE_ENV === 'production' && errorId && (
-              <Alert variant="info">
-                <p className="text-sm">
-                  Error ID: <code className="font-mono">{errorId}</code>
-                </p>
-                <p className="text-xs text-gray-600 mt-1">
-                  Please provide this ID when contacting support.
-                </p>
-              </Alert>
-            )}
-
-            {/* Retry Information */}
-            {retryCount > 0 && (
-              <Alert variant="warning">
-                <p className="text-sm">
-                  Retry attempt {retryCount} of {maxRetries}
-                  {!canRetry && ' - Maximum retries reached'}
-                </p>
-              </Alert>
-            )}
-
-            {/* Action Buttons with accessibility */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              {canRetry && (
-                <Button
-                  onClick={this.handleRetry}
-                  variant="primary"
-                  aria-label={`Retry creating limit (attempt ${retryCount + 1} of ${maxRetries})`}
-                >
-                  Try Again
-                </Button>
-              )}
-              
-              <Button
-                onClick={this.handleGoBack}
-                variant="secondary"
-                aria-label="Go back to previous page"
-              >
-                Go Back
-              </Button>
-              
-              <Button
-                onClick={this.handleGoToLimitsList}
-                variant="outline"
-                aria-label="Navigate to limits list page"
-              >
-                View All Limits
-              </Button>
-            </div>
-
-            {/* Additional Help Information */}
-            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                Need Help?
-              </h3>
-              <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                <p>• Check your network connection</p>
-                <p>• Verify you have permission to create limits</p>
-                <p>• Try refreshing the page</p>
-                <p>• Contact system administrator if the issue persists</p>
-              </div>
-            </div>
-
-            {/* Accessibility: Screen reader announcement */}
-            <div 
-              className="sr-only" 
-              aria-live="assertive" 
-              aria-atomic="true"
+            <button
+              onClick={handleRefresh}
+              className="flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+              aria-describedby="refresh-description"
             >
-              An error occurred while creating a limit. 
-              {canRetry ? 'You can try again or navigate to a different page.' : 'Maximum retry attempts reached. Please navigate to a different page or contact support.'}
+              <svg 
+                className="w-4 h-4 mr-2" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+                />
+              </svg>
+              Refresh
+            </button>
+            <div id="refresh-description" className="sr-only">
+              Refresh the current page to reload the application
             </div>
           </div>
-        </Card>
+        </div>
+
+        {/* Contact Support Information */}
+        <div className="text-center pt-4 border-t border-gray-200">
+          <p className="text-sm text-gray-500">
+            If this problem persists, please{' '}
+            <a 
+              href="/support" 
+              className="font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
+              aria-describedby="support-description"
+            >
+              contact support
+            </a>
+            {' '}or check the{' '}
+            <a 
+              href="/status" 
+              className="font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
+              aria-describedby="status-description"
+            >
+              system status
+            </a>
+            .
+          </p>
+          <div id="support-description" className="sr-only">
+            Contact support for assistance with this error
+          </div>
+          <div id="status-description" className="sr-only">
+            Check the system status page for any known issues
+          </div>
+        </div>
       </div>
-    );
-  }
-
-  /**
-   * Render method - returns children if no error, otherwise fallback UI
-   */
-  render(): ReactNode {
-    if (this.state.hasError) {
-      // Return custom fallback if provided, otherwise default error UI
-      return this.props.fallback || this.renderErrorFallback();
-    }
-
-    return this.props.children;
-  }
+    </div>
+  )
 }
-
-/**
- * Hook for integrating with React Query error handling
- * Provides error boundary context for React Query mutations and queries
- * Integration with React Query error handling per Section 3.2.2 state management architecture
- */
-export const useErrorBoundaryIntegration = () => {
-  const queryClient = useQueryClient();
-  const router = useRouter();
-
-  const handleQueryError = React.useCallback((error: Error, queryKey?: string[]) => {
-    const errorLogger = ErrorLogger.getInstance();
-    
-    errorLogger.logError(
-      error,
-      { componentStack: 'React Query Error' } as ErrorInfo,
-      {
-        queryKey,
-        route: '/adf-limits/create',
-        source: 'react-query-integration'
-      }
-    );
-
-    // Clear related cache on error
-    if (queryKey) {
-      queryClient.removeQueries({ queryKey });
-    }
-  }, [queryClient]);
-
-  const resetErrorBoundary = React.useCallback(() => {
-    // Clear all queries related to limits creation
-    queryClient.invalidateQueries({ queryKey: ['limits'] });
-    queryClient.removeQueries({ queryKey: ['limits', 'create'] });
-    
-    // Navigate to a clean state
-    router.refresh();
-  }, [queryClient, router]);
-
-  return {
-    handleQueryError,
-    resetErrorBoundary
-  };
-};
-
-/**
- * Export types for use in other components
- */
-export type { ErrorBoundaryState, CreateLimitsErrorProps };
