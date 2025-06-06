@@ -1,896 +1,745 @@
 /**
- * Comprehensive Vitest Test Suite for Email Template Details Page
+ * Comprehensive Vitest test suite for the email template details page component.
+ * Tests both create and edit workflows with React Testing Library and MSW integration.
  * 
- * This test suite provides complete coverage for the email template details page component,
- * covering both create and edit workflows with React Testing Library and Mock Service Worker
- * integration. Tests form validation, submission logic, error handling, navigation, and
- * responsive behavior. Replaces Angular/Jest tests with modern React testing patterns.
- * 
- * Key Features:
- * - Vitest 2.1+ testing framework with 10x faster test execution
- * - Mock Service Worker for realistic API mocking
- * - React Testing Library for component testing best practices
- * - User event simulation and accessibility testing
- * - Comprehensive validation testing per React/Next.js Integration Requirements
- * - 90%+ code coverage target
- * - Responsive behavior and dark mode functionality testing
- * 
- * Performance Target: < 50ms per test execution (10x faster than Jest)
- * Coverage Target: 90%+ code coverage
- * Accessibility: WCAG 2.1 AA compliance validation
+ * @file page.test.tsx
+ * @description Replaces Angular/Jest tests with modern React testing patterns including
+ * user event simulation, accessibility testing, and realistic API mocking for complete
+ * test coverage of email template management workflows.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { server } from '@/test/mocks/server';
-import { http, HttpResponse } from 'msw';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useRouter, useParams } from 'next/navigation';
-import EmailTemplateDetailsPage from './page';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockedFunction } from 'vitest'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { axe, toHaveNoViolations } from 'jest-axe'
+import { server } from '@/test/mocks/server'
+import { rest } from 'msw'
+import { EmailTemplateDetailsPage } from './page'
+import { EmailTemplateForm } from './email-template-form'
+import { useEmailTemplate } from './use-email-template'
+import { renderWithProviders } from '@/test/utils/test-utils'
+import { createMockEmailTemplate, createMockEmailTemplatePayload } from '@/test/utils/component-factories'
 
-// Mock Next.js navigation hooks
+// Extend Jest matchers for accessibility testing
+expect.extend(toHaveNoViolations)
+
+// Mock Next.js navigation
+const mockPush = vi.fn()
+const mockBack = vi.fn()
+const mockReplace = vi.fn()
+
 vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
-  useParams: vi.fn(),
-  usePathname: vi.fn(() => '/adf-config/df-email-template-details'),
-  useSearchParams: vi.fn(() => new URLSearchParams()),
-}));
+  useRouter: () => ({
+    push: mockPush,
+    back: mockBack,
+    replace: mockReplace,
+  }),
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({ id: undefined }),
+}))
 
-// Mock the form component and custom hook
-vi.mock('./email-template-form', () => ({
-  default: vi.fn(({ onSubmit, onCancel, initialData, isLoading }) => (
-    <div data-testid="email-template-form">
-      <h2>{initialData?.id ? 'Edit Email Template' : 'Create Email Template'}</h2>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const formData = new FormData(e.target as HTMLFormElement);
-          onSubmit({
-            name: formData.get('name') as string,
-            subject: formData.get('subject') as string,
-            body_text: formData.get('body_text') as string,
-            body_html: formData.get('body_html') as string,
-            from_name: formData.get('from_name') as string,
-            from_email: formData.get('from_email') as string,
-            reply_to_name: formData.get('reply_to_name') as string,
-            reply_to_email: formData.get('reply_to_email') as string,
-          });
-        }}
-      >
-        <input
-          name="name"
-          placeholder="Template Name"
-          defaultValue={initialData?.name || ''}
-          required
-        />
-        <input
-          name="subject"
-          placeholder="Email Subject"
-          defaultValue={initialData?.subject || ''}
-          required
-        />
-        <textarea
-          name="body_text"
-          placeholder="Text Body"
-          defaultValue={initialData?.body_text || ''}
-          rows={4}
-        />
-        <textarea
-          name="body_html"
-          placeholder="HTML Body"
-          defaultValue={initialData?.body_html || ''}
-          rows={6}
-        />
-        <input
-          name="from_name"
-          placeholder="From Name"
-          defaultValue={initialData?.from_name || ''}
-        />
-        <input
-          name="from_email"
-          type="email"
-          placeholder="From Email"
-          defaultValue={initialData?.from_email || ''}
-          required
-        />
-        <input
-          name="reply_to_name"
-          placeholder="Reply To Name"
-          defaultValue={initialData?.reply_to_name || ''}
-        />
-        <input
-          name="reply_to_email"
-          type="email"
-          placeholder="Reply To Email"
-          defaultValue={initialData?.reply_to_email || ''}
-        />
-        <button type="submit" disabled={isLoading}>
-          {isLoading ? 'Saving...' : 'Save Template'}
-        </button>
-        <button type="button" onClick={onCancel}>
-          Cancel
-        </button>
-      </form>
-    </div>
-  )),
-}));
+// Mock react-hook-form for form testing
+vi.mock('react-hook-form', async () => {
+  const actual = await vi.importActual('react-hook-form')
+  return {
+    ...actual,
+    useForm: vi.fn(),
+  }
+})
 
+// Mock custom hook
 vi.mock('./use-email-template', () => ({
   useEmailTemplate: vi.fn(),
-}));
+}))
 
-// Mock data fixtures
-const mockEmailTemplate = {
-  id: '1',
-  name: 'Welcome Email',
-  subject: 'Welcome to DreamFactory',
-  body_text: 'Welcome to DreamFactory! Thank you for signing up.',
-  body_html: '<h1>Welcome to DreamFactory!</h1><p>Thank you for signing up.</p>',
-  from_name: 'DreamFactory Team',
-  from_email: 'noreply@dreamfactory.com',
-  reply_to_name: 'Support Team',
-  reply_to_email: 'support@dreamfactory.com',
-  created_date: '2024-01-01T00:00:00Z',
-  last_modified_date: '2024-01-01T00:00:00Z',
-};
-
-const createMockEmailTemplate = (overrides = {}) => ({
-  ...mockEmailTemplate,
-  ...overrides,
-});
-
-// Test utilities
-const createQueryClient = () => new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-      gcTime: 0,
-    },
-    mutations: {
-      retry: false,
-    },
-  },
-});
-
-const renderWithProviders = (component: React.ReactElement, queryClient = createQueryClient()) => {
-  return render(
-    <QueryClientProvider client={queryClient}>
-      {component}
-    </QueryClientProvider>
-  );
-};
-
-// Mock router functions
-const mockPush = vi.fn();
-const mockReplace = vi.fn();
-const mockBack = vi.fn();
-
-describe('EmailTemplateDetailsPage', () => {
-  let queryClient: QueryClient;
-  let mockUseEmailTemplate: any;
-
-  beforeEach(() => {
-    queryClient = createQueryClient();
-    
-    // Reset all mocks
-    vi.clearAllMocks();
-    
-    // Configure Next.js mocks
-    (useRouter as any).mockReturnValue({
-      push: mockPush,
-      replace: mockReplace,
-      back: mockBack,
-      refresh: vi.fn(),
-      prefetch: vi.fn(),
-    });
-
-    // Import the mock hook
-    const { useEmailTemplate } = require('./use-email-template');
-    mockUseEmailTemplate = useEmailTemplate;
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
-  describe('Create Email Template Workflow', () => {
-    beforeEach(() => {
-      (useParams as any).mockReturnValue({ id: undefined });
-      mockUseEmailTemplate.mockReturnValue({
-        template: null,
-        isLoading: false,
-        error: null,
-        createTemplate: vi.fn(),
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-    });
-
-    it('renders create form with correct heading', async () => {
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Create Email Template')).toBeInTheDocument();
-    });
-
-    it('renders form fields with correct placeholders', async () => {
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-      });
-
-      expect(screen.getByPlaceholderText('Email Subject')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Text Body')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('HTML Body')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('From Name')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('From Email')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Reply To Name')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Reply To Email')).toBeInTheDocument();
-    });
-
-    it('handles successful template creation', async () => {
-      const mockCreateTemplate = vi.fn().mockResolvedValue(mockEmailTemplate);
-      mockUseEmailTemplate.mockReturnValue({
-        template: null,
-        isLoading: false,
-        error: null,
-        createTemplate: mockCreateTemplate,
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-      });
-
-      // Fill out the form
-      await user.type(screen.getByPlaceholderText('Template Name'), 'Test Template');
-      await user.type(screen.getByPlaceholderText('Email Subject'), 'Test Subject');
-      await user.type(screen.getByPlaceholderText('From Email'), 'test@example.com');
-
-      // Submit the form
-      await user.click(screen.getByText('Save Template'));
-
-      await waitFor(() => {
-        expect(mockCreateTemplate).toHaveBeenCalledWith({
-          name: 'Test Template',
-          subject: 'Test Subject',
-          body_text: '',
-          body_html: '',
-          from_name: '',
-          from_email: 'test@example.com',
-          reply_to_name: '',
-          reply_to_email: '',
-        });
-      });
-
-      // Should navigate back on success
-      expect(mockBack).toHaveBeenCalled();
-    });
-
-    it('displays validation errors for required fields', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Save Template')).toBeInTheDocument();
-      });
-
-      // Try to submit without required fields
-      await user.click(screen.getByText('Save Template'));
-
-      // The browser's built-in validation should prevent submission
-      const nameField = screen.getByPlaceholderText('Template Name');
-      expect(nameField).toBeInvalid();
-    });
-
-    it('handles form cancellation', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Cancel')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByText('Cancel'));
-
-      expect(mockBack).toHaveBeenCalled();
-    });
-  });
-
-  describe('Edit Email Template Workflow', () => {
-    beforeEach(() => {
-      (useParams as any).mockReturnValue({ id: '1' });
-      mockUseEmailTemplate.mockReturnValue({
-        template: mockEmailTemplate,
-        isLoading: false,
-        error: null,
-        createTemplate: vi.fn(),
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-    });
-
-    it('renders edit form with existing data', async () => {
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Edit Email Template')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('Welcome Email')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('Welcome to DreamFactory')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('noreply@dreamfactory.com')).toBeInTheDocument();
-    });
-
-    it('handles successful template update', async () => {
-      const mockUpdateTemplate = vi.fn().mockResolvedValue({
-        ...mockEmailTemplate,
-        name: 'Updated Template',
-      });
-      
-      mockUseEmailTemplate.mockReturnValue({
-        template: mockEmailTemplate,
-        isLoading: false,
-        error: null,
-        createTemplate: vi.fn(),
-        updateTemplate: mockUpdateTemplate,
-        deleteTemplate: vi.fn(),
-      });
-
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('Welcome Email')).toBeInTheDocument();
-      });
-
-      // Update the template name
-      const nameField = screen.getByDisplayValue('Welcome Email');
-      await user.clear(nameField);
-      await user.type(nameField, 'Updated Template');
-
-      // Submit the form
-      await user.click(screen.getByText('Save Template'));
-
-      await waitFor(() => {
-        expect(mockUpdateTemplate).toHaveBeenCalledWith('1', expect.objectContaining({
-          name: 'Updated Template',
-        }));
-      });
-
-      expect(mockBack).toHaveBeenCalled();
-    });
-  });
-
-  describe('Loading States', () => {
-    it('displays loading state while fetching template', async () => {
-      (useParams as any).mockReturnValue({ id: '1' });
-      mockUseEmailTemplate.mockReturnValue({
-        template: null,
-        isLoading: true,
-        error: null,
-        createTemplate: vi.fn(),
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      // Should show loading indicator or skeleton
-      await waitFor(() => {
-        expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      });
-
-      // Form should be disabled during loading
-      expect(screen.getByText('Saving...')).toBeInTheDocument();
-    });
-
-    it('displays loading state during form submission', async () => {
-      const mockCreateTemplate = vi.fn(() => new Promise(resolve => setTimeout(resolve, 100)));
-      mockUseEmailTemplate.mockReturnValue({
-        template: null,
-        isLoading: true,
-        error: null,
-        createTemplate: mockCreateTemplate,
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Saving...')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('displays error message when template fetch fails', async () => {
-      (useParams as any).mockReturnValue({ id: '1' });
-      mockUseEmailTemplate.mockReturnValue({
-        template: null,
-        isLoading: false,
-        error: new Error('Failed to fetch email template'),
-        createTemplate: vi.fn(),
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Failed to fetch email template/i)).toBeInTheDocument();
-      });
-    });
-
-    it('handles template creation errors', async () => {
-      const mockCreateTemplate = vi.fn().mockRejectedValue(
-        new Error('Failed to create email template')
-      );
-      
-      mockUseEmailTemplate.mockReturnValue({
-        template: null,
-        isLoading: false,
-        error: null,
-        createTemplate: mockCreateTemplate,
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-      });
-
-      // Fill required fields and submit
-      await user.type(screen.getByPlaceholderText('Template Name'), 'Test');
-      await user.type(screen.getByPlaceholderText('Email Subject'), 'Test');
-      await user.type(screen.getByPlaceholderText('From Email'), 'test@example.com');
-      await user.click(screen.getByText('Save Template'));
-
-      await waitFor(() => {
-        expect(mockCreateTemplate).toHaveBeenCalled();
-      });
-
-      // Error should be handled gracefully
-      expect(mockBack).not.toHaveBeenCalled();
-    });
-
-    it('handles validation errors from server', async () => {
-      const mockCreateTemplate = vi.fn().mockRejectedValue({
-        message: 'Validation failed',
-        errors: {
-          from_email: ['Invalid email format'],
-          name: ['Name is required'],
-        },
-      });
-
-      mockUseEmailTemplate.mockReturnValue({
-        template: null,
-        isLoading: false,
-        error: null,
-        createTemplate: mockCreateTemplate,
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByText('Save Template'));
-
-      await waitFor(() => {
-        expect(mockCreateTemplate).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Navigation and Routing', () => {
-    it('navigates back on successful form submission', async () => {
-      const mockCreateTemplate = vi.fn().mockResolvedValue(mockEmailTemplate);
-      mockUseEmailTemplate.mockReturnValue({
-        template: null,
-        isLoading: false,
-        error: null,
-        createTemplate: mockCreateTemplate,
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-      });
-
-      await user.type(screen.getByPlaceholderText('Template Name'), 'Test');
-      await user.type(screen.getByPlaceholderText('Email Subject'), 'Test');
-      await user.type(screen.getByPlaceholderText('From Email'), 'test@example.com');
-      await user.click(screen.getByText('Save Template'));
-
-      await waitFor(() => {
-        expect(mockBack).toHaveBeenCalled();
-      });
-    });
-
-    it('navigates back on form cancellation', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Cancel')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByText('Cancel'));
-      expect(mockBack).toHaveBeenCalled();
-    });
-  });
-
-  describe('Form Validation', () => {
-    it('validates email format for from_email field', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('From Email')).toBeInTheDocument();
-      });
-
-      const emailField = screen.getByPlaceholderText('From Email');
-      await user.type(emailField, 'invalid-email');
-
-      // Check if field is invalid due to email validation
-      expect(emailField).toBeInvalid();
-    });
-
-    it('validates email format for reply_to_email field', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Reply To Email')).toBeInTheDocument();
-      });
-
-      const replyEmailField = screen.getByPlaceholderText('Reply To Email');
-      await user.type(replyEmailField, 'invalid-email');
-
-      expect(replyEmailField).toBeInvalid();
-    });
-
-    it('allows submission with valid email formats', async () => {
-      const mockCreateTemplate = vi.fn().mockResolvedValue(mockEmailTemplate);
-      mockUseEmailTemplate.mockReturnValue({
-        template: null,
-        isLoading: false,
-        error: null,
-        createTemplate: mockCreateTemplate,
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('From Email')).toBeInTheDocument();
-      });
-
-      await user.type(screen.getByPlaceholderText('Template Name'), 'Test');
-      await user.type(screen.getByPlaceholderText('Email Subject'), 'Test');
-      await user.type(screen.getByPlaceholderText('From Email'), 'valid@example.com');
-      await user.type(screen.getByPlaceholderText('Reply To Email'), 'reply@example.com');
-
-      await user.click(screen.getByText('Save Template'));
-
-      await waitFor(() => {
-        expect(mockCreateTemplate).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Accessibility', () => {
-    it('has proper form labeling and structure', async () => {
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      });
-
-      // Check for form structure
-      const form = screen.getByRole('form');
-      expect(form).toBeInTheDocument();
-
-      // Check for proper input accessibility
-      const nameInput = screen.getByPlaceholderText('Template Name');
-      expect(nameInput).toHaveAttribute('name', 'name');
-      expect(nameInput).toHaveAttribute('required');
-
-      const emailInput = screen.getByPlaceholderText('From Email');
-      expect(emailInput).toHaveAttribute('type', 'email');
-      expect(emailInput).toHaveAttribute('required');
-    });
-
-    it('supports keyboard navigation', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-      });
-
-      // Tab through form fields
-      await user.tab();
-      expect(screen.getByPlaceholderText('Template Name')).toHaveFocus();
-
-      await user.tab();
-      expect(screen.getByPlaceholderText('Email Subject')).toHaveFocus();
-
-      await user.tab();
-      expect(screen.getByPlaceholderText('Text Body')).toHaveFocus();
-    });
-
-    it('provides proper button labels and states', async () => {
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Save Template')).toBeInTheDocument();
-      });
-
-      const saveButton = screen.getByText('Save Template');
-      expect(saveButton).toHaveAttribute('type', 'submit');
-
-      const cancelButton = screen.getByText('Cancel');
-      expect(cancelButton).toHaveAttribute('type', 'button');
-    });
-  });
-
-  describe('Responsive Behavior', () => {
-    it('adapts to mobile viewport', async () => {
-      // Mock mobile viewport
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 375,
-      });
-
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      });
-
-      // Form should still be functional on mobile
-      expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-      expect(screen.getByText('Save Template')).toBeInTheDocument();
-    });
-
-    it('adapts to tablet viewport', async () => {
-      // Mock tablet viewport
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 768,
-      });
-
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      });
-
-      expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-    });
-
-    it('handles window resize events', async () => {
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      });
-
-      // Simulate window resize
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 1200,
-      });
-
-      fireEvent(window, new Event('resize'));
-
-      // Component should remain functional after resize
-      expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-    });
-  });
-
-  describe('Dark Mode Support', () => {
-    it('renders correctly in dark mode', async () => {
-      // Mock dark mode by adding dark class to document
-      document.documentElement.classList.add('dark');
-
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      });
-
-      // Form should be functional in dark mode
-      expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-      expect(screen.getByText('Save Template')).toBeInTheDocument();
-
-      // Clean up
-      document.documentElement.classList.remove('dark');
-    });
-
-    it('handles theme transitions', async () => {
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      });
-
-      // Toggle dark mode
-      document.documentElement.classList.add('dark');
-      
-      // Component should remain functional during theme transition
-      expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-
-      // Toggle back to light mode
-      document.documentElement.classList.remove('dark');
-      
-      expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-    });
-  });
-
-  describe('Performance Optimizations', () => {
-    it('handles large template content efficiently', async () => {
-      const largeTemplate = createMockEmailTemplate({
-        body_html: '<div>' + 'Large content '.repeat(1000) + '</div>',
-        body_text: 'Large text content '.repeat(1000),
-      });
-
-      (useParams as any).mockReturnValue({ id: '1' });
-      mockUseEmailTemplate.mockReturnValue({
-        template: largeTemplate,
-        isLoading: false,
-        error: null,
-        createTemplate: vi.fn(),
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-
-      const startTime = performance.now();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      });
-
-      const endTime = performance.now();
-      const renderTime = endTime - startTime;
-
-      // Should render within performance budget (< 100ms)
-      expect(renderTime).toBeLessThan(100);
-    });
-
-    it('debounces form input changes', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Template Name')).toBeInTheDocument();
-      });
-
-      const nameInput = screen.getByPlaceholderText('Template Name');
-      
-      // Type rapidly and ensure no performance issues
-      await user.type(nameInput, 'Test Template Name');
-      
-      expect(nameInput).toHaveValue('Test Template Name');
-    });
-  });
-
-  describe('Integration with Custom Hook', () => {
-    it('properly initializes hook for create mode', () => {
-      (useParams as any).mockReturnValue({ id: undefined });
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      expect(mockUseEmailTemplate).toHaveBeenCalledWith(undefined);
-    });
-
-    it('properly initializes hook for edit mode', () => {
-      (useParams as any).mockReturnValue({ id: '123' });
-      renderWithProviders(<EmailTemplateDetailsPage />);
-
-      expect(mockUseEmailTemplate).toHaveBeenCalledWith('123');
-    });
-
-    it('handles hook state changes correctly', async () => {
-      const { rerender } = renderWithProviders(<EmailTemplateDetailsPage />);
-
-      // Initial state
-      await waitFor(() => {
-        expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      });
-
-      // Update hook to return template data
-      mockUseEmailTemplate.mockReturnValue({
-        template: mockEmailTemplate,
-        isLoading: false,
-        error: null,
-        createTemplate: vi.fn(),
-        updateTemplate: vi.fn(),
-        deleteTemplate: vi.fn(),
-      });
-
-      rerender(
-        <QueryClientProvider client={queryClient}>
-          <EmailTemplateDetailsPage />
-        </QueryClientProvider>
-      );
-
-      expect(screen.getByDisplayValue('Welcome Email')).toBeInTheDocument();
-    });
-  });
-
-  describe('Error Boundary Integration', () => {
-    it('handles component errors gracefully', async () => {
-      // Mock an error in the form component
-      const OriginalEmailTemplateForm = require('./email-template-form').default;
-      vi.mocked(require('./email-template-form')).default.mockImplementation(() => {
-        throw new Error('Component error');
-      });
-
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      try {
-        renderWithProviders(<EmailTemplateDetailsPage />);
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-      }
-
-      // Restore original component
-      vi.mocked(require('./email-template-form')).default.mockImplementation(OriginalEmailTemplateForm);
-      consoleError.mockRestore();
-    });
-  });
-
-  describe('Memory Management', () => {
-    it('cleans up resources on unmount', () => {
-      const { unmount } = renderWithProviders(<EmailTemplateDetailsPage />);
-      
-      // Verify component mounts successfully
-      expect(screen.getByTestId('email-template-form')).toBeInTheDocument();
-      
-      // Unmount and verify cleanup
-      unmount();
-      
-      // Should not have any lingering elements
-      expect(screen.queryByTestId('email-template-form')).not.toBeInTheDocument();
-    });
-  });
-});
+const mockUseEmailTemplate = useEmailTemplate as MockedFunction<typeof useEmailTemplate>
 
 /**
- * Export test utilities for potential reuse in other test files
+ * Test suite for EmailTemplateDetailsPage component - Create workflow
+ * Tests form initialization, validation, submission, and error handling for new templates
  */
-export {
-  renderWithProviders,
-  createQueryClient,
-  createMockEmailTemplate,
-};
+describe('EmailTemplateDetailsPage - Create Workflow', () => {
+  const user = userEvent.setup()
+  
+  const defaultHookReturn = {
+    emailTemplate: undefined,
+    isLoading: false,
+    isError: false,
+    error: null,
+    createTemplate: vi.fn(),
+    updateTemplate: vi.fn(),
+    isCreating: false,
+    isUpdating: false,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockUseEmailTemplate.mockReturnValue(defaultHookReturn)
+  })
+
+  afterEach(() => {
+    server.resetHandlers()
+  })
+
+  it('should render create form with initial empty state', () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    expect(screen.getByRole('textbox', { name: /template name/i })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: /description/i })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: /recipient/i })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: /subject/i })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: /body/i })).toHaveValue('')
+    expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument()
+  })
+
+  it('should display proper form validation for required fields', async () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    const nameInput = screen.getByRole('textbox', { name: /template name/i })
+    const saveButton = screen.getByRole('button', { name: /save/i })
+    
+    // Try to submit without required field
+    await user.click(saveButton)
+    
+    await waitFor(() => {
+      expect(screen.getByText(/template name is required/i)).toBeInTheDocument()
+    })
+    
+    // Fill required field and verify validation passes
+    await user.type(nameInput, 'Test Template')
+    
+    await waitFor(() => {
+      expect(screen.queryByText(/template name is required/i)).not.toBeInTheDocument()
+    })
+  })
+
+  it('should validate email format for sender and reply-to fields', async () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    const senderEmailInput = screen.getByRole('textbox', { name: /sender email/i })
+    const replyToEmailInput = screen.getByRole('textbox', { name: /reply-to email/i })
+    
+    // Test invalid email format
+    await user.type(senderEmailInput, 'invalid-email')
+    await user.type(replyToEmailInput, 'also-invalid')
+    await user.tab()
+    
+    await waitFor(() => {
+      expect(screen.getByText(/please enter a valid email address/i)).toBeInTheDocument()
+    })
+    
+    // Test valid email format
+    await user.clear(senderEmailInput)
+    await user.clear(replyToEmailInput)
+    await user.type(senderEmailInput, 'sender@example.com')
+    await user.type(replyToEmailInput, 'reply@example.com')
+    
+    await waitFor(() => {
+      expect(screen.queryByText(/please enter a valid email address/i)).not.toBeInTheDocument()
+    })
+  })
+
+  it('should call createTemplate when form is submitted with valid data', async () => {
+    const mockCreate = vi.fn().mockResolvedValue({ id: 1 })
+    mockUseEmailTemplate.mockReturnValue({
+      ...defaultHookReturn,
+      createTemplate: mockCreate,
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    // Fill form with valid data
+    await user.type(screen.getByRole('textbox', { name: /template name/i }), 'Test Template')
+    await user.type(screen.getByRole('textbox', { name: /description/i }), 'Test Description')
+    await user.type(screen.getByRole('textbox', { name: /recipient/i }), 'test@example.com')
+    await user.type(screen.getByRole('textbox', { name: /subject/i }), 'Test Subject')
+    await user.type(screen.getByRole('textbox', { name: /body/i }), '<p>Test HTML Body</p>')
+    
+    // Submit form
+    await user.click(screen.getByRole('button', { name: /save/i }))
+    
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith({
+        name: 'Test Template',
+        description: 'Test Description',
+        to: 'test@example.com',
+        subject: 'Test Subject',
+        bodyHtml: '<p>Test HTML Body</p>',
+        cc: '',
+        bcc: '',
+        attachment: '',
+        fromName: '',
+        fromEmail: '',
+        replyToName: '',
+        replyToEmail: '',
+      })
+    })
+  })
+
+  it('should prevent submission when form is invalid', async () => {
+    const mockCreate = vi.fn()
+    mockUseEmailTemplate.mockReturnValue({
+      ...defaultHookReturn,
+      createTemplate: mockCreate,
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    // Try to submit without required fields
+    await user.click(screen.getByRole('button', { name: /save/i }))
+    
+    // Should not call create function
+    expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it('should navigate back when cancel button is clicked', async () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+    
+    expect(mockBack).toHaveBeenCalled()
+  })
+
+  it('should display loading state during creation', () => {
+    mockUseEmailTemplate.mockReturnValue({
+      ...defaultHookReturn,
+      isCreating: true,
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    expect(screen.getByRole('button', { name: /creating\.\.\./i })).toBeDisabled()
+  })
+
+  it('should display error message when creation fails', async () => {
+    const errorMessage = 'Failed to create email template'
+    mockUseEmailTemplate.mockReturnValue({
+      ...defaultHookReturn,
+      isError: true,
+      error: new Error(errorMessage),
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    expect(screen.getByRole('alert')).toHaveTextContent(errorMessage)
+  })
+
+  it('should meet accessibility standards', async () => {
+    const { container } = renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('should support keyboard navigation', async () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    const nameInput = screen.getByRole('textbox', { name: /template name/i })
+    const descriptionInput = screen.getByRole('textbox', { name: /description/i })
+    const cancelButton = screen.getByRole('button', { name: /cancel/i })
+    
+    // Test tab navigation
+    nameInput.focus()
+    expect(nameInput).toHaveFocus()
+    
+    await user.tab()
+    expect(descriptionInput).toHaveFocus()
+    
+    // Navigate to buttons
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    expect(cancelButton).toHaveFocus()
+  })
+})
+
+/**
+ * Test suite for EmailTemplateDetailsPage component - Edit workflow
+ * Tests form initialization with existing data, updates, and edit-specific behaviors
+ */
+describe('EmailTemplateDetailsPage - Edit Workflow', () => {
+  const user = userEvent.setup()
+  const mockTemplate = createMockEmailTemplate({
+    id: 1,
+    name: 'Existing Template',
+    description: 'Existing Description',
+    to: 'existing@example.com',
+    subject: 'Existing Subject',
+    bodyHtml: '<p>Existing HTML Body</p>',
+    fromName: 'Existing Sender',
+    fromEmail: 'sender@example.com',
+  })
+
+  const editHookReturn = {
+    emailTemplate: mockTemplate,
+    isLoading: false,
+    isError: false,
+    error: null,
+    createTemplate: vi.fn(),
+    updateTemplate: vi.fn(),
+    isCreating: false,
+    isUpdating: false,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Mock useParams to return an ID for edit mode
+    vi.mocked(vi.importActual('next/navigation')).useParams = vi.fn(() => ({ id: '1' }))
+    mockUseEmailTemplate.mockReturnValue(editHookReturn)
+  })
+
+  afterEach(() => {
+    server.resetHandlers()
+  })
+
+  it('should render edit form with existing template data', () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    expect(screen.getByRole('textbox', { name: /template name/i })).toHaveValue('Existing Template')
+    expect(screen.getByRole('textbox', { name: /description/i })).toHaveValue('Existing Description')
+    expect(screen.getByRole('textbox', { name: /recipient/i })).toHaveValue('existing@example.com')
+    expect(screen.getByRole('textbox', { name: /subject/i })).toHaveValue('Existing Subject')
+    expect(screen.getByRole('textbox', { name: /body/i })).toHaveValue('<p>Existing HTML Body</p>')
+    expect(screen.getByRole('textbox', { name: /sender name/i })).toHaveValue('Existing Sender')
+    expect(screen.getByRole('textbox', { name: /sender email/i })).toHaveValue('sender@example.com')
+    expect(screen.getByRole('button', { name: /update/i })).toBeInTheDocument()
+  })
+
+  it('should call updateTemplate when form is submitted with changes', async () => {
+    const mockUpdate = vi.fn().mockResolvedValue({ id: 1 })
+    mockUseEmailTemplate.mockReturnValue({
+      ...editHookReturn,
+      updateTemplate: mockUpdate,
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    // Modify the template name
+    const nameInput = screen.getByRole('textbox', { name: /template name/i })
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Updated Template Name')
+    
+    // Submit form
+    await user.click(screen.getByRole('button', { name: /update/i }))
+    
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith(1, {
+        name: 'Updated Template Name',
+        description: 'Existing Description',
+        to: 'existing@example.com',
+        subject: 'Existing Subject',
+        bodyHtml: '<p>Existing HTML Body</p>',
+        cc: '',
+        bcc: '',
+        attachment: '',
+        fromName: 'Existing Sender',
+        fromEmail: 'sender@example.com',
+        replyToName: '',
+        replyToEmail: '',
+      })
+    })
+  })
+
+  it('should display loading state during update', () => {
+    mockUseEmailTemplate.mockReturnValue({
+      ...editHookReturn,
+      isUpdating: true,
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    expect(screen.getByRole('button', { name: /updating\.\.\./i })).toBeDisabled()
+  })
+
+  it('should display error message when update fails', () => {
+    const errorMessage = 'Failed to update email template'
+    mockUseEmailTemplate.mockReturnValue({
+      ...editHookReturn,
+      isError: true,
+      error: new Error(errorMessage),
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    expect(screen.getByRole('alert')).toHaveTextContent(errorMessage)
+  })
+
+  it('should display loading state while fetching template data', () => {
+    mockUseEmailTemplate.mockReturnValue({
+      ...editHookReturn,
+      emailTemplate: undefined,
+      isLoading: true,
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    expect(screen.getByText(/loading template data\.\.\./i)).toBeInTheDocument()
+  })
+})
+
+/**
+ * Test suite for responsive design and theme functionality
+ * Tests dark mode, responsive breakpoints, and mobile accessibility
+ */
+describe('EmailTemplateDetailsPage - Responsive and Theme Testing', () => {
+  const user = userEvent.setup()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockUseEmailTemplate.mockReturnValue({
+      emailTemplate: undefined,
+      isLoading: false,
+      isError: false,
+      error: null,
+      createTemplate: vi.fn(),
+      updateTemplate: vi.fn(),
+      isCreating: false,
+      isUpdating: false,
+    })
+  })
+
+  it('should apply dark mode styles when theme is dark', () => {
+    // Mock theme context to return dark mode
+    const DarkThemeWrapper = ({ children }: { children: React.ReactNode }) => (
+      <div className="dark">{children}</div>
+    )
+    
+    render(
+      <DarkThemeWrapper>
+        <EmailTemplateDetailsPage />
+      </DarkThemeWrapper>
+    )
+    
+    const container = screen.getByTestId('email-template-container')
+    expect(container).toHaveClass('dark:bg-gray-900')
+  })
+
+  it('should handle mobile viewport correctly', () => {
+    // Mock mobile viewport
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 390,
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    const form = screen.getByRole('form')
+    expect(form).toHaveClass('flex-col', 'space-y-4')
+  })
+
+  it('should maintain form usability on tablet viewport', () => {
+    // Mock tablet viewport
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 768,
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    const form = screen.getByRole('form')
+    expect(form).toHaveClass('md:grid-cols-2')
+  })
+
+  it('should handle text area auto-resize', async () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    const bodyTextarea = screen.getByRole('textbox', { name: /body/i })
+    
+    // Type a long text to test auto-resize
+    const longText = 'This is a very long email body content that should cause the textarea to expand. '.repeat(10)
+    await user.type(bodyTextarea, longText)
+    
+    expect(bodyTextarea).toHaveValue(longText)
+    // Verify textarea has grown (min-height increases)
+    expect(bodyTextarea).toHaveStyle('min-height: 120px')
+  })
+})
+
+/**
+ * Test suite for error boundary and network error handling
+ * Tests API error scenarios, network failures, and error recovery
+ */
+describe('EmailTemplateDetailsPage - Error Handling', () => {
+  const user = userEvent.setup()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    server.resetHandlers()
+  })
+
+  it('should handle API validation errors gracefully', async () => {
+    // Mock API to return validation errors
+    server.use(
+      rest.post('/api/v2/system/email_template', (req, res, ctx) => {
+        return res(
+          ctx.status(422),
+          ctx.json({
+            error: {
+              code: 422,
+              message: 'Validation failed',
+              context: {
+                resource: [{
+                  message: 'The name field is required.',
+                  details: [{ name: ['The name field is required.'] }]
+                }]
+              }
+            }
+          })
+        )
+      })
+    )
+
+    const mockCreate = vi.fn().mockRejectedValue(new Error('Validation failed'))
+    mockUseEmailTemplate.mockReturnValue({
+      emailTemplate: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('Validation failed'),
+      createTemplate: mockCreate,
+      updateTemplate: vi.fn(),
+      isCreating: false,
+      isUpdating: false,
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    expect(screen.getByRole('alert')).toHaveTextContent('Validation failed')
+  })
+
+  it('should handle network timeout errors', async () => {
+    server.use(
+      rest.post('/api/v2/system/email_template', (req, res, ctx) => {
+        return res.networkError('Network timeout')
+      })
+    )
+
+    const mockCreate = vi.fn().mockRejectedValue(new Error('Network timeout'))
+    mockUseEmailTemplate.mockReturnValue({
+      emailTemplate: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('Network timeout'),
+      createTemplate: mockCreate,
+      updateTemplate: vi.fn(),
+      isCreating: false,
+      isUpdating: false,
+    })
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    expect(screen.getByRole('alert')).toHaveTextContent('Network timeout')
+  })
+
+  it('should provide retry functionality after error', async () => {
+    const mockCreate = vi.fn()
+    let hasError = true
+    
+    mockUseEmailTemplate.mockImplementation(() => ({
+      emailTemplate: undefined,
+      isLoading: false,
+      isError: hasError,
+      error: hasError ? new Error('Temporary error') : null,
+      createTemplate: mockCreate,
+      updateTemplate: vi.fn(),
+      isCreating: false,
+      isUpdating: false,
+    }))
+    
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    expect(screen.getByRole('alert')).toHaveTextContent('Temporary error')
+    
+    const retryButton = screen.getByRole('button', { name: /retry/i })
+    
+    // Simulate successful retry
+    hasError = false
+    await user.click(retryButton)
+    
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+  })
+})
+
+/**
+ * Test suite for performance and optimization
+ * Tests form debouncing, validation performance, and memory management
+ */
+describe('EmailTemplateDetailsPage - Performance Testing', () => {
+  const user = userEvent.setup()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockUseEmailTemplate.mockReturnValue({
+      emailTemplate: undefined,
+      isLoading: false,
+      isError: false,
+      error: null,
+      createTemplate: vi.fn(),
+      updateTemplate: vi.fn(),
+      isCreating: false,
+      isUpdating: false,
+    })
+  })
+
+  it('should debounce validation to avoid excessive re-renders', async () => {
+    const { container } = renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    const nameInput = screen.getByRole('textbox', { name: /template name/i })
+    
+    // Type rapidly to test debouncing
+    await user.type(nameInput, 'Test')
+    
+    // Verify only final state is rendered
+    expect(nameInput).toHaveValue('Test')
+    
+    // Check for performance markers
+    const performanceEntries = performance.getEntriesByType('measure')
+    expect(performanceEntries.length).toBeGreaterThan(0)
+  })
+
+  it('should handle large form data efficiently', async () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    const bodyTextarea = screen.getByRole('textbox', { name: /body/i })
+    
+    // Create large HTML content
+    const largeContent = '<div>' + 'Large content '.repeat(1000) + '</div>'
+    
+    const startTime = performance.now()
+    await user.type(bodyTextarea, largeContent)
+    const endTime = performance.now()
+    
+    expect(bodyTextarea).toHaveValue(largeContent)
+    // Verify performance is acceptable (under 100ms for large content)
+    expect(endTime - startTime).toBeLessThan(100)
+  })
+
+  it('should properly cleanup resources on unmount', () => {
+    const { unmount } = renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    // Verify no memory leaks after unmount
+    unmount()
+    
+    // Check that event listeners are cleaned up
+    expect(document.querySelectorAll('[data-testid="email-template-container"]')).toHaveLength(0)
+  })
+})
+
+/**
+ * Test suite for user experience and interaction testing
+ * Tests realistic user workflows, form interactions, and edge cases
+ */
+describe('EmailTemplateDetailsPage - User Experience Testing', () => {
+  const user = userEvent.setup()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockUseEmailTemplate.mockReturnValue({
+      emailTemplate: undefined,
+      isLoading: false,
+      isError: false,
+      error: null,
+      createTemplate: vi.fn().mockResolvedValue({ id: 1 }),
+      updateTemplate: vi.fn(),
+      isCreating: false,
+      isUpdating: false,
+    })
+  })
+
+  it('should complete full create workflow successfully', async () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    // Fill out complete form
+    await user.type(screen.getByRole('textbox', { name: /template name/i }), 'Welcome Email')
+    await user.type(screen.getByRole('textbox', { name: /description/i }), 'Welcome new users')
+    await user.type(screen.getByRole('textbox', { name: /recipient/i }), '{user_email}')
+    await user.type(screen.getByRole('textbox', { name: /cc/i }), 'admin@example.com')
+    await user.type(screen.getByRole('textbox', { name: /subject/i }), 'Welcome to DreamFactory!')
+    await user.type(screen.getByRole('textbox', { name: /body/i }), '<h1>Welcome!</h1><p>Thanks for joining us.</p>')
+    await user.type(screen.getByRole('textbox', { name: /sender name/i }), 'DreamFactory Team')
+    await user.type(screen.getByRole('textbox', { name: /sender email/i }), 'noreply@dreamfactory.com')
+    
+    // Submit form
+    await user.click(screen.getByRole('button', { name: /save/i }))
+    
+    // Verify success flow
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/system-settings/email-templates')
+    })
+  })
+
+  it('should handle unsaved changes warning', async () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    // Make changes to form
+    await user.type(screen.getByRole('textbox', { name: /template name/i }), 'Modified Template')
+    
+    // Try to navigate away
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+    
+    // Should show confirmation dialog
+    expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /discard changes/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /continue editing/i })).toBeInTheDocument()
+  })
+
+  it('should provide helpful tooltips and guidance', async () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    // Hover over help icon for body field
+    const helpIcon = screen.getByLabelText(/html body help/i)
+    await user.hover(helpIcon)
+    
+    await waitFor(() => {
+      expect(screen.getByText(/you can use html tags and template variables/i)).toBeInTheDocument()
+    })
+  })
+
+  it('should support template variable suggestions', async () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    const bodyTextarea = screen.getByRole('textbox', { name: /body/i })
+    
+    // Type opening brace to trigger suggestions
+    await user.type(bodyTextarea, 'Hello {')
+    
+    await waitFor(() => {
+      expect(screen.getByText(/user_email/i)).toBeInTheDocument()
+      expect(screen.getByText(/user_name/i)).toBeInTheDocument()
+      expect(screen.getByText(/app_name/i)).toBeInTheDocument()
+    })
+  })
+
+  it('should validate HTML content in body field', async () => {
+    renderWithProviders(<EmailTemplateDetailsPage />)
+    
+    const bodyTextarea = screen.getByRole('textbox', { name: /body/i })
+    
+    // Type invalid HTML
+    await user.type(bodyTextarea, '<div><p>Unclosed tags')
+    
+    await waitFor(() => {
+      expect(screen.getByText(/html syntax error/i)).toBeInTheDocument()
+    })
+    
+    // Fix HTML
+    await user.type(bodyTextarea, '</p></div>')
+    
+    await waitFor(() => {
+      expect(screen.queryByText(/html syntax error/i)).not.toBeInTheDocument()
+    })
+  })
+})
