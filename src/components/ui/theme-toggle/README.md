@@ -1,451 +1,379 @@
-# ThemeToggle Component
+# ThemeToggle Component System
 
-A fully accessible React component that provides three-state theme switching functionality (light/dark/system) for the DreamFactory Admin Interface. This component replaces the Angular Material `mat-slide-toggle` implementation with a modern React-based solution using Headless UI and Tailwind CSS.
+A comprehensive, accessible theme switching component system for the DreamFactory Admin Interface, built with React 19, TypeScript 5.8+, and Tailwind CSS 4.1+. This system replaces Angular Material mat-slide-toggle patterns with modern React implementations while maintaining WCAG 2.1 AA compliance and supporting a three-state theme system (light/dark/system).
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [Installation & Setup](#installation--setup)
-- [API Reference](#api-reference)
-- [Usage Examples](#usage-examples)
-- [Accessibility](#accessibility)
+- [Quick Start](#quick-start)
+- [Component API](#component-api)
+- [TypeScript Interfaces](#typescript-interfaces)
+- [Accessibility Features](#accessibility-features)
 - [Migration Guide](#migration-guide)
-- [Integration](#integration)
+- [Usage Examples](#usage-examples)
+- [Theme States and System Detection](#theme-states-and-system-detection)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
 
-## Overview
-
-The ThemeToggle component is a core UI element that enables users to switch between light, dark, and system theme preferences throughout the DreamFactory Admin Interface. It provides seamless integration with the application's theme system while maintaining WCAG 2.1 AA accessibility compliance.
-
-### Key Technologies
-
-- **React 19.0**: Modern React with concurrent features and enhanced performance
-- **Headless UI 2.0+**: Accessible, unstyled Switch component for toggle functionality
-- **Tailwind CSS 4.1+**: Utility-first styling with enhanced accessibility features
-- **TypeScript 5.8+**: Complete type safety with advanced inference capabilities
-- **Theme Context**: React context-based theme state management
-
-## Features
-
-### Core Functionality
-- ✅ **Three-State Theme System**: Support for light, dark, and system preferences
-- ✅ **System Theme Detection**: Automatic detection and following of OS-level theme changes
-- ✅ **Persistent Preferences**: User selections are saved to localStorage with `df-admin-theme` key
-- ✅ **Real-Time Updates**: Instant theme application across the entire application
-- ✅ **Theme Transitions**: Smooth visual transitions between theme states (configurable)
-
-### Accessibility Features
-- ✅ **WCAG 2.1 AA Compliance**: Meets level AA accessibility standards
-- ✅ **Keyboard Navigation**: Full keyboard support with proper focus management
-- ✅ **Screen Reader Support**: Comprehensive ARIA labeling and announcements
-- ✅ **Touch Target Compliance**: Minimum 44x44px interactive areas for mobile accessibility
-- ✅ **High Contrast Support**: Enhanced visibility in high contrast modes
-- ✅ **Focus-Visible Support**: Keyboard-only focus indicators with 2px outline
-
-### Design System Integration
-- ✅ **Design Token Compliance**: Uses WCAG-compliant color tokens from Section 7.7.1
-- ✅ **Responsive Design**: Mobile-first approach with consistent behavior across devices
-- ✅ **Brand Consistency**: Aligns with DreamFactory visual design language
-- ✅ **Variant Support**: Multiple size and styling variants for different contexts
-
-## Installation & Setup
-
-### Prerequisites
-
-Ensure your project has the required dependencies:
-
-```json
-{
-  "dependencies": {
-    "react": "^19.0.0",
-    "next": "^15.1.0",
-    "@headlessui/react": "^2.0.0",
-    "tailwindcss": "^4.1.0",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.0.0",
-    "tailwind-merge": "^2.0.0"
-  }
-}
-```
-
-### Theme Provider Setup
-
-The ThemeToggle component requires the ThemeProvider to be set up at the root of your application:
+## Quick Start
 
 ```tsx
-// app/layout.tsx
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { ThemeProvider } from '@/components/layout/theme/theme-provider';
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// Basic usage - requires ThemeProvider wrapper
+function App() {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
-        <ThemeProvider
-          defaultTheme="system"
-          storageKey="df-admin-theme"
-          enableSystem={true}
-          disableTransitionOnChange={false}
-        >
-          {children}
-        </ThemeProvider>
-      </body>
-    </html>
+    <ThemeProvider defaultTheme="system" storageKey="df-admin-theme">
+      {/* Simple theme toggle */}
+      <ThemeToggle variant="switch" size="md" />
+      
+      {/* With custom label */}
+      <ThemeToggle 
+        variant="button" 
+        size="lg"
+        showLabel={true}
+        label="Toggle theme"
+      />
+      
+      {/* Compact icon-only toggle */}
+      <ThemeToggle 
+        variant="icon" 
+        size="sm"
+        aria-label="Switch theme preference"
+      />
+    </ThemeProvider>
   );
 }
 ```
 
-### Component Import
-
-```tsx
-// Import the component and types
-import { ThemeToggle } from '@/components/ui/theme-toggle';
-import type { ThemeToggleProps } from '@/components/ui/theme-toggle';
-
-// Or use the barrel import
-import { ThemeToggle } from '@/components/ui';
-```
-
-## API Reference
+## Component API
 
 ### ThemeToggle Component
 
-```tsx
-interface ThemeToggleProps {
-  /** Visual size variant */
+The primary theme toggle component supporting three visual variants and complete accessibility features.
+
+#### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `variant` | `'switch' \| 'button' \| 'icon'` | `'switch'` | Visual style variant |
+| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Size variant affecting dimensions and touch targets |
+| `showLabel` | `boolean` | `false` | Shows text label alongside toggle control |
+| `label` | `string` | `'Toggle theme'` | Custom label text for display and accessibility |
+| `hideSystemOption` | `boolean` | `false` | Disables system preference option, shows only light/dark |
+| `className` | `string` | - | Additional CSS classes |
+| `aria-label` | `string` | - | Override default accessibility label |
+| `aria-describedby` | `string` | - | References additional descriptive text |
+| `disabled` | `boolean` | `false` | Disables theme switching functionality |
+| `...props` | `HTMLAttributes<HTMLDivElement>` | - | All standard div HTML attributes |
+
+### ThemeToggleMenu Component
+
+Dropdown menu variant for expanded theme selection with visible state labels.
+
+#### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `trigger` | `'button' \| 'icon'` | `'button'` | Trigger element style |
+| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Size variant for trigger and menu items |
+| `align` | `'start' \| 'center' \| 'end'` | `'end'` | Menu alignment relative to trigger |
+| `showIcons` | `boolean` | `true` | Shows theme icons in menu options |
+| `showLabels` | `boolean` | `true` | Shows descriptive labels for each theme |
+| `className` | `string` | - | Additional CSS classes |
+| `...props` | `DropdownMenuProps` | - | All DropdownMenu component props |
+
+### ThemeProvider Integration
+
+The ThemeToggle components require the ThemeProvider context for state management.
+
+#### ThemeProvider Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `defaultTheme` | `'light' \| 'dark' \| 'system'` | `'system'` | Initial theme preference |
+| `storageKey` | `string` | `'df-admin-theme'` | localStorage key for theme persistence |
+| `attribute` | `string` | `'class'` | HTML attribute for theme application |
+| `enableSystem` | `boolean` | `true` | Enables system preference detection |
+| `disableTransitionOnChange` | `boolean` | `false` | Disables CSS transitions during theme changes |
+| `children` | `React.ReactNode` | - | Application content |
+
+## TypeScript Interfaces
+
+### Core Interfaces
+
+```typescript
+import { HTMLAttributes, ReactNode } from 'react';
+
+// Theme state type definitions
+export type Theme = 'light' | 'dark' | 'system';
+export type ResolvedTheme = 'light' | 'dark';
+
+// Base theme toggle configuration
+export interface ThemeToggleProps extends HTMLAttributes<HTMLDivElement> {
+  variant?: 'switch' | 'button' | 'icon';
   size?: 'sm' | 'md' | 'lg';
-  
-  /** Visual style variant */
-  variant?: 'default' | 'outline' | 'ghost';
-  
-  /** Whether the toggle is disabled */
+  showLabel?: boolean;
+  label?: string;
+  hideSystemOption?: boolean;
   disabled?: boolean;
-  
-  /** Additional CSS classes */
-  className?: string;
-  
-  /** Accessible label for screen readers */
   'aria-label'?: string;
-  
-  /** Additional description for accessibility */
   'aria-describedby'?: string;
-  
-  /** Show theme labels next to toggle */
+}
+
+// Theme toggle menu variant props
+export interface ThemeToggleMenuProps {
+  trigger?: 'button' | 'icon';
+  size?: 'sm' | 'md' | 'lg';
+  align?: 'start' | 'center' | 'end';
+  showIcons?: boolean;
   showLabels?: boolean;
-  
-  /** Custom labels for theme states */
-  labels?: {
-    light: string;
-    dark: string;
-    system: string;
-  };
-  
-  /** Show current theme indicator */
-  showIndicator?: boolean;
-  
-  /** Callback when theme changes */
-  onThemeChange?: (theme: ThemeMode) => void;
-  
-  /** Custom theme icons */
-  icons?: {
-    light: React.ComponentType<{ className?: string }>;
-    dark: React.ComponentType<{ className?: string }>;
-    system: React.ComponentType<{ className?: string }>;
-  };
+  className?: string;
 }
-```
 
-### Theme Types
-
-```tsx
-/** Available theme modes */
-type ThemeMode = 'light' | 'dark' | 'system';
-
-/** Resolved theme after system detection */
-type ResolvedTheme = 'light' | 'dark';
-
-/** Theme context state */
-interface ThemeContextState {
-  theme: ThemeMode;
+// Theme context interface
+export interface ThemeContextType {
+  theme: Theme;
   resolvedTheme: ResolvedTheme;
+  setTheme: (theme: Theme) => void;
   systemTheme: ResolvedTheme;
-  setTheme: (theme: ThemeMode) => void;
-  mounted: boolean;
+  isLoaded: boolean;
+}
+
+// Theme provider configuration
+export interface ThemeProviderProps {
+  children: ReactNode;
+  defaultTheme?: Theme;
+  storageKey?: string;
+  attribute?: string;
+  enableSystem?: boolean;
+  disableTransitionOnChange?: boolean;
+}
+
+// Accessibility enhancement types
+export interface ThemeAccessibilityProps {
+  ariaLabel?: string;
+  ariaDescribedBy?: string;
+  ariaPressed?: boolean;
+  role?: string;
+  announceOnChange?: boolean;
+}
+
+// Theme state configuration for advanced use cases
+export interface ThemeStateConfig {
+  light: {
+    label: string;
+    icon: ReactNode;
+    description: string;
+  };
+  dark: {
+    label: string;
+    icon: ReactNode;
+    description: string;
+  };
+  system: {
+    label: string;
+    icon: ReactNode;
+    description: string;
+  };
 }
 ```
 
-### useTheme Hook
+### Hook Interfaces
 
-```tsx
-const {
-  theme,           // Current theme setting
-  resolvedTheme,   // Actual applied theme
-  systemTheme,     // System detected theme
-  setTheme,        // Function to change theme
-  mounted          // Whether theme system is ready
-} = useTheme();
-```
+```typescript
+// useTheme hook return type
+export interface UseThemeReturn extends ThemeContextType {
+  // Additional helper methods
+  toggleTheme: () => void;
+  isSystemTheme: boolean;
+  isDarkMode: boolean;
+  isLightMode: boolean;
+}
 
-### useThemeUtils Hook
+// System theme detection hook
+export interface UseSystemThemeReturn {
+  systemTheme: ResolvedTheme;
+  isSupported: boolean;
+  mediaQuery: MediaQueryList | null;
+}
 
-```tsx
-const {
-  toggleTheme,       // Toggle between light/dark
-  resetToSystem,     // Reset to system preference
-  isTheme,          // Check current theme mode
-  isResolvedTheme,  // Check resolved theme
-  getSystemTheme,   // Get system preference
-  isSystemThemeSupported // Check system support
-} = useThemeUtils();
-```
-
-## Usage Examples
-
-### Basic Usage
-
-```tsx
-import { ThemeToggle } from '@/components/ui/theme-toggle';
-
-export function Header() {
-  return (
-    <header className="flex items-center justify-between p-4">
-      <h1>DreamFactory Admin</h1>
-      <ThemeToggle />
-    </header>
-  );
+// Theme persistence hook
+export interface UseThemePersistenceReturn {
+  persistTheme: (theme: Theme) => void;
+  getPersistedTheme: () => Theme | null;
+  clearPersistedTheme: () => void;
 }
 ```
 
-### With Size Variants
+### Variant Configuration Types
 
-```tsx
-// Small toggle for compact layouts
-<ThemeToggle size="sm" />
+```typescript
+// Size variants with minimum touch targets
+export type ThemeToggleSize = 
+  | 'sm'  // 44x44px minimum (WCAG compliance)
+  | 'md'  // 48x48px standard
+  | 'lg'  // 56x56px enhanced
 
-// Medium toggle (default)
-<ThemeToggle size="md" />
+// Visual variants for different contexts
+export type ThemeToggleVariant = 
+  | 'switch'  // Toggle switch control (Headless UI Switch)
+  | 'button'  // Button-style toggle with text
+  | 'icon'    // Icon-only toggle for compact spaces
 
-// Large toggle for prominent placement
-<ThemeToggle size="lg" />
+// Theme selection states
+export type ThemeState = 
+  | 'light'   // Light theme active
+  | 'dark'    // Dark theme active
+  | 'system'  // Following system preference
+  | 'auto'    // Alias for system preference
 ```
 
-### With Style Variants
+## Accessibility Features
 
-```tsx
-// Default solid styling
-<ThemeToggle variant="default" />
+### WCAG 2.1 AA Compliance
 
-// Outlined styling
-<ThemeToggle variant="outline" />
+The ThemeToggle component system meets Level AA accessibility standards through:
 
-// Ghost styling for minimal appearance
-<ThemeToggle variant="ghost" />
-```
+#### Color Contrast Requirements
+- **UI Components**: Minimum 3:1 contrast ratio for focus indicators and borders
+- **Text Labels**: Minimum 4.5:1 contrast ratio for all text content
+- **Enhanced Visibility**: Focus rings use 7.14:1 contrast ratio (AAA compliant)
 
-### With Labels and Indicators
-
-```tsx
-<ThemeToggle 
-  showLabels={true}
-  showIndicator={true}
-  labels={{
-    light: 'Light Mode',
-    dark: 'Dark Mode',
-    system: 'Auto'
-  }}
-/>
-```
-
-### With Custom Icons
-
-```tsx
-import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline';
-
-<ThemeToggle 
-  icons={{
-    light: SunIcon,
-    dark: MoonIcon,
-    system: ComputerDesktopIcon
-  }}
-/>
-```
-
-### With Custom Accessibility
-
-```tsx
-<ThemeToggle 
-  aria-label="Switch between light and dark themes"
-  aria-describedby="theme-description"
-  onThemeChange={(theme) => {
-    // Announce theme change to screen readers
-    announceToScreenReader(`Theme changed to ${theme} mode`);
-  }}
-/>
-
-<div id="theme-description" className="sr-only">
-  Toggle between light mode, dark mode, or automatic system preference
-</div>
-```
-
-### Programmatic Theme Control
-
-```tsx
-import { useTheme, useThemeUtils } from '@/components/layout/theme/theme-provider';
-
-function CustomThemeControls() {
-  const { theme, resolvedTheme } = useTheme();
-  const { toggleTheme, resetToSystem } = useThemeUtils();
-
-  return (
-    <div className="flex gap-2">
-      <button onClick={toggleTheme}>
-        Toggle Theme (Current: {resolvedTheme})
-      </button>
-      
-      <button onClick={resetToSystem}>
-        Use System Preference
-      </button>
-      
-      <ThemeToggle 
-        onThemeChange={(newTheme) => {
-          console.log(`Theme changed from ${theme} to ${newTheme}`);
-        }}
-      />
-    </div>
-  );
-}
-```
-
-### Advanced Integration
-
-```tsx
-import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { useTheme } from '@/components/layout/theme/theme-provider';
-
-function AdvancedThemeExample() {
-  const { theme, resolvedTheme, mounted } = useTheme();
-
-  // Prevent flash of unstyled content
-  if (!mounted) {
-    return <div className="w-12 h-6 bg-gray-200 rounded-full animate-pulse" />;
+```typescript
+// Accessibility compliant color tokens
+const accessibleThemeColors = {
+  light: {
+    background: '#ffffff',     // Base light theme
+    foreground: '#0f172a',     // 18.91:1 contrast ratio ✓ AAA
+    border: '#e2e8f0',         // 1.15:1 decorative
+    focus: '#4f46e5',          // 7.14:1 contrast ratio ✓ AAA
+  },
+  dark: {
+    background: '#0f172a',     // Base dark theme
+    foreground: '#f8fafc',     // 19.15:1 contrast ratio ✓ AAA
+    border: '#334155',         // 10.89:1 contrast ratio ✓ AAA
+    focus: '#6366f1',          // 4.52:1 contrast ratio ✓ AA
+  },
+  focus: {
+    ring: '#4f46e5',          // Primary focus color
+    offset: '2px',            // Clear visual separation
+    width: '2px',             // Minimum visible width
   }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <span className="text-sm text-gray-600 dark:text-gray-400">
-          Current theme: {theme}
-        </span>
-        <span className="text-sm text-gray-600 dark:text-gray-400">
-          Resolved: {resolvedTheme}
-        </span>
-      </div>
-      
-      <ThemeToggle 
-        size="lg"
-        showLabels={true}
-        className="border border-gray-200 dark:border-gray-700 rounded-lg p-2"
-      />
-    </div>
-  );
-}
+};
 ```
 
-## Accessibility
+#### Keyboard Navigation
 
-The ThemeToggle component follows WCAG 2.1 AA accessibility guidelines and provides comprehensive support for users with disabilities.
-
-### Keyboard Navigation
-
-| Key | Action |
-|-----|--------|
-| `Tab` | Focus the toggle control |
-| `Space` or `Enter` | Activate the toggle and cycle through themes |
-| `Shift + Tab` | Move focus to previous element |
-
-### Screen Reader Support
-
-- **Role**: Uses `switch` role for proper semantic meaning
-- **State**: Announces current theme state and changes
-- **Labels**: Provides descriptive labels for each theme option
-- **Live Regions**: Announces theme changes using `aria-live` regions
-
-### ARIA Attributes
+- **Switch Focus**: Tab navigation with visible focus indicators
+- **Activation**: Enter and Space key support for all variants
+- **Menu Navigation**: Arrow keys for ThemeToggleMenu options
+- **Escape Handling**: Closes dropdown menus and returns focus
 
 ```tsx
-// Example of ARIA implementation
-<Switch
-  checked={theme === 'dark'}
-  onChange={handleThemeChange}
-  className={toggleClasses}
-  aria-label="Toggle between light and dark themes"
+// Keyboard navigation example
+<ThemeToggle
+  variant="switch"
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleTheme();
+    }
+  }}
+  className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2"
+/>
+```
+
+#### Screen Reader Support
+
+- **ARIA Labels**: Descriptive labels for current theme state
+- **Live Regions**: Announcements for theme changes
+- **Role Attributes**: Proper semantic roles for switch and button variants
+- **State Communication**: Current theme communicated to assistive technology
+
+```tsx
+// Screen reader optimized theme toggle
+<ThemeToggle
+  variant="switch"
+  aria-label="Theme preference toggle"
   aria-describedby="theme-description"
+  aria-pressed={isDarkMode}
   role="switch"
-  aria-checked={theme === 'dark'}
->
-  <span className="sr-only">
-    {theme === 'system' ? 'System theme' : `${theme} theme`} active
-  </span>
-  {/* Toggle indicator */}
-</Switch>
+/>
+<div id="theme-description" className="sr-only">
+  Currently using {resolvedTheme} theme. Press to switch to {isDarkMode ? 'light' : 'dark'} theme.
+</div>
 ```
 
 ### Touch Target Compliance
 
-All interactive elements meet the minimum 44x44px touch target requirement:
+All interactive elements meet WCAG minimum touch target requirements:
 
-```tsx
-// Size variants maintain accessibility standards
-const sizeClasses = {
-  sm: "h-11 min-w-[44px]", // 44px minimum
-  md: "h-12 min-w-[48px]", // Enhanced target
-  lg: "h-14 min-w-[56px]"  // Premium target
+```typescript
+// Touch target size variants
+export const touchTargetSizes = {
+  sm: "min-h-[44px] min-w-[44px]", // WCAG minimum
+  md: "min-h-[48px] min-w-[48px]", // Enhanced usability
+  lg: "min-h-[56px] min-w-[56px]", // Optimal touch experience
 };
+
+// Applied to all interactive elements
+const switchStyles = cn(
+  "relative inline-flex items-center justify-center",
+  "rounded-full transition-colors duration-200",
+  touchTargetSizes[size],
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+);
 ```
 
-### Color Contrast Compliance
+### Focus Management
 
-All color combinations meet WCAG 2.1 AA standards:
+Comprehensive focus management for complex interactions:
 
-- **Normal text**: Minimum 4.5:1 contrast ratio
-- **Large text**: Minimum 3:1 contrast ratio  
-- **UI components**: Minimum 3:1 contrast ratio
-- **Focus indicators**: 2px outline with 7.14:1 contrast ratio
+```typescript
+// Focus trap for menu variant
+export const useThemeMenuFocus = () => {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
-### High Contrast Mode Support
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    switch (e.key) {
+      case 'ArrowDown':
+        // Focus next option
+        break;
+      case 'ArrowUp':
+        // Focus previous option
+        break;
+      case 'Escape':
+        // Close menu and return focus to trigger
+        triggerRef.current?.focus();
+        break;
+      case 'Tab':
+        // Handle tab navigation within menu
+        break;
+    }
+  }, []);
 
-The component adapts to high contrast preferences:
-
-```css
-@media (prefers-contrast: high) {
-  .theme-toggle {
-    border-width: 2px;
-    border-color: currentColor;
-  }
-  
-  .theme-toggle:focus-visible {
-    outline-width: 3px;
-    outline-color: highlight;
-  }
-}
+  return { menuRef, triggerRef, handleKeyDown };
+};
 ```
 
 ## Migration Guide
 
 ### From Angular Material to React
 
-This guide helps migrate from the Angular `df-theme-toggle` component to the React implementation.
+This guide helps migrate existing Angular Material mat-slide-toggle patterns to the new React implementation.
 
-#### Angular Implementation (Before)
+#### Basic Theme Toggle Migration
 
+**Angular Material (Before):**
 ```typescript
 // df-theme-toggle.component.ts
+import { Component, inject } from '@angular/core';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { DfThemeService } from '../../services/df-theme.service';
+import { BehaviorSubject } from 'rxjs';
+
 @Component({
   selector: 'df-theme-toggle',
   templateUrl: './df-theme-toggle.component.html',
@@ -474,440 +402,901 @@ export class DfThemeToggleComponent {
 </mat-slide-toggle>
 ```
 
-#### React Implementation (After)
-
+**React Implementation (After):**
 ```tsx
-// theme-toggle.tsx
-import { Switch } from '@headlessui/react';
-import { useTheme } from '@/components/layout/theme/theme-provider';
+// ThemeToggle component usage
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { useTheme } from '@/components/layout/theme/use-theme';
 
-export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  
-  const handleToggle = () => {
-    if (theme === 'system') {
-      setTheme('dark');
-    } else {
-      setTheme(theme === 'light' ? 'dark' : 'light');
-    }
-  };
-
+function HeaderNavigation() {
   return (
-    <Switch
-      checked={theme === 'dark'}
-      onChange={handleToggle}
-      className="theme-toggle"
-    >
-      {/* Switch implementation */}
-    </Switch>
+    <div className="flex items-center space-x-4">
+      {/* Simple replacement for mat-slide-toggle */}
+      <ThemeToggle 
+        variant="switch" 
+        size="md"
+        aria-label="Toggle theme preference"
+      />
+    </div>
   );
 }
-```
 
-#### Key Migration Changes
-
-| Aspect | Angular Material | React Implementation |
-|--------|------------------|---------------------|
-| **Component Type** | `mat-slide-toggle` | Headless UI `Switch` |
-| **State Management** | `BehaviorSubject` | React Context `useTheme` |
-| **Theme States** | Boolean (dark/light) | Three-state (light/dark/system) |
-| **Styling** | Material Design | Tailwind CSS + Design Tokens |
-| **Accessibility** | Material a11y | WCAG 2.1 AA compliant |
-| **Event Handling** | `(change)` event | `onChange` prop |
-| **Type Safety** | Angular types | TypeScript 5.8+ interfaces |
-
-#### Migration Steps
-
-1. **Replace Component Import**:
-   ```typescript
-   // Remove Angular Material import
-   - import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-   
-   // Add React component import
-   + import { ThemeToggle } from '@/components/ui/theme-toggle';
-   ```
-
-2. **Update State Management**:
-   ```typescript
-   // Remove Angular service injection
-   - themeService = inject(DfThemeService);
-   - isDarkMode$: BehaviorSubject<boolean>
-   
-   // Use React hook
-   + const { theme, setTheme } = useTheme();
-   ```
-
-3. **Replace Template**:
-   ```html
-   <!-- Remove Angular template -->
-   - <mat-slide-toggle [checked]="isDarkMode$ | async" (change)="toggle()">
-   - </mat-slide-toggle>
-   
-   <!-- Add React component -->
-   + <ThemeToggle />
-   ```
-
-4. **Update Event Handling**:
-   ```typescript
-   // Remove Observable pattern
-   - toggle() {
-   -   this.isDarkMode$.subscribe(isDarkMode => {
-   -     this.themeService.setThemeMode(!isDarkMode);
-   -   });
-   -   this.isDarkMode$.next(!this.isDarkMode$.value);
-   - }
-   
-   // Use direct theme setting (handled internally)
-   // No additional code needed - handled by component
-   ```
-
-#### Enhanced Features Available
-
-The React implementation provides several enhancements over the Angular version:
-
-1. **System Theme Support**: Automatic detection of OS preference
-2. **Better Accessibility**: WCAG 2.1 AA compliance with screen reader support
-3. **Improved Performance**: React 19 optimizations with concurrent features
-4. **Type Safety**: Enhanced TypeScript support with strict typing
-5. **Customization**: Multiple variants and styling options
-6. **Mobile Optimization**: Proper touch targets and responsive design
-
-## Integration
-
-### Theme Provider Integration
-
-The ThemeToggle component integrates seamlessly with the application's theme system through React Context:
-
-```tsx
-// Root layout setup
-import { ThemeProvider } from '@/components/layout/theme/theme-provider';
-
-export default function Layout({ children }: { children: React.ReactNode }) {
+// Theme provider setup (required)
+function App() {
   return (
-    <ThemeProvider
-      defaultTheme="system"
-      storageKey="df-admin-theme" 
-      enableSystem={true}
-    >
-      {children}
+    <ThemeProvider defaultTheme="system" storageKey="df-admin-theme">
+      <HeaderNavigation />
     </ThemeProvider>
   );
 }
+```
 
-// Component usage anywhere in the tree
-function NavigationBar() {
+#### Service Injection to Hook Pattern
+
+**Angular Service Pattern (Before):**
+```typescript
+// DfThemeService injection
+export class DfThemeToggleComponent {
+  themeService = inject(DfThemeService);
+  
+  toggle() {
+    // Service-based state management
+    this.themeService.setThemeMode(!this.isDarkMode$.value);
+  }
+}
+```
+
+**React Hook Pattern (After):**
+```tsx
+// useTheme hook integration
+import { useTheme } from '@/components/layout/theme/use-theme';
+
+function CustomThemeControl() {
+  const { theme, setTheme, resolvedTheme } = useTheme();
+
+  const handleThemeChange = () => {
+    // Cycle through theme options
+    const nextTheme = theme === 'light' ? 'dark' : 
+                     theme === 'dark' ? 'system' : 'light';
+    setTheme(nextTheme);
+  };
+
   return (
-    <nav>
-      <ThemeToggle />
-    </nav>
+    <button onClick={handleThemeChange}>
+      Current: {resolvedTheme} (preference: {theme})
+    </button>
   );
 }
 ```
 
-### State Management Integration
+#### Observable Pattern to State Hook
 
-Integration with Zustand or other state management libraries:
+**RxJS Observable Pattern (Before):**
+```typescript
+// BehaviorSubject state management
+isDarkMode$: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(true);
 
-```tsx
-// stores/theme-store.ts
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-
-interface ThemeStore {
-  userPreferences: {
-    themePreference: ThemeMode;
-    autoSwitch: boolean;
-    highContrast: boolean;
-  };
-  updateThemePreference: (theme: ThemeMode) => void;
+toggle() {
+  this.isDarkMode$.subscribe(isDarkMode => {
+    this.themeService.setThemeMode(!isDarkMode);
+  });
+  this.isDarkMode$.next(!this.isDarkMode$.value);
 }
 
-export const useThemeStore = create<ThemeStore>()(
-  persist(
-    (set) => ({
-      userPreferences: {
-        themePreference: 'system',
-        autoSwitch: true,
-        highContrast: false,
-      },
-      updateThemePreference: (theme) => 
-        set((state) => ({
-          userPreferences: {
-            ...state.userPreferences,
-            themePreference: theme,
-          }
-        })),
-    }),
-    {
-      name: 'theme-preferences',
-    }
-  )
-);
-
-// Component integration
-function EnhancedThemeToggle() {
-  const { setTheme } = useTheme();
-  const { updateThemePreference } = useThemeStore();
-
-  const handleThemeChange = (theme: ThemeMode) => {
-    setTheme(theme);
-    updateThemePreference(theme);
-  };
-
-  return (
-    <ThemeToggle onThemeChange={handleThemeChange} />
-  );
-}
+// Template usage with async pipe
+// [checked]="isDarkMode$ | async"
 ```
 
-### API Integration
-
-Integration with backend preferences:
-
+**React State Hook Pattern (After):**
 ```tsx
-// hooks/use-theme-sync.ts
-import { useTheme } from '@/components/layout/theme/theme-provider';
-import { useMutation, useQuery } from '@tanstack/react-query';
+// React context-based state management
+import { useTheme } from '@/components/layout/theme/use-theme';
 
-interface UserPreferences {
-  themeMode: ThemeMode;
-  // other preferences...
-}
+function ThemeAwareComponent() {
+  const { theme, resolvedTheme, setTheme, isLoaded } = useTheme();
+  
+  // No need for subscriptions or async pipes
+  const isDarkMode = resolvedTheme === 'dark';
+  
+  const toggleTheme = () => {
+    setTheme(isDarkMode ? 'light' : 'dark');
+  };
 
-export function useThemeSync() {
-  const { setTheme } = useTheme();
-
-  // Fetch user preferences from API
-  const { data: preferences } = useQuery({
-    queryKey: ['user-preferences'],
-    queryFn: () => fetch('/api/user/preferences').then(res => res.json()),
-  });
-
-  // Sync theme changes to API
-  const { mutate: updateTheme } = useMutation({
-    mutationFn: (theme: ThemeMode) => 
-      fetch('/api/user/preferences', {
-        method: 'PATCH',
-        body: JSON.stringify({ themeMode: theme }),
-      }),
-  });
-
-  // Sync local theme with server preferences
-  useEffect(() => {
-    if (preferences?.themeMode) {
-      setTheme(preferences.themeMode);
-    }
-  }, [preferences, setTheme]);
-
-  return { updateTheme };
-}
-
-// Usage in component
-function SyncedThemeToggle() {
-  const { updateTheme } = useThemeSync();
+  if (!isLoaded) {
+    return <div>Loading theme...</div>;
+  }
 
   return (
     <ThemeToggle 
-      onThemeChange={(theme) => {
-        updateTheme(theme);
-      }}
+      variant="switch"
+      onClick={toggleTheme}
+      aria-pressed={isDarkMode}
     />
   );
 }
 ```
 
-### Testing Integration
+#### Two-State to Three-State Migration
 
-Integration with Vitest and React Testing Library:
+**Angular Boolean Theme (Before):**
+```typescript
+// Simple boolean dark mode
+isDarkMode$: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(true);
+
+toggle() {
+  // Only light/dark toggle
+  this.isDarkMode$.next(!this.isDarkMode$.value);
+}
+```
+
+**React Three-State System (After):**
+```tsx
+// Enhanced three-state theme system
+import { ThemeToggle, ThemeToggleMenu } from '@/components/ui/theme-toggle';
+
+function EnhancedThemeControl() {
+  return (
+    <div className="flex items-center space-x-2">
+      {/* Simple toggle (light/dark only) */}
+      <ThemeToggle 
+        variant="switch" 
+        hideSystemOption={true}
+      />
+      
+      {/* Full three-state menu */}
+      <ThemeToggleMenu 
+        trigger="button"
+        showIcons={true}
+        showLabels={true}
+      />
+    </div>
+  );
+}
+
+// Access to all three states
+function ThemeStateExample() {
+  const { theme, resolvedTheme, systemTheme } = useTheme();
+  
+  return (
+    <div>
+      <p>User preference: {theme}</p>
+      <p>Active theme: {resolvedTheme}</p>
+      <p>System preference: {systemTheme}</p>
+    </div>
+  );
+}
+```
+
+### Component Replacement Map
+
+| Angular Material | React Implementation | Notes |
+|---|---|---|
+| `mat-slide-toggle` | `<ThemeToggle variant="switch">` | Direct replacement with enhanced accessibility |
+| `mat-button-toggle` | `<ThemeToggle variant="button">` | Button-style theme toggle |
+| `mat-icon-button` | `<ThemeToggle variant="icon">` | Icon-only compact toggle |
+| `mat-menu` | `<ThemeToggleMenu>` | Dropdown theme selection |
+| `BehaviorSubject` | `useTheme()` hook | React context replaces observables |
+| `DfThemeService` | `ThemeProvider` context | Service injection to provider pattern |
+
+### Styling Migration
+
+**Angular Material Theme (Before):**
+```scss
+// Angular Material custom theme
+.mat-slide-toggle.mat-primary .mat-slide-toggle-bar {
+  background-color: var(--primary-color);
+}
+
+.mat-slide-toggle.mat-checked .mat-slide-toggle-thumb {
+  background-color: var(--primary-color);
+}
+```
+
+**Tailwind CSS Implementation (After):**
+```tsx
+// Tailwind CSS with design tokens
+<ThemeToggle
+  variant="switch"
+  className="data-[state=checked]:bg-primary-600 data-[state=unchecked]:bg-gray-200"
+  // Uses design tokens from tailwind.config.ts
+/>
+
+// Custom styling with CSS variables
+<ThemeToggle
+  variant="button"
+  className="
+    bg-white dark:bg-gray-900
+    border border-gray-200 dark:border-gray-700
+    text-gray-900 dark:text-gray-100
+    hover:bg-gray-50 dark:hover:bg-gray-800
+  "
+/>
+```
+
+## Usage Examples
+
+### Basic Theme Toggle Variants
 
 ```tsx
-// __tests__/theme-toggle.test.tsx
-import { render, screen, fireEvent } from '@testing-library/react';
-import { ThemeProvider } from '@/components/layout/theme/theme-provider';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { ThemeToggle, ThemeToggleMenu } from '@/components/ui/theme-toggle';
+import { Sun, Moon, Monitor } from 'lucide-react';
 
-const renderWithTheme = (ui: React.ReactElement) => {
-  return render(
-    <ThemeProvider defaultTheme="light">
-      {ui}
-    </ThemeProvider>
+// Switch variant (default)
+<ThemeToggle variant="switch" size="md" />
+
+// Button variant with label
+<ThemeToggle 
+  variant="button" 
+  size="lg" 
+  showLabel={true}
+  label="Theme preference"
+/>
+
+// Icon variant for compact spaces
+<ThemeToggle 
+  variant="icon" 
+  size="sm"
+  aria-label="Toggle between light and dark theme"
+/>
+
+// Menu variant for full theme selection
+<ThemeToggleMenu 
+  trigger="button"
+  align="end"
+  showIcons={true}
+  showLabels={true}
+/>
+```
+
+### Integration with Navigation Components
+
+```tsx
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { Button } from '@/components/ui/button';
+
+function HeaderNavigation() {
+  return (
+    <header className="border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center space-x-4">
+          <img src="/logo.svg" alt="DreamFactory" className="h-8 w-auto" />
+          <nav className="hidden md:flex space-x-6">
+            <Button variant="ghost">Dashboard</Button>
+            <Button variant="ghost">Services</Button>
+            <Button variant="ghost">API Docs</Button>
+          </nav>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          {/* Compact theme toggle in header */}
+          <ThemeToggle 
+            variant="icon" 
+            size="md"
+            aria-label="Toggle theme preference"
+          />
+          
+          <Button variant="outline" size="sm">
+            Sign Out
+          </Button>
+        </div>
+      </div>
+    </header>
   );
+}
+```
+
+### Custom Theme Control with State
+
+```tsx
+import { useTheme } from '@/components/layout/theme/use-theme';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { Sun, Moon, Monitor } from 'lucide-react';
+
+function AdvancedThemeControl() {
+  const { theme, resolvedTheme, setTheme, systemTheme } = useTheme();
+
+  const getThemeIcon = (themeType: string) => {
+    switch (themeType) {
+      case 'light': return <Sun className="w-4 h-4" />;
+      case 'dark': return <Moon className="w-4 h-4" />;
+      case 'system': return <Monitor className="w-4 h-4" />;
+      default: return <Monitor className="w-4 h-4" />;
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Standard toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          {getThemeIcon(theme)}
+          <span className="text-sm font-medium">
+            Theme: {theme} {theme === 'system' && `(${systemTheme})`}
+          </span>
+        </div>
+        <ThemeToggle variant="switch" size="md" />
+      </div>
+
+      {/* Manual theme selection buttons */}
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          onClick={() => setTheme('light')}
+          className={`
+            flex items-center justify-center p-3 rounded-md border-2 transition-colors
+            ${theme === 'light' 
+              ? 'border-primary-600 bg-primary-50 text-primary-700' 
+              : 'border-gray-200 hover:border-gray-300'
+            }
+          `}
+        >
+          <Sun className="w-5 h-5 mr-2" />
+          Light
+        </button>
+        
+        <button
+          onClick={() => setTheme('dark')}
+          className={`
+            flex items-center justify-center p-3 rounded-md border-2 transition-colors
+            ${theme === 'dark' 
+              ? 'border-primary-600 bg-primary-50 text-primary-700' 
+              : 'border-gray-200 hover:border-gray-300'
+            }
+          `}
+        >
+          <Moon className="w-5 h-5 mr-2" />
+          Dark
+        </button>
+        
+        <button
+          onClick={() => setTheme('system')}
+          className={`
+            flex items-center justify-center p-3 rounded-md border-2 transition-colors
+            ${theme === 'system' 
+              ? 'border-primary-600 bg-primary-50 text-primary-700' 
+              : 'border-gray-200 hover:border-gray-300'
+            }
+          `}
+        >
+          <Monitor className="w-5 h-5 mr-2" />
+          System
+        </button>
+      </div>
+
+      {/* Theme status display */}
+      <div className="text-sm text-gray-600 dark:text-gray-400">
+        <p>Current theme: <strong>{resolvedTheme}</strong></p>
+        <p>User preference: <strong>{theme}</strong></p>
+        <p>System preference: <strong>{systemTheme}</strong></p>
+      </div>
+    </div>
+  );
+}
+```
+
+### Settings Page Integration
+
+```tsx
+import { ThemeToggle, ThemeToggleMenu } from '@/components/ui/theme-toggle';
+import { useTheme } from '@/components/layout/theme/use-theme';
+
+function UserPreferencesPage() {
+  const { theme, resolvedTheme } = useTheme();
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          User Preferences
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Customize your DreamFactory Admin experience
+        </p>
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-lg font-semibold mb-4">Appearance</h2>
+        
+        <div className="space-y-6">
+          {/* Theme selection with description */}
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                Theme preference
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Choose your preferred color scheme. System will follow your device setting.
+              </p>
+            </div>
+            
+            <ThemeToggleMenu 
+              trigger="button"
+              align="end"
+              showIcons={true}
+              showLabels={true}
+            />
+          </div>
+
+          {/* Quick toggle for power users */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex-1">
+              <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                Quick toggle
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Switch between light and dark themes
+              </p>
+            </div>
+            
+            <ThemeToggle 
+              variant="switch" 
+              size="lg"
+              hideSystemOption={true}
+            />
+          </div>
+
+          {/* Theme status */}
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-md p-4">
+            <div className="flex items-center space-x-4 text-sm">
+              <span className="text-gray-600 dark:text-gray-400">
+                Current theme:
+              </span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">
+                {resolvedTheme} {theme === 'system' && '(following system)'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Responsive Theme Toggle
+
+```tsx
+import { ThemeToggle, ThemeToggleMenu } from '@/components/ui/theme-toggle';
+import { useResponsive } from '@/lib/responsive';
+
+function ResponsiveThemeControl() {
+  const { isMobile, isTablet } = useResponsive();
+
+  return (
+    <div className="flex items-center">
+      {/* Mobile: Icon only */}
+      {isMobile && (
+        <ThemeToggle 
+          variant="icon" 
+          size="md"
+          aria-label="Toggle theme"
+        />
+      )}
+      
+      {/* Tablet: Switch with label */}
+      {isTablet && (
+        <ThemeToggle 
+          variant="switch" 
+          size="md"
+          showLabel={true}
+          label="Theme"
+        />
+      )}
+      
+      {/* Desktop: Full menu */}
+      {!isMobile && !isTablet && (
+        <ThemeToggleMenu 
+          trigger="button"
+          showIcons={true}
+          showLabels={true}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+## Theme States and System Detection
+
+### Three-State Theme System
+
+The ThemeToggle component supports a comprehensive three-state theme system:
+
+```typescript
+// Theme state definitions
+export type Theme = 'light' | 'dark' | 'system';
+export type ResolvedTheme = 'light' | 'dark';
+
+// Theme state behavior
+const themeStates = {
+  light: {
+    description: 'Always use light theme',
+    behavior: 'Forces light mode regardless of system preference',
+    icon: Sun,
+  },
+  dark: {
+    description: 'Always use dark theme', 
+    behavior: 'Forces dark mode regardless of system preference',
+    icon: Moon,
+  },
+  system: {
+    description: 'Follow system preference',
+    behavior: 'Automatically switches based on device setting',
+    icon: Monitor,
+  },
+};
+```
+
+### System Preference Detection
+
+Automatic detection and following of system theme preferences:
+
+```tsx
+import { useEffect, useState } from 'react';
+
+// System theme detection hook
+export function useSystemTheme() {
+  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>('light');
+  const [isSupported, setIsSupported] = useState(false);
+
+  useEffect(() => {
+    // Check if system preference detection is supported
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      setIsSupported(true);
+      
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      
+      // Set initial value
+      setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
+      
+      // Listen for changes
+      const handleChange = (e: MediaQueryListEvent) => {
+        setSystemTheme(e.matches ? 'dark' : 'light');
+      };
+      
+      mediaQuery.addEventListener('change', handleChange);
+      
+      return () => {
+        mediaQuery.removeEventListener('change', handleChange);
+      };
+    }
+  }, []);
+
+  return { systemTheme, isSupported };
+}
+
+// Usage in ThemeProvider
+function ThemeProvider({ children, ...props }) {
+  const { systemTheme } = useSystemTheme();
+  const [theme, setTheme] = useState<Theme>('system');
+  
+  // Resolve current theme
+  const resolvedTheme = theme === 'system' ? systemTheme : theme;
+  
+  return (
+    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, systemTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+```
+
+### Theme Persistence
+
+Automatic theme preference persistence across sessions:
+
+```typescript
+// Theme persistence utilities
+export const themeStorage = {
+  key: 'df-admin-theme',
+  
+  save: (theme: Theme) => {
+    try {
+      localStorage.setItem(themeStorage.key, theme);
+    } catch (error) {
+      console.warn('Failed to save theme preference:', error);
+    }
+  },
+  
+  load: (): Theme | null => {
+    try {
+      const stored = localStorage.getItem(themeStorage.key);
+      return ['light', 'dark', 'system'].includes(stored as string) 
+        ? (stored as Theme) 
+        : null;
+    } catch (error) {
+      console.warn('Failed to load theme preference:', error);
+      return null;
+    }
+  },
+  
+  clear: () => {
+    try {
+      localStorage.removeItem(themeStorage.key);
+    } catch (error) {
+      console.warn('Failed to clear theme preference:', error);
+    }
+  },
 };
 
-describe('ThemeToggle Integration', () => {
-  it('integrates with theme context', () => {
-    renderWithTheme(<ThemeToggle />);
-    
-    const toggle = screen.getByRole('switch');
-    expect(toggle).toBeInTheDocument();
-    expect(toggle).toHaveAccessibleName(/theme/i);
-  });
+// Theme persistence hook
+export function useThemePersistence(storageKey = 'df-admin-theme') {
+  const persistTheme = useCallback((theme: Theme) => {
+    themeStorage.save(theme);
+  }, []);
+  
+  const getPersistedTheme = useCallback((): Theme | null => {
+    return themeStorage.load();
+  }, []);
+  
+  const clearPersistedTheme = useCallback(() => {
+    themeStorage.clear();
+  }, []);
+  
+  return { persistTheme, getPersistedTheme, clearPersistedTheme };
+}
+```
 
-  it('persists theme changes', () => {
-    renderWithTheme(<ThemeToggle />);
-    
-    const toggle = screen.getByRole('switch');
-    fireEvent.click(toggle);
-    
-    // Verify localStorage was updated
-    expect(localStorage.getItem('df-admin-theme')).toBe('dark');
-  });
-});
+### Theme Application
+
+CSS class and attribute application for theme changes:
+
+```typescript
+// Theme application utility
+export function applyTheme(resolvedTheme: ResolvedTheme) {
+  const root = document.documentElement;
+  
+  // Remove existing theme classes
+  root.classList.remove('light', 'dark');
+  
+  // Add current theme class
+  root.classList.add(resolvedTheme);
+  
+  // Set data attribute for additional styling hooks
+  root.setAttribute('data-theme', resolvedTheme);
+  
+  // Update meta theme-color for mobile browsers
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeColorMeta) {
+    themeColorMeta.setAttribute(
+      'content',
+      resolvedTheme === 'dark' ? '#0f172a' : '#ffffff'
+    );
+  }
+  
+  // Update color-scheme CSS property
+  root.style.colorScheme = resolvedTheme;
+}
+
+// Smooth theme transitions
+export function enableThemeTransitions() {
+  const css = document.createElement('style');
+  css.appendChild(
+    document.createTextNode(`
+      *, *::before, *::after {
+        transition: background-color 0.2s ease, 
+                   border-color 0.2s ease, 
+                   color 0.2s ease !important;
+      }
+    `)
+  );
+  document.head.appendChild(css);
+  
+  // Remove transition styles after theme change
+  return () => {
+    setTimeout(() => {
+      document.head.removeChild(css);
+    }, 200);
+  };
+}
 ```
 
 ## Best Practices
 
+### Accessibility Guidelines
+
+1. **Always provide descriptive labels**
+   ```tsx
+   // Good: Clear purpose
+   <ThemeToggle 
+     variant="switch" 
+     aria-label="Toggle between light and dark theme"
+   />
+   
+   // Better: Include current state
+   <ThemeToggle 
+     variant="switch"
+     aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} theme`}
+     aria-pressed={resolvedTheme === 'dark'}
+   />
+   ```
+
+2. **Use appropriate variants for context**
+   ```tsx
+   // Good: Switch for simple light/dark toggle
+   <ThemeToggle variant="switch" hideSystemOption={true} />
+   
+   // Better: Menu for full theme selection
+   <ThemeToggleMenu showIcons={true} showLabels={true} />
+   ```
+
+3. **Ensure sufficient touch targets**
+   ```tsx
+   // Good: Minimum size for accessibility
+   <ThemeToggle variant="icon" size="sm" /> // 44x44px minimum
+   
+   // Better: Enhanced touch targets for mobile
+   <ThemeToggle variant="switch" size="lg" /> // 56x56px optimal
+   ```
+
+4. **Provide system theme option**
+   ```tsx
+   // Good: Respect user system preferences
+   <ThemeToggle variant="switch" />
+   
+   // Limited: Only when system detection isn't desired
+   <ThemeToggle variant="switch" hideSystemOption={true} />
+   ```
+
 ### Performance Optimization
 
-1. **Lazy Loading**: Load ThemeToggle only when needed
+1. **Use ThemeProvider at the app root**
    ```tsx
-   const ThemeToggle = lazy(() => import('@/components/ui/theme-toggle'));
-   
-   function Header() {
+   // Optimal: Single provider for entire app
+   function App() {
      return (
-       <header>
-         <Suspense fallback={<ThemeToggleSkeleton />}>
-           <ThemeToggle />
-         </Suspense>
-       </header>
+       <ThemeProvider defaultTheme="system" storageKey="df-admin-theme">
+         <Router>
+           <Routes>
+             {/* All routes have access to theme context */}
+           </Routes>
+         </Router>
+       </ThemeProvider>
      );
    }
    ```
 
-2. **Memoization**: Prevent unnecessary re-renders
+2. **Avoid multiple theme providers**
    ```tsx
-   const MemoizedThemeToggle = memo(ThemeToggle);
+   // Avoid: Nested providers cause performance issues
+   <ThemeProvider>
+     <Header>
+       <ThemeProvider> {/* Unnecessary nesting */}
+         <ThemeToggle />
+       </ThemeProvider>
+     </Header>
+   </ThemeProvider>
    
-   // Or with custom comparison
-   const MemoizedThemeToggle = memo(ThemeToggle, (prev, next) => {
-     return prev.size === next.size && prev.variant === next.variant;
-   });
+   // Prefer: Single provider with multiple consumers
+   <ThemeProvider>
+     <Header>
+       <ThemeToggle />
+     </Header>
+     <Main>
+       <ThemeToggle variant="menu" />
+     </Main>
+   </ThemeProvider>
    ```
 
-3. **Bundle Optimization**: Use tree-shaking friendly imports
+3. **Implement proper loading states**
    ```tsx
-   // Good - specific import
-   import { ThemeToggle } from '@/components/ui/theme-toggle';
-   
-   // Avoid - barrel import for single component
-   import { ThemeToggle } from '@/components/ui';
-   ```
-
-### Accessibility Best Practices
-
-1. **Descriptive Labels**: Provide clear context
-   ```tsx
-   <ThemeToggle 
-     aria-label="Switch between light and dark themes"
-     aria-describedby="theme-help-text"
-   />
-   <div id="theme-help-text" className="sr-only">
-     Choose between light mode, dark mode, or automatic based on your system preference
-   </div>
-   ```
-
-2. **Reduced Motion**: Respect user preferences
-   ```tsx
-   <ThemeToggle 
-     className="motion-reduce:transition-none"
-     disableTransitionOnChange={prefersReducedMotion}
-   />
-   ```
-
-3. **Focus Management**: Maintain proper focus order
-   ```tsx
-   function NavigationMenu() {
-     return (
-       <nav role="navigation" aria-label="Main navigation">
-         <ul>
-           <li><a href="/dashboard">Dashboard</a></li>
-           <li><a href="/services">Services</a></li>
-           <li>
-             <ThemeToggle aria-label="Theme settings" />
-           </li>
-         </ul>
-       </nav>
-     );
-   }
-   ```
-
-### Design System Integration
-
-1. **Consistent Spacing**: Use design system tokens
-   ```tsx
-   <div className="flex items-center gap-4">
-     <UserMenu />
-     <ThemeToggle className="ml-auto" />
-   </div>
-   ```
-
-2. **Brand Consistency**: Maintain visual hierarchy
-   ```tsx
-   // Primary navigation
-   <ThemeToggle size="md" variant="default" />
-   
-   // Secondary context
-   <ThemeToggle size="sm" variant="ghost" />
-   
-   // Settings page
-   <ThemeToggle size="lg" variant="outline" showLabels={true} />
-   ```
-
-3. **Responsive Behavior**: Adapt to screen sizes
-   ```tsx
-   <ThemeToggle 
-     size={{
-       sm: 'sm',
-       md: 'md',
-       lg: 'lg'
-     }}
-     showLabels={{
-       sm: false,
-       md: true,
-       lg: true
-     }}
-   />
-   ```
-
-### State Management Best Practices
-
-1. **Single Source of Truth**: Use theme context consistently
-   ```tsx
-   // Good - use theme context
-   const { theme } = useTheme();
-   
-   // Avoid - duplicate state
-   const [localTheme, setLocalTheme] = useState('light');
-   ```
-
-2. **Error Boundaries**: Handle theme errors gracefully
-   ```tsx
-   function ThemeErrorBoundary({ children }: { children: React.ReactNode }) {
-     return (
-       <ErrorBoundary
-         fallback={
-           <ThemeToggle 
-             disabled 
-             aria-label="Theme toggle unavailable"
-           />
-         }
-       >
-         {children}
-       </ErrorBoundary>
-     );
-   }
-   ```
-
-3. **Hydration Safety**: Prevent SSR mismatches
-   ```tsx
-   function SafeThemeToggle() {
-     const { mounted } = useTheme();
+   // Good: Handle hydration mismatch
+   function ThemeAwareComponent() {
+     const { resolvedTheme, isLoaded } = useTheme();
      
-     if (!mounted) {
-       return <ThemeToggleSkeleton />;
+     if (!isLoaded) {
+       return <div className="h-11 w-11 animate-pulse bg-gray-200 rounded" />;
      }
      
-     return <ThemeToggle />;
+     return <ThemeToggle variant="switch" />;
+   }
+   ```
+
+### Theme Design Patterns
+
+1. **Consistent theme application**
+   ```tsx
+   // Theme-aware component styling
+   <div className="
+     bg-white dark:bg-gray-900
+     text-gray-900 dark:text-gray-100
+     border border-gray-200 dark:border-gray-700
+     shadow-sm dark:shadow-gray-900/10
+   ">
+     <ThemeToggle variant="switch" />
+   </div>
+   ```
+
+2. **Theme-specific component variants**
+   ```tsx
+   import { useTheme } from '@/components/layout/theme/use-theme';
+   
+   function AdaptiveComponent() {
+     const { resolvedTheme } = useTheme();
+     
+     return (
+       <div className={cn(
+         "rounded-lg p-4",
+         resolvedTheme === 'dark' 
+           ? "bg-gradient-to-r from-gray-800 to-gray-900" 
+           : "bg-gradient-to-r from-blue-50 to-indigo-50"
+       )}>
+         <ThemeToggle variant="icon" size="sm" />
+       </div>
+     );
+   }
+   ```
+
+3. **Responsive theme controls**
+   ```tsx
+   // Responsive theme toggle placement
+   function ResponsiveLayout() {
+     return (
+       <div className="relative">
+         {/* Mobile: Drawer menu */}
+         <div className="md:hidden">
+           <MobileDrawer>
+             <ThemeToggle variant="button" showLabel={true} />
+           </MobileDrawer>
+         </div>
+         
+         {/* Desktop: Header utility */}
+         <div className="hidden md:flex items-center space-x-4">
+           <ThemeToggle variant="icon" size="md" />
+         </div>
+       </div>
+     );
+   }
+   ```
+
+### Error Handling
+
+1. **Handle localStorage failures gracefully**
+   ```tsx
+   function ThemeToggleWithFallback() {
+     const [error, setError] = useState<string | null>(null);
+     
+     const handleThemeChange = async (newTheme: Theme) => {
+       try {
+         setTheme(newTheme);
+       } catch (err) {
+         setError('Failed to save theme preference');
+         console.warn('Theme persistence error:', err);
+       }
+     };
+     
+     return (
+       <div>
+         <ThemeToggle 
+           variant="switch"
+           onThemeChange={handleThemeChange}
+         />
+         {error && (
+           <div className="text-red-600 text-xs mt-1" role="alert">
+             {error}
+           </div>
+         )}
+       </div>
+     );
+   }
+   ```
+
+2. **System preference detection fallbacks**
+   ```tsx
+   // Graceful degradation for older browsers
+   function SystemThemeDetection() {
+     const { systemTheme, isSupported } = useSystemTheme();
+     
+     if (!isSupported) {
+       return (
+         <ThemeToggle 
+           variant="switch" 
+           hideSystemOption={true}
+           aria-describedby="theme-limitation"
+         />
+       );
+     }
+     
+     return <ThemeToggle variant="switch" />;
    }
    ```
 
@@ -915,198 +1304,224 @@ describe('ThemeToggle Integration', () => {
 
 ### Common Issues and Solutions
 
-#### 1. Theme Toggle Not Working
+#### Issue: Theme Not Persisting Across Sessions
 
-**Problem**: Toggle appears but doesn't change theme
+**Problem**: Theme preference resets to default when user returns to application.
 
-**Solutions**:
-- Verify ThemeProvider is wrapping your app:
-  ```tsx
-  // Check if this exists in your root layout
-  <ThemeProvider>
-    <App />
-  </ThemeProvider>
-  ```
-
-- Check for React strict mode double-rendering:
-  ```tsx
-  // This is expected behavior in development
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-  ```
-
-- Verify localStorage is available:
-  ```tsx
-  if (typeof window !== 'undefined' && window.localStorage) {
-    // localStorage is available
-  }
-  ```
-
-#### 2. Hydration Mismatch Errors
-
-**Problem**: Server and client render different content
-
-**Solutions**:
-- Use the `mounted` state from useTheme:
-  ```tsx
-  const { mounted } = useTheme();
-  
-  if (!mounted) {
-    return <ThemeToggleSkeleton />;
-  }
-  ```
-
-- Add `suppressHydrationWarning` to HTML element:
-  ```tsx
-  <html suppressHydrationWarning>
-  ```
-
-- Use dynamic imports for client-only components:
-  ```tsx
-  const ThemeToggle = dynamic(
-    () => import('@/components/ui/theme-toggle'),
-    { ssr: false }
-  );
-  ```
-
-#### 3. Accessibility Issues
-
-**Problem**: Screen readers not announcing theme changes
-
-**Solutions**:
-- Add proper ARIA live regions:
-  ```tsx
-  <div aria-live="polite" aria-atomic="true" className="sr-only">
-    Theme changed to {resolvedTheme} mode
-  </div>
-  ```
-
-- Verify ARIA labels are present:
-  ```tsx
-  <ThemeToggle aria-label="Toggle theme" />
-  ```
-
-- Test with actual screen readers (NVDA, VoiceOver, JAWS)
-
-#### 4. Performance Issues
-
-**Problem**: Theme toggle causes layout shifts or slow renders
-
-**Solutions**:
-- Use CSS custom properties for smooth transitions:
-  ```css
-  :root {
-    --transition-colors: 150ms ease-in-out;
-  }
-  
-  * {
-    transition: background-color var(--transition-colors),
-                color var(--transition-colors),
-                border-color var(--transition-colors);
-  }
-  ```
-
-- Implement skeleton loading states:
-  ```tsx
-  function ThemeToggleSkeleton() {
-    return (
-      <div 
-        className="w-12 h-6 bg-gray-200 rounded-full animate-pulse" 
-        aria-hidden="true"
-      />
-    );
-  }
-  ```
-
-- Use `memo` to prevent unnecessary re-renders:
-  ```tsx
-  export const ThemeToggle = memo(function ThemeToggle(props) {
-    // Component implementation
-  });
-  ```
-
-#### 5. System Theme Not Detected
-
-**Problem**: System theme preference not being followed
-
-**Solutions**:
-- Check browser support for `prefers-color-scheme`:
-  ```tsx
-  const supportsSystemTheme = window.matchMedia && 
-    window.matchMedia('(prefers-color-scheme: dark)').media !== 'not all';
-  ```
-
-- Verify media query is correct:
-  ```tsx
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-  ```
-
-- Test on different operating systems and browsers
-
-#### 6. Styling Issues
-
-**Problem**: Theme toggle doesn't match design system
-
-**Solutions**:
-- Verify Tailwind CSS is properly configured:
-  ```javascript
-  // tailwind.config.js
-  module.exports = {
-    darkMode: 'class', // Important for theme switching
-    // ... rest of config
-  };
-  ```
-
-- Check design token imports:
-  ```tsx
-  import { designTokens } from '@/styles/design-tokens';
-  ```
-
-- Use className debugging:
-  ```tsx
-  <ThemeToggle 
-    className="debug-border border-2 border-red-500" 
-  />
-  ```
-
-### Debug Tools
-
-#### 1. Theme State Inspector
+**Solution**: Verify ThemeProvider configuration and localStorage functionality:
 
 ```tsx
-function ThemeDebugger() {
-  const { theme, resolvedTheme, systemTheme, mounted } = useTheme();
+// Check ThemeProvider setup
+<ThemeProvider 
+  defaultTheme="system" 
+  storageKey="df-admin-theme"  // Ensure unique key
+  enableSystem={true}          // Allow system detection
+>
+  <App />
+</ThemeProvider>
+
+// Debug localStorage issues
+function debugThemePersistence() {
+  try {
+    const stored = localStorage.getItem('df-admin-theme');
+    console.log('Stored theme:', stored);
+    
+    // Test write capability
+    localStorage.setItem('theme-test', 'test');
+    localStorage.removeItem('theme-test');
+    
+    console.log('localStorage is working');
+  } catch (error) {
+    console.error('localStorage not available:', error);
+    // Implement fallback storage or show warning
+  }
+}
+```
+
+#### Issue: Hydration Mismatch Errors
+
+**Problem**: Server-rendered content doesn't match client theme on first load.
+
+**Solution**: Implement proper hydration handling:
+
+```tsx
+// Prevent hydration mismatch
+function ThemeToggleSSR() {
+  const [mounted, setMounted] = useState(false);
+  const { theme, isLoaded } = useTheme();
   
-  if (process.env.NODE_ENV !== 'development') {
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  // Show placeholder during hydration
+  if (!mounted || !isLoaded) {
+    return (
+      <div className="h-11 w-11 rounded-full bg-gray-200 animate-pulse" />
+    );
+  }
+  
+  return <ThemeToggle variant="switch" />;
+}
+
+// Alternative: Use dynamic imports
+import dynamic from 'next/dynamic';
+
+const ThemeToggle = dynamic(
+  () => import('@/components/ui/theme-toggle'),
+  { 
+    ssr: false,
+    loading: () => <div className="h-11 w-11 bg-gray-200 rounded animate-pulse" />
+  }
+);
+```
+
+#### Issue: System Theme Detection Not Working
+
+**Problem**: System preference changes aren't reflected in the application.
+
+**Solution**: Verify media query listener setup:
+
+```tsx
+// Debug system theme detection
+function debugSystemTheme() {
+  if (typeof window === 'undefined') {
+    console.log('Server-side: No system theme detection');
+    return;
+  }
+  
+  if (!window.matchMedia) {
+    console.warn('matchMedia not supported in this browser');
+    return;
+  }
+  
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  console.log('System prefers dark:', mediaQuery.matches);
+  
+  // Test listener
+  const handleChange = (e: MediaQueryListEvent) => {
+    console.log('System theme changed to:', e.matches ? 'dark' : 'light');
+  };
+  
+  mediaQuery.addEventListener('change', handleChange);
+  
+  // Cleanup
+  return () => mediaQuery.removeEventListener('change', handleChange);
+}
+
+// Enhanced system theme hook with debugging
+export function useSystemTheme() {
+  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>('light');
+  
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      return;
+    }
+    
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const updateSystemTheme = (matches: boolean) => {
+      const newTheme = matches ? 'dark' : 'light';
+      console.debug('System theme updated:', newTheme);
+      setSystemTheme(newTheme);
+    };
+    
+    // Set initial value
+    updateSystemTheme(mediaQuery.matches);
+    
+    // Modern event listener
+    const handleChange = (e: MediaQueryListEvent) => {
+      updateSystemTheme(e.matches);
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+  
+  return systemTheme;
+}
+```
+
+#### Issue: Theme Toggle Not Responding to Clicks
+
+**Problem**: Theme toggle component doesn't respond to user interactions.
+
+**Solution**: Check event handling and context setup:
+
+```tsx
+// Debug theme toggle interactions
+function debugThemeToggle() {
+  const themeContext = useContext(ThemeContext);
+  
+  if (!themeContext) {
+    console.error('ThemeToggle must be used within ThemeProvider');
     return null;
   }
   
+  const { theme, setTheme } = themeContext;
+  
+  const handleClick = () => {
+    console.log('Current theme:', theme);
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    console.log('Setting theme to:', newTheme);
+    setTheme(newTheme);
+  };
+  
   return (
-    <div className="fixed bottom-4 right-4 p-4 bg-white dark:bg-gray-800 border rounded-lg shadow-lg">
-      <h3 className="font-semibold mb-2">Theme Debug</h3>
-      <ul className="text-sm space-y-1">
-        <li>Theme: {theme}</li>
-        <li>Resolved: {resolvedTheme}</li>
-        <li>System: {systemTheme}</li>
-        <li>Mounted: {mounted.toString()}</li>
-        <li>Storage: {localStorage.getItem('df-admin-theme')}</li>
-      </ul>
-    </div>
+    <button 
+      onClick={handleClick}
+      className="p-2 border rounded"
+    >
+      Toggle Theme (Current: {theme})
+    </button>
+  );
+}
+
+// Verify ThemeProvider is wrapping the component
+function App() {
+  return (
+    <ThemeProvider defaultTheme="system">
+      <div>
+        <ThemeToggle variant="switch" />
+        {/* If this doesn't work, ThemeProvider might be missing */}
+      </div>
+    </ThemeProvider>
   );
 }
 ```
 
-#### 2. Accessibility Testing
+#### Issue: Accessibility Warnings in Tests
+
+**Problem**: Automated accessibility tests fail for theme toggle components.
+
+**Solution**: Ensure proper ARIA attributes and labels:
 
 ```tsx
-// Test accessibility with jest-axe
-import { axe } from 'jest-axe';
+// Accessibility-compliant theme toggle
+<ThemeToggle
+  variant="switch"
+  aria-label="Toggle theme preference"
+  aria-describedby="theme-description"
+  role="switch"
+  aria-pressed={resolvedTheme === 'dark'}
+/>
 
-test('ThemeToggle is accessible', async () => {
+<div id="theme-description" className="sr-only">
+  Currently using {resolvedTheme} theme. 
+  {theme === 'system' && 'Following system preference.'}
+</div>
+
+// Test accessibility compliance
+import { render } from '@testing-library/react';
+import { axe, toHaveNoViolations } from 'jest-axe';
+
+expect.extend(toHaveNoViolations);
+
+test('ThemeToggle meets accessibility standards', async () => {
   const { container } = render(
     <ThemeProvider>
-      <ThemeToggle />
+      <ThemeToggle variant="switch" aria-label="Toggle theme" />
     </ThemeProvider>
   );
   
@@ -1115,83 +1530,123 @@ test('ThemeToggle is accessible', async () => {
 });
 ```
 
-#### 3. Visual Regression Testing
+#### Issue: Custom Styling Breaks Theme Transitions
+
+**Problem**: CSS transitions don't work smoothly when switching themes.
+
+**Solution**: Implement proper transition handling:
 
 ```tsx
-// Storybook story for visual testing
-export const AllVariants = () => (
-  <div className="grid grid-cols-3 gap-4 p-4">
-    <ThemeToggle size="sm" />
-    <ThemeToggle size="md" />
-    <ThemeToggle size="lg" />
-  </div>
-);
+// Enable smooth theme transitions
+function enableSmoothTransitions() {
+  const css = document.createElement('style');
+  css.textContent = `
+    *, *::before, *::after {
+      transition: 
+        background-color 200ms ease-in-out,
+        border-color 200ms ease-in-out,
+        color 200ms ease-in-out,
+        fill 200ms ease-in-out !important;
+    }
+  `;
+  document.head.appendChild(css);
+  
+  return () => {
+    // Remove after transition completes
+    setTimeout(() => {
+      if (document.head.contains(css)) {
+        document.head.removeChild(css);
+      }
+    }, 200);
+  };
+}
+
+// Use in ThemeProvider
+function ThemeProvider({ children, disableTransitionOnChange = false }) {
+  const [theme, setTheme] = useState('system');
+  
+  const handleThemeChange = (newTheme: Theme) => {
+    if (!disableTransitionOnChange) {
+      const cleanup = enableSmoothTransitions();
+      setTheme(newTheme);
+      // Cleanup function will remove styles after transition
+      cleanup();
+    } else {
+      setTheme(newTheme);
+    }
+  };
+  
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme: handleThemeChange }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
 ```
 
-### Getting Help
+### Performance Issues
 
-If you encounter issues not covered here:
+#### Issue: Slow Theme Switching
 
-1. **Check the GitHub Issues**: Search for existing issues and solutions
-2. **Review the Technical Specification**: Reference Section 7.7 for design system details
-3. **Test in Isolation**: Create a minimal reproduction case
-4. **Use Developer Tools**: Inspect the DOM and check console for errors
-5. **Submit a Bug Report**: Include environment details and reproduction steps
+**Problem**: Noticeable delay when switching between themes.
 
-## Contributing
+**Solution**: Optimize CSS application and reduce DOM manipulation:
 
-### Development Setup
+```tsx
+// Optimize theme application
+function optimizeThemeSwitch(newTheme: 'light' | 'dark') {
+  const root = document.documentElement;
+  
+  // Use requestAnimationFrame for smooth updates
+  requestAnimationFrame(() => {
+    // Batch DOM updates
+    root.classList.remove('light', 'dark');
+    root.classList.add(newTheme);
+    root.setAttribute('data-theme', newTheme);
+    root.style.colorScheme = newTheme;
+    
+    // Update meta theme-color
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute(
+        'content', 
+        newTheme === 'dark' ? '#0f172a' : '#ffffff'
+      );
+    }
+  });
+}
 
-1. **Clone and Install**:
-   ```bash
-   git clone <repository-url>
-   cd df-admin-interface
-   npm install
-   ```
+// Debounce rapid theme changes
+function useDebouncedTheme() {
+  const [theme, setThemeState] = useState<Theme>('system');
+  const timeoutRef = useRef<NodeJS.Timeout>();
+  
+  const setTheme = useCallback((newTheme: Theme) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    timeoutRef.current = setTimeout(() => {
+      setThemeState(newTheme);
+    }, 50); // 50ms debounce
+  }, []);
+  
+  return { theme, setTheme };
+}
+```
 
-2. **Start Development Server**:
-   ```bash
-   npm run dev
-   ```
-
-3. **Run Tests**:
-   ```bash
-   npm run test
-   npm run test:coverage
-   ```
-
-4. **Run Storybook**:
-   ```bash
-   npm run storybook
-   ```
-
-### Testing Requirements
-
-All changes to the ThemeToggle component must include:
-
-1. **Unit Tests**: Component behavior and props
-2. **Accessibility Tests**: WCAG compliance verification
-3. **Integration Tests**: Theme context interaction
-4. **Visual Tests**: Storybook stories for all variants
-
-### Code Quality Standards
-
-- **TypeScript**: Strict type checking enabled
-- **ESLint**: Follow project linting rules
-- **Prettier**: Consistent code formatting
-- **Performance**: No unnecessary re-renders
-- **Accessibility**: WCAG 2.1 AA compliance required
-
-### Submitting Changes
-
-1. Create a feature branch
-2. Add comprehensive tests
-3. Update documentation
-4. Run the full test suite
-5. Submit a pull request with detailed description
+For additional support, refer to the component implementation files:
+- `theme-toggle.tsx` - Main theme toggle component
+- `theme-toggle-menu.tsx` - Dropdown theme selection variant
+- `theme-provider.tsx` - Theme context provider
+- `use-theme.ts` - Theme state management hook
+- `theme-toggle.test.tsx` - Comprehensive test suite
 
 ---
 
+**Last Updated**: 2024-12-19  
 **Version**: 1.0.0  
-**Last Updated**: December 2024  
-**Compatibility**: React 19.0+, Next.js 15.1+, TypeScript 5.8+
+**React Version**: 19.0.0  
+**TypeScript Version**: 5.8+  
+**Accessibility Standard**: WCAG 2.1 AA  
+**Migration Source**: Angular Material mat-slide-toggle
