@@ -1,136 +1,160 @@
-/**
- * ThemeToggle Component - WCAG 2.1 AA Compliant Theme Switcher
- * 
- * Main ThemeToggle React component providing a three-state theme switcher 
- * (light/dark/system) with full WCAG 2.1 AA accessibility compliance. 
- * Replaces Angular Material mat-slide-toggle with Headless UI Switch component, 
- * supporting proper ARIA labeling, keyboard navigation, and minimum 44x44px touch targets.
- * Integrates with theme context for state management and provides smooth visual transitions.
- * 
- * Features:
- * - Three-state theme selection (light, dark, system)
- * - WCAG 2.1 AA compliance with 4.5:1+ contrast ratios
- * - 44x44px minimum touch targets for mobile accessibility
- * - Keyboard navigation with focus-visible indicators
- * - Screen reader support with proper ARIA labels
- * - Smooth transitions between theme states
- * - System theme preference detection and following
- * - Integration with React context via useTheme hook
- * 
- * @version 1.0.0
- * @since 2024-12-19
- */
-
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
+/**
+ * ThemeToggle Component for DreamFactory Admin Interface
+ * 
+ * A fully accessible three-state theme switcher providing seamless transitions between
+ * light, dark, and system preference modes. Built with Headless UI Switch component
+ * for optimal accessibility compliance and replacing Angular Material mat-slide-toggle.
+ * 
+ * Features:
+ * - WCAG 2.1 AA compliant with 4.5:1+ contrast ratios
+ * - Headless UI Switch component for unstyled, accessible control
+ * - Three-state theme selection: light, dark, and system preference detection
+ * - 44x44px minimum touch targets for mobile accessibility
+ * - Comprehensive keyboard navigation with focus-visible states
+ * - React context integration replacing Angular BehaviorSubject patterns
+ * - Smooth visual transitions with Tailwind CSS animations
+ * - Screen reader friendly with proper ARIA labeling
+ * - TypeScript 5.8+ interfaces with strict type safety
+ * 
+ * Accessibility Standards:
+ * - Focus rings with 2px width and 2px offset for keyboard navigation
+ * - Minimum 3:1 contrast ratio for UI components (exceeds WCAG requirements)
+ * - Touch targets meet 44x44px minimum size requirement
+ * - Screen reader announcements for theme changes
+ * - High contrast mode support with enhanced borders
+ * - Reduced motion preference respect for smooth transitions
+ * 
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
+ */
+
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { Switch } from '@headlessui/react';
 import { 
   SunIcon, 
   MoonIcon, 
   ComputerDesktopIcon,
-  CheckIcon 
+  CheckIcon
 } from '@heroicons/react/24/outline';
 import { useTheme } from '@/components/layout/theme/use-theme';
 import { 
-  themeToggleVariants, 
+  themeToggleVariants,
   themeToggleIconSizes,
   themeToggleAnimations,
   themeToggleAriaLabels,
-  type ThemeToggleVariantProps,
-  getThemeToggleClasses
+  getThemeToggleClasses,
+  type ThemeToggleVariantProps
 } from './theme-toggle-variants';
-import type { ThemeMode, ResolvedTheme } from '@/types/theme';
 import { cn } from '@/lib/utils';
+import type { ThemeMode, ResolvedTheme } from '@/types/theme';
 
 /**
- * ThemeToggle component props interface
- * Provides comprehensive customization options while maintaining accessibility standards
+ * Props interface for ThemeToggle component
+ * Provides comprehensive configuration options for visual appearance and behavior
  */
-export interface ThemeToggleProps {
-  /** Visual style variant for the toggle component */
-  variant?: ThemeToggleVariantProps['variant'];
-  
-  /** Size variant affecting touch target and icon dimensions */
-  size?: ThemeToggleVariantProps['size'];
-  
+export interface ThemeToggleProps extends Omit<ThemeToggleVariantProps, 'themeState'> {
   /** Additional CSS classes for custom styling */
   className?: string;
   
-  /** Whether to show text labels alongside icons */
+  /** Whether to show text labels alongside icons (default: false for icon-only mode) */
   showLabels?: boolean;
   
-  /** Position of labels relative to the toggle */
-  labelPosition?: 'top' | 'bottom' | 'left' | 'right';
+  /** Orientation of the toggle control */
+  orientation?: 'horizontal' | 'vertical';
   
-  /** Custom aria-label for the entire toggle group */
+  /** Whether to show the current theme state visually */
+  showCurrentState?: boolean;
+  
+  /** Callback fired when theme changes (for analytics/tracking) */
+  onThemeChange?: (theme: ThemeMode, resolvedTheme: ResolvedTheme) => void;
+  
+  /** Whether to announce theme changes to screen readers */
+  announceChanges?: boolean;
+  
+  /** Custom ARIA label override */
   ariaLabel?: string;
-  
-  /** ID for the toggle group (for form association) */
-  id?: string;
   
   /** Whether the toggle is disabled */
   disabled?: boolean;
   
-  /** Callback fired when theme changes */
-  onThemeChange?: (theme: ThemeMode) => void;
+  /** Tooltip text for additional context */
+  tooltip?: string;
   
-  /** Whether to include system preference option */
-  enableSystem?: boolean;
-  
-  /** Whether to show loading state during theme transitions */
-  showLoading?: boolean;
-  
-  /** Custom icons for each theme state */
-  icons?: {
-    light?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-    dark?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-    system?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  };
-  
-  /** Whether to use compact layout (icons only) */
-  compact?: boolean;
+  /** Position of tooltip when provided */
+  tooltipPosition?: 'top' | 'bottom' | 'left' | 'right';
 }
 
 /**
- * Individual theme option configuration
+ * Theme icon mapping with React components
+ * Uses Heroicons outline style for consistent visual design
  */
-interface ThemeOption {
-  mode: ThemeMode;
-  label: string;
-  ariaLabel: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  description: string;
-}
+const themeIcons = {
+  light: SunIcon,
+  dark: MoonIcon,
+  system: ComputerDesktopIcon,
+} as const;
 
 /**
- * ThemeToggle Component
+ * Theme cycle order for sequential switching
+ * Defines the progression when cycling through theme options
+ */
+const themeCycleOrder: ThemeMode[] = ['light', 'dark', 'system'];
+
+/**
+ * Get readable theme name for accessibility announcements
+ * Converts theme mode to human-readable string for screen readers
+ */
+const getThemeDisplayName = (theme: ThemeMode): string => {
+  const displayNames: Record<ThemeMode, string> = {
+    light: 'Light theme',
+    dark: 'Dark theme', 
+    system: 'System theme preference'
+  };
+  return displayNames[theme];
+};
+
+/**
+ * Get theme description for enhanced accessibility context
+ * Provides detailed descriptions for screen reader users
+ */
+const getThemeDescription = (theme: ThemeMode, resolvedTheme: ResolvedTheme): string => {
+  const descriptions: Record<ThemeMode, string> = {
+    light: 'Uses light colors with dark text for better visibility in bright environments',
+    dark: 'Uses dark colors with light text to reduce eye strain in low light conditions',
+    system: `Automatically follows your device preference, currently using ${resolvedTheme} theme`
+  };
+  return descriptions[theme];
+};
+
+/**
+ * Main ThemeToggle Component
  * 
- * Implements a three-state theme switcher with full accessibility compliance.
- * Uses Headless UI Switch for unstyled, accessible foundation with custom styling
- * applied via Tailwind CSS and class-variance-authority variants.
+ * A comprehensive three-state theme switcher with full accessibility compliance.
+ * Replaces Angular Material mat-slide-toggle with modern React implementation
+ * using Headless UI for unstyled, accessible control primitives.
  * 
- * @param props - ThemeToggle configuration options
- * @returns JSX.Element - Rendered theme toggle component
+ * @param props - Component configuration props
+ * @returns Fully accessible theme toggle switch component
  * 
  * @example
  * ```tsx
- * // Basic usage
+ * // Basic usage with default styling
  * <ThemeToggle />
  * 
  * // With custom styling and labels
  * <ThemeToggle 
- *   variant="outline" 
- *   size="lg" 
- *   showLabels 
- *   labelPosition="bottom"
+ *   size="lg"
+ *   variant="outline"
+ *   showLabels={true}
+ *   onThemeChange={(theme, resolved) => analytics.track('theme_changed', { theme, resolved })}
  * />
  * 
- * // Compact mobile-friendly version
+ * // Disabled state with tooltip
  * <ThemeToggle 
- *   compact 
- *   size="sm" 
- *   className="md:hidden" 
+ *   disabled={true}
+ *   tooltip="Theme switching is disabled in this context"
  * />
  * ```
  */
@@ -139,310 +163,330 @@ export function ThemeToggle({
   size = 'md',
   className,
   showLabels = false,
-  labelPosition = 'bottom',
-  ariaLabel = 'Select theme preference',
-  id,
-  disabled = false,
+  orientation = 'horizontal',
+  showCurrentState = true,
   onThemeChange,
-  enableSystem = true,
-  showLoading = false,
-  icons = {},
-  compact = false,
+  announceChanges = true,
+  ariaLabel,
+  disabled = false,
+  tooltip,
+  tooltipPosition = 'bottom',
+  loading = false,
   ...props
 }: ThemeToggleProps) {
-  // Access theme context with error handling
-  const { 
-    theme, 
-    resolvedTheme, 
-    setTheme, 
-    isTheme, 
-    mounted 
+  // Theme context integration replacing Angular service injection
+  const {
+    theme,
+    resolvedTheme,
+    setTheme,
+    mounted,
+    isTheme,
+    systemTheme
   } = useTheme();
 
-  /**
-   * Define available theme options with enhanced accessibility metadata
-   */
-  const themeOptions: ThemeOption[] = useMemo(() => {
-    const baseOptions: ThemeOption[] = [
-      {
-        mode: 'light',
-        label: 'Light',
-        ariaLabel: themeToggleAriaLabels.light,
-        icon: icons.light || SunIcon,
-        description: 'Use light theme with bright backgrounds and dark text'
-      },
-      {
-        mode: 'dark',
-        label: 'Dark', 
-        ariaLabel: themeToggleAriaLabels.dark,
-        icon: icons.dark || MoonIcon,
-        description: 'Use dark theme with dark backgrounds and light text'
-      }
-    ];
+  // Local state for UI feedback and interactions
+  const [isPressed, setIsPressed] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [lastAnnouncedTheme, setLastAnnouncedTheme] = useState<ThemeMode | null>(null);
 
-    // Add system option if enabled
-    if (enableSystem) {
-      baseOptions.push({
-        mode: 'system',
-        label: 'System',
-        ariaLabel: themeToggleAriaLabels.system,
-        icon: icons.system || ComputerDesktopIcon,
-        description: 'Follow system color scheme preference automatically'
-      });
+  /**
+   * Handle theme cycling through three states
+   * Implements sequential progression: light → dark → system → light
+   */
+  const handleThemeChange = useCallback(() => {
+    if (disabled || loading) return;
+
+    const currentIndex = themeCycleOrder.indexOf(theme);
+    const nextIndex = (currentIndex + 1) % themeCycleOrder.length;
+    const nextTheme = themeCycleOrder[nextIndex];
+
+    // Apply theme change
+    setTheme(nextTheme);
+
+    // Fire callback for analytics/tracking
+    onThemeChange?.(nextTheme, theme === 'system' ? systemTheme : nextTheme as ResolvedTheme);
+
+    // Announce change to screen readers if enabled
+    if (announceChanges && nextTheme !== lastAnnouncedTheme) {
+      announceThemeChange(nextTheme, theme === 'system' ? systemTheme : nextTheme as ResolvedTheme);
+      setLastAnnouncedTheme(nextTheme);
     }
-
-    return baseOptions;
-  }, [enableSystem, icons]);
-
-  /**
-   * Handle theme selection with validation and callbacks
-   */
-  const handleThemeSelect = useCallback((selectedTheme: ThemeMode) => {
-    try {
-      // Validate theme mode before setting
-      if (!['light', 'dark', 'system'].includes(selectedTheme)) {
-        console.warn(`Invalid theme mode: ${selectedTheme}`);
-        return;
-      }
-
-      // Update theme in context
-      setTheme(selectedTheme);
-      
-      // Fire custom callback if provided
-      onThemeChange?.(selectedTheme);
-      
-      // Announce change to screen readers
-      const announcement = `Theme changed to ${selectedTheme}`;
-      const liveRegion = document.createElement('div');
-      liveRegion.setAttribute('aria-live', 'polite');
-      liveRegion.setAttribute('aria-atomic', 'true');
-      liveRegion.className = 'sr-only';
-      liveRegion.textContent = announcement;
-      document.body.appendChild(liveRegion);
-      
-      // Remove announcement after screen readers have processed it
-      setTimeout(() => {
-        if (document.body.contains(liveRegion)) {
-          document.body.removeChild(liveRegion);
-        }
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Failed to change theme:', error);
-    }
-  }, [setTheme, onThemeChange]);
-
-  /**
-   * Get dynamic styling based on current theme state
-   */
-  const getThemeStateVariant = useCallback((mode: ThemeMode): ThemeToggleVariantProps['themeState'] => {
-    if (isTheme(mode)) {
-      return mode as ThemeToggleVariantProps['themeState'];
-    }
-    return undefined;
-  }, [isTheme]);
-
-  /**
-   * Render individual theme option button
-   */
-  const renderThemeOption = useCallback((option: ThemeOption) => {
-    const isSelected = isTheme(option.mode);
-    const IconComponent = option.icon;
-    const iconSize = themeToggleIconSizes[size];
-    
-    // Get variant-specific styling
-    const variantProps: ThemeToggleVariantProps = {
-      variant,
-      size,
-      themeState: getThemeStateVariant(option.mode),
-      loading: showLoading
-    };
-    
-    const buttonClasses = getThemeToggleClasses(variantProps, cn(
-      themeToggleAnimations.colorTransition,
-      themeToggleAnimations.scaleOnPress,
-      showLoading && themeToggleAnimations.loadingPulse,
-      'group relative'
-    ));
-
-    return (
-      <Switch
-        key={option.mode}
-        checked={isSelected}
-        onChange={() => handleThemeSelect(option.mode)}
-        disabled={disabled || showLoading}
-        className={buttonClasses}
-        aria-label={option.ariaLabel}
-        aria-describedby={`${id || 'theme-toggle'}-${option.mode}-description`}
-        data-state={isSelected ? 'on' : 'off'}
-        data-theme={option.mode}
-      >
-        {/* Icon with proper sizing and accessibility */}
-        <IconComponent 
-          className={cn(
-            iconSize,
-            themeToggleAnimations.iconRotation,
-            'flex-shrink-0',
-            // Enhanced contrast for better visibility
-            isSelected 
-              ? 'text-current' 
-              : 'text-current opacity-70 group-hover:opacity-100'
-          )}
-          aria-hidden="true"
-        />
-        
-        {/* Selection indicator for enhanced feedback */}
-        {isSelected && (
-          <CheckIcon 
-            className={cn(
-              'absolute -top-1 -right-1 h-3 w-3',
-              'text-primary-600 dark:text-primary-400',
-              'bg-white dark:bg-gray-900 rounded-full',
-              'ring-1 ring-primary-600 dark:ring-primary-400',
-              themeToggleAnimations.iconRotation
-            )}
-            aria-hidden="true"
-          />
-        )}
-        
-        {/* Label text (if enabled and not compact) */}
-        {showLabels && !compact && (
-          <span className={cn(
-            'text-xs font-medium mt-1',
-            'text-current',
-            isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
-          )}>
-            {option.label}
-          </span>
-        )}
-        
-        {/* Hidden description for screen readers */}
-        <span 
-          id={`${id || 'theme-toggle'}-${option.mode}-description`}
-          className="sr-only"
-        >
-          {option.description}
-        </span>
-      </Switch>
-    );
   }, [
-    variant, 
-    size, 
-    disabled, 
-    showLoading, 
-    showLabels, 
-    compact, 
-    id, 
-    isTheme, 
-    handleThemeSelect, 
-    getThemeStateVariant
+    theme,
+    systemTheme,
+    setTheme,
+    onThemeChange,
+    announceChanges,
+    lastAnnouncedTheme,
+    disabled,
+    loading
   ]);
 
   /**
-   * Get container layout classes based on label position and compact mode
+   * Announce theme changes to screen readers
+   * Creates temporary live region for accessibility announcements
    */
-  const getContainerClasses = useCallback(() => {
-    if (compact) {
-      return 'flex items-center space-x-1';
-    }
+  const announceThemeChange = useCallback((newTheme: ThemeMode, resolved: ResolvedTheme) => {
+    if (typeof window === 'undefined') return;
+
+    const announcement = document.createElement('div');
+    announcement.setAttribute('aria-live', 'polite');
+    announcement.setAttribute('aria-atomic', 'true');
+    announcement.className = 'sr-only absolute -top-10 -left-10 w-1 h-1 overflow-hidden';
     
-    if (!showLabels) {
-      return 'flex items-center space-x-2';
-    }
+    const themeName = getThemeDisplayName(newTheme);
+    const description = getThemeDescription(newTheme, resolved);
+    announcement.textContent = `Theme changed to ${themeName}. ${description}`;
     
-    switch (labelPosition) {
-      case 'top':
-        return 'flex flex-col space-y-2';
-      case 'bottom':
-        return 'flex flex-col space-y-2';
-      case 'left':
-        return 'flex items-center space-x-3';
-      case 'right':
-        return 'flex items-center space-x-3 flex-row-reverse';
-      default:
-        return 'flex items-center space-x-2';
-    }
-  }, [compact, showLabels, labelPosition]);
+    document.body.appendChild(announcement);
+    
+    // Clean up announcement after screen readers have processed it
+    setTimeout(() => {
+      if (document.body.contains(announcement)) {
+        document.body.removeChild(announcement);
+      }
+    }, 1000);
+  }, []);
 
   /**
-   * Get grid layout for theme options
+   * Handle keyboard interactions for enhanced accessibility
+   * Supports Enter, Space, and Arrow keys for navigation
    */
-  const getOptionsGridClasses = useCallback(() => {
-    if (compact) {
-      return 'flex space-x-1';
-    }
-    
-    const optionCount = themeOptions.length;
-    
-    if (showLabels && (labelPosition === 'top' || labelPosition === 'bottom')) {
-      return `grid grid-cols-${optionCount} gap-3`;
-    }
-    
-    return 'flex space-x-2';
-  }, [compact, showLabels, labelPosition, themeOptions.length]);
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (disabled || loading) return;
 
-  // Prevent hydration mismatch by not rendering until mounted
+    switch (event.key) {
+      case 'Enter':
+      case ' ': // Space key
+        event.preventDefault();
+        handleThemeChange();
+        setIsPressed(true);
+        break;
+      case 'ArrowRight':
+      case 'ArrowDown':
+        event.preventDefault();
+        handleThemeChange();
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        event.preventDefault();
+        // Cycle backward through themes
+        const currentIndex = themeCycleOrder.indexOf(theme);
+        const prevIndex = currentIndex === 0 ? themeCycleOrder.length - 1 : currentIndex - 1;
+        const prevTheme = themeCycleOrder[prevIndex];
+        setTheme(prevTheme);
+        onThemeChange?.(prevTheme, theme === 'system' ? systemTheme : prevTheme as ResolvedTheme);
+        break;
+    }
+  }, [theme, systemTheme, setTheme, onThemeChange, handleThemeChange, disabled, loading]);
+
+  /**
+   * Handle keyboard release for visual feedback
+   */
+  const handleKeyUp = useCallback((event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      setIsPressed(false);
+    }
+  }, []);
+
+  /**
+   * Get current theme icon component
+   * Returns appropriate icon based on current theme state
+   */
+  const CurrentIcon = useMemo(() => {
+    return themeIcons[theme];
+  }, [theme]);
+
+  /**
+   * Generate comprehensive ARIA label
+   * Provides rich context for screen reader users
+   */
+  const ariaLabelText = useMemo(() => {
+    if (ariaLabel) return ariaLabel;
+
+    const currentThemeName = getThemeDisplayName(theme);
+    const nextThemeIndex = (themeCycleOrder.indexOf(theme) + 1) % themeCycleOrder.length;
+    const nextThemeName = getThemeDisplayName(themeCycleOrder[nextThemeIndex]);
+    
+    return `Theme toggle, currently set to ${currentThemeName}. Press to switch to ${nextThemeName}.`;
+  }, [theme, ariaLabel]);
+
+  /**
+   * Generate component classes with variant support
+   * Combines base styles with variant-specific styling
+   */
+  const componentClasses = useMemo(() => {
+    return getThemeToggleClasses(
+      {
+        variant,
+        size,
+        themeState: theme,
+        loading: loading || !mounted,
+      },
+      cn(
+        // Base accessibility classes
+        'focus-accessible',
+        
+        // Animation classes
+        themeToggleAnimations.colorTransition,
+        themeToggleAnimations.scaleOnPress,
+        
+        // State-specific classes
+        isPressed && themeToggleAnimations.scaleOnPress,
+        
+        // Orientation classes
+        orientation === 'vertical' && 'flex-col',
+        
+        // Reduced motion support
+        'motion-reduce:transition-none',
+        
+        // High contrast support
+        '@media (prefers-contrast: high)': 'border-2',
+        
+        className
+      )
+    );
+  }, [variant, size, theme, loading, mounted, isPressed, orientation, className]);
+
+  /**
+   * Get icon size based on component size variant
+   */
+  const iconSize = useMemo(() => {
+    return themeToggleIconSizes[size];
+  }, [size]);
+
+  /**
+   * Tooltip visibility handlers for enhanced UX
+   */
+  const handleMouseEnter = useCallback(() => {
+    if (tooltip && !disabled) {
+      setShowTooltip(true);
+    }
+  }, [tooltip, disabled]);
+
+  const handleMouseLeave = useCallback(() => {
+    setShowTooltip(false);
+  }, []);
+
+  /**
+   * Prevent hydration mismatch by checking mount state
+   * Ensures server-side rendering compatibility
+   */
   if (!mounted) {
     return (
       <div 
-        className={cn(getContainerClasses(), 'animate-pulse', className)}
+        className={componentClasses}
         aria-hidden="true"
       >
-        <div className="flex space-x-2">
-          {themeOptions.map((option) => (
-            <div 
-              key={option.mode}
-              className={cn(
-                'h-11 w-11 bg-gray-200 dark:bg-gray-700 rounded-md',
-                size === 'sm' && 'h-11 w-11',
-                size === 'md' && 'h-12 w-12', 
-                size === 'lg' && 'h-14 w-14'
-              )}
-            />
-          ))}
-        </div>
+        <div className={cn(iconSize, 'animate-pulse bg-secondary-300 rounded')} />
       </div>
     );
   }
 
   return (
-    <div
-      className={cn(getContainerClasses(), className)}
-      role="radiogroup"
-      aria-label={ariaLabel}
-      aria-describedby={`${id || 'theme-toggle'}-description`}
-      id={id}
-      {...props}
-    >
-      {/* Hidden description for screen readers */}
-      <span 
-        id={`${id || 'theme-toggle'}-description`}
-        className="sr-only"
+    <div className="relative inline-flex">
+      {/* Main theme toggle switch */}
+      <Switch
+        checked={theme !== 'light'} // Switch state for visual feedback
+        onChange={handleThemeChange}
+        disabled={disabled || loading}
+        className={componentClasses}
+        onKeyDown={handleKeyDown}
+        onKeyUp={handleKeyUp}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        aria-label={ariaLabelText}
+        aria-describedby={tooltip ? 'theme-toggle-tooltip' : undefined}
+        data-theme={theme}
+        data-resolved-theme={resolvedTheme}
+        {...props}
       >
-        Select your preferred color theme. Current theme: {theme}
-        {theme === 'system' && `, resolving to ${resolvedTheme}`}
-      </span>
-      
-      {/* Loading indicator overlay */}
-      {showLoading && (
-        <div 
-          className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-gray-900/50 rounded-md"
-          aria-label={themeToggleAriaLabels.loading}
+        {/* Icon container with smooth transitions */}
+        <span 
+          className={cn(
+            'flex items-center justify-center transition-transform duration-300',
+            themeToggleAnimations.iconRotation,
+            loading && 'animate-pulse'
+          )}
+          aria-hidden="true"
         >
-          <div className="animate-spin h-4 w-4 border-2 border-primary-600 border-t-transparent rounded-full" />
-        </div>
-      )}
-      
-      {/* Theme option buttons */}
-      <div className={getOptionsGridClasses()}>
-        {themeOptions.map(renderThemeOption)}
-      </div>
-      
-      {/* Current resolved theme indicator for system mode */}
-      {theme === 'system' && !compact && (
-        <div className="text-xs text-secondary-600 dark:text-secondary-400 mt-1">
-          <span className="sr-only">System theme resolved to: </span>
-          Following {resolvedTheme} mode
+          <CurrentIcon 
+            className={cn(
+              iconSize,
+              'transition-colors duration-200',
+              // Theme-specific icon colors with WCAG compliance
+              theme === 'light' && 'text-amber-600 dark:text-amber-400',
+              theme === 'dark' && 'text-indigo-600 dark:text-indigo-400', 
+              theme === 'system' && 'text-secondary-600 dark:text-secondary-400',
+              disabled && 'text-secondary-400 dark:text-secondary-600'
+            )}
+          />
+        </span>
+
+        {/* Optional text labels for enhanced clarity */}
+        {showLabels && (
+          <span 
+            className={cn(
+              'ml-2 text-sm font-medium transition-colors duration-200',
+              orientation === 'vertical' && 'ml-0 mt-1',
+              disabled && 'text-secondary-400 dark:text-secondary-600'
+            )}
+          >
+            {getThemeDisplayName(theme)}
+          </span>
+        )}
+
+        {/* Current state indicator */}
+        {showCurrentState && (
+          <span className="sr-only">
+            Current theme: {getThemeDisplayName(theme)}
+            {theme === 'system' && ` (resolved to ${resolvedTheme})`}
+          </span>
+        )}
+
+        {/* Loading indicator */}
+        {loading && (
+          <span 
+            className="absolute inset-0 flex items-center justify-center"
+            aria-hidden="true"
+          >
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
+          </span>
+        )}
+      </Switch>
+
+      {/* Accessible tooltip with proper positioning */}
+      {tooltip && showTooltip && (
+        <div
+          id="theme-toggle-tooltip"
+          role="tooltip"
+          className={cn(
+            'absolute z-50 px-3 py-2 text-sm font-medium text-white bg-secondary-900 rounded-md shadow-lg',
+            'pointer-events-none transition-opacity duration-200',
+            // Position-based classes
+            tooltipPosition === 'top' && 'bottom-full mb-2 left-1/2 transform -translate-x-1/2',
+            tooltipPosition === 'bottom' && 'top-full mt-2 left-1/2 transform -translate-x-1/2',
+            tooltipPosition === 'left' && 'right-full mr-2 top-1/2 transform -translate-y-1/2',
+            tooltipPosition === 'right' && 'left-full ml-2 top-1/2 transform -translate-y-1/2',
+            // Dark mode styles
+            'dark:bg-white dark:text-secondary-900'
+          )}
+          aria-live="polite"
+        >
+          {tooltip}
+          
+          {/* Tooltip arrow */}
+          <div 
+            className={cn(
+              'absolute w-2 h-2 bg-secondary-900 transform rotate-45',
+              tooltipPosition === 'top' && 'top-full left-1/2 -translate-x-1/2 -translate-y-1/2',
+              tooltipPosition === 'bottom' && 'bottom-full left-1/2 -translate-x-1/2 translate-y-1/2',
+              tooltipPosition === 'left' && 'left-full top-1/2 -translate-x-1/2 -translate-y-1/2',
+              tooltipPosition === 'right' && 'right-full top-1/2 translate-x-1/2 -translate-y-1/2',
+              'dark:bg-white'
+            )}
+            aria-hidden="true"
+          />
         </div>
       )}
     </div>
@@ -450,71 +494,53 @@ export function ThemeToggle({
 }
 
 /**
- * Compact variant for mobile/constrained spaces
+ * Preset theme toggle variants for common use cases
+ * Provides convenient pre-configured components for specific scenarios
  */
-export function CompactThemeToggle(props: Omit<ThemeToggleProps, 'compact'>) {
-  return <ThemeToggle {...props} compact />;
+
+/**
+ * Compact theme toggle for tight spaces (toolbar, header)
+ */
+export function CompactThemeToggle(props: Omit<ThemeToggleProps, 'size' | 'showLabels'>) {
+  return (
+    <ThemeToggle
+      size="sm"
+      showLabels={false}
+      variant="ghost"
+      {...props}
+    />
+  );
 }
 
 /**
- * Pre-configured variants for common use cases
+ * Full-featured theme toggle with labels for settings pages
  */
-export const ThemeToggleVariants = {
-  /**
-   * Header/navbar variant with compact design
-   */
-  Header: (props: Partial<ThemeToggleProps>) => (
-    <ThemeToggle 
-      variant="ghost"
-      size="sm"
-      compact
-      {...props}
-    />
-  ),
-  
-  /**
-   * Settings page variant with labels
-   */
-  Settings: (props: Partial<ThemeToggleProps>) => (
+export function DetailedThemeToggle(props: Omit<ThemeToggleProps, 'showLabels' | 'showCurrentState'>) {
+  return (
     <ThemeToggle
-      variant="outline"
-      size="md"
-      showLabels
-      labelPosition="bottom"
-      {...props}
-    />
-  ),
-  
-  /**
-   * Mobile-friendly variant
-   */
-  Mobile: (props: Partial<ThemeToggleProps>) => (
-    <ThemeToggle
-      variant="secondary"
+      showLabels={true}
+      showCurrentState={true}
       size="lg"
-      compact
-      className="md:hidden"
       {...props}
     />
-  ),
-  
-  /**
-   * Accessibility-enhanced variant for high contrast needs
-   */
-  HighContrast: (props: Partial<ThemeToggleProps>) => (
-    <ThemeToggle
-      variant="outline"
-      size="lg"
-      showLabels
-      labelPosition="right"
-      className="border-2 focus-within:ring-4"
-      {...props}
-    />
-  )
-};
+  );
+}
 
-// Export types for external use
+/**
+ * Accessible theme toggle for keyboard-first navigation
+ */
+export function KeyboardThemeToggle(props: ThemeToggleProps) {
+  return (
+    <ThemeToggle
+      announceChanges={true}
+      tooltip="Use arrow keys to navigate, Enter or Space to select"
+      {...props}
+    />
+  );
+}
+
+// Export types for external usage
 export type { ThemeToggleProps };
 
-// Export the main component as default
+// Default export
 export default ThemeToggle;
