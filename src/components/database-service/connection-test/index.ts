@@ -1,349 +1,304 @@
 /**
- * Database Connection Testing Module - Barrel Export Index
+ * Database Service Connection Test Module
  * 
- * This barrel export file provides centralized access to all database connection testing
- * components, hooks, types, and utilities. Designed to support React 19 stable features
- * with TypeScript 5.8+ module system and Turbopack optimization for enhanced tree-shaking
- * performance.
- * 
- * The module implements real-time database connection validation functionality including:
- * - SWR-powered connection testing with intelligent caching under 50ms per integration requirements
- * - Real-time connection validation under 5-second timeout requirement from F-001-RQ-002
- * - Automatic retry logic with exponential backoff for failed database connections
- * - Support for multi-database types (MySQL, PostgreSQL, Oracle, MongoDB, Snowflake) per F-001-RQ-001
- * - Connection state management for loading, success, error, and idle states with proper TypeScript typing
- * 
- * @fileoverview Centralized exports for database connection testing functionality
- * @version 1.0.0
- * @since 2024-01-01
- */
-
-// =============================================================================
-// CONNECTION TEST COMPONENTS
-// =============================================================================
-
-/**
- * Core connection testing components for database service validation.
- * Implements real-time feedback with SWR data synchronization and proper accessibility.
- */
-
-/**
- * Connection test button component with loading states, success/error feedback,
- * and integration with the connection testing hook.
+ * Centralized export file for all connection testing components, hooks, and types.
+ * Provides tree-shaking optimized exports following React 19 ecosystem best practices
+ * with TypeScript 5.8+ module system integration for Turbopack build pipeline.
  * 
  * Features:
- * - React Hook Form integration with real-time validation under 100ms
- * - Tailwind CSS 4.1+ styling with consistent theme injection
- * - HeadlessUI components for accessible button interactions
- * - TypeScript 5.8+ component interfaces following React 19 patterns
- * - SWR hook integration for real-time feedback per F-001 feature specification
+ * - Tree-shaking optimization for minimal bundle sizes
+ * - Organized exports by category (components, hooks, types, utilities)
+ * - Re-exports of commonly used types from parent database service module
+ * - TypeScript 5.8+ module system compatibility
+ * - Clear API surface for development experience
+ * 
+ * @fileoverview Connection testing module barrel exports for React/Next.js application
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
-export {
+
+// =============================================================================
+// COMPONENT EXPORTS
+// =============================================================================
+
+/**
+ * Connection Test Button Component
+ * Interactive button component with loading states, success/error feedback,
+ * and integration with connection testing workflow
+ */
+export { 
   ConnectionTestButton,
-  default as TestButton,
-  type ConnectionTestButtonProps
+  connectionTestButtonVariants,
+  default as ConnectionTestButtonDefault 
 } from './connection-test-button';
 
 /**
- * Real-time connection status indicator with visual feedback and animations.
- * 
- * Features:
- * - SWR data synchronization for automatic status updates per Section 5.2 component details
- * - Tailwind CSS animations and transitions for visual feedback per Section 7.1.1 framework stack
- * - WCAG 2.1 AA accessibility compliance with proper ARIA labeling per Section 7.6 user interactions
- * - Connection status integration with database testing workflow per F-001 feature specification
- * - TypeScript 5.8+ component props with strict type safety per Section 3.1 programming languages
+ * Connection Status Indicator Component  
+ * Real-time status display with visual indicators, progress animations,
+ * and accessibility-compliant status messaging
  */
-export {
+export { 
   ConnectionStatusIndicator,
-  default as StatusIndicator,
-  type ConnectionStatusIndicatorProps
+  default as ConnectionStatusIndicatorDefault 
 } from './connection-status-indicator';
 
 /**
- * Detailed connection test result display with error troubleshooting and success metadata.
- * 
- * Features:
- * - SWR error and success state integration for automatic result updates
- * - Responsive design with Tailwind CSS for multi-device support per Section 7.1.1 framework stack
- * - Database-specific error handling and metadata display per F-001-RQ-001 multi-database support
- * - TypeScript interfaces for test result data structures per Section 7.4.4 schemas
- * - Detailed error message display with database-specific troubleshooting hints
+ * Test Result Display Component
+ * Comprehensive test result presentation with success/error states,
+ * troubleshooting information, and database-specific guidance
  */
-export {
+export { 
   TestResultDisplay,
-  default as ResultDisplay,
-  type TestResultDisplayProps
+  default as TestResultDisplayDefault 
 } from './test-result-display';
 
 // =============================================================================
-// CONNECTION TEST HOOK
+// HOOK EXPORTS
 // =============================================================================
 
 /**
- * Custom React hook for database connection testing with SWR integration.
- * Implements intelligent caching, automatic retries, and real-time validation.
- * 
- * Features:
- * - Real-time connection validation under 5 seconds with SWR caching per F-001-RQ-002
- * - Automatic retry logic with exponential backoff for failed database connections
- * - Support for all database types (MySQL, PostgreSQL, Oracle, MongoDB, Snowflake)
- * - TypeScript 5.8+ interface definitions for type safety per Section 7.4.4
- * - Next.js API routes integration for serverless connection testing
+ * Primary Connection Test Hook
+ * SWR-powered connection testing with intelligent caching, automatic retries,
+ * and comprehensive error handling for sub-5-second validation
  */
-export {
+export { 
   useConnectionTest,
-  type UseConnectionTestReturn,
-  type ConnectionTestOptions,
-  type ConnectionTestHookParams
+  default as useConnectionTestDefault 
+} from './use-connection-test';
+
+/**
+ * Connection Test Hook with SWR Caching
+ * Enhanced version with automatic revalidation and cached results
+ */
+export { useConnectionTestWithCache } from './use-connection-test';
+
+/**
+ * Batch Connection Test Hook
+ * Concurrent testing of multiple database configurations with result aggregation
+ */
+export { useBatchConnectionTest } from './use-connection-test';
+
+/**
+ * Connection Status State Hook
+ * Simplified state management for connection status operations
+ */
+export { useConnectionStatus } from './connection-status-indicator';
+
+// =============================================================================
+// TYPE EXPORTS - CONNECTION TEST HOOKS
+// =============================================================================
+
+/**
+ * Hook Configuration and Return Types
+ * TypeScript interfaces for connection test hook configuration and responses
+ */
+export type {
+  UseConnectionTestOptions,
+  UseConnectionTestReturn,
+  ConnectionTestRequest,
+  ConnectionTestResponse
 } from './use-connection-test';
 
 // =============================================================================
-// TYPE DEFINITIONS AND INTERFACES
+// TYPE EXPORTS - COMPONENT PROPS
 // =============================================================================
 
 /**
- * Re-export commonly used types from parent database service module
- * for convenient access without additional imports.
+ * Connection Test Button Props
+ * Component props interface with variant props from class-variance-authority
+ */
+export type { 
+  ConnectionTestButtonProps,
+  VariantProps
+} from './connection-test-button';
+
+/**
+ * Connection Status Indicator Props
+ * Component props interface for status display configuration
+ */
+export type { 
+  ConnectionStatusProps 
+} from './connection-status-indicator';
+
+/**
+ * Test Result Display Props
+ * Component props interface for result presentation customization
+ */
+export type { 
+  TestResultDisplayProps 
+} from './test-result-display';
+
+// =============================================================================
+// TYPE EXPORTS - CONNECTION TEST TYPES
+// =============================================================================
+
+/**
+ * Core Connection Test Types
+ * Essential types for connection testing operations and results
  */
 export type {
-  // Core connection testing types
-  ConnectionTestResult,
   ConnectionTestStatus,
-  ConnectionMetadata,
-  
-  // Connection configuration types
+  ConnectionTestResult
+} from './connection-status-indicator';
+
+// =============================================================================
+// UTILITY FUNCTION EXPORTS
+// =============================================================================
+
+/**
+ * Cache Key Generation Utility
+ * Creates unique cache keys for connection test results with security considerations
+ */
+export { createCacheKey } from './use-connection-test';
+
+/**
+ * Connection Configuration Validator
+ * Validates database configuration before testing with comprehensive checks
+ */
+export { validateConnectionConfig } from './use-connection-test';
+
+/**
+ * Exponential Backoff Calculator
+ * Implements exponential backoff delay calculation for retry mechanisms
+ */
+export { calculateBackoffDelay } from './use-connection-test';
+
+// =============================================================================
+// RE-EXPORTS FROM PARENT DATABASE SERVICE MODULE
+// =============================================================================
+
+/**
+ * Database Configuration Types
+ * Core database service types commonly used in connection testing
+ */
+export type {
   DatabaseConfig,
+  DatabaseDriver,
+  DatabaseType,
+  ConnectionMetadata,
+  ApiErrorResponse,
+  ServiceStatus,
   SSLConfig,
   PoolingConfig,
   DatabaseOptions,
-  
-  // API response types
-  ApiErrorResponse,
-  
-  // Database driver types
-  DatabaseDriver,
-  DatabaseType,
-  
-  // Component prop base interface
-  BaseComponentProps
+  DatabaseConnectionInput,
+  ConnectionTestInput
 } from '../types';
 
 /**
- * Re-export validation schemas for connection testing
+ * Database Service Validation Schemas
+ * Zod schemas for form validation and data transformation
  */
 export {
-  ConnectionTestSchema,
-  type ConnectionTestInput
+  DatabaseConnectionSchema,
+  ConnectionTestSchema
+} from '../types';
+
+/**
+ * Database Service Constants
+ * Default ports, labels, and configuration constants for database types
+ */
+export {
+  DATABASE_DEFAULT_PORTS,
+  DATABASE_TYPE_LABELS,
+  DATABASE_TYPE_DESCRIPTIONS,
+  SERVICE_STATUS_LABELS,
+  SERVICE_STATUS_COLORS,
+  VALIDATION_MESSAGES
+} from '../types';
+
+/**
+ * Database Service Utility Functions
+ * Helper functions for database type checking and configuration
+ */
+export {
+  isDatabaseDriver,
+  isServiceStatus,
+  getDefaultPort,
+  formatServiceStatus,
+  getServiceStatusColor,
+  validateConnectionConfig as validateDatabaseConfig,
+  createInitialFormData
 } from '../types';
 
 // =============================================================================
-// CONSTANTS AND CONFIGURATION
+// OPTIMIZED DEFAULT EXPORTS FOR TREE-SHAKING
 // =============================================================================
 
 /**
- * Re-export relevant constants for connection testing operations
- * from parent database service module.
+ * Default export object for convenient imports while maintaining tree-shaking
+ * 
+ * Usage examples:
+ * ```typescript
+ * // Named imports (recommended for tree-shaking)
+ * import { ConnectionTestButton, useConnectionTest } from './connection-test';
+ * 
+ * // Default import for multiple components
+ * import ConnectionTest from './connection-test';
+ * const { ConnectionTestButton, useConnectionTest } = ConnectionTest;
+ * 
+ * // Specific component default
+ * import { ConnectionTestButtonDefault as ConnectionTestButton } from './connection-test';
+ * ```
  */
-export {
-  // Connection timeout configuration per F-001 requirement for 5-second testing
-  CONNECTION_TIMEOUTS,
-  CONNECTION_RETRY_CONFIG,
+const ConnectionTestModule = {
+  // Components
+  ConnectionTestButton,
+  ConnectionStatusIndicator,
+  TestResultDisplay,
   
-  // SWR configuration for connection testing with sub-50ms cache responses
-  DATABASE_SERVICE_SWR_CONFIG as SWR_CONFIG,
+  // Hooks
+  useConnectionTest,
+  useConnectionTestWithCache,
+  useBatchConnectionTest,
+  useConnectionStatus,
   
-  // Database type definitions for multi-database support
-  DATABASE_TYPES,
-  DATABASE_TYPE_LIST,
+  // Utilities
+  createCacheKey,
+  validateConnectionConfig,
+  calculateBackoffDelay,
   
-  // Default configurations for connection testing
-  DEFAULT_DATABASE_CONFIGS,
-  
-  // API endpoints for connection testing
-  DATABASE_SERVICE_ENDPOINTS
-} from '../constants';
-
-// =============================================================================
-// CONVENIENCE EXPORTS FOR COMMON PATTERNS
-// =============================================================================
-
-/**
- * Commonly used component combinations for enhanced developer experience.
- * These exports provide convenient access to frequently used patterns.
- */
-
-/**
- * Complete connection testing component collection for easy imports
- */
-export const ConnectionTestComponents = {
-  Button: ConnectionTestButton,
-  StatusIndicator: ConnectionStatusIndicator,
-  ResultDisplay: TestResultDisplay
+  // Style variants
+  connectionTestButtonVariants
 } as const;
 
-/**
- * Hook and utilities collection for connection testing operations
- */
-export const ConnectionTestHooks = {
-  useConnectionTest
-} as const;
-
-/**
- * Configuration object for connection testing with all relevant settings
- */
-export const ConnectionTestConfig = {
-  // Timeout configurations
-  timeouts: CONNECTION_TIMEOUTS,
-  retryConfig: CONNECTION_RETRY_CONFIG,
-  
-  // SWR configuration for connection testing
-  swrConfig: DATABASE_SERVICE_SWR_CONFIG.connectionTest,
-  
-  // Database type support
-  supportedTypes: DATABASE_TYPE_LIST,
-  defaultConfigs: DEFAULT_DATABASE_CONFIGS,
-  
-  // API endpoint patterns
-  endpoints: {
-    connectionTest: DATABASE_SERVICE_ENDPOINTS.CONNECTION_TEST,
-    serviceTest: DATABASE_SERVICE_ENDPOINTS.SERVICE_TEST
-  }
-} as const;
+export default ConnectionTestModule;
 
 // =============================================================================
-// UTILITY FUNCTIONS AND HELPERS
+// MODULE METADATA FOR DEVELOPMENT TOOLS
 // =============================================================================
 
 /**
- * Utility functions for connection testing operations
+ * Module information for development tools and documentation generation
  */
-
-/**
- * Helper function to determine if a database type supports connection testing
- * @param databaseType - The database driver type to check
- * @returns boolean indicating if connection testing is supported
- */
-export const supportsConnectionTesting = (databaseType: DatabaseDriver): boolean => {
-  const type = DATABASE_TYPES[databaseType];
-  return type ? type.supportedFeatures.includes('schema_discovery') : false;
-};
-
-/**
- * Helper function to get default connection timeout for a database type
- * @param databaseType - The database driver type
- * @returns timeout in milliseconds
- */
-export const getConnectionTimeout = (databaseType: DatabaseDriver): number => {
-  const config = DEFAULT_DATABASE_CONFIGS[databaseType];
-  return config?.connectionTimeout || CONNECTION_TIMEOUTS.CONNECTION_TEST;
-};
-
-/**
- * Helper function to validate connection test configuration
- * @param config - Database configuration to validate
- * @returns boolean indicating if configuration is valid for testing
- */
-export const isValidConnectionConfig = (config: DatabaseConfig): boolean => {
-  return !!(config.host && config.database && config.username);
-};
-
-/**
- * Helper function to format connection test error messages
- * @param error - Error from connection test
- * @param databaseType - Type of database being tested
- * @returns formatted error message with troubleshooting hints
- */
-export const formatConnectionError = (
-  error: string, 
-  databaseType: DatabaseDriver
-): string => {
-  const baseError = error || 'Connection test failed';
-  const type = DATABASE_TYPES[databaseType];
-  
-  if (type) {
-    return `${baseError} (${type.label} on port ${type.defaultPort || 'default'})`;
-  }
-  
-  return baseError;
-};
-
-// =============================================================================
-// TYPE GUARDS AND VALIDATION HELPERS
-// =============================================================================
-
-/**
- * Type guard to check if a connection test result indicates success
- * @param result - Connection test result to check
- * @returns boolean indicating if result represents successful connection
- */
-export const isSuccessfulConnection = (
-  result: ConnectionTestResult | null
-): result is ConnectionTestResult & { success: true } => {
-  return result !== null && result.success === true;
-};
-
-/**
- * Type guard to check if a connection test result contains error information
- * @param result - Connection test result to check
- * @returns boolean indicating if result represents failed connection with error details
- */
-export const isFailedConnection = (
-  result: ConnectionTestResult | null
-): result is ConnectionTestResult & { success: false } => {
-  return result !== null && result.success === false;
-};
-
-/**
- * Type guard to check if connection test status indicates an active test
- * @param status - Connection test status to check
- * @returns boolean indicating if test is currently running
- */
-export const isTestInProgress = (status: ConnectionTestStatus): boolean => {
-  return status === 'testing';
-};
-
-// =============================================================================
-// DEFAULT EXPORT
-// =============================================================================
-
-/**
- * Default export provides the main connection testing hook for convenient import patterns:
- * import useConnectionTest from './connection-test'
- */
-export { useConnectionTest as default } from './use-connection-test';
-
-// =============================================================================
-// MODULE METADATA AND VERSIONING
-// =============================================================================
-
-/**
- * Module metadata for version tracking and compatibility checking
- */
-export const ConnectionTestModule = {
+export const MODULE_INFO = {
+  name: 'database-service-connection-test',
   version: '1.0.0',
-  compatible: {
-    react: '>=19.0.0',
-    nextjs: '>=15.1.0',
-    typescript: '>=5.8.0'
+  description: 'Connection testing components and hooks for database services',
+  exports: {
+    components: ['ConnectionTestButton', 'ConnectionStatusIndicator', 'TestResultDisplay'],
+    hooks: ['useConnectionTest', 'useConnectionTestWithCache', 'useBatchConnectionTest', 'useConnectionStatus'],
+    types: ['ConnectionTestButtonProps', 'ConnectionStatusProps', 'UseConnectionTestOptions', 'ConnectionTestResult'],
+    utilities: ['createCacheKey', 'validateConnectionConfig', 'calculateBackoffDelay']
   },
   dependencies: {
-    'swr': '^2.2.0',
-    'react-hook-form': '^7.52.0',
-    'zod': '^3.22.0',
-    '@headlessui/react': '^2.0.0',
-    'tailwindcss': '^4.1.0'
+    react: '>=19.0.0',
+    'class-variance-authority': '^0.7.0',
+    swr: '^2.2.0',
+    zod: '^3.22.0'
   },
-  description: 'Real-time database connection testing components and hooks for React/Next.js applications',
   features: [
-    'Real-time connection validation under 5 seconds',
-    'SWR-powered intelligent caching with sub-50ms responses',
-    'Multi-database support (MySQL, PostgreSQL, Oracle, MongoDB, Snowflake)',
-    'Automatic retry logic with exponential backoff',
-    'WCAG 2.1 AA accessibility compliance',
-    'TypeScript 5.8+ type safety with React 19 patterns',
-    'Tailwind CSS 4.1+ styling with Turbopack optimization'
-  ],
-  author: 'DreamFactory Admin Interface Team',
-  license: 'MIT'
+    'Tree-shaking optimization',
+    'TypeScript 5.8+ support',
+    'React 19 concurrent features',
+    'SWR intelligent caching',
+    'Comprehensive error handling',
+    'Accessibility compliance',
+    'Turbopack build optimization'
+  ]
 } as const;
+
+/**
+ * Type-only export for module metadata
+ */
+export type ConnectionTestModuleInfo = typeof MODULE_INFO;
