@@ -1,673 +1,857 @@
-'use client'
+/**
+ * Application Details Form Component
+ * 
+ * React functional component that manages the create and edit form for application
+ * entities in the adf-apps feature. Implements React Hook Form with Zod validation
+ * for real-time form validation under 100ms, integrates SWR/React Query for API
+ * operations with cache hit responses under 50ms, uses Headless UI components with
+ * Tailwind CSS styling, and provides API key generation, clipboard operations,
+ * and navigation using Next.js patterns.
+ * 
+ * Replaces Angular standalone component while maintaining all existing functionality
+ * for application CRUD operations.
+ * 
+ * @fileoverview Application details form component for create/edit workflows
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
+ */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useForm, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import useSWR, { mutate } from 'swr'
+'use client';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import useSWR from 'swr';
+import { useSWRConfig } from 'swr';
 import { 
-  ApplicationFormSchema, 
-  DEFAULT_APPLICATION_FORM,
-  transformFormToPayload,
-  transformPayloadToForm,
-  type ApplicationForm,
-  type ApplicationPayload,
-  type RoleSelection
-} from './df-app-details.schema'
-import { useTheme } from '@/hooks/use-theme'
-import { apiClient } from '@/lib/api-client'
-import { useApiMutation } from '@/hooks/use-api-mutation'
-import { AppType, AppPayload } from '@/types/apps'
-import { RoleType } from '@/types/role'
+  InfoIcon,
+  CopyIcon, 
+  RefreshCwIcon,
+  ArrowLeftIcon,
+  CheckIcon,
+  XIcon
+} from 'lucide-react';
 
-// UI Components (these would be imported from actual components when they exist)
-// For now, using basic implementations with Tailwind styling
-import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { FormField } from '@/components/ui/form-field'
-import { Alert } from '@/components/ui/alert'
-import { Combobox } from '@/components/ui/combobox'
-import { RadioGroup } from '@/components/ui/radio-group'
-import { Switch } from '@/components/ui/switch'
+// Type imports
+import type { 
+  AppType, 
+  AppPayload, 
+  APP_TYPES,
+  AppFormData,
+  transformPayloadToApi 
+} from '@/types/apps';
+import type { RoleType } from '@/types/role';
 
-// Icons
+// Schema and validation
 import { 
-  InformationCircleIcon, 
-  ClipboardDocumentIcon, 
-  ArrowPathIcon,
-  ExclamationTriangleIcon
-} from '@heroicons/react/24/outline'
+  AppFormSchema, 
+  type AppFormFieldNames,
+  validateAppForm,
+  getRequiredFieldsForType,
+  transformFormDataToPayload
+} from './df-app-details.schema';
 
-// Utility functions for API key generation
-const generateApiKey = async (host: string, appName: string): Promise<string> => {
-  const timestamp = Date.now()
-  const randomStr = Math.random().toString(36).substring(2, 15)
-  const combined = `${host}-${appName}-${timestamp}-${randomStr}`
+// API and hooks
+import { apiGet, apiPost, apiPut, API_ENDPOINTS } from '@/lib/api-client';
+import { useApiMutation } from '@/hooks/use-api-mutation';
+import { useTheme } from '@/hooks/use-theme';
+
+// UI Components
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Combobox } from '@/components/ui/combobox';
+import { RadioGroup } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
+import { Alert } from '@/components/ui/alert';
+
+// ============================================================================
+// CONSTANTS AND CONFIGURATION
+// ============================================================================
+
+/**
+ * Application location type options for radio group
+ */
+const APP_LOCATION_OPTIONS = [
+  {
+    value: '0',
+    label: 'No Storage',
+    description: 'Application without file storage'
+  },
+  {
+    value: '1', 
+    label: 'File Storage',
+    description: 'Application hosted on file service'
+  },
+  {
+    value: '3',
+    label: 'Web Server',
+    description: 'Application on web server path'
+  },
+  {
+    value: '2',
+    label: 'Remote URL',
+    description: 'Application hosted at remote URL'
+  }
+] as const;
+
+/**
+ * Storage service options for file storage applications
+ */
+const STORAGE_SERVICE_OPTIONS = [
+  { value: 3, label: 'File Service' },
+  { value: 4, label: 'Log Service' }
+] as const;
+
+/**
+ * Default form values for new applications
+ */
+const DEFAULT_FORM_VALUES: Partial<AppFormData> = {
+  name: '',
+  description: '',
+  type: 0,
+  role_id: undefined,
+  is_active: true,
+  storage_service_id: 3,
+  storage_container: 'applications',
+  path: '',
+  url: '',
+};
+
+/**
+ * Performance configuration
+ */
+const PERFORMANCE_CONFIG = {
+  validationDelay: 100, // ms - validation under 100ms requirement
+  debounceDelay: 300, // ms - debounce for API calls
+  cacheStaleTime: 30000, // 30s - SWR cache stale time
+  cacheDedupingInterval: 5000, // 5s - SWR deduping interval
+} as const;
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Generate API key for applications
+ */
+async function generateApiKey(host: string, appName: string): Promise<string> {
+  // Simple API key generation (matches original functionality)
+  const timestamp = Date.now().toString();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const combined = `${host}-${appName}-${timestamp}-${randomString}`;
   
-  // Use Web Crypto API for generating hash
-  const encoder = new TextEncoder()
-  const data = encoder.encode(combined)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-// API endpoints
-const APPS_ENDPOINT = '/apps'
-const ROLES_ENDPOINT = '/system/roles'
-
-// Main component interface
-interface DfAppDetailsProps {
-  /** Optional app ID for edit mode - passed via URL params or props */
-  appId?: string | number
-  /** Optional roles data for autocomplete - if not provided, will fetch via SWR */
-  initialRoles?: RoleType[]
-  /** Callback function called after successful save operation */
-  onSaveSuccess?: (app: AppType) => void
-  /** Callback function called when user cancels/navigates back */
-  onCancel?: () => void
+  // Create a simple hash
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    const char = combined.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  
+  return `df_api_${Math.abs(hash).toString(36)}_${randomString}`;
 }
 
 /**
- * DfAppDetailsComponent - React functional component for application entity management
- * 
- * Replaces Angular DfAppDetailsComponent with modern React patterns:
- * - React Hook Form with Zod validation for forms
- * - SWR/React Query for intelligent caching and data fetching
- * - Headless UI components with Tailwind CSS styling
- * - Next.js navigation and middleware-based authentication
- * - Zustand state management for theme and global state
- * 
- * Supports both create and edit modes for application entities,
- * maintaining all existing functionality from the Angular version
- * while providing enhanced performance and developer experience.
+ * Copy text to clipboard with error handling
  */
-export default function DfAppDetailsComponent({
-  appId,
-  initialRoles,
-  onSaveSuccess,
-  onCancel
-}: DfAppDetailsProps) {
-  // Next.js hooks for navigation and URL params
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const editAppId = appId || searchParams.get('id')
-  const isEditMode = Boolean(editAppId)
-  
-  // Theme management using Zustand-based theme hook
-  const { isDark } = useTheme()
-  
-  // Local state for UI interactions
-  const [showAlert, setShowAlert] = useState(false)
-  const [alertMessage, setAlertMessage] = useState('')
-  const [alertType, setAlertType] = useState<'success' | 'error' | 'warning' | 'info'>('error')
-  const [isGeneratingKey, setIsGeneratingKey] = useState(false)
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'success' | 'error'>('idle')
-  
-  // URL origin for app location calculation
-  const urlOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    console.error('Failed to copy to clipboard:', error);
+    return false;
+  }
+}
 
-  // SWR data fetching for roles with cache optimization
-  const { 
-    data: rolesData, 
-    error: rolesError, 
-    isLoading: rolesLoading 
-  } = useSWR<{ resource: RoleType[] }>(
-    ROLES_ENDPOINT, 
-    apiClient.get,
+/**
+ * Get application launch URL based on form data
+ */
+function getAppLocationUrl(formData: AppFormData, origin: string): string {
+  const appLocation = formData.type.toString();
+  
+  let url = origin;
+  
+  if (appLocation === '1' && formData.storage_service_id === 3) {
+    url += '/file/';
+  } else if (appLocation === '1' && formData.storage_service_id === 4) {
+    url += '/log/';
+  }
+  
+  if (appLocation === '1' && formData.storage_container) {
+    url += formData.storage_container + '/';
+  }
+  
+  if (formData.path && (appLocation === '1' || appLocation === '3')) {
+    url += formData.path;
+  }
+  
+  return url.replace(/\/+/g, '/').replace(/\/$/, '');
+}
+
+// ============================================================================
+// CUSTOM HOOKS
+// ============================================================================
+
+/**
+ * Hook for fetching roles data with caching
+ */
+function useRoles() {
+  return useSWR(
+    'roles',
+    () => apiGet<{ resource: RoleType[] }>(`${API_ENDPOINTS.SYSTEM_ROLE}?fields=*&limit=1000`),
     {
+      dedupingInterval: PERFORMANCE_CONFIG.cacheDedupingInterval,
+      focusThrottleInterval: PERFORMANCE_CONFIG.cacheStaleTime,
       revalidateOnFocus: false,
-      dedupingInterval: 5 * 60 * 1000, // 5 minutes deduplication
-      fallbackData: initialRoles ? { resource: initialRoles } : undefined,
-      onError: (error) => {
-        console.error('Failed to load roles:', error)
-        triggerAlert('error', 'Failed to load roles. Please refresh the page.')
-      }
+      errorRetryCount: 3,
     }
-  )
+  );
+}
 
-  // SWR data fetching for application data in edit mode
-  const { 
-    data: appData, 
-    error: appError, 
-    isLoading: appLoading 
-  } = useSWR<AppType>(
-    isEditMode ? `${APPS_ENDPOINT}/${editAppId}` : null,
-    apiClient.get,
+/**
+ * Hook for fetching app data with caching
+ */
+function useAppData(appId: string | null) {
+  return useSWR(
+    appId ? ['app', appId] : null,
+    () => apiGet<AppType>(`${API_ENDPOINTS.SYSTEM_APP}/${appId}?related=role_by_role_id`),
     {
+      dedupingInterval: PERFORMANCE_CONFIG.cacheDedupingInterval,
+      focusThrottleInterval: PERFORMANCE_CONFIG.cacheStaleTime,
       revalidateOnFocus: false,
-      dedupingInterval: 2 * 60 * 1000, // 2 minutes deduplication
-      onError: (error) => {
-        console.error('Failed to load application:', error)
-        triggerAlert('error', 'Failed to load application data. Please try again.')
-      }
+      errorRetryCount: 3,
     }
-  )
+  );
+}
 
-  // Extract roles from API response
-  const roles = useMemo(() => rolesData?.resource || [], [rolesData])
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
-  // React Hook Form setup with Zod validation
-  const form = useForm<ApplicationForm>({
-    resolver: zodResolver(ApplicationFormSchema),
-    defaultValues: DEFAULT_APPLICATION_FORM,
-    mode: 'onTouched', // Real-time validation on touch for under 100ms response
-    criteriaMode: 'all' // Show all validation errors
-  })
+/**
+ * Application Details Form Component
+ */
+export default function DfAppDetails() {
+  // ==========================================================================
+  // HOOKS AND STATE
+  // ==========================================================================
 
-  const { 
-    register, 
-    handleSubmit, 
-    control, 
-    watch, 
-    formState: { errors, isSubmitting, isDirty, isValid },
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { mutate } = useSWRConfig();
+  const { resolvedTheme } = useTheme();
+  
+  // Get app ID from URL parameters
+  const appId = searchParams.get('id');
+  const isEditMode = Boolean(appId);
+  
+  // Fetch data
+  const { data: rolesData, error: rolesError, isLoading: rolesLoading } = useRoles();
+  const { data: appData, error: appError, isLoading: appLoading } = useAppData(appId);
+  
+  // Local state
+  const [alertState, setAlertState] = useState<{
+    show: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    message: string;
+  }>({
+    show: false,
+    type: 'error',
+    message: '',
+  });
+  
+  const [urlOrigin] = useState(() => 
+    typeof window !== 'undefined' ? window.location.origin : ''
+  );
+
+  // ==========================================================================
+  // FORM SETUP
+  // ==========================================================================
+
+  const {
+    control,
+    handleSubmit,
+    watch,
     setValue,
+    getValues,
     reset,
-    getValues
-  } = form
+    formState: { errors, isSubmitting, isDirty, isValid }
+  } = useForm<AppFormData>({
+    resolver: zodResolver(AppFormSchema),
+    defaultValues: DEFAULT_FORM_VALUES,
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
+    shouldFocusError: true,
+  });
 
-  // Watch appLocation for conditional field validation
-  const watchedAppLocation = watch('appLocation')
+  // Watch form values for reactive updates
+  const watchedValues = watch();
+  const appLocationType = watchedValues.type?.toString();
 
-  // API mutations using custom hook with SWR cache integration
-  const createMutation = useApiMutation({
-    mutationFn: async (payload: ApplicationPayload) => {
-      const response = await apiClient.post(APPS_ENDPOINT, { 
-        resource: [payload] 
-      }, {
-        headers: {
-          'X-Request-ID': `create-app-${Date.now()}`
+  // ==========================================================================
+  // API MUTATIONS
+  // ==========================================================================
+
+  const createAppMutation = useApiMutation({
+    mutationFn: async (data: AppPayload) => {
+      return apiPost<{ resource: AppType[] }>(
+        API_ENDPOINTS.SYSTEM_APP,
+        { resource: [data] },
+        {
+          fields: '*',
+          related: 'role_by_role_id',
+          snackbarSuccess: 'Application created successfully',
         }
-      })
-      return response.resource[0]
+      );
+    },
+    onSuccess: () => {
+      mutate('apps'); // Invalidate apps list cache
+      goBack();
+    },
+    onError: (error) => {
+      const errorMessage = error.message || 'Failed to create application';
+      triggerAlert('error', errorMessage);
+    },
+  });
+
+  const updateAppMutation = useApiMutation({
+    mutationFn: async (data: { id: string; payload: Partial<AppPayload> }) => {
+      return apiPut<AppType>(
+        `${API_ENDPOINTS.SYSTEM_APP}/${data.id}`,
+        data.payload,
+        {
+          snackbarSuccess: 'Application updated successfully',
+        }
+      );
+    },
+    onSuccess: () => {
+      mutate(['app', appId]); // Invalidate specific app cache
+      mutate('apps'); // Invalidate apps list cache
+      goBack();
+    },
+    onError: (error) => {
+      const errorMessage = error.message || 'Failed to update application';
+      triggerAlert('error', errorMessage);
+    },
+  });
+
+  const refreshApiKeyMutation = useApiMutation({
+    mutationFn: async (data: { id: string; apiKey: string }) => {
+      return apiPut<AppType>(
+        `${API_ENDPOINTS.SYSTEM_APP}/${data.id}`,
+        { apiKey: data.apiKey }
+      );
     },
     onSuccess: (data) => {
-      triggerAlert('success', 'Application created successfully!')
-      // Invalidate related cache entries
-      mutate(APPS_ENDPOINT)
-      onSaveSuccess?.(data)
-      // Navigate back after short delay to show success message
-      setTimeout(() => goBack(), 1500)
+      mutate(['app', appId]); // Invalidate app cache to refresh data
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.error?.context?.resource?.[0]?.message 
-        || error?.message 
-        || 'Failed to create application'
-      triggerAlert('error', message)
-    }
-  })
+    onError: (error) => {
+      triggerAlert('error', 'Failed to refresh API key');
+    },
+  });
 
-  const updateMutation = useApiMutation({
-    mutationFn: async (payload: ApplicationPayload) => {
-      const response = await apiClient.put(`${APPS_ENDPOINT}/${editAppId}`, payload, {
-        headers: {
-          'X-Request-ID': `update-app-${editAppId}-${Date.now()}`
-        }
-      })
-      return response
-    },
-    onSuccess: (data) => {
-      triggerAlert('success', 'Application updated successfully!')
-      // Invalidate related cache entries
-      mutate(APPS_ENDPOINT)
-      mutate(`${APPS_ENDPOINT}/${editAppId}`)
-      onSaveSuccess?.(data)
-      // Navigate back after short delay to show success message
-      setTimeout(() => goBack(), 1500)
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.error?.message 
-        || error?.message 
-        || 'Failed to update application'
-      triggerAlert('error', message)
-    }
-  })
+  // ==========================================================================
+  // COMPUTED VALUES
+  // ==========================================================================
 
-  // Initialize form with application data in edit mode
+  const roles = useMemo(() => rolesData?.resource || [], [rolesData]);
+  const editApp = useMemo(() => appData || null, [appData]);
+  
+  const isLoading = rolesLoading || (isEditMode && appLoading);
+  const hasError = rolesError || (isEditMode && appError);
+  
+  const requiredFields = useMemo(() => 
+    getRequiredFieldsForType(watchedValues.type || 0), 
+    [watchedValues.type]
+  );
+
+  const appLocationUrl = useMemo(() => {
+    if (appLocationType === '1' || appLocationType === '3') {
+      return getAppLocationUrl(watchedValues, urlOrigin);
+    }
+    return '';
+  }, [watchedValues, urlOrigin, appLocationType]);
+
+  const disableKeyRefresh = useMemo(() => {
+    return !editApp || editApp.createdById === null;
+  }, [editApp]);
+
+  // ==========================================================================
+  // EFFECTS
+  // ==========================================================================
+
+  /**
+   * Initialize form with existing app data in edit mode
+   */
   useEffect(() => {
-    if (isEditMode && appData && roles.length > 0) {
-      const formData = transformPayloadToForm(appData, roles)
-      reset(formData)
+    if (isEditMode && editApp) {
+      reset({
+        name: editApp.name,
+        description: editApp.description || '',
+        type: editApp.type,
+        role_id: editApp.roleByRoleId?.id,
+        is_active: editApp.isActive,
+        storage_service_id: editApp.storageServiceId,
+        storage_container: editApp.storageContainer || 'applications',
+        path: editApp.path || '',
+        url: editApp.url || '',
+      });
     }
-  }, [isEditMode, appData, roles, reset])
+  }, [isEditMode, editApp, reset]);
 
-  // Utility function for triggering alerts
-  const triggerAlert = useCallback((type: typeof alertType, message: string) => {
-    setAlertType(type)
-    setAlertMessage(message)
-    setShowAlert(true)
+  /**
+   * Handle conditional validation based on app location type
+   */
+  useEffect(() => {
+    const type = watchedValues.type;
     
-    // Auto-hide success alerts after 3 seconds
-    if (type === 'success') {
-      setTimeout(() => setShowAlert(false), 3000)
+    // Update validation based on type changes
+    if (type === 2) { // URL
+      // URL is required, path is not
+      setValue('path', '');
+    } else if (type === 3) { // Web Server
+      // Path is required, URL is not
+      setValue('url', '');
+    } else if (type === 0) { // No Storage
+      // Clear all storage-related fields
+      setValue('path', '');
+      setValue('url', '');
+      setValue('storage_service_id', 3);
+      setValue('storage_container', 'applications');
     }
-  }, [])
+  }, [watchedValues.type, setValue]);
 
-  // Navigation helper
+  // ==========================================================================
+  // EVENT HANDLERS
+  // ==========================================================================
+
+  /**
+   * Show alert message
+   */
+  const triggerAlert = useCallback((type: typeof alertState.type, message: string) => {
+    setAlertState({
+      show: true,
+      type,
+      message,
+    });
+  }, []);
+
+  /**
+   * Hide alert message
+   */
+  const hideAlert = useCallback(() => {
+    setAlertState(prev => ({ ...prev, show: false }));
+  }, []);
+
+  /**
+   * Navigate back to apps list
+   */
   const goBack = useCallback(() => {
-    if (onCancel) {
-      onCancel()
+    router.push('/adf-apps');
+  }, [router]);
+
+  /**
+   * Copy API key to clipboard
+   */
+  const copyApiKey = useCallback(async () => {
+    if (!editApp?.apiKey) return;
+    
+    const success = await copyToClipboard(editApp.apiKey);
+    if (success) {
+      triggerAlert('success', 'API key copied to clipboard');
     } else {
-      router.back()
+      triggerAlert('error', 'Failed to copy API key');
     }
-  }, [router, onCancel])
+  }, [editApp?.apiKey, triggerAlert]);
 
-  // Generate application URL based on current form values
-  const getAppLocationUrl = useCallback((): string => {
-    const values = getValues()
-    const { appLocation, storageServiceId, storageContainer, path } = values
-
-    const baseUrl = urlOrigin
-    
-    if (appLocation === '1') {
-      // File storage
-      let servicePath = ''
-      if (storageServiceId === 3) servicePath = 'file/'
-      if (storageServiceId === 4) servicePath = 'log/'
-      
-      return `${baseUrl}/${servicePath}${storageContainer}/${path}`.replace(/\/+/g, '/')
+  /**
+   * Copy app URL to clipboard
+   */
+  const copyAppUrl = useCallback(async () => {
+    const success = await copyToClipboard(appLocationUrl);
+    if (success) {
+      triggerAlert('success', 'URL copied to clipboard');
+    } else {
+      triggerAlert('error', 'Failed to copy URL');
     }
-    
-    if (appLocation === '3') {
-      // Web server
-      return `${baseUrl}${path}`.replace(/\/+/g, '/')
-    }
-    
-    return baseUrl
-  }, [urlOrigin, getValues])
+  }, [appLocationUrl, triggerAlert]);
 
-  // Copy to clipboard functionality with status feedback
-  const copyToClipboard = useCallback(async (text: string, label: string = 'text') => {
-    setCopyStatus('copying')
-    
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopyStatus('success')
-      triggerAlert('success', `${label} copied to clipboard!`)
-      
-      // Reset copy status after 2 seconds
-      setTimeout(() => setCopyStatus('idle'), 2000)
-    } catch (error) {
-      setCopyStatus('error')
-      triggerAlert('error', `Failed to copy ${label}. Please try again.`)
-      console.error('Copy to clipboard failed:', error)
-      
-      // Reset copy status after 2 seconds
-      setTimeout(() => setCopyStatus('idle'), 2000)
-    }
-  }, [triggerAlert])
-
-  // API key refresh functionality
+  /**
+   * Refresh API key
+   */
   const refreshApiKey = useCallback(async () => {
-    if (!appData || !isEditMode) return
-
-    setIsGeneratingKey(true)
+    if (!editApp || !editApp.id || disableKeyRefresh) return;
     
     try {
-      const newKey = await generateApiKey(urlOrigin, getValues('name'))
-      
-      const response = await apiClient.put(`${APPS_ENDPOINT}/${editAppId}`, {
-        apiKey: newKey
-      })
-      
-      // Update local cache
-      mutate(`${APPS_ENDPOINT}/${editAppId}`, { ...appData, apiKey: newKey }, false)
-      
-      triggerAlert('success', 'API key refreshed successfully!')
+      const newKey = await generateApiKey(urlOrigin, getValues('name'));
+      refreshApiKeyMutation.mutate({
+        id: editApp.id.toString(),
+        apiKey: newKey,
+      });
     } catch (error) {
-      triggerAlert('error', 'Failed to refresh API key. Please try again.')
-      console.error('API key refresh failed:', error)
-    } finally {
-      setIsGeneratingKey(false)
+      triggerAlert('error', 'Failed to generate new API key');
     }
-  }, [appData, isEditMode, urlOrigin, getValues, editAppId, triggerAlert])
+  }, [editApp, disableKeyRefresh, urlOrigin, getValues, refreshApiKeyMutation, triggerAlert]);
 
-  // Form submission handler
-  const onSubmit = useCallback(async (data: ApplicationForm) => {
+  /**
+   * Handle form submission
+   */
+  const onSubmit = useCallback(async (data: AppFormData) => {
     try {
-      const payload = transformFormToPayload(data)
+      const payload = transformFormDataToPayload(data);
       
-      if (isEditMode) {
-        await updateMutation.mutateAsync(payload)
+      if (isEditMode && editApp) {
+        updateAppMutation.mutate({
+          id: editApp.id.toString(),
+          payload,
+        });
       } else {
-        await createMutation.mutateAsync(payload)
+        createAppMutation.mutate(payload);
       }
     } catch (error) {
-      // Error handling is done in mutation callbacks
-      console.error('Form submission error:', error)
+      triggerAlert('error', 'Failed to save application');
     }
-  }, [isEditMode, updateMutation, createMutation])
+  }, [isEditMode, editApp, updateAppMutation, createAppMutation, triggerAlert]);
 
-  // Role filtering for autocomplete
-  const [roleSearchTerm, setRoleSearchTerm] = useState('')
-  const filteredRoles = useMemo(() => {
-    if (!roleSearchTerm) return roles
+  /**
+   * Filter roles based on input
+   */
+  const filterRoles = useCallback((query: string) => {
+    if (!query.trim()) return roles;
     
+    const lowercaseQuery = query.toLowerCase();
     return roles.filter(role =>
-      role.name.toLowerCase().includes(roleSearchTerm.toLowerCase()) ||
-      role.description?.toLowerCase().includes(roleSearchTerm.toLowerCase())
-    )
-  }, [roles, roleSearchTerm])
+      role.name.toLowerCase().includes(lowercaseQuery)
+    );
+  }, [roles]);
 
-  // Loading state
-  const isLoading = appLoading || rolesLoading
+  // ==========================================================================
+  // LOADING AND ERROR STATES
+  // ==========================================================================
 
-  // Error state handling
-  if (rolesError && !rolesData) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Alert type="error" className="max-w-md">
-          <ExclamationTriangleIcon className="w-5 h-5" />
-          <div>
-            <h3 className="font-semibold">Failed to load required data</h3>
-            <p className="text-sm">Please refresh the page to try again.</p>
-          </div>
-        </Alert>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
-    )
+    );
   }
 
-  if (isEditMode && appError && !appData) {
+  if (hasError) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Alert type="error" className="max-w-md">
-          <ExclamationTriangleIcon className="w-5 h-5" />
-          <div>
-            <h3 className="font-semibold">Application not found</h3>
-            <p className="text-sm">The requested application could not be loaded.</p>
-            <Button 
-              onClick={goBack} 
-              variant="outline" 
-              size="sm" 
-              className="mt-2"
-            >
-              Go Back
-            </Button>
-          </div>
+      <div className="p-4">
+        <Alert type="error">
+          Failed to load {isEditMode ? 'application' : 'form'} data. Please try again.
         </Alert>
       </div>
-    )
+    );
   }
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
 
   return (
-    <div className={`${isDark ? 'dark' : ''} w-full max-w-4xl mx-auto p-6 space-y-6`}>
-      {/* Alert Display */}
-      {showAlert && (
-        <Alert 
-          type={alertType}
-          onClose={() => setShowAlert(false)}
-          className="mb-6"
-        >
-          {alertMessage}
-        </Alert>
-      )}
-
-      {/* Loading State */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-          <span className="ml-3 text-gray-600 dark:text-gray-400">
-            Loading {isEditMode ? 'application' : 'form'}...
-          </span>
+    <div className={`min-h-screen bg-background ${resolvedTheme === 'dark' ? 'dark' : ''}`}>
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={goBack}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            Back to Apps
+          </Button>
+          <h1 className="text-2xl font-semibold text-foreground">
+            {isEditMode ? 'Edit Application' : 'Create Application'}
+          </h1>
         </div>
-      )}
 
-      {/* Main Form */}
-      {!isLoading && (
+        {/* Alert */}
+        {alertState.show && (
+          <div className="mb-6">
+            <Alert
+              type={alertState.type}
+              onClose={hideAlert}
+            >
+              {alertState.message}
+            </Alert>
+          </div>
+        )}
+
+        {/* Main Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Application Name Field */}
-          <FormField 
+          
+          {/* Application Name */}
+          <FormField
             label="Application Name"
             required
             error={errors.name?.message}
-            tooltip="Enter a unique name for your application. This will be used to identify the app in the admin interface."
-          >
-            <Input
-              {...register('name')}
-              placeholder="Enter application name"
-              disabled={isSubmitting}
-              className="w-full"
-            />
-          </FormField>
-
-          {/* Default Role Field */}
-          <FormField 
-            label="Default Role"
-            error={errors.defaultRole?.message}
-            tooltip="Select a default role for users accessing this application. This role will be applied automatically."
+            tooltip="Unique name for this application"
           >
             <Controller
-              name="defaultRole"
+              name="name"
               control={control}
               render={({ field }) => (
-                <Combobox
-                  value={field.value}
-                  onChange={field.onChange}
-                  onSearchChange={setRoleSearchTerm}
-                  options={filteredRoles}
-                  displayValue={(role: RoleSelection) => role?.name || ''}
-                  placeholder="Select a role"
-                  disabled={isSubmitting}
+                <Input
+                  {...field}
+                  placeholder="Enter application name"
                   className="w-full"
                 />
               )}
             />
           </FormField>
 
-          {/* Description Field */}
-          <FormField 
+          {/* Default Role */}
+          <FormField
+            label="Default Role"
+            error={errors.role_id?.message}
+            tooltip="Default role for application users"
+          >
+            <Controller
+              name="role_id"
+              control={control}
+              render={({ field }) => (
+                <Combobox
+                  value={field.value ? roles.find(r => r.id === field.value) : null}
+                  onChange={(role) => field.onChange(role?.id)}
+                  options={roles}
+                  filterFunction={filterRoles}
+                  displayValue={(role) => role?.name || ''}
+                  placeholder="Select a role"
+                  className="w-full"
+                />
+              )}
+            />
+          </FormField>
+
+          {/* Description */}
+          <FormField
             label="Description"
             error={errors.description?.message}
-            tooltip="Provide a brief description of what this application does."
+            tooltip="Optional description for this application"
           >
-            <textarea
-              {...register('description')}
-              rows={3}
-              placeholder="Enter application description"
-              disabled={isSubmitting}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            <Controller
+              name="description"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  placeholder="Enter application description"
+                  className="w-full"
+                />
+              )}
             />
           </FormField>
 
           {/* Active Toggle */}
-          <FormField label="Active Status">
+          <FormField
+            label="Active"
+            tooltip="Whether this application is currently active"
+          >
             <Controller
-              name="active"
+              name="is_active"
               control={control}
               render={({ field }) => (
                 <Switch
                   checked={field.value}
-                  onChange={field.onChange}
-                  disabled={isSubmitting}
-                  label="Application is active"
+                  onCheckedChange={field.onChange}
+                  className="ml-0"
                 />
               )}
             />
           </FormField>
 
           {/* API Key Card (Edit Mode Only) */}
-          {isEditMode && appData && (
+          {isEditMode && editApp && (
             <Card className="p-6">
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    API Key
-                  </h3>
-                  <div className="flex space-x-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(appData.apiKey, 'API key')}
-                      disabled={copyStatus === 'copying'}
-                      className="flex items-center space-x-1"
-                    >
-                      <ClipboardDocumentIcon className="w-4 h-4" />
-                      <span>Copy</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={refreshApiKey}
-                      disabled={isGeneratingKey || appData.createdById === null}
-                      className="flex items-center space-x-1"
-                    >
-                      <ArrowPathIcon className={`w-4 h-4 ${isGeneratingKey ? 'animate-spin' : ''}`} />
-                      <span>Refresh</span>
-                    </Button>
-                  </div>
+                <h3 className="text-lg font-medium text-foreground">API Key</h3>
+                <div className="break-all text-sm font-mono bg-muted p-3 rounded border">
+                  {editApp.apiKey}
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-md border font-mono text-sm break-all">
-                  {appData.apiKey}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={copyApiKey}
+                    className="flex items-center gap-2"
+                  >
+                    <CopyIcon className="h-4 w-4" />
+                    Copy
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={refreshApiKey}
+                    disabled={disableKeyRefresh || refreshApiKeyMutation.isPending}
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCwIcon className="h-4 w-4" />
+                    Refresh
+                  </Button>
                 </div>
-                {appData.createdById === null && (
-                  <p className="text-sm text-amber-600 dark:text-amber-400">
-                    API key refresh is disabled for system-created applications.
-                  </p>
-                )}
               </div>
             </Card>
           )}
 
-          {/* App Location Configuration */}
-          <div className="space-y-4">
-            <FormField 
-              label="Application Location"
-              error={errors.appLocation?.message}
-              tooltip="Choose where your application is hosted and how users will access it."
+          {/* App Location */}
+          <FormField
+            label="Application Location"
+            required
+            error={errors.type?.message}
+            tooltip="Where is this application hosted?"
+          >
+            <Controller
+              name="type"
+              control={control}
+              render={({ field }) => (
+                <RadioGroup
+                  value={field.value?.toString()}
+                  onValueChange={(value) => field.onChange(parseInt(value))}
+                  className="space-y-3"
+                >
+                  {APP_LOCATION_OPTIONS.map((option) => (
+                    <div key={option.value} className="flex items-center space-x-2">
+                      <RadioGroup.Item value={option.value} id={option.value} />
+                      <label 
+                        htmlFor={option.value}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        {option.label}
+                      </label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              )}
+            />
+          </FormField>
+
+          {/* Conditional Fields Based on App Location */}
+          {appLocationType === '1' && (
+            <>
+              {/* Storage Service */}
+              <FormField
+                label="Storage Service"
+                required
+                error={errors.storage_service_id?.message}
+                tooltip="Which storage service to use"
+              >
+                <Controller
+                  name="storage_service_id"
+                  control={control}
+                  render={({ field }) => (
+                    <Combobox
+                      value={STORAGE_SERVICE_OPTIONS.find(s => s.value === field.value)}
+                      onChange={(service) => field.onChange(service?.value)}
+                      options={STORAGE_SERVICE_OPTIONS}
+                      displayValue={(service) => service?.label || ''}
+                      placeholder="Select storage service"
+                      className="w-full"
+                    />
+                  )}
+                />
+              </FormField>
+
+              {/* Storage Container */}
+              <FormField
+                label="Storage Folder"
+                required
+                error={errors.storage_container?.message}
+                tooltip="Folder name in the storage service"
+              >
+                <Controller
+                  name="storage_container"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      placeholder="applications"
+                      className="w-full"
+                    />
+                  )}
+                />
+              </FormField>
+            </>
+          )}
+
+          {/* Path field for File Storage and Web Server */}
+          {(appLocationType === '1' || appLocationType === '3') && (
+            <FormField
+              label={appLocationType === '1' ? 'Launch Path' : 'Path to App'}
+              required
+              error={errors.path?.message}
+              tooltip={appLocationType === '1' ? 'Path to the launch file' : 'Path on web server'}
             >
               <Controller
-                name="appLocation"
+                name="path"
                 control={control}
                 render={({ field }) => (
-                  <RadioGroup
-                    value={field.value}
-                    onChange={field.onChange}
-                    disabled={isSubmitting}
-                    options={[
-                      { value: '0', label: 'No Specific Storage', description: 'Application does not require file storage' },
-                      { value: '1', label: 'File Storage', description: 'Application files are stored in the DreamFactory file system' },
-                      { value: '3', label: 'Web Server Path', description: 'Application is accessible via a web server path' },
-                      { value: '2', label: 'Remote URL', description: 'Application is hosted externally and accessed via URL' }
-                    ]}
-                    className="space-y-3"
+                  <Input
+                    {...field}
+                    placeholder={appLocationType === '1' ? 'index.html' : '/path/to/app'}
+                    className="w-full"
                   />
                 )}
               />
             </FormField>
+          )}
 
-            {/* Conditional Fields Based on App Location */}
-            {(watchedAppLocation === '1' || watchedAppLocation === '2' || watchedAppLocation === '3') && (
-              <div className="space-y-4 pl-6 border-l-2 border-gray-200 dark:border-gray-700">
-                
-                {/* Storage Service Selection (File Storage Only) */}
-                {watchedAppLocation === '1' && (
-                  <FormField 
-                    label="Storage Service"
-                    error={errors.storageServiceId?.message}
-                    tooltip="Select the storage service where your application files are located."
-                  >
-                    <Controller
-                      name="storageServiceId"
-                      control={control}
-                      render={({ field }) => (
-                        <select
-                          {...field}
-                          disabled={isSubmitting}
-                          className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                        >
-                          <option value={3}>File Service</option>
-                          <option value={4}>Log Service</option>
-                        </select>
-                      )}
-                    />
-                  </FormField>
+          {/* URL field for Remote URL */}
+          {appLocationType === '2' && (
+            <FormField
+              label="Remote URL"
+              required
+              error={errors.url?.message}
+              tooltip="Full URL to the remote application"
+            >
+              <Controller
+                name="url"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    placeholder="https://example.com/app"
+                    className="w-full"
+                  />
                 )}
+              />
+            </FormField>
+          )}
 
-                {/* Storage Container (File Storage Only) */}
-                {watchedAppLocation === '1' && (
-                  <FormField 
-                    label="Storage Folder"
-                    error={errors.storageContainer?.message}
-                    tooltip="Specify the folder name where your application files are stored."
-                  >
-                    <Input
-                      {...register('storageContainer')}
-                      placeholder="applications"
-                      disabled={isSubmitting}
-                      className="w-full"
-                    />
-                  </FormField>
-                )}
-
-                {/* Path Field (File Storage and Web Server) */}
-                {(watchedAppLocation === '1' || watchedAppLocation === '3') && (
-                  <FormField 
-                    label={watchedAppLocation === '1' ? 'Launch Path' : 'Path to Application'}
-                    error={errors.path?.message}
-                    tooltip={
-                      watchedAppLocation === '1' 
-                        ? 'Specify the relative path to your application\'s main file (e.g., index.html).'
-                        : 'Specify the absolute path where your application is accessible (must start with /).'
-                    }
-                  >
-                    <Input
-                      {...register('path')}
-                      placeholder={watchedAppLocation === '1' ? 'index.html' : '/path/to/app'}
-                      disabled={isSubmitting}
-                      className="w-full"
-                    />
-                  </FormField>
-                )}
-
-                {/* URL Field (Remote URL Only) */}
-                {watchedAppLocation === '2' && (
-                  <FormField 
-                    label="Remote URL"
-                    error={errors.url?.message}
-                    tooltip="Enter the complete URL where your application is hosted."
-                  >
-                    <Input
-                      {...register('url')}
-                      placeholder="https://example.com/myapp"
-                      disabled={isSubmitting}
-                      className="w-full"
-                    />
-                  </FormField>
-                )}
-
-                {/* Generated URL Preview */}
-                {(watchedAppLocation === '1' || watchedAppLocation === '3') && (
-                  <Card className="p-4">
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Generated Application URL
-                      </h4>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-md border text-sm break-all font-mono">
-                        {getAppLocationUrl()}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(getAppLocationUrl(), 'Application URL')}
-                        disabled={copyStatus === 'copying'}
-                        className="flex items-center space-x-1"
-                      >
-                        <ClipboardDocumentIcon className="w-4 h-4" />
-                        <span>Copy URL</span>
-                      </Button>
-                    </div>
-                  </Card>
-                )}
+          {/* Generated URL Display */}
+          {(appLocationType === '1' || appLocationType === '3') && appLocationUrl && (
+            <Card className="p-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-foreground">Application URL</h3>
+                <div className="break-all text-sm font-mono bg-muted p-3 rounded border">
+                  {appLocationUrl}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={copyAppUrl}
+                  className="flex items-center gap-2"
+                >
+                  <CopyIcon className="h-4 w-4" />
+                  Copy URL
+                </Button>
               </div>
-            )}
-          </div>
+            </Card>
+          )}
 
           {/* Form Actions */}
-          <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end gap-4 pt-6 border-t">
             <Button
               type="button"
               variant="outline"
@@ -678,23 +862,21 @@ export default function DfAppDetailsComponent({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !isDirty || !isValid}
-              className="flex items-center space-x-2"
+              disabled={isSubmitting || !isValid}
+              className="min-w-[100px]"
             >
-              {isSubmitting && (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              {isSubmitting ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Saving...
+                </div>
+              ) : (
+                isEditMode ? 'Save' : 'Create'
               )}
-              <span>{isEditMode ? 'Save Changes' : 'Create Application'}</span>
             </Button>
           </div>
         </form>
-      )}
+      </div>
     </div>
-  )
+  );
 }
-
-/**
- * Export component for use in Next.js App Router
- * Supports both direct import and lazy loading patterns
- */
-export { DfAppDetailsComponent }
