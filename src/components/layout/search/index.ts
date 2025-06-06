@@ -1,557 +1,308 @@
 /**
- * @fileoverview Barrel export file for search components
+ * Search Module Barrel Exports
  * 
- * Provides centralized imports for DreamFactory Admin Interface search functionality.
- * Enables clean imports like `import { SearchDialog, SearchInput, SearchResults } from '@/components/layout/search'`
- * with full TypeScript support and tree-shaking optimization.
+ * Provides clean import paths for all search-related components, hooks, utilities, and types.
+ * Organized for optimal tree-shaking and developer experience with comprehensive TypeScript support.
  * 
- * The search system provides global search capabilities across all DreamFactory entities including
- * services, users, roles, applications, event scripts, and system configurations with real-time
- * results and intelligent caching for sub-50ms response times.
+ * @example Basic component usage
+ * ```tsx
+ * import { SearchDialog, SearchInput, SearchResults } from '@/components/layout/search';
+ * ```
  * 
- * @version 1.0.0
- * @since React 19.0.0 / Next.js 15.1.0
- */
-
-// =============================================================================
-// SEARCH COMPONENTS
-// =============================================================================
-
-/**
- * Main search modal component that provides global search functionality using Headless UI Dialog
- * with React Query integration. Renders a responsive search interface with debounced input,
- * real-time results, recent searches, and accessible navigation.
- * 
- * Features:
- * - Headless UI Dialog for WCAG 2.1 AA compliance
- * - React Query for intelligent caching with sub-50ms response times
- * - Debounced input with 2000ms delay matching Angular implementation
- * - Keyboard navigation with Escape to close and Enter to navigate
- * - Responsive design with mobile-optimized touch targets
- * 
- * @example
+ * @example Individual imports for optimal bundle size
  * ```tsx
  * import { SearchDialog } from '@/components/layout/search';
+ * import { useSearchDialog } from '@/components/layout/search';
+ * import { searchResults, getTranslationKey } from '@/components/layout/search';
+ * ```
  * 
- * function App() {
- *   const [isOpen, setIsOpen] = useState(false);
- *   
- *   return (
- *     <SearchDialog 
- *       isOpen={isOpen} 
- *       onClose={() => setIsOpen(false)} 
- *     />
- *   );
- * }
+ * @example Type-only imports
+ * ```tsx
+ * import type { SearchResult, SearchDialogProps, SearchOptions } from '@/components/layout/search';
  * ```
  */
-export { SearchDialog } from './search-dialog';
-export type { 
-  SearchDialogProps,
-  SearchDialogRef
-} from './search-dialog';
+
+// ========================================
+// Component Exports
+// ========================================
 
 /**
- * Search input component with React Hook Form integration, debounced input handling,
- * and responsive design. Provides the search field UI with proper accessibility attributes,
- * loading states, and integration with global search functionality.
- * 
- * Features:
- * - React Hook Form integration for controlled input with validation
- * - Debounced input handling with configurable delay (default 2000ms)
- * - Tailwind CSS styling with outline appearance and responsive sizing
- * - Loading state indicators synchronized with React Query operations
- * - ARIA attributes for screen reader support
- * 
- * @example
- * ```tsx
- * import { SearchInput } from '@/components/layout/search';
- * 
- * function SearchForm() {
- *   const { searchQuery, setSearchQuery, isLoading } = useSearch();
- *   
- *   return (
- *     <SearchInput
- *       value={searchQuery}
- *       onChange={setSearchQuery}
- *       loading={isLoading}
- *       placeholder="Search services, users, roles..."
- *     />
- *   );
- * }
- * ```
+ * Main search dialog component with React Query integration and accessibility features.
+ * Provides modal search interface with keyboard navigation and recent searches.
  */
-export { SearchInput } from './search-input';
-export type { 
-  SearchInputProps,
-  SearchInputRef
-} from './search-input';
+export { SearchDialog, default as SearchDialogDefault } from './search-dialog';
 
 /**
- * Search results display component that renders grouped search results with navigation
- * capabilities. Handles both live search results and recent searches with proper grouping,
- * accessible navigation, and responsive design.
- * 
- * Features:
- * - Grouped results display with hierarchical structure
- * - Next.js Link components for optimized navigation with prefetching
- * - Keyboard navigation with arrow keys and Enter key support
- * - Responsive design with mobile-optimized touch targets
- * - Loading and empty states for improved user experience
- * - ARIA attributes for screen reader compatibility
- * 
- * @example
- * ```tsx
- * import { SearchResults } from '@/components/layout/search';
- * 
- * function SearchInterface() {
- *   const { results, isLoading, error } = useSearchResults(query);
- *   
- *   return (
- *     <SearchResults
- *       results={results}
- *       loading={isLoading}
- *       error={error}
- *       onNavigate={(path) => router.push(path)}
- *     />
- *   );
- * }
- * ```
+ * Search input component with React Hook Form integration and debounced input handling.
+ * Features responsive design, loading states, and accessibility compliance.
+ */
+export { SearchInput, default as SearchInputDefault } from './search-input';
+
+/**
+ * Search results display component with keyboard navigation and result grouping.
+ * Supports various result types with icons, metadata, and accessibility features.
  */
 export { SearchResults } from './search-results';
-export type { 
-  SearchResultsProps,
-  SearchResultGroup,
-  SearchResultItem
-} from './search-results';
 
-// =============================================================================
-// SEARCH UTILITIES AND HELPERS
-// =============================================================================
+// ========================================
+// React Hooks
+// ========================================
 
 /**
- * Utility functions for search functionality including translation key generation,
- * result formatting, and search result processing. Provides helper functions for
- * converting search paths to translation keys and formatting search results for display.
- * 
- * Functions:
- * - `getTranslationKey`: Converts navigation paths to translation keys
- * - `formatSearchResults`: Groups and formats search results for display
- * - `getServiceRoute`: Maps service types to their corresponding routes
- * - `createSearchFilter`: Generates filter queries for different entity types
- * - `processSearchResponse`: Transforms API responses into display format
- * 
- * @example
- * ```tsx
- * import { getTranslationKey, formatSearchResults } from '@/components/layout/search';
- * 
- * function ResultsProcessor() {
- *   const translationKey = getTranslationKey('api-connections/database');
- *   // Returns: 'nav.api-connections.database.nav'
- *   
- *   const formatted = formatSearchResults(rawResults);
- *   // Returns structured SearchResultGroup[]
- * }
- * ```
+ * Hook for integrating SearchDialog with global app state.
+ * Provides convenient access to search dialog state management.
+ */
+export { useSearchDialog } from './search-dialog';
+
+// ========================================
+// Utility Functions
+// ========================================
+
+/**
+ * Translation and internationalization utilities for converting paths to i18n keys.
+ * Maintains compatibility with existing Angular i18n structure.
  */
 export {
   getTranslationKey,
-  formatSearchResults,
-  getServiceRoute,
-  createSearchFilter,
-  processSearchResponse,
-  debounceSearchQuery,
-  validateSearchQuery,
-  normalizeSearchTerm
+  getBreadcrumbTranslationKeys,
+  getNavigationTranslationKeys,
 } from './search-utils';
 
-// =============================================================================
-// SEARCH TYPES AND INTERFACES
-// =============================================================================
+/**
+ * Core search functionality including fuzzy matching, result scoring, and filtering.
+ * Provides comprehensive search capabilities with performance optimization.
+ */
+export {
+  searchResults,
+  groupResultsByCategory,
+  filterResultsByCategory,
+  sortSearchResults,
+} from './search-utils';
 
 /**
- * Core search result type representing a group of search results for a specific path/category.
- * Each group contains a navigation path and an array of matching items.
+ * Recent searches persistence and management utilities.
+ * Handles localStorage operations with error handling and data validation.
  */
-export type SearchResult = {
-  /** Navigation path for the result group (e.g., 'api-connections/database') */
-  path: string;
-  /** Array of individual items within this result group */
-  items: SearchResultItem[];
-  /** Optional group metadata */
-  metadata?: SearchResultMetadata;
-};
+export {
+  saveRecentSearch,
+  getRecentSearches,
+  clearRecentSearches,
+  recentSearchesToResults,
+} from './search-utils';
 
 /**
- * Individual search result item within a result group.
+ * Navigation and routing utilities for search result handling.
+ * Provides breadcrumb generation and path manipulation functions.
  */
-export type SearchResultItem = {
-  /** Display label for the search result */
-  label: string;
-  /** URL segment or identifier for navigation */
-  segment: string | number;
-  /** Optional description for additional context */
-  description?: string;
-  /** Optional icon identifier */
-  icon?: string;
-  /** Whether this item represents a creation action */
-  isCreation?: boolean;
-  /** Optional metadata for the item */
-  metadata?: SearchItemMetadata;
-};
+export {
+  resultPathToRoute,
+  generateBreadcrumbs,
+} from './search-utils';
 
 /**
- * Metadata for search result groups.
+ * Keyboard navigation and accessibility support utilities.
+ * Handles keyboard events and ARIA attribute generation for search interfaces.
  */
-export type SearchResultMetadata = {
-  /** Total count of items in this group */
-  totalCount?: number;
-  /** Whether more items are available */
-  hasMore?: boolean;
-  /** Group category for styling/behavior */
-  category?: SearchCategory;
-  /** Priority for display ordering */
-  priority?: number;
-};
+export {
+  handleSearchKeyboardNavigation,
+  getSearchResultAriaAttributes,
+  getSearchPlaceholder,
+} from './search-utils';
 
 /**
- * Metadata for individual search result items.
+ * Search result processing utilities from SearchResults component.
+ * Provides result grouping and icon selection functionality.
  */
-export type SearchItemMetadata = {
-  /** Last modified timestamp */
-  lastModified?: string;
-  /** Item status */
-  status?: 'active' | 'inactive' | 'pending' | 'error';
-  /** Additional tags */
-  tags?: string[];
-  /** Relevance score for sorting */
-  relevance?: number;
-};
+export {
+  groupResults,
+  getResultIcon,
+} from './search-results';
+
+// ========================================
+// TypeScript Type Exports
+// ========================================
 
 /**
- * Search query configuration and options.
+ * Component prop interfaces for search components.
+ * Provides type safety for component usage and customization.
  */
-export type SearchQuery = {
-  /** The search term */
-  term: string;
-  /** Filter by specific categories */
-  categories?: SearchCategory[];
-  /** Maximum number of results per category */
-  limit?: number;
-  /** Whether to include recent searches */
-  includeRecents?: boolean;
-  /** Minimum query length to trigger search */
-  minLength?: number;
-  /** Debounce delay in milliseconds */
-  debounceMs?: number;
-};
+export type {
+  SearchDialogProps,
+  SearchInputProps,
+  SearchResultsProps,
+} from './search-dialog';
+
+export type {
+  SearchFormData,
+  SearchState,
+} from './search-input';
+
+export type {
+  SearchResultGroup,
+} from './search-results';
 
 /**
- * Search configuration options.
+ * Core search data types and interfaces.
+ * Defines the structure of search results, filters, and configuration options.
  */
-export type SearchConfig = {
-  /** Enable/disable specific search categories */
-  enabledCategories: SearchCategory[];
-  /** Default search options */
-  defaultQuery: Partial<SearchQuery>;
-  /** Cache configuration */
-  cache: SearchCacheConfig;
-  /** UI configuration */
-  ui: SearchUIConfig;
-};
+export type {
+  SearchResult,
+  SearchCategory,
+  SearchFilter,
+  SearchOptions,
+  SearchResults as SearchResultsData,
+  RecentSearch,
+  BreadcrumbItem,
+} from './search-utils';
+
+// ========================================
+// Re-exports for Convenience
+// ========================================
 
 /**
- * Cache configuration for search operations.
+ * Default export providing the main SearchDialog component for common usage patterns.
+ * Allows for `import SearchDialog from '@/components/layout/search'` syntax.
  */
-export type SearchCacheConfig = {
-  /** Cache TTL in milliseconds */
-  ttl: number;
-  /** Maximum cache size */
-  maxSize: number;
-  /** Whether to enable background refresh */
-  backgroundRefresh: boolean;
-};
+export { SearchDialog as default } from './search-dialog';
+
+// ========================================
+// Module Documentation
+// ========================================
 
 /**
- * UI configuration for search components.
+ * Search Module Overview
+ * 
+ * This module provides a comprehensive search system for the DreamFactory Admin Interface,
+ * featuring:
+ * 
+ * **Core Components:**
+ * - `SearchDialog`: Modal search interface with global keyboard shortcuts
+ * - `SearchInput`: Form input with debouncing and validation
+ * - `SearchResults`: Results display with keyboard navigation and grouping
+ * 
+ * **Key Features:**
+ * - React Query integration for intelligent caching and real-time updates
+ * - Accessibility compliance with WCAG 2.1 AA standards
+ * - Responsive design with mobile-optimized touch targets
+ * - Keyboard navigation with arrow keys, Enter, and Escape
+ * - Recent searches with localStorage persistence
+ * - Fuzzy search matching with typo tolerance
+ * - Result categorization and priority-based sorting
+ * - Dark theme support with Tailwind CSS
+ * - TypeScript support with comprehensive type definitions
+ * 
+ * **Performance Optimizations:**
+ * - Debounced input handling (2000ms delay)
+ * - Virtual scrolling for large result sets
+ * - Intelligent result caching with React Query
+ * - Tree-shaking optimized exports
+ * - Lazy loading support for large datasets
+ * 
+ * **Accessibility Features:**
+ * - Screen reader announcements for search status
+ * - Keyboard-only navigation support
+ * - Proper ARIA labels and roles
+ * - Focus management with dialog open/close
+ * - High contrast ratio support
+ * 
+ * **Integration:**
+ * - Next.js App Router compatibility
+ * - React Hook Form integration
+ * - Zustand state management support
+ * - Headless UI dialog components
+ * - Tailwind CSS styling system
+ * 
+ * @version 1.0.0
+ * @since Next.js 15.1 migration
  */
-export type SearchUIConfig = {
-  /** Show/hide recent searches */
-  showRecents: boolean;
-  /** Maximum number of recent searches to store */
-  maxRecents: number;
-  /** Show/hide search suggestions */
-  showSuggestions: boolean;
-  /** Highlight matching text */
-  highlightMatches: boolean;
-};
 
 /**
- * Search categories for filtering and organization.
+ * Usage Examples
+ * 
+ * @example Basic search dialog integration
+ * ```tsx
+ * import { SearchDialog, useSearchDialog } from '@/components/layout/search';
+ * 
+ * function App() {
+ *   const { isOpen, openSearch, closeSearch } = useSearchDialog();
+ *   
+ *   return (
+ *     <>
+ *       <button onClick={() => openSearch()}>Search</button>
+ *       <SearchDialog open={isOpen} onClose={closeSearch} />
+ *     </>
+ *   );
+ * }
+ * ```
+ * 
+ * @example Custom search input in a form
+ * ```tsx
+ * import { SearchInput, type SearchFormData } from '@/components/layout/search';
+ * import { useForm } from 'react-hook-form';
+ * 
+ * function SearchForm() {
+ *   const { control } = useForm<SearchFormData>();
+ *   
+ *   return (
+ *     <SearchInput
+ *       control={control}
+ *       placeholder="Search services..."
+ *       onSearchExecute={(query) => console.log('Searching:', query)}
+ *     />
+ *   );
+ * }
+ * ```
+ * 
+ * @example Manual search with utilities
+ * ```tsx
+ * import { searchResults, type SearchResult } from '@/components/layout/search';
+ * 
+ * const results: SearchResult[] = [
+ *   {
+ *     id: '1',
+ *     title: 'MySQL Database',
+ *     path: '/api-connections/database/mysql',
+ *     category: 'database-services',
+ *     keywords: ['mysql', 'database', 'sql'],
+ *     priority: 10,
+ *   },
+ * ];
+ * 
+ * const searchData = searchResults(results, 'mysql', {
+ *   fuzzy: true,
+ *   limit: 10,
+ *   searchDescriptions: true,
+ * });
+ * 
+ * console.log(`Found ${searchData.results.length} results`);
+ * ```
+ * 
+ * @example Translation key generation
+ * ```tsx
+ * import { getTranslationKey, getBreadcrumbTranslationKeys } from '@/components/layout/search';
+ * 
+ * const titleKey = getTranslationKey('/api-connections/database/create');
+ * // Returns: 'apiConnections.database.create'
+ * 
+ * const breadcrumbKeys = getBreadcrumbTranslationKeys('/api-connections/database/mysql');
+ * // Returns: ['home.dashboard', 'apiConnections', 'apiConnections.database', 'apiConnections.database.mysql']
+ * ```
+ * 
+ * @example Recent searches management
+ * ```tsx
+ * import { 
+ *   saveRecentSearch, 
+ *   getRecentSearches, 
+ *   clearRecentSearches 
+ * } from '@/components/layout/search';
+ * 
+ * // Save a search
+ * saveRecentSearch('mysql database', 5, 'result-123');
+ * 
+ * // Get recent searches
+ * const recent = getRecentSearches();
+ * 
+ * // Clear all recent searches
+ * clearRecentSearches();
+ * ```
  */
-export type SearchCategory = 
-  | 'services'
-  | 'users' 
-  | 'admins'
-  | 'roles'
-  | 'applications'
-  | 'scripts'
-  | 'limits'
-  | 'templates'
-  | 'config'
-  | 'logs'
-  | 'docs';
-
-/**
- * Search state management interface.
- */
-export type SearchState = {
-  /** Current query */
-  query: string;
-  /** Search results */
-  results: SearchResult[];
-  /** Recent searches */
-  recents: SearchResult[];
-  /** Loading state */
-  loading: boolean;
-  /** Error state */
-  error: string | null;
-  /** Whether search dialog is open */
-  isOpen: boolean;
-};
-
-/**
- * Search actions for state management.
- */
-export type SearchActions = {
-  /** Set search query */
-  setQuery: (query: string) => void;
-  /** Set search results */
-  setResults: (results: SearchResult[]) => void;
-  /** Add to recent searches */
-  addRecent: (result: SearchResult) => void;
-  /** Clear recent searches */
-  clearRecents: () => void;
-  /** Set loading state */
-  setLoading: (loading: boolean) => void;
-  /** Set error state */
-  setError: (error: string | null) => void;
-  /** Toggle search dialog */
-  toggleDialog: () => void;
-  /** Close search dialog */
-  closeDialog: () => void;
-};
-
-/**
- * Search hook return type.
- */
-export type UseSearchReturn = SearchState & SearchActions & {
-  /** Perform search operation */
-  search: (term: string) => Promise<void>;
-  /** Navigate to search result */
-  navigate: (path: string, segment: string | number) => void;
-  /** Check if query is valid */
-  isValidQuery: (query: string) => boolean;
-  /** Get filtered results */
-  getFilteredResults: (category?: SearchCategory) => SearchResult[];
-};
-
-/**
- * Search API response types.
- */
-export type SearchApiResponse<T = any> = {
-  /** Response data */
-  resource: T[];
-  /** Response metadata */
-  meta?: {
-    count?: number;
-    offset?: number;
-    limit?: number;
-  };
-};
-
-/**
- * Error types for search operations.
- */
-export type SearchError = {
-  /** Error code */
-  code: string;
-  /** Error message */
-  message: string;
-  /** Additional error details */
-  details?: Record<string, any>;
-  /** Whether the error is retryable */
-  retryable?: boolean;
-};
-
-// =============================================================================
-// SEARCH CONSTANTS
-// =============================================================================
-
-/**
- * Default search configuration values.
- */
-export const SEARCH_DEFAULTS = {
-  /** Default debounce delay in milliseconds */
-  DEBOUNCE_MS: 2000,
-  /** Minimum query length */
-  MIN_QUERY_LENGTH: 2,
-  /** Maximum results per category */
-  MAX_RESULTS_PER_CATEGORY: 10,
-  /** Maximum recent searches to store */
-  MAX_RECENT_SEARCHES: 5,
-  /** Cache TTL in milliseconds */
-  CACHE_TTL: 300000, // 5 minutes
-} as const;
-
-/**
- * Search category configurations.
- */
-export const SEARCH_CATEGORIES: Record<SearchCategory, { label: string; icon: string; priority: number }> = {
-  services: { label: 'Services', icon: 'database', priority: 1 },
-  users: { label: 'Users', icon: 'users', priority: 2 },
-  admins: { label: 'Administrators', icon: 'shield', priority: 3 },
-  roles: { label: 'Roles', icon: 'key', priority: 4 },
-  applications: { label: 'Applications', icon: 'app', priority: 5 },
-  scripts: { label: 'Event Scripts', icon: 'code', priority: 6 },
-  limits: { label: 'Rate Limits', icon: 'gauge', priority: 7 },
-  templates: { label: 'Email Templates', icon: 'mail', priority: 8 },
-  config: { label: 'Configuration', icon: 'settings', priority: 9 },
-  logs: { label: 'Logs', icon: 'file-text', priority: 10 },
-  docs: { label: 'Documentation', icon: 'book', priority: 11 },
-} as const;
-
-/**
- * Keyboard shortcuts for search functionality.
- */
-export const SEARCH_SHORTCUTS = {
-  /** Open search dialog */
-  OPEN: 'cmd+k',
-  /** Close search dialog */
-  CLOSE: 'Escape',
-  /** Navigate to first result */
-  SELECT_FIRST: 'Enter',
-  /** Navigate down in results */
-  NEXT: 'ArrowDown',
-  /** Navigate up in results */
-  PREVIOUS: 'ArrowUp',
-  /** Clear search query */
-  CLEAR: 'cmd+backspace',
-} as const;
-
-// =============================================================================
-// TYPE GUARDS AND VALIDATORS
-// =============================================================================
-
-/**
- * Type guard to check if a value is a valid search category.
- */
-export const isValidSearchCategory = (category: unknown): category is SearchCategory => {
-  return typeof category === 'string' && category in SEARCH_CATEGORIES;
-};
-
-/**
- * Type guard to check if a value is a valid search result.
- */
-export const isValidSearchResult = (result: unknown): result is SearchResult => {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    'path' in result &&
-    'items' in result &&
-    typeof (result as SearchResult).path === 'string' &&
-    Array.isArray((result as SearchResult).items)
-  );
-};
-
-/**
- * Validates search query parameters.
- */
-export const validateSearchQuery = (query: SearchQuery): boolean => {
-  if (!query.term || typeof query.term !== 'string') return false;
-  if (query.term.length < (query.minLength ?? SEARCH_DEFAULTS.MIN_QUERY_LENGTH)) return false;
-  if (query.categories && !query.categories.every(isValidSearchCategory)) return false;
-  return true;
-};
-
-/**
- * Validates search result structure.
- */
-export const validateSearchResults = (results: unknown): results is SearchResult[] => {
-  return Array.isArray(results) && results.every(isValidSearchResult);
-};
-
-// =============================================================================
-// UTILITY FUNCTIONS
-// =============================================================================
-
-/**
- * Creates a search filter query for API requests.
- */
-export const createSearchFilterQuery = (term: string, category: SearchCategory): string => {
-  // Implementation would depend on the specific API filter format
-  const normalizedTerm = term.toLowerCase().trim();
-  
-  switch (category) {
-    case 'services':
-      return `name like "${normalizedTerm}%" or label like "${normalizedTerm}%"`;
-    case 'users':
-    case 'admins':
-      return `name like "${normalizedTerm}%" or email like "${normalizedTerm}%"`;
-    case 'roles':
-      return `name like "${normalizedTerm}%" or description like "${normalizedTerm}%"`;
-    default:
-      return `name like "${normalizedTerm}%"`;
-  }
-};
-
-/**
- * Sorts search results by relevance and priority.
- */
-export const sortSearchResults = (results: SearchResult[]): SearchResult[] => {
-  return results.sort((a, b) => {
-    const aPriority = a.metadata?.priority ?? 999;
-    const bPriority = b.metadata?.priority ?? 999;
-    return aPriority - bPriority;
-  });
-};
-
-/**
- * Highlights matching text in search results.
- */
-export const highlightSearchTerm = (text: string, term: string): string => {
-  if (!term.trim()) return text;
-  
-  const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-  return text.replace(regex, '<mark>$1</mark>');
-};
-
-// =============================================================================
-// RE-EXPORTS FOR CONVENIENCE
-// =============================================================================
-
-// Re-export common React types for search components
-export type { 
-  ReactNode, 
-  ReactElement, 
-  ComponentType, 
-  FC, 
-  PropsWithChildren,
-  RefObject,
-  ForwardedRef
-} from 'react';
-
-// Re-export common form types for search input
-export type { 
-  FieldPath, 
-  FieldValues, 
-  Control, 
-  UseFormRegister,
-  UseFormWatch
-} from 'react-hook-form';
-
-// Re-export router types for navigation
-export type { 
-  AppRouterInstance,
-  NavigateOptions 
-} from 'next/dist/shared/lib/app-router-context.shared-runtime';
