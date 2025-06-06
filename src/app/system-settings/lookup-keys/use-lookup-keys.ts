@@ -1,554 +1,822 @@
+/**
+ * Lookup Keys Management Hook
+ * 
+ * Custom React hook providing global lookup keys management operations including
+ * CRUD operations, unique name validation, and real-time data synchronization for
+ * the system settings interface. Implements TanStack React Query patterns for
+ * intelligent caching, optimistic updates, and error recovery with comprehensive
+ * loading states and mutation management.
+ * 
+ * Replaces Angular DfBaseCrudService lookup keys operations with React Query-powered
+ * data fetching and mutations, providing cache hit responses under 50ms and API
+ * responses under 2 seconds per React/Next.js Integration Requirements.
+ * 
+ * @fileoverview Global lookup keys management hook with comprehensive CRUD operations
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
+ */
+
 'use client';
 
 import { 
   useQuery, 
   useMutation, 
-  useQueryClient, 
-  QueryClient,
-  UseQueryOptions,
-  UseMutationOptions 
+  useQueryClient,
+  type UseQueryOptions,
+  type UseMutationOptions,
+  type QueryKey
 } from '@tanstack/react-query';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
+import { 
+  apiGet, 
+  apiPost, 
+  apiPut, 
+  apiDelete,
+  type ApiRequestOptions 
+} from '@/lib/api-client';
+import { useMutation as useEnhancedMutation } from '@/hooks/useMutation';
+import type { 
+  ApiResponse,
+  ApiListResponse,
+  ApiResourceResponse,
+  ApiErrorResponse,
+  isApiError,
+  isApiListResponse
+} from '@/types/api';
 
-// Import dependencies from the established patterns
-import { useMutation as useEnhancedMutation } from '@/hooks/use-mutation';
-import { apiClient } from '@/lib/api-client';
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
-// Types that will be implemented in the type dependencies
-interface LookupKey {
+/**
+ * Lookup key entity structure matching DreamFactory API response
+ * Represents global system lookup keys for configuration management
+ */
+export interface LookupKey {
+  /** Unique identifier for the lookup key */
   id?: number;
+  /** Unique name identifier for the lookup key */
   name: string;
+  /** Value associated with the lookup key */
   value: string;
+  /** Whether the lookup key is private (restricted access) */
   private: boolean;
+  /** Optional description for the lookup key */
   description?: string;
+  /** ISO 8601 timestamp of creation */
   created_date?: string;
+  /** ISO 8601 timestamp of last modification */
   last_modified_date?: string;
+  /** User ID who created the lookup key */
   created_by_id?: number;
+  /** User ID who last modified the lookup key */
   last_modified_by_id?: number;
 }
 
-interface LookupKeyPayload {
-  resource: LookupKey[];
+/**
+ * Lookup key input data for create and update operations
+ * Omits system-generated fields for user input
+ */
+export interface LookupKeyInput {
+  /** Unique name identifier for the lookup key */
+  name: string;
+  /** Value associated with the lookup key */
+  value: string;
+  /** Whether the lookup key is private (restricted access) */
+  private: boolean;
+  /** Optional description for the lookup key */
+  description?: string;
 }
 
-interface LookupKeyResponse {
-  resource: LookupKey[];
-  meta?: {
-    count: number;
-    limit: number;
-    offset: number;
-  };
+/**
+ * Lookup key update data including ID for modifications
+ */
+export interface LookupKeyUpdate extends LookupKeyInput {
+  /** Required ID for update operations */
+  id: number;
 }
 
-interface LookupKeyValidationError {
+/**
+ * Bulk create request structure for multiple lookup keys
+ */
+export interface BulkCreateRequest {
+  /** Array of lookup key inputs for bulk creation */
+  resource: LookupKeyInput[];
+}
+
+/**
+ * Bulk update request structure for multiple lookup keys
+ */
+export interface BulkUpdateRequest {
+  /** Array of lookup key updates for bulk modification */
+  resource: LookupKeyUpdate[];
+}
+
+/**
+ * Query configuration options for lookup keys fetching
+ */
+export interface LookupKeysQueryOptions extends Omit<UseQueryOptions<ApiListResponse<LookupKey>>, 'queryKey' | 'queryFn'> {
+  /** Filter criteria for lookup keys */
+  filter?: string;
+  /** Sorting parameters */
+  sort?: string;
+  /** Field selection for optimization */
+  fields?: string;
+  /** Include related data */
+  related?: string;
+  /** Pagination limit */
+  limit?: number;
+  /** Pagination offset */
+  offset?: number;
+  /** Include total count in response */
+  includeCount?: boolean;
+  /** Force refresh from server */
+  refresh?: boolean;
+}
+
+/**
+ * Mutation configuration options for lookup key operations
+ */
+export interface LookupKeyMutationOptions<TData = any, TVariables = any> extends 
+  Omit<UseMutationOptions<TData, ApiErrorResponse, TVariables>, 'mutationFn'> {
+  /** Enable optimistic updates */
+  enableOptimistic?: boolean;
+  /** Custom success message */
+  successMessage?: string;
+  /** Custom error message */
+  errorMessage?: string;
+}
+
+/**
+ * Validation error structure for unique name constraints
+ */
+export interface ValidationError {
+  /** Field name with validation error */
   field: string;
+  /** Validation error message */
   message: string;
+  /** Error code for programmatic handling */
   code: string;
 }
 
-interface ApiError {
-  message: string;
-  status?: number;
-  code?: string;
-  details?: any;
-  errors?: LookupKeyValidationError[];
-}
-
-interface QueryOptions {
-  fields?: string;
-  limit?: number;
-  offset?: number;
-  filter?: string;
-  order?: string;
-}
-
-// Mock notification and loading hooks (will be replaced by actual implementations)
-const useNotifications = () => ({
-  showNotification: (options: { type: string; message: string; duration?: number }) => {
-    console.log(`[${options.type.toUpperCase()}] ${options.message}`);
-  }
-});
-
-const useLoading = () => ({
-  setLoading: (loading: boolean) => {
-    console.log(`Loading state: ${loading}`);
-  }
-});
+// ============================================================================
+// Constants and Configuration
+// ============================================================================
 
 /**
- * Custom React hook providing global lookup keys management operations
- * 
- * Features:
- * - CRUD operations with optimistic updates
- * - Unique name validation with real-time feedback
- * - Intelligent caching with SWR/React Query patterns
- * - Comprehensive error handling and retry logic
- * - Cache hit responses under 50ms
- * - API responses under 2 seconds
- * - MSW integration for development and testing
- * 
- * Replaces Angular DfBaseCrudService lookup keys operations with React patterns
- * per Section 4.3 state management workflows and React/Next.js Integration Requirements.
- * 
- * @returns Hook object with CRUD operations, validation, and state management
+ * API endpoint for global lookup keys management
  */
-export function useLookupKeys(options: QueryOptions = {}) {
+const LOOKUP_KEYS_ENDPOINT = '/api/v2/system/lookup';
+
+/**
+ * Query key factory for lookup keys operations
+ * Provides consistent cache key generation for React Query
+ */
+const lookupKeysKeys = {
+  /** Base key for all lookup keys queries */
+  all: ['lookup-keys'] as const,
+  /** Key for listing lookup keys with optional filters */
+  lists: () => [...lookupKeysKeys.all, 'list'] as const,
+  /** Key for specific lookup keys list with parameters */
+  list: (params?: Record<string, any>) => [...lookupKeysKeys.lists(), params] as const,
+  /** Key for individual lookup key details */
+  details: () => [...lookupKeysKeys.all, 'detail'] as const,
+  /** Key for specific lookup key by ID */
+  detail: (id: number) => [...lookupKeysKeys.details(), id] as const,
+  /** Key for unique name validation */
+  validation: () => [...lookupKeysKeys.all, 'validation'] as const,
+  /** Key for specific name validation */
+  validateName: (name: string) => [...lookupKeysKeys.validation(), name] as const,
+} as const;
+
+/**
+ * Default query configuration for optimal performance
+ * Ensures cache hit responses under 50ms per requirements
+ */
+const DEFAULT_QUERY_CONFIG = {
+  /** Cache data for 10 minutes */
+  gcTime: 10 * 60 * 1000,
+  /** Consider data stale after 5 minutes */
+  staleTime: 5 * 60 * 1000,
+  /** Refetch on window focus for fresh data */
+  refetchOnWindowFocus: true,
+  /** Refetch on network reconnection */
+  refetchOnReconnect: true,
+  /** Retry failed requests up to 3 times */
+  retry: 3,
+  /** Use exponential backoff for retries */
+  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
+} as const;
+
+/**
+ * API request options for lookup keys operations
+ * Optimized for under 2 seconds response time per requirements
+ */
+const DEFAULT_API_OPTIONS: ApiRequestOptions = {
+  /** Include cache control headers */
+  includeCacheControl: true,
+  /** Show loading spinner for user feedback */
+  showSpinner: true,
+  /** Request timeout (2 seconds per requirements) */
+  timeout: 2000,
+} as const;
+
+// ============================================================================
+// Validation Utilities
+// ============================================================================
+
+/**
+ * Check if lookup key name is unique among existing keys
+ * Provides real-time validation for form inputs
+ */
+export function useValidateUniqueName() {
   const queryClient = useQueryClient();
-  const { showNotification } = useNotifications();
-  const { setLoading } = useLoading();
-  
-  // Cache key for lookup keys data
-  const LOOKUP_KEYS_QUERY_KEY = ['lookup-keys'];
-  const LOOKUP_KEYS_DETAIL_KEY = (id: number) => ['lookup-keys', 'detail', id];
 
-  // API endpoint configuration
-  const LOOKUP_KEYS_ENDPOINT = '/system/config/lookup_key';
+  return useCallback(async (name: string, currentId?: number): Promise<boolean> => {
+    try {
+      // Get cached lookup keys data for validation
+      const cachedData = queryClient.getQueryData<ApiListResponse<LookupKey>>(
+        lookupKeysKeys.list()
+      );
 
-  /**
-   * Fetch all lookup keys with intelligent caching
-   * Cache hit responses under 50ms per React/Next.js Integration Requirements
-   */
-  const {
-    data: lookupKeysData,
-    isLoading,
-    isError,
-    error,
-    refetch,
-    isFetching,
-    isStale
-  } = useQuery<LookupKeyResponse, ApiError>({
-    queryKey: [...LOOKUP_KEYS_QUERY_KEY, options],
-    queryFn: async () => {
-      const queryParams = new URLSearchParams();
-      
-      // Configure query parameters
-      if (options.fields) queryParams.append('fields', options.fields);
-      if (options.limit !== undefined) queryParams.append('limit', options.limit.toString());
-      if (options.offset !== undefined) queryParams.append('offset', options.offset.toString());
-      if (options.filter) queryParams.append('filter', options.filter);
-      if (options.order) queryParams.append('order', options.order);
-      
-      const url = `${LOOKUP_KEYS_ENDPOINT}${queryParams.toString() ? `?${queryParams}` : ''}`;
-      
-      try {
-        const response = await apiClient.get(url);
-        return response;
-      } catch (error: any) {
-        throw {
-          message: error.message || 'Failed to fetch lookup keys',
-          status: error.status || 500,
-          code: error.code || 'FETCH_ERROR',
-          details: error
-        };
+      if (cachedData?.resource) {
+        // Check for name conflicts in cached data
+        const conflictingKey = cachedData.resource.find(
+          key => key.name.toLowerCase() === name.toLowerCase() && key.id !== currentId
+        );
+        return !conflictingKey;
       }
-    },
-    // Intelligent caching configuration for sub-50ms cache hits
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes (was cacheTime)
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    retry: (failureCount, error) => {
-      // Don't retry on 4xx errors except 408, 429
-      if (error.status && error.status >= 400 && error.status < 500) {
-        const retryableClientErrors = [408, 429];
-        return retryableClientErrors.includes(error.status) && failureCount < 2;
-      }
-      return failureCount < 3;
-    },
-    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000),
-  });
 
-  /**
-   * Create lookup key mutation with optimistic updates
-   * Implements optimistic updates with rollback per Section 4.1.3 error handling
-   */
-  const createMutation = useEnhancedMutation<LookupKey, Partial<LookupKey>>({
-    mutationFn: async (newLookupKey: Partial<LookupKey>) => {
-      try {
-        const payload: LookupKeyPayload = {
-          resource: [{ ...newLookupKey, id: undefined } as LookupKey]
-        };
-        
-        const response = await apiClient.post(LOOKUP_KEYS_ENDPOINT, payload, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        return response.resource[0];
-      } catch (error: any) {
-        throw {
-          message: error.message || 'Failed to create lookup key',
-          status: error.status || 500,
-          code: error.code || 'CREATE_ERROR',
-          details: error
-        };
-      }
-    },
-    invalidateQueries: [LOOKUP_KEYS_QUERY_KEY],
-    optimisticUpdate: {
-      queryKey: LOOKUP_KEYS_QUERY_KEY,
-      updater: (oldData: any, newItem: Partial<LookupKey>) => {
-        if (oldData?.resource) {
-          return {
-            ...oldData,
-            resource: [...oldData.resource, { ...newItem, id: `temp-${Date.now()}` }]
-          };
+      // Fallback to server validation if no cached data
+      const response = await apiGet<ApiListResponse<LookupKey>>(
+        LOOKUP_KEYS_ENDPOINT,
+        {
+          ...DEFAULT_API_OPTIONS,
+          filter: `name="${name}"`,
+          fields: 'id,name',
+          limit: 1,
         }
-        return oldData;
-      }
-    },
-    onSuccessMessage: 'Lookup key created successfully',
-    onErrorMessage: 'Failed to create lookup key',
-    retryCount: 3,
-    retryDelay: 1000
-  });
+      );
 
-  /**
-   * Update lookup key mutation with optimistic updates
-   */
-  const updateMutation = useEnhancedMutation<LookupKey, { id: number; updates: Partial<LookupKey> }>({
-    mutationFn: async ({ id, updates }) => {
-      try {
-        const response = await apiClient.post(`${LOOKUP_KEYS_ENDPOINT}/${id}`, updates, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        return response;
-      } catch (error: any) {
-        throw {
-          message: error.message || 'Failed to update lookup key',
-          status: error.status || 500,
-          code: error.code || 'UPDATE_ERROR',
-          details: error
-        };
+      if (isApiError(response)) {
+        return true; // Allow on validation error
       }
-    },
-    invalidateQueries: [LOOKUP_KEYS_QUERY_KEY],
-    optimisticUpdate: {
-      queryKey: LOOKUP_KEYS_QUERY_KEY,
-      updater: (oldData: any, { id, updates }) => {
-        if (oldData?.resource) {
-          return {
-            ...oldData,
-            resource: oldData.resource.map((item: LookupKey) =>
-              item.id === id ? { ...item, ...updates } : item
-            )
-          };
-        }
-        return oldData;
-      }
-    },
-    onSuccessMessage: 'Lookup key updated successfully',
-    onErrorMessage: 'Failed to update lookup key',
-    retryCount: 3,
-    retryDelay: 1000
-  });
 
-  /**
-   * Delete lookup key mutation with optimistic updates
-   */
-  const deleteMutation = useEnhancedMutation<void, number | number[]>({
-    mutationFn: async (id: number | number[]) => {
-      try {
-        if (Array.isArray(id)) {
-          // Batch delete
-          const deletePromises = id.map(itemId => 
-            apiClient.post(`${LOOKUP_KEYS_ENDPOINT}/${itemId}`, undefined, {
-              headers: { 'X-HTTP-Method': 'DELETE' }
-            })
-          );
-          await Promise.all(deletePromises);
-        } else {
-          // Single delete
-          await apiClient.post(`${LOOKUP_KEYS_ENDPOINT}/${id}`, undefined, {
-            headers: { 'X-HTTP-Method': 'DELETE' }
-          });
-        }
-      } catch (error: any) {
-        throw {
-          message: error.message || 'Failed to delete lookup key(s)',
-          status: error.status || 500,
-          code: error.code || 'DELETE_ERROR',
-          details: error
-        };
+      if (isApiListResponse(response)) {
+        const conflictingKey = response.resource.find(
+          key => key.id !== currentId
+        );
+        return !conflictingKey;
       }
-    },
-    invalidateQueries: [LOOKUP_KEYS_QUERY_KEY],
-    optimisticUpdate: {
-      queryKey: LOOKUP_KEYS_QUERY_KEY,
-      updater: (oldData: any, id: number | number[]) => {
-        if (oldData?.resource) {
-          const idsToDelete = Array.isArray(id) ? id : [id];
-          return {
-            ...oldData,
-            resource: oldData.resource.filter((item: LookupKey) => !idsToDelete.includes(item.id!))
-          };
-        }
-        return oldData;
-      }
-    },
-    onSuccessMessage: 'Lookup key(s) deleted successfully',
-    onErrorMessage: 'Failed to delete lookup key(s)',
-    retryCount: 2,
-    retryDelay: 1000
-  });
 
-  /**
-   * Batch create/update mutation for bulk operations
-   * Implements the same pattern as the original Angular save() method
-   */
-  const batchMutation = useEnhancedMutation<LookupKey[], { 
-    create: Partial<LookupKey>[], 
-    update: { id: number; data: Partial<LookupKey> }[] 
-  }>({
-    mutationFn: async ({ create, update }) => {
-      const results: LookupKey[] = [];
-      
-      try {
-        // Handle create operations
-        if (create.length > 0) {
-          const createPayload: LookupKeyPayload = {
-            resource: create.map(item => ({ ...item, id: undefined } as LookupKey))
-          };
-          
-          const createResponse = await apiClient.post(LOOKUP_KEYS_ENDPOINT, createPayload, {
-            headers: { 'Content-Type': 'application/json' }
-          });
-          
-          results.push(...createResponse.resource);
-        }
-        
-        // Handle update operations
-        if (update.length > 0) {
-          const updatePromises = update.map(async ({ id, data }) => {
-            const response = await apiClient.post(`${LOOKUP_KEYS_ENDPOINT}/${id}`, data, {
-              headers: { 'Content-Type': 'application/json' }
-            });
-            return response;
-          });
-          
-          const updateResponses = await Promise.all(updatePromises);
-          results.push(...updateResponses);
-        }
-        
-        return results;
-      } catch (error: any) {
-        throw {
-          message: error.message || 'Failed to save lookup keys',
-          status: error.status || 500,
-          code: error.code || 'BATCH_SAVE_ERROR',
-          details: error
-        };
-      }
-    },
-    invalidateQueries: [LOOKUP_KEYS_QUERY_KEY],
-    onSuccessMessage: 'Lookup keys saved successfully',
-    onErrorMessage: 'Failed to save lookup keys',
-    retryCount: 2,
-    retryDelay: 1500
-  });
-
-  /**
-   * Unique name validation function
-   * Replicates the Angular uniqueNameValidator logic in React patterns
-   */
-  const validateUniqueName = useCallback((lookupKeys: LookupKey[], currentKey: LookupKey, index: number): string | null => {
-    if (!currentKey.name || currentKey.name.trim() === '') {
-      return null; // Let required validation handle empty names
+      return true;
+    } catch (error) {
+      console.warn('Name validation failed:', error);
+      return true; // Allow on validation error
     }
-    
-    const duplicateIndex = lookupKeys.findIndex((key, idx) => 
-      idx !== index && 
-      key.name && 
-      key.name.toLowerCase().trim() === currentKey.name.toLowerCase().trim()
-    );
-    
-    return duplicateIndex !== -1 ? 'Name must be unique' : null;
-  }, []);
+  }, [queryClient]);
+}
+
+// ============================================================================
+// Main Hook Implementation
+// ============================================================================
+
+/**
+ * Comprehensive lookup keys management hook
+ * 
+ * Provides complete CRUD operations for global lookup keys with intelligent
+ * caching, optimistic updates, error handling, and real-time validation.
+ * Implements SWR/React Query patterns for performance optimization and
+ * user experience enhancement.
+ * 
+ * @param options Optional configuration for query behavior
+ * @returns Object containing query data, mutations, and utility functions
+ */
+export function useLookupKeys(options: LookupKeysQueryOptions = {}) {
+  const queryClient = useQueryClient();
+  const validateUniqueName = useValidateUniqueName();
+
+  // Merge default options with user-provided options
+  const queryOptions = useMemo(() => ({
+    ...DEFAULT_QUERY_CONFIG,
+    ...options,
+  }), [options]);
+
+  // Build query parameters for API request
+  const queryParams = useMemo(() => {
+    const params: Record<string, any> = {};
+    if (options.filter) params.filter = options.filter;
+    if (options.sort) params.sort = options.sort;
+    if (options.fields) params.fields = options.fields;
+    if (options.related) params.related = options.related;
+    if (options.limit !== undefined) params.limit = options.limit;
+    if (options.offset !== undefined) params.offset = options.offset;
+    if (options.includeCount !== undefined) params.includeCount = options.includeCount;
+    if (options.refresh) params.refresh = options.refresh;
+    return params;
+  }, [options]);
+
+  // ============================================================================
+  // Queries
+  // ============================================================================
 
   /**
-   * Validate all lookup keys for unique names
-   * Returns validation errors for each key
+   * Main query for fetching lookup keys list
+   * Implements intelligent caching with background revalidation
    */
-  const validateAllLookupKeys = useCallback((lookupKeys: LookupKey[]): Record<number, string> => {
-    const errors: Record<number, string> = {};
-    
-    lookupKeys.forEach((key, index) => {
-      const nameError = validateUniqueName(lookupKeys, key, index);
-      if (nameError) {
-        errors[index] = nameError;
+  const lookupKeysQuery = useQuery({
+    queryKey: lookupKeysKeys.list(queryParams),
+    queryFn: async (): Promise<ApiListResponse<LookupKey>> => {
+      const response = await apiGet<ApiListResponse<LookupKey>>(
+        LOOKUP_KEYS_ENDPOINT,
+        {
+          ...DEFAULT_API_OPTIONS,
+          ...queryParams,
+        }
+      );
+
+      if (isApiError(response)) {
+        throw new Error(JSON.stringify(response));
       }
+
+      return response as ApiListResponse<LookupKey>;
+    },
+    ...queryOptions,
+  });
+
+  // ============================================================================
+  // Create Mutations
+  // ============================================================================
+
+  /**
+   * Single lookup key creation mutation with optimistic updates
+   */
+  const createLookupKey = useEnhancedMutation<LookupKey, LookupKeyInput>({
+    operation: 'create',
+    endpoint: {
+      url: LOOKUP_KEYS_ENDPOINT,
+      method: 'POST',
+    },
+    optimistic: {
+      enabled: true,
+      getOptimisticData: (variables) => ({
+        id: Date.now(), // Temporary ID for optimistic update
+        ...variables,
+        created_date: new Date().toISOString(),
+        last_modified_date: new Date().toISOString(),
+      } as LookupKey),
+      invalidateKeys: [lookupKeysKeys.lists()],
+    },
+    invalidation: {
+      exact: [lookupKeysKeys.lists()],
+      refetchActive: true,
+    },
+    notifications: {
+      success: {
+        enabled: true,
+        title: 'Success',
+        message: 'Lookup key created successfully',
+        duration: 3000,
+      },
+      error: {
+        enabled: true,
+        title: 'Error',
+        message: 'Failed to create lookup key',
+        duration: 5000,
+        includeErrorDetails: true,
+      },
+    },
+    retry: {
+      maxAttempts: 3,
+      backoffMultiplier: 2,
+      initialDelay: 1000,
+      maxDelay: 10000,
+      shouldRetry: (error, attempt) => {
+        return error.error.status_code >= 500 && attempt < 3;
+      },
+    },
+  });
+
+  /**
+   * Bulk lookup keys creation mutation for multiple entries
+   */
+  const createLookupKeys = useEnhancedMutation<LookupKey[], BulkCreateRequest>({
+    operation: 'bulk-create',
+    endpoint: {
+      url: LOOKUP_KEYS_ENDPOINT,
+      method: 'POST',
+    },
+    optimistic: {
+      enabled: false, // Disable for bulk operations
+    },
+    invalidation: {
+      exact: [lookupKeysKeys.lists()],
+      refetchActive: true,
+      refetchInactive: true,
+    },
+    notifications: {
+      success: {
+        enabled: true,
+        title: 'Success',
+        message: 'Lookup keys created successfully',
+        duration: 3000,
+      },
+      error: {
+        enabled: true,
+        title: 'Error',
+        message: 'Failed to create lookup keys',
+        duration: 5000,
+        includeErrorDetails: true,
+      },
+    },
+    retry: {
+      maxAttempts: 1, // Reduce retries for bulk operations
+    },
+  });
+
+  // ============================================================================
+  // Update Mutations
+  // ============================================================================
+
+  /**
+   * Single lookup key update mutation with optimistic updates
+   */
+  const updateLookupKey = useEnhancedMutation<LookupKey, LookupKeyUpdate>({
+    operation: 'update',
+    endpoint: {
+      url: `${LOOKUP_KEYS_ENDPOINT}`,
+      method: 'PUT',
+    },
+    optimistic: {
+      enabled: true,
+      updateHandler: (variables, queryClient) => {
+        const queryKey = lookupKeysKeys.list();
+        const previousData = queryClient.getQueryData<ApiListResponse<LookupKey>>(queryKey);
+        
+        if (previousData?.resource) {
+          const updatedResource = previousData.resource.map(item =>
+            item.id === variables.id 
+              ? { ...item, ...variables, last_modified_date: new Date().toISOString() }
+              : item
+          );
+          
+          queryClient.setQueryData(queryKey, {
+            ...previousData,
+            resource: updatedResource,
+          });
+        }
+        
+        return previousData;
+      },
+      invalidateKeys: [lookupKeysKeys.lists()],
+    },
+    invalidation: {
+      exact: [lookupKeysKeys.lists(), lookupKeysKeys.detail(0)], // 0 as wildcard
+      refetchActive: true,
+    },
+    notifications: {
+      success: {
+        enabled: true,
+        title: 'Success',
+        message: 'Lookup key updated successfully',
+        duration: 3000,
+      },
+      error: {
+        enabled: true,
+        title: 'Error',
+        message: 'Failed to update lookup key',
+        duration: 5000,
+        includeErrorDetails: true,
+      },
+    },
+  });
+
+  /**
+   * Bulk lookup keys update mutation for multiple entries
+   */
+  const updateLookupKeys = useEnhancedMutation<LookupKey[], BulkUpdateRequest>({
+    operation: 'bulk-update',
+    endpoint: {
+      url: LOOKUP_KEYS_ENDPOINT,
+      method: 'PUT',
+    },
+    optimistic: {
+      enabled: false, // Disable for bulk operations
+    },
+    invalidation: {
+      exact: [lookupKeysKeys.lists()],
+      refetchActive: true,
+      refetchInactive: true,
+    },
+    notifications: {
+      success: {
+        enabled: true,
+        title: 'Success',
+        message: 'Lookup keys updated successfully',
+        duration: 3000,
+      },
+      error: {
+        enabled: true,
+        title: 'Error',
+        message: 'Failed to update lookup keys',
+        duration: 5000,
+        includeErrorDetails: true,
+      },
+    },
+    retry: {
+      maxAttempts: 1, // Reduce retries for bulk operations
+    },
+  });
+
+  // ============================================================================
+  // Delete Mutations
+  // ============================================================================
+
+  /**
+   * Single lookup key deletion mutation with optimistic updates
+   */
+  const deleteLookupKey = useEnhancedMutation<void, { id: number }>({
+    operation: 'delete',
+    endpoint: {
+      url: `${LOOKUP_KEYS_ENDPOINT}`,
+      method: 'DELETE',
+    },
+    optimistic: {
+      enabled: true,
+      updateHandler: (variables, queryClient) => {
+        const queryKey = lookupKeysKeys.list();
+        const previousData = queryClient.getQueryData<ApiListResponse<LookupKey>>(queryKey);
+        
+        if (previousData?.resource) {
+          const updatedResource = previousData.resource.filter(
+            item => item.id !== variables.id
+          );
+          
+          queryClient.setQueryData(queryKey, {
+            ...previousData,
+            resource: updatedResource,
+            meta: {
+              ...previousData.meta,
+              count: previousData.meta.count - 1,
+            },
+          });
+        }
+        
+        return previousData;
+      },
+      invalidateKeys: [lookupKeysKeys.lists()],
+    },
+    invalidation: {
+      exact: [lookupKeysKeys.lists(), lookupKeysKeys.detail(0)], // 0 as wildcard
+      refetchActive: true,
+    },
+    notifications: {
+      success: {
+        enabled: true,
+        title: 'Success',
+        message: 'Lookup key deleted successfully',
+        duration: 3000,
+      },
+      error: {
+        enabled: true,
+        title: 'Error',
+        message: 'Failed to delete lookup key',
+        duration: 5000,
+        includeErrorDetails: true,
+      },
+    },
+    conflict: {
+      strategy: 'queue', // Queue deletes to prevent conflicts
+    },
+  });
+
+  /**
+   * Bulk lookup keys deletion mutation for multiple entries
+   */
+  const deleteLookupKeys = useEnhancedMutation<void, { ids: number[] }>({
+    operation: 'bulk-delete',
+    endpoint: {
+      url: `${LOOKUP_KEYS_ENDPOINT}`,
+      method: 'DELETE',
+    },
+    optimistic: {
+      enabled: false, // Disable for bulk operations
+    },
+    invalidation: {
+      exact: [lookupKeysKeys.lists()],
+      refetchActive: true,
+      refetchInactive: true,
+    },
+    notifications: {
+      success: {
+        enabled: true,
+        title: 'Success',
+        message: 'Lookup keys deleted successfully',
+        duration: 3000,
+      },
+      error: {
+        enabled: true,
+        title: 'Error',
+        message: 'Failed to delete lookup keys',
+        duration: 5000,
+        includeErrorDetails: true,
+      },
+    },
+    conflict: {
+      strategy: 'queue', // Queue deletes to prevent conflicts
+    },
+    retry: {
+      maxAttempts: 1, // Reduce retries for bulk operations
+    },
+  });
+
+  // ============================================================================
+  // Utility Functions
+  // ============================================================================
+
+  /**
+   * Manually refresh lookup keys data
+   * Forces immediate cache invalidation and refetch
+   */
+  const refreshLookupKeys = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: lookupKeysKeys.lists(),
     });
-    
-    return errors;
+  }, [queryClient]);
+
+  /**
+   * Prefetch lookup keys for improved performance
+   * Useful for optimistic navigation scenarios
+   */
+  const prefetchLookupKeys = useCallback(async (params?: Record<string, any>) => {
+    await queryClient.prefetchQuery({
+      queryKey: lookupKeysKeys.list(params),
+      queryFn: async () => {
+        const response = await apiGet<ApiListResponse<LookupKey>>(
+          LOOKUP_KEYS_ENDPOINT,
+          {
+            ...DEFAULT_API_OPTIONS,
+            ...params,
+          }
+        );
+
+        if (isApiError(response)) {
+          throw new Error(JSON.stringify(response));
+        }
+
+        return response as ApiListResponse<LookupKey>;
+      },
+      ...DEFAULT_QUERY_CONFIG,
+    });
+  }, [queryClient]);
+
+  /**
+   * Get specific lookup key by ID from cache
+   * Provides instant access to cached data
+   */
+  const getLookupKeyById = useCallback((id: number): LookupKey | undefined => {
+    const cachedData = queryClient.getQueryData<ApiListResponse<LookupKey>>(
+      lookupKeysKeys.list()
+    );
+    return cachedData?.resource?.find(key => key.id === id);
+  }, [queryClient]);
+
+  /**
+   * Check if a lookup key name is unique
+   * Provides real-time validation for forms
+   */
+  const isNameUnique = useCallback(async (name: string, currentId?: number): Promise<boolean> => {
+    return await validateUniqueName(name, currentId);
   }, [validateUniqueName]);
 
   /**
-   * Get lookup key by ID with caching
+   * Get validation errors for a lookup key
+   * Provides comprehensive validation feedback
    */
-  const getLookupKey = useCallback((id: number) => {
-    return queryClient.getQueryData<LookupKey>(LOOKUP_KEYS_DETAIL_KEY(id)) || 
-           lookupKeysData?.resource.find(key => key.id === id);
-  }, [queryClient, lookupKeysData]);
+  const getValidationErrors = useCallback((lookupKey: Partial<LookupKeyInput>): ValidationError[] => {
+    const errors: ValidationError[] = [];
 
-  /**
-   * Search lookup keys by name or value
-   */
-  const searchLookupKeys = useCallback((searchTerm: string): LookupKey[] => {
-    if (!lookupKeysData?.resource || !searchTerm.trim()) {
-      return lookupKeysData?.resource || [];
+    // Name validation
+    if (!lookupKey.name || lookupKey.name.trim().length === 0) {
+      errors.push({
+        field: 'name',
+        message: 'Lookup key name is required',
+        code: 'REQUIRED',
+      });
+    } else if (lookupKey.name.length > 50) {
+      errors.push({
+        field: 'name',
+        message: 'Lookup key name must be less than 50 characters',
+        code: 'MAX_LENGTH',
+      });
     }
-    
-    const term = searchTerm.toLowerCase();
-    return lookupKeysData.resource.filter(key => 
-      key.name.toLowerCase().includes(term) || 
-      key.value.toLowerCase().includes(term) ||
-      (key.description && key.description.toLowerCase().includes(term))
-    );
-  }, [lookupKeysData]);
 
-  /**
-   * Reset all cache data for lookup keys
-   */
-  const resetCache = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: LOOKUP_KEYS_QUERY_KEY });
-    queryClient.removeQueries({ queryKey: LOOKUP_KEYS_QUERY_KEY });
-  }, [queryClient]);
+    // Value validation
+    if (lookupKey.value !== undefined && lookupKey.value.length > 1000) {
+      errors.push({
+        field: 'value',
+        message: 'Lookup key value must be less than 1000 characters',
+        code: 'MAX_LENGTH',
+      });
+    }
 
-  /**
-   * Prefetch lookup key details
-   */
-  const prefetchLookupKey = useCallback(async (id: number) => {
-    await queryClient.prefetchQuery({
-      queryKey: LOOKUP_KEYS_DETAIL_KEY(id),
-      queryFn: async () => {
-        const response = await apiClient.get(`${LOOKUP_KEYS_ENDPOINT}/${id}`);
-        return response;
-      },
-      staleTime: 5 * 60 * 1000
-    });
-  }, [queryClient]);
+    // Description validation
+    if (lookupKey.description && lookupKey.description.length > 255) {
+      errors.push({
+        field: 'description',
+        message: 'Description must be less than 255 characters',
+        code: 'MAX_LENGTH',
+      });
+    }
 
-  // Computed values for easier consumption
-  const lookupKeys = useMemo(() => lookupKeysData?.resource || [], [lookupKeysData]);
-  const totalCount = useMemo(() => lookupKeysData?.meta?.count || lookupKeys.length, [lookupKeysData, lookupKeys.length]);
-  const hasData = useMemo(() => lookupKeys.length > 0, [lookupKeys.length]);
+    return errors;
+  }, []);
 
-  // Loading states for different operations
-  const isCreating = createMutation.isPending;
-  const isUpdating = updateMutation.isPending;
-  const isDeleting = deleteMutation.isPending;
-  const isSaving = batchMutation.isPending;
-  const isModifying = isCreating || isUpdating || isDeleting || isSaving;
+  // ============================================================================
+  // Return Hook Interface
+  // ============================================================================
 
-  return {
-    // Data
-    lookupKeys,
-    lookupKeysData,
-    totalCount,
-    hasData,
-    
-    // Loading states
-    isLoading,
-    isFetching,
-    isStale,
-    isCreating,
-    isUpdating,
-    isDeleting,
-    isSaving,
-    isModifying,
-    
-    // Error states
-    isError,
-    error,
-    
-    // CRUD operations
-    createLookupKey: createMutation.mutate,
-    createLookupKeyAsync: createMutation.mutateAsync,
-    updateLookupKey: updateMutation.mutate,
-    updateLookupKeyAsync: updateMutation.mutateAsync,
-    deleteLookupKey: deleteMutation.mutate,
-    deleteLookupKeyAsync: deleteMutation.mutateAsync,
-    saveLookupKeys: batchMutation.mutate,
-    saveLookupKeysAsync: batchMutation.mutateAsync,
-    
+  return useMemo(() => ({
+    // Query data and state
+    lookupKeys: lookupKeysQuery.data?.resource || [],
+    meta: lookupKeysQuery.data?.meta,
+    isLoading: lookupKeysQuery.isLoading,
+    isError: lookupKeysQuery.isError,
+    error: lookupKeysQuery.error,
+    isFetching: lookupKeysQuery.isFetching,
+    isStale: lookupKeysQuery.isStale,
+
+    // Mutation operations
+    mutations: {
+      create: createLookupKey,
+      createBulk: createLookupKeys,
+      update: updateLookupKey,
+      updateBulk: updateLookupKeys,
+      delete: deleteLookupKey,
+      deleteBulk: deleteLookupKeys,
+    },
+
     // Utility functions
-    validateUniqueName,
-    validateAllLookupKeys,
-    getLookupKey,
-    searchLookupKeys,
-    prefetchLookupKey,
-    refetch,
-    resetCache,
-    
-    // Mutation objects for advanced usage
-    createMutation,
-    updateMutation,
-    deleteMutation,
-    batchMutation,
-    
-    // Query client for advanced cache management
-    queryClient
-  };
+    utils: {
+      refresh: refreshLookupKeys,
+      prefetch: prefetchLookupKeys,
+      getById: getLookupKeyById,
+      isNameUnique,
+      getValidationErrors,
+    },
+
+    // Loading states for all mutations
+    isCreating: createLookupKey.isPending,
+    isCreatingBulk: createLookupKeys.isPending,
+    isUpdating: updateLookupKey.isPending,
+    isUpdatingBulk: updateLookupKeys.isPending,
+    isDeleting: deleteLookupKey.isPending,
+    isDeletingBulk: deleteLookupKeys.isPending,
+
+    // Combined loading state for UI feedback
+    isMutating: createLookupKey.isPending || 
+                createLookupKeys.isPending || 
+                updateLookupKey.isPending || 
+                updateLookupKeys.isPending || 
+                deleteLookupKey.isPending || 
+                deleteLookupKeys.isPending,
+
+    // Query client for advanced operations
+    queryClient,
+  }), [
+    lookupKeysQuery,
+    createLookupKey,
+    createLookupKeys,
+    updateLookupKey,
+    updateLookupKeys,
+    deleteLookupKey,
+    deleteLookupKeys,
+    refreshLookupKeys,
+    prefetchLookupKeys,
+    getLookupKeyById,
+    isNameUnique,
+    getValidationErrors,
+    queryClient,
+  ]);
 }
 
-/**
- * Factory function for creating a typed lookup keys hook with specific options
- */
-export function createLookupKeysHook(defaultOptions: QueryOptions = {}) {
-  return function useLookupKeysWithDefaults(overrideOptions: QueryOptions = {}) {
-    return useLookupKeys({ ...defaultOptions, ...overrideOptions });
-  };
-}
+// ============================================================================
+// Type Exports
+// ============================================================================
 
-/**
- * Hook for managing lookup keys in form scenarios
- * Provides additional utilities for form state management
- */
-export function useLookupKeysForm(initialData: LookupKey[] = []) {
-  const {
-    lookupKeys,
-    saveLookupKeys,
-    validateAllLookupKeys,
-    ...rest
-  } = useLookupKeys();
-  
-  const validationErrors = useMemo(() => 
-    validateAllLookupKeys(initialData), 
-    [validateAllLookupKeys, initialData]
-  );
-  
-  const hasValidationErrors = useMemo(() => 
-    Object.keys(validationErrors).length > 0, 
-    [validationErrors]
-  );
-  
-  /**
-   * Save form data with proper create/update partitioning
-   * Replicates the Angular component's save() method logic
-   */
-  const saveFormData = useCallback((formData: LookupKey[]) => {
-    const createKeys: Partial<LookupKey>[] = [];
-    const updateKeys: { id: number; data: Partial<LookupKey> }[] = [];
-    
-    formData.forEach(key => {
-      // Check if this is a new key (no ID) or existing key (has ID)
-      if (key.id) {
-        updateKeys.push({ id: key.id, data: key });
-      } else {
-        createKeys.push({ ...key, id: undefined });
-      }
-    });
-    
-    saveLookupKeys({ create: createKeys, update: updateKeys });
-  }, [saveLookupKeys]);
-  
-  return {
-    ...rest,
-    lookupKeys,
-    validationErrors,
-    hasValidationErrors,
-    saveFormData
-  };
-}
+export type {
+  LookupKey,
+  LookupKeyInput,
+  LookupKeyUpdate,
+  BulkCreateRequest,
+  BulkUpdateRequest,
+  LookupKeysQueryOptions,
+  LookupKeyMutationOptions,
+  ValidationError,
+};
+
+// ============================================================================
+// Default Export
+// ============================================================================
 
 export default useLookupKeys;
