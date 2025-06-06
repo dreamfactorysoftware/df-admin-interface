@@ -1,1182 +1,1166 @@
 /**
- * TypeScript type definitions for all React context providers in the DreamFactory Admin Interface.
+ * Provider Type Definitions for DreamFactory Admin Interface
  * 
- * This file provides comprehensive type safety for provider state and actions throughout the application,
- * supporting the migration from Angular services to React context patterns with enhanced type inference
- * and strict type checking for all provider context values and action functions.
+ * Comprehensive TypeScript type definitions for all React context providers in the
+ * refactored DreamFactory Admin Interface. Provides type safety for authentication,
+ * theme management, notifications, and error handling contexts with React 19 and
+ * TypeScript 5.8+ enhanced support.
  * 
+ * Key Features:
+ * - React 19 compatible context typing with enhanced inference
+ * - TypeScript 5.8+ generic type support for reusable provider patterns
+ * - Strict type definitions for all provider context values and actions
+ * - Integration with Zustand state types for consistent state management
+ * - Provider props typing with optional configuration and default handling
+ * - WCAG 2.1 AA accessibility compliance types
+ * - Next.js 15.1 middleware integration patterns
+ * 
+ * @fileoverview Provider types for React context system
  * @version 1.0.0
- * @requires TypeScript 5.8+ with enhanced React 19 support for context typing
- * @requires React 19.0.0 for enhanced concurrent features and context optimizations
+ * @since React 19.0.0 / Next.js 15.1+ / TypeScript 5.8+
  */
 
-import { ReactNode } from 'react';
-import { StateCreator } from 'zustand';
-import { QueryClient } from '@tanstack/react-query';
+import React, { ReactNode } from 'react';
+import type {
+  UserProfile,
+  AdminProfile,
+  UserSession,
+  LoginCredentials,
+  LoginResponse,
+  RegisterDetails,
+  ForgetPasswordRequest,
+  ResetFormData,
+  UpdatePasswordRequest,
+  PermissionCheckResult,
+  RouteProtection,
+  RoleType,
+  SystemPermission,
+  UserAction,
+} from '@/types/user';
+import type {
+  ThemeMode,
+  ResolvedTheme,
+  ThemeContextState,
+  ThemeProviderConfig,
+  UseThemeReturn,
+  ThemeUtils,
+  ThemeStorage,
+  ThemeTransition,
+  SystemThemeConfig,
+} from '@/types/theme';
+import type {
+  Notification,
+  NotificationConfig,
+  NotificationQueueConfig,
+  NotificationQueueState,
+  UseNotificationsReturn,
+  NotificationContextValue,
+  NotificationEventHandlers,
+  NotificationPersistence,
+  DfSnackbarCompatibility,
+  NotificationServiceCompatibility,
+} from '@/types/notification';
+import type {
+  AppError,
+  ErrorType,
+  ErrorSeverity,
+  ErrorCategory,
+  BaseError,
+  NetworkError,
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  ServerError,
+  ClientError,
+  SystemError,
+  ErrorContext,
+  ErrorReportingOptions,
+  RetryConfig,
+  CircuitBreakerConfig,
+  CircuitBreakerState,
+  RecoveryAction,
+  UserFriendlyErrorMessage,
+  ErrorRecoveryOptions,
+  ErrorBoundaryInfo,
+  ErrorMetrics,
+  ErrorHandlerConfig,
+  UseErrorHandlerReturn,
+} from '@/types/error';
 
-// =============================================================================
-// Generic Provider Types & Utilities
-// =============================================================================
+// ============================================================================
+// CORE PROVIDER INTERFACES
+// ============================================================================
 
 /**
- * Generic provider props interface supporting optional configuration and default value handling.
- * Enables reusable provider patterns and context composition across the application.
+ * Generic provider props interface for reusable patterns
+ * Supports composition and optional configuration across all providers
  */
-export interface BaseProviderProps<T = unknown> {
-  /** Child components to be wrapped by the provider */
+export interface BaseProviderProps<TConfig = Record<string, unknown>> {
+  /** Child components to wrap with provider */
   children: ReactNode;
-  /** Optional initial value for the context */
-  defaultValue?: T;
-  /** Optional configuration overrides for the provider */
-  config?: Partial<T>;
-  /** Development mode flag for enhanced debugging */
+  
+  /** Optional configuration for provider behavior */
+  config?: Partial<TConfig>;
+  
+  /** Optional default values to override built-in defaults */
+  defaultValues?: Partial<TConfig>;
+  
+  /** Whether to enable debug mode for development */
   debug?: boolean;
+  
+  /** Unique identifier for provider instance (useful for testing) */
+  id?: string;
 }
 
 /**
- * Generic context value interface with loading and error states.
- * Provides consistent patterns for context values across all providers.
+ * Generic context value interface with common provider patterns
+ * Ensures consistency across all provider implementations
  */
-export interface ContextValue<T, A = Record<string, unknown>> {
-  /** Current state value */
-  value: T;
-  /** Loading state indicator */
+export interface BaseContextValue<TState = unknown, TActions = unknown> {
+  /** Current state managed by the provider */
+  state: TState;
+  
+  /** Available actions for state mutations */
+  actions: TActions;
+  
+  /** Whether the provider is initialized and ready */
+  isInitialized: boolean;
+  
+  /** Loading state for async operations */
   isLoading: boolean;
-  /** Error state if any operation failed */
-  error: Error | null;
-  /** Available actions for this context */
-  actions: A;
+  
+  /** Error state if provider initialization failed */
+  error: AppError | null;
+  
+  /** Provider configuration settings */
+  config: Record<string, unknown>;
+  
+  /** Debug information for development */
+  debug?: {
+    lastUpdate: string;
+    renderCount: number;
+    subscribers: number;
+  };
 }
 
 /**
- * Generic async action interface for context actions that perform network operations.
- * Ensures consistent error handling and loading states across all provider actions.
+ * Provider composition interface for nested provider configurations
+ * Enables complex provider hierarchies with dependency injection
  */
-export interface AsyncAction<TInput = void, TOutput = void> {
-  (input: TInput): Promise<TOutput>;
+export interface ProviderComposition {
+  /** Provider component constructor */
+  Provider: React.ComponentType<any>;
+  
+  /** Provider-specific props */
+  props?: Record<string, unknown>;
+  
+  /** Dependencies this provider requires */
+  dependencies?: string[];
+  
+  /** Priority for provider initialization order */
+  priority?: number;
 }
 
-/**
- * Zustand state creator type with enhanced typing for React 19 compatibility.
- * Provides type-safe state management integration with context providers.
- */
-export type ProviderStateCreator<T> = StateCreator<
-  T,
-  [],
-  [],
-  T
->;
-
-// =============================================================================
-// Authentication Context Types
-// =============================================================================
+// ============================================================================
+// AUTHENTICATION CONTEXT TYPES
+// ============================================================================
 
 /**
- * User authentication state and session data.
- * Represents the current user's authentication status and profile information.
+ * Authentication state managed by AuthProvider
  */
 export interface AuthState {
-  /** Current authenticated user, null if not logged in */
-  user: AuthUser | null;
-  /** Authentication status */
+  /** Current authenticated user profile */
+  user: UserProfile | AdminProfile | null;
+  
+  /** Active user session information */
+  session: UserSession | null;
+  
+  /** Whether user is currently authenticated */
   isAuthenticated: boolean;
-  /** Current session token */
-  token: string | null;
-  /** User permissions and role-based access control data */
-  permissions: UserPermissions;
-  /** Session expiration timestamp */
-  expiresAt: number | null;
-  /** Loading state for authentication operations */
-  isLoading: boolean;
-  /** Last authentication error */
-  error: AuthError | null;
+  
+  /** Authentication loading states */
+  loading: {
+    /** Global authentication loading */
+    isLoading: boolean;
+    /** Login process loading */
+    isLoggingIn: boolean;
+    /** Logout process loading */
+    isLoggingOut: boolean;
+    /** Session refresh loading */
+    isRefreshing: boolean;
+    /** Registration process loading */
+    isRegistering: boolean;
+    /** Password reset loading */
+    isResettingPassword: boolean;
+  };
+  
+  /** User permissions and roles */
+  permissions: {
+    /** Array of permission strings */
+    list: string[];
+    /** Array of user roles */
+    roles: RoleType[];
+    /** System-level permissions */
+    system: SystemPermission[];
+    /** Accessible routes for navigation */
+    accessibleRoutes: string[];
+    /** Restricted routes for security */
+    restrictedRoutes: string[];
+  };
+  
+  /** Session metadata */
+  sessionMeta: {
+    /** Session expiration timestamp */
+    expiresAt: string | null;
+    /** Last activity timestamp */
+    lastActivity: string | null;
+    /** Token version for security */
+    tokenVersion: number | null;
+    /** Whether session needs refresh */
+    requiresRefresh: boolean;
+  };
+  
+  /** Error states for different auth operations */
+  errors: {
+    /** General authentication error */
+    auth: AppError | null;
+    /** Login-specific error */
+    login: AppError | null;
+    /** Registration-specific error */
+    registration: AppError | null;
+    /** Password reset error */
+    passwordReset: AppError | null;
+    /** Session refresh error */
+    sessionRefresh: AppError | null;
+  };
 }
 
 /**
- * Authenticated user profile data with enhanced type safety.
- * Maintains compatibility with DreamFactory user management patterns.
- */
-export interface AuthUser {
-  /** Unique user identifier */
-  id: number;
-  /** User email address (primary identifier) */
-  email: string;
-  /** User display name */
-  name: string;
-  /** First name */
-  firstName?: string;
-  /** Last name */
-  lastName?: string;
-  /** User avatar URL */
-  avatar?: string;
-  /** User role assignments */
-  roles: UserRole[];
-  /** Account status flags */
-  isActive: boolean;
-  /** Administrative privileges flag */
-  isAdmin: boolean;
-  /** Last login timestamp */
-  lastLogin?: string;
-  /** User preferences and settings */
-  preferences: UserPreferences;
-}
-
-/**
- * User role definition with granular permissions.
- * Supports DreamFactory's role-based access control system.
- */
-export interface UserRole {
-  /** Role identifier */
-  id: number;
-  /** Role name */
-  name: string;
-  /** Role description */
-  description?: string;
-  /** Service access permissions */
-  serviceAccess: ServicePermission[];
-  /** Administrative capabilities */
-  isDefault: boolean;
-}
-
-/**
- * Service-level permission configuration.
- * Defines granular access control for DreamFactory services.
- */
-export interface ServicePermission {
-  /** Service identifier */
-  serviceId: number;
-  /** Service name */
-  serviceName: string;
-  /** Allowed HTTP verbs */
-  verbs: HttpVerb[];
-  /** Request filters */
-  requestFilters?: string[];
-  /** Response filters */
-  responseFilters?: string[];
-}
-
-/**
- * HTTP verb enumeration for API permissions.
- */
-export type HttpVerb = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-
-/**
- * Comprehensive user permissions object.
- * Provides quick access to user capabilities and restrictions.
- */
-export interface UserPermissions {
-  /** Services the user can access */
-  services: string[];
-  /** Administrative capabilities */
-  canManageUsers: boolean;
-  /** Service management permissions */
-  canManageServices: boolean;
-  /** Schema modification permissions */
-  canManageSchema: boolean;
-  /** System configuration access */
-  canManageSystem: boolean;
-  /** API documentation access */
-  canViewApiDocs: boolean;
-  /** Role management permissions */
-  canManageRoles: boolean;
-}
-
-/**
- * User preferences and customization settings.
- */
-export interface UserPreferences {
-  /** Preferred theme */
-  theme: 'light' | 'dark' | 'system';
-  /** Preferred language/locale */
-  locale: string;
-  /** Dashboard layout preferences */
-  dashboardLayout: 'grid' | 'list';
-  /** Notification preferences */
-  notifications: NotificationPreferences;
-}
-
-/**
- * Notification preferences configuration.
- */
-export interface NotificationPreferences {
-  /** Enable browser notifications */
-  browser: boolean;
-  /** Enable email notifications */
-  email: boolean;
-  /** Show success messages */
-  showSuccess: boolean;
-  /** Show warning messages */
-  showWarnings: boolean;
-  /** Auto-dismiss timing in milliseconds */
-  autoDismiss: number;
-}
-
-/**
- * Authentication error types with detailed context.
- */
-export interface AuthError {
-  /** Error type classification */
-  type: 'INVALID_CREDENTIALS' | 'TOKEN_EXPIRED' | 'NETWORK_ERROR' | 'SERVER_ERROR' | 'UNKNOWN';
-  /** Error message */
-  message: string;
-  /** Additional error context */
-  details?: string;
-  /** Error timestamp */
-  timestamp: number;
-  /** Retry capability flag */
-  canRetry: boolean;
-}
-
-/**
- * Authentication context actions interface.
- * Provides type-safe methods for authentication operations with React 19 optimizations.
+ * Authentication actions available through AuthProvider
  */
 export interface AuthActions {
-  /** User login with credentials */
-  login: AsyncAction<LoginCredentials, AuthUser>;
-  /** User logout with session cleanup */
-  logout: AsyncAction<void, void>;
-  /** Refresh authentication token */
-  refreshToken: AsyncAction<void, string>;
-  /** Update user profile */
-  updateProfile: AsyncAction<Partial<AuthUser>, AuthUser>;
-  /** Update user preferences */
-  updatePreferences: AsyncAction<Partial<UserPreferences>, UserPreferences>;
-  /** Check user permissions for specific service */
-  checkPermission: (service: string, verb: HttpVerb) => boolean;
-  /** Clear authentication errors */
-  clearError: () => void;
-  /** Force session validation */
-  validateSession: AsyncAction<void, boolean>;
+  // =============== Core Authentication Operations ===============
+  
+  /** 
+   * Authenticate user with credentials 
+   * @param credentials - User login credentials
+   * @param options - Additional login options
+   */
+  login: (
+    credentials: LoginCredentials,
+    options?: {
+      redirectTo?: string;
+      rememberSession?: boolean;
+      validateDevice?: boolean;
+    }
+  ) => Promise<LoginResponse>;
+  
+  /** 
+   * Log out current user and clear session 
+   * @param options - Logout configuration
+   */
+  logout: (options?: {
+    clearAllSessions?: boolean;
+    redirectTo?: string;
+    reason?: 'user_initiated' | 'session_expired' | 'security_logout';
+  }) => Promise<void>;
+  
+  /** 
+   * Register new user account 
+   * @param details - User registration information
+   */
+  register: (details: RegisterDetails) => Promise<LoginResponse>;
+  
+  // =============== Session Management ===============
+  
+  /** 
+   * Refresh current session token 
+   * @param force - Whether to force refresh even if not needed
+   */
+  refreshSession: (force?: boolean) => Promise<UserSession>;
+  
+  /** 
+   * Validate current session status 
+   */
+  validateSession: () => Promise<boolean>;
+  
+  /** 
+   * Clear current session without logout 
+   */
+  clearSession: () => void;
+  
+  // =============== Password Management ===============
+  
+  /** 
+   * Request password reset email 
+   * @param request - Password reset request data
+   */
+  requestPasswordReset: (request: ForgetPasswordRequest) => Promise<void>;
+  
+  /** 
+   * Reset password with reset token 
+   * @param resetData - Password reset form data
+   */
+  resetPassword: (resetData: ResetFormData) => Promise<void>;
+  
+  /** 
+   * Update current user password 
+   * @param passwordData - Password update information
+   */
+  updatePassword: (passwordData: UpdatePasswordRequest) => Promise<void>;
+  
+  // =============== User Profile Management ===============
+  
+  /** 
+   * Update current user profile 
+   * @param updates - Profile fields to update
+   */
+  updateProfile: (updates: Partial<UserProfile>) => Promise<UserProfile>;
+  
+  /** 
+   * Reload user profile from server 
+   */
+  reloadProfile: () => Promise<UserProfile>;
+  
+  // =============== Permission and Role Management ===============
+  
+  /** 
+   * Check if user has specific permission 
+   * @param permission - Permission string to check
+   * @param resource - Optional resource context
+   */
+  hasPermission: (permission: string, resource?: string) => boolean;
+  
+  /** 
+   * Check if user has any of the specified permissions 
+   * @param permissions - Array of permission strings
+   */
+  hasAnyPermission: (permissions: string[]) => boolean;
+  
+  /** 
+   * Check if user has all specified permissions 
+   * @param permissions - Array of permission strings
+   */
+  hasAllPermissions: (permissions: string[]) => boolean;
+  
+  /** 
+   * Check if user has specific role 
+   * @param role - Role name to check
+   */
+  hasRole: (role: string) => boolean;
+  
+  /** 
+   * Get permission check result with details 
+   * @param permission - Permission to check
+   * @param resource - Optional resource context
+   */
+  checkPermission: (permission: string, resource?: string) => PermissionCheckResult;
+  
+  /** 
+   * Check if user can perform action on resource 
+   * @param action - Action to perform
+   * @param resource - Resource to act upon
+   */
+  canPerformAction: (action: UserAction, resource?: string) => boolean;
+  
+  // =============== Route Protection ===============
+  
+  /** 
+   * Check if user can access route 
+   * @param route - Route path to check
+   */
+  canAccessRoute: (route: string) => boolean;
+  
+  /** 
+   * Get route protection configuration 
+   * @param route - Route path
+   */
+  getRouteProtection: (route: string) => RouteProtection | null;
+  
+  // =============== Error Handling ===============
+  
+  /** 
+   * Clear specific authentication error 
+   * @param errorType - Type of error to clear
+   */
+  clearError: (errorType?: keyof AuthState['errors']) => void;
+  
+  /** 
+   * Clear all authentication errors 
+   */
+  clearAllErrors: () => void;
+  
+  // =============== State Management ===============
+  
+  /** 
+   * Reset authentication state to initial values 
+   */
+  resetState: () => void;
+  
+  /** 
+   * Set authentication loading state 
+   * @param loadingType - Type of loading to set
+   * @param isLoading - Loading state value
+   */
+  setLoading: (loadingType: keyof AuthState['loading'], isLoading: boolean) => void;
 }
 
 /**
- * Login credentials interface.
+ * Authentication provider configuration
  */
-export interface LoginCredentials {
-  /** User email address */
-  email: string;
-  /** User password */
-  password: string;
-  /** Remember session flag */
-  rememberMe?: boolean;
-  /** Two-factor authentication code */
-  twoFactorCode?: string;
+export interface AuthProviderConfig {
+  /** API endpoints configuration */
+  endpoints: {
+    login: string;
+    logout: string;
+    register: string;
+    refresh: string;
+    profile: string;
+    resetPassword: string;
+    requestReset: string;
+  };
+  
+  /** Session management configuration */
+  session: {
+    /** Session storage key */
+    storageKey: string;
+    /** Session refresh threshold (minutes before expiry) */
+    refreshThreshold: number;
+    /** Auto refresh interval in minutes */
+    autoRefreshInterval: number;
+    /** Whether to clear session on tab close */
+    clearOnClose: boolean;
+  };
+  
+  /** Security configuration */
+  security: {
+    /** Token encryption enabled */
+    encryptTokens: boolean;
+    /** CSRF protection enabled */
+    csrfProtection: boolean;
+    /** Device fingerprinting enabled */
+    deviceFingerprinting: boolean;
+    /** Session timeout in minutes */
+    sessionTimeout: number;
+  };
+  
+  /** Route protection defaults */
+  routing: {
+    /** Default redirect after login */
+    defaultLoginRedirect: string;
+    /** Default redirect after logout */
+    defaultLogoutRedirect: string;
+    /** Protected routes configuration */
+    protectedRoutes: RouteProtection[];
+  };
+  
+  /** Permission system configuration */
+  permissions: {
+    /** Whether to cache permission results */
+    cacheResults: boolean;
+    /** Permission cache TTL in minutes */
+    cacheTTL: number;
+    /** Whether to check permissions server-side */
+    serverSideValidation: boolean;
+  };
 }
 
 /**
- * Authentication context value with comprehensive type safety.
+ * Authentication context value interface
  */
-export interface AuthContextValue extends ContextValue<AuthState, AuthActions> {}
-
-/**
- * Authentication provider props with configuration options.
- */
-export interface AuthProviderProps extends BaseProviderProps<AuthState> {
-  /** Custom authentication service endpoint */
-  authEndpoint?: string;
-  /** Token refresh interval in milliseconds */
-  refreshInterval?: number;
-  /** Enable automatic token refresh */
-  autoRefresh?: boolean;
+export interface AuthContextValue extends BaseContextValue<AuthState, AuthActions> {
+  /** Current authentication state */
+  state: AuthState;
+  
+  /** Available authentication actions */
+  actions: AuthActions;
+  
+  /** Provider configuration */
+  config: AuthProviderConfig;
+  
+  /** Convenience getters for common auth checks */
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  currentUser: UserProfile | AdminProfile | null;
+  userPermissions: string[];
+  userRoles: RoleType[];
 }
 
-// =============================================================================
-// Theme Context Types
-// =============================================================================
+/**
+ * Authentication provider props
+ */
+export interface AuthProviderProps extends BaseProviderProps<AuthProviderConfig> {
+  /** Initial authentication state */
+  initialState?: Partial<AuthState>;
+  
+  /** Authentication event handlers */
+  onLogin?: (user: UserProfile, session: UserSession) => void;
+  onLogout?: (reason?: string) => void;
+  onSessionExpired?: () => void;
+  onAuthError?: (error: AppError) => void;
+  
+  /** Custom authentication storage */
+  storage?: {
+    getItem: (key: string) => string | null;
+    setItem: (key: string, value: string) => void;
+    removeItem: (key: string) => void;
+  };
+}
+
+// ============================================================================
+// THEME CONTEXT TYPES
+// ============================================================================
 
 /**
- * Application theme state and configuration.
- * Manages light/dark theme preferences with Tailwind CSS integration.
+ * Theme state managed by ThemeProvider
  */
-export interface ThemeState {
-  /** Current active theme */
+export interface ThemeState extends ThemeContextState {
+  /** Current theme mode setting */
   theme: ThemeMode;
-  /** System preference detection */
-  systemPreference: 'light' | 'dark';
-  /** Theme initialization status */
-  isInitialized: boolean;
-  /** CSS variables loaded flag */
-  cssVariablesLoaded: boolean;
-  /** Available theme configurations */
-  availableThemes: ThemeConfig[];
-  /** Custom theme overrides */
-  customizations: ThemeCustomizations;
-}
-
-/**
- * Theme mode enumeration.
- */
-export type ThemeMode = 'light' | 'dark' | 'system';
-
-/**
- * Theme configuration definition.
- */
-export interface ThemeConfig {
-  /** Theme identifier */
-  id: string;
-  /** Display name */
-  name: string;
-  /** Theme description */
-  description?: string;
-  /** CSS class name for Tailwind CSS */
-  className: string;
-  /** Color palette definition */
-  colors: ThemeColorPalette;
-  /** Typography configuration */
-  typography: ThemeTypography;
-  /** Component-specific styling */
-  components: ThemeComponentStyles;
-}
-
-/**
- * Color palette for theme configuration.
- */
-export interface ThemeColorPalette {
-  /** Primary brand colors */
-  primary: ColorScale;
-  /** Secondary colors */
-  secondary: ColorScale;
-  /** Accent colors */
-  accent: ColorScale;
-  /** Neutral/gray colors */
-  neutral: ColorScale;
-  /** Success state colors */
-  success: ColorScale;
-  /** Warning state colors */
-  warning: ColorScale;
-  /** Error state colors */
-  error: ColorScale;
-  /** Background colors */
-  background: {
-    primary: string;
-    secondary: string;
-    tertiary: string;
+  
+  /** Resolved theme after system detection */
+  resolvedTheme: ResolvedTheme;
+  
+  /** System detected theme preference */
+  systemTheme: ResolvedTheme;
+  
+  /** Whether theme system is mounted */
+  mounted: boolean;
+  
+  /** Theme transition configuration */
+  transitions: ThemeTransition;
+  
+  /** Accessibility preferences */
+  accessibility: {
+    /** Reduced motion preference */
+    prefersReducedMotion: boolean;
+    /** High contrast preference */
+    prefersHighContrast: boolean;
+    /** Color scheme preference override */
+    colorSchemeOverride: ResolvedTheme | null;
   };
-  /** Text colors */
-  text: {
-    primary: string;
-    secondary: string;
-    tertiary: string;
-    inverse: string;
-  };
-  /** Border colors */
-  border: {
-    primary: string;
-    secondary: string;
-    focus: string;
+  
+  /** Theme persistence state */
+  persistence: {
+    /** Whether theme is stored */
+    isStored: boolean;
+    /** Storage method used */
+    storageMethod: 'localStorage' | 'sessionStorage' | 'cookie' | 'none';
+    /** Last sync timestamp */
+    lastSync: string | null;
   };
 }
 
 /**
- * Color scale with multiple shades.
- */
-export interface ColorScale {
-  50: string;
-  100: string;
-  200: string;
-  300: string;
-  400: string;
-  500: string;
-  600: string;
-  700: string;
-  800: string;
-  900: string;
-  950: string;
-}
-
-/**
- * Typography configuration for themes.
- */
-export interface ThemeTypography {
-  /** Font family definitions */
-  fontFamily: {
-    sans: string[];
-    serif: string[];
-    mono: string[];
-  };
-  /** Font size scale */
-  fontSize: {
-    xs: string;
-    sm: string;
-    base: string;
-    lg: string;
-    xl: string;
-    '2xl': string;
-    '3xl': string;
-    '4xl': string;
-    '5xl': string;
-  };
-  /** Font weight scale */
-  fontWeight: {
-    thin: string;
-    light: string;
-    normal: string;
-    medium: string;
-    semibold: string;
-    bold: string;
-    extrabold: string;
-  };
-  /** Line height scale */
-  lineHeight: {
-    tight: string;
-    normal: string;
-    relaxed: string;
-    loose: string;
-  };
-}
-
-/**
- * Component-specific theme styling.
- */
-export interface ThemeComponentStyles {
-  /** Button component styles */
-  button: {
-    primary: string;
-    secondary: string;
-    danger: string;
-    ghost: string;
-  };
-  /** Input component styles */
-  input: {
-    base: string;
-    focus: string;
-    error: string;
-    disabled: string;
-  };
-  /** Card component styles */
-  card: {
-    base: string;
-    header: string;
-    content: string;
-    footer: string;
-  };
-  /** Navigation component styles */
-  navigation: {
-    base: string;
-    item: string;
-    active: string;
-    hover: string;
-  };
-}
-
-/**
- * Theme customization overrides.
- */
-export interface ThemeCustomizations {
-  /** Custom CSS variables */
-  cssVariables: Record<string, string>;
-  /** Component class overrides */
-  componentOverrides: Record<string, string>;
-  /** Custom animations */
-  animations: Record<string, string>;
-  /** Responsive breakpoint overrides */
-  breakpoints: Record<string, string>;
-}
-
-/**
- * Theme context actions interface.
+ * Theme actions available through ThemeProvider
  */
 export interface ThemeActions {
   /** Set theme mode */
   setTheme: (theme: ThemeMode) => void;
-  /** Toggle between light and dark */
+  
+  /** Toggle between light and dark themes */
   toggleTheme: () => void;
-  /** Apply custom theme configuration */
-  applyCustomTheme: (config: Partial<ThemeConfig>) => void;
-  /** Reset to default theme */
-  resetTheme: () => void;
-  /** Export current theme configuration */
-  exportTheme: () => ThemeConfig;
-  /** Import theme configuration */
-  importTheme: (config: ThemeConfig) => void;
-  /** Update theme customizations */
-  updateCustomizations: (customizations: Partial<ThemeCustomizations>) => void;
+  
+  /** Reset theme to system preference */
+  resetToSystem: () => void;
+  
+  /** Update theme configuration */
+  updateConfig: (config: Partial<ThemeProviderConfig>) => void;
+  
+  /** Set accessibility preferences */
+  setAccessibilityPreferences: (preferences: Partial<ThemeState['accessibility']>) => void;
+  
+  /** Force theme refresh from system */
+  refreshSystemTheme: () => void;
+  
+  /** Clear stored theme preference */
+  clearStoredTheme: () => void;
+  
+  /** Check if theme mode is supported */
+  isThemeSupported: (theme: ThemeMode) => boolean;
+  
+  /** Get theme-appropriate colors */
+  getThemeColors: (theme?: ResolvedTheme) => Record<string, string>;
+  
+  /** Apply custom theme properties */
+  applyCustomTheme: (properties: Record<string, string>) => void;
 }
 
 /**
- * Theme context value interface.
+ * Enhanced theme context value with utilities
  */
-export interface ThemeContextValue extends ContextValue<ThemeState, ThemeActions> {}
-
-/**
- * Theme provider props with configuration options.
- */
-export interface ThemeProviderProps extends BaseProviderProps<ThemeState> {
-  /** Default theme mode */
-  defaultTheme?: ThemeMode;
-  /** Enable system preference detection */
-  enableSystemDetection?: boolean;
-  /** Storage key for theme persistence */
-  storageKey?: string;
-  /** Custom theme configurations */
-  themes?: ThemeConfig[];
+export interface ThemeContextValue extends BaseContextValue<ThemeState, ThemeActions>, UseThemeReturn {
+  /** Current theme state */
+  state: ThemeState;
+  
+  /** Available theme actions */
+  actions: ThemeActions;
+  
+  /** Theme utilities */
+  utils: ThemeUtils;
+  
+  /** Theme storage interface */
+  storage: ThemeStorage;
+  
+  /** Provider configuration */
+  config: ThemeProviderConfig;
 }
 
-// =============================================================================
-// Notification Context Types
-// =============================================================================
+/**
+ * Theme provider props
+ */
+export interface ThemeProviderProps extends BaseProviderProps<ThemeProviderConfig> {
+  /** Initial theme state */
+  initialState?: Partial<ThemeState>;
+  
+  /** Theme change event handlers */
+  onThemeChange?: (theme: ThemeMode, resolvedTheme: ResolvedTheme) => void;
+  onSystemThemeChange?: (systemTheme: ResolvedTheme) => void;
+  
+  /** Custom theme storage implementation */
+  storage?: ThemeStorage;
+  
+  /** System theme detection configuration */
+  systemConfig?: SystemThemeConfig;
+  
+  /** Force server-side rendering mode */
+  forceSSR?: boolean;
+}
+
+// ============================================================================
+// NOTIFICATION CONTEXT TYPES
+// ============================================================================
 
 /**
- * Application notification state and queue management.
- * Replaces Angular Material snackbar with React-based notification system.
+ * Notification state managed by NotificationProvider
  */
-export interface NotificationState {
-  /** Current notification queue */
+export interface NotificationState extends NotificationQueueState {
+  /** Array of active notifications */
   notifications: Notification[];
-  /** Maximum queue size */
-  maxQueueSize: number;
-  /** Global notification settings */
-  globalSettings: NotificationSettings;
-  /** Persistence across route changes */
-  persistAcrossRoutes: boolean;
-}
-
-/**
- * Individual notification definition.
- */
-export interface Notification {
-  /** Unique notification identifier */
-  id: string;
-  /** Notification type for styling and behavior */
-  type: NotificationType;
-  /** Notification title */
-  title: string;
-  /** Notification message content */
-  message: string;
-  /** Auto-dismiss duration in milliseconds */
-  duration?: number;
-  /** Notification persistence flag */
-  persistent?: boolean;
-  /** Action buttons */
-  actions?: NotificationAction[];
-  /** Creation timestamp */
-  timestamp: number;
-  /** Position preference */
-  position?: NotificationPosition;
-  /** Additional metadata */
-  metadata?: Record<string, unknown>;
-  /** Read status */
-  isRead?: boolean;
-}
-
-/**
- * Notification type enumeration for styling and behavior.
- */
-export type NotificationType = 
-  | 'success' 
-  | 'error' 
-  | 'warning' 
-  | 'info' 
-  | 'loading';
-
-/**
- * Notification position on screen.
- */
-export type NotificationPosition = 
-  | 'top-right' 
-  | 'top-left' 
-  | 'top-center'
-  | 'bottom-right' 
-  | 'bottom-left' 
-  | 'bottom-center';
-
-/**
- * Notification action button configuration.
- */
-export interface NotificationAction {
-  /** Action identifier */
-  id: string;
-  /** Button label */
-  label: string;
-  /** Action handler */
-  handler: () => void | Promise<void>;
-  /** Button style variant */
-  variant?: 'primary' | 'secondary' | 'ghost';
-  /** Action icon */
-  icon?: string;
-}
-
-/**
- * Global notification settings.
- */
-export interface NotificationSettings {
-  /** Default duration for auto-dismiss */
-  defaultDuration: number;
-  /** Maximum visible notifications */
-  maxVisible: number;
-  /** Default position */
-  defaultPosition: NotificationPosition;
-  /** Animation duration */
-  animationDuration: number;
-  /** Enable sound notifications */
-  enableSound: boolean;
-  /** Sound file paths */
-  sounds: {
-    success: string;
-    error: string;
-    warning: string;
-    info: string;
+  
+  /** Queue configuration */
+  config: NotificationQueueConfig;
+  
+  /** Whether notifications are paused */
+  paused: boolean;
+  
+  /** Edit page persistence state */
+  persistence: {
+    /** Whether current page is edit page */
+    isEditPage: boolean;
+    /** Last element ID for edit page */
+    lastElementId: string | null;
+    /** Stored notifications for page restore */
+    storedNotifications: Notification[];
+  };
+  
+  /** Notification metrics */
+  metrics: {
+    /** Total notifications shown */
+    totalShown: number;
+    /** Total notifications dismissed */
+    totalDismissed: number;
+    /** Total notifications expired */
+    totalExpired: number;
+    /** Average display duration */
+    averageDisplayDuration: number;
+  };
+  
+  /** Accessibility state */
+  accessibility: {
+    /** Whether screen reader announcements are enabled */
+    announceToScreenReader: boolean;
+    /** Current focus management mode */
+    focusManagement: 'none' | 'notification' | 'action';
+    /** Keyboard navigation enabled */
+    keyboardNavigation: boolean;
   };
 }
 
 /**
- * Notification context actions interface.
+ * Notification actions available through NotificationProvider
  */
 export interface NotificationActions {
-  /** Add new notification to queue */
-  addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => string;
-  /** Remove specific notification */
-  removeNotification: (id: string) => void;
-  /** Clear all notifications */
-  clearAll: () => void;
-  /** Clear notifications by type */
-  clearByType: (type: NotificationType) => void;
-  /** Mark notification as read */
-  markAsRead: (id: string) => void;
-  /** Mark all notifications as read */
-  markAllAsRead: () => void;
-  /** Update notification settings */
-  updateSettings: (settings: Partial<NotificationSettings>) => void;
-  /** Show success notification (convenience method) */
-  success: (title: string, message?: string, options?: Partial<Notification>) => string;
-  /** Show error notification (convenience method) */
-  error: (title: string, message?: string, options?: Partial<Notification>) => string;
-  /** Show warning notification (convenience method) */
-  warning: (title: string, message?: string, options?: Partial<Notification>) => string;
-  /** Show info notification (convenience method) */
-  info: (title: string, message?: string, options?: Partial<Notification>) => string;
-  /** Show loading notification (convenience method) */
-  loading: (title: string, message?: string, options?: Partial<Notification>) => string;
+  /** Show a notification */
+  notify: (config: NotificationConfig) => string;
+  
+  /** Show success notification */
+  success: (message: string, options?: Partial<NotificationConfig>) => string;
+  
+  /** Show error notification */
+  error: (message: string, options?: Partial<NotificationConfig>) => string;
+  
+  /** Show warning notification */
+  warning: (message: string, options?: Partial<NotificationConfig>) => string;
+  
+  /** Show info notification */
+  info: (message: string, options?: Partial<NotificationConfig>) => string;
+  
+  /** Dismiss specific notification */
+  dismiss: (id: string) => void;
+  
+  /** Dismiss all notifications */
+  dismissAll: () => void;
+  
+  /** Pause auto-dismissal */
+  pause: () => void;
+  
+  /** Resume auto-dismissal */
+  resume: () => void;
+  
+  /** Update notification content */
+  update: (id: string, updates: Partial<NotificationConfig>) => void;
+  
+  /** Set edit page state */
+  setEditPageState: (isEditPage: boolean, elementId?: string) => void;
+  
+  /** Restore notifications for edit page */
+  restoreNotifications: () => void;
+  
+  /** Clear stored notifications */
+  clearStoredNotifications: () => void;
+  
+  /** Update queue configuration */
+  updateConfig: (config: Partial<NotificationQueueConfig>) => void;
+  
+  /** Set accessibility preferences */
+  setAccessibilityPreferences: (preferences: Partial<NotificationState['accessibility']>) => void;
+  
+  /** Get notification by ID */
+  getNotification: (id: string) => Notification | null;
+  
+  /** Get notifications by type */
+  getNotificationsByType: (type: string) => Notification[];
 }
 
 /**
- * Notification context value interface.
+ * Enhanced notification context value
  */
-export interface NotificationContextValue extends ContextValue<NotificationState, NotificationActions> {}
-
-/**
- * Notification provider props with configuration options.
- */
-export interface NotificationProviderProps extends BaseProviderProps<NotificationState> {
-  /** Maximum number of notifications in queue */
-  maxQueueSize?: number;
-  /** Default notification position */
-  position?: NotificationPosition;
-  /** Enable persistence across route changes */
-  persistAcrossRoutes?: boolean;
-  /** Custom notification settings */
-  settings?: Partial<NotificationSettings>;
+export interface NotificationContextValue extends BaseContextValue<NotificationState, NotificationActions>, UseNotificationsReturn {
+  /** Current notification state */
+  state: NotificationState;
+  
+  /** Available notification actions */
+  actions: NotificationActions;
+  
+  /** Provider configuration */
+  config: NotificationQueueConfig;
+  
+  /** Angular compatibility layer */
+  compatibility: {
+    /** DfSnackbar service compatibility */
+    dfSnackbar: DfSnackbarCompatibility;
+    /** Notification service compatibility */
+    notificationService: NotificationServiceCompatibility;
+  };
 }
 
-// =============================================================================
-// Error Context Types
-// =============================================================================
+/**
+ * Notification provider props
+ */
+export interface NotificationProviderProps extends BaseProviderProps<NotificationQueueConfig> {
+  /** Initial notification state */
+  initialState?: Partial<NotificationState>;
+  
+  /** Notification event handlers */
+  eventHandlers?: NotificationEventHandlers;
+  
+  /** Persistence configuration */
+  persistence?: NotificationPersistence;
+  
+  /** Angular compatibility mode */
+  enableCompatibilityMode?: boolean;
+  
+  /** Custom notification components */
+  customComponents?: {
+    Toast?: React.ComponentType<{ notification: Notification }>;
+    Banner?: React.ComponentType<{ notification: Notification }>;
+    Modal?: React.ComponentType<{ notification: Notification }>;
+  };
+}
+
+// ============================================================================
+// ERROR CONTEXT TYPES
+// ============================================================================
 
 /**
- * Application error state and recovery management.
- * Replaces Angular error handling with React Error Boundary integration.
+ * Error state managed by ErrorProvider
  */
 export interface ErrorState {
-  /** Current global error if any */
-  globalError: GlobalError | null;
-  /** Component-level errors */
-  componentErrors: ComponentError[];
-  /** Error reporting configuration */
-  reportingConfig: ErrorReportingConfig;
-  /** Error recovery strategies */
-  recoveryStrategies: ErrorRecoveryStrategy[];
-  /** Error history for debugging */
-  errorHistory: ErrorHistoryEntry[];
-}
-
-/**
- * Global application error definition.
- */
-export interface GlobalError {
-  /** Error identifier */
-  id: string;
-  /** Error type classification */
-  type: ErrorType;
-  /** Error message */
-  message: string;
-  /** Error stack trace */
-  stack?: string;
-  /** Component stack where error occurred */
-  componentStack?: string;
-  /** User context when error occurred */
-  userContext: ErrorUserContext;
-  /** Timestamp when error occurred */
-  timestamp: number;
-  /** Error severity level */
-  severity: ErrorSeverity;
-  /** Recovery actions attempted */
-  recoveryAttempts: number;
-  /** Additional error metadata */
-  metadata: Record<string, unknown>;
-}
-
-/**
- * Component-specific error information.
- */
-export interface ComponentError {
-  /** Component error identifier */
-  id: string;
-  /** Component name where error occurred */
-  componentName: string;
-  /** Error boundary that caught the error */
-  errorBoundary: string;
-  /** Original error object */
-  error: Error;
-  /** Error info from React */
-  errorInfo: {
-    componentStack: string;
+  /** Active application errors */
+  activeErrors: AppError[];
+  
+  /** Error handler configuration */
+  config: ErrorHandlerConfig;
+  
+  /** Circuit breaker state */
+  circuitBreaker: {
+    /** Current state */
+    state: CircuitBreakerState;
+    /** Failure count */
+    failureCount: number;
+    /** Last failure timestamp */
+    lastFailure: string | null;
+    /** Next retry timestamp */
+    nextRetry: string | null;
   };
-  /** Error timestamp */
-  timestamp: number;
+  
+  /** Retry mechanism state */
+  retryState: {
+    /** Active retry operations */
+    activeRetries: Record<string, {
+      attempt: number;
+      nextAttempt: string;
+      config: RetryConfig;
+    }>;
+    /** Retry history */
+    retryHistory: Array<{
+      operationId: string;
+      attempts: number;
+      success: boolean;
+      duration: number;
+    }>;
+  };
+  
+  /** Error metrics */
+  metrics: ErrorMetrics;
+  
+  /** Error reporting state */
+  reporting: {
+    /** Whether reporting is enabled */
+    enabled: boolean;
+    /** Queue of errors to report */
+    queue: Array<{ error: AppError; context: ErrorContext }>;
+    /** Last successful report timestamp */
+    lastReport: string | null;
+    /** Failed report count */
+    failedReports: number;
+  };
+  
   /** Recovery state */
-  isRecovered: boolean;
-}
-
-/**
- * Error type classification.
- */
-export type ErrorType = 
-  | 'JAVASCRIPT_ERROR'
-  | 'NETWORK_ERROR' 
-  | 'API_ERROR'
-  | 'VALIDATION_ERROR'
-  | 'AUTHENTICATION_ERROR'
-  | 'AUTHORIZATION_ERROR'
-  | 'CONFIGURATION_ERROR'
-  | 'UNKNOWN_ERROR';
-
-/**
- * Error severity levels.
- */
-export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
-
-/**
- * User context information for error reporting.
- */
-export interface ErrorUserContext {
-  /** User identifier */
-  userId?: number;
-  /** User email */
-  userEmail?: string;
-  /** Current route */
-  currentRoute: string;
-  /** User agent string */
-  userAgent: string;
-  /** Viewport dimensions */
-  viewport: {
-    width: number;
-    height: number;
-  };
-  /** Browser information */
-  browser: {
-    name: string;
-    version: string;
-  };
-  /** Operating system */
-  os: {
-    name: string;
-    version: string;
+  recovery: {
+    /** Available recovery actions */
+    availableActions: Record<string, RecoveryAction[]>;
+    /** Recovery attempt history */
+    recoveryHistory: Array<{
+      errorId: string;
+      action: RecoveryAction;
+      success: boolean;
+      timestamp: string;
+    }>;
   };
 }
 
 /**
- * Error reporting configuration.
- */
-export interface ErrorReportingConfig {
-  /** Enable error reporting */
-  enabled: boolean;
-  /** Error reporting endpoint */
-  endpoint?: string;
-  /** Include user context in reports */
-  includeUserContext: boolean;
-  /** Include stack traces */
-  includeStackTrace: boolean;
-  /** Sampling rate for error reporting */
-  sampleRate: number;
-  /** Maximum errors to report per session */
-  maxErrorsPerSession: number;
-  /** Ignored error patterns */
-  ignoredErrors: string[];
-}
-
-/**
- * Error recovery strategy definition.
- */
-export interface ErrorRecoveryStrategy {
-  /** Strategy identifier */
-  id: string;
-  /** Error types this strategy handles */
-  errorTypes: ErrorType[];
-  /** Recovery action */
-  action: ErrorRecoveryAction;
-  /** Maximum retry attempts */
-  maxRetries: number;
-  /** Retry delay in milliseconds */
-  retryDelay: number;
-  /** Success condition check */
-  isSuccessful: () => boolean;
-}
-
-/**
- * Error recovery action definition.
- */
-export interface ErrorRecoveryAction {
-  /** Action name */
-  name: string;
-  /** Action description */
-  description: string;
-  /** Action handler */
-  handler: () => Promise<void>;
-  /** User-visible label */
-  label: string;
-  /** Action icon */
-  icon?: string;
-}
-
-/**
- * Error history entry for debugging.
- */
-export interface ErrorHistoryEntry {
-  /** Entry identifier */
-  id: string;
-  /** Error that occurred */
-  error: GlobalError;
-  /** Recovery actions taken */
-  recoveryActions: string[];
-  /** Final resolution */
-  resolution: 'recovered' | 'unresolved' | 'ignored';
-  /** Resolution timestamp */
-  resolvedAt?: number;
-}
-
-/**
- * Error context actions interface.
+ * Error actions available through ErrorProvider
  */
 export interface ErrorActions {
-  /** Report a new error */
-  reportError: (error: Error, context?: Partial<ErrorUserContext>) => void;
+  /** Handle any error with comprehensive processing */
+  handleError: (
+    error: any,
+    options?: Partial<ErrorRecoveryOptions>
+  ) => Promise<UserFriendlyErrorMessage>;
+  
+  /** Report error to monitoring service */
+  reportError: (
+    error: AppError,
+    context?: Partial<ErrorContext>
+  ) => Promise<void>;
+  
+  /** Retry operation with backoff */
+  retryWithBackoff: <T>(
+    operation: () => Promise<T>,
+    operationId: string,
+    options?: Partial<RetryConfig>
+  ) => Promise<T>;
+  
+  /** Recover from specific error */
+  recoverFromError: (
+    errorId: string,
+    action: RecoveryAction
+  ) => Promise<boolean>;
+  
   /** Clear specific error */
   clearError: (errorId: string) => void;
+  
   /** Clear all errors */
   clearAllErrors: () => void;
-  /** Attempt error recovery */
-  attemptRecovery: (errorId: string, strategyId?: string) => Promise<boolean>;
-  /** Add custom recovery strategy */
-  addRecoveryStrategy: (strategy: ErrorRecoveryStrategy) => void;
-  /** Update error reporting configuration */
-  updateReportingConfig: (config: Partial<ErrorReportingConfig>) => void;
-  /** Get error by ID */
-  getError: (errorId: string) => GlobalError | undefined;
-  /** Get errors by type */
-  getErrorsByType: (type: ErrorType) => GlobalError[];
-  /** Export error history */
-  exportErrorHistory: () => ErrorHistoryEntry[];
+  
+  /** Reset circuit breaker */
+  resetCircuitBreaker: () => void;
+  
+  /** Update error handler configuration */
+  updateConfig: (config: Partial<ErrorHandlerConfig>) => void;
+  
+  /** Create error boundary component */
+  createErrorBoundary: (
+    fallbackComponent?: React.ComponentType<ErrorBoundaryInfo>
+  ) => React.ComponentType<React.PropsWithChildren<{}>>;
+  
+  /** Get user-friendly error message */
+  getUserFriendlyMessage: (error: AppError) => UserFriendlyErrorMessage;
+  
+  /** Get recovery actions for error */
+  getRecoveryActions: (error: AppError) => RecoveryAction[];
+  
+  /** Get error metrics */
+  getMetrics: () => ErrorMetrics;
+  
+  /** Get circuit breaker state */
+  getCircuitBreakerState: () => CircuitBreakerState;
+  
+  /** Check if operation should be retried */
+  shouldRetry: (error: AppError, attempt: number) => boolean;
+  
+  /** Collect error context */
+  collectErrorContext: () => ErrorContext;
+  
+  /** Sanitize error for production */
+  sanitizeError: (error: AppError) => AppError;
 }
 
 /**
- * Error context value interface.
+ * Enhanced error context value
  */
-export interface ErrorContextValue extends ContextValue<ErrorState, ErrorActions> {}
-
-/**
- * Error provider props with configuration options.
- */
-export interface ErrorProviderProps extends BaseProviderProps<ErrorState> {
-  /** Error reporting configuration */
-  reportingConfig?: Partial<ErrorReportingConfig>;
-  /** Custom recovery strategies */
-  recoveryStrategies?: ErrorRecoveryStrategy[];
-  /** Maximum error history entries */
-  maxHistoryEntries?: number;
-  /** Enable development mode logging */
-  developmentMode?: boolean;
-}
-
-// =============================================================================
-// Query Provider Types
-// =============================================================================
-
-/**
- * React Query provider configuration and state.
- * Manages TanStack React Query client with intelligent caching strategies.
- */
-export interface QueryState {
-  /** Query client instance */
-  client: QueryClient;
-  /** Global cache configuration */
-  cacheConfig: QueryCacheConfig;
-  /** Mutation configuration */
-  mutationConfig: QueryMutationConfig;
-  /** Default query options */
-  defaultOptions: QueryDefaultOptions;
-  /** Development tools configuration */
-  devtools: QueryDevtoolsConfig;
-}
-
-/**
- * Query cache configuration.
- */
-export interface QueryCacheConfig {
-  /** Default stale time in milliseconds */
-  defaultStaleTime: number;
-  /** Default cache time in milliseconds */
-  defaultCacheTime: number;
-  /** Maximum cache size */
-  maxCacheSize: number;
-  /** Cache garbage collection interval */
-  gcInterval: number;
-  /** Enable background refetching */
-  enableBackgroundRefetch: boolean;
-}
-
-/**
- * Mutation configuration.
- */
-export interface QueryMutationConfig {
-  /** Default retry count for mutations */
-  defaultRetryCount: number;
-  /** Retry delay function */
-  retryDelay: (attempt: number) => number;
-  /** Enable optimistic updates */
-  enableOptimisticUpdates: boolean;
-  /** Default mutation timeout */
-  defaultTimeout: number;
-}
-
-/**
- * Default query options configuration.
- */
-export interface QueryDefaultOptions {
-  /** Stale time for database queries */
-  databaseQueriesStaleTime: number;
-  /** Stale time for user queries */
-  userQueriesStaleTime: number;
-  /** Stale time for system queries */
-  systemQueriesStaleTime: number;
-  /** Refetch on window focus */
-  refetchOnWindowFocus: boolean;
-  /** Refetch on reconnect */
-  refetchOnReconnect: boolean;
-  /** Retry configuration */
-  retry: boolean | number | ((failureCount: number, error: Error) => boolean);
-}
-
-/**
- * Query devtools configuration.
- */
-export interface QueryDevtoolsConfig {
-  /** Enable React Query devtools */
-  enabled: boolean;
-  /** Devtools position */
-  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-  /** Initial devtools state */
-  initialIsOpen: boolean;
-  /** Button position */
-  buttonPosition: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-}
-
-/**
- * Query provider props with comprehensive configuration.
- */
-export interface QueryProviderProps extends BaseProviderProps<QueryState> {
-  /** Custom query client */
-  client?: QueryClient;
-  /** Cache configuration overrides */
-  cacheConfig?: Partial<QueryCacheConfig>;
-  /** Mutation configuration overrides */
-  mutationConfig?: Partial<QueryMutationConfig>;
-  /** Default options overrides */
-  defaultOptions?: Partial<QueryDefaultOptions>;
-  /** Devtools configuration */
-  devtools?: Partial<QueryDevtoolsConfig>;
-}
-
-// =============================================================================
-// Provider Composition Types
-// =============================================================================
-
-/**
- * Root provider configuration combining all application providers.
- */
-export interface AppProvidersConfig {
-  /** Authentication provider configuration */
-  auth?: Partial<AuthProviderProps>;
-  /** Theme provider configuration */
-  theme?: Partial<ThemeProviderProps>;
-  /** Query provider configuration */
-  query?: Partial<QueryProviderProps>;
-  /** Notification provider configuration */
-  notification?: Partial<NotificationProviderProps>;
-  /** Error provider configuration */
-  error?: Partial<ErrorProviderProps>;
-  /** Development mode settings */
-  development?: {
-    enableDevtools: boolean;
-    enableDebugLogging: boolean;
-    mockApiCalls: boolean;
+export interface ErrorContextValue extends BaseContextValue<ErrorState, ErrorActions>, UseErrorHandlerReturn {
+  /** Current error state */
+  state: ErrorState;
+  
+  /** Available error actions */
+  actions: ErrorActions;
+  
+  /** Provider configuration */
+  config: ErrorHandlerConfig;
+  
+  /** Error classification utilities */
+  classifiers: {
+    /** Classify generic error */
+    classifyError: (error: any) => AppError;
+    /** Classify API error response */
+    classifyApiError: (response: any) => AppError;
+    /** Classify network error */
+    classifyNetworkError: (error: any) => NetworkError;
+    /** Check if error is retryable */
+    isRetryable: (error: AppError) => boolean;
   };
 }
 
 /**
- * Provider order configuration for proper dependency resolution.
+ * Error provider props
  */
-export interface ProviderOrder {
-  /** Provider priority order (lower numbers = higher priority) */
-  order: {
-    error: 1;
-    query: 2;
-    auth: 3;
-    theme: 4;
-    notification: 5;
+export interface ErrorProviderProps extends BaseProviderProps<ErrorHandlerConfig> {
+  /** Initial error state */
+  initialState?: Partial<ErrorState>;
+  
+  /** Error event handlers */
+  onError?: (error: AppError, context: ErrorContext) => void;
+  onRecovery?: (errorId: string, action: RecoveryAction, success: boolean) => void;
+  onCircuitBreakerStateChange?: (state: CircuitBreakerState) => void;
+  
+  /** Custom error reporting service */
+  reportingService?: {
+    report: (error: AppError, context: ErrorContext) => Promise<void>;
+    batchReport: (errors: Array<{ error: AppError; context: ErrorContext }>) => Promise<void>;
   };
+  
+  /** Custom error boundary fallback */
+  defaultErrorBoundary?: React.ComponentType<ErrorBoundaryInfo>;
+}
+
+// ============================================================================
+// PROVIDER COMPOSITION TYPES
+// ============================================================================
+
+/**
+ * Combined provider state for app-wide state access
+ */
+export interface AppProviderState {
+  auth: AuthState;
+  theme: ThemeState;
+  notification: NotificationState;
+  error: ErrorState;
 }
 
 /**
- * Combined application context value interface.
- * Provides access to all provider contexts in a single interface.
+ * Combined provider actions for app-wide action access
+ */
+export interface AppProviderActions {
+  auth: AuthActions;
+  theme: ThemeActions;
+  notification: NotificationActions;
+  error: ErrorActions;
+}
+
+/**
+ * Root application context value
  */
 export interface AppContextValue {
-  /** Authentication context */
-  auth: AuthContextValue;
-  /** Theme context */
-  theme: ThemeContextValue;
-  /** Notification context */
-  notification: NotificationContextValue;
-  /** Error context */
-  error: ErrorContextValue;
-  /** Query state information */
-  query: QueryState;
+  /** Combined provider states */
+  state: AppProviderState;
+  
+  /** Combined provider actions */
+  actions: AppProviderActions;
+  
+  /** Combined provider configurations */
+  config: {
+    auth: AuthProviderConfig;
+    theme: ThemeProviderConfig;
+    notification: NotificationQueueConfig;
+    error: ErrorHandlerConfig;
+  };
+  
+  /** App-level utilities */
+  utils: {
+    /** Check if all providers are initialized */
+    isAppReady: boolean;
+    /** Get app initialization progress */
+    initializationProgress: number;
+    /** Reset all providers to initial state */
+    resetApp: () => void;
+  };
 }
 
 /**
- * App providers component props.
+ * Root application provider props
  */
-export interface AppProvidersProps {
-  /** Child components */
+export interface AppProviderProps {
   children: ReactNode;
-  /** Provider configuration */
-  config?: AppProvidersConfig;
-  /** Enable strict mode */
-  strictMode?: boolean;
-  /** Enable performance profiling */
-  enableProfiling?: boolean;
-}
-
-// =============================================================================
-// Utility Types for Enhanced Type Safety
-// =============================================================================
-
-/**
- * Extract provider state type from provider props.
- */
-export type ExtractProviderState<T> = T extends BaseProviderProps<infer U> ? U : never;
-
-/**
- * Extract provider actions type from context value.
- */
-export type ExtractProviderActions<T> = T extends ContextValue<unknown, infer A> ? A : never;
-
-/**
- * Utility type for creating provider hooks with proper typing.
- */
-export type ProviderHook<T extends ContextValue<unknown, unknown>> = () => T;
-
-/**
- * Utility type for creating provider components with proper typing.
- */
-export type ProviderComponent<T extends BaseProviderProps<unknown>> = (props: T) => JSX.Element;
-
-/**
- * Type guard for checking if a value is a valid context value.
- */
-export function isContextValue<T, A>(value: unknown): value is ContextValue<T, A> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'value' in value &&
-    'isLoading' in value &&
-    'error' in value &&
-    'actions' in value
-  );
+  
+  /** Configurations for all providers */
+  config?: {
+    auth?: Partial<AuthProviderConfig>;
+    theme?: Partial<ThemeProviderConfig>;
+    notification?: Partial<NotificationQueueConfig>;
+    error?: Partial<ErrorHandlerConfig>;
+  };
+  
+  /** Initial states for all providers */
+  initialState?: {
+    auth?: Partial<AuthState>;
+    theme?: Partial<ThemeState>;
+    notification?: Partial<NotificationState>;
+    error?: Partial<ErrorState>;
+  };
+  
+  /** Global event handlers */
+  onAppReady?: () => void;
+  onAppError?: (error: AppError) => void;
+  
+  /** Development mode configuration */
+  development?: {
+    enableDebugMode?: boolean;
+    enablePerformanceMonitoring?: boolean;
+    enableAccessibilityChecks?: boolean;
+  };
 }
 
 /**
- * Type guard for checking if an error is a known error type.
+ * Provider registry for dynamic provider management
  */
-export function isKnownError(error: unknown): error is GlobalError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'id' in error &&
-    'type' in error &&
-    'message' in error &&
-    'timestamp' in error
-  );
+export interface ProviderRegistry {
+  /** Register a new provider */
+  register: <T extends BaseContextValue<any, any>>(
+    name: string,
+    provider: ProviderComposition
+  ) => void;
+  
+  /** Unregister a provider */
+  unregister: (name: string) => void;
+  
+  /** Get provider by name */
+  get: (name: string) => ProviderComposition | null;
+  
+  /** Get all registered providers */
+  getAll: () => Record<string, ProviderComposition>;
+  
+  /** Check if provider is registered */
+  has: (name: string) => boolean;
 }
 
-// =============================================================================
-// Constants and Default Values
-// =============================================================================
+// ============================================================================
+// TYPE UTILITIES AND HELPERS
+// ============================================================================
 
 /**
- * Default configuration values for all providers.
+ * Extract state type from provider context value
  */
-export const DEFAULT_PROVIDER_CONFIG = {
-  /** Default authentication configuration */
-  auth: {
-    refreshInterval: 15 * 60 * 1000, // 15 minutes
-    autoRefresh: true,
-  },
-  /** Default theme configuration */
-  theme: {
-    defaultTheme: 'system' as const,
-    enableSystemDetection: true,
-    storageKey: 'df-admin-theme',
-  },
-  /** Default query configuration */
-  query: {
-    cacheConfig: {
-      defaultStaleTime: 5 * 60 * 1000, // 5 minutes
-      defaultCacheTime: 10 * 60 * 1000, // 10 minutes
-      maxCacheSize: 100,
-      gcInterval: 30 * 60 * 1000, // 30 minutes
-      enableBackgroundRefetch: true,
-    },
-  },
-  /** Default notification configuration */
-  notification: {
-    maxQueueSize: 10,
-    position: 'top-right' as const,
-    persistAcrossRoutes: true,
-  },
-  /** Default error configuration */
-  error: {
-    maxHistoryEntries: 50,
-    developmentMode: process.env.NODE_ENV === 'development',
-  },
-} as const;
+export type ExtractProviderState<T> = T extends BaseContextValue<infer S, any> ? S : never;
 
 /**
- * Provider context display names for debugging.
+ * Extract actions type from provider context value
  */
-export const PROVIDER_DISPLAY_NAMES = {
-  auth: 'AuthProvider',
-  theme: 'ThemeProvider',
-  query: 'QueryProvider',
-  notification: 'NotificationProvider',
-  error: 'ErrorProvider',
-  app: 'AppProviders',
-} as const;
+export type ExtractProviderActions<T> = T extends BaseContextValue<any, infer A> ? A : never;
 
-export default {
-  DEFAULT_PROVIDER_CONFIG,
-  PROVIDER_DISPLAY_NAMES,
-  isContextValue,
-  isKnownError,
+/**
+ * Extract config type from provider props
+ */
+export type ExtractProviderConfig<T> = T extends BaseProviderProps<infer C> ? C : never;
+
+/**
+ * Provider hook factory type
+ */
+export type ProviderHook<T extends BaseContextValue<any, any>> = () => T;
+
+/**
+ * Provider selector hook type
+ */
+export type ProviderSelector<T extends BaseContextValue<any, any>, R> = (value: T) => R;
+
+/**
+ * Provider subscription hook type
+ */
+export type ProviderSubscription<T extends BaseContextValue<any, any>> = (
+  selector: ProviderSelector<T, any>,
+  equalityFn?: (a: any, b: any) => boolean
+) => any;
+
+// ============================================================================
+// EXPORT TYPES FOR CONVENIENT IMPORTS
+// ============================================================================
+
+export type {
+  // Base provider types
+  BaseProviderProps,
+  BaseContextValue,
+  ProviderComposition,
+  
+  // Authentication types
+  AuthState,
+  AuthActions,
+  AuthContextValue,
+  AuthProviderProps,
+  AuthProviderConfig,
+  
+  // Theme types
+  ThemeState,
+  ThemeActions,
+  ThemeContextValue,
+  ThemeProviderProps,
+  
+  // Notification types
+  NotificationState,
+  NotificationActions,
+  NotificationContextValue,
+  NotificationProviderProps,
+  
+  // Error types
+  ErrorState,
+  ErrorActions,
+  ErrorContextValue,
+  ErrorProviderProps,
+  
+  // App-level types
+  AppProviderState,
+  AppProviderActions,
+  AppContextValue,
+  AppProviderProps,
+  ProviderRegistry,
+  
+  // Utility types
+  ExtractProviderState,
+  ExtractProviderActions,
+  ExtractProviderConfig,
+  ProviderHook,
+  ProviderSelector,
+  ProviderSubscription,
 };
