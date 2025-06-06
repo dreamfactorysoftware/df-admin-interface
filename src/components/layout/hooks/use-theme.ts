@@ -1,492 +1,680 @@
 /**
  * Custom React hook for comprehensive theme management in DreamFactory Admin Interface.
  * 
- * Provides theme state management, system theme detection, localStorage persistence,
- * and Tailwind CSS integration for dynamic theme switching.
+ * This hook replaces the Angular DfThemeService with React patterns, providing:
+ * - Theme state management with light, dark, and system preference options
+ * - LocalStorage persistence for theme preferences across browser sessions
+ * - System theme detection with automatic switching based on user OS preferences
+ * - Tailwind CSS integration with dynamic class application for theme changes
+ * - Theme context provider integration for global theme state access
  * 
- * Replaces Angular DfThemeService with React hook patterns and Zustand state management.
+ * Integrates with Zustand state management and React context patterns for optimal performance
+ * and maintainability in the React 19/Next.js 15.1 environment.
  * 
- * Features:
- * - Light/dark/system theme preferences with automatic switching
- * - System theme detection using prefers-color-scheme media query
- * - Seamless Zustand store integration for global state management
- * - Tailwind CSS class application with dynamic CSS variable injection
- * - localStorage persistence (handled by Zustand persist middleware)
- * - WCAG 2.1 AA compliant theme switching with proper announcements
+ * @version 1.0.0
+ * @requires React 19.0.0 for enhanced hook performance and concurrent features
+ * @requires Zustand 4.5.0 for lightweight state management
+ * @requires Tailwind CSS 4.1+ for utility-first styling framework
+ * @see Section 7.1.1 - Core UI Technologies framework stack
+ * @see Section 4.3.1 - React Context State Flow patterns
  */
 
 'use client';
 
-import { useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useAppStore } from '@/stores/app-store';
+import type { 
+  ThemeMode, 
+  ResolvedTheme, 
+  UseThemeReturn,
+  ThemeStorage,
+  ThemeUtils,
+} from '@/types/theme';
+
+// =============================================================================
+// Constants and Configuration
+// =============================================================================
 
 /**
- * Theme type definitions aligned with design system requirements.
+ * LocalStorage key for theme preference persistence.
+ * Replaces Angular service-based storage with browser localStorage.
  */
-export type ThemeMode = 'light' | 'dark' | 'system';
-export type ResolvedTheme = 'light' | 'dark';
+const THEME_STORAGE_KEY = 'df-admin-theme';
 
 /**
- * Theme configuration interface for advanced customization.
+ * CSS class name applied to document element for dark mode.
+ * Integrates with Tailwind CSS 4.1+ dark mode class strategy.
  */
-export interface ThemeConfig {
-  /** Enable smooth transitions when switching themes */
-  enableTransitions?: boolean;
-  /** Disable theme switching temporarily */
-  disabled?: boolean;
-  /** Force a specific theme regardless of user preference */
-  forcedTheme?: ResolvedTheme;
-  /** Custom storage key for theme persistence */
-  storageKey?: string;
-  /** Announce theme changes to screen readers */
-  announceChanges?: boolean;
+const DARK_MODE_CLASS = 'dark';
+
+/**
+ * Media query for system theme preference detection.
+ * Used with matchMedia API for automatic system theme updates.
+ */
+const DARK_MODE_MEDIA_QUERY = '(prefers-color-scheme: dark)';
+
+/**
+ * Transition CSS to prevent flash during theme changes.
+ * Applied temporarily when switching themes for smooth transitions.
+ */
+const TRANSITION_DISABLE_CSS = `
+*,
+*::before,
+*::after {
+  transition-duration: 0s !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
 }
+`;
+
+// =============================================================================
+// Utility Functions
+// =============================================================================
 
 /**
- * Theme context data returned by the hook.
+ * Detects the system's preferred color scheme using matchMedia API.
+ * Provides fallback handling for environments where matchMedia is unavailable.
+ * 
+ * @returns 'dark' if system prefers dark mode, 'light' otherwise
  */
-export interface ThemeData {
-  /** Current theme setting ('light' | 'dark' | 'system') */
-  theme: ThemeMode;
-  /** Resolved theme based on system preference if theme is 'system' */
-  resolvedTheme: ResolvedTheme;
-  /** Detected system theme preference */
-  systemTheme: ResolvedTheme;
-  /** Whether the component has mounted (prevents hydration mismatch) */
-  mounted: boolean;
-  /** Whether the current theme is dark */
-  isDark: boolean;
-  /** Whether the current theme is light */
-  isLight: boolean;
-  /** Whether system preference is being used */
-  isSystemTheme: boolean;
-  /** Update theme setting */
-  setTheme: (theme: ThemeMode) => void;
-  /** Toggle between light and dark modes */
-  toggleTheme: () => void;
-  /** Apply theme classes to document */
-  applyTheme: (theme?: ResolvedTheme) => void;
-  /** Check if theme switching is available */
-  canSwitchTheme: boolean;
-}
+const getSystemTheme = (): ResolvedTheme => {
+  if (typeof window === 'undefined') {
+    return 'light'; // Default to light mode on server
+  }
+
+  try {
+    return window.matchMedia(DARK_MODE_MEDIA_QUERY).matches ? 'dark' : 'light';
+  } catch (error) {
+    console.warn('useTheme: Unable to detect system theme preference:', error);
+    return 'light';
+  }
+};
+
+/**
+ * Validates if a given theme mode is supported.
+ * Provides type-safe theme validation for runtime checks.
+ * 
+ * @param theme - Theme value to validate
+ * @returns True if theme is a valid ThemeMode
+ */
+const isValidTheme = (theme: string): theme is ThemeMode => {
+  return ['light', 'dark', 'system'].includes(theme);
+};
+
+/**
+ * Resolves the effective theme based on user preference and system setting.
+ * Handles the 'system' theme mode by detecting actual system preference.
+ * 
+ * @param themeMode - User's theme preference
+ * @param systemTheme - System's preferred theme
+ * @returns The resolved theme ('light' or 'dark')
+ */
+const resolveTheme = (themeMode: ThemeMode, systemTheme: ResolvedTheme): ResolvedTheme => {
+  return themeMode === 'system' ? systemTheme : themeMode;
+};
+
+/**
+ * Applies theme classes to document and updates CSS custom properties.
+ * Integrates with Tailwind CSS 4.1+ dark mode class strategy and provides
+ * enhanced theming through CSS custom properties.
+ * 
+ * @param resolvedTheme - The resolved theme to apply
+ * @param selector - CSS selector for theme application (default: ':root')
+ */
+const applyTheme = (resolvedTheme: ResolvedTheme, selector: string = ':root'): void => {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  try {
+    const documentElement = document.documentElement;
+    
+    // Apply Tailwind CSS dark mode class
+    if (resolvedTheme === 'dark') {
+      documentElement.classList.add(DARK_MODE_CLASS);
+    } else {
+      documentElement.classList.remove(DARK_MODE_CLASS);
+    }
+
+    // Update meta theme-color for mobile browser chrome theming
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute(
+        'content',
+        resolvedTheme === 'dark' ? '#1e293b' : '#ffffff'
+      );
+    }
+
+    // Update CSS custom properties for enhanced theming support
+    const root = document.documentElement;
+    if (resolvedTheme === 'dark') {
+      root.style.setProperty('--df-bg-primary', '#1e293b');
+      root.style.setProperty('--df-bg-secondary', '#334155');
+      root.style.setProperty('--df-bg-tertiary', '#475569');
+      root.style.setProperty('--df-text-primary', '#f8fafc');
+      root.style.setProperty('--df-text-secondary', '#cbd5e1');
+      root.style.setProperty('--df-text-tertiary', '#94a3b8');
+      root.style.setProperty('--df-border-primary', '#475569');
+      root.style.setProperty('--df-border-secondary', '#334155');
+    } else {
+      root.style.setProperty('--df-bg-primary', '#ffffff');
+      root.style.setProperty('--df-bg-secondary', '#f8fafc');
+      root.style.setProperty('--df-bg-tertiary', '#f1f5f9');
+      root.style.setProperty('--df-text-primary', '#1e293b');
+      root.style.setProperty('--df-text-secondary', '#475569');
+      root.style.setProperty('--df-text-tertiary', '#64748b');
+      root.style.setProperty('--df-border-primary', '#e2e8f0');
+      root.style.setProperty('--df-border-secondary', '#cbd5e1');
+    }
+
+    // Set data attribute for additional styling hooks
+    documentElement.setAttribute('data-theme', resolvedTheme);
+  } catch (error) {
+    console.warn('useTheme: Unable to apply theme to document:', error);
+  }
+};
+
+/**
+ * Removes theme classes and CSS properties from document.
+ * Provides cleanup functionality for theme removal.
+ * 
+ * @param selector - CSS selector for theme removal (default: ':root')
+ */
+const removeTheme = (selector: string = ':root'): void => {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  try {
+    const documentElement = document.documentElement;
+    documentElement.classList.remove(DARK_MODE_CLASS);
+    documentElement.removeAttribute('data-theme');
+
+    // Remove custom CSS properties
+    const root = document.documentElement;
+    const propertiesToRemove = [
+      '--df-bg-primary',
+      '--df-bg-secondary',
+      '--df-bg-tertiary',
+      '--df-text-primary',
+      '--df-text-secondary',
+      '--df-text-tertiary',
+      '--df-border-primary',
+      '--df-border-secondary',
+    ];
+
+    propertiesToRemove.forEach(property => {
+      root.style.removeProperty(property);
+    });
+  } catch (error) {
+    console.warn('useTheme: Unable to remove theme from document:', error);
+  }
+};
+
+/**
+ * Disables CSS transitions temporarily to prevent flash during theme changes.
+ * Provides smooth theme transition experience by preventing jarring visual changes.
+ */
+const disableTransitions = (): void => {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  try {
+    const css = document.createElement('style');
+    css.appendChild(document.createTextNode(TRANSITION_DISABLE_CSS));
+    document.head.appendChild(css);
+
+    // Re-enable transitions after a frame
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try {
+          document.head.removeChild(css);
+        } catch (error) {
+          // Ignore errors if element was already removed
+        }
+      });
+    });
+  } catch (error) {
+    console.warn('useTheme: Unable to disable transitions:', error);
+  }
+};
+
+/**
+ * Calculates contrast ratio between two colors for accessibility validation.
+ * Used for ensuring WCAG compliance in theme color combinations.
+ * 
+ * @param foreground - Foreground color (hex format)
+ * @param background - Background color (hex format)
+ * @returns Contrast ratio as a number
+ */
+const getContrastRatio = (foreground: string, background: string): number => {
+  // Simplified contrast ratio calculation
+  // In a production app, you'd want a more robust color parsing library
+  const getLuminance = (hex: string): number => {
+    const rgb = parseInt(hex.slice(1), 16);
+    const r = (rgb >> 16) & 0xff;
+    const g = (rgb >> 8) & 0xff;
+    const b = (rgb >> 0) & 0xff;
+    
+    const [rs, gs, bs] = [r, g, b].map(c => {
+      c = c / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    
+    return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+  };
+
+  try {
+    const l1 = getLuminance(foreground);
+    const l2 = getLuminance(background);
+    const lightest = Math.max(l1, l2);
+    const darkest = Math.min(l1, l2);
+    
+    return (lightest + 0.05) / (darkest + 0.05);
+  } catch (error) {
+    console.warn('useTheme: Unable to calculate contrast ratio:', error);
+    return 1; // Fallback to minimum contrast
+  }
+};
+
+/**
+ * Checks if color combination meets WCAG accessibility standards.
+ * Validates contrast ratios for accessibility compliance.
+ * 
+ * @param foreground - Foreground color
+ * @param background - Background color
+ * @param level - WCAG level ('AA' or 'AAA')
+ * @param isLargeText - Whether text is considered large
+ * @returns True if combination meets standards
+ */
+const meetsAccessibilityStandards = (
+  foreground: string,
+  background: string,
+  level: 'AA' | 'AAA' = 'AA',
+  isLargeText: boolean = false
+): boolean => {
+  const contrastRatio = getContrastRatio(foreground, background);
+  
+  if (level === 'AAA') {
+    return isLargeText ? contrastRatio >= 4.5 : contrastRatio >= 7;
+  }
+  
+  // AA level
+  return isLargeText ? contrastRatio >= 3 : contrastRatio >= 4.5;
+};
+
+/**
+ * Gets accessible color palette for the current theme.
+ * Provides theme-appropriate colors that meet accessibility standards.
+ * 
+ * @param theme - The resolved theme
+ * @returns Object with accessible color values
+ */
+const getAccessibleColors = (theme: ResolvedTheme) => {
+  return theme === 'dark' 
+    ? {
+        text: '#f8fafc',
+        background: '#1e293b',
+        primary: '#6366f1',
+        secondary: '#64748b',
+      }
+    : {
+        text: '#1e293b',
+        background: '#ffffff',
+        primary: '#4f46e5',
+        secondary: '#64748b',
+      };
+};
+
+// =============================================================================
+// Theme Storage Implementation
+// =============================================================================
+
+/**
+ * LocalStorage implementation for theme persistence.
+ * Replaces Angular service-based storage with browser localStorage.
+ */
+const themeStorage: ThemeStorage = {
+  getTheme: (): ThemeMode | null => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    try {
+      const stored = localStorage.getItem(THEME_STORAGE_KEY);
+      if (stored && isValidTheme(stored)) {
+        return stored as ThemeMode;
+      }
+
+      // Handle legacy Angular storage migration
+      const legacyDarkMode = localStorage.getItem('isDarkMode');
+      if (legacyDarkMode !== null) {
+        const isLegacyDark = JSON.parse(legacyDarkMode);
+        localStorage.removeItem('isDarkMode'); // Clean up legacy key
+        const migratedTheme = isLegacyDark ? 'dark' : 'light';
+        
+        // Save migrated theme
+        localStorage.setItem(THEME_STORAGE_KEY, migratedTheme);
+        return migratedTheme;
+      }
+    } catch (error) {
+      console.warn('useTheme: Unable to load theme from localStorage:', error);
+    }
+
+    return null;
+  },
+
+  setTheme: (theme: ThemeMode): void => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (error) {
+      console.warn('useTheme: Unable to save theme to localStorage:', error);
+    }
+  },
+
+  removeTheme: (): void => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      localStorage.removeItem(THEME_STORAGE_KEY);
+    } catch (error) {
+      console.warn('useTheme: Unable to remove theme from localStorage:', error);
+    }
+  },
+
+  isAvailable: (): boolean => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    try {
+      const testKey = '__theme_storage_test__';
+      localStorage.setItem(testKey, 'test');
+      localStorage.removeItem(testKey);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
+
+// =============================================================================
+// Main Hook Implementation
+// =============================================================================
 
 /**
  * Custom React hook for comprehensive theme management.
  * 
- * Integrates with Zustand app store and provides system theme detection,
- * Tailwind CSS class application, and accessibility features.
+ * Provides complete theme functionality including state management, persistence,
+ * system detection, and Tailwind CSS integration. Replaces Angular DfThemeService
+ * with modern React patterns and Zustand state management.
  * 
- * @param config - Optional theme configuration
- * @returns Theme management interface
- * 
- * @example
- * ```tsx
- * function ThemeToggleButton() {
- *   const { theme, toggleTheme, isDark, mounted } = useTheme();
- *   
- *   if (!mounted) return null; // Prevent hydration mismatch
- *   
- *   return (
- *     <button onClick={toggleTheme}>
- *       {isDark ? '☀️ Light' : '🌙 Dark'} Mode
- *     </button>
- *   );
- * }
- * ```
- * 
- * @example
- * ```tsx
- * function ThemeAwareComponent() {
- *   const { resolvedTheme, isSystemTheme } = useTheme();
- *   
- *   return (
- *     <div className={`
- *       ${resolvedTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}
- *       ${isSystemTheme ? 'border-blue-500' : 'border-gray-300'}
- *     `}>
- *       Content adapts to theme
- *     </div>
- *   );
- * }
- * ```
+ * @returns Complete theme management interface with state and utilities
  */
-export function useTheme(config: ThemeConfig = {}): ThemeData {
-  const {
-    enableTransitions = true,
-    disabled = false,
-    forcedTheme,
-    storageKey = 'dreamfactory-admin-theme',
-    announceChanges = true,
-  } = config;
+export function useTheme(): UseThemeReturn {
+  // =============================================================================
+  // State Management with Zustand
+  // =============================================================================
 
-  // Access Zustand store theme state
   const {
     theme,
-    resolvedTheme,
-    setTheme: setStoreTheme,
-    setResolvedTheme,
-  } = useAppStore((state) => ({
+    resolvedTheme: storedResolvedTheme,
+    setTheme: setThemeInStore,
+    setResolvedTheme: setResolvedThemeInStore,
+  } = useAppStore(state => ({
     theme: state.theme,
     resolvedTheme: state.resolvedTheme,
     setTheme: state.setTheme,
     setResolvedTheme: state.setResolvedTheme,
   }));
 
+  // =============================================================================
+  // System Theme Detection
+  // =============================================================================
+
   /**
-   * System theme detection using prefers-color-scheme media query.
-   * Updates resolved theme when system preference changes.
+   * Gets current system theme preference.
+   * Cached computation to avoid repeated matchMedia calls.
    */
-  useEffect(() => {
-    // Check if running in browser environment
-    if (typeof window === 'undefined') return;
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const systemTheme: ResolvedTheme = mediaQuery.matches ? 'dark' : 'light';
-
-    // Update resolved theme based on current theme setting
-    const newResolvedTheme = forcedTheme || (theme === 'system' ? systemTheme : theme);
-    
-    if (newResolvedTheme !== resolvedTheme) {
-      setResolvedTheme(newResolvedTheme);
-    }
-
-    /**
-     * Handle system theme preference changes.
-     * Automatically updates resolved theme when user changes OS theme.
-     */
-    const handleSystemThemeChange = (event: MediaQueryListEvent) => {
-      const newSystemTheme: ResolvedTheme = event.matches ? 'dark' : 'light';
-      
-      // Only update if currently using system theme
-      if (theme === 'system' && !forcedTheme) {
-        setResolvedTheme(newSystemTheme);
-        
-        // Announce theme change to screen readers
-        if (announceChanges) {
-          announceThemeChange(newSystemTheme, 'system');
-        }
-      }
-    };
-
-    // Add event listener for system theme changes
-    mediaQuery.addEventListener('change', handleSystemThemeChange);
-    
-    // Cleanup event listener
-    return () => {
-      mediaQuery.removeEventListener('change', handleSystemThemeChange);
-    };
-  }, [theme, resolvedTheme, setResolvedTheme, forcedTheme, announceChanges]);
+  const systemTheme = useMemo(() => getSystemTheme(), []);
 
   /**
-   * Apply theme classes to document root and manage CSS variables.
-   * Integrates with Tailwind CSS dark mode and provides custom properties.
+   * Resolves effective theme based on current settings.
+   * Handles 'system' mode by using detected system preference.
    */
-  const applyTheme = useCallback((targetTheme?: ResolvedTheme) => {
-    if (typeof window === 'undefined' || disabled) return;
-
-    const themeToApply = targetTheme || forcedTheme || resolvedTheme;
-    const root = document.documentElement;
-
-    // Temporarily disable transitions if requested
-    if (!enableTransitions) {
-      const css = document.createElement('style');
-      css.appendChild(
-        document.createTextNode(
-          '*,*::before,*::after{-webkit-transition:none!important;-moz-transition:none!important;-o-transition:none!important;-ms-transition:none!important;transition:none!important}'
-        )
-      );
-      document.head.appendChild(css);
-      
-      // Re-enable transitions after a frame
-      requestAnimationFrame(() => {
-        document.head.removeChild(css);
-      });
-    }
-
-    // Remove existing theme classes
-    root.classList.remove('light', 'dark');
-    
-    // Add new theme class for Tailwind CSS
-    root.classList.add(themeToApply);
-    
-    // Set data attribute for additional styling hooks
-    root.setAttribute('data-theme', themeToApply);
-    root.setAttribute('data-color-scheme', themeToApply);
-
-    // Update CSS custom properties for dynamic theming
-    const cssVariables = getCSSVariablesForTheme(themeToApply);
-    Object.entries(cssVariables).forEach(([property, value]) => {
-      root.style.setProperty(property, value);
-    });
-
-    // Update meta theme-color for mobile browsers
-    updateMetaThemeColor(themeToApply);
-
-    // Update favicon if theme-specific versions exist
-    updateFavicon(themeToApply);
-  }, [resolvedTheme, forcedTheme, disabled, enableTransitions]);
+  const resolvedTheme = useMemo(() => {
+    return resolveTheme(theme, systemTheme);
+  }, [theme, systemTheme]);
 
   /**
-   * Set theme with validation and accessibility announcements.
+   * Determines if theme system has been properly initialized.
+   * Prevents flash of unstyled content during initialization.
+   */
+  const mounted = useMemo(() => {
+    return typeof window !== 'undefined' && theme !== null;
+  }, [theme]);
+
+  // =============================================================================
+  // Theme Actions
+  // =============================================================================
+
+  /**
+   * Sets theme mode with persistence and immediate application.
+   * Replaces Angular service setThemeMode with React state management.
+   * 
+   * @param newTheme - Theme mode to apply
    */
   const setTheme = useCallback((newTheme: ThemeMode) => {
-    if (disabled || !['light', 'dark', 'system'].includes(newTheme)) return;
-
-    // Update store theme (automatically persisted by Zustand)
-    setStoreTheme(newTheme);
-
-    // Determine and apply resolved theme
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const systemTheme: ResolvedTheme = mediaQuery.matches ? 'dark' : 'light';
-    const newResolvedTheme = forcedTheme || (newTheme === 'system' ? systemTheme : newTheme);
-    
-    setResolvedTheme(newResolvedTheme);
-
-    // Announce theme change to screen readers
-    if (announceChanges) {
-      announceThemeChange(newResolvedTheme, newTheme);
+    if (!isValidTheme(newTheme)) {
+      console.warn('useTheme: Invalid theme mode:', newTheme);
+      return;
     }
-  }, [disabled, setStoreTheme, setResolvedTheme, forcedTheme, announceChanges]);
+
+    // Disable transitions to prevent flash
+    disableTransitions();
+
+    // Update Zustand store
+    setThemeInStore(newTheme);
+
+    // Persist to localStorage
+    themeStorage.setTheme(newTheme);
+
+    // Update resolved theme
+    const newResolvedTheme = resolveTheme(newTheme, systemTheme);
+    setResolvedThemeInStore(newResolvedTheme);
+
+    // Apply theme to document
+    applyTheme(newResolvedTheme);
+  }, [setThemeInStore, setResolvedThemeInStore, systemTheme]);
 
   /**
-   * Toggle between light and dark themes.
-   * If currently on system, switches to opposite of current system preference.
+   * Toggles between light and dark themes.
+   * Provides convenient theme switching functionality.
    */
   const toggleTheme = useCallback(() => {
-    if (disabled) return;
-
-    let newTheme: ThemeMode;
-    
-    if (theme === 'system') {
-      // If on system theme, switch to opposite of current resolved theme
-      newTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
-    } else {
-      // Toggle between light and dark
-      newTheme = theme === 'dark' ? 'light' : 'dark';
-    }
-    
+    const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
-  }, [theme, resolvedTheme, setTheme, disabled]);
+  }, [theme, setTheme]);
 
-  // Apply theme whenever resolved theme changes
+  /**
+   * Resets theme to system preference.
+   * Provides quick access to system-based theming.
+   */
+  const resetToSystem = useCallback(() => {
+    setTheme('system');
+  }, [setTheme]);
+
+  // =============================================================================
+  // Theme Validation Functions
+  // =============================================================================
+
+  /**
+   * Checks if current theme matches the given mode.
+   * 
+   * @param mode - Theme mode to check against
+   * @returns True if current theme matches mode
+   */
+  const isTheme = useCallback((mode: ThemeMode): boolean => {
+    return theme === mode;
+  }, [theme]);
+
+  /**
+   * Checks if current resolved theme matches the given mode.
+   * 
+   * @param mode - Resolved theme mode to check against
+   * @returns True if current resolved theme matches mode
+   */
+  const isResolvedTheme = useCallback((mode: ResolvedTheme): boolean => {
+    return resolvedTheme === mode;
+  }, [resolvedTheme]);
+
+  // =============================================================================
+  // Theme Utilities
+  // =============================================================================
+
+  /**
+   * Theme utility functions for color management and accessibility.
+   */
+  const themeUtils: ThemeUtils = useMemo(() => ({
+    getSystemTheme,
+    isThemeSupported: () => typeof window !== 'undefined' && 'matchMedia' in window,
+    isValidTheme,
+    getAccessibleColors: (theme: ResolvedTheme) => getAccessibleColors(theme),
+    applyTheme,
+    removeTheme,
+    getContrastRatio,
+    meetsAccessibilityStandards,
+  }), []);
+
+  // =============================================================================
+  // System Theme Change Detection
+  // =============================================================================
+
+  /**
+   * Set up system theme change detection.
+   * Monitors system preferences and updates theme accordingly.
+   */
   useEffect(() => {
-    applyTheme();
-  }, [applyTheme]);
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      return;
+    }
 
-  // Detect system theme preference for reference
-  const systemTheme = useMemo<ResolvedTheme>(() => {
-    if (typeof window === 'undefined') return 'light';
-    
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    return mediaQuery.matches ? 'dark' : 'light';
-  }, []);
+    let mediaQuery: MediaQueryList;
 
-  // Computed theme properties
-  const isDark = resolvedTheme === 'dark';
-  const isLight = resolvedTheme === 'light';
-  const isSystemTheme = theme === 'system';
-  const canSwitchTheme = !disabled && !forcedTheme;
-  
-  // Prevent hydration mismatch by checking if component has mounted
-  const mounted = typeof window !== 'undefined';
+    try {
+      mediaQuery = window.matchMedia(DARK_MODE_MEDIA_QUERY);
+      
+      const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+        const newSystemTheme = e.matches ? 'dark' : 'light';
+        
+        // Only update if current theme is 'system'
+        if (theme === 'system') {
+          const newResolvedTheme = resolveTheme('system', newSystemTheme);
+          setResolvedThemeInStore(newResolvedTheme);
+          applyTheme(newResolvedTheme);
+        }
+      };
+
+      // Add event listener
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', handleSystemThemeChange);
+      } else {
+        // Fallback for older browsers
+        mediaQuery.addListener(handleSystemThemeChange);
+      }
+
+      // Cleanup function
+      return () => {
+        if (mediaQuery) {
+          if (mediaQuery.removeEventListener) {
+            mediaQuery.removeEventListener('change', handleSystemThemeChange);
+          } else {
+            // Fallback for older browsers
+            mediaQuery.removeListener(handleSystemThemeChange);
+          }
+        }
+      };
+    } catch (error) {
+      console.warn('useTheme: Error setting up system theme detection:', error);
+    }
+  }, [theme, setResolvedThemeInStore]);
+
+  // =============================================================================
+  // Initial Theme Application
+  // =============================================================================
+
+  /**
+   * Apply initial theme on mount and when resolved theme changes.
+   * Ensures proper theme application after component mount.
+   */
+  useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+
+    // Load theme from storage if not already set
+    if (!theme) {
+      const storedTheme = themeStorage.getTheme();
+      if (storedTheme) {
+        setTheme(storedTheme);
+      } else {
+        setTheme('system');
+      }
+      return;
+    }
+
+    // Apply current resolved theme
+    const currentResolvedTheme = resolveTheme(theme, systemTheme);
+    setResolvedThemeInStore(currentResolvedTheme);
+    applyTheme(currentResolvedTheme);
+  }, [mounted, theme, setTheme, setResolvedThemeInStore, systemTheme]);
+
+  // =============================================================================
+  // Return Hook Interface
+  // =============================================================================
 
   return {
+    // Theme State
     theme,
-    resolvedTheme: forcedTheme || resolvedTheme,
+    resolvedTheme,
     systemTheme,
     mounted,
-    isDark,
-    isLight,
-    isSystemTheme,
+    
+    // Theme Actions
     setTheme,
     toggleTheme,
-    applyTheme,
-    canSwitchTheme,
+    resetToSystem,
+    
+    // Theme Validation
+    isTheme,
+    isResolvedTheme,
+    
+    // Theme Utilities
+    ...themeUtils,
   };
 }
 
-/**
- * Get CSS custom properties for the specified theme.
- * Provides dynamic color values for advanced theming beyond Tailwind classes.
- */
-function getCSSVariablesForTheme(theme: ResolvedTheme): Record<string, string> {
-  const lightTheme = {
-    '--df-bg-primary': '#ffffff',
-    '--df-bg-secondary': '#f8fafc',
-    '--df-text-primary': '#0f172a',
-    '--df-text-secondary': '#475569',
-    '--df-border-primary': '#e2e8f0',
-    '--df-border-secondary': '#cbd5e1',
-    '--df-accent-primary': '#6366f1',
-    '--df-accent-secondary': '#f59e0b',
-    '--df-success': '#16a34a',
-    '--df-warning': '#d97706',
-    '--df-error': '#dc2626',
-    '--df-shadow': 'rgba(0, 0, 0, 0.1)',
-    '--df-overlay': 'rgba(0, 0, 0, 0.5)',
-  };
+// =============================================================================
+// Default Export
+// =============================================================================
 
-  const darkTheme = {
-    '--df-bg-primary': '#0f172a',
-    '--df-bg-secondary': '#1e293b',
-    '--df-text-primary': '#f8fafc',
-    '--df-text-secondary': '#cbd5e1',
-    '--df-border-primary': '#334155',
-    '--df-border-secondary': '#475569',
-    '--df-accent-primary': '#818cf8',
-    '--df-accent-secondary': '#fbbf24',
-    '--df-success': '#4ade80',
-    '--df-warning': '#fbbf24',
-    '--df-error': '#f87171',
-    '--df-shadow': 'rgba(0, 0, 0, 0.3)',
-    '--df-overlay': 'rgba(0, 0, 0, 0.7)',
-  };
+export default useTheme;
 
-  return theme === 'dark' ? darkTheme : lightTheme;
-}
+// =============================================================================
+// Type Re-exports for Convenience
+// =============================================================================
 
-/**
- * Update meta theme-color for mobile browsers.
- * Provides native mobile browser chrome theming.
- */
-function updateMetaThemeColor(theme: ResolvedTheme): void {
-  const themeColor = theme === 'dark' ? '#0f172a' : '#ffffff';
-  
-  let themeColorMeta = document.querySelector('meta[name="theme-color"]');
-  
-  if (!themeColorMeta) {
-    themeColorMeta = document.createElement('meta');
-    themeColorMeta.setAttribute('name', 'theme-color');
-    document.head.appendChild(themeColorMeta);
-  }
-  
-  themeColorMeta.setAttribute('content', themeColor);
-}
-
-/**
- * Update favicon based on theme if theme-specific versions exist.
- */
-function updateFavicon(theme: ResolvedTheme): void {
-  const faviconLink = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
-  
-  if (faviconLink) {
-    const currentHref = faviconLink.href;
-    const themeSpecificHref = currentHref.replace(
-      /favicon(-dark|-light)?\.ico/,
-      `favicon-${theme}.ico`
-    );
-    
-    // Only update if theme-specific favicon exists
-    // (This would require a server check in production)
-    if (theme === 'dark') {
-      faviconLink.href = themeSpecificHref;
-    }
-  }
-}
-
-/**
- * Announce theme changes to screen readers for accessibility.
- * Provides WCAG 2.1 AA compliant status announcements.
- */
-function announceThemeChange(resolvedTheme: ResolvedTheme, themeMode: ThemeMode): void {
-  if (typeof window === 'undefined') return;
-
-  const message = themeMode === 'system' 
-    ? `Theme automatically switched to ${resolvedTheme} mode based on system preference`
-    : `Theme switched to ${resolvedTheme} mode`;
-
-  // Create live region for screen reader announcement
-  const announcement = document.createElement('div');
-  announcement.setAttribute('aria-live', 'polite');
-  announcement.setAttribute('aria-atomic', 'true');
-  announcement.className = 'sr-only';
-  announcement.textContent = message;
-  
-  document.body.appendChild(announcement);
-  
-  // Remove announcement after screen readers have processed it
-  setTimeout(() => {
-    if (document.body.contains(announcement)) {
-      document.body.removeChild(announcement);
-    }
-  }, 1000);
-}
-
-/**
- * Higher-order component for theme-aware styling.
- * Provides consistent theme integration patterns for components.
- */
-export function withTheme<P extends object>(
-  Component: React.ComponentType<P>
-): React.ComponentType<P & { themeOverride?: ResolvedTheme }> {
-  return function ThemedComponent({ themeOverride, ...props }: P & { themeOverride?: ResolvedTheme }) {
-    const { resolvedTheme } = useTheme({ forcedTheme: themeOverride });
-    
-    return (
-      <div data-theme={resolvedTheme} className={resolvedTheme}>
-        <Component {...(props as P)} />
-      </div>
-    );
-  };
-}
-
-/**
- * Utility function to generate theme-aware class names.
- * Simplifies conditional Tailwind class application.
- */
-export function themeClasses(
-  lightClasses: string,
-  darkClasses: string,
-  resolvedTheme?: ResolvedTheme
-): string {
-  const { resolvedTheme: currentTheme } = useTheme();
-  const theme = resolvedTheme || currentTheme;
-  
-  return theme === 'dark' ? darkClasses : lightClasses;
-}
-
-/**
- * Theme persistence manager for advanced use cases.
- * Provides manual control over theme storage and retrieval.
- */
-export const themeStorage = {
-  /**
-   * Get stored theme preference from localStorage.
-   */
-  getStoredTheme: (key = 'dreamfactory-admin-theme'): ThemeMode | null => {
-    if (typeof window === 'undefined') return null;
-    
-    try {
-      const stored = localStorage.getItem(key);
-      return stored as ThemeMode || null;
-    } catch {
-      return null;
-    }
-  },
-
-  /**
-   * Set theme preference in localStorage.
-   */
-  setStoredTheme: (theme: ThemeMode, key = 'dreamfactory-admin-theme'): void => {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      localStorage.setItem(key, theme);
-    } catch {
-      // Silently fail if localStorage is unavailable
-    }
-  },
-
-  /**
-   * Clear stored theme preference.
-   */
-  clearStoredTheme: (key = 'dreamfactory-admin-theme'): void => {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      // Silently fail if localStorage is unavailable
-    }
-  },
-};
+export type {
+  ThemeMode,
+  ResolvedTheme,
+  UseThemeReturn,
+  ThemeStorage,
+  ThemeUtils,
+} from '@/types/theme';
