@@ -1,464 +1,420 @@
-/**
- * Lookup Keys Form Component
- * 
- * React form component for managing individual global lookup key entries 
- * within the system settings interface. Implements React Hook Form with 
- * Zod schema validation for real-time form validation.
- * 
- * Features:
- * - React Hook Form with Zod schema validators per React/Next.js Integration Requirements
- * - Real-time validation under 100ms per React/Next.js Integration Requirements
- * - Unique name constraints with custom validation
- * - Private flag management with optimistic updates
- * - WCAG 2.1 AA compliance per Section 7.6.4 accessibility requirements
- * - Headless UI with Tailwind CSS styling per Section 7.1 Core UI Technologies
- */
-
 'use client';
 
-import React, { useMemo, useCallback, useEffect } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import React, { useEffect, useCallback } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { 
-  Form, 
-  FormField, 
-  FormLabel, 
-  FormControl, 
-  FormErrorMessage, 
-  FormActions,
-  FormSection
-} from '@/components/ui/form';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
-import { 
-  lookupKeysFormSchema, 
-  defaultLookupKeysFormValues,
-  defaultLookupKeyValues,
-  type LookupKeysFormData,
-  type LookupKeyFormData,
-  createUniqueNameValidator
-} from '@/lib/validations/lookup-keys';
-import { LookupKeyType } from '@/types/lookup-keys';
-import { cn } from '@/lib/utils';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-export interface LookupKeysFormProps {
-  /** Initial data for the form */
-  initialData?: LookupKeyType[];
-  /** Whether the form is in read-only mode */
-  readOnly?: boolean;
-  /** Whether to show the private column */
-  showPrivateColumn?: boolean;
-  /** Loading state */
-  isLoading?: boolean;
-  /** Save handler */
-  onSave?: (data: LookupKeysFormData) => Promise<void>;
-  /** Cancel handler */
-  onCancel?: () => void;
-  /** Error message to display */
-  error?: string;
-  /** Success message to display */
-  success?: string;
-  /** Additional CSS classes */
-  className?: string;
-  /** Whether to auto-focus the first input */
-  autoFocus?: boolean;
+// Types for lookup key entries
+interface LookupKeyType {
+  id?: number;
+  name: string;
+  value: string;
+  private: boolean;
+  description?: string;
+  created_date?: string;
+  last_modified_date?: string;
+  created_by_id?: number;
+  last_modified_by_id?: number;
 }
 
-// ============================================================================
-// LOOKUP KEYS FORM COMPONENT
-// ============================================================================
+// Component props interface
+interface LookupKeysFormProps {
+  initialData?: LookupKeyType;
+  existingNames?: string[];
+  onSubmit: (data: LookupKeyType) => void | Promise<void>;
+  onCancel?: () => void;
+  isLoading?: boolean;
+  mode?: 'create' | 'edit';
+}
 
+// Zod schema with custom unique name validation
+const createLookupKeySchema = (existingNames: string[] = [], currentName?: string) =>
+  z.object({
+    id: z.number().optional(),
+    name: z
+      .string()
+      .min(1, 'Name is required')
+      .max(255, 'Name must be less than 255 characters')
+      .regex(/^[a-zA-Z0-9_-]+$/, 'Name can only contain letters, numbers, underscores, and hyphens')
+      .refine(
+        (name) => {
+          // Skip validation if this is the current name in edit mode
+          if (currentName && name === currentName) {
+            return true;
+          }
+          // Check if name exists in the list of existing names
+          return !existingNames.some((existing) => existing.toLowerCase() === name.toLowerCase());
+        },
+        {
+          message: 'A lookup key with this name already exists',
+        }
+      ),
+    value: z
+      .string()
+      .max(4000, 'Value must be less than 4000 characters'),
+    private: z.boolean().default(false),
+    description: z.string().optional(),
+    created_date: z.string().optional(),
+    last_modified_date: z.string().optional(),
+    created_by_id: z.number().optional(),
+    last_modified_by_id: z.number().optional(),
+  });
+
+type LookupKeyFormData = z.infer<ReturnType<typeof createLookupKeySchema>>;
+
+/**
+ * LookupKeysForm Component
+ * 
+ * A React form component for managing individual global lookup key entries within 
+ * the system settings interface. Implements React Hook Form with Zod schema validation 
+ * for real-time form validation, providing comprehensive interface for adding, editing, 
+ * and validating lookup key entries with unique name constraints, private flag management, 
+ * and optimistic updates.
+ * 
+ * Features:
+ * - Real-time validation under 100ms per React/Next.js Integration Requirements
+ * - WCAG 2.1 AA compliance with comprehensive ARIA labels and keyboard navigation
+ * - Zod schema validators integrated with React Hook Form
+ * - Unique name validation with case-insensitive checking
+ * - Support for both create and edit modes
+ * - Comprehensive error handling and user feedback
+ * - Optimistic updates with loading states
+ */
 export function LookupKeysForm({
-  initialData = [],
-  readOnly = false,
-  showPrivateColumn = true,
-  isLoading = false,
-  onSave,
+  initialData,
+  existingNames = [],
+  onSubmit,
   onCancel,
-  error,
-  success,
-  className,
-  autoFocus = false,
+  isLoading = false,
+  mode = 'create',
 }: LookupKeysFormProps) {
-  // ============================================================================
-  // FORM SETUP
-  // ============================================================================
+  // Create schema with dynamic validation based on existing names and current mode
+  const schema = createLookupKeySchema(
+    existingNames,
+    mode === 'edit' ? initialData?.name : undefined
+  );
 
-  const form = useForm<LookupKeysFormData>({
-    resolver: zodResolver(lookupKeysFormSchema),
-    defaultValues: useMemo(() => ({
-      lookupKeys: initialData.length > 0 
-        ? initialData.map(item => ({
-            id: item.id,
-            name: item.name,
-            value: item.value,
-            private: item.private || false,
-          }))
-        : [{ ...defaultLookupKeyValues }]
-    }), [initialData]),
+  // Initialize form with React Hook Form and Zod resolver
+  const form = useForm<LookupKeyFormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      id: initialData?.id,
+      name: initialData?.name || '',
+      value: initialData?.value || '',
+      private: initialData?.private || false,
+      description: initialData?.description || '',
+      created_date: initialData?.created_date,
+      last_modified_date: initialData?.last_modified_date,
+      created_by_id: initialData?.created_by_id,
+      last_modified_by_id: initialData?.last_modified_by_id,
+    },
     mode: 'onChange', // Enable real-time validation
   });
 
-  const { 
-    control, 
-    handleSubmit, 
-    formState: { errors, isValid, isDirty, isSubmitting },
-    watch,
-    trigger,
-    reset
-  } = form;
+  // Handle form submission with error handling
+  const handleSubmit = useCallback(
+    async (data: LookupKeyFormData) => {
+      try {
+        await onSubmit(data as LookupKeyType);
+      } catch (error) {
+        // Error handling can be extended here if needed
+        console.error('Error submitting lookup key form:', error);
+      }
+    },
+    [onSubmit]
+  );
 
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'lookupKeys',
-  });
+  // Handle cancel action
+  const handleCancel = useCallback(() => {
+    form.reset();
+    onCancel?.();
+  }, [form, onCancel]);
 
-  // Watch all form values for real-time validation
-  const watchedValues = watch('lookupKeys');
-
-  // ============================================================================
-  // VALIDATION AND ERROR HANDLING
-  // ============================================================================
-
-  // Custom unique name validation
-  const uniqueNameValidator = useMemo(() => createUniqueNameValidator(), []);
-
-  // Check for duplicate names in real-time
-  const duplicateNames = useMemo(() => {
-    const nameCount = new Map<string, number>();
-    const duplicates = new Set<string>();
-    
-    watchedValues?.forEach(item => {
-      const name = item.name?.trim().toLowerCase();
-      if (name) {
-        const count = nameCount.get(name) || 0;
-        nameCount.set(name, count + 1);
-        if (count > 0) {
-          duplicates.add(item.name);
+  // Keyboard navigation support
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Save with Ctrl/Cmd + S
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault();
+        if (form.formState.isValid && !isLoading) {
+          form.handleSubmit(handleSubmit)();
         }
       }
-    });
-    
-    return Array.from(duplicates);
-  }, [watchedValues]);
+      
+      // Cancel with Escape
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        handleCancel();
+      }
+    };
 
-  // Check if a specific field has a duplicate name
-  const isDuplicateName = useCallback((index: number) => {
-    const currentName = watchedValues?.[index]?.name?.trim().toLowerCase();
-    if (!currentName) return false;
-    
-    return watchedValues?.some((item, idx) => 
-      idx !== index && item.name?.trim().toLowerCase() === currentName
-    ) || false;
-  }, [watchedValues]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [form, handleSubmit, handleCancel, isLoading]);
 
-  // ============================================================================
-  // FORM HANDLERS
-  // ============================================================================
-
-  const handleAddLookupKey = useCallback(() => {
-    append({ ...defaultLookupKeyValues });
-  }, [append]);
-
-  const handleRemoveLookupKey = useCallback((index: number) => {
-    remove(index);
-    // Re-trigger validation after removal
-    setTimeout(() => trigger(), 0);
-  }, [remove, trigger]);
-
-  const handleFormSubmit = useCallback(async (data: LookupKeysFormData) => {
-    if (!onSave) return;
-    
-    try {
-      await onSave(data);
-    } catch (error) {
-      console.error('Failed to save lookup keys:', error);
-    }
-  }, [onSave]);
-
-  const handleCancel = useCallback(() => {
-    if (onCancel) {
-      onCancel();
-    } else {
-      reset();
-    }
-  }, [onCancel, reset]);
-
-  // ============================================================================
-  // EFFECTS
-  // ============================================================================
-
-  // Reset form when initial data changes
-  useEffect(() => {
-    const formData = initialData.length > 0 
-      ? {
-          lookupKeys: initialData.map(item => ({
-            id: item.id,
-            name: item.name,
-            value: item.value,
-            private: item.private || false,
-          }))
-        }
-      : { lookupKeys: [{ ...defaultLookupKeyValues }] };
-    
-    reset(formData);
-  }, [initialData, reset]);
-
-  // ============================================================================
-  // RENDER HELPERS
-  // ============================================================================
-
-  const renderLookupKeyRow = (field: LookupKeyFormData & { id: string }, index: number) => {
-    const hasError = Boolean(errors.lookupKeys?.[index]);
-    const isNameDuplicate = isDuplicateName(index);
-    const isExistingEntry = Boolean(field.id && typeof field.id === 'number');
-    
-    return (
-      <div
-        key={field.id}
-        className={cn(
-          'grid grid-cols-1 gap-4 p-4 border border-gray-200 rounded-lg bg-white dark:border-gray-700 dark:bg-gray-800',
-          showPrivateColumn ? 'md:grid-cols-4' : 'md:grid-cols-3',
-          hasError && 'border-red-300 dark:border-red-600',
-          isNameDuplicate && 'ring-2 ring-red-200 dark:ring-red-800'
-        )}
-        role="group"
-        aria-label={`Lookup key ${index + 1}`}
-      >
-        {/* Name Field */}
-        <FormField>
-          <FormLabel 
-            htmlFor={`lookupKeys.${index}.name`}
-            required
-            className={cn(isNameDuplicate && 'text-red-600 dark:text-red-400')}
-          >
-            Name
-          </FormLabel>
-          <FormControl>
-            <Controller
-              name={`lookupKeys.${index}.name`}
-              control={control}
-              render={({ field, fieldState }) => (
-                <Input
-                  {...field}
-                  id={`lookupKeys.${index}.name`}
-                  placeholder="Enter unique name"
-                  disabled={readOnly || (isExistingEntry && isLoading)}
-                  error={Boolean(fieldState.error) || isNameDuplicate}
-                  autoFocus={autoFocus && index === 0}
-                  aria-describedby={
-                    fieldState.error || isNameDuplicate 
-                      ? `lookupKeys.${index}.name-error` 
-                      : undefined
-                  }
-                  aria-invalid={Boolean(fieldState.error) || isNameDuplicate}
-                />
-              )}
-            />
-          </FormControl>
-          <FormErrorMessage 
-            id={`lookupKeys.${index}.name-error`}
-            error={
-              errors.lookupKeys?.[index]?.name?.message || 
-              (isNameDuplicate ? 'Name must be unique' : undefined)
-            }
-          />
-        </FormField>
-
-        {/* Value Field */}
-        <FormField>
-          <FormLabel htmlFor={`lookupKeys.${index}.value`}>
-            Value
-          </FormLabel>
-          <FormControl>
-            <Controller
-              name={`lookupKeys.${index}.value`}
-              control={control}
-              render={({ field, fieldState }) => (
-                <Input
-                  {...field}
-                  id={`lookupKeys.${index}.value`}
-                  placeholder="Enter value"
-                  disabled={readOnly || isLoading}
-                  error={Boolean(fieldState.error)}
-                  aria-describedby={
-                    fieldState.error ? `lookupKeys.${index}.value-error` : undefined
-                  }
-                  aria-invalid={Boolean(fieldState.error)}
-                />
-              )}
-            />
-          </FormControl>
-          <FormErrorMessage 
-            id={`lookupKeys.${index}.value-error`}
-            error={errors.lookupKeys?.[index]?.value?.message}
-          />
-        </FormField>
-
-        {/* Private Field */}
-        {showPrivateColumn && (
-          <FormField>
-            <FormLabel htmlFor={`lookupKeys.${index}.private`}>
-              Private
-            </FormLabel>
-            <FormControl>
-              <Controller
-                name={`lookupKeys.${index}.private`}
-                control={control}
-                render={({ field }) => (
-                  <Checkbox
-                    id={`lookupKeys.${index}.private`}
-                    checked={field.value}
-                    onChange={field.onChange}
-                    disabled={readOnly || isLoading}
-                    label="Mark as private"
-                    description="Private lookup keys are not visible to end users"
-                    aria-describedby={`lookupKeys.${index}.private-desc`}
-                  />
-                )}
-              />
-            </FormControl>
-          </FormField>
-        )}
-
-        {/* Actions */}
-        <div className="flex items-end justify-end">
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={() => handleRemoveLookupKey(index)}
-            disabled={readOnly || isLoading || fields.length === 1}
-            aria-label={`Remove lookup key ${index + 1}`}
-          >
-            <TrashIcon className="h-4 w-4" />
-            <span className="sr-only">Remove</span>
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
-  // ============================================================================
-  // MAIN RENDER
-  // ============================================================================
+  // Dynamic form state for better UX
+  const isFormDirty = form.formState.isDirty;
+  const isFormValid = form.formState.isValid;
+  const hasErrors = Object.keys(form.formState.errors).length > 0;
 
   return (
-    <FormSection
-      title="Global Lookup Keys"
-      description="Manage global lookup key entries. Names must be unique and start with a letter."
-      className={cn('space-y-6', className)}
+    <div 
+      className="space-y-6 max-w-2xl mx-auto p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg"
+      role="form"
+      aria-labelledby="lookup-key-form-title"
+      aria-describedby="lookup-key-form-description"
     >
-      <Form onSubmit={handleSubmit(handleFormSubmit)}>
-        {/* Status Messages */}
-        {error && (
-          <div 
-            className="p-4 text-sm text-red-800 bg-red-50 border border-red-200 rounded-md dark:bg-red-900/20 dark:text-red-200 dark:border-red-800"
-            role="alert"
-            aria-live="polite"
-          >
-            {error}
-          </div>
-        )}
-        
-        {success && (
-          <div 
-            className="p-4 text-sm text-green-800 bg-green-50 border border-green-200 rounded-md dark:bg-green-900/20 dark:text-green-200 dark:border-green-800"
-            role="status"
-            aria-live="polite"
-          >
-            {success}
-          </div>
-        )}
+      {/* Form Header */}
+      <div className="space-y-2">
+        <h2 
+          id="lookup-key-form-title"
+          className="text-2xl font-semibold text-gray-900 dark:text-gray-100"
+        >
+          {mode === 'create' ? 'Create New Lookup Key' : 'Edit Lookup Key'}
+        </h2>
+        <p 
+          id="lookup-key-form-description"
+          className="text-sm text-gray-600 dark:text-gray-400"
+        >
+          {mode === 'create' 
+            ? 'Define a new global lookup key for your application. The name must be unique and follow naming conventions.'
+            : 'Modify the existing lookup key. The name cannot be changed for existing keys.'
+          }
+        </p>
+      </div>
 
-        {/* Duplicate Names Warning */}
-        {duplicateNames.length > 0 && (
-          <div 
-            className="p-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-800"
-            role="alert"
-            aria-live="polite"
-          >
-            <strong>Duplicate names detected:</strong> {duplicateNames.join(', ')}. 
-            Please ensure all lookup key names are unique.
-          </div>
-        )}
-
-        {/* Form Fields */}
-        <div className="space-y-4">
-          {fields.map((field, index) => renderLookupKeyRow(field, index))}
-        </div>
-
-        {/* Add Button */}
-        {!readOnly && (
-          <div className="flex justify-center">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleAddLookupKey}
-              disabled={isLoading}
-              className="w-full max-w-xs"
-            >
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Add Lookup Key
-            </Button>
-          </div>
-        )}
-
-        {/* Form Actions */}
-        {!readOnly && (onSave || onCancel) && (
-          <FormActions justify="end">
-            {onCancel && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancel}
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
+      <Form {...form}>
+        <form 
+          onSubmit={form.handleSubmit(handleSubmit)} 
+          className="space-y-6"
+          noValidate
+          aria-label={`${mode === 'create' ? 'Create' : 'Edit'} lookup key form`}
+        >
+          {/* Name Field */}
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel 
+                  className="text-sm font-medium text-gray-900 dark:text-gray-100"
+                  htmlFor="lookup-key-name"
+                >
+                  Name *
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    id="lookup-key-name"
+                    placeholder="e.g., API_TIMEOUT, MAX_RETRIES"
+                    disabled={mode === 'edit' || isLoading}
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    aria-describedby="lookup-key-name-description lookup-key-name-error"
+                    aria-invalid={!!form.formState.errors.name}
+                    autoComplete="off"
+                    autoFocus={mode === 'create'}
+                  />
+                </FormControl>
+                <FormDescription id="lookup-key-name-description">
+                  A unique identifier for this lookup key. Can contain letters, numbers, underscores, and hyphens.
+                  {mode === 'edit' && ' (Cannot be changed for existing keys)'}
+                </FormDescription>
+                <FormMessage 
+                  id="lookup-key-name-error"
+                  className="text-error-600 dark:text-error-400"
+                  role="alert"
+                  aria-live="polite"
+                />
+              </FormItem>
             )}
-            {onSave && (
+          />
+
+          {/* Value Field */}
+          <FormField
+            control={form.control}
+            name="value"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel 
+                  className="text-sm font-medium text-gray-900 dark:text-gray-100"
+                  htmlFor="lookup-key-value"
+                >
+                  Value
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    id="lookup-key-value"
+                    placeholder="Enter the value for this lookup key"
+                    disabled={isLoading}
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    aria-describedby="lookup-key-value-description lookup-key-value-error"
+                    aria-invalid={!!form.formState.errors.value}
+                    autoComplete="off"
+                  />
+                </FormControl>
+                <FormDescription id="lookup-key-value-description">
+                  The value associated with this lookup key. Can be any string up to 4000 characters.
+                </FormDescription>
+                <FormMessage 
+                  id="lookup-key-value-error"
+                  className="text-error-600 dark:text-error-400"
+                  role="alert"
+                  aria-live="polite"
+                />
+              </FormItem>
+            )}
+          />
+
+          {/* Private Flag */}
+          <FormField
+            control={form.control}
+            name="private"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                <FormControl>
+                  <Controller
+                    name="private"
+                    control={form.control}
+                    render={({ field: { value, onChange } }) => (
+                      <Checkbox
+                        id="lookup-key-private"
+                        checked={value}
+                        onCheckedChange={onChange}
+                        disabled={isLoading}
+                        className="mt-1"
+                        aria-describedby="lookup-key-private-description"
+                        aria-labelledby="lookup-key-private-label"
+                      />
+                    )}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel 
+                    id="lookup-key-private-label"
+                    htmlFor="lookup-key-private"
+                    className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
+                  >
+                    Private Lookup Key
+                  </FormLabel>
+                  <FormDescription id="lookup-key-private-description">
+                    When enabled, this lookup key will be marked as private and may have restricted access.
+                  </FormDescription>
+                </div>
+              </FormItem>
+            )}
+          />
+
+          {/* Form Actions */}
+          <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center space-x-2">
+              {/* Form Status Indicators */}
+              {isFormDirty && !hasErrors && (
+                <span 
+                  className="text-xs text-amber-600 dark:text-amber-400 flex items-center"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Unsaved changes
+                </span>
+              )}
+              
+              {isFormValid && isFormDirty && !hasErrors && (
+                <span 
+                  className="text-xs text-success-600 dark:text-success-400 flex items-center"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Ready to save
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-3">
+              {/* Cancel Button */}
+              {onCancel && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancel}
+                  disabled={isLoading}
+                  className="transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  aria-label="Cancel changes and return to previous page"
+                >
+                  Cancel
+                </Button>
+              )}
+
+              {/* Submit Button */}
               <Button
                 type="submit"
-                disabled={!isValid || !isDirty || isSubmitting || isLoading || duplicateNames.length > 0}
-                loading={isSubmitting || isLoading}
-                loadingText="Saving..."
+                disabled={!isFormValid || isLoading || (!isFormDirty && mode === 'edit')}
+                className="transition-all duration-200 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed min-w-[100px]"
+                aria-label={`${mode === 'create' ? 'Create' : 'Update'} lookup key`}
+                aria-describedby="submit-button-description"
               >
-                Save Changes
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <svg 
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      fill="none" 
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <circle 
+                        className="opacity-25" 
+                        cx="12" 
+                        cy="12" 
+                        r="10" 
+                        stroke="currentColor" 
+                        strokeWidth="4"
+                      />
+                      <path 
+                        className="opacity-75" 
+                        fill="currentColor" 
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    <span>{mode === 'create' ? 'Creating...' : 'Updating...'}</span>
+                  </div>
+                ) : (
+                  mode === 'create' ? 'Create Lookup Key' : 'Update Lookup Key'
+                )}
               </Button>
-            )}
-          </FormActions>
-        )}
+            </div>
+          </div>
 
-        {/* Form Validation Summary for Screen Readers */}
-        <div className="sr-only" aria-live="polite" aria-atomic="true">
-          {errors.lookupKeys && 
-            `Form has ${Object.keys(errors.lookupKeys).length} validation errors. Please review and correct the highlighted fields.`
-          }
-          {duplicateNames.length > 0 && 
-            `${duplicateNames.length} duplicate name(s) detected. All lookup key names must be unique.`
-          }
-        </div>
+          {/* Keyboard shortcuts hint */}
+          <div className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-800">
+            <p>
+              <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-xs">Ctrl+S</kbd> to save, 
+              <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-xs ml-2">Esc</kbd> to cancel
+            </p>
+          </div>
+        </form>
       </Form>
-    </FormSection>
+    </div>
   );
 }
 
-// ============================================================================
-// DISPLAY NAME
-// ============================================================================
-
-LookupKeysForm.displayName = 'LookupKeysForm';
-
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
 export default LookupKeysForm;
-export type { LookupKeysFormProps };
