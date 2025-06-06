@@ -1,474 +1,435 @@
+/**
+ * Comprehensive Zod validation schemas for email template forms
+ * Provides field-level validation rules, custom validators, and type-safe integration
+ * with React Hook Form per React/Next.js Integration Requirements
+ */
+
 import { z } from 'zod';
 
-/**
- * Email Template Validation Schemas
- * 
- * Comprehensive Zod validation schemas for email template forms with:
- * - Field-level validation rules per Section 4.2 Error Handling
- * - Custom validators for email formats and template syntax
- * - Type-safe validation integration with React Hook Form
- * - Internationalized error messages for proper context
- * - Support for create, update, and bulk operations
- * 
- * Converted from Angular validators to Zod schemas per React/Next.js Integration Requirements
- * Applied TypeScript 5.8+ type safety per Section 0.2.1 technical requirements
- */
+// Email validation pattern for comprehensive RFC 5322 compliance
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
-// ============================================================================
-// CUSTOM VALIDATORS
-// ============================================================================
+// Template variable pattern for validation (supports {{variable}} and {variable} formats)
+const TEMPLATE_VARIABLE_REGEX = /\{\{?[a-zA-Z_][a-zA-Z0-9_]*\}?\}/g;
+
+// HTML tag pattern for basic HTML validation
+const HTML_TAG_REGEX = /<\/?[a-z][\s\S]*>/i;
+
+// Dangerous script/style tag patterns to prevent XSS
+const DANGEROUS_HTML_REGEX = /<\s*(script|style|iframe|object|embed)\b[^<]*(?:(?!<\/\s*\1\s*>)<[^<]*)*<\/\s*\1\s*>/gi;
 
 /**
- * Email address format validation with support for comma-separated lists
- * Validates against RFC 5322 standard email format
+ * Custom validator for email addresses with enhanced validation
+ * Supports multiple email formats: single email, comma-separated emails, template variables
  */
-const emailValidator = z
-  .string()
-  .refine(
-    (value) => {
-      if (!value || value.trim() === '') return true; // Optional field
-      
-      // Split by comma and validate each email
-      const emails = value.split(',').map(email => email.trim());
-      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-      
-      return emails.every(email => emailRegex.test(email));
-    },
-    {
-      message: 'emailTemplates.validation.invalidEmailFormat',
-    }
-  );
+const validateEmailField = (value: string | undefined | null, allowEmpty = true): boolean => {
+  if (!value || value.trim() === '') {
+    return allowEmpty;
+  }
+
+  const trimmedValue = value.trim();
+  
+  // Allow template variables
+  if (TEMPLATE_VARIABLE_REGEX.test(trimmedValue)) {
+    return true;
+  }
+
+  // Split by comma for multiple emails
+  const emails = trimmedValue.split(',').map(email => email.trim());
+  
+  return emails.every(email => {
+    if (!email) return false;
+    return EMAIL_REGEX.test(email) || TEMPLATE_VARIABLE_REGEX.test(email);
+  });
+};
 
 /**
- * Email list validator for multiple recipients
- * Supports comma-separated email addresses with proper validation
+ * Custom validator for template content syntax
+ * Validates template variables and basic HTML structure
  */
-const emailListValidator = z
-  .string()
-  .optional()
-  .refine(
-    (value) => {
-      if (!value || value.trim() === '') return true;
-      
-      // Split by comma and validate each email
-      const emails = value.split(',').map(email => email.trim()).filter(Boolean);
-      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-      
-      return emails.every(email => emailRegex.test(email));
-    },
-    {
-      message: 'emailTemplates.validation.invalidEmailList',
-    }
-  );
+const validateTemplateContent = (content: string | undefined | null): boolean => {
+  if (!content || content.trim() === '') {
+    return true; // Allow empty content
+  }
+
+  // Check for dangerous HTML patterns
+  if (DANGEROUS_HTML_REGEX.test(content)) {
+    return false;
+  }
+
+  // Validate template variables are properly formatted
+  const variables = content.match(TEMPLATE_VARIABLE_REGEX);
+  if (variables) {
+    return variables.every(variable => {
+      // Check for properly closed braces
+      const openBraces = (variable.match(/\{/g) || []).length;
+      const closeBraces = (variable.match(/\}/g) || []).length;
+      return openBraces === closeBraces && openBraces >= 1 && openBraces <= 2;
+    });
+  }
+
+  return true;
+};
 
 /**
- * HTML template syntax validator
- * Validates basic HTML structure and DreamFactory template variables
+ * Custom validator for HTML content structure
+ * Ensures basic HTML validity and security compliance
  */
-const htmlTemplateValidator = z
-  .string()
-  .optional()
-  .refine(
-    (value) => {
-      if (!value || value.trim() === '') return true;
-      
-      // Check for balanced HTML tags (basic validation)
-      const openTags = (value.match(/<[^\/][^>]*>/g) || []).length;
-      const closeTags = (value.match(/<\/[^>]*>/g) || []).length;
-      const selfClosingTags = (value.match(/<[^>]*\/>/g) || []).length;
-      
-      // Allow for self-closing tags and basic HTML structure
-      const isBalanced = Math.abs(openTags - closeTags - selfClosingTags) <= 2;
-      
-      // Check for potentially dangerous scripts (basic XSS prevention)
-      const hasScript = /<script[^>]*>.*?<\/script>/gi.test(value);
-      const hasOnEvents = /on\w+\s*=/gi.test(value);
-      
-      return isBalanced && !hasScript && !hasOnEvents;
-    },
-    {
-      message: 'emailTemplates.validation.invalidHtmlTemplate',
-    }
-  );
+const validateHtmlContent = (html: string | undefined | null): boolean => {
+  if (!html || html.trim() === '') {
+    return true;
+  }
+
+  // Check for dangerous content
+  if (DANGEROUS_HTML_REGEX.test(html)) {
+    return false;
+  }
+
+  // Basic HTML structure validation
+  const openTags = (html.match(/<[^\/][^>]*>/g) || []).length;
+  const closeTags = (html.match(/<\/[^>]*>/g) || []).length;
+  const selfClosingTags = (html.match(/<[^>]*\/>/g) || []).length;
+
+  // Allow some tolerance for self-closing tags and simple HTML
+  return Math.abs(openTags - closeTags - selfClosingTags) <= 5;
+};
+
+// Internationalization error message keys for type-safe translation access
+export const EMAIL_TEMPLATE_VALIDATION_ERRORS = {
+  NAME_REQUIRED: 'emailTemplates.validation.errors.nameRequired',
+  NAME_TOO_LONG: 'emailTemplates.validation.errors.nameTooLong',
+  NAME_INVALID_CHARS: 'emailTemplates.validation.errors.nameInvalidChars',
+  DESCRIPTION_TOO_LONG: 'emailTemplates.validation.errors.descriptionTooLong',
+  EMAIL_INVALID_FORMAT: 'emailTemplates.validation.errors.emailInvalidFormat',
+  EMAIL_MULTIPLE_INVALID: 'emailTemplates.validation.errors.emailMultipleInvalid',
+  SUBJECT_TOO_LONG: 'emailTemplates.validation.errors.subjectTooLong',
+  SUBJECT_REQUIRED: 'emailTemplates.validation.errors.subjectRequired',
+  BODY_TEXT_INVALID_TEMPLATE: 'emailTemplates.validation.errors.bodyTextInvalidTemplate',
+  BODY_HTML_INVALID_TEMPLATE: 'emailTemplates.validation.errors.bodyHtmlInvalidTemplate',
+  BODY_HTML_DANGEROUS_CONTENT: 'emailTemplates.validation.errors.bodyHtmlDangerousContent',
+  BODY_HTML_INVALID_STRUCTURE: 'emailTemplates.validation.errors.bodyHtmlInvalidStructure',
+  FROM_NAME_TOO_LONG: 'emailTemplates.validation.errors.fromNameTooLong',
+  FROM_EMAIL_INVALID: 'emailTemplates.validation.errors.fromEmailInvalid',
+  FROM_EMAIL_REQUIRED: 'emailTemplates.validation.errors.fromEmailRequired',
+  REPLY_TO_NAME_TOO_LONG: 'emailTemplates.validation.errors.replyToNameTooLong',
+  REPLY_TO_EMAIL_INVALID: 'emailTemplates.validation.errors.replyToEmailInvalid',
+  ATTACHMENT_INVALID_PATH: 'emailTemplates.validation.errors.attachmentInvalidPath',
+  DEFAULTS_INVALID_JSON: 'emailTemplates.validation.errors.defaultsInvalidJson',
+  BODY_CONTENT_REQUIRED: 'emailTemplates.validation.errors.bodyContentRequired',
+} as const;
 
 /**
- * Template variable syntax validator
- * Validates DreamFactory template variables like {variable_name}
+ * Helper function to create email field validation schema
+ * Reusable for to, cc, bcc, fromEmail, replyToEmail fields
  */
-const templateVariableValidator = z
-  .string()
-  .optional()
-  .refine(
-    (value) => {
-      if (!value || value.trim() === '') return true;
-      
-      // Check for properly formatted template variables
-      const templateVarRegex = /\{[a-zA-Z_][a-zA-Z0-9_]*\}/g;
-      const braces = value.match(/[{}]/g) || [];
-      
-      // If there are braces, they should be properly paired
-      if (braces.length > 0) {
-        let depth = 0;
-        for (const brace of braces) {
-          if (brace === '{') depth++;
-          else depth--;
-          if (depth < 0) return false;
-        }
-        return depth === 0;
+const createEmailFieldSchema = (fieldName: string, required = false, allowMultiple = true) => {
+  let schema = z.string().optional();
+
+  if (required) {
+    schema = z.string({
+      required_error: EMAIL_TEMPLATE_VALIDATION_ERRORS.FROM_EMAIL_REQUIRED,
+    });
+  }
+
+  return schema
+    .refine(
+      (value) => {
+        if (!value || value.trim() === '') return !required;
+        return validateEmailField(value, !required);
+      },
+      {
+        message: allowMultiple 
+          ? EMAIL_TEMPLATE_VALIDATION_ERRORS.EMAIL_MULTIPLE_INVALID
+          : EMAIL_TEMPLATE_VALIDATION_ERRORS.EMAIL_INVALID_FORMAT,
       }
-      
-      return true;
+    )
+    .transform((value) => value?.trim() || undefined);
+};
+
+/**
+ * Base email template validation schema
+ * Core fields required for all email template operations
+ */
+export const baseEmailTemplateSchema = z.object({
+  name: z
+    .string({
+      required_error: EMAIL_TEMPLATE_VALIDATION_ERRORS.NAME_REQUIRED,
+    })
+    .min(1, EMAIL_TEMPLATE_VALIDATION_ERRORS.NAME_REQUIRED)
+    .max(255, EMAIL_TEMPLATE_VALIDATION_ERRORS.NAME_TOO_LONG)
+    .regex(/^[a-zA-Z0-9\s\-_.]+$/, EMAIL_TEMPLATE_VALIDATION_ERRORS.NAME_INVALID_CHARS)
+    .transform((value) => value.trim()),
+
+  description: z
+    .string()
+    .max(1000, EMAIL_TEMPLATE_VALIDATION_ERRORS.DESCRIPTION_TOO_LONG)
+    .optional()
+    .transform((value) => value?.trim() || undefined),
+});
+
+/**
+ * Email recipient fields validation schema
+ * Handles to, cc, bcc fields with multiple email support
+ */
+export const emailRecipientsSchema = z.object({
+  to: createEmailFieldSchema('to', false, true),
+  cc: createEmailFieldSchema('cc', false, true),
+  bcc: createEmailFieldSchema('bcc', false, true),
+});
+
+/**
+ * Email sender fields validation schema
+ * Handles fromEmail, fromName, replyToEmail, replyToName fields
+ */
+export const emailSenderSchema = z.object({
+  fromEmail: createEmailFieldSchema('fromEmail', true, false),
+  fromName: z
+    .string()
+    .max(255, EMAIL_TEMPLATE_VALIDATION_ERRORS.FROM_NAME_TOO_LONG)
+    .optional()
+    .transform((value) => value?.trim() || undefined),
+  replyToEmail: createEmailFieldSchema('replyToEmail', false, false),
+  replyToName: z
+    .string()
+    .max(255, EMAIL_TEMPLATE_VALIDATION_ERRORS.REPLY_TO_NAME_TOO_LONG)
+    .optional()
+    .transform((value) => value?.trim() || undefined),
+});
+
+/**
+ * Email content validation schema
+ * Handles subject, bodyText, bodyHtml with template syntax validation
+ */
+export const emailContentSchema = z.object({
+  subject: z
+    .string()
+    .max(500, EMAIL_TEMPLATE_VALIDATION_ERRORS.SUBJECT_TOO_LONG)
+    .optional()
+    .refine(
+      (value) => validateTemplateContent(value),
+      EMAIL_TEMPLATE_VALIDATION_ERRORS.SUBJECT_REQUIRED
+    )
+    .transform((value) => value?.trim() || undefined),
+
+  bodyText: z
+    .string()
+    .optional()
+    .refine(
+      (value) => validateTemplateContent(value),
+      EMAIL_TEMPLATE_VALIDATION_ERRORS.BODY_TEXT_INVALID_TEMPLATE
+    )
+    .transform((value) => value?.trim() || undefined),
+
+  bodyHtml: z
+    .string()
+    .optional()
+    .refine(
+      (value) => validateTemplateContent(value),
+      EMAIL_TEMPLATE_VALIDATION_ERRORS.BODY_HTML_INVALID_TEMPLATE
+    )
+    .refine(
+      (value) => validateHtmlContent(value),
+      EMAIL_TEMPLATE_VALIDATION_ERRORS.BODY_HTML_INVALID_STRUCTURE
+    )
+    .transform((value) => value?.trim() || undefined),
+
+  attachment: z
+    .string()
+    .optional()
+    .refine(
+      (value) => {
+        if (!value || value.trim() === '') return true;
+        // Basic path validation - no directory traversal
+        return !value.includes('..') && !value.includes('//');
+      },
+      EMAIL_TEMPLATE_VALIDATION_ERRORS.ATTACHMENT_INVALID_PATH
+    )
+    .transform((value) => value?.trim() || undefined),
+});
+
+/**
+ * Email template defaults validation schema
+ * Handles the defaults object with JSON validation
+ */
+export const emailDefaultsSchema = z.object({
+  defaults: z
+    .record(z.any())
+    .optional()
+    .refine(
+      (value) => {
+        if (!value) return true;
+        try {
+          // Ensure it's serializable JSON
+          JSON.stringify(value);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      EMAIL_TEMPLATE_VALIDATION_ERRORS.DEFAULTS_INVALID_JSON
+    ),
+});
+
+/**
+ * Complete email template validation schema for create operations
+ * Combines all validation schemas with body content requirement
+ */
+export const createEmailTemplateSchema = baseEmailTemplateSchema
+  .merge(emailRecipientsSchema)
+  .merge(emailSenderSchema)
+  .merge(emailContentSchema)
+  .merge(emailDefaultsSchema)
+  .refine(
+    (data) => {
+      // At least one body content is required (text or HTML)
+      return !!(data.bodyText?.trim() || data.bodyHtml?.trim());
     },
     {
-      message: 'emailTemplates.validation.invalidTemplateVariables',
+      message: EMAIL_TEMPLATE_VALIDATION_ERRORS.BODY_CONTENT_REQUIRED,
+      path: ['bodyText'], // Show error on bodyText field
     }
   );
 
 /**
- * File attachment validator
- * Validates attachment file paths and formats
+ * Email template validation schema for update operations
+ * Same as create but allows partial updates
  */
-const attachmentValidator = z
-  .string()
-  .optional()
-  .refine(
-    (value) => {
-      if (!value || value.trim() === '') return true;
-      
-      // Basic file path validation
-      const filePathRegex = /^[a-zA-Z0-9._\-\/\\]+$/;
-      const hasValidExtension = /\.(pdf|doc|docx|xls|xlsx|txt|csv|zip)$/i.test(value);
-      
-      return filePathRegex.test(value) && hasValidExtension;
-    },
-    {
-      message: 'emailTemplates.validation.invalidAttachment',
-    }
-  );
-
-// ============================================================================
-// BASE FIELD SCHEMAS
-// ============================================================================
-
-/**
- * Template name field with comprehensive validation
- */
-const nameField = z
-  .string()
-  .min(1, 'emailTemplates.validation.nameRequired')
-  .max(100, 'emailTemplates.validation.nameTooLong')
-  .regex(
-    /^[a-zA-Z0-9._\-\s]+$/,
-    'emailTemplates.validation.nameInvalidCharacters'
-  )
-  .refine(
-    (value) => value.trim().length > 0,
-    'emailTemplates.validation.nameRequired'
-  );
-
-/**
- * Description field with length validation
- */
-const descriptionField = z
-  .string()
-  .optional()
-  .refine(
-    (value) => !value || value.length <= 500,
-    'emailTemplates.validation.descriptionTooLong'
-  );
-
-/**
- * Subject field with template variable support
- */
-const subjectField = z
-  .string()
-  .optional()
-  .refine(
-    (value) => !value || value.length <= 200,
-    'emailTemplates.validation.subjectTooLong'
-  )
-  .pipe(templateVariableValidator);
-
-/**
- * Sender name field validation
- */
-const senderNameField = z
-  .string()
-  .optional()
-  .refine(
-    (value) => !value || (value.length >= 1 && value.length <= 100),
-    'emailTemplates.validation.senderNameLength'
-  );
-
-/**
- * Sender email field validation
- */
-const senderEmailField = z
-  .string()
-  .optional()
-  .refine(
-    (value) => {
-      if (!value || value.trim() === '') return true;
-      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-      return emailRegex.test(value);
-    },
-    'emailTemplates.validation.invalidSenderEmail'
-  );
-
-// ============================================================================
-// MAIN VALIDATION SCHEMAS
-// ============================================================================
-
-/**
- * Base email template schema with all fields
- * Used as foundation for create and update schemas
- */
-const baseEmailTemplateSchema = z.object({
-  name: nameField,
-  description: descriptionField,
-  to: emailListValidator,
-  cc: emailListValidator,
-  bcc: emailListValidator,
-  subject: subjectField,
-  attachment: attachmentValidator,
-  bodyHtml: htmlTemplateValidator,
-  fromName: senderNameField,
-  fromEmail: senderEmailField,
-  replyToName: senderNameField,
-  replyToEmail: senderEmailField,
+export const updateEmailTemplateSchema = createEmailTemplateSchema.partial().extend({
+  id: z.number().int().positive(),
 });
 
 /**
- * Email template creation schema
- * Enforces required fields for new templates
- */
-export const createEmailTemplateSchema = baseEmailTemplateSchema.extend({
-  name: nameField, // Required for creation
-});
-
-/**
- * Email template update schema
- * Allows partial updates with optional ID field
- */
-export const updateEmailTemplateSchema = baseEmailTemplateSchema.extend({
-  id: z.number().int().positive().optional(),
-}).partial().extend({
-  // Name remains required even in updates
-  name: nameField.optional(),
-});
-
-/**
- * Email template bulk operation schema
- * For batch create/update operations
+ * Bulk email template operations validation schema
+ * For handling multiple template operations
  */
 export const bulkEmailTemplateSchema = z.object({
-  templates: z.array(createEmailTemplateSchema).min(1, 'emailTemplates.validation.bulkMinimum'),
-  operation: z.enum(['create', 'update', 'delete']),
-  overwrite: z.boolean().optional().default(false),
+  operation: z.enum(['delete', 'duplicate', 'export']),
+  templateIds: z
+    .array(z.number().int().positive())
+    .min(1, 'At least one template must be selected')
+    .max(50, 'Cannot process more than 50 templates at once'),
+  options: z
+    .object({
+      prefix: z.string().max(50).optional(), // For duplicate operations
+      format: z.enum(['json', 'xml']).optional(), // For export operations
+    })
+    .optional(),
 });
 
 /**
- * Email template query schema
- * For filtering and searching templates
+ * Email template search and filter validation schema
+ * For validating search parameters and filters
  */
-export const emailTemplateQuerySchema = z.object({
-  search: z.string().optional(),
-  limit: z.number().int().min(1).max(100).optional().default(25),
-  offset: z.number().int().min(0).optional().default(0),
-  sortBy: z.enum(['name', 'createdDate', 'lastModifiedDate']).optional().default('name'),
-  sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
-  active: z.boolean().optional(),
+export const emailTemplateFilterSchema = z.object({
+  search: z.string().max(255).optional(),
+  dateFrom: z.string().datetime().optional(),
+  dateTo: z.string().datetime().optional(),
+  tags: z.array(z.string()).max(10).optional(),
+  sortBy: z.enum(['name', 'createdDate', 'lastModifiedDate']).default('name'),
+  sortOrder: z.enum(['asc', 'desc']).default('asc'),
+  limit: z.number().int().min(1).max(100).default(25),
+  offset: z.number().int().min(0).default(0),
 });
 
 /**
- * Email template preview schema
- * For testing template rendering with sample data
+ * Email template test validation schema
+ * For validating email template test operations
  */
-export const emailTemplatePreviewSchema = z.object({
+export const emailTemplateTestSchema = z.object({
   templateId: z.number().int().positive(),
-  sampleData: z.record(z.string(), z.any()).optional(),
-  recipientEmail: emailValidator.optional(),
+  testEmail: createEmailFieldSchema('testEmail', true, false),
+  testData: z.record(z.any()).optional(),
+  previewOnly: z.boolean().default(false),
 });
 
-// ============================================================================
-// TYPE EXPORTS
-// ============================================================================
+// Type exports for React Hook Form integration
+export type CreateEmailTemplateForm = z.infer<typeof createEmailTemplateSchema>;
+export type UpdateEmailTemplateForm = z.infer<typeof updateEmailTemplateSchema>;
+export type BulkEmailTemplateForm = z.infer<typeof bulkEmailTemplateSchema>;
+export type EmailTemplateFilterForm = z.infer<typeof emailTemplateFilterSchema>;
+export type EmailTemplateTestForm = z.infer<typeof emailTemplateTestSchema>;
+
+// Validation schema registry for different operations
+export const EMAIL_TEMPLATE_VALIDATION_SCHEMAS = {
+  create: createEmailTemplateSchema,
+  update: updateEmailTemplateSchema,
+  bulk: bulkEmailTemplateSchema,
+  filter: emailTemplateFilterSchema,
+  test: emailTemplateTestSchema,
+  base: baseEmailTemplateSchema,
+  recipients: emailRecipientsSchema,
+  sender: emailSenderSchema,
+  content: emailContentSchema,
+  defaults: emailDefaultsSchema,
+} as const;
 
 /**
- * TypeScript types inferred from Zod schemas
- * Provides compile-time type safety for React Hook Form integration
+ * Utility function to get validation schema by operation type
+ * Provides type-safe access to validation schemas
  */
-export type CreateEmailTemplateData = z.infer<typeof createEmailTemplateSchema>;
-export type UpdateEmailTemplateData = z.infer<typeof updateEmailTemplateSchema>;
-export type BulkEmailTemplateData = z.infer<typeof bulkEmailTemplateSchema>;
-export type EmailTemplateQueryData = z.infer<typeof emailTemplateQuerySchema>;
-export type EmailTemplatePreviewData = z.infer<typeof emailTemplatePreviewSchema>;
-
-// ============================================================================
-// FORM VALIDATION UTILITIES
-// ============================================================================
+export const getEmailTemplateValidationSchema = <T extends keyof typeof EMAIL_TEMPLATE_VALIDATION_SCHEMAS>(
+  operation: T
+): typeof EMAIL_TEMPLATE_VALIDATION_SCHEMAS[T] => {
+  return EMAIL_TEMPLATE_VALIDATION_SCHEMAS[operation];
+};
 
 /**
- * Email template field validation for real-time form feedback
- * Provides field-level validation with performance under 100ms
+ * Utility function to validate email template field in real-time
+ * Optimized for React Hook Form field-level validation under 100ms
  */
-export const validateEmailTemplateField = (
-  fieldName: keyof CreateEmailTemplateData,
-  value: unknown
+export const validateEmailTemplateField = <T extends keyof CreateEmailTemplateForm>(
+  fieldName: T,
+  value: CreateEmailTemplateForm[T],
+  schema = createEmailTemplateSchema
 ): { isValid: boolean; error?: string } => {
   try {
-    const fieldSchema = baseEmailTemplateSchema.shape[fieldName];
+    const fieldSchema = schema.shape[fieldName];
+    if (!fieldSchema) {
+      return { isValid: true };
+    }
+
     fieldSchema.parse(value);
     return { isValid: true };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {
         isValid: false,
-        error: error.errors[0]?.message || 'emailTemplates.validation.invalidField',
+        error: error.errors[0]?.message || 'Validation error',
       };
     }
-    return {
-      isValid: false,
-      error: 'emailTemplates.validation.unknownError',
-    };
+    return { isValid: false, error: 'Unknown validation error' };
   }
 };
 
 /**
- * Complete form validation with detailed error reporting
- * Returns comprehensive validation results for all fields
+ * Utility function for async validation (e.g., unique name checking)
+ * Returns a Promise for integration with React Hook Form async validation
  */
-export const validateEmailTemplateForm = (
-  data: Partial<CreateEmailTemplateData>,
-  isUpdate = false
-): {
-  isValid: boolean;
-  errors: Record<string, string>;
-  fieldErrors: Record<string, string[]>;
-} => {
-  try {
-    const schema = isUpdate ? updateEmailTemplateSchema : createEmailTemplateSchema;
-    schema.parse(data);
-    
-    return {
-      isValid: true,
-      errors: {},
-      fieldErrors: {},
-    };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const errors: Record<string, string> = {};
-      const fieldErrors: Record<string, string[]> = {};
-      
-      error.errors.forEach((err) => {
-        const path = err.path.join('.');
-        errors[path] = err.message;
-        
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-        fieldErrors[path].push(err.message);
+export const validateEmailTemplateNameUnique = async (
+  name: string,
+  excludeId?: number
+): Promise<{ isValid: boolean; error?: string }> => {
+  // This would typically call an API to check uniqueness
+  // For now, return a mock implementation
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      // Mock validation - in real implementation, this would call the API
+      const isValid = !['duplicate', 'reserved', 'system'].includes(name.toLowerCase());
+      resolve({
+        isValid,
+        error: isValid ? undefined : 'Template name already exists',
       });
-      
-      return {
-        isValid: false,
-        errors,
-        fieldErrors,
-      };
-    }
-    
-    return {
-      isValid: false,
-      errors: { general: 'emailTemplates.validation.unknownError' },
-      fieldErrors: {},
-    };
-  }
+    }, 50); // Keep under 100ms performance requirement
+  });
 };
 
-/**
- * Custom validation hook for React Hook Form integration
- * Provides seamless integration with form state management
- */
-export const getEmailTemplateFormResolver = (isUpdate = false) => {
-  const schema = isUpdate ? updateEmailTemplateSchema : createEmailTemplateSchema;
-  
-  return (data: Partial<CreateEmailTemplateData>) => {
-    const result = validateEmailTemplateForm(data, isUpdate);
-    
-    if (result.isValid) {
-      return { values: data, errors: {} };
-    }
-    
-    return {
-      values: {},
-      errors: Object.entries(result.fieldErrors).reduce(
-        (acc, [field, fieldErrors]) => ({
-          ...acc,
-          [field]: { message: fieldErrors[0] },
-        }),
-        {}
-      ),
-    };
-  };
+// Export custom validators for external use
+export const customValidators = {
+  validateEmailField,
+  validateTemplateContent,
+  validateHtmlContent,
+  validateEmailTemplateNameUnique,
 };
 
-// ============================================================================
-// VALIDATION CONSTANTS
-// ============================================================================
-
-/**
- * Validation configuration constants
- * Centralized validation rules for consistency
- */
-export const EMAIL_TEMPLATE_VALIDATION_CONFIG = {
-  NAME_MIN_LENGTH: 1,
-  NAME_MAX_LENGTH: 100,
-  DESCRIPTION_MAX_LENGTH: 500,
-  SUBJECT_MAX_LENGTH: 200,
-  SENDER_NAME_MAX_LENGTH: 100,
-  BULK_MIN_TEMPLATES: 1,
-  BULK_MAX_TEMPLATES: 50,
-  QUERY_MIN_LIMIT: 1,
-  QUERY_MAX_LIMIT: 100,
-  QUERY_DEFAULT_LIMIT: 25,
-} as const;
-
-/**
- * Supported email template variables
- * Used for template variable validation and auto-completion
- */
-export const SUPPORTED_TEMPLATE_VARIABLES = [
-  'user_name',
-  'user_email',
-  'user_first_name',
-  'user_last_name',
-  'current_date',
-  'current_time',
-  'app_name',
-  'server_name',
-  'base_url',
-  'activation_code',
-  'reset_code',
-] as const;
-
-/**
- * Default validation error messages
- * Fallback messages when internationalization is not available
- */
-export const DEFAULT_ERROR_MESSAGES = {
-  nameRequired: 'Template name is required',
-  nameTooLong: 'Template name must be less than 100 characters',
-  nameInvalidCharacters: 'Template name contains invalid characters',
-  descriptionTooLong: 'Description must be less than 500 characters',
-  subjectTooLong: 'Subject must be less than 200 characters',
-  invalidEmailFormat: 'Invalid email address format',
-  invalidEmailList: 'One or more email addresses are invalid',
-  invalidHtmlTemplate: 'Invalid HTML template format',
-  invalidTemplateVariables: 'Invalid template variable format',
-  invalidAttachment: 'Invalid attachment file format',
-  invalidSenderEmail: 'Invalid sender email address',
-  senderNameLength: 'Sender name must be between 1 and 100 characters',
-  bulkMinimum: 'At least one template is required for bulk operations',
-  invalidField: 'Field contains invalid data',
-  unknownError: 'An unknown validation error occurred',
-} as const;
+// Export error message constants for internationalization
+export { EMAIL_TEMPLATE_VALIDATION_ERRORS };
