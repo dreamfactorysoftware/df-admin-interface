@@ -1,336 +1,289 @@
 /**
- * Theme Toggle Component System - Barrel Export Index
+ * Theme Toggle Component System - Barrel Export
  * 
- * Centralized exports for the theme toggle component system providing clean import patterns
- * for React 19/Next.js 15.1 applications. Supports tree-shaking optimization and follows
- * established UI component library structure for maintainable, scalable theme management.
- * 
- * This barrel export enables consumers to import components, utilities, and types through
- * a single entry point while maintaining optimal bundle size through selective imports.
+ * Centralized export hub for theme toggle components, variants, utilities, and TypeScript types.
+ * Provides clean imports for React 19/Next.js 15.1 applications with tree-shaking optimization.
  * 
  * Features:
- * - Main ThemeToggle component with WCAG 2.1 AA compliance
- * - Pre-configured component variants for common use cases
- * - Styling utilities and design tokens for customization
- * - Complete TypeScript type definitions for type safety
- * - Theme management utilities and helper functions
- * - Accessibility-first design with proper ARIA support
+ * - Main ThemeToggle component with full accessibility support
+ * - Preset component variants for common use cases
+ * - Comprehensive variant utilities using class-variance-authority
+ * - TypeScript type definitions for type-safe usage
+ * - Design tokens and animation utilities
+ * - Theme state management types
  * 
- * @example
+ * Usage Examples:
  * ```tsx
- * // Import main component
+ * // Basic usage
  * import { ThemeToggle } from '@/components/ui/theme-toggle';
  * 
- * // Import with utilities
+ * // Preset variants
+ * import { CompactThemeToggle, DetailedThemeToggle } from '@/components/ui/theme-toggle';
+ * 
+ * // Utility functions and variants
  * import { 
- *   ThemeToggle, 
- *   ThemeToggleVariants,
- *   getThemeToggleClasses 
+ *   themeToggleVariants, 
+ *   getThemeToggleClasses,
+ *   themeToggleAnimations 
  * } from '@/components/ui/theme-toggle';
  * 
- * // Import types for custom implementations
+ * // Type definitions
  * import type { 
  *   ThemeToggleProps, 
- *   ThemeMode,
- *   ThemeToggleVariantProps 
+ *   ThemeToggleVariantProps,
+ *   ThemeMode 
  * } from '@/components/ui/theme-toggle';
  * ```
  * 
  * @version 1.0.0
- * @since 2024-12-19
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-// =============================================================================
-// MAIN COMPONENT EXPORTS
-// =============================================================================
-
-/**
- * Main ThemeToggle component - WCAG 2.1 AA compliant theme switcher
- * 
- * Primary export providing three-state theme switching with full accessibility support.
- * Supports light, dark, and system preference modes with proper ARIA labeling,
- * keyboard navigation, and minimum 44x44px touch targets for mobile accessibility.
- */
-export { 
-  ThemeToggle,
-  type ThemeToggleProps 
-} from './theme-toggle';
-
-/**
- * Compact variant for constrained spaces and mobile interfaces
- * 
- * Pre-configured ThemeToggle with compact layout optimized for headers,
- * navigation bars, and mobile-first responsive designs.
- */
-export { CompactThemeToggle } from './theme-toggle';
-
-/**
- * Pre-configured theme toggle variants for common use cases
- * 
- * Provides ready-to-use component configurations including:
- * - Header: Compact design for navigation bars
- * - Settings: Full-featured for settings pages  
- * - Mobile: Mobile-optimized with enhanced touch targets
- * - HighContrast: Enhanced accessibility for vision needs
- */
-export { ThemeToggleVariants } from './theme-toggle';
-
-/**
- * Default export for convenient importing
- * 
- * Enables `import ThemeToggle from '@/components/ui/theme-toggle'` syntax
- * following React 19/Next.js 15.1 conventions for component libraries.
- */
-export { default } from './theme-toggle';
-
-// =============================================================================
-// STYLING AND VARIANT EXPORTS
-// =============================================================================
-
-/**
- * Class Variance Authority (CVA) configuration for theme toggle styling
- * 
- * Base variant function providing systematic styling with WCAG compliance.
- * Includes variants for size, visual style, theme states, and loading conditions.
- */
-export { 
-  themeToggleVariants,
-  type ThemeToggleVariantProps 
-} from './theme-toggle-variants';
-
-/**
- * Utility function for creating theme toggle classes with proper merging
- * 
- * Combines variant classes with custom classes using tailwind-merge to resolve
- * conflicts and ensure consistent styling application.
- * 
- * @param props - Variant props for styling configuration
- * @param className - Additional custom classes for extension
- * @returns Merged class string with conflicts resolved
- */
-export { getThemeToggleClasses } from './theme-toggle-variants';
-
-/**
- * Design system utilities and constants for theme toggle styling
- * 
- * Provides consistent sizing, animations, accessibility labels, and design tokens
- * for building custom theme toggle implementations or extending existing ones.
- */
+// Main component exports
 export {
-  themeToggleIconSizes,
-  themeToggleAnimations,
-  themeToggleAriaLabels,
-  themeToggleDesignTokens
-} from './theme-toggle-variants';
-
-// =============================================================================
-// THEME MANAGEMENT TYPE EXPORTS
-// =============================================================================
-
-/**
- * Core theme type definitions for type-safe theme management
- * 
- * Essential types for theme mode selection, resolved theme states,
- * and system preference handling throughout the application.
- */
-export type {
-  ThemeMode,
-  ResolvedTheme,
-  ThemeContextState,
-  UseThemeReturn
-} from '@/types/theme';
-
-/**
- * Theme provider and configuration types
- * 
- * Types for configuring theme providers, storage options, and transition
- * behaviors for comprehensive theme management systems.
- */
-export type {
-  ThemeProviderConfig,
-  ThemeStorage,
-  ThemeTransition,
-  SystemThemeConfig
-} from '@/types/theme';
-
-/**
- * Theme utility and validation types
- * 
- * Types for theme utility functions, validation schemas, and error handling
- * to ensure robust theme management with proper type safety.
- */
-export type {
-  ThemeUtils,
-  ThemeValidation,
-  ThemeCSSProperties,
-  ThemeColorPalette
-} from '@/types/theme';
-
-/**
- * Theme error handling exports
- * 
- * Error class and constants for standardized theme error handling,
- * providing clear error codes and messaging for debugging and user feedback.
- */
-export {
-  ThemeError,
-  THEME_ERROR_CODES
-} from '@/types/theme';
-
-/**
- * Default theme configuration and constants
- * 
- * Pre-configured default values and system constants for consistent
- * theme behavior across application instances and deployments.
- */
-export {
-  DEFAULT_THEME_CONFIG,
-  THEME_CONSTANTS
-} from '@/types/theme';
-
-// =============================================================================
-// RE-EXPORT ORGANIZATION FOR TREE-SHAKING
-// =============================================================================
-
-/**
- * Grouped exports for selective importing and optimal tree-shaking
- * 
- * Organized exports enable consumers to import exactly what they need
- * while maintaining clear separation between components, utilities, and types.
- */
-
-/**
- * Component exports - Main theme toggle components and variants
- */
-export const ThemeToggleComponents = {
   ThemeToggle,
   CompactThemeToggle,
-  ThemeToggleVariants,
-} as const;
+  DetailedThemeToggle,
+  KeyboardThemeToggle,
+  type ThemeToggleProps,
+} from './theme-toggle';
 
-/**
- * Utility exports - Styling utilities, classes, and helper functions
- */
-export const ThemeToggleUtils = {
+// Variant system exports
+export {
   themeToggleVariants,
   getThemeToggleClasses,
   themeToggleIconSizes,
   themeToggleAnimations,
   themeToggleAriaLabels,
   themeToggleDesignTokens,
-} as const;
+  type ThemeToggleVariantProps,
+} from './theme-toggle-variants';
 
-/**
- * Configuration exports - Default configs and system constants
- */
-export const ThemeToggleConfig = {
+// Theme type definitions (re-exported for convenience)
+export type {
+  ThemeMode,
+  ResolvedTheme,
+  ThemeContextState,
+  ThemeProviderConfig,
+  ThemeUtils,
+  UseThemeReturn,
+  ThemeStorage,
+  ThemeTransition,
+  SystemThemeConfig,
+  ThemeError,
+  ThemeValidation,
+  ThemeCSSProperties,
+  ThemeColorPalette,
+} from '@/types/theme';
+
+// Theme constants (re-exported for convenience)
+export {
   DEFAULT_THEME_CONFIG,
   THEME_CONSTANTS,
   THEME_ERROR_CODES,
-} as const;
-
-// =============================================================================
-// COMPATIBILITY AND MIGRATION HELPERS
-// =============================================================================
+} from '@/types/theme';
 
 /**
- * Legacy compatibility exports for Angular to React migration
+ * Default export for convenient importing
+ * Provides the main ThemeToggle component as default export
+ * while maintaining named exports for all variants and utilities
  * 
- * Provides familiar naming patterns for teams migrating from Angular Material
- * theme toggles to React implementations, easing the transition process.
- * 
- * @deprecated Use direct imports for new implementations
+ * @example
+ * ```tsx
+ * import ThemeToggle from '@/components/ui/theme-toggle';
+ * // or
+ * import { ThemeToggle } from '@/components/ui/theme-toggle';
+ * ```
  */
-export const LegacyThemeToggle = {
-  /** @deprecated Use ThemeToggle instead */
-  MatThemeToggle: ThemeToggle,
-  /** @deprecated Use CompactThemeToggle instead */
-  MatSlideToggle: CompactThemeToggle,
-  /** @deprecated Use ThemeToggleVariants.Settings instead */
-  ThemeSettingsToggle: ThemeToggleVariants.Settings,
-} as const;
+export { ThemeToggle as default } from './theme-toggle';
 
 /**
- * Migration utilities for theme state conversion
+ * Utility function for creating custom theme toggle variants
+ * Combines the theme toggle variant system with custom styling
  * 
- * Helper functions to assist with converting Angular Material theme states
- * to React theme management patterns during the migration process.
+ * @param props - Theme toggle variant props
+ * @param customClasses - Additional CSS classes to apply
+ * @returns Merged CSS class string optimized for Tailwind CSS
  * 
- * @deprecated Remove after migration completion
+ * @example
+ * ```tsx
+ * import { createThemeToggleClasses } from '@/components/ui/theme-toggle';
+ * 
+ * const customClasses = createThemeToggleClasses(
+ *   { variant: 'outline', size: 'lg', themeState: 'dark' },
+ *   'custom-shadow border-4'
+ * );
+ * ```
  */
-export const MigrationHelpers = {
+export const createThemeToggleClasses = getThemeToggleClasses;
+
+/**
+ * Theme toggle configuration presets for common scenarios
+ * Provides pre-configured props objects for frequently used theme toggle setups
+ */
+export const THEME_TOGGLE_PRESETS = {
   /**
-   * Convert Angular Material theme value to React theme mode
-   * @deprecated Direct theme mode usage recommended
+   * Compact preset for toolbars and navigation
+   * Small size with ghost variant for minimal visual impact
    */
-  convertMatTheme: (matValue: string): ThemeMode => {
-    switch (matValue) {
-      case 'dark-theme':
-        return 'dark';
-      case 'light-theme':
-        return 'light';
-      default:
-        return 'system';
-    }
+  toolbar: {
+    size: 'sm' as const,
+    variant: 'ghost' as const,
+    showLabels: false,
+    announceChanges: true,
   },
-  
+
   /**
-   * Map Angular component props to React props
-   * @deprecated Use ThemeToggleProps directly
+   * Settings page preset with full feature visibility
+   * Large size with labels and detailed feedback
    */
-  mapAngularProps: (angularProps: Record<string, unknown>): Partial<ThemeToggleProps> => {
-    return {
-      disabled: Boolean(angularProps.disabled),
-      className: String(angularProps.class || ''),
-      ariaLabel: String(angularProps.ariaLabel || 'Select theme preference'),
+  settings: {
+    size: 'lg' as const,
+    variant: 'outline' as const,
+    showLabels: true,
+    showCurrentState: true,
+    announceChanges: true,
+  },
+
+  /**
+   * Card preset for dashboard widgets
+   * Medium size with secondary variant for cards
+   */
+  card: {
+    size: 'md' as const,
+    variant: 'secondary' as const,
+    showLabels: false,
+    showCurrentState: true,
+  },
+
+  /**
+   * Mobile-optimized preset
+   * Large touch targets with enhanced accessibility
+   */
+  mobile: {
+    size: 'lg' as const,
+    variant: 'default' as const,
+    showLabels: false,
+    announceChanges: true,
+    tooltip: 'Tap to change theme',
+  },
+
+  /**
+   * Minimal preset for integration in tight spaces
+   * Extra small size with minimal visual styling
+   */
+  minimal: {
+    size: 'sm' as const,
+    variant: 'ghost' as const,
+    showLabels: false,
+    showCurrentState: false,
+    announceChanges: false,
+  },
+} as const;
+
+/**
+ * Theme toggle accessibility helpers
+ * Utility functions for enhanced accessibility support
+ */
+export const themeToggleA11y = {
+  /**
+   * Generate comprehensive ARIA label for theme toggle
+   * @param currentTheme - Current theme mode
+   * @returns ARIA label string
+   */
+  generateAriaLabel: (currentTheme: ThemeMode): string => {
+    const nextTheme = currentTheme === 'light' ? 'dark' : 
+                    currentTheme === 'dark' ? 'system' : 'light';
+    return `Theme toggle, currently ${currentTheme} mode. Press to switch to ${nextTheme} mode.`;
+  },
+
+  /**
+   * Generate theme description for screen readers
+   * @param theme - Theme mode
+   * @param resolved - Resolved theme
+   * @returns Description string
+   */
+  generateDescription: (theme: ThemeMode, resolved: ResolvedTheme): string => {
+    const descriptions = {
+      light: 'Uses light colors with dark text for better visibility in bright environments',
+      dark: 'Uses dark colors with light text to reduce eye strain in low light conditions',
+      system: `Automatically follows your device preference, currently using ${resolved} theme`,
     };
+    return descriptions[theme];
   },
-} as const;
 
-// =============================================================================
-// DOCUMENTATION AND VERSION INFO
-// =============================================================================
+  /**
+   * Get keyboard shortcuts for theme toggle
+   * @returns Keyboard shortcuts object
+   */
+  getKeyboardShortcuts: () => ({
+    toggle: ['Enter', 'Space'],
+    next: ['ArrowRight', 'ArrowDown'],
+    previous: ['ArrowLeft', 'ArrowUp'],
+  }),
+} as const;
 
 /**
- * Component system metadata for development and debugging
+ * Theme toggle integration helpers
+ * Utilities for integrating theme toggle with various UI patterns
  */
-export const ThemeToggleSystemInfo = {
-  version: '1.0.0',
-  lastUpdated: '2024-12-19',
-  reactVersion: '19.0.0',
-  nextjsVersion: '15.1.0',
-  tailwindVersion: '4.1.0',
-  wcagCompliance: 'AA',
-  touchTargetCompliance: true,
-  keyboardNavigationSupport: true,
-  screenReaderSupport: true,
-  
+export const themeToggleIntegration = {
   /**
-   * Feature support matrix
+   * Header navigation integration props
+   * Optimized for header/navigation bar usage
    */
-  features: {
-    lightMode: true,
-    darkMode: true,
-    systemMode: true,
-    customVariants: true,
-    accessibilityCompliance: true,
-    keyboardNavigation: true,
-    touchTargets: true,
-    transitionAnimations: true,
-    loadingStates: true,
-    errorHandling: true,
+  headerProps: {
+    ...THEME_TOGGLE_PRESETS.toolbar,
+    className: 'ml-auto',
+    'aria-label': 'Toggle theme',
   },
-  
+
   /**
-   * Supported environments
+   * Sidebar integration props
+   * Optimized for sidebar placement
    */
-  compatibility: {
-    react: '>=19.0.0',
-    nextjs: '>=15.1.0',
-    typescript: '>=5.8.0',
-    tailwindcss: '>=4.1.0',
-    browsers: ['Chrome >=90', 'Firefox >=88', 'Safari >=14', 'Edge >=90'],
-    devices: ['desktop', 'tablet', 'mobile'],
-    assistiveTechnology: ['screenReaders', 'keyboardNavigation', 'voiceControl'],
+  sidebarProps: {
+    ...THEME_TOGGLE_PRESETS.settings,
+    orientation: 'vertical' as const,
+    className: 'w-full justify-start',
+  },
+
+  /**
+   * Modal/dialog integration props
+   * Optimized for modal and dialog usage
+   */
+  modalProps: {
+    ...THEME_TOGGLE_PRESETS.card,
+    className: 'self-start',
+  },
+
+  /**
+   * Form integration props
+   * Optimized for form field usage
+   */
+  formProps: {
+    ...THEME_TOGGLE_PRESETS.settings,
+    className: 'flex-shrink-0',
   },
 } as const;
+
+/**
+ * Type utility for theme toggle preset keys
+ * Enables type-safe usage of preset configurations
+ */
+export type ThemeTogglePreset = keyof typeof THEME_TOGGLE_PRESETS;
+
+/**
+ * Type utility for theme toggle integration keys
+ * Enables type-safe usage of integration configurations
+ */
+export type ThemeToggleIntegration = keyof typeof themeToggleIntegration;
+
+/**
+ * React hook for theme toggle state management
+ * Provides reactive theme toggle state with local storage persistence
+ * 
+ * Note: This is a convenience re-export. The actual implementation
+ * should use the useTheme hook from the theme provider context.
+ */
+export { useTheme as useThemeToggle } from '@/components/layout/theme/use-theme';
