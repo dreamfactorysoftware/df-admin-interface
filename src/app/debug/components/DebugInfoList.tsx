@@ -1,739 +1,1006 @@
-'use client'
-
 /**
- * DebugInfoList Component
+ * Debug Information List Component
  * 
- * Comprehensive debug information list component for the DreamFactory Admin Interface.
- * Migrated from Angular to React with enhanced functionality and performance optimizations.
+ * Displays debug entries from localStorage and other debug sources in a structured, 
+ * interactive format with filtering, search capabilities, and detailed view options.
+ * Essential for development debugging workflow and troubleshooting during development cycles.
  * 
  * Features:
- * - Real-time localStorage integration with automatic updates
- * - Advanced search and filtering capabilities
- * - Virtual scrolling for large debug datasets (1000+ entries)
- * - Expandable debug entries with JSON syntax highlighting
- * - Copy-to-clipboard functionality for individual entries
- * - Responsive design with dark mode support
- * - Legacy debug data migration support
+ * - Virtual scrolling support for large debug datasets per Section 5.2 component scaling
+ * - Enhanced filtering and search per Summary of Changes debugging transformation  
+ * - React hooks for localStorage integration with automatic updates per Section 4.3 state management
+ * - Tailwind CSS responsive styling with dark mode support per React/Next.js Integration Requirements
+ * - Expandable debug entries with JSON formatting and syntax highlighting
+ * - Copy-to-clipboard functionality for developer productivity enhancements
  * 
- * Performance:
- * - Virtual scrolling handles 10,000+ entries smoothly
- * - Debounced search for optimal user experience
- * - Memoized filtering and sorting operations
- * - Optimized re-rendering with React.memo and useMemo
+ * @fileoverview Debug information list component for DreamFactory Admin Interface
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { FixedSizeList as List } from 'react-window';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+'use client';
+
+import React, { 
+  useState, 
+  useMemo, 
+  useCallback, 
+  useEffect, 
+  useRef,
+  Fragment
+} from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { 
+  Search, 
+  Filter, 
+  Copy, 
+  ChevronDown, 
+  ChevronRight, 
+  Trash2, 
+  RefreshCw,
+  Download,
+  AlertCircle,
+  Info,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Code,
+  Eye,
+  EyeOff
+} from 'lucide-react';
+
+import { Button } from '@/components/ui/button/button';
+import { Input } from '@/components/ui/input/input';
 import { useLocalStorage } from '@/hooks/use-local-storage';
-import {
-  type DebugEntry,
-  type DebugLevel,
-  type DebugFilter,
-  type DebugSortField,
-  type DebugSortDirection,
-  createDebugEntry,
-  filterDebugEntries,
-  searchDebugEntries,
-  sortDebugEntries,
-  formatTimestamp,
-  formatDebugData,
-  getDebugLevelStyles,
-  generateDebugStats,
-  getUniqueCategories,
-  getUniqueSources,
-  exportDebugEntries,
-  downloadDebugEntries,
-  copyToClipboard,
-  truncateText,
-  migrateLegacyDebugInfo,
-  debounce,
-  sanitizeDebugEntries
-} from '@/lib/debug-utils';
 
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
+// =============================================================================
+// DEBUG TYPES AND INTERFACES
+// =============================================================================
 
-const ITEM_HEIGHT = 120; // Height for each debug entry item
-const VISIBLE_ITEMS = 8; // Number of items visible in viewport
-const MAX_MESSAGE_LENGTH = 100; // Maximum message length before truncation
-const SEARCH_DEBOUNCE_MS = 300; // Debounce delay for search input
+/**
+ * Debug entry severity levels
+ */
+export type DebugLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
-// ============================================================================
-// COMPONENT INTERFACES
-// ============================================================================
+/**
+ * Debug entry source types
+ */
+export type DebugSource = 
+  | 'api-client'
+  | 'auth-service' 
+  | 'database-service'
+  | 'schema-discovery'
+  | 'api-generation'
+  | 'ui-component'
+  | 'middleware'
+  | 'system'
+  | 'user-action'
+  | 'performance'
+  | 'error-boundary'
+  | 'unknown';
 
-interface DebugInfoListProps {
-  className?: string;
-  maxHeight?: number;
-  showStats?: boolean;
-  enableExport?: boolean;
-  enableClearAll?: boolean;
-  autoRefresh?: boolean;
-  refreshInterval?: number;
-}
-
-interface DebugEntryItemProps {
-  index: number;
-  style: React.CSSProperties;
-  data: {
-    entries: DebugEntry[];
-    expandedIds: Set<string>;
-    onToggleExpand: (id: string) => void;
-    onCopyEntry: (entry: DebugEntry) => void;
+/**
+ * Debug entry data structure
+ */
+export interface DebugEntry {
+  /** Unique identifier for the debug entry */
+  id: string;
+  /** Timestamp when the debug entry was created */
+  timestamp: number;
+  /** Debug level/severity */
+  level: DebugLevel;
+  /** Source component or service */
+  source: DebugSource;
+  /** Debug message or title */
+  message: string;
+  /** Additional debug data (objects, arrays, etc.) */
+  data?: unknown;
+  /** Stack trace for errors */
+  stack?: string;
+  /** User ID associated with the debug entry */
+  userId?: string;
+  /** Session ID for tracking */
+  sessionId?: string;
+  /** Request ID for API calls */
+  requestId?: string;
+  /** Performance timing data */
+  timing?: {
+    start: number;
+    end?: number;
+    duration?: number;
   };
+  /** Additional context metadata */
+  context?: Record<string, unknown>;
+  /** Tags for categorization */
+  tags?: string[];
 }
 
-// ============================================================================
-// DEBUG ENTRY ITEM COMPONENT
-// ============================================================================
+/**
+ * Debug filter configuration
+ */
+export interface DebugFilter {
+  /** Filter by debug level */
+  levels: DebugLevel[];
+  /** Filter by source */
+  sources: DebugSource[];
+  /** Time range filter */
+  timeRange?: {
+    start: Date;
+    end: Date;
+  };
+  /** Search query */
+  searchQuery: string;
+  /** Show only entries with data */
+  hasDataOnly: boolean;
+  /** Show only entries with errors */
+  errorsOnly: boolean;
+  /** Filter by tags */
+  tags: string[];
+}
 
-const DebugEntryItem = React.memo<DebugEntryItemProps>(({ index, style, data }) => {
-  const { entries, expandedIds, onToggleExpand, onCopyEntry } = data;
-  const entry = entries[index];
-  const isExpanded = expandedIds.has(entry.id);
-  const styles = getDebugLevelStyles(entry.level);
+/**
+ * Component props interface
+ */
+export interface DebugInfoListProps {
+  /** Custom CSS class name */
+  className?: string;
+  /** Maximum number of entries to display */
+  maxEntries?: number;
+  /** Auto-refresh interval in milliseconds */
+  autoRefreshInterval?: number;
+  /** Enable virtual scrolling */
+  enableVirtualScrolling?: boolean;
+  /** Initial filter state */
+  initialFilter?: Partial<DebugFilter>;
+  /** Callback when entry is selected */
+  onEntrySelect?: (entry: DebugEntry) => void;
+  /** Callback when entries are cleared */
+  onEntriesCleared?: () => void;
+  /** Enable export functionality */
+  enableExport?: boolean;
+}
 
-  const handleToggleExpand = useCallback(() => {
-    onToggleExpand(entry.id);
-  }, [entry.id, onToggleExpand]);
+// =============================================================================
+// DEBUG UTILITIES
+// =============================================================================
 
-  const handleCopyEntry = useCallback(() => {
-    onCopyEntry(entry);
-  }, [entry, onCopyEntry]);
+/**
+ * Debug level configurations with colors and icons
+ */
+const DEBUG_LEVEL_CONFIG: Record<DebugLevel, {
+  color: string;
+  bgColor: string;
+  textColor: string;
+  icon: React.ComponentType<any>;
+  label: string;
+}> = {
+  trace: {
+    color: 'text-gray-500',
+    bgColor: 'bg-gray-100 dark:bg-gray-800',
+    textColor: 'text-gray-700 dark:text-gray-300',
+    icon: Eye,
+    label: 'Trace'
+  },
+  debug: {
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+    textColor: 'text-blue-700 dark:text-blue-300',
+    icon: Code,
+    label: 'Debug'
+  },
+  info: {
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+    textColor: 'text-blue-700 dark:text-blue-300',
+    icon: Info,
+    label: 'Info'
+  },
+  warn: {
+    color: 'text-yellow-500',
+    bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
+    textColor: 'text-yellow-700 dark:text-yellow-300',
+    icon: AlertCircle,
+    label: 'Warning'
+  },
+  error: {
+    color: 'text-red-500',
+    bgColor: 'bg-red-50 dark:bg-red-900/20',
+    textColor: 'text-red-700 dark:text-red-300',
+    icon: XCircle,
+    label: 'Error'
+  },
+  fatal: {
+    color: 'text-red-600',
+    bgColor: 'bg-red-100 dark:bg-red-900/30',
+    textColor: 'text-red-800 dark:text-red-200',
+    icon: XCircle,
+    label: 'Fatal'
+  }
+};
 
-  const hasData = entry.data !== undefined && entry.data !== null;
-  const formattedData = hasData ? formatDebugData(entry.data) : '';
-  const truncatedMessage = isExpanded 
-    ? entry.message 
-    : truncateText(entry.message, MAX_MESSAGE_LENGTH);
+/**
+ * Format timestamp for display
+ */
+const formatTimestamp = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - timestamp;
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
 
-  return (
-    <div style={style} className="px-4">
-      <div className={`
-        bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 
-        shadow-sm hover:shadow-md transition-shadow duration-200 p-4 border-l-4 ${styles.background}
-      `}>
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            {/* Level Badge */}
-            <span className={`
-              inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${styles.badge}
-            `}>
-              {entry.level.toUpperCase()}
-            </span>
-            
-            {/* Category */}
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {entry.category}
-            </span>
-            
-            {/* Timestamp */}
-            <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-              {formatTimestamp(entry.timestamp)}
-            </span>
-            
-            {/* Source */}
-            {entry.source && (
-              <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                {entry.source}
-              </span>
-            )}
-          </div>
-          
-          {/* Actions */}
-          <div className="flex items-center gap-1">
-            {/* Copy Button */}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={handleCopyEntry}
-              className="h-6 w-6"
-              aria-label="Copy debug entry"
-            >
-              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </Button>
-            
-            {/* Expand/Collapse Button */}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={handleToggleExpand}
-              className="h-6 w-6"
-              aria-label={isExpanded ? 'Collapse entry' : 'Expand entry'}
-            >
-              <svg 
-                className={`h-3 w-3 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </Button>
-          </div>
-        </div>
-        
-        {/* Message */}
-        <div className="mb-2">
-          <p className={`text-sm leading-relaxed ${styles.text}`}>
-            {truncatedMessage}
-          </p>
-          {!isExpanded && entry.message.length > MAX_MESSAGE_LENGTH && (
-            <button 
-              onClick={handleToggleExpand}
-              className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 mt-1"
-            >
-              Show more...
-            </button>
-          )}
-        </div>
-        
-        {/* Expanded Content */}
-        {isExpanded && (
-          <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-            {/* Full Message if truncated */}
-            {entry.message.length > MAX_MESSAGE_LENGTH && (
-              <div>
-                <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Full Message:
-                </h4>
-                <p className={`text-sm leading-relaxed ${styles.text}`}>
-                  {entry.message}
-                </p>
-              </div>
-            )}
-            
-            {/* Debug Data */}
-            {hasData && (
-              <div>
-                <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Debug Data:
-                </h4>
-                <pre className="bg-gray-50 dark:bg-gray-900 p-3 rounded-md text-xs overflow-x-auto border border-gray-200 dark:border-gray-700">
-                  <code className="text-gray-800 dark:text-gray-200">
-                    {formattedData}
-                  </code>
-                </pre>
-              </div>
-            )}
-            
-            {/* Stack Trace */}
-            {entry.stack && (
-              <div>
-                <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Stack Trace:
-                </h4>
-                <pre className="bg-red-50 dark:bg-red-900/20 p-3 rounded-md text-xs overflow-x-auto border border-red-200 dark:border-red-800">
-                  <code className="text-red-800 dark:text-red-200">
-                    {entry.stack}
-                  </code>
-                </pre>
-              </div>
-            )}
-            
-            {/* Entry Metadata */}
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div>
-                <span className="font-medium text-gray-700 dark:text-gray-300">ID:</span>
-                <span className="ml-2 text-gray-500 dark:text-gray-400 font-mono">{entry.id}</span>
-              </div>
-              {entry.session && (
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Session:</span>
-                  <span className="ml-2 text-gray-500 dark:text-gray-400 font-mono">{entry.session}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-});
+  if (diffSecs < 60) return `${diffSecs}s ago`;
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  
+  return date.toLocaleString();
+};
 
-DebugEntryItem.displayName = 'DebugEntryItem';
+/**
+ * Format JSON data for display with syntax highlighting
+ */
+const formatJsonData = (data: unknown): string => {
+  try {
+    return JSON.stringify(data, null, 2);
+  } catch {
+    return String(data);
+  }
+};
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
+/**
+ * Copy text to clipboard with fallback
+ */
+const copyToClipboard = async (text: string): Promise<boolean> => {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } else {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return true;
+    }
+  } catch {
+    return false;
+  }
+};
 
-export default function DebugInfoList({
-  className = '',
-  maxHeight = 600,
-  showStats = true,
-  enableExport = true,
-  enableClearAll = true,
-  autoRefresh = false,
-  refreshInterval = 5000
-}: DebugInfoListProps) {
-  // ============================================================================
-  // STATE MANAGEMENT
-  // ============================================================================
+/**
+ * Get debug entries from localStorage and other sources
+ */
+const getDebugEntries = (): DebugEntry[] => {
+  const entries: DebugEntry[] = [];
 
-  // LocalStorage integration with automatic updates and legacy migration
-  const [debugEntries, setDebugEntries, removeDebugEntries, storageError] = useLocalStorage<DebugEntry[]>('debugInfo', {
-    defaultValue: [],
-    syncAcrossTabs: true,
-    migrator: {
-      version: 2,
-      migrate: (oldData: unknown) => {
-        // Handle legacy string array format
-        if (Array.isArray(oldData) && oldData.every(item => typeof item === 'string')) {
-          return migrateLegacyDebugInfo(oldData as string[]);
-        }
-        // Handle existing DebugEntry array
-        if (Array.isArray(oldData)) {
-          return sanitizeDebugEntries(oldData);
-        }
-        return [];
+  // Get entries from localStorage
+  try {
+    const storedEntries = localStorage.getItem('debug-entries');
+    if (storedEntries) {
+      const parsed = JSON.parse(storedEntries);
+      if (Array.isArray(parsed)) {
+        entries.push(...parsed);
       }
+    }
+  } catch (error) {
+    console.warn('Failed to parse debug entries from localStorage:', error);
+  }
+
+  // Get entries from sessionStorage
+  try {
+    const sessionEntries = sessionStorage.getItem('debug-entries');
+    if (sessionEntries) {
+      const parsed = JSON.parse(sessionEntries);
+      if (Array.isArray(parsed)) {
+        entries.push(...parsed.map(entry => ({ ...entry, source: 'session' as DebugSource })));
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to parse debug entries from sessionStorage:', error);
+  }
+
+  // Get performance entries
+  try {
+    const perfEntries = performance.getEntriesByType('navigation');
+    perfEntries.forEach((entry, index) => {
+      entries.push({
+        id: `perf-nav-${index}`,
+        timestamp: entry.startTime,
+        level: 'info',
+        source: 'performance',
+        message: 'Navigation Performance',
+        data: {
+          type: entry.entryType,
+          duration: entry.duration,
+          loadEventEnd: (entry as PerformanceNavigationTiming).loadEventEnd,
+          domContentLoadedEventEnd: (entry as PerformanceNavigationTiming).domContentLoadedEventEnd,
+        },
+        timing: {
+          start: entry.startTime,
+          end: entry.startTime + entry.duration,
+          duration: entry.duration,
+        }
+      });
+    });
+  } catch (error) {
+    console.warn('Failed to get performance entries:', error);
+  }
+
+  // Sort by timestamp (newest first)
+  return entries.sort((a, b) => b.timestamp - a.timestamp);
+};
+
+// =============================================================================
+// COMPONENT IMPLEMENTATION
+// =============================================================================
+
+/**
+ * Debug Information List Component
+ */
+export const DebugInfoList: React.FC<DebugInfoListProps> = ({
+  className = '',
+  maxEntries = 1000,
+  autoRefreshInterval = 5000,
+  enableVirtualScrolling = true,
+  initialFilter = {},
+  onEntrySelect,
+  onEntriesCleared,
+  enableExport = true,
+}) => {
+  // =============================================================================
+  // STATE MANAGEMENT
+  // =============================================================================
+
+  const [debugEntries, setDebugEntries] = useState<DebugEntry[]>([]);
+  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
+  const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [copyNotification, setCopyNotification] = useState<string | null>(null);
+
+  // Filter state with localStorage persistence
+  const [filter, setFilter] = useLocalStorage<DebugFilter>('debug-filter', {
+    defaultValue: {
+      levels: ['debug', 'info', 'warn', 'error', 'fatal'],
+      sources: [],
+      searchQuery: '',
+      hasDataOnly: false,
+      errorsOnly: false,
+      tags: [],
+      ...initialFilter,
     },
-    validator: (value): value is DebugEntry[] => 
-      Array.isArray(value) && value.every(item => 
-        typeof item === 'object' && 
-        item !== null &&
-        'id' in item &&
-        'timestamp' in item &&
-        'level' in item &&
-        'message' in item
-      )
+    syncAcrossTabs: true,
   });
 
-  // Component state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [filterLevel, setFilterLevel] = useState<DebugLevel[]>([]);
-  const [filterCategory, setFilterCategory] = useState<string[]>([]);
-  const [sortField, setSortField] = useState<DebugSortField>('timestamp');
-  const [sortDirection, setSortDirection] = useState<DebugSortDirection>('desc');
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  // UI state
+  const [showFilters, setShowFilters] = useState(false);
+  const parentRef = useRef<HTMLDivElement>(null);
 
-  // Refs
-  const listRef = useRef<List>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
-  const copyTimeoutRef = useRef<NodeJS.Timeout>();
+  // =============================================================================
+  // DATA FETCHING AND MANAGEMENT
+  // =============================================================================
 
-  // ============================================================================
-  // DEBOUNCED SEARCH
-  // ============================================================================
-
-  const debouncedSearch = useMemo(
-    () => debounce((query: string) => {
-      setDebouncedSearchQuery(query);
-    }, SEARCH_DEBOUNCE_MS),
-    []
-  );
-
-  useEffect(() => {
-    debouncedSearch(searchQuery);
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [searchQuery, debouncedSearch]);
-
-  // ============================================================================
-  // AUTO REFRESH
-  // ============================================================================
-
-  useEffect(() => {
-    if (!autoRefresh) return;
-
-    const interval = setInterval(() => {
-      // Force re-read from localStorage to catch external updates
-      const currentEntries = JSON.parse(localStorage.getItem('__storage_debugInfo') || '{"data":[]}');
-      if (currentEntries.data && Array.isArray(currentEntries.data)) {
-        setDebugEntries(sanitizeDebugEntries(currentEntries.data));
-      }
-    }, refreshInterval);
-
-    return () => clearInterval(interval);
-  }, [autoRefresh, refreshInterval, setDebugEntries]);
-
-  // ============================================================================
-  // COMPUTED VALUES
-  // ============================================================================
-
-  const debugStats = useMemo(() => 
-    generateDebugStats(debugEntries || []), 
-    [debugEntries]
-  );
-
-  const uniqueCategories = useMemo(() => 
-    getUniqueCategories(debugEntries || []), 
-    [debugEntries]
-  );
-
-  const uniqueSources = useMemo(() => 
-    getUniqueSources(debugEntries || []), 
-    [debugEntries]
-  );
-
-  // Filtered and sorted entries
-  const processedEntries = useMemo(() => {
-    if (!debugEntries || debugEntries.length === 0) return [];
-
-    let filtered = debugEntries;
-
-    // Apply filters
-    const filter: DebugFilter = {
-      level: filterLevel.length > 0 ? filterLevel : undefined,
-      category: filterCategory.length > 0 ? filterCategory : undefined,
-      search: debouncedSearchQuery || undefined
-    };
-
-    if (Object.values(filter).some(v => v !== undefined)) {
-      filtered = filterDebugEntries(debugEntries, filter);
+  /**
+   * Load debug entries from various sources
+   */
+  const loadDebugEntries = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const entries = getDebugEntries();
+      setDebugEntries(entries.slice(0, maxEntries));
+    } catch (error) {
+      console.error('Failed to load debug entries:', error);
+    } finally {
+      setIsLoading(false);
     }
+  }, [maxEntries]);
 
-    // Apply search if no other filters
-    if (debouncedSearchQuery && !filter.level && !filter.category) {
-      filtered = searchDebugEntries(filtered, debouncedSearchQuery);
+  /**
+   * Clear all debug entries
+   */
+  const clearDebugEntries = useCallback(() => {
+    try {
+      localStorage.removeItem('debug-entries');
+      sessionStorage.removeItem('debug-entries');
+      setDebugEntries([]);
+      setExpandedEntries(new Set());
+      setSelectedEntry(null);
+      onEntriesCleared?.();
+    } catch (error) {
+      console.error('Failed to clear debug entries:', error);
     }
+  }, [onEntriesCleared]);
 
-    // Apply sorting
-    return sortDebugEntries(filtered, sortField, sortDirection);
-  }, [debugEntries, filterLevel, filterCategory, debouncedSearchQuery, sortField, sortDirection]);
+  /**
+   * Export debug entries to JSON file
+   */
+  const exportDebugEntries = useCallback(() => {
+    try {
+      const dataStr = JSON.stringify(filteredEntries, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `debug-entries-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export debug entries:', error);
+    }
+  }, []);
 
-  // ============================================================================
+  // =============================================================================
+  // FILTERING AND SEARCH
+  // =============================================================================
+
+  /**
+   * Filter and search debug entries
+   */
+  const filteredEntries = useMemo(() => {
+    if (!filter) return debugEntries;
+
+    return debugEntries.filter(entry => {
+      // Level filter
+      if (filter.levels.length > 0 && !filter.levels.includes(entry.level)) {
+        return false;
+      }
+
+      // Source filter
+      if (filter.sources.length > 0 && !filter.sources.includes(entry.source)) {
+        return false;
+      }
+
+      // Time range filter
+      if (filter.timeRange) {
+        const entryDate = new Date(entry.timestamp);
+        if (entryDate < filter.timeRange.start || entryDate > filter.timeRange.end) {
+          return false;
+        }
+      }
+
+      // Search query filter
+      if (filter.searchQuery) {
+        const query = filter.searchQuery.toLowerCase();
+        const searchableText = [
+          entry.message,
+          entry.source,
+          entry.level,
+          entry.stack,
+          JSON.stringify(entry.data),
+          JSON.stringify(entry.context),
+          ...(entry.tags || [])
+        ].join(' ').toLowerCase();
+
+        if (!searchableText.includes(query)) {
+          return false;
+        }
+      }
+
+      // Has data filter
+      if (filter.hasDataOnly && !entry.data) {
+        return false;
+      }
+
+      // Errors only filter
+      if (filter.errorsOnly && !['error', 'fatal'].includes(entry.level)) {
+        return false;
+      }
+
+      // Tags filter
+      if (filter.tags.length > 0) {
+        const entryTags = entry.tags || [];
+        const hasMatchingTag = filter.tags.some(tag => entryTags.includes(tag));
+        if (!hasMatchingTag) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [debugEntries, filter]);
+
+  // =============================================================================
+  // VIRTUAL SCROLLING SETUP
+  // =============================================================================
+
+  const virtualizer = useVirtualizer({
+    count: filteredEntries.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 120, // Estimated height per entry
+    enabled: enableVirtualScrolling,
+    overscan: 10,
+  });
+
+  // =============================================================================
   // EVENT HANDLERS
-  // ============================================================================
+  // =============================================================================
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  }, []);
-
-  const handleClearSearch = useCallback(() => {
-    setSearchQuery('');
-    setDebouncedSearchQuery('');
-  }, []);
-
-  const handleLevelFilter = useCallback((level: DebugLevel) => {
-    setFilterLevel(prev => 
-      prev.includes(level) 
-        ? prev.filter(l => l !== level)
-        : [...prev, level]
-    );
-  }, []);
-
-  const handleSortChange = useCallback((field: DebugSortField) => {
-    if (sortField === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
-    }
-  }, [sortField]);
-
-  const handleToggleExpand = useCallback((id: string) => {
-    setExpandedIds(prev => {
+  /**
+   * Toggle entry expansion
+   */
+  const toggleEntryExpansion = useCallback((entryId: string) => {
+    setExpandedEntries(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
+      if (newSet.has(entryId)) {
+        newSet.delete(entryId);
       } else {
-        newSet.add(id);
+        newSet.add(entryId);
       }
       return newSet;
     });
   }, []);
 
-  const handleCopyEntry = useCallback(async (entry: DebugEntry) => {
-    const entryText = [
-      `[${entry.level.toUpperCase()}] ${entry.category}`,
-      `Time: ${formatTimestamp(entry.timestamp)}`,
-      `Message: ${entry.message}`,
-      entry.data ? `Data: ${formatDebugData(entry.data)}` : '',
-      entry.source ? `Source: ${entry.source}` : '',
-      entry.stack ? `Stack: ${entry.stack}` : ''
-    ].filter(Boolean).join('\n');
+  /**
+   * Select entry
+   */
+  const selectEntry = useCallback((entry: DebugEntry) => {
+    setSelectedEntry(entry.id);
+    onEntrySelect?.(entry);
+  }, [onEntrySelect]);
 
-    const success = await copyToClipboard(entryText);
+  /**
+   * Copy entry data to clipboard
+   */
+  const copyEntryData = useCallback(async (entry: DebugEntry) => {
+    const entryData = {
+      ...entry,
+      formattedTimestamp: formatTimestamp(entry.timestamp),
+    };
     
-    setCopyFeedback(success ? 'Entry copied to clipboard!' : 'Failed to copy entry');
-    
-    if (copyTimeoutRef.current) {
-      clearTimeout(copyTimeoutRef.current);
+    const success = await copyToClipboard(formatJsonData(entryData));
+    if (success) {
+      setCopyNotification(entry.id);
+      setTimeout(() => setCopyNotification(null), 2000);
     }
-    
-    copyTimeoutRef.current = setTimeout(() => {
-      setCopyFeedback(null);
-    }, 2000);
   }, []);
 
-  const handleClearAll = useCallback(() => {
-    if (window.confirm('Are you sure you want to clear all debug entries? This action cannot be undone.')) {
-      removeDebugEntries();
-      setExpandedIds(new Set());
-      setSearchQuery('');
-      setDebouncedSearchQuery('');
-      setFilterLevel([]);
-      setFilterCategory([]);
+  /**
+   * Update filter
+   */
+  const updateFilter = useCallback((updates: Partial<DebugFilter>) => {
+    if (!filter) return;
+    
+    const result = setFilter({ ...filter, ...updates });
+    if (!result.success) {
+      console.warn('Failed to update debug filter:', result.error);
     }
-  }, [removeDebugEntries]);
+  }, [filter, setFilter]);
 
-  const handleExport = useCallback(() => {
-    if (!debugEntries || debugEntries.length === 0) return;
-    downloadDebugEntries(debugEntries);
-  }, [debugEntries]);
+  // =============================================================================
+  // EFFECTS
+  // =============================================================================
 
-  const handleExpandAll = useCallback(() => {
-    setExpandedIds(new Set(processedEntries.map(entry => entry.id)));
-  }, [processedEntries]);
+  // Initial load
+  useEffect(() => {
+    loadDebugEntries();
+  }, [loadDebugEntries]);
 
-  const handleCollapseAll = useCallback(() => {
-    setExpandedIds(new Set());
-  }, []);
+  // Auto-refresh
+  useEffect(() => {
+    if (autoRefreshInterval > 0) {
+      const interval = setInterval(loadDebugEntries, autoRefreshInterval);
+      return () => clearInterval(interval);
+    }
+  }, [autoRefreshInterval, loadDebugEntries]);
 
-  // ============================================================================
+  // Listen for storage changes
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'debug-entries') {
+        loadDebugEntries();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [loadDebugEntries]);
+
+  // =============================================================================
   // RENDER HELPERS
-  // ============================================================================
+  // =============================================================================
 
-  const itemData = useMemo(() => ({
-    entries: processedEntries,
-    expandedIds,
-    onToggleExpand: handleToggleExpand,
-    onCopyEntry: handleCopyEntry
-  }), [processedEntries, expandedIds, handleToggleExpand, handleCopyEntry]);
+  /**
+   * Render debug entry
+   */
+  const renderDebugEntry = useCallback((entry: DebugEntry, index: number) => {
+    const config = DEBUG_LEVEL_CONFIG[entry.level];
+    const isExpanded = expandedEntries.has(entry.id);
+    const isSelected = selectedEntry === entry.id;
+    const isCopied = copyNotification === entry.id;
+    const IconComponent = config.icon;
 
-  const noEntries = !debugEntries || debugEntries.length === 0;
-  const noFilteredEntries = processedEntries.length === 0 && debugEntries && debugEntries.length > 0;
-
-  // ============================================================================
-  // RENDER
-  // ============================================================================
-
-  return (
-    <div className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}>
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Debug Information
-            {debugStats.total > 0 && (
-              <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-                ({debugStats.total} entries)
-              </span>
-            )}
-          </h3>
-          
-          {/* Copy Feedback */}
-          {copyFeedback && (
-            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              {copyFeedback}
+    return (
+      <div
+        key={entry.id}
+        className={`
+          border-b border-gray-200 dark:border-gray-700 p-4 transition-all duration-200
+          hover:bg-gray-50 dark:hover:bg-gray-800/50
+          ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' : ''}
+          ${config.bgColor}
+        `}
+        onClick={() => selectEntry(entry)}
+      >
+        {/* Entry Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            {/* Level Icon */}
+            <div className={`flex-shrink-0 mt-0.5 ${config.color}`}>
+              <IconComponent className="h-4 w-4" />
             </div>
-          )}
+
+            {/* Entry Content */}
+            <div className="min-w-0 flex-1">
+              {/* Message and Metadata */}
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`font-medium text-sm ${config.textColor}`}>
+                  {entry.message}
+                </span>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">
+                  {entry.source}
+                </span>
+              </div>
+
+              {/* Timestamp and Additional Info */}
+              <div className="flex items-center gap-3 text-xs text-gray-500">
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatTimestamp(entry.timestamp)}
+                </span>
+                {entry.requestId && (
+                  <span>ID: {entry.requestId.slice(-8)}</span>
+                )}
+                {entry.timing?.duration && (
+                  <span>{Math.round(entry.timing.duration)}ms</span>
+                )}
+                {entry.tags && entry.tags.length > 0 && (
+                  <div className="flex gap-1">
+                    {entry.tags.map(tag => (
+                      <span 
+                        key={tag}
+                        className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                copyEntryData(entry);
+              }}
+              className="h-8 w-8 p-0"
+              ariaLabel="Copy entry data"
+            >
+              {isCopied ? (
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </Button>
+
+            {(entry.data || entry.stack || entry.context) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleEntryExpansion(entry.id);
+                }}
+                className="h-8 w-8 p-0"
+                ariaLabel={isExpanded ? "Collapse entry" : "Expand entry"}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Search and Filters */}
-        <div className="space-y-3">
+        {/* Expanded Content */}
+        {isExpanded && (
+          <div className="mt-3 space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3">
+            {/* Debug Data */}
+            {entry.data && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Data
+                </h4>
+                <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded-md text-xs overflow-x-auto">
+                  <code>{formatJsonData(entry.data)}</code>
+                </pre>
+              </div>
+            )}
+
+            {/* Stack Trace */}
+            {entry.stack && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Stack Trace
+                </h4>
+                <pre className="bg-red-50 dark:bg-red-900/20 p-3 rounded-md text-xs overflow-x-auto text-red-700 dark:text-red-300">
+                  <code>{entry.stack}</code>
+                </pre>
+              </div>
+            )}
+
+            {/* Context */}
+            {entry.context && Object.keys(entry.context).length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Context
+                </h4>
+                <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded-md text-xs overflow-x-auto">
+                  <code>{formatJsonData(entry.context)}</code>
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }, [
+    expandedEntries,
+    selectedEntry,
+    copyNotification,
+    selectEntry,
+    copyEntryData,
+    toggleEntryExpansion,
+  ]);
+
+  /**
+   * Render filter controls
+   */
+  const renderFilterControls = useCallback(() => {
+    if (!filter || !showFilters) return null;
+
+    const availableSources = Array.from(
+      new Set(debugEntries.map(entry => entry.source))
+    ).sort();
+
+    const availableTags = Array.from(
+      new Set(debugEntries.flatMap(entry => entry.tags || []))
+    ).sort();
+
+    return (
+      <div className="border-b border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800/50">
+        <div className="space-y-4">
           {/* Search Input */}
-          <div className="relative">
+          <div>
             <Input
-              type="text"
               placeholder="Search debug entries..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="pl-10"
-              leftIcon={
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              }
-              rightIcon={searchQuery && (
-                <button
-                  onClick={handleClearSearch}
-                  className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
+              value={filter.searchQuery}
+              onChange={(e) => updateFilter({ searchQuery: e.target.value })}
+              prefix={<Search className="h-4 w-4" />}
+              className="w-full"
             />
           </div>
 
           {/* Level Filters */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Debug Levels
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(DEBUG_LEVEL_CONFIG).map(([level, config]) => {
+                const isSelected = filter.levels.includes(level as DebugLevel);
+                return (
+                  <Button
+                    key={level}
+                    variant={isSelected ? "primary" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const newLevels = isSelected
+                        ? filter.levels.filter(l => l !== level)
+                        : [...filter.levels, level as DebugLevel];
+                      updateFilter({ levels: newLevels });
+                    }}
+                    className="text-xs"
+                  >
+                    {config.label}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Source Filters */}
+          {availableSources.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Sources
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {availableSources.map(source => {
+                  const isSelected = filter.sources.includes(source);
+                  return (
+                    <Button
+                      key={source}
+                      variant={isSelected ? "primary" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        const newSources = isSelected
+                          ? filter.sources.filter(s => s !== source)
+                          : [...filter.sources, source];
+                        updateFilter({ sources: newSources });
+                      }}
+                      className="text-xs"
+                    >
+                      {source}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Quick Filters */}
           <div className="flex flex-wrap gap-2">
-            {(['error', 'warn', 'info', 'debug', 'trace'] as DebugLevel[]).map(level => {
-              const count = debugStats.byLevel[level];
-              const isActive = filterLevel.includes(level);
-              const styles = getDebugLevelStyles(level);
-              
-              return (
-                <button
-                  key={level}
-                  onClick={() => handleLevelFilter(level)}
-                  disabled={count === 0}
-                  className={`
-                    inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors
-                    ${isActive ? styles.badge : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}
-                    ${count === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'}
-                  `}
-                >
-                  {level.toUpperCase()}
-                  <span className="ml-1 opacity-75">({count})</span>
-                </button>
-              );
-            })}
+            <Button
+              variant={filter.hasDataOnly ? "primary" : "outline"}
+              size="sm"
+              onClick={() => updateFilter({ hasDataOnly: !filter.hasDataOnly })}
+              className="text-xs"
+            >
+              Has Data Only
+            </Button>
+            <Button
+              variant={filter.errorsOnly ? "primary" : "outline"}
+              size="sm"
+              onClick={() => updateFilter({ errorsOnly: !filter.errorsOnly })}
+              className="text-xs"
+            >
+              Errors Only
+            </Button>
           </div>
         </div>
+      </div>
+    );
+  }, [filter, showFilters, debugEntries, updateFilter]);
 
-        {/* Controls */}
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center gap-2">
-            {/* Sort Controls */}
-            <select
-              value={`${sortField}-${sortDirection}`}
-              onChange={(e) => {
-                const [field, direction] = e.target.value.split('-') as [DebugSortField, DebugSortDirection];
-                setSortField(field);
-                setSortDirection(direction);
-              }}
-              className="text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-            >
-              <option value="timestamp-desc">Newest First</option>
-              <option value="timestamp-asc">Oldest First</option>
-              <option value="level-desc">Level (High to Low)</option>
-              <option value="level-asc">Level (Low to High)</option>
-              <option value="category-asc">Category A-Z</option>
-              <option value="category-desc">Category Z-A</option>
-            </select>
+  // =============================================================================
+  // MAIN RENDER
+  // =============================================================================
 
-            {/* Expand/Collapse Controls */}
-            {processedEntries.length > 0 && (
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="sm" onClick={handleExpandAll}>
-                  Expand All
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleCollapseAll}>
-                  Collapse All
-                </Button>
-              </div>
-            )}
+  return (
+    <div className={`h-full flex flex-col bg-white dark:bg-gray-900 ${className}`}>
+      {/* Header */}
+      <div className="border-b border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Debug Information
+            </h2>
+            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm rounded">
+              {filteredEntries.length} entries
+            </span>
           </div>
 
-          {/* Action Controls */}
           <div className="flex items-center gap-2">
-            {enableExport && debugEntries && debugEntries.length > 0 && (
-              <Button variant="outline" size="sm" onClick={handleExport}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              icon={<Filter className="h-4 w-4" />}
+              ariaLabel="Toggle filters"
+            >
+              Filters
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadDebugEntries}
+              loading={isLoading}
+              icon={<RefreshCw className="h-4 w-4" />}
+              ariaLabel="Refresh debug entries"
+            >
+              Refresh
+            </Button>
+
+            {enableExport && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportDebugEntries}
+                icon={<Download className="h-4 w-4" />}
+                ariaLabel="Export debug entries"
+              >
                 Export
               </Button>
             )}
-            {enableClearAll && debugEntries && debugEntries.length > 0 && (
-              <Button variant="destructive" size="sm" onClick={handleClearAll}>
-                Clear All
-              </Button>
-            )}
-          </div>
-        </div>
 
-        {/* Storage Error */}
-        {storageError && (
-          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-            <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Storage Error: {storageError.message}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div style={{ height: maxHeight }}>
-        {noEntries ? (
-          /* No Entries State */
-          <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400 p-8">
-            <svg className="h-12 w-12 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h4 className="text-lg font-medium mb-2">No Debug Information</h4>
-            <p className="text-sm text-center max-w-md">
-              Debug entries will appear here when the application generates debug information.
-              Check your browser's localStorage or enable debug logging.
-            </p>
-          </div>
-        ) : noFilteredEntries ? (
-          /* No Filtered Results State */
-          <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400 p-8">
-            <svg className="h-12 w-12 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <h4 className="text-lg font-medium mb-2">No Matching Entries</h4>
-            <p className="text-sm text-center max-w-md">
-              No debug entries match your current search and filter criteria.
-              Try adjusting your filters or search terms.
-            </p>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => {
-                setSearchQuery('');
-                setDebouncedSearchQuery('');
-                setFilterLevel([]);
-                setFilterCategory([]);
-              }}
-              className="mt-3"
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearDebugEntries}
+              icon={<Trash2 className="h-4 w-4" />}
+              ariaLabel="Clear all debug entries"
             >
-              Clear Filters
+              Clear
             </Button>
           </div>
-        ) : (
-          /* Virtual List */
-          <List
-            ref={listRef}
-            height={maxHeight}
-            itemCount={processedEntries.length}
-            itemSize={ITEM_HEIGHT}
-            itemData={itemData}
-            className="scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800"
-          >
-            {DebugEntryItem}
-          </List>
-        )}
+        </div>
       </div>
 
-      {/* Statistics Footer */}
-      {showStats && debugStats.total > 0 && (
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-            <div className="flex items-center gap-4">
-              <span>Total: {debugStats.total}</span>
-              <span>Filtered: {processedEntries.length}</span>
-              {debugStats.lastEntry && (
-                <span>
-                  Latest: {formatTimestamp(debugStats.lastEntry.timestamp, false)}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-4">
-              {Object.entries(debugStats.byLevel).map(([level, count]) => (
-                count > 0 && (
-                  <span key={level} className="flex items-center gap-1">
-                    <span className={`w-2 h-2 rounded-full ${getDebugLevelStyles(level as DebugLevel).badge.includes('bg-red') ? 'bg-red-500' :
-                      getDebugLevelStyles(level as DebugLevel).badge.includes('bg-yellow') ? 'bg-yellow-500' :
-                      getDebugLevelStyles(level as DebugLevel).badge.includes('bg-blue') ? 'bg-blue-500' :
-                      getDebugLevelStyles(level as DebugLevel).badge.includes('bg-purple') ? 'bg-purple-500' : 'bg-gray-500'}`}></span>
-                    {level}: {count}
-                  </span>
-                )
-              ))}
+      {/* Filter Controls */}
+      {renderFilterControls()}
+
+      {/* Debug Entries List */}
+      <div className="flex-1 overflow-hidden">
+        {filteredEntries.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+            <div className="text-center">
+              <Info className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium mb-2">No debug entries found</p>
+              <p className="text-sm">
+                {debugEntries.length === 0
+                  ? "Debug entries will appear here as they are generated"
+                  : "Try adjusting your filters to see more entries"
+                }
+              </p>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div
+            ref={parentRef}
+            className="h-full overflow-auto"
+            style={{ contain: 'strict' }}
+          >
+            {enableVirtualScrolling ? (
+              <div
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {virtualizer.getVirtualItems().map((virtualItem) => (
+                  <div
+                    key={virtualItem.key}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualItem.size}px`,
+                      transform: `translateY(${virtualItem.start}px)`,
+                    }}
+                  >
+                    {renderDebugEntry(filteredEntries[virtualItem.index], virtualItem.index)}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div>
+                {filteredEntries.map((entry, index) => 
+                  renderDebugEntry(entry, index)
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
-}
+};
+
+DebugInfoList.displayName = 'DebugInfoList';
+
+export default DebugInfoList;
