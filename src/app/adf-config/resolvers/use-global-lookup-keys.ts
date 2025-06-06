@@ -1,393 +1,320 @@
 /**
- * Global Lookup Keys React Query Hook
+ * React Query-based custom hook for global lookup key management.
  * 
- * React Query-powered custom hook that fetches global lookup key entries with
- * intelligent caching and automatic revalidation. Replaces the Angular
- * DfGlobalLookupKeysResolver by implementing React Query useQuery with TTL
- * configuration and comprehensive data fetching for lookup key management.
+ * Replaces the Angular DfGlobalLookupKeysResolver by implementing React Query
+ * useQuery with intelligent caching and automatic revalidation for global lookup
+ * key enumeration in ADF configuration workflows.
  * 
  * Features:
- * - Intelligent caching with 5-minute stale time and 15-minute cache time
+ * - TanStack React Query 5.0.0 for server-state management
+ * - Intelligent caching with TTL configuration (staleTime: 300s, cacheTime: 900s)
+ * - Cache responses under 50ms for optimal performance
  * - Automatic background revalidation for real-time updates
- * - Type-safe ApiListResponse<LookupKeyType> return type
- * - Cache responses under 50ms performance target
- * - Error handling with React Error Boundary integration
- * - Optimistic updates and cache invalidation support
+ * - Type-safe GenericListResponse<LookupKeyType> return type
+ * - Error handling and validation per Section 4.2 requirements
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Global lookup keys React Query hook
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
-import { ApiListResponse, ApiErrorResponse } from '@/types/api';
+import { apiGet } from '../../../lib/api-client';
+import type { GenericListResponse } from '../../../types/generic-http';
 
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 /**
- * Global Lookup Key Entry
- * Defines the structure for individual lookup key entries managed
- * by the DreamFactory system for configuration and administrative workflows
+ * Global lookup key type definition
+ * 
+ * @interface LookupKeyType
  */
 export interface LookupKeyType {
-  /** Unique identifier for the lookup key entry */
+  /** Unique identifier for the lookup key */
   id?: number;
-  /** Name/key identifier for the lookup entry */
+  /** Name of the lookup key */
   name: string;
   /** Value associated with the lookup key */
   value: string;
-  /** Indicates if the lookup key is private/internal */
+  /** Whether the lookup key is private */
   private: boolean;
-  /** Optional description of the lookup key purpose */
+  /** Optional description of the lookup key */
   description?: string;
-  /** ISO 8601 timestamp of entry creation */
+  /** Creation timestamp */
   created_date?: string;
-  /** ISO 8601 timestamp of last modification */
+  /** Last modification timestamp */
   last_modified_date?: string;
-  /** User ID who created the entry */
+  /** ID of user who created the lookup key */
   created_by_id?: number;
-  /** User ID who last modified the entry */
+  /** ID of user who last modified the lookup key */
   last_modified_by_id?: number;
 }
 
 /**
- * Global Lookup Keys Query Configuration
- * React Query configuration options for optimal caching behavior
+ * API response type for global lookup keys list
  */
-export interface GlobalLookupKeysQueryOptions {
-  /** Enable/disable the query execution */
-  enabled?: boolean;
-  /** Custom stale time override (default: 300000ms = 5 minutes) */
-  staleTime?: number;
-  /** Custom cache time override (default: 900000ms = 15 minutes) */
-  cacheTime?: number;
-  /** Enable/disable automatic background refetching */
-  refetchOnWindowFocus?: boolean;
-  /** Enable/disable refetch on network reconnect */
-  refetchOnReconnect?: boolean;
-  /** Refetch interval for automatic updates (default: disabled) */
-  refetchInterval?: number | false;
-  /** Number of retry attempts on failure */
-  retry?: boolean | number;
-  /** Retry delay configuration */
-  retryDelay?: number;
-  /** Enable React Suspense integration */
-  suspense?: boolean;
-  /** Error boundary integration */
-  useErrorBoundary?: boolean;
-}
+export type GlobalLookupKeysResponse = GenericListResponse<LookupKeyType>;
 
-// =============================================================================
-// QUERY KEY CONSTANTS
-// =============================================================================
+// ============================================================================
+// React Query Configuration
+// ============================================================================
 
 /**
- * React Query key factory for global lookup keys
- * Provides consistent cache key generation for all global lookup key queries
+ * React Query query key for global lookup keys
  */
-export const globalLookupKeysKeys = {
-  /** Base key for all global lookup key queries */
-  all: ['global-lookup-keys'] as const,
-  /** List query key with optional filters */
-  list: (filters?: Record<string, unknown>) => 
-    ['global-lookup-keys', 'list', filters] as const,
-  /** Detail query key for specific lookup key */
-  detail: (id: number | string) => 
-    ['global-lookup-keys', 'detail', id] as const,
-} as const;
-
-// =============================================================================
-// API ENDPOINTS
-// =============================================================================
+export const globalLookupKeysQueryKey = ['global-lookup-keys'] as const;
 
 /**
- * API endpoint paths for global lookup keys
- * Maintains compatibility with existing DreamFactory Core API structure
+ * API endpoint for global lookup keys
  */
-const LOOKUP_KEYS_ENDPOINTS = {
-  /** Base path for lookup keys API */
-  base: '/system/lookup',
-  /** Get all lookup keys */
-  list: '/system/lookup',
-  /** Create new lookup key */
-  create: '/system/lookup',
-  /** Update existing lookup key */
-  update: (id: number | string) => `/system/lookup/${id}`,
-  /** Delete lookup key */
-  delete: (id: number | string) => `/system/lookup/${id}`,
+const GLOBAL_LOOKUP_KEYS_ENDPOINT = '/api/v2/system/lookup';
+
+/**
+ * React Query cache configuration optimized for global lookup keys
+ * 
+ * Configuration aligns with React/Next.js Integration Requirements:
+ * - Cache hit responses under 50ms
+ * - Intelligent caching with background synchronization
+ * - TTL configuration for performance optimization
+ */
+export const globalLookupKeysCacheConfig = {
+  /** Cache time: 15 minutes (900s) - data remains in cache for extended periods */
+  gcTime: 15 * 60 * 1000,
+  /** Stale time: 5 minutes (300s) - data considered fresh for 5 minutes */
+  staleTime: 5 * 60 * 1000,
+  /** Enable background refetch when component mounts */
+  refetchOnMount: true,
+  /** Enable background refetch on window focus for real-time updates */
+  refetchOnWindowFocus: true,
+  /** Retry failed requests up to 3 times with exponential backoff */
+  retry: 3,
+  /** Retry delay with exponential backoff */
+  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
 } as const;
 
-// =============================================================================
-// QUERY FUNCTIONS
-// =============================================================================
+// ============================================================================
+// API Functions
+// ============================================================================
 
 /**
  * Fetches global lookup keys from the DreamFactory API
  * 
- * @param options - Request options for filtering and pagination
- * @returns Promise resolving to ApiListResponse<LookupKeyType>
+ * Implements the same pattern as Angular DfGlobalLookupKeysResolver but with
+ * modern fetch-based API client and React Query optimizations.
+ * 
+ * @returns Promise resolving to global lookup keys response
+ * @throws {Error} When API request fails or returns invalid data
  */
-async function fetchGlobalLookupKeys(
-  options: {
-    limit?: number;
-    offset?: number;
-    filter?: string;
-    sort?: string;
-    fields?: string;
-  } = {}
-): Promise<ApiListResponse<LookupKeyType>> {
+export async function fetchGlobalLookupKeys(): Promise<GlobalLookupKeysResponse> {
   try {
-    // Construct query parameters
-    const params = new URLSearchParams();
-    
-    // Add pagination parameters
-    if (options.limit !== undefined) {
-      params.append('limit', String(options.limit));
+    const response = await apiGet<GlobalLookupKeysResponse>(
+      GLOBAL_LOOKUP_KEYS_ENDPOINT,
+      {
+        fields: '*',
+        includeCount: true,
+        showSpinner: false, // Handled by React Query loading states
+        snackbarError: 'Failed to load global lookup keys',
+      }
+    );
+
+    // Validate response structure for type safety
+    if (!response || typeof response !== 'object') {
+      throw new Error('Invalid response format from global lookup keys API');
     }
-    if (options.offset !== undefined) {
-      params.append('offset', String(options.offset));
+
+    if (!Array.isArray(response.resource)) {
+      throw new Error('Invalid resource format in global lookup keys response');
     }
-    
-    // Add filtering parameters
-    if (options.filter) {
-      params.append('filter', options.filter);
-    }
-    if (options.sort) {
-      params.append('sort', options.sort);
-    }
-    
-    // Add field selection (default to all fields)
-    const fields = options.fields || '*';
-    params.append('fields', fields);
-    
-    // Always include count for pagination metadata
-    params.append('include_count', 'true');
-    
-    // Construct the full endpoint URL
-    const endpoint = `${LOOKUP_KEYS_ENDPOINTS.list}?${params.toString()}`;
-    
-    // Execute the API request
-    const response = await apiClient.get(endpoint, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
+
+    // Ensure each lookup key has required properties
+    response.resource.forEach((item, index) => {
+      if (!item || typeof item !== 'object') {
+        throw new Error(`Invalid lookup key format at index ${index}`);
+      }
+      
+      if (typeof item.name !== 'string' || !item.name.trim()) {
+        throw new Error(`Invalid lookup key name at index ${index}`);
+      }
+      
+      if (typeof item.value !== 'string') {
+        throw new Error(`Invalid lookup key value at index ${index}`);
+      }
+      
+      if (typeof item.private !== 'boolean') {
+        throw new Error(`Invalid lookup key private flag at index ${index}`);
+      }
     });
-    
-    // Transform the response to match our expected structure
-    // DreamFactory returns { resource: [...], meta: {...} }
-    return {
-      resource: response.resource || [],
-      meta: {
-        count: response.meta?.count || 0,
-        limit: response.meta?.limit || 25,
-        offset: response.meta?.offset || 0,
-        total: response.meta?.total,
-        has_more: response.meta?.has_more,
-        next_cursor: response.meta?.next_cursor,
-        prev_cursor: response.meta?.prev_cursor,
-      },
-    };
+
+    return response;
   } catch (error) {
-    // Transform API errors to our standardized error format
+    // Enhanced error handling per Section 4.2 requirements
     if (error instanceof Error) {
       throw new Error(`Failed to fetch global lookup keys: ${error.message}`);
     }
-    throw new Error('Failed to fetch global lookup keys: Unknown error');
+    throw new Error('Unknown error occurred while fetching global lookup keys');
   }
 }
 
-// =============================================================================
-// REACT QUERY HOOKS
-// =============================================================================
+// ============================================================================
+// React Query Hook
+// ============================================================================
 
 /**
- * React Query hook for fetching global lookup keys
+ * Custom React Query hook for global lookup keys management
  * 
- * Provides intelligent caching, automatic revalidation, and type-safe data
- * fetching for global lookup key management. Optimized for cache responses
- * under 50ms and maintains real-time synchronization with the server.
+ * Replaces Angular DfGlobalLookupKeysResolver with React Query-powered data
+ * fetching, intelligent caching, and automatic revalidation. Provides type-safe
+ * access to global lookup keys for ADF configuration workflows.
  * 
- * @param options - Query configuration options
- * @returns UseQueryResult with global lookup keys data and query state
+ * Key Features:
+ * - Cache responses under 50ms per React/Next.js Integration Requirements
+ * - Automatic background revalidation for real-time lookup key updates
+ * - Intelligent caching with TTL configuration (staleTime: 300s, cacheTime: 900s)
+ * - Type-safe GenericListResponse<LookupKeyType> return type
+ * - Comprehensive error handling and validation
+ * 
+ * @param options - Optional React Query configuration overrides
+ * @returns UseQueryResult with global lookup keys data and state
  * 
  * @example
- * ```typescript
- * function GlobalLookupKeysComponent() {
+ * ```tsx
+ * function GlobalLookupKeysManager() {
  *   const {
- *     data,
+ *     data: lookupKeys,
  *     isLoading,
  *     isError,
  *     error,
- *     isStale,
- *     isFetching,
- *   } = useGlobalLookupKeys({
- *     staleTime: 300000, // 5 minutes
- *     cacheTime: 900000, // 15 minutes
- *     refetchOnWindowFocus: true,
- *   });
+ *     refetch
+ *   } = useGlobalLookupKeys();
  * 
  *   if (isLoading) return <div>Loading lookup keys...</div>;
  *   if (isError) return <div>Error: {error?.message}</div>;
  * 
  *   return (
  *     <div>
- *       <h2>Global Lookup Keys ({data?.meta.count})</h2>
- *       {data?.resource.map(key => (
- *         <div key={key.id}>
- *           <strong>{key.name}</strong>: {key.value}
+ *       <h2>Global Lookup Keys ({lookupKeys?.meta?.count || 0})</h2>
+ *       {lookupKeys?.resource?.map(key => (
+ *         <div key={key.id || key.name}>
+ *           <strong>{key.name}:</strong> {key.value}
  *           {key.private && <span> (Private)</span>}
  *         </div>
  *       ))}
+ *       <button onClick={() => refetch()}>Refresh</button>
  *     </div>
  *   );
  * }
  * ```
  */
 export function useGlobalLookupKeys(
-  queryOptions: GlobalLookupKeysQueryOptions = {}
-): UseQueryResult<ApiListResponse<LookupKeyType>, ApiErrorResponse> {
-  // Extract query options with defaults optimized for performance
-  const {
-    enabled = true,
-    staleTime = 300000, // 5 minutes (300 seconds)
-    cacheTime = 900000, // 15 minutes (900 seconds)
-    refetchOnWindowFocus = true,
-    refetchOnReconnect = true,
-    refetchInterval = false, // Disabled by default, can be enabled for real-time updates
-    retry = 3,
-    retryDelay = 1000,
-    suspense = false,
-    useErrorBoundary = false,
-  } = queryOptions;
-
-  return useQuery({
-    // Query key for cache identification and invalidation
-    queryKey: globalLookupKeysKeys.list(),
+  options: {
+    /** Enable/disable the query */
+    enabled?: boolean;
+    /** Custom stale time override */
+    staleTime?: number;
+    /** Custom cache time override */
+    gcTime?: number;
+    /** Custom refetch interval */
+    refetchInterval?: number;
+    /** Select function for data transformation */
+    select?: (data: GlobalLookupKeysResponse) => any;
+  } = {}
+): UseQueryResult<GlobalLookupKeysResponse, Error> {
+  return useQuery<GlobalLookupKeysResponse, Error>({
+    queryKey: globalLookupKeysQueryKey,
+    queryFn: fetchGlobalLookupKeys,
     
-    // Query function that fetches the data
-    queryFn: () => fetchGlobalLookupKeys({
-      fields: '*', // Fetch all fields for comprehensive data
-    }),
+    // Cache configuration with TTL per requirements
+    ...globalLookupKeysCacheConfig,
     
-    // Caching and revalidation configuration
-    enabled,
-    staleTime,
-    cacheTime,
-    refetchOnWindowFocus,
-    refetchOnReconnect,
-    refetchInterval,
+    // Apply user-provided overrides
+    enabled: options.enabled,
+    staleTime: options.staleTime ?? globalLookupKeysCacheConfig.staleTime,
+    gcTime: options.gcTime ?? globalLookupKeysCacheConfig.gcTime,
+    refetchInterval: options.refetchInterval,
+    select: options.select,
     
-    // Error handling and retry configuration
-    retry,
-    retryDelay,
-    useErrorBoundary,
+    // Error boundary integration for React 19 concurrent features
+    throwOnError: false,
     
-    // React integration options
-    suspense,
+    // Optimistic updates and suspense integration
+    notifyOnChangeProps: ['data', 'error', 'isLoading'],
     
-    // Keep previous data during background refetches for better UX
-    keepPreviousData: true,
-    
-    // Select function to optimize re-renders (optional transformation)
-    select: (data) => data,
-    
-    // Optional: Network mode for offline handling
-    networkMode: 'online',
-    
-    // Optional: Refetch on mount behavior
-    refetchOnMount: true,
-    
-    // Optional: Configure when stale data should be considered
-    staleTime,
-    
-    // Meta information for debugging and monitoring
+    // Metadata for debugging and monitoring
     meta: {
-      feature: 'global-lookup-keys',
-      component: 'adf-config',
-      endpoint: LOOKUP_KEYS_ENDPOINTS.list,
+      component: 'GlobalLookupKeysManager',
+      feature: 'adf-config',
+      endpoint: GLOBAL_LOOKUP_KEYS_ENDPOINT,
     },
   });
 }
 
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
 /**
- * Hook for fetching global lookup keys with custom filters
+ * Utility function to get lookup key value by name
  * 
- * @param filters - Filter criteria for lookup keys
- * @param queryOptions - Additional query configuration
- * @returns UseQueryResult with filtered global lookup keys
- * 
- * @example
- * ```typescript
- * const { data } = useGlobalLookupKeysFiltered(
- *   { filter: 'private eq false' }, // Only public keys
- *   { staleTime: 60000 } // 1 minute cache
- * );
- * ```
+ * @param lookupKeys - Array of lookup keys from the query result
+ * @param name - Name of the lookup key to find
+ * @returns The value of the lookup key or undefined if not found
  */
-export function useGlobalLookupKeysFiltered(
-  filters: {
-    filter?: string;
-    sort?: string;
-    limit?: number;
-    offset?: number;
-  } = {},
-  queryOptions: GlobalLookupKeysQueryOptions = {}
-): UseQueryResult<ApiListResponse<LookupKeyType>, ApiErrorResponse> {
-  return useQuery({
-    queryKey: globalLookupKeysKeys.list(filters),
-    queryFn: () => fetchGlobalLookupKeys(filters),
-    ...queryOptions,
-    staleTime: queryOptions.staleTime ?? 300000,
-    cacheTime: queryOptions.cacheTime ?? 900000,
-    keepPreviousData: true,
-  });
+export function getLookupKeyValue(
+  lookupKeys: LookupKeyType[] | undefined,
+  name: string
+): string | undefined {
+  if (!lookupKeys || !Array.isArray(lookupKeys)) {
+    return undefined;
+  }
+  
+  const key = lookupKeys.find(item => item.name === name);
+  return key?.value;
 }
 
-// =============================================================================
-// CACHE UTILITIES
-// =============================================================================
+/**
+ * Utility function to check if a lookup key exists
+ * 
+ * @param lookupKeys - Array of lookup keys from the query result
+ * @param name - Name of the lookup key to check
+ * @returns True if the lookup key exists, false otherwise
+ */
+export function hasLookupKey(
+  lookupKeys: LookupKeyType[] | undefined,
+  name: string
+): boolean {
+  if (!lookupKeys || !Array.isArray(lookupKeys)) {
+    return false;
+  }
+  
+  return lookupKeys.some(item => item.name === name);
+}
 
 /**
- * Utility functions for cache management
- * Provides manual cache control for optimistic updates and cache invalidation
+ * Utility function to filter lookup keys by private flag
+ * 
+ * @param lookupKeys - Array of lookup keys from the query result
+ * @param includePrivate - Whether to include private keys (default: true)
+ * @returns Filtered array of lookup keys
  */
-export const globalLookupKeysCacheUtils = {
-  /**
-   * Query key factory for external cache operations
-   */
-  keys: globalLookupKeysKeys,
+export function filterLookupKeys(
+  lookupKeys: LookupKeyType[] | undefined,
+  includePrivate: boolean = true
+): LookupKeyType[] {
+  if (!lookupKeys || !Array.isArray(lookupKeys)) {
+    return [];
+  }
   
-  /**
-   * Endpoint configuration for external API calls
-   */
-  endpoints: LOOKUP_KEYS_ENDPOINTS,
+  if (includePrivate) {
+    return lookupKeys;
+  }
   
-  /**
-   * Default query options for consistent configuration
-   */
-  defaultOptions: {
-    staleTime: 300000, // 5 minutes
-    cacheTime: 900000, // 15 minutes
-    retry: 3,
-    retryDelay: 1000,
-  } as const,
-} as const;
+  return lookupKeys.filter(item => !item.private);
+}
 
-// =============================================================================
-// EXPORTS
-// =============================================================================
+// ============================================================================
+// Default Export
+// ============================================================================
 
-export type {
-  LookupKeyType,
-  GlobalLookupKeysQueryOptions,
-};
-
-export {
-  globalLookupKeysKeys,
-  LOOKUP_KEYS_ENDPOINTS,
-  fetchGlobalLookupKeys,
-  useGlobalLookupKeys as default,
-};
+export default useGlobalLookupKeys;
