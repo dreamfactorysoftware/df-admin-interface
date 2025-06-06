@@ -1,73 +1,162 @@
 /**
- * Mock Service Worker (MSW) handlers for API mocking during development and testing
- * of endpoint configuration components. Provides realistic API simulation without
- * backend dependencies for comprehensive endpoint configuration workflow testing.
+ * Mock Service Worker (MSW) Handlers for Endpoint Configuration Testing
+ * 
+ * Comprehensive HTTP request handlers for API mocking during development and testing
+ * of endpoint configuration components. Defines realistic API simulation patterns
+ * for endpoint operations, parameter validation, security configuration, and OpenAPI
+ * generation workflows enabling isolated frontend testing without backend dependencies.
  * 
  * Features:
- * - Complete endpoint CRUD operations with validation
- * - Parameter configuration with type-specific validation
- * - Security scheme assignment and validation
- * - OpenAPI specification generation and preview
- * - Realistic error simulation and edge case handling
- * - Performance optimized for Vitest test execution
+ * - Complete endpoint configuration CRUD operations with realistic response simulation
+ * - Parameter validation and configuration with comprehensive error handling
+ * - Security scheme assignment and authentication workflow testing
+ * - OpenAPI specification generation and preview simulation
+ * - Real-time validation feedback with configurable latency simulation
+ * - Comprehensive error scenarios and edge case handling for robust test coverage
+ * 
+ * Technical Implementation:
+ * - MSW 2.4.0+ HTTP request handlers with type-safe response structures
+ * - Realistic database-backed endpoint simulation with in-memory state management
+ * - Configurable response delays for performance testing and UX validation
+ * - Comprehensive error simulation including network failures and validation errors
+ * - Integration with Vitest testing framework for automated endpoint configuration testing
+ * 
+ * @fileoverview MSW handlers for endpoint configuration component testing
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, MSW 2.4.0+
  */
 
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, delay } from 'msw';
+import type { DefaultBodyType, PathParams } from 'msw';
 
-// Types for endpoint configuration (inferred from technical specification)
-interface EndpointParameter {
+// Type imports for endpoint configuration
+import type { 
+  DatabaseService,
+  DatabaseDriver,
+  ServiceStatus,
+  DatabaseType,
+  ApiErrorResponse,
+  ResponseMetadata
+} from '../../../../types/database-service';
+
+// =============================================================================
+// ENDPOINT CONFIGURATION TYPES
+// =============================================================================
+
+/**
+ * HTTP methods supported by endpoint configuration
+ */
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
+
+/**
+ * Parameter types for endpoint configuration
+ */
+export type ParameterType = 'path' | 'query' | 'header' | 'body' | 'form';
+
+/**
+ * Data types for parameter validation
+ */
+export type DataType = 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'file' | 'date' | 'datetime';
+
+/**
+ * Security scheme types
+ */
+export type SecuritySchemeType = 'none' | 'api_key' | 'bearer' | 'basic' | 'oauth2' | 'session';
+
+/**
+ * Parameter configuration interface
+ */
+export interface ParameterConfig {
   id: string;
   name: string;
-  type: 'path' | 'query' | 'body' | 'header';
-  dataType: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  type: ParameterType;
+  dataType: DataType;
   required: boolean;
   description?: string;
+  defaultValue?: any;
+  example?: any;
   validation?: {
     minLength?: number;
     maxLength?: number;
     pattern?: string;
     minimum?: number;
     maximum?: number;
-    enum?: string[];
+    enum?: any[];
+    format?: string;
   };
+  deprecated?: boolean;
+  allowEmptyValue?: boolean;
 }
 
-interface SecurityScheme {
-  id: string;
-  type: 'apiKey' | 'bearer' | 'basic' | 'oauth2';
+/**
+ * Security configuration interface
+ */
+export interface SecurityConfig {
+  type: SecuritySchemeType;
   name?: string;
   in?: 'header' | 'query' | 'cookie';
   scheme?: string;
+  bearerFormat?: string;
+  flows?: any;
+  openIdConnectUrl?: string;
   description?: string;
+  required: boolean;
 }
 
-interface ValidationRule {
-  id: string;
-  field: string;
-  type: 'required' | 'minLength' | 'maxLength' | 'pattern' | 'range' | 'enum';
-  value: string | number | string[];
-  message: string;
-  condition?: string;
+/**
+ * Response configuration interface
+ */
+export interface ResponseConfig {
+  statusCode: number;
+  description: string;
+  mediaType?: string;
+  schema?: any;
+  examples?: Record<string, any>;
+  headers?: Record<string, any>;
 }
 
-interface EndpointConfiguration {
+/**
+ * Endpoint configuration interface
+ */
+export interface EndpointConfig {
   id: string;
-  serviceName: string;
-  tableName: string;
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  serviceId: number;
   path: string;
-  parameters: EndpointParameter[];
-  security: SecurityScheme[];
-  validation: ValidationRule[];
-  description?: string;
+  method: HttpMethod;
+  operationId?: string;
   summary?: string;
+  description?: string;
   tags?: string[];
-  responses?: Record<string, any>;
-  createdAt: string;
-  updatedAt: string;
+  parameters: ParameterConfig[];
+  security: SecurityConfig[];
+  responses: ResponseConfig[];
+  requestBody?: {
+    required: boolean;
+    mediaType: string;
+    schema: any;
+    examples?: Record<string, any>;
+  };
+  metadata: {
+    createdAt: string;
+    updatedAt: string;
+    createdBy: string;
+    version: number;
+    deprecated?: boolean;
+  };
 }
 
-interface OpenAPISpecification {
+/**
+ * Endpoint list response interface
+ */
+export interface EndpointListResponse {
+  resource: EndpointConfig[];
+  meta: ResponseMetadata;
+}
+
+/**
+ * OpenAPI specification interface
+ */
+export interface OpenAPISpec {
   openapi: string;
   info: {
     title: string;
@@ -79,275 +168,350 @@ interface OpenAPISpecification {
     description?: string;
   }>;
   paths: Record<string, any>;
-  components: {
-    schemas: Record<string, any>;
-    securitySchemes: Record<string, any>;
-    responses: Record<string, any>;
+  components?: {
+    schemas?: Record<string, any>;
+    securitySchemes?: Record<string, any>;
+    parameters?: Record<string, any>;
+    responses?: Record<string, any>;
   };
-  security: Array<Record<string, any>>;
+  security?: Array<Record<string, any>>;
 }
 
-interface ApiError {
-  code: number;
-  message: string;
-  details?: Record<string, any>;
-  timestamp: string;
+/**
+ * Validation result interface
+ */
+export interface ValidationResult {
+  valid: boolean;
+  errors: Array<{
+    field: string;
+    message: string;
+    code: string;
+  }>;
+  warnings: Array<{
+    field: string;
+    message: string;
+    code: string;
+  }>;
+  suggestions?: Array<{
+    field: string;
+    message: string;
+    suggestion: string;
+  }>;
 }
 
-// Mock data storage
-const mockEndpoints: EndpointConfiguration[] = [
-  {
-    id: 'ep-001',
-    serviceName: 'users_db',
-    tableName: 'users',
-    method: 'GET',
-    path: '/api/v2/users_db/_table/users',
-    parameters: [
-      {
-        id: 'param-001',
-        name: 'limit',
-        type: 'query',
-        dataType: 'number',
-        required: false,
-        description: 'Maximum number of records to return',
-        validation: { minimum: 1, maximum: 1000 }
+/**
+ * Preview request interface
+ */
+export interface PreviewRequest {
+  endpoint: EndpointConfig;
+  testData?: Record<string, any>;
+  format: 'openapi' | 'postman' | 'curl' | 'raw';
+}
+
+/**
+ * Preview response interface
+ */
+export interface PreviewResponse {
+  openapi?: OpenAPISpec;
+  postman?: any;
+  curl?: string;
+  raw?: string;
+  validationResult: ValidationResult;
+  generatedAt: string;
+}
+
+// =============================================================================
+// MOCK DATA GENERATION UTILITIES
+// =============================================================================
+
+/**
+ * Generate mock database services for testing
+ */
+function generateMockServices(): DatabaseService[] {
+  return [
+    {
+      id: 1,
+      name: 'mysql_primary',
+      label: 'MySQL Primary Database',
+      description: 'Primary MySQL database for application data',
+      type: 'mysql' as DatabaseDriver,
+      is_active: true,
+      mutable: true,
+      deletable: true,
+      config: {
+        driver: 'mysql',
+        host: 'localhost',
+        port: 3306,
+        database: 'app_db',
+        username: 'root',
+        charset: 'utf8mb4',
+        collation: 'utf8mb4_unicode_ci'
       },
-      {
-        id: 'param-002',
-        name: 'offset',
-        type: 'query',
-        dataType: 'number',
-        required: false,
-        description: 'Number of records to skip',
-        validation: { minimum: 0 }
+      created_date: '2024-01-15T10:30:00Z',
+      last_modified_date: '2024-01-15T10:30:00Z',
+      created_by_id: 1,
+      last_modified_by_id: 1
+    },
+    {
+      id: 2,
+      name: 'postgresql_analytics',
+      label: 'PostgreSQL Analytics',
+      description: 'PostgreSQL database for analytics and reporting',
+      type: 'pgsql' as DatabaseDriver,
+      is_active: true,
+      mutable: true,
+      deletable: true,
+      config: {
+        driver: 'pgsql',
+        host: 'localhost',
+        port: 5432,
+        database: 'analytics_db',
+        username: 'postgres',
+        charset: 'utf8'
       },
-      {
-        id: 'param-003',
-        name: 'filter',
-        type: 'query',
-        dataType: 'string',
-        required: false,
-        description: 'SQL WHERE clause for filtering'
-      }
-    ],
-    security: [
-      {
-        id: 'sec-001',
-        type: 'apiKey',
-        name: 'X-DreamFactory-API-Key',
-        in: 'header',
-        description: 'API Key authentication'
-      }
-    ],
-    validation: [
-      {
-        id: 'val-001',
-        field: 'limit',
-        type: 'range',
-        value: [1, 1000],
-        message: 'Limit must be between 1 and 1000'
-      }
-    ],
-    description: 'Retrieve users from the database',
-    summary: 'Get Users',
-    tags: ['users'],
-    responses: {
-      '200': {
-        description: 'Success Response',
-        schema: { type: 'object' }
+      created_date: '2024-01-15T11:30:00Z',
+      last_modified_date: '2024-01-15T11:30:00Z',
+      created_by_id: 1,
+      last_modified_by_id: 1
+    }
+  ];
+}
+
+/**
+ * Generate mock endpoint configurations for testing
+ */
+function generateMockEndpoints(): EndpointConfig[] {
+  return [
+    {
+      id: 'ep_001',
+      serviceId: 1,
+      path: '/api/v1/users',
+      method: 'GET',
+      operationId: 'getUsers',
+      summary: 'Get all users',
+      description: 'Retrieve a paginated list of all users with optional filtering',
+      tags: ['users', 'management'],
+      parameters: [
+        {
+          id: 'param_001',
+          name: 'page',
+          type: 'query',
+          dataType: 'integer',
+          required: false,
+          description: 'Page number for pagination',
+          defaultValue: 1,
+          example: 1,
+          validation: { minimum: 1, maximum: 1000 }
+        },
+        {
+          id: 'param_002',
+          name: 'limit',
+          type: 'query',
+          dataType: 'integer',
+          required: false,
+          description: 'Number of items per page',
+          defaultValue: 20,
+          example: 20,
+          validation: { minimum: 1, maximum: 100 }
+        },
+        {
+          id: 'param_003',
+          name: 'search',
+          type: 'query',
+          dataType: 'string',
+          required: false,
+          description: 'Search term for filtering users',
+          example: 'john',
+          validation: { minLength: 2, maxLength: 50 }
+        }
+      ],
+      security: [
+        {
+          type: 'bearer',
+          required: true,
+          description: 'JWT Bearer token for authentication',
+          bearerFormat: 'JWT'
+        }
+      ],
+      responses: [
+        {
+          statusCode: 200,
+          description: 'Successful response with user list',
+          mediaType: 'application/json',
+          schema: {
+            type: 'object',
+            properties: {
+              data: {
+                type: 'array',
+                items: { $ref: '#/components/schemas/User' }
+              },
+              meta: { $ref: '#/components/schemas/PaginationMeta' }
+            }
+          },
+          examples: {
+            default: {
+              summary: 'Default user list response',
+              value: {
+                data: [
+                  { id: 1, name: 'John Doe', email: 'john@example.com' },
+                  { id: 2, name: 'Jane Smith', email: 'jane@example.com' }
+                ],
+                meta: { page: 1, limit: 20, total: 2, pages: 1 }
+              }
+            }
+          }
+        },
+        {
+          statusCode: 401,
+          description: 'Unauthorized - Invalid or missing authentication',
+          mediaType: 'application/json',
+          schema: { $ref: '#/components/schemas/Error' }
+        }
+      ],
+      metadata: {
+        createdAt: '2024-01-15T10:30:00Z',
+        updatedAt: '2024-01-15T10:30:00Z',
+        createdBy: 'admin',
+        version: 1
       }
     },
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z'
-  },
-  {
-    id: 'ep-002',
-    serviceName: 'users_db',
-    tableName: 'users',
-    method: 'POST',
-    path: '/api/v2/users_db/_table/users',
-    parameters: [
-      {
-        id: 'param-004',
-        name: 'body',
-        type: 'body',
-        dataType: 'object',
+    {
+      id: 'ep_002',
+      serviceId: 1,
+      path: '/api/v1/users/{id}',
+      method: 'PUT',
+      operationId: 'updateUser',
+      summary: 'Update user',
+      description: 'Update an existing user by ID',
+      tags: ['users', 'management'],
+      parameters: [
+        {
+          id: 'param_004',
+          name: 'id',
+          type: 'path',
+          dataType: 'integer',
+          required: true,
+          description: 'User ID to update',
+          example: 123,
+          validation: { minimum: 1 }
+        }
+      ],
+      security: [
+        {
+          type: 'bearer',
+          required: true,
+          description: 'JWT Bearer token for authentication',
+          bearerFormat: 'JWT'
+        }
+      ],
+      responses: [
+        {
+          statusCode: 200,
+          description: 'User updated successfully',
+          mediaType: 'application/json',
+          schema: { $ref: '#/components/schemas/User' }
+        },
+        {
+          statusCode: 404,
+          description: 'User not found',
+          mediaType: 'application/json',
+          schema: { $ref: '#/components/schemas/Error' }
+        }
+      ],
+      requestBody: {
         required: true,
-        description: 'User data to create'
-      }
-    ],
-    security: [
-      {
-        id: 'sec-002',
-        type: 'bearer',
-        scheme: 'bearer',
-        description: 'JWT Bearer token authentication'
-      }
-    ],
-    validation: [
-      {
-        id: 'val-002',
-        field: 'email',
-        type: 'pattern',
-        value: '^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$',
-        message: 'Invalid email format'
+        mediaType: 'application/json',
+        schema: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', minLength: 2, maxLength: 100 },
+            email: { type: 'string', format: 'email' },
+            active: { type: 'boolean' }
+          },
+          required: ['name', 'email']
+        },
+        examples: {
+          default: {
+            summary: 'Update user example',
+            value: {
+              name: 'John Doe Updated',
+              email: 'john.updated@example.com',
+              active: true
+            }
+          }
+        }
       },
-      {
-        id: 'val-003',
-        field: 'username',
-        type: 'minLength',
-        value: 3,
-        message: 'Username must be at least 3 characters'
+      metadata: {
+        createdAt: '2024-01-15T11:30:00Z',
+        updatedAt: '2024-01-15T11:30:00Z',
+        createdBy: 'admin',
+        version: 1
       }
-    ],
-    description: 'Create a new user in the database',
-    summary: 'Create User',
-    tags: ['users'],
-    responses: {
-      '201': {
-        description: 'User created successfully',
-        schema: { type: 'object' }
-      }
-    },
-    createdAt: '2024-01-15T10:30:00Z',
-    updatedAt: '2024-01-15T10:30:00Z'
-  }
-];
+    }
+  ];
+}
 
-const mockSecuritySchemes: SecurityScheme[] = [
-  {
-    id: 'sec-api-key',
-    type: 'apiKey',
-    name: 'X-DreamFactory-API-Key',
-    in: 'header',
-    description: 'API Key authentication'
-  },
-  {
-    id: 'sec-bearer',
-    type: 'bearer',
-    scheme: 'bearer',
-    description: 'JWT Bearer token authentication'
-  },
-  {
-    id: 'sec-basic',
-    type: 'basic',
-    description: 'HTTP Basic authentication'
-  },
-  {
-    id: 'sec-session',
-    type: 'apiKey',
-    name: 'X-DreamFactory-Session-Token',
-    in: 'header',
-    description: 'Session token authentication'
-  }
-];
-
-// Helper functions
-const createApiError = (code: number, message: string, details?: any): ApiError => ({
-  code,
-  message,
-  details,
-  timestamp: new Date().toISOString()
-});
-
-const generateEndpointId = (): string => {
-  return `ep-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-};
-
-const generateParameterId = (): string => {
-  return `param-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-};
-
-const validateEndpointConfiguration = (config: Partial<EndpointConfiguration>): string[] => {
-  const errors: string[] = [];
-  
-  if (!config.serviceName) errors.push('Service name is required');
-  if (!config.tableName) errors.push('Table name is required');
-  if (!config.method) errors.push('HTTP method is required');
-  if (!config.path) errors.push('Path is required');
-  
-  if (config.path && !/^\/api\/v2\//.test(config.path)) {
-    errors.push('Path must start with /api/v2/');
-  }
-  
-  if (config.method && !['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(config.method)) {
-    errors.push('Invalid HTTP method');
-  }
-  
-  return errors;
-};
-
-const generateOpenAPISpec = (endpoints: EndpointConfiguration[]): OpenAPISpecification => {
+/**
+ * Generate OpenAPI specification for testing
+ */
+function generateOpenAPISpec(endpoints: EndpointConfig[]): OpenAPISpec {
   const paths: Record<string, any> = {};
-  const schemas: Record<string, any> = {};
-  const securitySchemes: Record<string, any> = {};
   
-  // Build paths from endpoints
   endpoints.forEach(endpoint => {
     if (!paths[endpoint.path]) {
       paths[endpoint.path] = {};
     }
     
-    const operation = {
-      summary: endpoint.summary || `${endpoint.method} ${endpoint.tableName}`,
-      description: endpoint.description || '',
-      operationId: `${endpoint.method.toLowerCase()}${endpoint.tableName}`,
-      tags: endpoint.tags || [endpoint.tableName],
-      parameters: endpoint.parameters
-        .filter(p => p.type !== 'body')
-        .map(p => ({
-          name: p.name,
-          in: p.type,
-          required: p.required,
-          description: p.description,
-          schema: { type: p.dataType }
-        })),
-      responses: endpoint.responses || {
-        '200': {
-          description: 'Success Response',
-          content: {
-            'application/json': {
-              schema: { type: 'object' }
+    paths[endpoint.path][endpoint.method.toLowerCase()] = {
+      operationId: endpoint.operationId,
+      summary: endpoint.summary,
+      description: endpoint.description,
+      tags: endpoint.tags,
+      parameters: endpoint.parameters.map(param => ({
+        name: param.name,
+        in: param.type,
+        required: param.required,
+        description: param.description,
+        schema: {
+          type: param.dataType,
+          default: param.defaultValue,
+          example: param.example,
+          ...param.validation
+        }
+      })),
+      security: endpoint.security.map(sec => ({
+        [sec.type]: []
+      })),
+      responses: endpoint.responses.reduce((acc, resp) => {
+        acc[resp.statusCode] = {
+          description: resp.description,
+          content: resp.mediaType ? {
+            [resp.mediaType]: {
+              schema: resp.schema,
+              examples: resp.examples
             }
-          }
-        }
-      },
-      security: endpoint.security.map(s => ({ [s.id]: [] }))
-    };
-    
-    // Add request body for POST/PUT/PATCH methods
-    const bodyParam = endpoint.parameters.find(p => p.type === 'body');
-    if (bodyParam && ['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-      operation.requestBody = {
-        required: bodyParam.required,
+          } : undefined
+        };
+        return acc;
+      }, {} as Record<string, any>),
+      requestBody: endpoint.requestBody ? {
+        required: endpoint.requestBody.required,
         content: {
-          'application/json': {
-            schema: { type: bodyParam.dataType }
+          [endpoint.requestBody.mediaType]: {
+            schema: endpoint.requestBody.schema,
+            examples: endpoint.requestBody.examples
           }
         }
-      };
-    }
-    
-    paths[endpoint.path][endpoint.method.toLowerCase()] = operation;
-  });
-  
-  // Build security schemes
-  mockSecuritySchemes.forEach(scheme => {
-    securitySchemes[scheme.id] = {
-      type: scheme.type,
-      ...(scheme.name && { name: scheme.name }),
-      ...(scheme.in && { in: scheme.in }),
-      ...(scheme.scheme && { scheme: scheme.scheme }),
-      description: scheme.description
+      } : undefined
     };
   });
-  
+
   return {
-    openapi: '3.0.0',
+    openapi: '3.0.3',
     info: {
-      title: 'Generated API Documentation',
+      title: 'DreamFactory Generated API',
       version: '1.0.0',
-      description: 'Auto-generated API documentation from DreamFactory endpoint configuration'
+      description: 'API generated by DreamFactory Admin Interface'
     },
     servers: [
       {
@@ -357,611 +521,1112 @@ const generateOpenAPISpec = (endpoints: EndpointConfiguration[]): OpenAPISpecifi
     ],
     paths,
     components: {
-      schemas,
-      securitySchemes,
-      responses: {
-        Success: {
-          description: 'Success Response',
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                properties: {
-                  success: { type: 'boolean' }
-                }
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT'
+        },
+        apiKeyAuth: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'X-API-Key'
+        }
+      },
+      schemas: {
+        User: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer', example: 1 },
+            name: { type: 'string', example: 'John Doe' },
+            email: { type: 'string', format: 'email', example: 'john@example.com' },
+            active: { type: 'boolean', example: true },
+            created_at: { type: 'string', format: 'date-time' },
+            updated_at: { type: 'string', format: 'date-time' }
+          }
+        },
+        Error: {
+          type: 'object',
+          properties: {
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'integer' },
+                message: { type: 'string' },
+                details: { type: 'object' }
               }
             }
           }
         },
-        Error: {
-          description: 'Error Response',
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                properties: {
-                  code: { type: 'integer' },
-                  message: { type: 'string' },
-                  details: { type: 'object' }
-                }
-              }
-            }
+        PaginationMeta: {
+          type: 'object',
+          properties: {
+            page: { type: 'integer', example: 1 },
+            limit: { type: 'integer', example: 20 },
+            total: { type: 'integer', example: 100 },
+            pages: { type: 'integer', example: 5 }
           }
         }
       }
     },
-    security: mockSecuritySchemes.map(scheme => ({ [scheme.id]: [] }))
+    security: [
+      { bearerAuth: [] }
+    ]
   };
-};
+}
 
 /**
- * MSW HTTP handlers for endpoint configuration API mocking
- * 
- * Provides comprehensive coverage for:
- * - Endpoint CRUD operations
- * - Parameter configuration and validation
- * - Security scheme management
- * - OpenAPI specification generation
- * - Error simulation and edge cases
+ * Validate endpoint configuration
+ */
+function validateEndpointConfiguration(endpoint: Partial<EndpointConfig>): ValidationResult {
+  const errors: ValidationResult['errors'] = [];
+  const warnings: ValidationResult['warnings'] = [];
+  const suggestions: ValidationResult['suggestions'] = [];
+
+  // Validate required fields
+  if (!endpoint.path) {
+    errors.push({
+      field: 'path',
+      message: 'Endpoint path is required',
+      code: 'REQUIRED_FIELD'
+    });
+  } else if (!endpoint.path.startsWith('/')) {
+    errors.push({
+      field: 'path',
+      message: 'Endpoint path must start with /',
+      code: 'INVALID_FORMAT'
+    });
+  }
+
+  if (!endpoint.method) {
+    errors.push({
+      field: 'method',
+      message: 'HTTP method is required',
+      code: 'REQUIRED_FIELD'
+    });
+  }
+
+  if (!endpoint.serviceId) {
+    errors.push({
+      field: 'serviceId',
+      message: 'Service ID is required',
+      code: 'REQUIRED_FIELD'
+    });
+  }
+
+  // Validate parameters
+  if (endpoint.parameters) {
+    endpoint.parameters.forEach((param, index) => {
+      if (!param.name) {
+        errors.push({
+          field: `parameters[${index}].name`,
+          message: 'Parameter name is required',
+          code: 'REQUIRED_FIELD'
+        });
+      }
+
+      if (!param.type) {
+        errors.push({
+          field: `parameters[${index}].type`,
+          message: 'Parameter type is required',
+          code: 'REQUIRED_FIELD'
+        });
+      }
+
+      if (!param.dataType) {
+        errors.push({
+          field: `parameters[${index}].dataType`,
+          message: 'Parameter data type is required',
+          code: 'REQUIRED_FIELD'
+        });
+      }
+
+      // Suggest parameter descriptions
+      if (!param.description) {
+        suggestions?.push({
+          field: `parameters[${index}].description`,
+          message: 'Parameter description is recommended for better documentation',
+          suggestion: `Add a description for parameter '${param.name}'`
+        });
+      }
+    });
+  }
+
+  // Validate security configuration
+  if (endpoint.security && endpoint.security.length === 0) {
+    warnings.push({
+      field: 'security',
+      message: 'No security schemes configured. This endpoint will be publicly accessible',
+      code: 'SECURITY_WARNING'
+    });
+  }
+
+  // Validate responses
+  if (!endpoint.responses || endpoint.responses.length === 0) {
+    warnings.push({
+      field: 'responses',
+      message: 'No response configurations defined',
+      code: 'MISSING_RESPONSES'
+    });
+  } else {
+    const hasSuccessResponse = endpoint.responses.some(r => r.statusCode >= 200 && r.statusCode < 300);
+    if (!hasSuccessResponse) {
+      warnings.push({
+        field: 'responses',
+        message: 'No success response (2xx) defined',
+        code: 'MISSING_SUCCESS_RESPONSE'
+      });
+    }
+  }
+
+  // Check for common patterns and suggest improvements
+  if (endpoint.method === 'GET' && endpoint.path && !endpoint.path.includes('{')) {
+    suggestions?.push({
+      field: 'parameters',
+      message: 'Consider adding query parameters for filtering and pagination',
+      suggestion: 'Add pagination parameters like page, limit, or search filters'
+    });
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    suggestions
+  };
+}
+
+// =============================================================================
+// IN-MEMORY STATE MANAGEMENT
+// =============================================================================
+
+// Mock data storage
+let mockServices = generateMockServices();
+let mockEndpoints = generateMockEndpoints();
+
+// Configurable response delays for testing
+const RESPONSE_DELAYS = {
+  default: 100,
+  slow: 2000,
+  fast: 50,
+  timeout: 30000
+};
+
+// Error simulation flags
+let simulateNetworkError = false;
+let simulateValidationError = false;
+let simulateServerError = false;
+
+// =============================================================================
+// MSW HTTP HANDLERS
+// =============================================================================
+
+/**
+ * MSW handlers for endpoint configuration API simulation
  */
 export const endpointConfigurationHandlers = [
-  // Get all endpoints for a service
-  http.get('/api/v2/system/service/:serviceName/endpoints', ({ params }) => {
-    const { serviceName } = params;
-    
-    const serviceEndpoints = mockEndpoints.filter(
-      ep => ep.serviceName === serviceName
-    );
-    
+  // =============================================================================
+  // SERVICE MANAGEMENT ENDPOINTS
+  // =============================================================================
+
+  /**
+   * GET /api/v2/service - Get all database services
+   */
+  http.get('/api/v2/service', async ({ request }) => {
+    await delay(RESPONSE_DELAYS.default);
+
+    if (simulateNetworkError) {
+      return HttpResponse.error();
+    }
+
+    const url = new URL(request.url);
+    const includeInactive = url.searchParams.get('include_inactive') === 'true';
+    const limit = parseInt(url.searchParams.get('limit') || '0');
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+
+    let services = includeInactive 
+      ? mockServices 
+      : mockServices.filter(service => service.is_active);
+
+    // Apply pagination
+    if (limit > 0) {
+      services = services.slice(offset, offset + limit);
+    }
+
     return HttpResponse.json({
-      resource: serviceEndpoints,
+      resource: services,
       meta: {
-        count: serviceEndpoints.length,
-        schema: ['id', 'method', 'path', 'summary', 'createdAt', 'updatedAt']
+        count: services.length,
+        total: mockServices.length
       }
-    });
+    }, { status: 200 });
   }),
 
-  // Get specific endpoint configuration
-  http.get('/api/v2/system/service/:serviceName/endpoints/:endpointId', ({ params }) => {
-    const { serviceName, endpointId } = params;
-    
-    const endpoint = mockEndpoints.find(
-      ep => ep.id === endpointId && ep.serviceName === serviceName
-    );
-    
-    if (!endpoint) {
-      return HttpResponse.json(
-        createApiError(404, `Endpoint ${endpointId} not found`),
-        { status: 404 }
-      );
-    }
-    
-    return HttpResponse.json(endpoint);
-  }),
+  /**
+   * GET /api/v2/service/{serviceId} - Get specific database service
+   */
+  http.get('/api/v2/service/:serviceId', async ({ params }) => {
+    await delay(RESPONSE_DELAYS.default);
 
-  // Create new endpoint configuration
-  http.post('/api/v2/system/service/:serviceName/endpoints', async ({ params, request }) => {
-    const { serviceName } = params;
-    const requestBody = await request.json() as Partial<EndpointConfiguration>;
-    
-    // Validate configuration
-    const validationErrors = validateEndpointConfiguration(requestBody);
-    if (validationErrors.length > 0) {
-      return HttpResponse.json(
-        createApiError(400, 'Validation failed', { errors: validationErrors }),
-        { status: 400 }
-      );
+    if (simulateNetworkError) {
+      return HttpResponse.error();
     }
-    
-    // Check for duplicate endpoint
-    const duplicate = mockEndpoints.find(
-      ep => ep.serviceName === serviceName && 
-           ep.method === requestBody.method && 
-           ep.path === requestBody.path
-    );
-    
-    if (duplicate) {
-      return HttpResponse.json(
-        createApiError(409, 'Endpoint already exists for this method and path'),
-        { status: 409 }
-      );
-    }
-    
-    // Create new endpoint
-    const newEndpoint: EndpointConfiguration = {
-      id: generateEndpointId(),
-      serviceName: serviceName as string,
-      tableName: requestBody.tableName!,
-      method: requestBody.method!,
-      path: requestBody.path!,
-      parameters: requestBody.parameters || [],
-      security: requestBody.security || [],
-      validation: requestBody.validation || [],
-      description: requestBody.description,
-      summary: requestBody.summary,
-      tags: requestBody.tags,
-      responses: requestBody.responses,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    mockEndpoints.push(newEndpoint);
-    
-    return HttpResponse.json(newEndpoint, { status: 201 });
-  }),
 
-  // Update endpoint configuration
-  http.put('/api/v2/system/service/:serviceName/endpoints/:endpointId', async ({ params, request }) => {
-    const { serviceName, endpointId } = params;
-    const requestBody = await request.json() as Partial<EndpointConfiguration>;
-    
-    const endpointIndex = mockEndpoints.findIndex(
-      ep => ep.id === endpointId && ep.serviceName === serviceName
-    );
-    
-    if (endpointIndex === -1) {
-      return HttpResponse.json(
-        createApiError(404, `Endpoint ${endpointId} not found`),
-        { status: 404 }
-      );
-    }
-    
-    // Validate configuration if provided
-    if (Object.keys(requestBody).length > 0) {
-      const validationErrors = validateEndpointConfiguration(requestBody);
-      if (validationErrors.length > 0) {
-        return HttpResponse.json(
-          createApiError(400, 'Validation failed', { errors: validationErrors }),
-          { status: 400 }
-        );
-      }
-    }
-    
-    // Update endpoint
-    const updatedEndpoint = {
-      ...mockEndpoints[endpointIndex],
-      ...requestBody,
-      updatedAt: new Date().toISOString()
-    };
-    
-    mockEndpoints[endpointIndex] = updatedEndpoint;
-    
-    return HttpResponse.json(updatedEndpoint);
-  }),
+    const serviceId = parseInt(params.serviceId as string);
+    const service = mockServices.find(s => s.id === serviceId);
 
-  // Delete endpoint configuration
-  http.delete('/api/v2/system/service/:serviceName/endpoints/:endpointId', ({ params }) => {
-    const { serviceName, endpointId } = params;
-    
-    const endpointIndex = mockEndpoints.findIndex(
-      ep => ep.id === endpointId && ep.serviceName === serviceName
-    );
-    
-    if (endpointIndex === -1) {
-      return HttpResponse.json(
-        createApiError(404, `Endpoint ${endpointId} not found`),
-        { status: 404 }
-      );
+    if (!service) {
+      return HttpResponse.json({
+        error: {
+          code: 404,
+          message: `Service with ID ${serviceId} not found`,
+          details: { serviceId }
+        }
+      }, { status: 404 });
     }
-    
-    mockEndpoints.splice(endpointIndex, 1);
-    
-    return HttpResponse.json({ success: true });
-  }),
 
-  // Get endpoint parameters
-  http.get('/api/v2/system/service/:serviceName/endpoints/:endpointId/parameters', ({ params }) => {
-    const { serviceName, endpointId } = params;
-    
-    const endpoint = mockEndpoints.find(
-      ep => ep.id === endpointId && ep.serviceName === serviceName
-    );
-    
-    if (!endpoint) {
-      return HttpResponse.json(
-        createApiError(404, `Endpoint ${endpointId} not found`),
-        { status: 404 }
-      );
-    }
-    
     return HttpResponse.json({
-      resource: endpoint.parameters,
+      resource: service
+    }, { status: 200 });
+  }),
+
+  // =============================================================================
+  // ENDPOINT CONFIGURATION ENDPOINTS
+  // =============================================================================
+
+  /**
+   * GET /api/v2/service/{serviceId}/endpoints - Get all endpoints for a service
+   */
+  http.get('/api/v2/service/:serviceId/endpoints', async ({ request, params }) => {
+    await delay(RESPONSE_DELAYS.default);
+
+    if (simulateNetworkError) {
+      return HttpResponse.error();
+    }
+
+    const serviceId = parseInt(params.serviceId as string);
+    const url = new URL(request.url);
+    const method = url.searchParams.get('method');
+    const path = url.searchParams.get('path');
+    const limit = parseInt(url.searchParams.get('limit') || '0');
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+
+    // Check if service exists
+    const service = mockServices.find(s => s.id === serviceId);
+    if (!service) {
+      return HttpResponse.json({
+        error: {
+          code: 404,
+          message: `Service with ID ${serviceId} not found`,
+          details: { serviceId }
+        }
+      }, { status: 404 });
+    }
+
+    let endpoints = mockEndpoints.filter(ep => ep.serviceId === serviceId);
+
+    // Apply filters
+    if (method) {
+      endpoints = endpoints.filter(ep => ep.method === method.toUpperCase());
+    }
+    if (path) {
+      endpoints = endpoints.filter(ep => ep.path.includes(path));
+    }
+
+    // Apply pagination
+    if (limit > 0) {
+      endpoints = endpoints.slice(offset, offset + limit);
+    }
+
+    return HttpResponse.json({
+      resource: endpoints,
       meta: {
-        count: endpoint.parameters.length,
-        schema: ['id', 'name', 'type', 'dataType', 'required', 'description']
-      }
-    });
-  }),
-
-  // Add parameter to endpoint
-  http.post('/api/v2/system/service/:serviceName/endpoints/:endpointId/parameters', async ({ params, request }) => {
-    const { serviceName, endpointId } = params;
-    const parameter = await request.json() as Partial<EndpointParameter>;
-    
-    const endpoint = mockEndpoints.find(
-      ep => ep.id === endpointId && ep.serviceName === serviceName
-    );
-    
-    if (!endpoint) {
-      return HttpResponse.json(
-        createApiError(404, `Endpoint ${endpointId} not found`),
-        { status: 404 }
-      );
-    }
-    
-    // Validate parameter
-    if (!parameter.name || !parameter.type || !parameter.dataType) {
-      return HttpResponse.json(
-        createApiError(400, 'Parameter name, type, and dataType are required'),
-        { status: 400 }
-      );
-    }
-    
-    // Check for duplicate parameter name
-    const duplicate = endpoint.parameters.find(p => p.name === parameter.name);
-    if (duplicate) {
-      return HttpResponse.json(
-        createApiError(409, `Parameter ${parameter.name} already exists`),
-        { status: 409 }
-      );
-    }
-    
-    const newParameter: EndpointParameter = {
-      id: generateParameterId(),
-      name: parameter.name!,
-      type: parameter.type!,
-      dataType: parameter.dataType!,
-      required: parameter.required || false,
-      description: parameter.description,
-      validation: parameter.validation
-    };
-    
-    endpoint.parameters.push(newParameter);
-    endpoint.updatedAt = new Date().toISOString();
-    
-    return HttpResponse.json(newParameter, { status: 201 });
-  }),
-
-  // Update parameter
-  http.put('/api/v2/system/service/:serviceName/endpoints/:endpointId/parameters/:parameterId', async ({ params, request }) => {
-    const { serviceName, endpointId, parameterId } = params;
-    const parameterUpdate = await request.json() as Partial<EndpointParameter>;
-    
-    const endpoint = mockEndpoints.find(
-      ep => ep.id === endpointId && ep.serviceName === serviceName
-    );
-    
-    if (!endpoint) {
-      return HttpResponse.json(
-        createApiError(404, `Endpoint ${endpointId} not found`),
-        { status: 404 }
-      );
-    }
-    
-    const parameterIndex = endpoint.parameters.findIndex(p => p.id === parameterId);
-    if (parameterIndex === -1) {
-      return HttpResponse.json(
-        createApiError(404, `Parameter ${parameterId} not found`),
-        { status: 404 }
-      );
-    }
-    
-    const updatedParameter = {
-      ...endpoint.parameters[parameterIndex],
-      ...parameterUpdate
-    };
-    
-    endpoint.parameters[parameterIndex] = updatedParameter;
-    endpoint.updatedAt = new Date().toISOString();
-    
-    return HttpResponse.json(updatedParameter);
-  }),
-
-  // Delete parameter
-  http.delete('/api/v2/system/service/:serviceName/endpoints/:endpointId/parameters/:parameterId', ({ params }) => {
-    const { serviceName, endpointId, parameterId } = params;
-    
-    const endpoint = mockEndpoints.find(
-      ep => ep.id === endpointId && ep.serviceName === serviceName
-    );
-    
-    if (!endpoint) {
-      return HttpResponse.json(
-        createApiError(404, `Endpoint ${endpointId} not found`),
-        { status: 404 }
-      );
-    }
-    
-    const parameterIndex = endpoint.parameters.findIndex(p => p.id === parameterId);
-    if (parameterIndex === -1) {
-      return HttpResponse.json(
-        createApiError(404, `Parameter ${parameterId} not found`),
-        { status: 404 }
-      );
-    }
-    
-    endpoint.parameters.splice(parameterIndex, 1);
-    endpoint.updatedAt = new Date().toISOString();
-    
-    return HttpResponse.json({ success: true });
-  }),
-
-  // Get available security schemes
-  http.get('/api/v2/system/security-schemes', () => {
-    return HttpResponse.json({
-      resource: mockSecuritySchemes,
-      meta: {
-        count: mockSecuritySchemes.length,
-        schema: ['id', 'type', 'name', 'in', 'description']
-      }
-    });
-  }),
-
-  // Assign security scheme to endpoint
-  http.post('/api/v2/system/service/:serviceName/endpoints/:endpointId/security', async ({ params, request }) => {
-    const { serviceName, endpointId } = params;
-    const securityScheme = await request.json() as { schemeId: string };
-    
-    const endpoint = mockEndpoints.find(
-      ep => ep.id === endpointId && ep.serviceName === serviceName
-    );
-    
-    if (!endpoint) {
-      return HttpResponse.json(
-        createApiError(404, `Endpoint ${endpointId} not found`),
-        { status: 404 }
-      );
-    }
-    
-    const scheme = mockSecuritySchemes.find(s => s.id === securityScheme.schemeId);
-    if (!scheme) {
-      return HttpResponse.json(
-        createApiError(404, `Security scheme ${securityScheme.schemeId} not found`),
-        { status: 404 }
-      );
-    }
-    
-    // Check if already assigned
-    const existing = endpoint.security.find(s => s.id === scheme.id);
-    if (existing) {
-      return HttpResponse.json(
-        createApiError(409, 'Security scheme already assigned to endpoint'),
-        { status: 409 }
-      );
-    }
-    
-    endpoint.security.push(scheme);
-    endpoint.updatedAt = new Date().toISOString();
-    
-    return HttpResponse.json(scheme, { status: 201 });
-  }),
-
-  // Remove security scheme from endpoint
-  http.delete('/api/v2/system/service/:serviceName/endpoints/:endpointId/security/:schemeId', ({ params }) => {
-    const { serviceName, endpointId, schemeId } = params;
-    
-    const endpoint = mockEndpoints.find(
-      ep => ep.id === endpointId && ep.serviceName === serviceName
-    );
-    
-    if (!endpoint) {
-      return HttpResponse.json(
-        createApiError(404, `Endpoint ${endpointId} not found`),
-        { status: 404 }
-      );
-    }
-    
-    const schemeIndex = endpoint.security.findIndex(s => s.id === schemeId);
-    if (schemeIndex === -1) {
-      return HttpResponse.json(
-        createApiError(404, `Security scheme ${schemeId} not assigned to endpoint`),
-        { status: 404 }
-      );
-    }
-    
-    endpoint.security.splice(schemeIndex, 1);
-    endpoint.updatedAt = new Date().toISOString();
-    
-    return HttpResponse.json({ success: true });
-  }),
-
-  // Generate OpenAPI specification preview
-  http.post('/api/v2/system/service/:serviceName/openapi/preview', async ({ params, request }) => {
-    const { serviceName } = params;
-    const options = await request.json() as { endpointIds?: string[]; format?: 'json' | 'yaml' };
-    
-    let endpointsToInclude = mockEndpoints.filter(ep => ep.serviceName === serviceName);
-    
-    // Filter by specific endpoints if requested
-    if (options.endpointIds && options.endpointIds.length > 0) {
-      endpointsToInclude = endpointsToInclude.filter(ep => 
-        options.endpointIds!.includes(ep.id)
-      );
-    }
-    
-    if (endpointsToInclude.length === 0) {
-      return HttpResponse.json(
-        createApiError(404, 'No endpoints found for the specified criteria'),
-        { status: 404 }
-      );
-    }
-    
-    const openApiSpec = generateOpenAPISpec(endpointsToInclude);
-    
-    // Simulate processing delay for realistic testing
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    return HttpResponse.json({
-      specification: openApiSpec,
-      format: options.format || 'json',
-      generatedAt: new Date().toISOString(),
-      endpointCount: endpointsToInclude.length
-    });
-  }),
-
-  // Validate endpoint configuration
-  http.post('/api/v2/system/service/:serviceName/endpoints/validate', async ({ params, request }) => {
-    const { serviceName } = params;
-    const config = await request.json() as Partial<EndpointConfiguration>;
-    
-    const validationErrors = validateEndpointConfiguration({
-      ...config,
-      serviceName: serviceName as string
-    });
-    
-    // Additional business logic validation
-    if (config.method === 'GET' && config.parameters?.some(p => p.type === 'body')) {
-      validationErrors.push('GET requests cannot have body parameters');
-    }
-    
-    if (config.method === 'DELETE' && config.parameters?.some(p => p.type === 'body')) {
-      validationErrors.push('DELETE requests should not have body parameters');
-    }
-    
-    // Check for required parameters in path
-    if (config.path && config.path.includes('{') && config.path.includes('}')) {
-      const pathParams = config.path.match(/{([^}]+)}/g)?.map(p => p.slice(1, -1)) || [];
-      const definedPathParams = config.parameters?.filter(p => p.type === 'path').map(p => p.name) || [];
-      
-      const missingPathParams = pathParams.filter(pp => !definedPathParams.includes(pp));
-      if (missingPathParams.length > 0) {
-        validationErrors.push(`Missing path parameters: ${missingPathParams.join(', ')}`);
-      }
-    }
-    
-    return HttpResponse.json({
-      valid: validationErrors.length === 0,
-      errors: validationErrors,
-      warnings: [],
-      validatedAt: new Date().toISOString()
-    });
-  }),
-
-  // Test endpoint configuration
-  http.post('/api/v2/system/service/:serviceName/endpoints/:endpointId/test', async ({ params, request }) => {
-    const { serviceName, endpointId } = params;
-    const testData = await request.json() as { parameters: Record<string, any>; body?: any };
-    
-    const endpoint = mockEndpoints.find(
-      ep => ep.id === endpointId && ep.serviceName === serviceName
-    );
-    
-    if (!endpoint) {
-      return HttpResponse.json(
-        createApiError(404, `Endpoint ${endpointId} not found`),
-        { status: 404 }
-      );
-    }
-    
-    // Simulate endpoint testing with various scenarios
-    const testResults = {
-      success: true,
-      executionTime: Math.floor(Math.random() * 500) + 50, // 50-550ms
-      requestUrl: endpoint.path,
-      requestMethod: endpoint.method,
-      requestParameters: testData.parameters,
-      requestBody: testData.body,
-      responseStatus: 200,
-      responseHeaders: {
-        'Content-Type': 'application/json',
-        'X-DreamFactory-API-Key': 'test-key'
-      },
-      responseBody: {
-        success: true,
-        message: 'Test endpoint executed successfully',
-        data: endpoint.method === 'GET' ? 
-          { resource: [{ id: 1, name: 'Test Record' }] } :
-          { id: 1, name: 'Test Record' }
-      },
-      validationResults: {
-        parameterValidation: 'passed',
-        securityValidation: 'passed',
-        businessRuleValidation: 'passed'
-      },
-      testedAt: new Date().toISOString()
-    };
-    
-    // Simulate occasional failures for testing error handling
-    if (Math.random() < 0.1) { // 10% chance of failure
-      testResults.success = false;
-      testResults.responseStatus = 400;
-      testResults.responseBody = createApiError(400, 'Validation failed during test execution');
-    }
-    
-    // Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    return HttpResponse.json(testResults);
-  }),
-
-  // Error simulation endpoints for edge case testing
-  http.get('/api/v2/system/service/error-simulation/endpoints', () => {
-    return HttpResponse.json(
-      createApiError(500, 'Internal server error - service temporarily unavailable'),
-      { status: 500 }
-    );
-  }),
-
-  http.post('/api/v2/system/service/timeout-simulation/endpoints', async () => {
-    // Simulate timeout scenario
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    return HttpResponse.json({ success: true });
-  }),
-
-  http.get('/api/v2/system/service/rate-limit-simulation/endpoints', () => {
-    return HttpResponse.json(
-      createApiError(429, 'Rate limit exceeded - too many requests'),
-      { 
-        status: 429,
-        headers: {
-          'Retry-After': '60',
-          'X-RateLimit-Limit': '100',
-          'X-RateLimit-Remaining': '0'
+        count: endpoints.length,
+        total: mockEndpoints.filter(ep => ep.serviceId === serviceId).length,
+        service: {
+          id: service.id,
+          name: service.name,
+          type: service.type
         }
       }
+    }, { status: 200 });
+  }),
+
+  /**
+   * POST /api/v2/service/{serviceId}/endpoints - Create new endpoint
+   */
+  http.post('/api/v2/service/:serviceId/endpoints', async ({ request, params }) => {
+    await delay(RESPONSE_DELAYS.default);
+
+    if (simulateNetworkError) {
+      return HttpResponse.error();
+    }
+
+    if (simulateServerError) {
+      return HttpResponse.json({
+        error: {
+          code: 500,
+          message: 'Internal server error during endpoint creation',
+          details: { phase: 'creation' }
+        }
+      }, { status: 500 });
+    }
+
+    const serviceId = parseInt(params.serviceId as string);
+    
+    // Check if service exists
+    const service = mockServices.find(s => s.id === serviceId);
+    if (!service) {
+      return HttpResponse.json({
+        error: {
+          code: 404,
+          message: `Service with ID ${serviceId} not found`,
+          details: { serviceId }
+        }
+      }, { status: 404 });
+    }
+
+    try {
+      const endpointData = await request.json() as Partial<EndpointConfig>;
+      
+      // Validate endpoint configuration
+      const validation = validateEndpointConfiguration(endpointData);
+      
+      if (simulateValidationError || !validation.valid) {
+        return HttpResponse.json({
+          error: {
+            code: 422,
+            message: 'Validation failed',
+            details: {
+              validation_errors: validation.errors,
+              warnings: validation.warnings
+            }
+          }
+        }, { status: 422 });
+      }
+
+      // Check for duplicate endpoint
+      const existingEndpoint = mockEndpoints.find(ep => 
+        ep.serviceId === serviceId && 
+        ep.path === endpointData.path && 
+        ep.method === endpointData.method
+      );
+
+      if (existingEndpoint) {
+        return HttpResponse.json({
+          error: {
+            code: 409,
+            message: 'Endpoint already exists',
+            details: {
+              existingEndpoint: {
+                id: existingEndpoint.id,
+                path: existingEndpoint.path,
+                method: existingEndpoint.method
+              }
+            }
+          }
+        }, { status: 409 });
+      }
+
+      // Create new endpoint
+      const newEndpoint: EndpointConfig = {
+        id: `ep_${Date.now()}`,
+        serviceId,
+        path: endpointData.path || '/api/v1/example',
+        method: endpointData.method || 'GET',
+        operationId: endpointData.operationId || `${endpointData.method?.toLowerCase()}${endpointData.path?.replace(/[^a-zA-Z0-9]/g, '')}`,
+        summary: endpointData.summary || 'Generated endpoint',
+        description: endpointData.description,
+        tags: endpointData.tags || [],
+        parameters: endpointData.parameters || [],
+        security: endpointData.security || [],
+        responses: endpointData.responses || [
+          {
+            statusCode: 200,
+            description: 'Successful response',
+            mediaType: 'application/json',
+            schema: { type: 'object' }
+          }
+        ],
+        requestBody: endpointData.requestBody,
+        metadata: {
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          createdBy: 'admin',
+          version: 1
+        }
+      };
+
+      mockEndpoints.push(newEndpoint);
+
+      return HttpResponse.json({
+        resource: newEndpoint,
+        meta: {
+          validation,
+          service: {
+            id: service.id,
+            name: service.name,
+            type: service.type
+          }
+        }
+      }, { status: 201 });
+    } catch (error) {
+      return HttpResponse.json({
+        error: {
+          code: 400,
+          message: 'Invalid request body',
+          details: { error: error instanceof Error ? error.message : 'Unknown error' }
+        }
+      }, { status: 400 });
+    }
+  }),
+
+  /**
+   * GET /api/v2/service/{serviceId}/endpoints/{endpointId} - Get specific endpoint
+   */
+  http.get('/api/v2/service/:serviceId/endpoints/:endpointId', async ({ params }) => {
+    await delay(RESPONSE_DELAYS.default);
+
+    if (simulateNetworkError) {
+      return HttpResponse.error();
+    }
+
+    const serviceId = parseInt(params.serviceId as string);
+    const endpointId = params.endpointId as string;
+
+    const endpoint = mockEndpoints.find(ep => 
+      ep.id === endpointId && ep.serviceId === serviceId
     );
+
+    if (!endpoint) {
+      return HttpResponse.json({
+        error: {
+          code: 404,
+          message: `Endpoint ${endpointId} not found for service ${serviceId}`,
+          details: { serviceId, endpointId }
+        }
+      }, { status: 404 });
+    }
+
+    return HttpResponse.json({
+      resource: endpoint
+    }, { status: 200 });
+  }),
+
+  /**
+   * PUT /api/v2/service/{serviceId}/endpoints/{endpointId} - Update endpoint
+   */
+  http.put('/api/v2/service/:serviceId/endpoints/:endpointId', async ({ request, params }) => {
+    await delay(RESPONSE_DELAYS.default);
+
+    if (simulateNetworkError) {
+      return HttpResponse.error();
+    }
+
+    if (simulateServerError) {
+      return HttpResponse.json({
+        error: {
+          code: 500,
+          message: 'Internal server error during endpoint update',
+          details: { phase: 'update' }
+        }
+      }, { status: 500 });
+    }
+
+    const serviceId = parseInt(params.serviceId as string);
+    const endpointId = params.endpointId as string;
+
+    const endpointIndex = mockEndpoints.findIndex(ep => 
+      ep.id === endpointId && ep.serviceId === serviceId
+    );
+
+    if (endpointIndex === -1) {
+      return HttpResponse.json({
+        error: {
+          code: 404,
+          message: `Endpoint ${endpointId} not found for service ${serviceId}`,
+          details: { serviceId, endpointId }
+        }
+      }, { status: 404 });
+    }
+
+    try {
+      const updateData = await request.json() as Partial<EndpointConfig>;
+      
+      // Validate endpoint configuration
+      const validation = validateEndpointConfiguration({
+        ...mockEndpoints[endpointIndex],
+        ...updateData
+      });
+      
+      if (simulateValidationError || !validation.valid) {
+        return HttpResponse.json({
+          error: {
+            code: 422,
+            message: 'Validation failed',
+            details: {
+              validation_errors: validation.errors,
+              warnings: validation.warnings
+            }
+          }
+        }, { status: 422 });
+      }
+
+      // Update endpoint
+      const updatedEndpoint: EndpointConfig = {
+        ...mockEndpoints[endpointIndex],
+        ...updateData,
+        id: endpointId, // Preserve original ID
+        serviceId, // Preserve original service ID
+        metadata: {
+          ...mockEndpoints[endpointIndex].metadata,
+          updatedAt: new Date().toISOString(),
+          version: mockEndpoints[endpointIndex].metadata.version + 1
+        }
+      };
+
+      mockEndpoints[endpointIndex] = updatedEndpoint;
+
+      return HttpResponse.json({
+        resource: updatedEndpoint,
+        meta: {
+          validation,
+          previousVersion: mockEndpoints[endpointIndex].metadata.version - 1
+        }
+      }, { status: 200 });
+    } catch (error) {
+      return HttpResponse.json({
+        error: {
+          code: 400,
+          message: 'Invalid request body',
+          details: { error: error instanceof Error ? error.message : 'Unknown error' }
+        }
+      }, { status: 400 });
+    }
+  }),
+
+  /**
+   * DELETE /api/v2/service/{serviceId}/endpoints/{endpointId} - Delete endpoint
+   */
+  http.delete('/api/v2/service/:serviceId/endpoints/:endpointId', async ({ params }) => {
+    await delay(RESPONSE_DELAYS.default);
+
+    if (simulateNetworkError) {
+      return HttpResponse.error();
+    }
+
+    if (simulateServerError) {
+      return HttpResponse.json({
+        error: {
+          code: 500,
+          message: 'Internal server error during endpoint deletion',
+          details: { phase: 'deletion' }
+        }
+      }, { status: 500 });
+    }
+
+    const serviceId = parseInt(params.serviceId as string);
+    const endpointId = params.endpointId as string;
+
+    const endpointIndex = mockEndpoints.findIndex(ep => 
+      ep.id === endpointId && ep.serviceId === serviceId
+    );
+
+    if (endpointIndex === -1) {
+      return HttpResponse.json({
+        error: {
+          code: 404,
+          message: `Endpoint ${endpointId} not found for service ${serviceId}`,
+          details: { serviceId, endpointId }
+        }
+      }, { status: 404 });
+    }
+
+    const deletedEndpoint = mockEndpoints.splice(endpointIndex, 1)[0];
+
+    return HttpResponse.json({
+      resource: deletedEndpoint,
+      meta: {
+        deleted: true,
+        deletedAt: new Date().toISOString()
+      }
+    }, { status: 200 });
+  }),
+
+  // =============================================================================
+  // VALIDATION AND PREVIEW ENDPOINTS
+  // =============================================================================
+
+  /**
+   * POST /api/v2/service/{serviceId}/endpoints/validate - Validate endpoint configuration
+   */
+  http.post('/api/v2/service/:serviceId/endpoints/validate', async ({ request, params }) => {
+    await delay(RESPONSE_DELAYS.fast);
+
+    if (simulateNetworkError) {
+      return HttpResponse.error();
+    }
+
+    const serviceId = parseInt(params.serviceId as string);
+
+    // Check if service exists
+    const service = mockServices.find(s => s.id === serviceId);
+    if (!service) {
+      return HttpResponse.json({
+        error: {
+          code: 404,
+          message: `Service with ID ${serviceId} not found`,
+          details: { serviceId }
+        }
+      }, { status: 404 });
+    }
+
+    try {
+      const endpointData = await request.json() as Partial<EndpointConfig>;
+      const validation = validateEndpointConfiguration(endpointData);
+
+      return HttpResponse.json({
+        resource: validation,
+        meta: {
+          serviceId,
+          validatedAt: new Date().toISOString()
+        }
+      }, { status: 200 });
+    } catch (error) {
+      return HttpResponse.json({
+        error: {
+          code: 400,
+          message: 'Invalid request body',
+          details: { error: error instanceof Error ? error.message : 'Unknown error' }
+        }
+      }, { status: 400 });
+    }
+  }),
+
+  /**
+   * POST /api/v2/service/{serviceId}/endpoints/preview - Generate endpoint preview
+   */
+  http.post('/api/v2/service/:serviceId/endpoints/preview', async ({ request, params }) => {
+    await delay(RESPONSE_DELAYS.default);
+
+    if (simulateNetworkError) {
+      return HttpResponse.error();
+    }
+
+    const serviceId = parseInt(params.serviceId as string);
+
+    // Check if service exists
+    const service = mockServices.find(s => s.id === serviceId);
+    if (!service) {
+      return HttpResponse.json({
+        error: {
+          code: 404,
+          message: `Service with ID ${serviceId} not found`,
+          details: { serviceId }
+        }
+      }, { status: 404 });
+    }
+
+    try {
+      const previewRequest = await request.json() as PreviewRequest;
+      const validation = validateEndpointConfiguration(previewRequest.endpoint);
+
+      let response: PreviewResponse = {
+        validationResult: validation,
+        generatedAt: new Date().toISOString()
+      };
+
+      if (previewRequest.format === 'openapi' || !previewRequest.format) {
+        response.openapi = generateOpenAPISpec([previewRequest.endpoint as EndpointConfig]);
+      }
+
+      if (previewRequest.format === 'curl') {
+        response.curl = `curl -X ${previewRequest.endpoint.method} \\
+  "${service.config?.host || 'localhost'}${previewRequest.endpoint.path}" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_TOKEN"`;
+      }
+
+      if (previewRequest.format === 'postman') {
+        response.postman = {
+          info: {
+            name: `${previewRequest.endpoint.summary || 'Generated Endpoint'}`,
+            schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+          },
+          item: [{
+            name: previewRequest.endpoint.summary || previewRequest.endpoint.operationId,
+            request: {
+              method: previewRequest.endpoint.method,
+              header: [
+                { key: 'Content-Type', value: 'application/json' },
+                { key: 'Authorization', value: 'Bearer {{token}}' }
+              ],
+              url: {
+                raw: `{{baseUrl}}${previewRequest.endpoint.path}`,
+                host: ['{{baseUrl}}'],
+                path: previewRequest.endpoint.path.split('/').filter(Boolean)
+              }
+            }
+          }]
+        };
+      }
+
+      if (previewRequest.format === 'raw') {
+        response.raw = JSON.stringify({
+          endpoint: previewRequest.endpoint,
+          service: service,
+          generatedAt: response.generatedAt
+        }, null, 2);
+      }
+
+      return HttpResponse.json({
+        resource: response,
+        meta: {
+          serviceId,
+          format: previewRequest.format || 'openapi'
+        }
+      }, { status: 200 });
+    } catch (error) {
+      return HttpResponse.json({
+        error: {
+          code: 400,
+          message: 'Invalid preview request',
+          details: { error: error instanceof Error ? error.message : 'Unknown error' }
+        }
+      }, { status: 400 });
+    }
+  }),
+
+  // =============================================================================
+  // OPENAPI GENERATION ENDPOINTS
+  // =============================================================================
+
+  /**
+   * GET /api/v2/service/{serviceId}/openapi - Generate OpenAPI specification for service
+   */
+  http.get('/api/v2/service/:serviceId/openapi', async ({ request, params }) => {
+    await delay(RESPONSE_DELAYS.slow);
+
+    if (simulateNetworkError) {
+      return HttpResponse.error();
+    }
+
+    const serviceId = parseInt(params.serviceId as string);
+    const url = new URL(request.url);
+    const format = url.searchParams.get('format') || 'json';
+    const includeSchemas = url.searchParams.get('include_schemas') === 'true';
+
+    // Check if service exists
+    const service = mockServices.find(s => s.id === serviceId);
+    if (!service) {
+      return HttpResponse.json({
+        error: {
+          code: 404,
+          message: `Service with ID ${serviceId} not found`,
+          details: { serviceId }
+        }
+      }, { status: 404 });
+    }
+
+    const serviceEndpoints = mockEndpoints.filter(ep => ep.serviceId === serviceId);
+    
+    if (serviceEndpoints.length === 0) {
+      return HttpResponse.json({
+        error: {
+          code: 404,
+          message: `No endpoints found for service ${serviceId}`,
+          details: { serviceId }
+        }
+      }, { status: 404 });
+    }
+
+    const openApiSpec = generateOpenAPISpec(serviceEndpoints);
+
+    // Enhance with service-specific information
+    openApiSpec.info.title = `${service.name} API`;
+    openApiSpec.info.description = service.description || `Generated API for ${service.name} service`;
+
+    if (format === 'yaml') {
+      // In a real implementation, this would convert to YAML
+      return new HttpResponse(
+        `# ${openApiSpec.info.title}\n# Generated OpenAPI Specification\n\n` + 
+        JSON.stringify(openApiSpec, null, 2),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/x-yaml'
+          }
+        }
+      );
+    }
+
+    return HttpResponse.json({
+      resource: openApiSpec,
+      meta: {
+        serviceId,
+        serviceName: service.name,
+        endpointCount: serviceEndpoints.length,
+        generatedAt: new Date().toISOString(),
+        format
+      }
+    }, { status: 200 });
+  }),
+
+  // =============================================================================
+  // BATCH OPERATIONS
+  // =============================================================================
+
+  /**
+   * POST /api/v2/service/{serviceId}/endpoints/batch - Batch endpoint operations
+   */
+  http.post('/api/v2/service/:serviceId/endpoints/batch', async ({ request, params }) => {
+    await delay(RESPONSE_DELAYS.slow);
+
+    if (simulateNetworkError) {
+      return HttpResponse.error();
+    }
+
+    const serviceId = parseInt(params.serviceId as string);
+
+    // Check if service exists
+    const service = mockServices.find(s => s.id === serviceId);
+    if (!service) {
+      return HttpResponse.json({
+        error: {
+          code: 404,
+          message: `Service with ID ${serviceId} not found`,
+          details: { serviceId }
+        }
+      }, { status: 404 });
+    }
+
+    try {
+      const batchRequest = await request.json() as {
+        operation: 'create' | 'update' | 'delete' | 'validate';
+        endpoints: Partial<EndpointConfig>[];
+      };
+
+      const results = [];
+      const errors = [];
+
+      for (const [index, endpointData] of batchRequest.endpoints.entries()) {
+        try {
+          if (batchRequest.operation === 'validate') {
+            const validation = validateEndpointConfiguration(endpointData);
+            results.push({
+              index,
+              endpoint: endpointData,
+              validation,
+              success: validation.valid
+            });
+          } else if (batchRequest.operation === 'create') {
+            const validation = validateEndpointConfiguration(endpointData);
+            if (validation.valid) {
+              const newEndpoint: EndpointConfig = {
+                id: `ep_batch_${Date.now()}_${index}`,
+                serviceId,
+                path: endpointData.path || `/api/v1/batch${index}`,
+                method: endpointData.method || 'GET',
+                operationId: endpointData.operationId || `batch${index}`,
+                summary: endpointData.summary || `Batch endpoint ${index}`,
+                description: endpointData.description,
+                tags: endpointData.tags || [],
+                parameters: endpointData.parameters || [],
+                security: endpointData.security || [],
+                responses: endpointData.responses || [
+                  {
+                    statusCode: 200,
+                    description: 'Successful response',
+                    mediaType: 'application/json',
+                    schema: { type: 'object' }
+                  }
+                ],
+                requestBody: endpointData.requestBody,
+                metadata: {
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  createdBy: 'admin',
+                  version: 1
+                }
+              };
+              mockEndpoints.push(newEndpoint);
+              results.push({
+                index,
+                endpoint: newEndpoint,
+                validation,
+                success: true
+              });
+            } else {
+              errors.push({
+                index,
+                endpoint: endpointData,
+                validation,
+                error: 'Validation failed'
+              });
+            }
+          }
+        } catch (error) {
+          errors.push({
+            index,
+            endpoint: endpointData,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      return HttpResponse.json({
+        resource: {
+          operation: batchRequest.operation,
+          results,
+          errors,
+          summary: {
+            total: batchRequest.endpoints.length,
+            successful: results.length,
+            failed: errors.length
+          }
+        },
+        meta: {
+          serviceId,
+          processedAt: new Date().toISOString()
+        }
+      }, { 
+        status: errors.length > 0 ? 207 : 200 // 207 Multi-Status for partial success
+      });
+    } catch (error) {
+      return HttpResponse.json({
+        error: {
+          code: 400,
+          message: 'Invalid batch request',
+          details: { error: error instanceof Error ? error.message : 'Unknown error' }
+        }
+      }, { status: 400 });
+    }
   })
 ];
 
+// =============================================================================
+// TEST UTILITY FUNCTIONS
+// =============================================================================
+
 /**
- * Default export for easy importing in test files
+ * Reset mock data to initial state
+ */
+export function resetMockData(): void {
+  mockServices = generateMockServices();
+  mockEndpoints = generateMockEndpoints();
+}
+
+/**
+ * Add mock service for testing
+ */
+export function addMockService(service: DatabaseService): void {
+  mockServices.push(service);
+}
+
+/**
+ * Add mock endpoint for testing
+ */
+export function addMockEndpoint(endpoint: EndpointConfig): void {
+  mockEndpoints.push(endpoint);
+}
+
+/**
+ * Get current mock services
+ */
+export function getMockServices(): DatabaseService[] {
+  return [...mockServices];
+}
+
+/**
+ * Get current mock endpoints
+ */
+export function getMockEndpoints(): EndpointConfig[] {
+  return [...mockEndpoints];
+}
+
+/**
+ * Configure response delays for testing
+ */
+export function configureResponseDelays(delays: Partial<typeof RESPONSE_DELAYS>): void {
+  Object.assign(RESPONSE_DELAYS, delays);
+}
+
+/**
+ * Enable/disable error simulation
+ */
+export function setErrorSimulation(options: {
+  networkError?: boolean;
+  validationError?: boolean;
+  serverError?: boolean;
+}): void {
+  if (options.networkError !== undefined) {
+    simulateNetworkError = options.networkError;
+  }
+  if (options.validationError !== undefined) {
+    simulateValidationError = options.validationError;
+  }
+  if (options.serverError !== undefined) {
+    simulateServerError = options.serverError;
+  }
+}
+
+/**
+ * Get current error simulation status
+ */
+export function getErrorSimulationStatus(): {
+  networkError: boolean;
+  validationError: boolean;
+  serverError: boolean;
+} {
+  return {
+    networkError: simulateNetworkError,
+    validationError: simulateValidationError,
+    serverError: simulateServerError
+  };
+}
+
+/**
+ * Generate test endpoint configuration
+ */
+export function generateTestEndpoint(overrides: Partial<EndpointConfig> = {}): EndpointConfig {
+  const baseEndpoint = generateMockEndpoints()[0];
+  return {
+    ...baseEndpoint,
+    id: `test_${Date.now()}`,
+    ...overrides
+  };
+}
+
+/**
+ * Generate test parameter configuration
+ */
+export function generateTestParameter(overrides: Partial<ParameterConfig> = {}): ParameterConfig {
+  return {
+    id: `param_test_${Date.now()}`,
+    name: 'testParam',
+    type: 'query',
+    dataType: 'string',
+    required: false,
+    description: 'Test parameter for unit testing',
+    example: 'test-value',
+    ...overrides
+  };
+}
+
+/**
+ * Generate test security configuration
+ */
+export function generateTestSecurity(overrides: Partial<SecurityConfig> = {}): SecurityConfig {
+  return {
+    type: 'bearer',
+    required: true,
+    description: 'Test security configuration',
+    bearerFormat: 'JWT',
+    ...overrides
+  };
+}
+
+/**
+ * Export all handlers as default for easy import
  */
 export default endpointConfigurationHandlers;
-
-/**
- * Helper function to reset mock data between tests
- */
-export const resetMockData = (): void => {
-  // Reset to initial state
-  mockEndpoints.splice(2); // Keep first 2 mock endpoints
-  
-  // Reset any other shared state if needed
-  console.log('Mock data reset for endpoint configuration handlers');
-};
-
-/**
- * Helper function to add custom mock endpoints for specific tests
- */
-export const addMockEndpoint = (endpoint: EndpointConfiguration): void => {
-  mockEndpoints.push(endpoint);
-};
-
-/**
- * Helper function to get current mock endpoints (for test assertions)
- */
-export const getMockEndpoints = (): EndpointConfiguration[] => {
-  return [...mockEndpoints];
-};
-
-/**
- * Export types for use in tests
- */
-export type {
-  EndpointConfiguration,
-  EndpointParameter,
-  SecurityScheme,
-  ValidationRule,
-  OpenAPISpecification,
-  ApiError
-};
