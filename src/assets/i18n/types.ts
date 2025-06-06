@@ -1,1239 +1,1208 @@
 /**
- * TypeScript type definitions for all translation keys and namespaces
- * used throughout the DreamFactory Admin Interface application.
+ * TypeScript type definitions for all translation keys and namespaces used throughout the application.
+ * This file provides compile-time type checking for translation keys, ensuring that all references
+ * to translation strings are valid and preventing runtime errors from missing translations.
  * 
- * This file provides compile-time type checking for translation keys,
- * ensuring that all references to translation strings are valid and
- * preventing runtime errors from missing translations.
- * 
- * Integration with React Hook Form and component prop validation is
- * supported through structured interfaces for form validation messages.
+ * Designed for React/Next.js integration with React Hook Form and component prop validation.
  */
 
-// ============================================================================
-// CORE TRANSLATION INTERFACES
-// ============================================================================
+// =============================================================================
+// BASE TRANSLATION INTERFACES
+// =============================================================================
 
 /**
- * Common actions used throughout the application
+ * Base interface for all translation objects with nested key support
  */
-interface CommonActions {
-  save: string;
-  close: string;
-  create: string;
-  upload: string;
-  delete: string;
-  edit: string;
-  saveAndClear: string;
-  saveAndContinue: string;
-  select: string;
-  submit: string;
-  browse: string;
-  launch: string;
-  launchApp: string;
-  cancel: string;
-  update: string;
-  confirmed: string;
-  sendInvite: string;
-  filter: string;
-  search: string;
-  newEntry: string;
-  clearLimitCounter: string;
-  clearLimitCounters: string;
-  exportList: string;
-  importList: string;
-  goBack: string;
-  view: string;
-  open: string;
-  confirm: string;
+export interface BaseTranslation {
+  [key: string]: string | BaseTranslation;
 }
 
 /**
- * Common labels used in forms and displays
+ * Common CRUD operation messages used across multiple features
  */
-interface CommonLabels {
-  basic: string;
-  selectAnOption: string;
-  name: string;
-  value: string;
-  private: string;
-  id: string;
-  email: string;
-  phone: string;
-  displayName: string;
-  firstName: string;
-  lastName: string;
-  active: string;
-  registration: string;
-  pending: string;
-  description: string;
-  role: string;
-  apiKey: string;
-  type: string;
-  rate: string;
-  counter: string;
-  user: string;
-  service: string;
-  time: string;
-  serviceId: string;
-  serviceName: string;
-  userEmail: string;
-  action: string;
-  request: string;
-  files: string;
-  logs: string;
-  data: string;
-  packages: string;
-  launchpad: string;
-  path: string;
-  version: string;
-  label: string;
-  origins: string;
-  headers: string;
-  exposedHeaders: string;
-  maxAge: string;
-  methods: string;
-  supportsCredentials: string;
-  enabled: string;
-  component: string;
-  method: string;
-  frequency: string;
-  payload: string;
-  noFileSelected: string;
-  schema: string;
-  apiDocs: string;
-  searchFeatures: string;
-  scriptType: string;
-}
-
-/**
- * Boolean representations
- */
-interface CommonBooleans {
-  yes: string;
-  no: string;
-}
-
-/**
- * Common translation keys used across all components
- */
-interface CommonTranslations {
-  actions: CommonActions;
-  labels: CommonLabels;
-  booleans: CommonBooleans;
-}
-
-/**
- * UI-specific translations for accessibility and states
- */
-interface UITranslations {
-  accessibility: {
-    resetRowCounter: string;
-    editRow: string;
-    deleteRow: string;
-    selectRow: string;
-    selectAll: string;
-    deselectRow: string;
-    deselectAll: string;
-    sortCleared: string;
-    sortedAsc: string;
-    sortedDesc: string;
-    sortDescription: string;
-    selectPage: string;
-    viewRow: string;
-    toggleNav: string;
-  };
-  fileUpload: {
-    desktopFile: string;
-    githubFile: string;
-  };
-  states: {
-    noEnteries: string;
-  };
-}
-
-/**
- * HTTP verbs with descriptions
- */
-interface VerbTranslations {
-  get: string;
-  post: string;
-  put: string;
-  patch: string;
-  delete: string;
-}
-
-/**
- * Script types supported by the platform
- */
-interface ScriptTypes {
-  javascript: string;
-  php: string;
-  python: string;
-  python3: string;
-  nodejs: string;
-}
-
-/**
- * Navigation structure with nested hierarchy
- */
-interface NavigationTranslations {
-  error: {
-    header: string;
-  };
-  home: {
-    nav: string;
-    header: string;
-  };
-  'api-connections': {
-    nav: string;
-    'api-types': {
-      nav: string;
-      database: {
-        nav: string;
-        header: string;
-        create: {
-          nav: string;
-          header: string;
-        };
-        edit: {
-          nav: string;
-          header: string;
-        };
-      };
-      scripting: {
-        nav: string;
-        header: string;
-        create: {
-          nav: string;
-          header: string;
-        };
-        edit: {
-          nav: string;
-          header: string;
-        };
-      };
-      network: {
-        nav: string;
-        header: string;
-        create: {
-          nav: string;
-          header: string;
-        };
-        edit: {
-          nav: string;
-          header: string;
-        };
-      };
-      file: {
-        nav: string;
-        header: string;
-        create: {
-          nav: string;
-          header: string;
-        };
-      };
-      utility: {
-        nav: string;
-        header: string;
-        create: {
-          nav: string;
-          header: string;
-        };
-      };
-    };
-    'role-based-access': {
-      nav: string;
-      header: string;
-      create: {
-        nav: string;
-        header: string;
-      };
-    };
-    'api-keys': {
-      nav: string;
-      header: string;
-      create: {
-        nav: string;
-        header: string;
-      };
-      edit: {
-        header: string;
-      };
-      import: {
-        nav: string;
-        header: string;
-      };
-    };
-    'event-scripts': {
-      nav: string;
-      header: string;
-      create: {
-        header: string;
-      };
-    };
-    'api-docs': {
-      nav: string;
-      header: string;
-    };
-  };
-  'api-security': {
-    nav: string;
-    'rate-limiting': {
-      nav: string;
-    };
-  };
-}
-
-// ============================================================================
-// MODULE-SPECIFIC TRANSLATION INTERFACES
-// ============================================================================
-
-/**
- * User management translations
- */
-interface UsersTranslations {
-  alerts: {
-    new: string;
-    createdSuccess: string;
-    updateSuccess: string;
-    deleteSuccess: string;
-    importSuccess: string;
-    exportSuccess: string;
-  };
-}
-
-/**
- * Service management translations
- */
-interface ServicesTranslations {
-  details: string;
-  definition: string;
-  config: string;
-  options: string;
-  controls: {
-    serviceType: {
-      label: string;
-      tooltip: string;
-    };
-    namespace: {
-      label: string;
-      tooltip: string;
-    };
-    label: {
-      label: string;
-      tooltip: string;
-    };
-    description: {
-      label: string;
-      tooltip: string;
-    };
-    createAndTest: string;
-    securityConfig: string;
-  };
-  deleteSuccessMsg: string;
-  createSuccessMsg: string;
-  updateSuccessMsg: string;
-}
-
-/**
- * Admin management translations
- */
-interface AdminsTranslations {
-  accessByTabs: string;
-  alerts: {
-    newAdminInvite: string;
-    restrictedAdminNotice: string;
-    autoGeneratedRoleWarning: string;
-    createSuccess: string;
-    updateSuccess: string;
-    deleteSuccess: string;
-    importSuccess: string;
-    exportSuccess: string;
-  };
-  tabs: {
-    apps: string;
-    users: string;
-    services: string;
-    apiDocs: string;
-    schema: string;
-    files: string;
-    scripts: string;
-    config: string;
-    packageManager: string;
-    rateLimiting: string;
-    scheduler: string;
-  };
-}
-
-/**
- * API documentation translations
- */
-interface ApiDocsTranslations {
-  table: {
-    header: {
-      serviceName: string;
-      label: string;
-      description: string;
-      group: string;
-      type: string;
-    };
-  };
-  downloadApiDoc: string;
-  apiKeys: {
-    label: string;
-    copied: string;
-  };
-}
-
-/**
- * Cache management translations
- */
-interface CacheTranslations {
-  cache: string;
-  overview: string;
-  flushService: string;
-  flushCache: string;
-  flushSystemCache: string;
-  perServiceCaches: string;
-  description: string;
-  serviceCacheFlushed: string;
-  systemCacheFlushed: string;
-}
-
-/**
- * CORS configuration translations
- */
-interface CorsTranslations {
-  pageTitle: string;
-  pageSubtitle: string;
-  formControls: {
-    path: string;
-    description: string;
-    origins: string;
-    headers: string;
-    exposedHeaders: string;
-    maxAge: string;
-    methods: string;
-    supportsCredentials: string;
-    enabled: string;
-  };
-  alerts: {
-    createSuccess: string;
-    updateSuccess: string;
-  };
-}
-
-/**
- * Email templates translations
- */
-interface EmailTemplatesTranslations {
-  templateName: {
-    label: string;
-    placeholder: string;
+export interface CrudMessages {
+  create: {
+    success: string;
     error: string;
+    pending: string;
   };
-  templateDescription: {
-    label: string;
-    placeholder: string;
+  update: {
+    success: string;
+    error: string;
+    pending: string;
   };
-  recipient: {
-    label: string;
-    tooltip: string;
+  delete: {
+    success: string;
+    error: string;
+    pending: string;
+    confirm: string;
   };
-  cc: {
-    label: string;
-    tooltip: string;
-  };
-  bcc: {
-    label: string;
-    tooltip: string;
-  };
-  subject: {
-    label: string;
-    placeholder: string;
-  };
-  attachment: {
-    label: string;
-    tooltip: string;
-    placeholder: string;
-  };
-  body: string;
-  senderName: string;
-  senderEmail: string;
-  replyToName: string;
-  replyToEmail: string;
-  alerts: {
-    createSuccess: string;
-    updateSuccess: string;
+  fetch: {
+    error: string;
+    pending: string;
+    empty: string;
   };
 }
 
 /**
- * File operations translations
+ * Form validation messages for React Hook Form integration
  */
-interface FilesTranslations {
-  createFolder: string;
-  folderName: string;
-  importList: string;
-  size: string;
-  deleteFile: string;
-  downloadFile: string;
-  editFile: string;
-  deleteFolder: string;
-  openFolder: string;
-  download: string;
-  alerts: {
-    uploadSuccess: string;
-    createFolderSuccess: string;
-    deleteFolderSuccess: string;
-    downloadSuccess: string;
-  };
-}
-
-/**
- * Home page translations
- */
-interface HomeTranslations {
-  resourceLinks: {
-    gettingStartedGuide: string;
-    writtenTutorials: string;
-    videoTutorials: string;
-    fullDocumentation: string;
-    communityForum: string;
-    bugFeatureRequests: string;
-    twitter: string;
-    blog: string;
-    contactSupport: string;
-  };
-  welcomePage: {
-    watchVideoCta: string;
-    welcomeHeading: string;
-    welcomeSubHeading: string;
-    hearFromYou: string;
-    clientPlatformHeading: string;
-    nativeExamplesHeading: string;
-    javaScriptExamplesHeading: string;
-  };
-  quickstartPage: {
-    quickstartHeading: string;
-    quickstartSubHeading: string;
-    quickstartSteps: {
-      stepOne: string;
-      stepTwo: string;
-      stepThree: string;
-    };
-  };
-  resourcesPage: {
-    resourcesHeading: string;
-    resourcesSubHeading: string;
-  };
-  downloadPage: {
-    downloadHeading: string;
-    downloadText: string;
-    cloudInstallersHeading: string;
-    localInstallersHeading: string;
-  };
-  brandNames: {
-    [key: string]: string;
-  };
-}
-
-/**
- * Rate limiting and API limits translations
- */
-interface LimitsTranslations {
-  name: string;
-  description: string;
-  limitType: string;
-  limitRate: string;
-  limitPeriod: string;
-  role: string;
-  service: string;
-  endpoint: string;
-  user: string;
-  verb: string;
-  active: string;
-  refresh: string;
-  invalidForm: string;
-  createSuccessMessage: string;
-  updateSuccessMessage: string;
-  deleteSuccessMessage: string;
-  verbTooltip: string;
-  limitTypes: {
-    [key: string]: string;
-  };
-  limitPeriods: {
-    [key: string]: string;
-  };
-}
-
-/**
- * Role management translations
- */
-interface RolesTranslations {
-  roles: string;
-  role: string;
-  app: string;
-  noRolesAssigned: string;
-  rolesOverview: {
-    heading: string;
-    description: string;
-    validationError: string;
-  };
-  accessOverview: {
-    heading: string;
-    description: string;
-    tableLabels: {
-      [key: string]: string;
-    };
-    columnHeadings: {
-      [key: string]: string;
-    };
-    noAccessRules: string;
-  };
-  lookupKeys: {
-    heading: string;
-    description: string;
-  };
-}
-
-/**
- * Scheduler translations
- */
-interface SchedulerTranslations {
-  form: {
-    label: {
-      [key: string]: string;
-    };
-  };
-  table: {
-    header: {
-      [key: string]: string;
-    };
-  };
-  logs: {
-    [key: string]: string;
-  };
-  logPageTitle: string;
-  logPageSubtitle: string;
-  taskOverview: string;
-  taskOverviewSubtitle: string;
-  alerts: {
-    [key: string]: string;
-  };
-}
-
-/**
- * Database schema builder translations
- */
-interface SchemaTranslations {
-  fieldDetailsForm: {
-    updateSuccess: string;
-    createSuccess: string;
-    controls: {
-      name: {
-        label: string;
-        tooltip: string;
-      };
-      alias: {
-        label: string;
-        tooltip: string;
-      };
-      label: {
-        label: string;
-        tooltip: string;
-      };
-      isVirtual: string;
-      isAggregate: string;
-      type: {
-        label: string;
-        tooltip: string;
-      };
-      databaseType: {
-        label: string;
-        tooltip: string;
-      };
-      length: string;
-      precision: string;
-      scale: string;
-      fixedLength: string;
-      supportsMultibyte: string;
-      allowNull: string;
-      autoIncrement: string;
-      defaultValue: string;
-      isIndex: string;
-      isUnique: string;
-      isPrimaryKey: string;
-      isForeignKey: string;
-      refTable: string;
-      refField: string;
-      validation: {
-        label: string;
-        tooltip: string;
-      };
-      picklist: string;
-      dbFunctionTitle: string;
-      dfFunctionTooltip: string;
-      dbFunctionUseDescription: string;
-      noDbFunctions: string;
-    };
-    errors: {
-      name: string;
-      json: string;
-      csv: string;
-    };
-  };
-  name: string;
-  alias: string;
-  type: string;
-  virtual: string;
-  aggregate: string;
+export interface FormValidation {
   required: string;
-  constraints: string;
-  tableName: string;
-  label: string;
-  plural: string;
-  description: string;
-  enter: {
-    tableName: string;
-    alias: string;
-    label: string;
-    plural: string;
-    description: string;
+  email: string;
+  minLength: string;
+  maxLength: string;
+  pattern: string;
+  numeric: string;
+  url: string;
+  custom: string;
+}
+
+/**
+ * Common UI labels and actions
+ */
+export interface CommonLabels {
+  actions: {
+    save: string;
+    cancel: string;
+    edit: string;
+    delete: string;
+    create: string;
+    update: string;
+    view: string;
+    close: string;
+    refresh: string;
+    search: string;
+    filter: string;
+    export: string;
+    import: string;
+    reset: string;
+    submit: string;
+    back: string;
+    next: string;
+    previous: string;
+    confirm: string;
   };
-  fields: string;
-  addField: string;
-  addRelationship: string;
-  alerts: {
-    tableNameError: string;
-    createSuccecss: string;
-    updateSuccess: string;
-    deleteSuccess: string;
+  status: {
+    active: string;
+    inactive: string;
+    pending: string;
+    loading: string;
+    success: string;
+    error: string;
+    warning: string;
   };
-  primaryKey: string;
-  foreignKey: string;
-  table: string;
-  relationships: {
-    heading: string;
-    name: {
-      tooltip: string;
+  pagination: {
+    first: string;
+    last: string;
+    next: string;
+    previous: string;
+    page: string;
+    of: string;
+    showing: string;
+    results: string;
+  };
+}
+
+// =============================================================================
+// FEATURE-SPECIFIC TRANSLATION INTERFACES
+// =============================================================================
+
+/**
+ * Users management translations
+ */
+export interface UsersTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  labels: {
+    name: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    phone: string;
+    status: string;
+    role: string;
+    lastLogin: string;
+    dateCreated: string;
+    defaultApp: string;
+    security: string;
+    profile: string;
+  };
+  placeholders: {
+    searchUsers: string;
+    enterName: string;
+    enterEmail: string;
+    selectRole: string;
+    selectApp: string;
+  };
+  messages: CrudMessages;
+  validation: FormValidation;
+  dialogs: {
+    delete: {
+      title: string;
+      message: string;
+      confirm: string;
+      cancel: string;
     };
-    alias: {
-      tooltip: string;
-    };
-    label: {
-      tooltip: string;
-    };
-    description: {
-      tooltip: string;
-    };
-    fetch: string;
-    type: string;
-    virtualRelationship: string;
-    field: {
-      label: string;
-      default: string;
-    };
-    referenceService: {
-      label: string;
-      default: string;
-    };
-    referenceTable: {
-      label: string;
-      default: string;
-    };
-    referenceField: {
-      label: string;
-      default: string;
-    };
-    junctionService: {
-      label: string;
-      default: string;
-    };
-    junctionTable: {
-      label: string;
-      default: string;
-    };
-    junctionField: {
-      label: string;
-      default: string;
-    };
-    junctionReferenceField: {
-      label: string;
-      default: string;
-    };
-    alerts: {
-      createSuccecss: string;
-      updateSuccess: string;
+    deactivate: {
+      title: string;
+      message: string;
     };
   };
 }
 
 /**
- * Script management translations (Vue.js module)
+ * User management (authentication) translations
  */
-interface ScriptsTranslations {
-  scriptName: string;
-  scriptMethod: string;
-  scriptType: string;
-  scriptLocation: string;
-  tableName: string;
-  active: string;
-  importScriptFile: string;
-  fromDesktop: string;
-  fromGitHub: string;
-  selectFile: string;
-  service: string;
-  repository: string;
-  branch: string;
-  path: string;
-  viewLatest: string;
-  deleteCache: string;
-  runtimes: {
-    javascript: string;
-    php: string;
-    python: string;
-    python3: string;
-    nodejs: string;
+export interface UserManagementTranslations extends BaseTranslation {
+  login: {
+    title: string;
+    subtitle: string;
+    fields: {
+      email: string;
+      password: string;
+      rememberMe: string;
+    };
+    actions: {
+      signIn: string;
+      forgotPassword: string;
+      createAccount: string;
+    };
+    messages: {
+      invalidCredentials: string;
+      accountLocked: string;
+      sessionExpired: string;
+    };
   };
-  errors: {
-    githubImport: string;
+  register: {
+    title: string;
+    subtitle: string;
+    fields: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      password: string;
+      confirmPassword: string;
+    };
+    messages: {
+      passwordMismatch: string;
+      emailExists: string;
+      registrationSuccess: string;
+    };
   };
-  createSuccessMsg: string;
-  updateSuccessMsg: string;
-  deleteSuccessMsg: string;
-  getScriptSuccessMsg: string;
-  fetchCacheSuccessMsg: string;
-  deleteCacheSuccessMsg: string;
+  forgotPassword: {
+    title: string;
+    subtitle: string;
+    fields: {
+      email: string;
+    };
+    messages: {
+      emailSent: string;
+      emailNotFound: string;
+    };
+  };
+  resetPassword: {
+    title: string;
+    subtitle: string;
+    fields: {
+      newPassword: string;
+      confirmPassword: string;
+    };
+    messages: {
+      resetSuccess: string;
+      tokenExpired: string;
+    };
+  };
+  validation: FormValidation;
 }
 
 /**
  * System information translations
  */
-interface SystemInfoTranslations {
-  subheading: string;
-  instance: {
-    instance: string;
-    licenseLevel: string;
-    licenseKey: string;
-    subscriptionStatus: string;
-    subscriptionExpirationDate: string;
-    systemDatabase: string;
-    installPath: string;
-    logPath: string;
-    logMode: string;
-    logLevel: string;
-    cacheDriver: string;
-    demo: string;
-    instanceId: string;
+export interface SystemInfoTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  sections: {
+    general: {
+      title: string;
+      version: string;
+      buildDate: string;
+      environment: string;
+      timezone: string;
+      locale: string;
+    };
+    database: {
+      title: string;
+      driver: string;
+      version: string;
+      host: string;
+      status: string;
+    };
+    server: {
+      title: string;
+      phpVersion: string;
+      webServer: string;
+      memoryLimit: string;
+      diskSpace: string;
+    };
+    license: {
+      title: string;
+      type: string;
+      expiresAt: string;
+      features: string;
+      status: string;
+    };
   };
-  packages: string;
-  server: {
-    heading: string;
-    os: string;
-    release: string;
-    host: string;
-    machine: string;
-    serverApi: string;
-  };
-  client: {
-    heading: string;
-    userAgent: string;
-    ipAddress: string;
-    locale: string;
+  actions: {
+    refresh: string;
+    downloadLogs: string;
+    checkUpdates: string;
   };
 }
 
 /**
- * User management flow translations
+ * Services management translations
  */
-interface UserManagementTranslations {
-  // Login translations
-  login: {
-    [key: string]: string;
+export interface ServicesTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  types: {
+    database: string;
+    email: string;
+    file: string;
+    script: string;
+    remote: string;
+    oauth: string;
+    notification: string;
   };
-  // Registration translations
-  registration: {
-    [key: string]: string;
+  database: {
+    title: string;
+    labels: {
+      name: string;
+      type: string;
+      label: string;
+      description: string;
+      host: string;
+      port: string;
+      database: string;
+      username: string;
+      password: string;
+      dsn: string;
+      options: string;
+      charset: string;
+      collation: string;
+      timezone: string;
+      connection: string;
+      pooling: string;
+    };
+    placeholders: {
+      serviceName: string;
+      serviceDescription: string;
+      hostAddress: string;
+      portNumber: string;
+      databaseName: string;
+      dsnString: string;
+    };
+    validation: FormValidation & {
+      connectionTest: string;
+      hostRequired: string;
+      portInvalid: string;
+      databaseRequired: string;
+    };
+    connection: {
+      testing: string;
+      success: string;
+      failed: string;
+      timeout: string;
+    };
+    actions: {
+      testConnection: string;
+      generateSchema: string;
+      refreshSchema: string;
+      manageAccess: string;
+    };
   };
-  // Password reset translations
-  passwordReset: {
-    [key: string]: string;
-  };
-  // Profile translations
-  profile: {
-    [key: string]: string;
-  };
-  // Confirmation translations
-  confirmation: {
-    [key: string]: string;
+  messages: CrudMessages;
+  dialogs: {
+    delete: {
+      title: string;
+      message: string;
+      warning: string;
+    };
   };
 }
 
-// ============================================================================
-// MAIN TRANSLATION INTERFACE
-// ============================================================================
+/**
+ * Scripts management translations
+ */
+export interface ScriptsTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  types: {
+    php: string;
+    javascript: string;
+    python: string;
+    nodejs: string;
+  };
+  labels: {
+    name: string;
+    type: string;
+    language: string;
+    description: string;
+    content: string;
+    active: string;
+    storage: string;
+    github: string;
+    local: string;
+  };
+  editor: {
+    loading: string;
+    saving: string;
+    saved: string;
+    error: string;
+    syntax: string;
+    fullscreen: string;
+    exitFullscreen: string;
+  };
+  github: {
+    repository: string;
+    branch: string;
+    path: string;
+    token: string;
+    sync: string;
+    lastSync: string;
+  };
+  validation: FormValidation;
+  messages: CrudMessages;
+}
 
 /**
- * Root translation interface that encompasses all translation namespaces
- * This interface provides complete type safety for all translation keys
- * used throughout the DreamFactory Admin Interface application.
+ * Schema management translations
  */
-export interface RootTranslations {
-  // Global metadata
-  $schema?: string;
-  _metadata?: {
-    version: string;
-    locale: string;
-    direction: 'ltr' | 'rtl';
+export interface SchemaTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  navigation: {
+    tables: string;
+    fields: string;
+    relationships: string;
+    schemas: string;
+  };
+  tables: {
+    title: string;
+    labels: {
+      name: string;
+      label: string;
+      plural: string;
+      description: string;
+      primaryKey: string;
+      alias: string;
+      fieldCount: string;
+      relationshipCount: string;
+      access: string;
+    };
+    actions: {
+      viewSchema: string;
+      manageFields: string;
+      manageRelationships: string;
+      generateAPI: string;
+      exportSchema: string;
+    };
+    filters: {
+      all: string;
+      withData: string;
+      empty: string;
+      system: string;
+      custom: string;
+    };
+  };
+  fields: {
+    title: string;
+    labels: {
+      name: string;
+      type: string;
+      length: string;
+      precision: string;
+      scale: string;
+      nullable: string;
+      default: string;
+      autoIncrement: string;
+      unique: string;
+      indexed: string;
+      comment: string;
+      validation: string;
+    };
+    types: {
+      string: string;
+      integer: string;
+      float: string;
+      decimal: string;
+      boolean: string;
+      date: string;
+      datetime: string;
+      timestamp: string;
+      text: string;
+      json: string;
+      binary: string;
+    };
+    validation: FormValidation & {
+      fieldName: string;
+      fieldType: string;
+      lengthRequired: string;
+      precisionRequired: string;
+    };
+  };
+  relationships: {
+    title: string;
+    labels: {
+      name: string;
+      type: string;
+      localTable: string;
+      localField: string;
+      foreignTable: string;
+      foreignField: string;
+      junction: string;
+      onUpdate: string;
+      onDelete: string;
+    };
+    types: {
+      belongsTo: string;
+      hasOne: string;
+      hasMany: string;
+      manyToMany: string;
+    };
+    actions: {
+      cascade: string;
+      restrict: string;
+      setNull: string;
+      noAction: string;
+    };
+  };
+  discovery: {
+    scanning: string;
+    complete: string;
+    error: string;
+    progress: string;
+    foundTables: string;
+    foundFields: string;
+    foundRelationships: string;
+  };
+  messages: CrudMessages;
+}
+
+/**
+ * Scheduler translations
+ */
+export interface SchedulerTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  labels: {
+    name: string;
+    description: string;
+    schedule: string;
+    timezone: string;
+    active: string;
+    lastRun: string;
+    nextRun: string;
+    service: string;
+    endpoint: string;
+    method: string;
+    payload: string;
+    headers: string;
+  };
+  schedule: {
+    hourly: string;
+    daily: string;
+    weekly: string;
+    monthly: string;
+    yearly: string;
+    custom: string;
+    cron: string;
+  };
+  status: {
+    running: string;
+    completed: string;
+    failed: string;
+    disabled: string;
+    pending: string;
+  };
+  actions: {
+    runNow: string;
+    enable: string;
+    disable: string;
+    viewHistory: string;
+    editSchedule: string;
+  };
+  validation: FormValidation & {
+    cronExpression: string;
+    serviceRequired: string;
+    endpointRequired: string;
+  };
+  messages: CrudMessages;
+}
+
+/**
+ * Roles management translations
+ */
+export interface RolesTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  labels: {
+    name: string;
+    description: string;
+    active: string;
+    defaultApp: string;
+    serviceAccess: string;
+    permissions: string;
+    users: string;
+    dateCreated: string;
     lastModified: string;
-    framework: string;
-    ssrOptimized: boolean;
   };
-
-  // Core global translations
-  common: CommonTranslations;
-  ui: UITranslations;
-  notifications: {
-    inviteSent: string;
-    eventModification: string;
+  permissions: {
+    title: string;
+    create: string;
+    read: string;
+    update: string;
+    delete: string;
+    admin: string;
+    service: string;
+    component: string;
+    verb: string;
+    access: string;
+    condition: string;
   };
-  verbs: VerbTranslations;
-  confirmations: {
-    confirmDelete: string;
+  access: {
+    allow: string;
+    deny: string;
+    inherit: string;
   };
-  scriptTypes: ScriptTypes;
-  nav: NavigationTranslations;
+  validation: FormValidation;
+  messages: CrudMessages;
+  dialogs: {
+    delete: {
+      title: string;
+      message: string;
+      warning: string;
+    };
+  };
 }
 
 /**
- * Module-specific translations interface
- * Each module has its own namespace to avoid key conflicts
+ * Limits management translations
  */
-export interface ModuleTranslations {
-  // Feature modules
+export interface LimitsTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  labels: {
+    name: string;
+    description: string;
+    type: string;
+    period: string;
+    limit: string;
+    active: string;
+    service: string;
+    endpoint: string;
+    verb: string;
+    user: string;
+    role: string;
+    key: string;
+  };
+  types: {
+    instance: string;
+    user: string;
+    role: string;
+    service: string;
+    endpoint: string;
+  };
+  periods: {
+    minute: string;
+    hour: string;
+    day: string;
+    week: string;
+    month: string;
+    year: string;
+  };
+  validation: FormValidation & {
+    limitValue: string;
+    periodRequired: string;
+    typeRequired: string;
+  };
+  messages: CrudMessages;
+}
+
+/**
+ * Home/Dashboard translations
+ */
+export interface HomeTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  welcome: string;
+  quickstart: {
+    title: string;
+    subtitle: string;
+    steps: {
+      database: string;
+      schema: string;
+      api: string;
+      test: string;
+    };
+  };
+  statistics: {
+    services: string;
+    tables: string;
+    users: string;
+    requests: string;
+  };
+  resources: {
+    title: string;
+    documentation: string;
+    tutorials: string;
+    community: string;
+    support: string;
+  };
+  download: {
+    title: string;
+    mobile: string;
+    desktop: string;
+    cli: string;
+  };
+}
+
+/**
+ * Files management translations
+ */
+export interface FilesTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  labels: {
+    name: string;
+    size: string;
+    type: string;
+    modified: string;
+    path: string;
+    permissions: string;
+  };
+  actions: {
+    upload: string;
+    download: string;
+    delete: string;
+    rename: string;
+    createFolder: string;
+    viewDetails: string;
+  };
+  upload: {
+    dropzone: string;
+    selectFiles: string;
+    uploading: string;
+    success: string;
+    error: string;
+    maxSize: string;
+    allowedTypes: string;
+  };
+  logs: {
+    title: string;
+    level: string;
+    timestamp: string;
+    message: string;
+    context: string;
+    download: string;
+    clear: string;
+  };
+  validation: FormValidation;
+  messages: CrudMessages;
+}
+
+/**
+ * Email templates translations
+ */
+export interface EmailTemplatesTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  labels: {
+    name: string;
+    subject: string;
+    to: string;
+    cc: string;
+    bcc: string;
+    from: string;
+    replyTo: string;
+    contentType: string;
+    bodyText: string;
+    bodyHtml: string;
+    defaults: string;
+  };
+  types: {
+    plain: string;
+    html: string;
+    both: string;
+  };
+  defaults: {
+    userInvite: string;
+    passwordReset: string;
+    registration: string;
+    notification: string;
+  };
+  editor: {
+    preview: string;
+    variables: string;
+    insertVariable: string;
+    testSend: string;
+  };
+  validation: FormValidation & {
+    emailFormat: string;
+    subjectRequired: string;
+    bodyRequired: string;
+  };
+  messages: CrudMessages;
+}
+
+/**
+ * CORS configuration translations
+ */
+export interface CorsTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  labels: {
+    enabled: string;
+    origins: string;
+    headers: string;
+    methods: string;
+    credentials: string;
+    maxAge: string;
+    exposedHeaders: string;
+  };
+  placeholders: {
+    origins: string;
+    headers: string;
+    methods: string;
+  };
+  methods: {
+    get: string;
+    post: string;
+    put: string;
+    patch: string;
+    delete: string;
+    options: string;
+    head: string;
+  };
+  validation: FormValidation & {
+    originsFormat: string;
+    headersFormat: string;
+    maxAgeNumeric: string;
+  };
+  messages: {
+    updateSuccess: string;
+    updateError: string;
+  };
+}
+
+/**
+ * Cache configuration translations
+ */
+export interface CacheTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  labels: {
+    enabled: string;
+    driver: string;
+    prefix: string;
+    ttl: string;
+    tags: string;
+    compression: string;
+    serialization: string;
+  };
+  drivers: {
+    file: string;
+    database: string;
+    redis: string;
+    memcached: string;
+    array: string;
+  };
+  actions: {
+    clear: string;
+    flush: string;
+    stats: string;
+    test: string;
+  };
+  stats: {
+    hits: string;
+    misses: string;
+    ratio: string;
+    size: string;
+    keys: string;
+  };
+  validation: FormValidation;
+  messages: {
+    cleared: string;
+    flushed: string;
+    testSuccess: string;
+    testError: string;
+  };
+}
+
+/**
+ * Apps management translations
+ */
+export interface AppsTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  labels: {
+    name: string;
+    description: string;
+    url: string;
+    active: string;
+    storage: string;
+    path: string;
+    type: string;
+    defaultRole: string;
+    apiKey: string;
+    users: string;
+  };
+  types: {
+    none: string;
+    file: string;
+    url: string;
+    repo: string;
+  };
+  storage: {
+    local: string;
+    github: string;
+    gitlab: string;
+    bitbucket: string;
+  };
+  actions: {
+    launch: string;
+    preview: string;
+    download: string;
+    regenerateKey: string;
+  };
+  validation: FormValidation & {
+    urlFormat: string;
+    pathRequired: string;
+    storageRequired: string;
+  };
+  messages: CrudMessages;
+}
+
+/**
+ * API documentation translations
+ */
+export interface ApiDocsTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  sections: {
+    overview: string;
+    authentication: string;
+    services: string;
+    endpoints: string;
+    models: string;
+    examples: string;
+  };
+  labels: {
+    service: string;
+    resource: string;
+    method: string;
+    endpoint: string;
+    parameters: string;
+    response: string;
+    example: string;
+    schema: string;
+  };
+  methods: {
+    get: string;
+    post: string;
+    put: string;
+    patch: string;
+    delete: string;
+  };
+  parameters: {
+    query: string;
+    path: string;
+    header: string;
+    body: string;
+  };
+  responses: {
+    success: string;
+    error: string;
+    format: string;
+  };
+  actions: {
+    tryIt: string;
+    copyUrl: string;
+    download: string;
+    export: string;
+  };
+}
+
+/**
+ * Admins management translations
+ */
+export interface AdminsTranslations extends BaseTranslation {
+  title: string;
+  subtitle: string;
+  labels: {
+    name: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    phone: string;
+    active: string;
+    lastLogin: string;
+    dateCreated: string;
+    permissions: string;
+    role: string;
+  };
+  permissions: {
+    full: string;
+    limited: string;
+    readonly: string;
+    custom: string;
+  };
+  validation: FormValidation;
+  messages: CrudMessages;
+  dialogs: {
+    delete: {
+      title: string;
+      message: string;
+      warning: string;
+    };
+  };
+}
+
+// =============================================================================
+// UNIFIED TRANSLATION INTERFACE
+// =============================================================================
+
+/**
+ * Complete translation interface combining all feature namespaces
+ */
+export interface Translations extends BaseTranslation {
+  // Global common translations
+  common: CommonLabels;
+  
+  // Feature-specific translations
   users: UsersTranslations;
-  services: ServicesTranslations;
-  admins: AdminsTranslations;
-  apiDocs: ApiDocsTranslations;
-  cache: CacheTranslations;
-  cors: CorsTranslations;
-  emailTemplates: EmailTemplatesTranslations;
-  files: FilesTranslations;
-  home: HomeTranslations;
-  limits: LimitsTranslations;
-  roles: RolesTranslations;
-  scheduler: SchedulerTranslations;
-  schema: SchemaTranslations;
-  scripts: ScriptsTranslations;
-  systemInfo: SystemInfoTranslations;
   userManagement: UserManagementTranslations;
+  systemInfo: SystemInfoTranslations;
+  services: ServicesTranslations;
+  scripts: ScriptsTranslations;
+  schema: SchemaTranslations;
+  scheduler: SchedulerTranslations;
+  roles: RolesTranslations;
+  limits: LimitsTranslations;
+  home: HomeTranslations;
+  files: FilesTranslations;
+  emailTemplates: EmailTemplatesTranslations;
+  cors: CorsTranslations;
+  cache: CacheTranslations;
+  apps: AppsTranslations;
+  apiDocs: ApiDocsTranslations;
+  admins: AdminsTranslations;
 }
 
-// ============================================================================
-// UTILITY TYPES FOR TYPE-SAFE TRANSLATION KEYS
-// ============================================================================
+// =============================================================================
+// UTILITY TYPES FOR TYPE-SAFE TRANSLATION KEY ACCESS
+// =============================================================================
 
 /**
- * Utility type to extract nested keys from translation objects
- * Enables type-safe translation key access with dot notation
+ * Extract all possible translation keys from a nested object type
  */
-export type TranslationKey<T> = T extends object
+export type TranslationKeys<T> = T extends string
+  ? never
+  : T extends Record<string, any>
   ? {
       [K in keyof T]: K extends string
-        ? T[K] extends object
-          ? T[K] extends string
-            ? K
-            : `${K}.${TranslationKey<T[K]>}`
-          : K
+        ? T[K] extends string
+          ? K
+          : T[K] extends Record<string, any>
+          ? `${K}.${TranslationKeys<T[K]>}`
+          : never
         : never;
     }[keyof T]
   : never;
 
 /**
- * Extract all possible translation keys from root translations
+ * Get all possible translation keys for a specific namespace
  */
-export type RootTranslationKey = TranslationKey<RootTranslations>;
+export type NamespaceKeys<T extends keyof Translations> = TranslationKeys<Translations[T]>;
 
 /**
- * Extract all possible translation keys from module translations
+ * Get all possible translation namespaces
  */
-export type ModuleTranslationKey<M extends keyof ModuleTranslations> = 
-  TranslationKey<ModuleTranslations[M]>;
+export type TranslationNamespace = keyof Translations;
 
 /**
- * Union type of all available translation namespaces
+ * Type for translation function parameter
  */
-export type TranslationNamespace = keyof RootTranslations | keyof ModuleTranslations;
+export type TranslationKey = 
+  | TranslationKeys<Translations>
+  | `${TranslationNamespace}.${string}`;
 
 /**
- * Type for translation interpolation variables
- * Used when translations contain placeholders like {{variableName}}
+ * Type for translation function with interpolation support
  */
-export interface TranslationVariables {
-  [key: string]: string | number | boolean;
+export interface TranslationFunction {
+  (key: TranslationKey, values?: Record<string, string | number>): string;
+  <T extends TranslationNamespace>(namespace: T, key: NamespaceKeys<T>, values?: Record<string, string | number>): string;
 }
 
-// ============================================================================
+// =============================================================================
 // REACT HOOK FORM INTEGRATION TYPES
-// ============================================================================
+// =============================================================================
 
 /**
- * Form validation message structure for React Hook Form integration
- * Maps field names to their validation error messages
+ * Form validation message keys for React Hook Form integration
  */
-export interface FormValidationMessages {
-  [fieldName: string]: {
-    required?: string;
-    pattern?: string;
-    minLength?: string;
-    maxLength?: string;
-    min?: string;
-    max?: string;
-    email?: string;
-    url?: string;
-    custom?: string;
-  };
+export type ValidationMessageKey = 
+  | 'required'
+  | 'email'
+  | 'minLength'
+  | 'maxLength'
+  | 'pattern'
+  | 'numeric'
+  | 'url'
+  | 'custom';
+
+/**
+ * Type for form field validation with i18n support
+ */
+export interface FieldValidation {
+  required?: boolean | string;
+  minLength?: { value: number; message: string };
+  maxLength?: { value: number; message: string };
+  pattern?: { value: RegExp; message: string };
+  validate?: Record<string, (value: any) => boolean | string>;
 }
 
 /**
- * Database connection form validation messages
+ * Props for components that need translation support
  */
-export interface DatabaseConnectionValidationMessages extends FormValidationMessages {
-  name: {
-    required: string;
-    minLength: string;
-    pattern: string;
-  };
-  host: {
-    required: string;
-    url: string;
-  };
-  port: {
-    required: string;
-    min: string;
-    max: string;
-  };
-  username: {
-    required: string;
-  };
-  password: {
-    required: string;
-    minLength: string;
-  };
-  database: {
-    required: string;
-  };
+export interface TranslationProps {
+  t: TranslationFunction;
+  namespace?: TranslationNamespace;
 }
 
 /**
- * API generation form validation messages
- */
-export interface ApiGenerationValidationMessages extends FormValidationMessages {
-  serviceName: {
-    required: string;
-    pattern: string;
-    minLength: string;
-  };
-  namespace: {
-    required: string;
-    pattern: string;
-  };
-  description: {
-    maxLength: string;
-  };
-}
-
-/**
- * Schema field form validation messages
- */
-export interface SchemaFieldValidationMessages extends FormValidationMessages {
-  name: {
-    required: string;
-    pattern: string;
-  };
-  type: {
-    required: string;
-  };
-  length: {
-    min: string;
-    max: string;
-  };
-  validation: {
-    custom: string;
-  };
-}
-
-// ============================================================================
-// COMPONENT PROP VALIDATION TYPES
-// ============================================================================
-
-/**
- * Props for translation-aware components
- */
-export interface TranslationAwareProps {
-  /**
-   * Translation key for the component's text content
-   */
-  translationKey?: RootTranslationKey | string;
-  
-  /**
-   * Variables for translation interpolation
-   */
-  translationVariables?: TranslationVariables;
-  
-  /**
-   * Translation namespace for module-specific translations
-   */
-  translationNamespace?: keyof ModuleTranslations;
-  
-  /**
-   * Fallback text when translation key is not found
-   */
-  fallbackText?: string;
-}
-
-/**
- * Props for form components with validation message support
- */
-export interface FormComponentTranslationProps extends TranslationAwareProps {
-  /**
-   * Validation messages for form fields
-   */
-  validationMessages?: FormValidationMessages;
-  
-  /**
-   * Error message translation key
-   */
-  errorMessageKey?: string;
-  
-  /**
-   * Success message translation key
-   */
-  successMessageKey?: string;
-}
-
-// ============================================================================
-// HOOKS AND UTILITY FUNCTION TYPES
-// ============================================================================
-
-/**
- * Translation hook return type
+ * Hook return type for translation functionality
  */
 export interface UseTranslationReturn {
+  t: TranslationFunction;
+  ready: boolean;
+  i18n: {
+    language: string;
+    changeLanguage: (lng: string) => Promise<void>;
+  };
+}
+
+// =============================================================================
+// COMPONENT INTEGRATION TYPES
+// =============================================================================
+
+/**
+ * Props for components that display localized content
+ */
+export interface LocalizedComponentProps {
   /**
-   * Function to get translated text by key
+   * Translation key or pre-translated text
    */
-  t: (key: string, variables?: TranslationVariables) => string;
+  text?: TranslationKey | string;
   
   /**
-   * Function to check if a translation key exists
+   * Translation namespace for scoped keys
    */
-  exists: (key: string) => boolean;
+  namespace?: TranslationNamespace;
   
   /**
-   * Current locale
+   * Values for string interpolation
    */
-  locale: string;
+  values?: Record<string, string | number>;
   
   /**
-   * Function to change locale
+   * Fallback text if translation is missing
    */
-  setLocale: (locale: string) => void;
-  
-  /**
-   * Available locales
-   */
-  availableLocales: string[];
-  
-  /**
-   * Loading state for translations
-   */
-  isLoading: boolean;
-  
-  /**
-   * Error state for translation loading
-   */
-  error?: Error;
+  fallback?: string;
 }
 
 /**
- * Translation provider configuration
+ * Props for form components with validation messages
  */
-export interface TranslationProviderConfig {
+export interface ValidatedFormComponentProps extends LocalizedComponentProps {
   /**
-   * Default locale
+   * Validation message translation keys
    */
+  validationMessages?: Partial<Record<ValidationMessageKey, TranslationKey>>;
+  
+  /**
+   * Custom validation message namespace
+   */
+  validationNamespace?: TranslationNamespace;
+}
+
+// =============================================================================
+// SERVER-SIDE RENDERING SUPPORT
+// =============================================================================
+
+/**
+ * Static translation data for SSR
+ */
+export interface StaticTranslations {
+  [locale: string]: Translations;
+}
+
+/**
+ * Translation loading configuration
+ */
+export interface TranslationConfig {
   defaultLocale: string;
-  
-  /**
-   * Available locales
-   */
-  supportedLocales: string[];
-  
-  /**
-   * Base path for translation files
-   */
-  basePath: string;
-  
-  /**
-   * Fallback locale when translation is missing
-   */
+  locales: string[];
   fallbackLocale: string;
-  
-  /**
-   * Enable debug mode for missing translations
-   */
-  debug: boolean;
-  
-  /**
-   * Cache strategy for translation files
-   */
-  cacheStrategy: 'memory' | 'localStorage' | 'none';
+  load: 'currentOnly' | 'all' | 'currentAndFallback';
+  interpolation: {
+    escapeValue: boolean;
+    formatSeparator: string;
+  };
 }
 
-// ============================================================================
-// EXPORTED TYPE UNIONS
-// ============================================================================
+/**
+ * Next.js page props with translations
+ */
+export interface PagePropsWithTranslations {
+  translations: Translations;
+  locale: string;
+  fallbackTranslations?: Partial<Translations>;
+}
+
+// =============================================================================
+// TYPE GUARDS AND UTILITIES
+// =============================================================================
 
 /**
- * Complete translation type that combines root and module translations
+ * Type guard to check if a string is a valid translation key
  */
-export type CompleteTranslations = RootTranslations & ModuleTranslations;
+export function isValidTranslationKey(key: string): key is TranslationKey {
+  return typeof key === 'string' && key.length > 0;
+}
 
 /**
- * All possible translation keys across the application
+ * Type guard to check if a string is a valid namespace
  */
-export type AllTranslationKeys = 
-  | RootTranslationKey 
-  | {
-      [K in keyof ModuleTranslations]: `${K}.${ModuleTranslationKey<K>}`
-    }[keyof ModuleTranslations];
+export function isValidNamespace(namespace: string): namespace is TranslationNamespace {
+  const validNamespaces: TranslationNamespace[] = [
+    'common', 'users', 'userManagement', 'systemInfo', 'services', 'scripts',
+    'schema', 'scheduler', 'roles', 'limits', 'home', 'files', 'emailTemplates',
+    'cors', 'cache', 'apps', 'apiDocs', 'admins'
+  ];
+  return validNamespaces.includes(namespace as TranslationNamespace);
+}
 
 /**
- * Validation message types for all forms
+ * Utility type to ensure proper translation object structure
  */
-export type AllValidationMessages = 
-  | DatabaseConnectionValidationMessages
-  | ApiGenerationValidationMessages
-  | SchemaFieldValidationMessages
-  | FormValidationMessages;
-
-// ============================================================================
-// DEFAULT EXPORT
-// ============================================================================
+export type EnsureTranslationStructure<T> = T extends Translations ? T : never;
 
 /**
- * Default export provides the main translation interfaces
- * for easy importing in React components and hooks
+ * Default export for easier importing
  */
-export default {
-  RootTranslations,
-  ModuleTranslations,
-  CompleteTranslations,
-  TranslationAwareProps,
-  FormComponentTranslationProps,
-  UseTranslationReturn,
-  TranslationProviderConfig,
-} as const;
+export default Translations;
