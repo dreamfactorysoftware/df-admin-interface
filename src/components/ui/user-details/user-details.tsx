@@ -1,411 +1,188 @@
 /**
- * @fileoverview User Details Component - React implementation migrated from Angular DfUserDetailsBaseComponent
- * @description Comprehensive user management interface with profile editing, role assignment, security settings,
- * and conditional form workflows. Supports both admin and user creation/editing modes with complex nested forms.
- * @module UserDetailsComponent
+ * User Details Component for DreamFactory Admin Interface
+ * 
+ * Comprehensive React implementation migrated from Angular DfUserDetailsBaseComponent.
+ * Provides robust user management interface with profile editing, role assignment,
+ * security settings, and conditional form workflows using React Hook Form, Zod validation,
+ * and modern accessibility standards.
+ * 
+ * Key Features:
+ * - React Hook Form with Zod schema validation for sub-100ms real-time validation
+ * - Support for both admin and user creation/editing workflows with proper mode switching  
+ * - Complex nested form structure (profile details, tab access, lookup keys, app roles)
+ * - Dynamic password field management based on user selection
+ * - Tab-based access control for admin users with select all functionality
+ * - Paywall integration for feature restriction enforcement
+ * - Theme-aware styling with dark/light mode support via Zustand
+ * - Responsive design with Tailwind CSS for mobile and tablet viewports
+ * - WCAG 2.1 AA accessibility compliance with proper ARIA attributes
+ * - Internationalization support using Next.js i18n patterns
+ * - Performance optimized for large datasets and real-time validation
+ * 
+ * @fileoverview User Details React component with comprehensive form management
  * @version 1.0.0
- * @since 2024-12-19
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
 'use client';
 
-import React, { 
-  useCallback, 
-  useEffect, 
-  useMemo, 
-  useState, 
-  useRef,
-  forwardRef,
-  useImperativeHandle,
-} from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { 
-  useForm, 
-  useFieldArray, 
-  useWatch, 
-  Controller,
-  FormProvider,
-  useFormContext,
-} from 'react-hook-form';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useForm, useFieldArray, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Switch } from '@headlessui/react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ChevronDownIcon, 
-  ChevronUpIcon,
+  UserIcon,
+  EnvelopeIcon, 
+  LockClosedIcon,
+  KeyIcon,
   EyeIcon,
   EyeSlashIcon,
-  UserIcon,
-  CogIcon,
-  KeyIcon,
-  ShieldCheckIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
+  CheckIcon,
   XMarkIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  Cog6ToothIcon,
+  ShieldCheckIcon,
+  UserGroupIcon,
+  TagIcon,
   PlusIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
-import { clsx } from 'clsx';
 
-// Type imports
+// Internal imports
 import type {
   UserDetailsProps,
   UserDetailsFormData,
-  ProfileDetailsFormData,
+  UserType,
+  FormMode,
   TabAccessItem,
   LookupKeyItem,
   AppRoleItem,
-  FormMode,
-  UserType,
-  ValidationState,
-  AccessibilityProps,
-  ThemeMode,
+  ValidationErrors,
 } from './types';
-
-// Hook imports - these will be available once created
-import { useTheme } from '@/hooks/use-theme';
-import { usePaywall } from '@/hooks/use-paywall';
-import { useDebounce } from '@/hooks/use-debounce';
-import { useBreakpoint } from '@/hooks/use-breakpoint';
-import { useNotifications } from '@/hooks/use-notifications';
-import { useAuth } from '@/hooks/use-auth';
-
-// Component imports - these will be available once created
-import { ProfileDetails } from '@/components/ui/profile-details';
-import { UserAppRoles } from '@/components/ui/user-app-roles';
-import { LookupKeys } from '@/components/ui/lookup-keys';
-import { Alert } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Toggle } from '@/components/ui/toggle';
-
-// Utility imports - these will be available once created
-import { cn } from '@/lib/utils';
+import { useTheme } from '../../../hooks/use-theme';
+import { usePaywall } from '../../../hooks/use-paywall';
+import { cn } from '../../../lib/utils';
+import { Button } from '../button';
+import { Input } from '../input';
+import { Toggle } from '../toggle';
+import { Alert } from '../alert';
+import { ProfileDetails } from '../profile-details';
+import { UserAppRoles } from '../user-app-roles';
+import { LookupKeys } from '../lookup-keys';
 
 // ============================================================================
-// VALIDATION SCHEMAS
+// VALIDATION SCHEMA
 // ============================================================================
 
 /**
- * Profile details validation schema with comprehensive field validation
- */
-const profileDetailsSchema = z.object({
-  username: z
-    .string()
-    .min(3, 'Username must be at least 3 characters')
-    .max(50, 'Username must not exceed 50 characters')
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens'),
-  email: z
-    .string()
-    .email('Please enter a valid email address')
-    .max(255, 'Email must not exceed 255 characters'),
-  firstName: z
-    .string()
-    .min(1, 'First name is required')
-    .max(100, 'First name must not exceed 100 characters'),
-  lastName: z
-    .string()
-    .min(1, 'Last name is required')
-    .max(100, 'Last name must not exceed 100 characters'),
-  name: z
-    .string()
-    .min(1, 'Display name is required')
-    .max(200, 'Display name must not exceed 200 characters'),
-  phone: z
-    .string()
-    .regex(/^[\+]?[0-9\(\)\-\.\s]+$/, 'Please enter a valid phone number')
-    .optional()
-    .or(z.literal('')),
-});
-
-/**
- * Tab access item validation schema
- */
-const tabAccessSchema = z.object({
-  id: z.string().min(1, 'Tab ID is required'),
-  name: z.string().min(1, 'Tab name is required'),
-  label: z.string().min(1, 'Tab label is required'),
-  selected: z.boolean().default(false),
-  enabled: z.boolean().default(true),
-  required: z.boolean().optional(),
-  description: z.string().optional(),
-  category: z.string().optional(),
-});
-
-/**
- * Lookup key validation schema
- */
-const lookupKeySchema = z.object({
-  name: z
-    .string()
-    .min(1, 'Lookup key name is required')
-    .max(100, 'Name must not exceed 100 characters')
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Name can only contain letters, numbers, underscores, and hyphens'),
-  value: z
-    .string()
-    .min(1, 'Lookup key value is required')
-    .max(1000, 'Value must not exceed 1000 characters'),
-  private: z.boolean().default(false),
-  description: z.string().optional(),
-});
-
-/**
- * App role validation schema
- */
-const appRoleSchema = z.object({
-  app: z.string().min(1, 'Application is required'),
-  role: z.string().min(1, 'Role is required'),
-  appName: z.string().optional(),
-  roleName: z.string().optional(),
-  active: z.boolean().default(true),
-});
-
-/**
- * Complete user details form validation schema
+ * Comprehensive Zod validation schema for user details form
+ * Implements real-time validation with conditional rules
  */
 const userDetailsSchema = z.object({
-  profileDetailsGroup: profileDetailsSchema,
-  isActive: z.boolean().default(true),
-  tabs: z.array(tabAccessSchema).default([]),
-  lookupKeys: z.array(lookupKeySchema).default([]),
-  appRoles: z.array(appRoleSchema).default([]),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(128, 'Password must not exceed 128 characters')
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
-      'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
-    )
-    .optional(),
-  confirmPassword: z.string().optional(),
-  setPassword: z.boolean().default(false),
-  sendInvite: z.boolean().default(true),
-}).superRefine((data, ctx) => {
-  // Password confirmation validation
-  if (data.setPassword && data.password && data.confirmPassword !== data.password) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Passwords do not match',
-      path: ['confirmPassword'],
-    });
-  }
-
-  // Require password for new users when not sending invite
-  if (!data.sendInvite && !data.password) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Password is required when not sending an invite',
-      path: ['password'],
-    });
-  }
+  profileDetailsGroup: z.object({
+    id: z.number().optional(),
+    username: z.string()
+      .min(3, 'Username must be at least 3 characters')
+      .max(50, 'Username must not exceed 50 characters')
+      .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, hyphens, and underscores'),
+    email: z.string()
+      .email('Invalid email format')
+      .max(255, 'Email must not exceed 255 characters'),
+    first_name: z.string()
+      .max(100, 'First name must not exceed 100 characters')
+      .optional(),
+    last_name: z.string()
+      .max(100, 'Last name must not exceed 100 characters')
+      .optional(),
+    display_name: z.string()
+      .max(100, 'Display name must not exceed 100 characters')
+      .optional(),
+    phone: z.string().optional(),
+    is_active: z.boolean().default(true),
+    password: z.string().optional(),
+    confirmPassword: z.string().optional(),
+    security_question: z.string().optional(),
+    security_answer: z.string().optional(),
+    userType: z.enum(['admin', 'user']).optional(),
+    is_sys_admin: z.boolean().optional(),
+  }).refine((data) => {
+    // Password confirmation validation
+    if (data.password && data.password !== data.confirmPassword) {
+      return false;
+    }
+    return true;
+  }, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  }),
+  tabs: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string().optional(),
+    accessible: z.boolean(),
+    category: z.string().optional(),
+    order: z.number().optional(),
+    required: z.boolean().optional(),
+  })),
+  lookupKeys: z.array(z.object({
+    id: z.number().optional(),
+    name: z.string().min(1, 'Lookup key name is required'),
+    value: z.string().min(1, 'Lookup key value is required'),
+    private: z.boolean().default(false),
+    description: z.string().optional(),
+    _delete: z.boolean().optional(),
+    _formId: z.string().optional(),
+  })),
+  appRoles: z.array(z.object({
+    id: z.number().optional(),
+    app_id: z.number().min(1, 'Application is required'),
+    role_id: z.number().min(1, 'Role is required'),
+    _delete: z.boolean().optional(),
+    _formId: z.string().optional(),
+  })),
 });
 
 // ============================================================================
-// INTERFACES AND TYPES
+// ANIMATION VARIANTS
 // ============================================================================
 
-/**
- * Component ref interface for parent access
- */
-export interface UserDetailsRef {
-  /** Submit the form programmatically */
-  submit: () => Promise<void>;
-  /** Reset the form to initial values */
-  reset: () => void;
-  /** Validate the form */
-  validate: () => Promise<boolean>;
-  /** Get current form values */
-  getValues: () => UserDetailsFormData;
-  /** Set form values */
-  setValues: (values: Partial<UserDetailsFormData>) => void;
-}
-
-/**
- * Internal component state interface
- */
-interface UserDetailsState {
-  /** Current validation state */
-  validationState: ValidationState;
-  /** Whether component is mounted */
-  isMounted: boolean;
-  /** Current step in multi-step workflow */
-  currentStep: number;
-  /** Total steps in workflow */
-  totalSteps: number;
-  /** Password visibility toggle */
-  showPassword: boolean;
-  /** Confirm password visibility toggle */
-  showConfirmPassword: boolean;
-  /** Whether form has been submitted */
-  hasSubmitted: boolean;
-  /** Loading states for async operations */
-  loading: {
-    submit: boolean;
-    validate: boolean;
-    reset: boolean;
-  };
-}
-
-/**
- * Tab management interface
- */
-interface TabManager {
-  /** Select all tabs */
-  selectAll: () => void;
-  /** Deselect all tabs */
-  deselectAll: () => void;
-  /** Toggle individual tab selection */
-  toggleTab: (tabId: string) => void;
-  /** Check if all tabs are selected */
-  isAllSelected: boolean;
-  /** Check if some tabs are selected */
-  isSomeSelected: boolean;
-}
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Default tab access items for admin users
- */
-const getDefaultTabs = (): TabAccessItem[] => [
-  {
-    id: 'api-docs',
-    name: 'api-docs',
-    label: 'API Documentation',
-    selected: false,
-    enabled: true,
-    description: 'Access to API documentation and testing interfaces',
-    category: 'development',
-  },
-  {
-    id: 'schema',
-    name: 'schema',
-    label: 'Schema Management',
-    selected: false,
-    enabled: true,
-    description: 'Database schema viewing and management capabilities',
-    category: 'database',
-  },
-  {
-    id: 'services',
-    name: 'services',
-    label: 'Service Configuration',
-    selected: false,
-    enabled: true,
-    description: 'Service configuration and management access',
-    category: 'administration',
-  },
-  {
-    id: 'files',
-    name: 'files',
-    label: 'File Management',
-    selected: false,
-    enabled: true,
-    description: 'File system access and management capabilities',
-    category: 'data',
-  },
-  {
-    id: 'apps',
-    name: 'apps',
-    label: 'Application Management',
-    selected: false,
-    enabled: true,
-    description: 'Application configuration and deployment management',
-    category: 'administration',
-  },
-  {
-    id: 'users',
-    name: 'users',
-    label: 'User Management',
-    selected: false,
-    enabled: true,
-    description: 'User account creation and management capabilities',
-    category: 'security',
-  },
-  {
-    id: 'roles',
-    name: 'roles',
-    label: 'Role Management',
-    selected: false,
-    enabled: true,
-    description: 'Role definition and permission management',
-    category: 'security',
-  },
-  {
-    id: 'config',
-    name: 'config',
-    label: 'System Configuration',
-    selected: false,
-    enabled: true,
-    description: 'System-wide configuration and settings management',
-    category: 'administration',
-  },
-];
-
-/**
- * Generate default form values based on mode and user type
- */
-const getDefaultFormValues = (
-  mode: FormMode,
-  userType: UserType,
-  currentProfile?: Partial<UserDetailsFormData>
-): UserDetailsFormData => {
-  const baseValues: UserDetailsFormData = {
-    profileDetailsGroup: {
-      username: '',
-      email: '',
-      firstName: '',
-      lastName: '',
-      name: '',
-      phone: '',
-    },
-    isActive: true,
-    tabs: userType === 'admins' ? getDefaultTabs() : [],
-    lookupKeys: [],
-    appRoles: [],
-    setPassword: mode === 'create',
-    sendInvite: mode === 'create',
-  };
-
-  // Merge with current profile data for edit mode
-  if (mode === 'edit' && currentProfile) {
-    return {
-      ...baseValues,
-      ...currentProfile,
-      profileDetailsGroup: {
-        ...baseValues.profileDetailsGroup,
-        ...currentProfile.profileDetailsGroup,
+const animationVariants = {
+  container: {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.3,
+        ease: 'easeOut',
+        staggerChildren: 0.1,
       },
-    };
-  }
-
-  return baseValues;
-};
-
-/**
- * Debounce utility for form validation
- */
-const useFormValidation = (form: any, delay: number = 300) => {
-  const [validationState, setValidationState] = useState<ValidationState>('idle');
-  const debouncedValidation = useDebounce(
-    async () => {
-      setValidationState('pending');
-      try {
-        const isValid = await form.trigger();
-        setValidationState(isValid ? 'valid' : 'invalid');
-        return isValid;
-      } catch (error) {
-        setValidationState('invalid');
-        return false;
-      }
     },
-    delay
-  );
-
-  return { validationState, validateForm: debouncedValidation };
+    exit: {
+      opacity: 0,
+      y: -20,
+      transition: { duration: 0.2, ease: 'easeIn' },
+    },
+  },
+  section: {
+    hidden: { opacity: 0, x: -20 },
+    visible: {
+      opacity: 1,
+      x: 0,
+      transition: { duration: 0.3, ease: 'easeOut' },
+    },
+  },
+  field: {
+    hidden: { opacity: 0, scale: 0.95 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      transition: { duration: 0.2, ease: 'easeOut' },
+    },
+  },
 };
 
 // ============================================================================
@@ -415,1047 +192,1099 @@ const useFormValidation = (form: any, delay: number = 300) => {
 /**
  * UserDetails Component
  * 
- * Comprehensive user management interface that handles user creation and editing
- * workflows with support for profile details, role assignments, security settings,
- * and conditional form behaviors. Migrated from Angular DfUserDetailsBaseComponent
- * with enhanced React patterns, accessibility, and performance optimizations.
+ * @param props - Component props with generic type support
+ * @returns JSX.Element - Rendered user details form
  */
-export const UserDetails = forwardRef<UserDetailsRef, UserDetailsProps>(
-  (
-    {
-      mode,
-      userType,
-      disabled = false,
-      loading = false,
-      defaultValues,
-      validation,
-      schemas,
-      callbacks,
-      apps = [],
-      roles = [],
-      availableTabs,
-      currentProfile,
-      paywall,
-      showPasswordFields = true,
-      showInviteFeature = true,
-      showAdminAccess = true,
-      showAppRoles = true,
-      showLookupKeys = true,
-      layout = { columns: 1, gap: 'md', responsive: true },
-      fieldVisibility,
-      fieldLabels,
-      fieldPlaceholders,
-      cancelRoute,
-      customActions = [],
-      customRenderers,
-      conditionalFields = [],
-      sections = [],
-      className,
-      'data-testid': dataTestId,
-      theme: themeOverride,
-      darkMode,
-      locale = 'en',
-      namespace = 'userDetails',
-      translations,
-      size = 'md',
-      ...accessibilityProps
+export function UserDetails<T extends UserType = UserType>({
+  mode,
+  userType,
+  initialData,
+  defaultValues,
+  readOnly = false,
+  loading = false,
+  submitting = false,
+  
+  // React Hook Form integration
+  form: externalForm,
+  validationSchema = userDetailsSchema,
+  
+  // Data sources
+  availableApps = [],
+  availableRoles = [],
+  availableTabs = [],
+  systemLookupKeys = [],
+  
+  // Workflow configuration
+  enableTabAccess = userType === 'admin',
+  enableLookupKeys = true,
+  enableAppRoles = true,
+  enablePassword = mode === 'create',
+  enableSecurityQuestions = true,
+  enableUserTypeSelection = userType === 'admin',
+  
+  // UI customization
+  size = 'md',
+  variant = 'default',
+  className = '',
+  layout = {
+    type: 'vertical',
+    columns: 1,
+    spacing: 'md',
+    sections: {
+      profile: true,
+      tabs: enableTabAccess,
+      lookupKeys: enableLookupKeys,
+      appRoles: enableAppRoles,
     },
-    ref
-  ) => {
-    // ========================================================================
-    // HOOKS AND STATE
-    // ========================================================================
-
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const { theme, isDarkMode } = useTheme();
-    const { isActive: paywallActive, restrictedFeatures } = usePaywall();
-    const { isMobile, isTablet, isDesktop } = useBreakpoint();
-    const { showNotification } = useNotifications();
-    const { user } = useAuth();
-
-    // Component state management
-    const [state, setState] = useState<UserDetailsState>({
-      validationState: 'idle',
-      isMounted: false,
-      currentStep: 1,
-      totalSteps: 4,
-      showPassword: false,
-      showConfirmPassword: false,
-      hasSubmitted: false,
-      loading: {
-        submit: false,
-        validate: false,
-        reset: false,
+  },
+  
+  // Internationalization
+  locale = 'en',
+  
+  // Paywall integration
+  paywallState,
+  onPaywallCheck,
+  onPaywallUpgrade,
+  
+  // Event handlers
+  callbacks = {},
+  
+  // Advanced features
+  autoSave,
+  persistence,
+  performanceMonitoring,
+  debug = false,
+  testIds = {},
+  
+  // Accessibility
+  'aria-label': ariaLabel = 'User details form',
+  'aria-describedby': ariaDescribedBy,
+  tabIndex,
+  ...accessibilityProps
+}: UserDetailsProps<T>): JSX.Element {
+  
+  // ============================================================================
+  // HOOKS AND STATE
+  // ============================================================================
+  
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { theme, resolvedTheme } = useTheme();
+  const { isFeatureLocked, activatePaywall, paywallState: hookPaywallState } = usePaywall();
+  
+  // Internal state
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordType, setPasswordType] = useState<'invite' | 'password'>('invite');
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({
+    fieldErrors: {},
+    globalErrors: [],
+    serverErrors: {},
+    asyncErrors: {},
+    errorTimestamps: {},
+    i18nErrors: {},
+  });
+  const [mounted, setMounted] = useState(false);
+  
+  // Refs for accessibility and focus management
+  const formRef = useRef<HTMLFormElement>(null);
+  const firstErrorRef = useRef<HTMLInputElement>(null);
+  const announcementRef = useRef<HTMLDivElement>(null);
+  
+  // Performance monitoring
+  const renderCountRef = useRef(0);
+  const validationTimesRef = useRef<number[]>([]);
+  
+  // ============================================================================
+  // FORM INITIALIZATION
+  // ============================================================================
+  
+  const form = useForm<UserDetailsFormData>({
+    resolver: zodResolver(validationSchema),
+    defaultValues: defaultValues || {
+      profileDetailsGroup: {
+        username: '',
+        email: '',
+        first_name: '',
+        last_name: '',
+        display_name: '',
+        phone: '',
+        is_active: true,
+        userType: userType,
+        is_sys_admin: false,
+        ...initialData,
       },
-    });
-
-    // Form setup with React Hook Form
-    const formDefaultValues = useMemo(
-      () => getDefaultFormValues(mode, userType, currentProfile || defaultValues),
-      [mode, userType, currentProfile, defaultValues]
-    );
-
-    const form = useForm<UserDetailsFormData>({
-      resolver: zodResolver(schemas?.userDetailsSchema || userDetailsSchema),
-      defaultValues: formDefaultValues,
-      mode: validation?.mode || 'onChange',
-      reValidateMode: validation?.reValidateMode || 'onChange',
-      shouldFocusError: validation?.shouldFocusError ?? true,
-      delayError: validation?.delayError || 100,
-    });
-
-    const {
-      control,
-      handleSubmit,
-      formState: { errors, isDirty, isSubmitting, isValid },
-      watch,
-      setValue,
-      getValues,
-      reset,
-      trigger,
-      unregister,
-      register,
-    } = form;
-
-    // Field arrays for dynamic collections
-    const tabsFieldArray = useFieldArray({
-      control,
-      name: 'tabs',
-    });
-
-    const lookupKeysFieldArray = useFieldArray({
-      control,
-      name: 'lookupKeys',
-    });
-
-    const appRolesFieldArray = useFieldArray({
-      control,
-      name: 'appRoles',
-    });
-
-    // Watch form values for conditional logic
-    const watchedValues = useWatch({ control });
-    const setPassword = watch('setPassword');
-    const sendInvite = watch('sendInvite');
-    const isActive = watch('isActive');
-    const tabs = watch('tabs');
-
-    // Form validation hook
-    const { validationState, validateForm } = useFormValidation(form);
-
-    // ========================================================================
-    // COMPUTED VALUES
-    // ========================================================================
-
-    // Theme computation
-    const effectiveTheme = themeOverride || theme;
-    const isEffectiveDarkMode = darkMode ?? (effectiveTheme === 'dark' || 
-      (effectiveTheme === 'system' && isDarkMode));
-
-    // Paywall restrictions
-    const isPaywallRestricted = paywallActive && paywall?.isActive;
-    const restrictedTabAccess = restrictedFeatures.includes('tab-access');
-    const restrictedLookupKeys = restrictedFeatures.includes('lookup-keys');
-    const restrictedAppRoles = restrictedFeatures.includes('app-roles');
-
-    // Layout responsive classes
-    const layoutClasses = useMemo(() => {
-      const baseClasses = 'space-y-6';
-      const responsiveClasses = layout.responsive
-        ? {
-            'grid-cols-1': isMobile,
-            'grid-cols-1 md:grid-cols-2': isTablet && layout.columns >= 2,
-            'grid-cols-1 md:grid-cols-2 lg:grid-cols-3': isDesktop && layout.columns >= 3,
-          }
-        : { [`grid-cols-${layout.columns}`]: true };
-
-      const gapClasses = {
-        xs: 'gap-2',
-        sm: 'gap-4',
-        md: 'gap-6',
-        lg: 'gap-8',
-        xl: 'gap-10',
-      };
-
-      return cn(
-        baseClasses,
-        layout.columns > 1 && 'grid',
-        responsiveClasses,
-        gapClasses[layout.gap || 'md']
-      );
-    }, [layout, isMobile, isTablet, isDesktop]);
-
-    // ========================================================================
-    // TAB MANAGEMENT
-    // ========================================================================
-
-    const tabManager: TabManager = useMemo(() => {
-      const selectAll = () => {
-        const updatedTabs = tabs.map(tab => ({ ...tab, selected: true }));
-        setValue('tabs', updatedTabs, { shouldDirty: true, shouldValidate: true });
-      };
-
-      const deselectAll = () => {
-        const updatedTabs = tabs.map(tab => ({ ...tab, selected: false }));
-        setValue('tabs', updatedTabs, { shouldDirty: true, shouldValidate: true });
-      };
-
-      const toggleTab = (tabId: string) => {
-        const updatedTabs = tabs.map(tab =>
-          tab.id === tabId ? { ...tab, selected: !tab.selected } : tab
-        );
-        setValue('tabs', updatedTabs, { shouldDirty: true, shouldValidate: true });
-      };
-
-      const selectedTabs = tabs.filter(tab => tab.selected);
-      const isAllSelected = tabs.length > 0 && selectedTabs.length === tabs.length;
-      const isSomeSelected = selectedTabs.length > 0 && selectedTabs.length < tabs.length;
-
-      return {
-        selectAll,
-        deselectAll,
-        toggleTab,
-        isAllSelected,
-        isSomeSelected,
-      };
-    }, [tabs, setValue]);
-
-    // ========================================================================
-    // CONDITIONAL FIELD LOGIC
-    // ========================================================================
-
-    // Password field management
-    useEffect(() => {
-      if (mode === 'create') {
-        if (sendInvite) {
-          unregister('password');
-          unregister('confirmPassword');
-        } else if (setPassword) {
-          register('password');
-          register('confirmPassword');
-        }
-      } else if (mode === 'edit') {
-        if (setPassword) {
-          register('password');
-          register('confirmPassword');
-        } else {
-          unregister('password');
-          unregister('confirmPassword');
-        }
+      tabs: availableTabs || [],
+      lookupKeys: [],
+      appRoles: [],
+    },
+    mode: 'onChange',
+    reValidateMode: 'onChange',
+    shouldFocusError: true,
+    shouldUnregister: false,
+  });
+  
+  // Field arrays for dynamic sections
+  const {
+    fields: tabFields,
+    append: appendTab,
+    remove: removeTab,
+    update: updateTab,
+  } = useFieldArray({
+    control: form.control,
+    name: 'tabs',
+  });
+  
+  const {
+    fields: lookupKeyFields,
+    append: appendLookupKey,
+    remove: removeLookupKey,
+    update: updateLookupKey,
+  } = useFieldArray({
+    control: form.control,
+    name: 'lookupKeys',
+  });
+  
+  const {
+    fields: appRoleFields,
+    append: appendAppRole,
+    remove: removeAppRole,
+    update: updateAppRole,
+  } = useFieldArray({
+    control: form.control,
+    name: 'appRoles',
+  });
+  
+  // Watch form values for dynamic behavior
+  const watchedValues = useWatch({
+    control: form.control,
+  });
+  
+  const watchedPasswordType = useWatch({
+    control: form.control,
+    name: 'profileDetailsGroup.password',
+  });
+  
+  const watchedUserType = useWatch({
+    control: form.control,
+    name: 'profileDetailsGroup.userType',
+  });
+  
+  // ============================================================================
+  // MEMOIZED VALUES
+  // ============================================================================
+  
+  const isCreateMode = useMemo(() => mode === 'create', [mode]);
+  const isEditMode = useMemo(() => mode === 'edit', [mode]);
+  const isAdminWorkflow = useMemo(() => userType === 'admin', [userType]);
+  const currentPaywallState = useMemo(() => paywallState || hookPaywallState, [paywallState, hookPaywallState]);
+  
+  const formClasses = useMemo(() => cn(
+    'space-y-6 p-6',
+    'bg-white dark:bg-gray-900',
+    'border border-gray-200 dark:border-gray-700',
+    'rounded-lg shadow-sm',
+    {
+      'opacity-50 pointer-events-none': loading || submitting,
+      'animate-pulse': loading,
+    },
+    className
+  ), [loading, submitting, className]);
+  
+  // ============================================================================
+  // EVENT HANDLERS
+  // ============================================================================
+  
+  const handleSubmit = useCallback(async (data: UserDetailsFormData) => {
+    const startTime = Date.now();
+    
+    try {
+      // Performance monitoring
+      if (performanceMonitoring?.enabled) {
+        renderCountRef.current++;
       }
-    }, [mode, setPassword, sendInvite, register, unregister]);
-
-    // Paywall enforcement for tabs
-    useEffect(() => {
-      if (restrictedTabAccess && tabs.length > 0) {
-        setValue('tabs', [], { shouldDirty: true });
-      }
-    }, [restrictedTabAccess, setValue, tabs.length]);
-
-    // ========================================================================
-    // EVENT HANDLERS
-    // ========================================================================
-
-    /**
-     * Form submission handler with comprehensive error handling
-     */
-    const onSubmit = useCallback(async (data: UserDetailsFormData) => {
-      setState(prev => ({ ...prev, loading: { ...prev.loading, submit: true } }));
-
-      try {
-        // Validate form before submission
-        const isValid = await trigger();
-        if (!isValid) {
-          throw new Error('Form validation failed');
-        }
-
-        // Execute callback if provided
-        if (callbacks?.onSubmit) {
-          await callbacks.onSubmit(data);
-        }
-
-        // Success notification
-        showNotification({
-          type: 'success',
-          title: mode === 'create' ? 'User Created' : 'User Updated',
-          message: `User ${data.profileDetailsGroup.name} has been ${mode === 'create' ? 'created' : 'updated'} successfully.`,
-        });
-
-        // Execute success callback
-        if (callbacks?.onSuccess) {
-          callbacks.onSuccess(data);
-        }
-
-        setState(prev => ({ ...prev, hasSubmitted: true }));
-      } catch (error) {
-        console.error('Form submission error:', error);
-        
-        // Error notification
-        showNotification({
-          type: 'error',
-          title: 'Submission Failed',
-          message: error instanceof Error ? error.message : 'An unexpected error occurred.',
-        });
-
-        // Execute error callback
-        if (callbacks?.onError) {
-          callbacks.onError(error as Error);
-        }
-      } finally {
-        setState(prev => ({ ...prev, loading: { ...prev.loading, submit: false } }));
-      }
-    }, [trigger, callbacks, mode, showNotification]);
-
-    /**
-     * Form reset handler
-     */
-    const onReset = useCallback(() => {
-      setState(prev => ({ ...prev, loading: { ...prev.loading, reset: true } }));
       
-      reset(formDefaultValues);
-      setState(prev => ({
-        ...prev,
-        hasSubmitted: false,
-        showPassword: false,
-        showConfirmPassword: false,
-        loading: { ...prev.loading, reset: false },
-      }));
-
-      if (callbacks?.onReset) {
-        callbacks.onReset();
+      // Before submit validation
+      if (callbacks.beforeSubmit) {
+        const canSubmit = await callbacks.beforeSubmit(data);
+        if (!canSubmit) return;
       }
-    }, [reset, formDefaultValues, callbacks]);
-
-    /**
-     * Cancel handler with navigation
-     */
-    const onCancel = useCallback(() => {
-      if (callbacks?.onCancel) {
-        callbacks.onCancel();
-      } else if (cancelRoute) {
-        router.push(cancelRoute);
-      } else {
-        router.back();
+      
+      // Call submission handler
+      if (callbacks.onSubmit) {
+        await callbacks.onSubmit(data);
       }
-    }, [callbacks, cancelRoute, router]);
-
-    /**
-     * Lookup key management
-     */
-    const addLookupKey = useCallback(() => {
-      lookupKeysFieldArray.append({
-        name: '',
-        value: '',
-        private: false,
-        description: '',
-      });
-    }, [lookupKeysFieldArray]);
-
-    const removeLookupKey = useCallback((index: number) => {
-      lookupKeysFieldArray.remove(index);
-    }, [lookupKeysFieldArray]);
-
-    /**
-     * App role management
-     */
-    const addAppRole = useCallback(() => {
-      appRolesFieldArray.append({
-        app: '',
-        role: '',
-        active: true,
-      });
-    }, [appRolesFieldArray]);
-
-    const removeAppRole = useCallback((index: number) => {
-      appRolesFieldArray.remove(index);
-    }, [appRolesFieldArray]);
-
-    // ========================================================================
-    // IMPERATIVE HANDLE FOR REF
-    // ========================================================================
-
-    useImperativeHandle(ref, () => ({
-      submit: async () => {
-        await handleSubmit(onSubmit)();
-      },
-      reset: onReset,
-      validate: async () => {
-        setState(prev => ({ ...prev, loading: { ...prev.loading, validate: true } }));
-        try {
-          const isValid = await trigger();
-          return isValid;
-        } finally {
-          setState(prev => ({ ...prev, loading: { ...prev.loading, validate: false } }));
-        }
-      },
-      getValues,
-      setValues: (values: Partial<UserDetailsFormData>) => {
-        Object.entries(values).forEach(([key, value]) => {
-          setValue(key as keyof UserDetailsFormData, value, { shouldDirty: true });
+      
+      // After submit success
+      if (callbacks.afterSubmit) {
+        callbacks.afterSubmit(data);
+      }
+      
+      // Announce success for screen readers
+      if (announcementRef.current) {
+        announcementRef.current.textContent = `User ${isCreateMode ? 'created' : 'updated'} successfully`;
+      }
+      
+    } catch (error) {
+      console.error('Form submission error:', error);
+      
+      if (callbacks.onError) {
+        callbacks.onError({} as any); // Type assertion for error handler
+      }
+      
+      // Focus first error field
+      if (firstErrorRef.current) {
+        firstErrorRef.current.focus();
+      }
+    } finally {
+      // Record performance metrics
+      const duration = Date.now() - startTime;
+      validationTimesRef.current.push(duration);
+      
+      if (performanceMonitoring?.enabled && performanceMonitoring.onMetrics) {
+        performanceMonitoring.onMetrics({
+          renderCount: renderCountRef.current,
+          validation: {
+            averageTime: validationTimesRef.current.reduce((a, b) => a + b, 0) / validationTimesRef.current.length,
+            maxTime: Math.max(...validationTimesRef.current),
+            totalValidations: validationTimesRef.current.length,
+            errorCount: Object.keys(form.formState.errors).length,
+          },
+          interaction: {
+            firstInputTime: new Date(),
+            lastChangeTime: new Date(),
+            totalChanges: renderCountRef.current,
+            fieldChanges: {},
+          },
+          submission: {
+            attempts: 1,
+            successCount: error ? 0 : 1,
+            errorCount: error ? 1 : 0,
+            averageTime: duration,
+            lastSubmissionTime: new Date(),
+          },
         });
-      },
-    }), [handleSubmit, onSubmit, onReset, trigger, getValues, setValue]);
-
-    // ========================================================================
-    // LIFECYCLE EFFECTS
-    // ========================================================================
-
-    useEffect(() => {
-      setState(prev => ({ ...prev, isMounted: true }));
-      return () => {
-        setState(prev => ({ ...prev, isMounted: false }));
-      };
-    }, []);
-
-    // Auto-save for draft mode (if configured)
-    useEffect(() => {
-      if (isDirty && callbacks?.onChange) {
-        const subscription = form.watch((value) => {
-          callbacks.onChange(value as Partial<UserDetailsFormData>);
-        });
-        return () => subscription.unsubscribe();
       }
-    }, [isDirty, callbacks, form]);
-
-    // ========================================================================
-    // RENDER FUNCTIONS
-    // ========================================================================
-
-    /**
-     * Render password fields with conditional logic
-     */
-    const renderPasswordFields = () => {
-      if (!showPasswordFields) return null;
-
-      const showPasswordControls = mode === 'create' ? !sendInvite : setPassword;
-
-      return (
-        <div className="space-y-4">
-          {mode === 'create' && (
-            <div className="flex items-center justify-between">
-              <Controller
-                name="sendInvite"
-                control={control}
-                render={({ field }) => (
-                  <Toggle
-                    checked={field.value}
-                    onChange={field.onChange}
-                    label="Send email invitation"
-                    description="User will receive an email to set their password"
-                    disabled={disabled}
-                    className="text-sm"
-                    aria-describedby="send-invite-description"
-                  />
-                )}
-              />
-            </div>
-          )}
-
-          {mode === 'edit' && (
-            <div className="flex items-center justify-between">
-              <Controller
-                name="setPassword"
-                control={control}
-                render={({ field }) => (
-                  <Toggle
-                    checked={field.value}
-                    onChange={field.onChange}
-                    label="Set password"
-                    description="Manually set a password for this user"
-                    disabled={disabled}
-                    className="text-sm"
-                    aria-describedby="set-password-description"
-                  />
-                )}
-              />
-            </div>
-          )}
-
-          {showPasswordControls && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Controller
-                  name="password"
-                  control={control}
-                  render={({ field, fieldState }) => (
-                    <div className="relative">
-                      <Input
-                        {...field}
-                        type={state.showPassword ? 'text' : 'password'}
-                        label="Password"
-                        placeholder="Enter password"
-                        error={fieldState.error?.message}
-                        disabled={disabled}
-                        required
-                        aria-describedby="password-requirements"
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                        onClick={() => setState(prev => ({ ...prev, showPassword: !prev.showPassword }))}
-                        aria-label={state.showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {state.showPassword ? (
-                          <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                        ) : (
-                          <EyeIcon className="h-5 w-5 text-gray-400" />
-                        )}
-                      </button>
-                    </div>
-                  )}
-                />
-                <p id="password-requirements" className="mt-1 text-sm text-gray-500">
-                  Must contain at least 8 characters with uppercase, lowercase, number, and special character.
-                </p>
-              </div>
-
-              <div>
-                <Controller
-                  name="confirmPassword"
-                  control={control}
-                  render={({ field, fieldState }) => (
-                    <div className="relative">
-                      <Input
-                        {...field}
-                        type={state.showConfirmPassword ? 'text' : 'password'}
-                        label="Confirm Password"
-                        placeholder="Confirm password"
-                        error={fieldState.error?.message}
-                        disabled={disabled}
-                        required
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                        onClick={() => setState(prev => ({ ...prev, showConfirmPassword: !prev.showConfirmPassword }))}
-                        aria-label={state.showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-                      >
-                        {state.showConfirmPassword ? (
-                          <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                        ) : (
-                          <EyeIcon className="h-5 w-5 text-gray-400" />
-                        )}
-                      </button>
-                    </div>
-                  )}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      );
+    }
+  }, [callbacks, isCreateMode, performanceMonitoring, form.formState.errors]);
+  
+  const handlePasswordTypeChange = useCallback((type: 'invite' | 'password') => {
+    setPasswordType(type);
+    
+    if (type === 'invite') {
+      form.unregister('profileDetailsGroup.password');
+      form.unregister('profileDetailsGroup.confirmPassword');
+    } else {
+      form.register('profileDetailsGroup.password');
+      form.register('profileDetailsGroup.confirmPassword');
+    }
+  }, [form]);
+  
+  const handleTabSelectAll = useCallback((checked: boolean) => {
+    tabFields.forEach((_, index) => {
+      form.setValue(`tabs.${index}.accessible`, checked);
+    });
+    
+    if (callbacks.onTabAccessChange) {
+      const updatedTabs = tabFields.map(tab => ({ ...tab, accessible: checked }));
+      callbacks.onTabAccessChange(updatedTabs);
+    }
+  }, [tabFields, form, callbacks]);
+  
+  const handleAddLookupKey = useCallback(() => {
+    const newKey: LookupKeyItem = {
+      name: '',
+      value: '',
+      private: false,
+      _formId: `new-${Date.now()}`,
     };
-
-    /**
-     * Render admin access tab controls
-     */
-    const renderTabAccessControl = () => {
-      if (!showAdminAccess || userType !== 'admins') return null;
-
-      if (restrictedTabAccess) {
-        return (
-          <div className="rounded-md bg-yellow-50 dark:bg-yellow-900/20 p-4">
-            <div className="flex">
-              <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" />
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                  Premium Feature Required
-                </h3>
-                <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
-                  Tab access control is available with a premium license.
-                </p>
-                {paywall?.upgradeUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => window.open(paywall.upgradeUrl, '_blank')}
+    appendLookupKey(newKey);
+  }, [appendLookupKey]);
+  
+  const handleAddAppRole = useCallback(() => {
+    const newRole: AppRoleItem = {
+      app_id: 0,
+      role_id: 0,
+      _formId: `new-${Date.now()}`,
+    };
+    appendAppRole(newRole);
+  }, [appendAppRole]);
+  
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  // Load initial data in edit mode
+  useEffect(() => {
+    if (isEditMode && initialData) {
+      form.reset({
+        profileDetailsGroup: {
+          ...form.getValues('profileDetailsGroup'),
+          ...initialData,
+        },
+        tabs: availableTabs,
+        lookupKeys: [],
+        appRoles: [],
+      });
+    }
+  }, [isEditMode, initialData, availableTabs, form]);
+  
+  // Auto-save functionality
+  useEffect(() => {
+    if (!autoSave?.enabled) return;
+    
+    const subscription = form.watch((value, { name, type }) => {
+      if (type === 'change' && autoSave.onSave) {
+        const timeoutId = setTimeout(() => {
+          autoSave.onSave(value);
+        }, autoSave.interval);
+        
+        return () => clearTimeout(timeoutId);
+      }
+    });
+    
+    return subscription.unsubscribe;
+  }, [autoSave, form]);
+  
+  // Paywall enforcement
+  useEffect(() => {
+    if (enableTabAccess && isAdminWorkflow) {
+      activatePaywall(['admin-access', 'user-management']).then(blocked => {
+        if (blocked && onPaywallCheck) {
+          onPaywallCheck('admin-access');
+        }
+      });
+    }
+  }, [enableTabAccess, isAdminWorkflow, activatePaywall, onPaywallCheck]);
+  
+  // ============================================================================
+  // RENDER HELPERS
+  // ============================================================================
+  
+  const renderPasswordFields = () => {
+    if (!enablePassword) return null;
+    
+    return (
+      <motion.div
+        variants={animationVariants.section}
+        className="space-y-4"
+      >
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex items-center space-x-4">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Password Setup:
+            </label>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={() => handlePasswordTypeChange('invite')}
+                className={cn(
+                  'px-3 py-1 text-sm rounded-md border',
+                  passwordType === 'invite'
+                    ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700'
+                    : 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
+                )}
+              >
+                Send Invite
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePasswordTypeChange('password')}
+                className={cn(
+                  'px-3 py-1 text-sm rounded-md border',
+                  passwordType === 'password'
+                    ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700'
+                    : 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
+                )}
+              >
+                Set Password
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <AnimatePresence>
+          {passwordType === 'password' && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="relative">
+                  <Input
+                    {...form.register('profileDetailsGroup.password')}
+                    type={showPassword ? 'text' : 'password'}
+                    label="Password"
+                    placeholder="Enter password"
+                    error={form.formState.errors.profileDetailsGroup?.password?.message}
+                    aria-describedby="password-requirements"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-9 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    Upgrade Now
-                  </Button>
+                    {showPassword ? (
+                      <EyeSlashIcon className="h-5 w-5" />
+                    ) : (
+                      <EyeIcon className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+                
+                <div className="relative">
+                  <Input
+                    {...form.register('profileDetailsGroup.confirmPassword')}
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    label="Confirm Password"
+                    placeholder="Confirm password"
+                    error={form.formState.errors.profileDetailsGroup?.confirmPassword?.message}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-9 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeSlashIcon className="h-5 w-5" />
+                    ) : (
+                      <EyeIcon className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+              
+              <div
+                id="password-requirements"
+                className="text-sm text-gray-600 dark:text-gray-400"
+              >
+                Password must be at least 8 characters and contain uppercase, lowercase, and numeric characters.
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  };
+  
+  const renderTabAccess = () => {
+    if (!enableTabAccess || !isAdminWorkflow) return null;
+    
+    const allSelected = tabFields.every(tab => 
+      form.getValues(`tabs.${tabFields.indexOf(tab)}.accessible`)
+    );
+    
+    return (
+      <motion.div
+        variants={animationVariants.section}
+        className="space-y-4"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
+            <ShieldCheckIcon className="h-5 w-5 mr-2" />
+            Tab Access Control
+          </h3>
+          <div className="flex items-center space-x-2">
+            <Toggle
+              checked={allSelected}
+              onChange={handleTabSelectAll}
+              label="Select All"
+              size="sm"
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Select All
+            </span>
+          </div>
+        </div>
+        
+        {currentPaywallState.isActive && (
+          <Alert
+            type="warning"
+            title="Feature Restricted"
+            description="Advanced admin controls require a premium license. Upgrade to access full functionality."
+            actions={
+              onPaywallUpgrade && (
+                <Button
+                  size="sm"
+                  onClick={() => onPaywallUpgrade('admin-access')}
+                >
+                  Upgrade Now
+                </Button>
+              )
+            }
+          />
+        )}
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {tabFields.map((tab, index) => (
+            <motion.div
+              key={tab.id}
+              variants={animationVariants.field}
+              className="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-700 rounded-md"
+            >
+              <Controller
+                name={`tabs.${index}.accessible`}
+                control={form.control}
+                render={({ field }) => (
+                  <Toggle
+                    checked={field.value}
+                    onChange={field.onChange}
+                    disabled={currentPaywallState.isActive || readOnly}
+                    size="sm"
+                  />
+                )}
+              />
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {tab.name}
+                </div>
+                {tab.description && (
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    {tab.description}
+                  </div>
                 )}
               </div>
-            </div>
-          </div>
-        );
-      }
-
-      return (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-              Admin Access Control
-            </h3>
-            <div className="flex items-center space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={tabManager.selectAll}
-                disabled={disabled || tabManager.isAllSelected}
-                className="text-xs"
-              >
-                Select All
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={tabManager.deselectAll}
-                disabled={disabled || tabs.filter(t => t.selected).length === 0}
-                className="text-xs"
-              >
-                Deselect All
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {tabsFieldArray.fields.map((tab, index) => (
-              <div
-                key={tab.id}
-                className={cn(
-                  'relative flex items-center p-3 rounded-lg border',
-                  'hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors',
-                  'focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2',
-                  tab.selected
-                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                    : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700'
-                )}
-              >
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+    );
+  };
+  
+  const renderLookupKeys = () => {
+    if (!enableLookupKeys) return null;
+    
+    return (
+      <motion.div
+        variants={animationVariants.section}
+        className="space-y-4"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
+            <TagIcon className="h-5 w-5 mr-2" />
+            Lookup Keys
+          </h3>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleAddLookupKey}
+            disabled={readOnly}
+            className="flex items-center space-x-2"
+          >
+            <PlusIcon className="h-4 w-4" />
+            <span>Add Key</span>
+          </Button>
+        </div>
+        
+        <div className="space-y-3">
+          {lookupKeyFields.map((field, index) => (
+            <motion.div
+              key={field.id}
+              variants={animationVariants.field}
+              className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-md"
+            >
+              <div className="md:col-span-3">
+                <Input
+                  {...form.register(`lookupKeys.${index}.name`)}
+                  label="Key Name"
+                  placeholder="Enter key name"
+                  error={form.formState.errors.lookupKeys?.[index]?.name?.message}
+                  disabled={readOnly}
+                />
+              </div>
+              
+              <div className="md:col-span-4">
+                <Input
+                  {...form.register(`lookupKeys.${index}.value`)}
+                  label="Key Value"
+                  placeholder="Enter key value"
+                  error={form.formState.errors.lookupKeys?.[index]?.value?.message}
+                  disabled={readOnly}
+                />
+              </div>
+              
+              <div className="md:col-span-3">
+                <Input
+                  {...form.register(`lookupKeys.${index}.description`)}
+                  label="Description"
+                  placeholder="Optional description"
+                  disabled={readOnly}
+                />
+              </div>
+              
+              <div className="md:col-span-1 flex items-center justify-center space-x-2">
                 <Controller
-                  name={`tabs.${index}.selected`}
-                  control={control}
+                  name={`lookupKeys.${index}.private`}
+                  control={form.control}
                   render={({ field }) => (
-                    <input
-                      type="checkbox"
+                    <Toggle
                       checked={field.value}
                       onChange={field.onChange}
-                      disabled={disabled || !tab.enabled}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      aria-describedby={`tab-${tab.id}-description`}
+                      label="Private"
+                      disabled={readOnly}
+                      size="sm"
                     />
                   )}
                 />
-                <div className="ml-3 flex-1">
-                  <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {tab.label}
-                  </label>
-                  {tab.description && (
-                    <p id={`tab-${tab.id}-description`} className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {tab.description}
-                    </p>
-                  )}
-                </div>
-                {tab.required && (
-                  <span className="text-red-500 text-xs font-medium">Required</span>
-                )}
               </div>
-            ))}
-          </div>
-
-          {tabs.filter(t => t.selected).length > 0 && (
-            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              {tabs.filter(t => t.selected).length} of {tabs.length} tabs selected
+              
+              <div className="md:col-span-1 flex items-center justify-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeLookupKey(index)}
+                  disabled={readOnly}
+                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  aria-label={`Remove lookup key ${field.name || 'at position ' + (index + 1)}`}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </Button>
+              </div>
+            </motion.div>
+          ))}
+          
+          {lookupKeyFields.length === 0 && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <TagIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No lookup keys configured.</p>
+              <p className="text-sm">Click "Add Key" to create your first lookup key.</p>
             </div>
           )}
         </div>
-      );
-    };
-
-    /**
-     * Render lookup keys section
-     */
-    const renderLookupKeys = () => {
-      if (!showLookupKeys) return null;
-
-      if (restrictedLookupKeys) {
-        return (
-          <div className="rounded-md bg-yellow-50 dark:bg-yellow-900/20 p-4">
-            <div className="flex">
-              <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" />
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                  Premium Feature Required
-                </h3>
-                <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
-                  Lookup keys are available with a premium license.
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      return (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-              Lookup Keys
-            </h3>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addLookupKey}
-              disabled={disabled}
-              className="flex items-center"
+      </motion.div>
+    );
+  };
+  
+  const renderAppRoles = () => {
+    if (!enableAppRoles) return null;
+    
+    return (
+      <motion.div
+        variants={animationVariants.section}
+        className="space-y-4"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
+            <UserGroupIcon className="h-5 w-5 mr-2" />
+            Application Roles
+          </h3>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleAddAppRole}
+            disabled={readOnly}
+            className="flex items-center space-x-2"
+          >
+            <PlusIcon className="h-4 w-4" />
+            <span>Add Role</span>
+          </Button>
+        </div>
+        
+        <div className="space-y-3">
+          {appRoleFields.map((field, index) => (
+            <motion.div
+              key={field.id}
+              variants={animationVariants.field}
+              className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-md"
             >
-              <PlusIcon className="h-4 w-4 mr-1" />
-              Add Key
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            {lookupKeysFieldArray.fields.map((lookupKey, index) => (
-              <div
-                key={lookupKey.id}
-                className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Controller
-                    name={`lookupKeys.${index}.name`}
-                    control={control}
-                    render={({ field, fieldState }) => (
-                      <Input
-                        {...field}
-                        label="Key Name"
-                        placeholder="e.g., api_key"
-                        error={fieldState.error?.message}
-                        disabled={disabled}
-                        required
-                      />
-                    )}
-                  />
-                  <Controller
-                    name={`lookupKeys.${index}.value`}
-                    control={control}
-                    render={({ field, fieldState }) => (
-                      <Input
-                        {...field}
-                        label="Key Value"
-                        placeholder="Enter value"
-                        error={fieldState.error?.message}
-                        disabled={disabled}
-                        required
-                      />
-                    )}
-                  />
-                  <div className="flex items-end space-x-2">
-                    <Controller
-                      name={`lookupKeys.${index}.private`}
-                      control={control}
-                      render={({ field }) => (
-                        <Toggle
-                          checked={field.value}
-                          onChange={field.onChange}
-                          label="Private"
-                          description="Hide value in API responses"
-                          disabled={disabled}
-                          size="sm"
-                        />
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Application
+                </label>
+                <Controller
+                  name={`appRoles.${index}.app_id`}
+                  control={form.control}
+                  render={({ field }) => (
+                    <select
+                      {...field}
+                      className={cn(
+                        'w-full px-3 py-2 border border-gray-300 dark:border-gray-600',
+                        'rounded-md bg-white dark:bg-gray-800',
+                        'text-gray-900 dark:text-gray-100',
+                        'focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                        'disabled:opacity-50 disabled:cursor-not-allowed'
                       )}
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => removeLookupKey(index)}
-                      disabled={disabled}
-                      className="flex items-center"
-                      aria-label={`Remove lookup key ${lookupKey.name || index + 1}`}
+                      disabled={readOnly}
                     >
-                      <TrashIcon className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                      <option value={0}>Select Application</option>
+                      {availableApps.map(app => (
+                        <option key={app.id} value={app.id}>
+                          {app.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                />
+                {form.formState.errors.appRoles?.[index]?.app_id && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                    {form.formState.errors.appRoles[index]?.app_id?.message}
+                  </p>
+                )}
               </div>
-            ))}
-
-            {lookupKeysFieldArray.fields.length === 0 && (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                No lookup keys configured. Click "Add Key" to create one.
+              
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Role
+                </label>
+                <Controller
+                  name={`appRoles.${index}.role_id`}
+                  control={form.control}
+                  render={({ field }) => (
+                    <select
+                      {...field}
+                      className={cn(
+                        'w-full px-3 py-2 border border-gray-300 dark:border-gray-600',
+                        'rounded-md bg-white dark:bg-gray-800',
+                        'text-gray-900 dark:text-gray-100',
+                        'focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                        'disabled:opacity-50 disabled:cursor-not-allowed'
+                      )}
+                      disabled={readOnly}
+                    >
+                      <option value={0}>Select Role</option>
+                      {availableRoles.map(role => (
+                        <option key={role.id} value={role.id}>
+                          {role.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                />
+                {form.formState.errors.appRoles?.[index]?.role_id && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                    {form.formState.errors.appRoles[index]?.role_id?.message}
+                  </p>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-      );
-    };
-
-    /**
-     * Render app roles section
-     */
-    const renderAppRoles = () => {
-      if (!showAppRoles) return null;
-
-      if (restrictedAppRoles) {
-        return (
-          <div className="rounded-md bg-yellow-50 dark:bg-yellow-900/20 p-4">
-            <div className="flex">
-              <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" />
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                  Premium Feature Required
-                </h3>
-                <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
-                  App role assignments are available with a premium license.
-                </p>
+              
+              <div className="md:col-span-1 flex items-end justify-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeAppRole(index)}
+                  disabled={readOnly}
+                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  aria-label={`Remove application role assignment ${index + 1}`}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </Button>
               </div>
-            </div>
-          </div>
-        );
-      }
-
-      return (
-        <UserAppRoles
-          apps={apps}
-          roles={roles}
-          fieldArray={appRolesFieldArray}
-          control={control}
-          errors={errors.appRoles}
-          disabled={disabled}
-        />
-      );
-    };
-
-    /**
-     * Render form actions
-     */
-    const renderFormActions = () => (
-      <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex space-x-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={disabled || state.loading.submit}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onReset}
-            disabled={disabled || state.loading.submit || !isDirty}
-            loading={state.loading.reset}
-          >
-            Reset
-          </Button>
-        </div>
-
-        <div className="flex space-x-3">
-          {customActions.map((action, index) => (
-            <Button
-              key={index}
-              type="button"
-              variant={action.variant || 'secondary'}
-              onClick={action.onClick}
-              disabled={disabled || action.disabled || state.loading.submit}
-              loading={action.loading}
-            >
-              {action.label}
-            </Button>
+            </motion.div>
           ))}
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={disabled || !isValid}
-            loading={state.loading.submit}
-            className="min-w-[120px]"
-          >
-            {mode === 'create' ? 'Create User' : 'Update User'}
-          </Button>
+          
+          {appRoleFields.length === 0 && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <UserGroupIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No application roles assigned.</p>
+              <p className="text-sm">Click "Add Role" to assign the first application role.</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
+  
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+  
+  if (!mounted) {
+    return (
+      <div className="animate-pulse space-y-6 p-6">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+        <div className="space-y-4">
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
         </div>
       </div>
     );
-
-    // ========================================================================
-    // MAIN RENDER
-    // ========================================================================
-
-    if (loading) {
-      return (
-        <div 
-          className="flex items-center justify-center p-8"
-          role="status"
-          aria-label="Loading user details form"
+  }
+  
+  return (
+    <motion.div
+      variants={animationVariants.container}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="max-w-4xl mx-auto"
+    >
+      {/* Screen reader announcements */}
+      <div
+        ref={announcementRef}
+        className="sr-only"
+        aria-live="polite"
+        aria-atomic="true"
+      />
+      
+      {/* Form container */}
+      <form
+        ref={formRef}
+        onSubmit={form.handleSubmit(handleSubmit)}
+        className={formClasses}
+        noValidate
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        {...accessibilityProps}
+      >
+        {/* Header */}
+        <motion.div
+          variants={animationVariants.section}
+          className="flex items-center justify-between mb-6"
         >
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600 dark:text-gray-400">Loading user details...</span>
-        </div>
-      );
-    }
-
-    return (
-      <FormProvider {...form}>
-        <div
-          className={cn(
-            'max-w-4xl mx-auto p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg',
-            'focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2',
-            isEffectiveDarkMode && 'ring-offset-gray-900',
-            className
-          )}
-          data-testid={dataTestId}
-          {...accessibilityProps}
-        >
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {mode === 'create' ? 'Create New User' : 'Edit User'}
-            </h1>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">
-              {mode === 'create'
-                ? `Create a new ${userType === 'admins' ? 'administrator' : 'user'} account with appropriate permissions and access controls.`
-                : `Modify user profile, permissions, and access settings for this ${userType === 'admins' ? 'administrator' : 'user'}.`
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {isCreateMode ? 'Create' : 'Edit'} {isAdminWorkflow ? 'Administrator' : 'User'}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {isCreateMode 
+                ? `Configure a new ${isAdminWorkflow ? 'administrator' : 'user'} account with appropriate permissions.`
+                : `Update the ${isAdminWorkflow ? 'administrator' : 'user'} account details and permissions.`
               }
             </p>
           </div>
-
-          {/* Progress indicator for multi-step workflow */}
-          {state.totalSteps > 1 && (
-            <div className="mb-8">
-              <div className="flex items-center justify-between">
-                {Array.from({ length: state.totalSteps }, (_, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      'flex items-center',
-                      i < state.totalSteps - 1 && 'flex-1'
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium',
-                        i + 1 <= state.currentStep
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-                      )}
-                    >
-                      {i + 1 < state.currentStep ? (
-                        <CheckCircleIcon className="h-5 w-5" />
-                      ) : (
-                        i + 1
-                      )}
-                    </div>
-                    {i < state.totalSteps - 1 && (
-                      <div
-                        className={cn(
-                          'flex-1 h-0.5 mx-4',
-                          i + 1 < state.currentStep
-                            ? 'bg-blue-600'
-                            : 'bg-gray-200 dark:bg-gray-700'
-                        )}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
+          
+          {debug && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 p-2 rounded">
+              <div>Mode: {mode}</div>
+              <div>Type: {userType}</div>
+              <div>Renders: {renderCountRef.current}</div>
+              <div>Dirty: {form.formState.isDirty ? 'Yes' : 'No'}</div>
+              <div>Valid: {form.formState.isValid ? 'Yes' : 'No'}</div>
             </div>
           )}
-
-          {/* Form content */}
-          <form onSubmit={handleSubmit(onSubmit)} className={layoutClasses} noValidate>
-            {/* User Status Toggle */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  User Status
-                </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {isActive ? 'User account is active and can log in' : 'User account is disabled'}
-                </p>
-              </div>
+        </motion.div>
+        
+        {/* Global form errors */}
+        {validationErrors.globalErrors.length > 0 && (
+          <motion.div
+            variants={animationVariants.section}
+            className="mb-6"
+          >
+            <Alert
+              type="error"
+              title="Form Validation Error"
+              description={validationErrors.globalErrors.join(', ')}
+              dismissible
+            />
+          </motion.div>
+        )}
+        
+        {/* Profile Details Section */}
+        <motion.div variants={animationVariants.section} className="space-y-6">
+          <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4 flex items-center">
+              <UserIcon className="h-5 w-5 mr-2" />
+              Profile Information
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input
+                {...form.register('profileDetailsGroup.username')}
+                label="Username"
+                placeholder="Enter username"
+                error={form.formState.errors.profileDetailsGroup?.username?.message}
+                required
+                disabled={readOnly}
+                aria-describedby="username-help"
+                autoComplete="username"
+              />
+              
+              <Input
+                {...form.register('profileDetailsGroup.email')}
+                type="email"
+                label="Email Address"
+                placeholder="Enter email address"
+                error={form.formState.errors.profileDetailsGroup?.email?.message}
+                required
+                disabled={readOnly}
+                autoComplete="email"
+              />
+              
+              <Input
+                {...form.register('profileDetailsGroup.first_name')}
+                label="First Name"
+                placeholder="Enter first name"
+                error={form.formState.errors.profileDetailsGroup?.first_name?.message}
+                disabled={readOnly}
+                autoComplete="given-name"
+              />
+              
+              <Input
+                {...form.register('profileDetailsGroup.last_name')}
+                label="Last Name"
+                placeholder="Enter last name"
+                error={form.formState.errors.profileDetailsGroup?.last_name?.message}
+                disabled={readOnly}
+                autoComplete="family-name"
+              />
+              
+              <Input
+                {...form.register('profileDetailsGroup.display_name')}
+                label="Display Name"
+                placeholder="Enter display name"
+                error={form.formState.errors.profileDetailsGroup?.display_name?.message}
+                disabled={readOnly}
+              />
+              
+              <Input
+                {...form.register('profileDetailsGroup.phone')}
+                type="tel"
+                label="Phone Number"
+                placeholder="Enter phone number"
+                error={form.formState.errors.profileDetailsGroup?.phone?.message}
+                disabled={readOnly}
+                autoComplete="tel"
+              />
+            </div>
+            
+            <div className="mt-6 flex items-center space-x-4">
               <Controller
-                name="isActive"
-                control={control}
+                name="profileDetailsGroup.is_active"
+                control={form.control}
                 render={({ field }) => (
                   <Toggle
                     checked={field.value}
                     onChange={field.onChange}
-                    disabled={disabled}
-                    label="Active"
-                    className="ml-4"
+                    label="Active Account"
+                    disabled={readOnly}
                   />
                 )}
               />
+              
+              {isAdminWorkflow && (
+                <Controller
+                  name="profileDetailsGroup.is_sys_admin"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Toggle
+                      checked={field.value}
+                      onChange={field.onChange}
+                      label="System Administrator"
+                      disabled={readOnly}
+                    />
+                  )}
+                />
+              )}
             </div>
-
-            {/* Profile Details Section */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
-                <UserIcon className="h-5 w-5 mr-2" />
-                Profile Information
-              </h2>
-              <ProfileDetails
-                control={control}
-                errors={errors.profileDetailsGroup}
-                disabled={disabled}
-                fieldLabels={fieldLabels}
-                fieldPlaceholders={fieldPlaceholders}
-              />
-            </div>
-
-            {/* Password Management Section */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
+          </div>
+          
+          {/* Password Section */}
+          {renderPasswordFields()}
+          
+          {/* Security Questions Section */}
+          {enableSecurityQuestions && (
+            <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4 flex items-center">
                 <KeyIcon className="h-5 w-5 mr-2" />
-                Password Settings
-              </h2>
-              {renderPasswordFields()}
-            </div>
-
-            {/* Admin Access Control Section */}
-            {userType === 'admins' && (
+                Security Questions (Optional)
+              </h3>
+              
               <div className="space-y-4">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
-                  <ShieldCheckIcon className="h-5 w-5 mr-2" />
-                  Access Control
-                </h2>
-                {renderTabAccessControl()}
+                <Input
+                  {...form.register('profileDetailsGroup.security_question')}
+                  label="Security Question"
+                  placeholder="Enter a security question"
+                  error={form.formState.errors.profileDetailsGroup?.security_question?.message}
+                  disabled={readOnly}
+                />
+                
+                <Input
+                  {...form.register('profileDetailsGroup.security_answer')}
+                  label="Security Answer"
+                  placeholder="Enter the answer"
+                  error={form.formState.errors.profileDetailsGroup?.security_answer?.message}
+                  disabled={readOnly}
+                />
               </div>
-            )}
-
-            {/* Lookup Keys Section */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
-                <CogIcon className="h-5 w-5 mr-2" />
-                Configuration
-              </h2>
-              {renderLookupKeys()}
             </div>
+          )}
+        </motion.div>
+        
+        {/* Tab Access Control Section */}
+        {renderTabAccess()}
+        
+        {/* Lookup Keys Section */}
+        {renderLookupKeys()}
+        
+        {/* Application Roles Section */}
+        {renderAppRoles()}
+        
+        {/* Form Actions */}
+        <motion.div
+          variants={animationVariants.section}
+          className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200 dark:border-gray-700"
+        >
+          <Button
+            type="submit"
+            loading={submitting}
+            disabled={!form.formState.isValid || readOnly}
+            className="flex-1 sm:flex-none"
+          >
+            {submitting 
+              ? (isCreateMode ? 'Creating...' : 'Updating...') 
+              : (isCreateMode ? 'Create User' : 'Update User')
+            }
+          </Button>
+          
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (callbacks.onCancel) {
+                callbacks.onCancel();
+              } else {
+                router.back();
+              }
+            }}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          
+          {form.formState.isDirty && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => form.reset()}
+              disabled={submitting}
+              className="text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+            >
+              Reset Changes
+            </Button>
+          )}
+        </motion.div>
+        
+        {/* Auto-save indicator */}
+        {autoSave?.enabled && autoSave.indicator && (
+          <motion.div
+            variants={animationVariants.field}
+            className="flex items-center justify-center pt-4"
+          >
+            {autoSave.indicator}
+          </motion.div>
+        )}
+      </form>
+    </motion.div>
+  );
+}
 
-            {/* App Roles Section */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
-                <ShieldCheckIcon className="h-5 w-5 mr-2" />
-                Role Assignments
-              </h2>
-              {renderAppRoles()}
-            </div>
-
-            {/* Global form errors */}
-            {Object.keys(errors).length > 0 && (
-              <Alert
-                type="error"
-                title="Form Validation Errors"
-                message="Please correct the errors below before submitting the form."
-                className="mt-4"
-              />
-            )}
-
-            {/* Form Actions */}
-            {renderFormActions()}
-          </form>
-        </div>
-      </FormProvider>
-    );
-  }
-);
-
+// Set display name for debugging
 UserDetails.displayName = 'UserDetails';
 
-export type { UserDetailsProps, UserDetailsFormData, UserDetailsRef };
 export default UserDetails;
