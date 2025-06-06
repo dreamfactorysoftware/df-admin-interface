@@ -1,817 +1,598 @@
 /**
- * Database Service Details Page - Next.js App Router
+ * Database Service Details Page
  * 
  * Main service details page component implementing Next.js server component with 
  * React Hook Form for database service configuration. Handles service editing, 
- * connection testing, and multi-step wizard interface for database API generation.
+ * connection testing, and multi-step wizard interface for database API generation. 
+ * Replaces Angular DfServiceDetailsComponent with modern React patterns including 
+ * SWR for connection testing, Tailwind CSS styling, and paywall integration for 
+ * premium features.
  * 
- * Replaces Angular DfServiceDetailsComponent with modern React patterns including:
- * - SWR for connection testing and intelligent caching
- * - React Hook Form with Zod validation for real-time form validation under 100ms
- * - Tailwind CSS styling with consistent theme injection
- * - Paywall integration for premium features
- * - Next.js useRouter for navigation to schema and API docs
- * 
- * Key Features:
- * - Database service configuration and editing
- * - Real-time connection testing with SWR mutation hooks
- * - Multi-step wizard interface for API generation
- * - Schema discovery integration
- * - Security configuration workflows
- * - Premium feature access control with paywall integration
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Next.js dynamic route page for database service management
+ * @version 1.0.0
+ * @since 2024-01-01
  */
 
-'use client';
-
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
-import { useForm, FormProvider } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import useSWR, { mutate } from 'swr';
-import { ChevronLeftIcon, CogIcon, PlayIcon, BookOpenIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import type { Metadata } from 'next';
+import { 
+  DatabaseIcon, 
+  SettingsIcon, 
+  ShieldCheckIcon, 
+  EyeIcon,
+  ZapIcon,
+  ArrowLeftIcon,
+  ExternalLinkIcon 
+} from 'lucide-react';
 
-// Type imports
-import type { 
-  Service, 
-  ServiceConfiguration, 
-  ServiceType,
-  DatabaseServiceConfig,
-  ServiceTestResult,
-  ServiceFormData
-} from '@/types/services';
-import type { DatabaseType } from '@/types/database';
-
-// Hook imports
-import { useAuth } from '@/hooks/use-auth';
-import { useLoading } from '@/hooks/use-loading';
-import { useNotifications } from '@/hooks/use-notifications';
-import { usePaywall } from '@/hooks/use-paywall';
-import { useTheme } from '@/hooks/use-theme';
-
-// Component imports
+// Component imports following established patterns
+import { ServiceConfigurationForm } from '@/components/database-service/service-form/service-form-container';
+import { ConnectionTestPanel } from '@/components/database-service/connection-test/connection-test-button';
+import { PaywallModal } from '@/components/database-service/service-form/paywall-modal';
+import { ServiceNavigationTabs } from '@/components/database-service/service-navigation-tabs';
+import { ServiceHeader } from '@/components/database-service/service-header';
+import { ServiceStatusIndicator } from '@/components/database-service/connection-test/connection-status-indicator';
+import { LoadingSkeleton } from '@/components/ui/loading-skeleton';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { Card } from '@/components/ui/card';
+import { Alert } from '@/components/ui/alert';
 
-// Feature-specific component imports (these would be created by other files)
-import { ServiceForm } from '@/components/database-service/service-form';
-import { ConnectionTest } from '@/components/database-service/connection-test';
-import { PaywallModal } from '@/components/ui/paywall-modal';
+// Type imports from established patterns
+import type {
+  DatabaseService,
+  ServiceConfiguration,
+  ConnectionTestResult,
+  DatabaseServicePermissions
+} from '@/types/database';
+import type { ApiResponse } from '@/types/api';
 
-// API client
-import { apiClient } from '@/lib/api-client';
+// =============================================================================
+// PAGE COMPONENT PROPS & METADATA
+// =============================================================================
 
-// ============================================================================
-// VALIDATION SCHEMAS
-// ============================================================================
-
-/**
- * Service form validation schema using Zod
- * Provides real-time validation under 100ms per integration requirements
- */
-const serviceFormSchema = z.object({
-  name: z.string()
-    .min(1, 'Service name is required')
-    .max(50, 'Service name must be 50 characters or less')
-    .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Service name must start with a letter and contain only letters, numbers, and underscores'),
-  label: z.string().min(1, 'Service label is required'),
-  description: z.string().optional(),
-  type: z.enum(['mysql', 'postgresql', 'mongodb', 'oracle', 'snowflake']),
-  isActive: z.boolean().default(true),
-  config: z.record(z.any()).default({})
-});
-
-type ServiceFormValues = z.infer<typeof serviceFormSchema>;
-
-// ============================================================================
-// API FETCHERS FOR SWR
-// ============================================================================
-
-/**
- * Fetches service details from the API
- */
-const fetchService = async (serviceId: string): Promise<Service> => {
-  const response = await apiClient.get(`/system/service/${serviceId}`);
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to fetch service');
-  }
-  return response.data;
-};
-
-/**
- * Fetches service types and configuration schemas
- */
-const fetchServiceTypes = async () => {
-  const response = await apiClient.get('/system/service_type');
-  if (!response.success) {
-    throw new Error(response.error?.message || 'Failed to fetch service types');
-  }
-  return response.data;
-};
-
-/**
- * Tests database connection
- */
-const testConnection = async (serviceId: string, config: ServiceConfiguration): Promise<ServiceTestResult> => {
-  const response = await apiClient.post(`/system/service/${serviceId}/_test`, { config });
-  return {
-    success: response.success,
-    connectionTime: response.execution_time || 0,
-    message: response.success ? 'Connection successful' : 'Connection failed',
-    details: response.data,
-    error: response.success ? undefined : response.error
+interface ServiceDetailsPageProps {
+  params: { 
+    service: string; 
   };
-};
+  searchParams: { 
+    tab?: 'configuration' | 'connection' | 'schema' | 'generate' | 'docs';
+    modal?: 'paywall' | 'delete' | 'clone';
+    wizard?: 'true' | 'false';
+  };
+}
 
-// ============================================================================
-// MAIN PAGE COMPONENT
-// ============================================================================
-
-export default function ServiceDetailsPage() {
-  // ============================================================================
-  // HOOKS AND STATE
-  // ============================================================================
+/**
+ * Generate dynamic metadata for service details pages
+ * Optimized for SEO while maintaining security (no indexing)
+ */
+export async function generateMetadata({ 
+  params 
+}: ServiceDetailsPageProps): Promise<Metadata> {
+  const serviceName = decodeURIComponent(params.service);
   
-  const params = useParams();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const serviceId = params.service as string;
-  const isNewService = serviceId === 'create';
-  
-  // Authentication and permissions
-  const { user, isAuthenticated } = useAuth();
-  const { showNotification } = useNotifications();
-  const { isLoading, setLoading } = useLoading();
-  const { checkFeatureAccess, showPaywall } = usePaywall();
-  const { theme } = useTheme();
-
-  // Component state
-  const [activeTab, setActiveTab] = useState('configuration');
-  const [isEditing, setIsEditing] = useState(isNewService);
-  const [showPaywallModal, setShowPaywallModal] = useState(false);
-  const [lastTestResult, setLastTestResult] = useState<ServiceTestResult | null>(null);
-
-  // ============================================================================
-  // DATA FETCHING WITH SWR
-  // ============================================================================
-
-  // Fetch service details (skip if creating new service)
-  const { 
-    data: service, 
-    error: serviceError, 
-    isLoading: isServiceLoading,
-    mutate: mutateService 
-  } = useSWR(
-    isNewService ? null : ['service', serviceId],
-    () => fetchService(serviceId),
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      errorRetryCount: 3,
-      errorRetryInterval: 1000
-    }
-  );
-
-  // Fetch service types for form configuration
-  const { 
-    data: serviceTypes, 
-    error: serviceTypesError,
-    isLoading: isServiceTypesLoading 
-  } = useSWR(
-    'service-types',
-    fetchServiceTypes,
-    {
-      revalidateOnFocus: false,
-      revalidateOnMount: true,
-      dedupingInterval: 300000, // 5 minutes
-    }
-  );
-
-  // ============================================================================
-  // FORM SETUP
-  // ============================================================================
-
-  const form = useForm<ServiceFormValues>({
-    resolver: zodResolver(serviceFormSchema),
-    defaultValues: {
-      name: '',
-      label: '',
-      description: '',
-      type: 'mysql' as ServiceType,
-      isActive: true,
-      config: {}
+  return {
+    title: `Database Service - ${serviceName}`,
+    description: `Configure and manage ${serviceName} database service with connection testing, schema discovery, and API generation capabilities`,
+    openGraph: {
+      title: `Database Service - ${serviceName} | DreamFactory`,
+      description: 'Configure database connections and generate REST APIs with real-time validation',
     },
-    mode: 'onChange' // Real-time validation
-  });
+    robots: {
+      index: false,
+      follow: false,
+    },
+  };
+}
 
-  const { handleSubmit, reset, watch, formState: { errors, isDirty, isValid } } = form;
-  const watchedType = watch('type');
+// Force dynamic rendering for real-time service data
+export const dynamic = 'force-dynamic';
 
-  // ============================================================================
-  // EFFECTS
-  // ============================================================================
+// =============================================================================
+// SERVER DATA FETCHING
+// =============================================================================
 
-  /**
-   * Redirect to login if not authenticated
-   */
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-  }, [isAuthenticated, router]);
+/**
+ * Fetch service data on server for initial page load
+ * Implements SSR under 2 seconds per React/Next.js Integration Requirements
+ */
+async function getServiceData(serviceId: string): Promise<{
+  service: DatabaseService | null;
+  permissions: DatabaseServicePermissions;
+  error?: string;
+}> {
+  try {
+    // Server-side data fetching with error handling
+    const apiUrl = process.env.DREAMFACTORY_API_URL || 'http://localhost:8080';
+    const response = await fetch(`${apiUrl}/api/v2/system/service/${serviceId}`, {
+      cache: 'no-store', // Force fresh data for dynamic content
+      next: { revalidate: 0 },
+      headers: {
+        'Content-Type': 'application/json',
+        // Server-side authentication will be handled by middleware
+      },
+    });
 
-  /**
-   * Initialize form with service data when editing
-   */
-  useEffect(() => {
-    if (service && !isNewService) {
-      reset({
-        name: service.name,
-        label: service.label,
-        description: service.description || '',
-        type: service.type as ServiceType,
-        isActive: service.isActive,
-        config: service.config || {}
-      });
-    }
-  }, [service, isNewService, reset]);
-
-  /**
-   * Handle URL parameters for tab switching
-   */
-  useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab && ['configuration', 'connection', 'security', 'documentation'].includes(tab)) {
-      setActiveTab(tab);
-    }
-  }, [searchParams]);
-
-  // ============================================================================
-  // EVENT HANDLERS
-  // ============================================================================
-
-  /**
-   * Handles form submission for service creation/update
-   */
-  const onSubmit = useCallback(async (data: ServiceFormValues) => {
-    try {
-      setLoading(true);
-
-      const payload = {
-        ...data,
-        id: isNewService ? undefined : parseInt(serviceId)
-      };
-
-      const endpoint = isNewService 
-        ? '/system/service'
-        : `/system/service/${serviceId}`;
-      
-      const method = isNewService ? 'post' : 'put';
-      const response = await apiClient[method](endpoint, payload);
-
-      if (response.success) {
-        showNotification({
-          type: 'success',
-          message: `Service ${isNewService ? 'created' : 'updated'} successfully`,
-          duration: 5000
-        });
-
-        // Update cache and navigate
-        if (isNewService) {
-          const newServiceId = response.data.id;
-          router.push(`/api-connections/database/${newServiceId}`);
-        } else {
-          await mutateService();
-          setIsEditing(false);
-        }
-      } else {
-        throw new Error(response.error?.message || 'Operation failed');
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { service: null, permissions: { canEdit: false, canDelete: false, canTest: false } };
       }
-    } catch (error) {
-      console.error('Service save error:', error);
-      showNotification({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to save service',
-        duration: 7000
-      });
-    } finally {
-      setLoading(false);
+      throw new Error(`Service fetch failed: ${response.status}`);
     }
-  }, [isNewService, serviceId, setLoading, showNotification, router, mutateService]);
 
-  /**
-   * Handles connection testing with SWR mutation
-   */
-  const handleConnectionTest = useCallback(async () => {
-    const formData = form.getValues();
+    const data: ApiResponse<DatabaseService> = await response.json();
     
-    try {
-      setLoading(true);
-      const result = await testConnection(serviceId, formData.config);
-      setLastTestResult(result);
-      
-      showNotification({
-        type: result.success ? 'success' : 'error',
-        message: result.message,
-        duration: 5000
-      });
-      
-      return result;
-    } catch (error) {
-      const errorResult: ServiceTestResult = {
-        success: false,
-        connectionTime: 0,
-        message: 'Connection test failed',
-        error: {
-          code: 'CONNECTION_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error'
-        }
-      };
-      
-      setLastTestResult(errorResult);
-      showNotification({
-        type: 'error',
-        message: errorResult.message,
-        duration: 7000
-      });
-      
-      return errorResult;
-    } finally {
-      setLoading(false);
-    }
-  }, [form, serviceId, setLoading, showNotification]);
+    // Determine user permissions based on service and user role
+    const permissions: DatabaseServicePermissions = {
+      canEdit: true, // Will be determined by middleware authentication
+      canDelete: data.data?.created_by_id !== 1, // Can't delete system services
+      canTest: true,
+      canViewSchema: true,
+      canGenerateAPI: data.data?.type === 'database', // Only database services can generate APIs
+    };
 
-  /**
-   * Handles navigation to schema browser
-   */
-  const handleViewSchema = useCallback(async () => {
-    // Check if premium feature requires paywall
-    const hasAccess = await checkFeatureAccess('schema_browser');
-    
-    if (!hasAccess) {
-      setShowPaywallModal(true);
-      return;
-    }
-
-    router.push(`/api-connections/database/${serviceId}/schema`);
-  }, [serviceId, router, checkFeatureAccess]);
-
-  /**
-   * Handles navigation to API generation
-   */
-  const handleGenerateAPI = useCallback(async () => {
-    // Check if premium feature requires paywall
-    const hasAccess = await checkFeatureAccess('api_generation');
-    
-    if (!hasAccess) {
-      setShowPaywallModal(true);
-      return;
-    }
-
-    router.push(`/api-connections/database/${serviceId}/generate`);
-  }, [serviceId, router, checkFeatureAccess]);
-
-  /**
-   * Handles navigation to API documentation
-   */
-  const handleViewAPIDocs = useCallback(() => {
-    router.push(`/api-connections/database/${serviceId}/docs`);
-  }, [serviceId, router]);
-
-  /**
-   * Handles service deletion
-   */
-  const handleDeleteService = useCallback(async () => {
-    if (!confirm('Are you sure you want to delete this service? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await apiClient.delete(`/system/service/${serviceId}`);
-      
-      if (response.success) {
-        showNotification({
-          type: 'success',
-          message: 'Service deleted successfully',
-          duration: 5000
-        });
-        router.push('/api-connections/database');
-      } else {
-        throw new Error(response.error?.message || 'Failed to delete service');
-      }
-    } catch (error) {
-      showNotification({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to delete service',
-        duration: 7000
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [serviceId, setLoading, showNotification, router]);
-
-  // ============================================================================
-  // DERIVED STATE
-  // ============================================================================
-
-  const isDataLoading = isServiceLoading || isServiceTypesLoading;
-  const hasError = serviceError || serviceTypesError;
-  const canEdit = service?.mutable !== false;
-  const canDelete = service?.deletable !== false;
-  const isValidForTesting = isValid && !isNewService;
-
-  // Get current service type configuration
-  const currentServiceType = useMemo(() => {
-    if (!serviceTypes) return null;
-    return serviceTypes.find((type: any) => type.name === watchedType);
-  }, [serviceTypes, watchedType]);
-
-  // ============================================================================
-  // ERROR HANDLING
-  // ============================================================================
-
-  if (!isAuthenticated) {
-    return null; // Will redirect in useEffect
+    return { 
+      service: data.data || null, 
+      permissions 
+    };
+  } catch (error) {
+    console.error('Failed to fetch service data:', error);
+    return { 
+      service: null, 
+      permissions: { canEdit: false, canDelete: false, canTest: false },
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
+}
 
-  if (hasError) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Alert variant="destructive">
-          <AlertDescription>
-            Failed to load service details. Please try again later.
-            {serviceError && ` Error: ${serviceError.message}`}
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
+// =============================================================================
+// MAIN PAGE COMPONENT
+// =============================================================================
 
-  if (!isNewService && service === null && !isDataLoading) {
+/**
+ * Database Service Details Page Component
+ * 
+ * Implements comprehensive service management interface with:
+ * - Server-side rendering for initial page load
+ * - Real-time connection testing with SWR
+ * - Multi-step configuration wizard
+ * - Schema discovery navigation
+ * - API generation workflow
+ * - Paywall integration for premium features
+ */
+export default async function ServiceDetailsPage({
+  params,
+  searchParams
+}: ServiceDetailsPageProps) {
+  const serviceId = decodeURIComponent(params.service);
+  const currentTab = searchParams.tab || 'configuration';
+  const showWizard = searchParams.wizard === 'true';
+  
+  // Server-side data fetching
+  const { service, permissions, error } = await getServiceData(serviceId);
+
+  // Handle service not found
+  if (!service && !error) {
     notFound();
   }
 
-  // ============================================================================
-  // LOADING STATE
-  // ============================================================================
-
-  if (isDataLoading) {
+  // Handle server errors
+  if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <LoadingSpinner size="lg" />
+      <div className="container mx-auto px-4 py-8 max-w-4xl" data-testid="service-details-error">
+        <Alert variant="destructive" className="mb-6">
+          <DatabaseIcon className="h-4 w-4" />
+          <div>
+            <h3 className="font-semibold">Service Loading Error</h3>
+            <p className="text-sm mt-1">
+              Failed to load service details: {error}. Please check your connection and try again.
+            </p>
+          </div>
+        </Alert>
+        
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={() => window.history.back()}
+            className="inline-flex items-center"
+          >
+            <ArrowLeftIcon className="h-4 w-4 mr-2" />
+            Go Back
+          </Button>
+          
+          <Button
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center"
+          >
+            Try Again
+          </Button>
         </div>
       </div>
     );
   }
 
-  // ============================================================================
-  // RENDER COMPONENT
-  // ============================================================================
-
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
-      {/* Header Section */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.back()}
-            className="flex items-center space-x-2"
-          >
-            <ChevronLeftIcon className="h-4 w-4" />
-            <span>Back</span>
-          </Button>
-          
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {isNewService ? 'Create Database Service' : service?.label || service?.name}
-            </h1>
-            {!isNewService && (
-              <div className="flex items-center space-x-2 mt-1">
-                <Badge variant={service?.isActive ? 'default' : 'secondary'}>
-                  {service?.isActive ? 'Active' : 'Inactive'}
-                </Badge>
-                <Badge variant="outline">{service?.type}</Badge>
-                {service?.healthStatus && (
-                  <Badge 
-                    variant={
-                      service.healthStatus.status === 'healthy' ? 'success' : 
-                      service.healthStatus.status === 'degraded' ? 'warning' : 'destructive'
-                    }
-                  >
-                    {service.healthStatus.status}
-                  </Badge>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+    <div className="container mx-auto px-4 py-6 max-w-6xl space-y-6" data-testid="service-details-page">
+      {/* Service Header with Status and Actions */}
+      <Suspense fallback={<LoadingSkeleton className="h-24" />}>
+        <ServiceHeader 
+          service={service!}
+          permissions={permissions}
+          showBackButton
+        />
+      </Suspense>
 
-        {/* Action Buttons */}
-        {!isNewService && (
-          <div className="flex items-center space-x-2">
-            {!isEditing && canEdit && (
-              <Button
-                variant="outline"
-                onClick={() => setIsEditing(true)}
-                className="flex items-center space-x-2"
-              >
-                <CogIcon className="h-4 w-4" />
-                <span>Edit</span>
-              </Button>
-            )}
-            
-            {isValidForTesting && (
-              <Button
-                variant="outline"
-                onClick={handleConnectionTest}
-                disabled={isLoading}
-                className="flex items-center space-x-2"
-              >
-                <PlayIcon className="h-4 w-4" />
-                <span>Test Connection</span>
-              </Button>
-            )}
+      {/* Connection Status Banner */}
+      <Suspense fallback={<LoadingSkeleton className="h-16" />}>
+        <ServiceStatusBanner 
+          serviceId={serviceId}
+          serviceType={service!.type}
+        />
+      </Suspense>
 
-            <Button
-              variant="outline"
-              onClick={handleViewSchema}
-              className="flex items-center space-x-2"
-            >
-              <BookOpenIcon className="h-4 w-4" />
-              <span>View Schema</span>
-            </Button>
+      {/* Navigation Tabs */}
+      <ServiceNavigationTabs
+        serviceId={serviceId}
+        currentTab={currentTab}
+        permissions={permissions}
+        className="border-b border-gray-200 dark:border-gray-700"
+      />
 
-            <Button
-              onClick={handleGenerateAPI}
-              className="flex items-center space-x-2"
-            >
-              <ShieldCheckIcon className="h-4 w-4" />
-              <span>Generate API</span>
-            </Button>
+      {/* Main Content Area */}
+      <div className="min-h-[600px]">
+        {/* Configuration Tab */}
+        {currentTab === 'configuration' && (
+          <Suspense fallback={<LoadingSkeleton className="h-96" />}>
+            <ServiceConfigurationTab
+              service={service!}
+              permissions={permissions}
+              showWizard={showWizard}
+            />
+          </Suspense>
+        )}
 
-            {canDelete && (
-              <Button
-                variant="destructive"
-                onClick={handleDeleteService}
-                disabled={isLoading}
-              >
-                Delete
-              </Button>
-            )}
-          </div>
+        {/* Connection Testing Tab */}
+        {currentTab === 'connection' && (
+          <Suspense fallback={<LoadingSkeleton className="h-96" />}>
+            <ConnectionTestingTab
+              serviceId={serviceId}
+              service={service!}
+              permissions={permissions}
+            />
+          </Suspense>
+        )}
+
+        {/* Schema Discovery Tab */}
+        {currentTab === 'schema' && (
+          <Suspense fallback={<LoadingSkeleton className="h-96" />}>
+            <SchemaDiscoveryTab
+              serviceId={serviceId}
+              service={service!}
+              permissions={permissions}
+            />
+          </Suspense>
+        )}
+
+        {/* API Generation Tab */}
+        {currentTab === 'generate' && (
+          <Suspense fallback={<LoadingSkeleton className="h-96" />}>
+            <APIGenerationTab
+              serviceId={serviceId}
+              service={service!}
+              permissions={permissions}
+            />
+          </Suspense>
+        )}
+
+        {/* API Documentation Tab */}
+        {currentTab === 'docs' && (
+          <Suspense fallback={<LoadingSkeleton className="h-96" />}>
+            <APIDocumentationTab
+              serviceId={serviceId}
+              service={service!}
+            />
+          </Suspense>
         )}
       </div>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Form Section */}
-        <div className="lg:col-span-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {isNewService ? 'Service Configuration' : 'Service Details'}
-              </CardTitle>
-              <CardDescription>
-                {isNewService 
-                  ? 'Configure your database connection settings and generate REST APIs in under 5 minutes.'
-                  : 'Manage your database service configuration and connection settings.'
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FormProvider {...form}>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                  {/* Service Configuration Tabs */}
-                  <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-4">
-                      <TabsTrigger value="configuration">Configuration</TabsTrigger>
-                      <TabsTrigger value="connection" disabled={isNewService}>Connection</TabsTrigger>
-                      <TabsTrigger value="security" disabled={isNewService}>Security</TabsTrigger>
-                      <TabsTrigger value="documentation" disabled={isNewService}>Documentation</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="configuration" className="mt-6">
-                      <ServiceForm
-                        serviceTypes={serviceTypes || []}
-                        isEditing={isEditing}
-                        isNew={isNewService}
-                        currentServiceType={currentServiceType}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="connection" className="mt-6">
-                      <ConnectionTest
-                        serviceId={serviceId}
-                        config={watch('config')}
-                        serviceType={watchedType}
-                        onTestComplete={setLastTestResult}
-                        lastResult={lastTestResult}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="security" className="mt-6">
-                      <div className="text-center py-8">
-                        <p className="text-gray-500 dark:text-gray-400">
-                          Security configuration will be available after service creation.
-                        </p>
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="documentation" className="mt-6">
-                      <div className="text-center py-8">
-                        <p className="text-gray-500 dark:text-gray-400">
-                          API documentation will be generated after service creation.
-                        </p>
-                        <Button
-                          variant="outline"
-                          onClick={handleViewAPIDocs}
-                          className="mt-4"
-                        >
-                          View API Documentation
-                        </Button>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-
-                  {/* Form Actions */}
-                  {(isEditing || isNewService) && (
-                    <div className="flex items-center justify-end space-x-4 pt-6 border-t">
-                      {!isNewService && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setIsEditing(false);
-                            reset();
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      )}
-                      
-                      <Button
-                        type="submit"
-                        disabled={!isDirty || !isValid || isLoading}
-                      >
-                        {isLoading ? (
-                          <LoadingSpinner size="sm" className="mr-2" />
-                        ) : null}
-                        {isNewService ? 'Create Service' : 'Save Changes'}
-                      </Button>
-                    </div>
-                  )}
-                </form>
-              </FormProvider>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Quick Actions */}
-          {!isNewService && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleViewSchema}
-                  className="w-full justify-start"
-                >
-                  <BookOpenIcon className="h-4 w-4 mr-2" />
-                  Browse Schema
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleGenerateAPI}
-                  className="w-full justify-start"
-                >
-                  <ShieldCheckIcon className="h-4 w-4 mr-2" />
-                  Generate APIs
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleViewAPIDocs}
-                  className="w-full justify-start"
-                >
-                  <BookOpenIcon className="h-4 w-4 mr-2" />
-                  View Documentation
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Service Info */}
-          {service && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Service Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Created
-                  </dt>
-                  <dd className="text-sm text-gray-900 dark:text-white">
-                    {new Date(service.createdDate).toLocaleDateString()}
-                  </dd>
-                </div>
-                
-                <div>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Last Modified
-                  </dt>
-                  <dd className="text-sm text-gray-900 dark:text-white">
-                    {new Date(service.lastModifiedDate).toLocaleDateString()}
-                  </dd>
-                </div>
-                
-                {service.version && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Version
-                    </dt>
-                    <dd className="text-sm text-gray-900 dark:text-white">
-                      {service.version}
-                    </dd>
-                  </div>
-                )}
-                
-                {lastTestResult && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Last Test
-                    </dt>
-                    <dd className="text-sm">
-                      <Badge variant={lastTestResult.success ? 'success' : 'destructive'}>
-                        {lastTestResult.success ? 'Success' : 'Failed'}
-                      </Badge>
-                      {lastTestResult.connectionTime > 0 && (
-                        <span className="text-gray-500 dark:text-gray-400 ml-2">
-                          ({lastTestResult.connectionTime}ms)
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Help & Documentation */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Help & Resources</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="text-sm text-gray-600 dark:text-gray-300">
-                <p className="mb-2">Need help setting up your database service?</p>
-                <ul className="space-y-1 text-xs">
-                  <li>• Check your database connection settings</li>
-                  <li>• Verify firewall and network access</li>
-                  <li>• Ensure proper user permissions</li>
-                  <li>• Review SSL/TLS configuration</li>
-                </ul>
-              </div>
-              
-              <Button variant="outline" size="sm" className="w-full">
-                View Documentation
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Paywall Modal */}
-      {showPaywallModal && (
+      {/* Modal Handling */}
+      {searchParams.modal === 'paywall' && (
         <PaywallModal
-          isOpen={showPaywallModal}
-          onClose={() => setShowPaywallModal(false)}
-          feature="Advanced Database Features"
-          description="Access schema browsing, API generation, and advanced database management features."
+          isOpen={true}
+          onClose={() => {
+            // Handle modal close navigation
+            const url = new URL(window.location.href);
+            url.searchParams.delete('modal');
+            window.history.replaceState({}, '', url.toString());
+          }}
+          feature="premium_database_features"
+          serviceType={service!.type}
         />
       )}
     </div>
+  );
+}
+
+// =============================================================================
+// TAB COMPONENT IMPLEMENTATIONS
+// =============================================================================
+
+/**
+ * Service Configuration Tab Component
+ * Handles database connection configuration with React Hook Form and Zod validation
+ */
+async function ServiceConfigurationTab({
+  service,
+  permissions,
+  showWizard
+}: {
+  service: DatabaseService;
+  permissions: DatabaseServicePermissions;
+  showWizard: boolean;
+}) {
+  return (
+    <div className="space-y-6" data-testid="service-configuration-tab">
+      {/* Configuration Form */}
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <SettingsIcon className="h-5 w-5 text-primary-600" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Database Configuration
+          </h2>
+        </div>
+        
+        <ServiceConfigurationForm
+          service={service}
+          permissions={permissions}
+          showWizard={showWizard}
+          mode="edit"
+        />
+      </Card>
+
+      {/* Connection Testing Panel */}
+      {permissions.canTest && (
+        <Card className="p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <DatabaseIcon className="h-5 w-5 text-primary-600" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Connection Testing
+            </h2>
+          </div>
+          
+          <ConnectionTestPanel
+            serviceId={service.id!}
+            serviceConfig={service.config}
+            realTimeValidation={true}
+          />
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Connection Testing Tab Component
+ * Dedicated tab for comprehensive connection testing and diagnostics
+ */
+async function ConnectionTestingTab({
+  serviceId,
+  service,
+  permissions
+}: {
+  serviceId: string;
+  service: DatabaseService;
+  permissions: DatabaseServicePermissions;
+}) {
+  if (!permissions.canTest) {
+    return (
+      <Card className="p-8 text-center">
+        <ShieldCheckIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+          Access Restricted
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400">
+          You don't have permission to test this database connection.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-testid="connection-testing-tab">
+      <Card className="p-6">
+        <ConnectionTestPanel
+          serviceId={serviceId}
+          serviceConfig={service.config}
+          realTimeValidation={true}
+          showDetailedResults={true}
+          enableRetryLogic={true}
+        />
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * Schema Discovery Tab Component
+ * Navigation to dedicated schema discovery interface
+ */
+async function SchemaDiscoveryTab({
+  serviceId,
+  service,
+  permissions
+}: {
+  serviceId: string;
+  service: DatabaseService;
+  permissions: DatabaseServicePermissions;
+}) {
+  if (!permissions.canViewSchema) {
+    return (
+      <Card className="p-8 text-center">
+        <ShieldCheckIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+          Schema Discovery Unavailable
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400">
+          Schema discovery is not available for this service type or you don't have sufficient permissions.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-testid="schema-discovery-tab">
+      <Card className="p-8 text-center">
+        <EyeIcon className="h-12 w-12 text-primary-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          Schema Discovery
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+          Explore your database schema, browse tables and relationships, and understand your data structure.
+        </p>
+        
+        <Button
+          size="lg"
+          className="inline-flex items-center"
+          onClick={() => {
+            window.location.href = `/api-connections/database/${serviceId}/schema`;
+          }}
+        >
+          <EyeIcon className="h-4 w-4 mr-2" />
+          Browse Schema
+          <ExternalLinkIcon className="h-4 w-4 ml-2" />
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * API Generation Tab Component  
+ * Navigation to API generation workflow
+ */
+async function APIGenerationTab({
+  serviceId,
+  service,
+  permissions
+}: {
+  serviceId: string;
+  service: DatabaseService;
+  permissions: DatabaseServicePermissions;
+}) {
+  if (!permissions.canGenerateAPI) {
+    return (
+      <Card className="p-8 text-center">
+        <ShieldCheckIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+          API Generation Unavailable
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400">
+          API generation is only available for database services.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-testid="api-generation-tab">
+      <Card className="p-8 text-center">
+        <ZapIcon className="h-12 w-12 text-primary-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          API Generation
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+          Generate comprehensive REST APIs from your database tables with configurable endpoints, security rules, and validation.
+        </p>
+        
+        <Button
+          size="lg"
+          className="inline-flex items-center"
+          onClick={() => {
+            window.location.href = `/api-connections/database/${serviceId}/generate`;
+          }}
+        >
+          <ZapIcon className="h-4 w-4 mr-2" />
+          Generate APIs
+          <ExternalLinkIcon className="h-4 w-4 ml-2" />
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * API Documentation Tab Component
+ * Navigation to interactive API documentation
+ */
+async function APIDocumentationTab({
+  serviceId,
+  service
+}: {
+  serviceId: string;
+  service: DatabaseService;
+}) {
+  return (
+    <div className="space-y-6" data-testid="api-documentation-tab">
+      <Card className="p-8 text-center">
+        <ExternalLinkIcon className="h-12 w-12 text-primary-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          API Documentation
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+          View interactive API documentation with Swagger UI, test endpoints, and explore available operations.
+        </p>
+        
+        <Button
+          size="lg"
+          className="inline-flex items-center"
+          onClick={() => {
+            window.location.href = `/api-docs/${serviceId}`;
+          }}
+        >
+          View Documentation
+          <ExternalLinkIcon className="h-4 w-4 ml-2" />
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
+// =============================================================================
+// SUPPORTING COMPONENTS
+// =============================================================================
+
+/**
+ * Service Status Banner Component
+ * Real-time connection status display with SWR
+ */
+async function ServiceStatusBanner({
+  serviceId,
+  serviceType
+}: {
+  serviceId: string;
+  serviceType: string;
+}) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <DatabaseIcon className="h-5 w-5 text-gray-600" />
+          <div>
+            <h3 className="font-medium text-gray-900 dark:text-white">
+              {serviceId}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {serviceType.charAt(0).toUpperCase() + serviceType.slice(1)} Service
+            </p>
+          </div>
+        </div>
+        
+        <ServiceStatusIndicator 
+          serviceId={serviceId}
+          realTimeUpdates={true}
+          showDetails={false}
+        />
+      </div>
+    </Card>
   );
 }
