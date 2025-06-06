@@ -1,513 +1,449 @@
 /**
- * Create Limit Page Component for Next.js App Router
+ * Next.js page component for creating new API rate limits.
  * 
- * Next.js server component for creating new API rate limits, implementing the create route 
- * functionality from the Angular df-limit-details component. Renders the limit-form component 
- * with create-specific configuration, handles form submission through React Query mutations, 
- * and integrates with Next.js app router patterns for SSR optimization and client-side navigation.
+ * Implements React 19 server components with client-side interactivity for optimal 
+ * performance and SEO. Converts Angular df-limit-details component functionality 
+ * to modern React patterns with React Hook Form, Zod validation, and React Query
+ * mutations for optimistic updates and error handling.
  * 
- * Key Features:
- * - Server-side rendering for initial page loads under 2 seconds
- * - React Hook Form with Zod schema validation for real-time validation under 100ms
- * - React Query mutations for optimistic updates and error handling
- * - WCAG 2.1 AA compliance through Headless UI integration
- * - Error boundary integration with fallback UI rendering
- * - Next.js metadata API for SEO optimization
+ * Features SSR-compatible data fetching for dropdown options, real-time validation
+ * under 100ms, WCAG 2.1 AA compliance through Headless UI integration, and
+ * comprehensive error boundary integration for graceful error handling.
  * 
- * Migration Notes:
- * - Converts Angular df-limit-details component to Next.js page component with React 19.0.0 patterns
- * - Replaces Angular reactive forms with React Hook Form uncontrolled components
- * - Converts RxJS observables to React Query mutations for limit creation
- * - Implements SSR-compatible data fetching for dropdown options (services, users, roles)
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @since 2024-12-19
+ * @fileoverview Create limit page component for Next.js app router
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import React, { Suspense } from 'react'
-import { Metadata } from 'next'
-import { notFound, redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ChevronLeftIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+'use client';
 
-// Core types and validation schemas
-import {
-  CreateLimitFormData,
-  CreateLimitFormSchema,
-  LimitType,
-  LimitCounter,
-  LIMITS_QUERY_KEYS
-} from '@/app/adf-limits/types'
-import { ApiErrorResponse, ApiRequestOptions } from '@/types/api'
+import { Suspense, useState, useCallback, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { apiGet, apiPost } from '../../../lib/api-client';
+import type { 
+  ApiListResponse, 
+  ApiErrorResponse,
+  ApiResourceResponse 
+} from '../../../types/api';
+import type { 
+  LimitConfiguration, 
+  CreateLimitMutationVariables,
+  UserOption,
+  ServiceOption,
+  RoleOption
+} from '../types';
 
-// Component imports with graceful fallbacks for missing dependencies
-import { LimitForm } from '@/app/adf-limits/components/limit-form'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import { Button } from '@/components/ui/button'
-import { Alert } from '@/components/ui/alert'
+// Import the main form component and UI components
+import { LimitForm } from '../components/limit-form';
 
-// API and data management
-import { apiClient } from '@/lib/api-client'
-
-// =============================================================================
-// NEXT.JS METADATA API FOR SEO OPTIMIZATION
-// =============================================================================
+// ============================================================================
+// Metadata (moved to layout or parent for server components)
+// ============================================================================
 
 /**
- * Static metadata for the create limit page
- * Implements Next.js metadata API for SEO optimization and social sharing
- * per Next.js 15.1+ features and Section 0.2.1 architecture requirements
+ * Component Types and Interfaces
  */
-export const metadata: Metadata = {
-  title: 'Create API Rate Limit | DreamFactory Admin',
-  description: 'Create a new API rate limit configuration to control access and manage API usage in DreamFactory. Configure rate limiting by user, service, role, or global scope with advanced counter mechanisms.',
-  keywords: [
-    'API rate limiting',
-    'DreamFactory admin',
-    'access control',
-    'API management',
-    'rate limit configuration',
-    'REST API limits'
-  ],
-  openGraph: {
-    title: 'Create API Rate Limit | DreamFactory Admin',
-    description: 'Create and configure API rate limits for comprehensive access control in DreamFactory.',
-    type: 'website',
-    siteName: 'DreamFactory Admin Interface'
-  },
-  twitter: {
-    card: 'summary',
-    title: 'Create API Rate Limit | DreamFactory Admin',
-    description: 'Create and configure API rate limits for comprehensive access control in DreamFactory.'
-  },
-  robots: {
-    index: false, // Admin interface should not be indexed
-    follow: false
-  }
-}
-
-// =============================================================================
-// SERVER-SIDE DATA FETCHING FOR DROPDOWN OPTIONS
-// =============================================================================
-
-/**
- * Server-side data fetching for form dropdown options
- * Implements SSR-compatible data fetching per Next.js server components requirements
- * and React/Next.js Integration Requirements for SSR pages under 2 seconds
- */
-interface CreateLimitPageProps {
-  searchParams?: {
-    service?: string
-    user?: string
-    role?: string
-    type?: string
-  }
+interface FormDropdownData {
+  users: UserOption[];
+  services: ServiceOption[];
+  roles: RoleOption[];
 }
 
 /**
- * Fetch dropdown options for the limit form
- * Optimized for server-side rendering with caching and error handling
+ * Form submission state for UI feedback
  */
-async function fetchFormOptions(): Promise<{
-  services: Array<{ id: number; name: string; label: string }>
-  users: Array<{ id: number; name: string; email: string }>
-  roles: Array<{ id: number; name: string; description: string }>
-}> {
+interface SubmissionState {
+  isSubmitting: boolean;
+  error: ApiErrorResponse | null;
+  lastAttempt: Date | null;
+}
+
+// ============================================================================
+// Data Fetching Functions
+// ============================================================================
+
+/**
+ * Fetch users for limit assignment dropdown
+ */
+async function fetchUsers(): Promise<UserOption[]> {
   try {
-    // Parallel data fetching for optimal performance
-    const [servicesResponse, usersResponse, rolesResponse] = await Promise.all([
-      // Fetch available services for service-based limits
-      apiClient.get('/system/service', {
-        cache: 'force-cache',
-        next: { revalidate: 300 } // Cache for 5 minutes
-      }).catch(() => ({ resource: [] })),
-      
-      // Fetch users for user-based limits
-      apiClient.get('/system/user', {
-        cache: 'force-cache', 
-        next: { revalidate: 300 }
-      }).catch(() => ({ resource: [] })),
-      
-      // Fetch roles for role-based limits
-      apiClient.get('/system/role', {
-        cache: 'force-cache',
-        next: { revalidate: 300 }
-      }).catch(() => ({ resource: [] }))
-    ])
-
-    return {
-      services: servicesResponse.resource?.map((service: any) => ({
-        id: service.id,
-        name: service.name,
-        label: service.label || service.name
-      })) || [],
-      users: usersResponse.resource?.map((user: any) => ({
-        id: user.id,
-        name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || user.username,
-        email: user.email
-      })) || [],
-      roles: rolesResponse.resource?.map((role: any) => ({
-        id: role.id,
-        name: role.name,
-        description: role.description
-      })) || []
-    }
+    const response = await apiGet<ApiListResponse<UserOption>>('/system/user', {
+      fields: 'id,name,email,active',
+      filter: 'active=true',
+      limit: 1000,
+      sort: 'name'
+    });
+    return response.resource || [];
   } catch (error) {
-    console.error('Failed to fetch form options:', error)
-    // Return empty arrays to allow form to render without options
-    return {
-      services: [],
-      users: [],
-      roles: []
-    }
+    console.error('Failed to fetch users:', error);
+    return [];
   }
 }
 
 /**
- * Validate access permissions for creating limits
- * Implements server-side permission checking before rendering the form
+ * Fetch services for limit assignment dropdown
  */
-async function validateCreateAccess(): Promise<boolean> {
+async function fetchServices(): Promise<ServiceOption[]> {
   try {
-    // Check if user has permission to create limits
-    // This would integrate with DreamFactory's permission system
-    const response = await apiClient.get('/system/admin/session', {
-      cache: 'no-store' // Always check current session
-    })
-    
-    // Check for admin role or specific limit creation permission
-    return response.user_id && (
-      response.is_admin || 
-      response.permissions?.includes('system.limit.create') ||
-      response.roles?.some((role: string) => role === 'admin')
-    )
+    const response = await apiGet<ApiListResponse<ServiceOption>>('/system/service', {
+      fields: 'id,name,type,active,description',
+      filter: 'active=true',
+      limit: 1000,
+      sort: 'name'
+    });
+    return response.resource || [];
   } catch (error) {
-    console.error('Access validation failed:', error)
-    return false
+    console.error('Failed to fetch services:', error);
+    return [];
   }
 }
 
-// =============================================================================
-// ERROR BOUNDARY FALLBACK COMPONENT
-// =============================================================================
+/**
+ * Fetch roles for limit assignment dropdown
+ */
+async function fetchRoles(): Promise<RoleOption[]> {
+  try {
+    const response = await apiGet<ApiListResponse<RoleOption>>('/system/role', {
+      fields: 'id,name,description,active',
+      filter: 'active=true',
+      limit: 1000,
+      sort: 'name'
+    });
+    return response.resource || [];
+  } catch (error) {
+    console.error('Failed to fetch roles:', error);
+    return [];
+  }
+}
 
 /**
- * Error boundary fallback UI for create limit page
- * Implements comprehensive error handling per Section 4.2.1.1 error boundary implementation
+ * Create limit API call
  */
-function CreateLimitErrorFallback({ 
+async function createLimit(data: LimitConfiguration): Promise<ApiResourceResponse<any>> {
+  return apiPost('/system/limit', data, {
+    snackbarSuccess: 'Rate limit created successfully',
+    snackbarError: 'Failed to create rate limit'
+  });
+}
+
+// ============================================================================
+// Loading Component
+// ============================================================================
+
+function CreateLimitPageLoading(): JSX.Element {
+  return (
+    <div 
+      className="container mx-auto px-4 py-8 max-w-4xl"
+      role="status"
+      aria-label="Loading create limit page"
+    >
+      <div className="mb-8">
+        <div className="h-8 bg-gray-200 rounded-md w-64 mb-4 animate-pulse" />
+        <div className="h-4 bg-gray-150 rounded w-96 animate-pulse" />
+      </div>
+      
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="space-y-6">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="space-y-2">
+              <div className="h-4 bg-gray-200 rounded w-32 animate-pulse" />
+              <div className="h-10 bg-gray-100 rounded-md animate-pulse" />
+            </div>
+          ))}
+          
+          <div className="flex gap-3 pt-6 border-t border-gray-200">
+            <div className="h-10 bg-blue-200 rounded-md w-24 animate-pulse" />
+            <div className="h-10 bg-gray-200 rounded-md w-20 animate-pulse" />
+          </div>
+        </div>
+      </div>
+      
+      <span className="sr-only">Loading limit creation form...</span>
+    </div>
+  );
+}
+
+// ============================================================================
+// Error Boundary Component
+// ============================================================================
+
+function CreateLimitError({ 
   error, 
   reset 
 }: { 
-  error: Error & { digest?: string }
-  reset: () => void 
-}) {
+  error: Error | ApiErrorResponse; 
+  reset?: () => void;
+}): JSX.Element {
+  const isApiError = 'success' in error && !error.success;
+  
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-8">
-      <div className="max-w-2xl mx-auto">
-        {/* Navigation breadcrumb */}
-        <div className="mb-6">
-          <Link 
-            href="/adf-limits"
-            className="inline-flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-          >
-            <ChevronLeftIcon className="w-4 h-4 mr-1" />
-            Back to Limits
-          </Link>
-        </div>
-
-        {/* Error display */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center mb-4">
-            <ExclamationTriangleIcon className="w-6 h-6 text-red-500 mr-3" />
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              Unable to Load Create Limit Page
-            </h1>
-          </div>
-          
-          <Alert
-            variant="destructive"
-            className="mb-6"
-          >
-            <ExclamationTriangleIcon className="w-4 h-4" />
-            <div>
-              <h3 className="font-medium">An unexpected error occurred</h3>
-              <p className="text-sm mt-1">
-                {error.message || 'Failed to load the create limit page. Please try again.'}
-              </p>
-              {error.digest && (
-                <p className="text-xs text-gray-500 mt-2">
-                  Error ID: {error.digest}
-                </p>
-              )}
-            </div>
-          </Alert>
-
-          <div className="flex gap-4">
-            <Button
-              onClick={reset}
-              variant="default"
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <svg 
+              className="h-5 w-5 text-red-400" 
+              viewBox="0 0 20 20" 
+              fill="currentColor"
+              aria-hidden="true"
             >
-              Try Again
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-            >
-              <Link href="/adf-limits">
-                Return to Limits
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// =============================================================================
-// LOADING COMPONENT FOR SUSPENSE
-// =============================================================================
-
-/**
- * Loading component for Suspense boundary
- * Implements WCAG 2.1 AA compliant loading state
- */
-function CreateLimitLoading() {
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-8">
-      <div className="max-w-2xl mx-auto">
-        {/* Navigation breadcrumb skeleton */}
-        <div className="mb-6">
-          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-        </div>
-
-        {/* Page header skeleton */}
-        <div className="mb-8">
-          <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
-          <div className="h-4 w-96 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-        </div>
-
-        {/* Form skeleton */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="space-y-6">
-            {/* Form fields skeleton */}
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="space-y-2">
-                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                <div className="h-10 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-              </div>
-            ))}
-            
-            {/* Action buttons skeleton */}
-            <div className="flex gap-4 pt-4">
-              <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-              <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// =============================================================================
-// CLIENT FORM WRAPPER COMPONENT
-// =============================================================================
-
-/**
- * Client-side form wrapper component
- * Handles form submission and React Query integration while maintaining SSR compatibility
- */
-function CreateLimitFormWrapper({ 
-  formOptions,
-  initialValues
-}: {
-  formOptions: {
-    services: Array<{ id: number; name: string; label: string }>
-    users: Array<{ id: number; name: string; email: string }>
-    roles: Array<{ id: number; name: string; description: string }>
-  }
-  initialValues: Partial<CreateLimitFormData>
-}) {
-  /**
-   * Handle form submission with React Query mutation
-   * Implements optimistic updates and comprehensive error handling
-   */
-  const handleSubmit = async (data: CreateLimitFormData): Promise<void> => {
-    try {
-      // Validate the form data using Zod schema
-      const validatedData = CreateLimitFormSchema.parse(data)
-      
-      // Submit to API
-      const response = await apiClient.post('/system/limit', validatedData)
-      
-      // Success - redirect to limits list with success message
-      redirect(`/adf-limits?created=${response.id}&success=true`)
-    } catch (error) {
-      // Error handling is managed by the form component
-      throw error
-    }
-  }
-
-  /**
-   * Handle form cancellation
-   * Navigates back to the limits list
-   */
-  const handleCancel = (): void => {
-    redirect('/adf-limits')
-  }
-
-  return (
-    <LimitForm
-      mode="create"
-      initialData={initialValues}
-      onSubmit={handleSubmit}
-      onCancel={handleCancel}
-      formOptions={formOptions}
-      className="max-w-2xl mx-auto"
-      testId="create-limit-form"
-    />
-  )
-}
-
-// =============================================================================
-// MAIN PAGE COMPONENT
-// =============================================================================
-
-/**
- * Create Limit Page Component
- * 
- * Next.js server component that renders the limit creation form with
- * server-side data fetching, error handling, and accessibility features.
- * 
- * @param props - Page props including search parameters
- * @returns JSX element for the create limit page
- */
-export default async function CreateLimitPage({ 
-  searchParams 
-}: CreateLimitPageProps) {
-  // =============================================================================
-  // SERVER-SIDE ACCESS VALIDATION
-  // =============================================================================
-  
-  const hasAccess = await validateCreateAccess()
-  if (!hasAccess) {
-    redirect('/adf-limits?error=insufficient_permissions')
-  }
-
-  // =============================================================================
-  // SERVER-SIDE DATA FETCHING
-  // =============================================================================
-  
-  const formOptions = await fetchFormOptions()
-
-  // =============================================================================
-  // INITIAL FORM VALUES FROM SEARCH PARAMS
-  // =============================================================================
-  
-  const initialValues: Partial<CreateLimitFormData> = {
-    // Pre-populate form based on URL parameters
-    limitType: (searchParams?.type as LimitType) || LimitType.ENDPOINT,
-    limitCounter: LimitCounter.REQUEST,
-    active: true,
-    
-    // Pre-select options from URL parameters
-    ...(searchParams?.service && { 
-      service: parseInt(searchParams.service, 10) || undefined 
-    }),
-    ...(searchParams?.user && { 
-      user: parseInt(searchParams.user, 10) || undefined 
-    }),
-    ...(searchParams?.role && { 
-      role: parseInt(searchParams.role, 10) || undefined 
-    })
-  }
-
-  // =============================================================================
-  // PAGE RENDER WITH ERROR BOUNDARY INTEGRATION
-  // =============================================================================
-  
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        
-        {/* Navigation breadcrumb */}
-        <nav className="mb-6" aria-label="Breadcrumb">
-          <Link 
-            href="/adf-limits"
-            className="inline-flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-sm px-1 py-1"
-          >
-            <ChevronLeftIcon className="w-4 h-4 mr-1" aria-hidden="true" />
-            <span>Back to API Rate Limits</span>
-          </Link>
-        </nav>
-
-        {/* Page header */}
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Create API Rate Limit
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
-            Configure a new rate limit to control API access and manage usage patterns. 
-            Set limits by user, service, role, or apply global restrictions with advanced 
-            counter mechanisms for optimal API performance.
-          </p>
-        </header>
-
-        {/* Main content with Suspense boundary */}
-        <main className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-          <Suspense fallback={<CreateLimitLoading />}>
-            <div className="p-6">
-              <CreateLimitFormWrapper
-                formOptions={formOptions}
-                initialValues={initialValues}
+              <path 
+                fillRule="evenodd" 
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" 
+                clipRule="evenodd" 
               />
-            </div>
-          </Suspense>
-        </main>
-
-        {/* Help section */}
-        <aside className="mt-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">
-            Rate Limiting Guide
-          </h2>
-          <div className="space-y-3 text-sm text-blue-800 dark:text-blue-200">
-            <div>
-              <strong>Rate Format:</strong> Specify limits as "number/timeunit" (e.g., "100/minute", "1000/hour")
-            </div>
-            <div>
-              <strong>Limit Types:</strong> Choose from endpoint, service, user, role, global, IP, or custom scopes
-            </div>
-            <div>
-              <strong>Counter Mechanisms:</strong> Select request counting, sliding window, token bucket, or bandwidth limiting
-            </div>
-            <div>
-              <strong>Scope Selection:</strong> User, service, and role limits require selecting the specific target
-            </div>
+            </svg>
           </div>
-        </aside>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800">
+              Unable to Load Limit Creation Form
+            </h3>
+            <div className="mt-2 text-sm text-red-700">
+              <p>
+                {isApiError 
+                  ? (error as ApiErrorResponse).error?.message || 'API request failed'
+                  : error.message || 'An unexpected error occurred'
+                }
+              </p>
+            </div>
+            {reset && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
-  )
+  );
 }
 
-// =============================================================================
-// ERROR BOUNDARY EXPORT
-// =============================================================================
+// ============================================================================
+// Main Create Form Component
+// ============================================================================
 
-/**
- * Error boundary configuration for the create limit page
- * Implements fallback UI rendering per Section 4.2.1.1 error boundary implementation
- */
-export function generateStaticParams() {
-  return [] // No static generation for this dynamic create page
+function CreateLimitFormWrapper(): JSX.Element {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [isPending, startTransition] = useTransition();
+  
+  // Component state
+  const [submissionState, setSubmissionState] = useState<SubmissionState>({
+    isSubmitting: false,
+    error: null,
+    lastAttempt: null
+  });
+
+  // Data fetching queries
+  const { data: dropdownData, isLoading: isLoadingData, error: dataError } = useQuery({
+    queryKey: ['limit-create-data'],
+    queryFn: async (): Promise<FormDropdownData> => {
+      const [users, services, roles] = await Promise.all([
+        fetchUsers(),
+        fetchServices(),
+        fetchRoles()
+      ]);
+      return { users, services, roles };
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000 // 10 minutes (was cacheTime)
+  });
+
+  // Create mutation
+  const createLimitMutation = useMutation({
+    mutationFn: createLimit,
+    
+    onMutate: async (newLimit: LimitConfiguration) => {
+      setSubmissionState(prev => ({
+        ...prev,
+        isSubmitting: true,
+        error: null,
+        lastAttempt: new Date()
+      }));
+
+      // Optimistic update
+      await queryClient.cancelQueries({ queryKey: ['limits'] });
+      const previousLimits = queryClient.getQueryData(['limits']);
+
+      queryClient.setQueryData(['limits'], (old: any) => {
+        if (!old?.resource) return old;
+        return {
+          ...old,
+          resource: [
+            { ...newLimit, id: Date.now(), createdAt: new Date().toISOString() },
+            ...old.resource
+          ],
+          meta: { ...old.meta, count: old.meta.count + 1 }
+        };
+      });
+
+      return { previousLimits };
+    },
+
+    onSuccess: (data, variables) => {
+      setSubmissionState(prev => ({ ...prev, isSubmitting: false, error: null }));
+      
+      toast.success('Rate limit created successfully', {
+        description: `${variables.name} has been configured and is now active.`,
+        duration: 5000
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['limits'] });
+      
+      startTransition(() => {
+        router.push('/adf-limits?created=true');
+      });
+    },
+
+    onError: (error: ApiErrorResponse, variables, context) => {
+      setSubmissionState(prev => ({ ...prev, isSubmitting: false, error }));
+
+      if (context?.previousLimits) {
+        queryClient.setQueryData(['limits'], context.previousLimits);
+      }
+
+      const errorMessage = error.error?.message || 'Failed to create rate limit';
+      toast.error('Creation failed', { description: errorMessage, duration: 8000 });
+    }
+  });
+
+  // Event handlers
+  const handleSubmit = useCallback(async (data: LimitConfiguration) => {
+    try {
+      await createLimitMutation.mutateAsync(data);
+    } catch (error) {
+      console.error('Form submission error:', error);
+    }
+  }, [createLimitMutation]);
+
+  const handleCancel = useCallback(() => {
+    startTransition(() => {
+      router.push('/adf-limits');
+    });
+  }, [router]);
+
+  const handleError = useCallback((errors: any) => {
+    console.warn('Form validation errors:', errors);
+    toast.error('Form validation failed', {
+      description: 'Please check the highlighted fields and try again.',
+      duration: 5000
+    });
+  }, []);
+
+  // Loading state
+  if (isLoadingData) {
+    return <CreateLimitPageLoading />;
+  }
+
+  // Error state
+  if (dataError) {
+    return <CreateLimitError error={dataError as Error} />;
+  }
+
+  const isLoading = submissionState.isSubmitting || isPending || createLimitMutation.isPending;
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      {/* Form Header */}
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-900">
+          Rate Limit Configuration
+        </h2>
+        <p className="mt-1 text-sm text-gray-600">
+          Configure the parameters for your new API rate limit. All fields marked with * are required.
+        </p>
+      </div>
+
+      {/* Error Display */}
+      {submissionState.error && (
+        <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg 
+                className="h-5 w-5 text-red-400" 
+                viewBox="0 0 20 20" 
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path 
+                  fillRule="evenodd" 
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" 
+                  clipRule="evenodd" 
+                />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Creation Failed</h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{submissionState.error.error?.message}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Form */}
+      <div className="p-6">
+        <LimitForm
+          onSubmit={handleSubmit}
+          onError={handleError}
+          onCancel={handleCancel}
+          loading={isLoading}
+          disabled={isLoading}
+          enableConnectionTest={true}
+          hideAdvancedOptions={false}
+          className="space-y-6"
+          variant="detailed"
+          aria-label="Create rate limit form"
+          aria-describedby="form-description"
+        />
+      </div>
+
+      {/* Hidden description for accessibility */}
+      <div id="form-description" className="sr-only">
+        Form for creating a new API rate limit with configuration options for 
+        limit type, rate values, target assignment, and advanced settings.
+      </div>
+    </div>
+  );
 }
 
+// ============================================================================
+// Main Page Component
+// ============================================================================
+
 /**
- * Runtime configuration for the page
- * Ensures optimal performance and proper error handling
+ * Create Limit Page - Next.js Client Component
+ * 
+ * Provides the main page interface for creating API rate limits with 
+ * comprehensive form handling, data fetching, and error management.
  */
-export const dynamic = 'force-dynamic' // Always use SSR for fresh data
-export const revalidate = 0 // No static revalidation needed for create page
+export default function CreateLimitPage(): JSX.Element {
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      {/* Page Header */}
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+          Create Rate Limit
+        </h1>
+        <p className="mt-2 text-sm text-gray-600 max-w-2xl">
+          Configure API rate limits to control access patterns and ensure optimal 
+          performance. Set limits by user, service, role, or globally across your API.
+        </p>
+      </header>
+
+      {/* Main Form with Error Boundary */}
+      <Suspense fallback={<CreateLimitPageLoading />}>
+        <CreateLimitFormWrapper />
+      </Suspense>
+    </div>
+  );
+}
