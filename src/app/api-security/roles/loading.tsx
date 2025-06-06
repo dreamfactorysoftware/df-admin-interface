@@ -1,152 +1,66 @@
 /**
- * Loading component for the roles management section
+ * @fileoverview Loading component for roles management section
  * 
- * Displays skeleton states and loading indicators while role data is being fetched.
- * Provides smooth user experience during data loading operations with accessible
- * skeleton UI patterns following WCAG 2.1 AA compliance standards.
+ * Displays accessible skeleton states and loading indicators while role data is being fetched.
+ * Provides smooth user experience during data loading operations with WCAG 2.1 AA compliant
+ * skeleton UI patterns and responsive design.
  * 
- * Features:
- * - Next.js app router loading component conventions
- * - Tailwind CSS skeleton patterns replacing Angular Material progress indicators
- * - Accessibility attributes for screen readers
- * - Responsive design for desktop and mobile viewports
- * - Smooth loading transitions with DreamFactory brand styling
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1.0
  */
 
 import React from 'react';
 
 /**
- * Skeleton component for individual table rows
+ * Skeleton component for individual content blocks
+ * Implements WCAG 2.1 AA compliant loading states with proper contrast and animation
  */
-const SkeletonTableRow: React.FC = () => (
-  <tr className="animate-pulse">
-    {/* Role name column */}
-    <td className="px-6 py-4 whitespace-nowrap">
-      <div className="flex items-center">
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 sm:w-32"></div>
-      </div>
-    </td>
-    
-    {/* Description column - hidden on mobile */}
-    <td className="px-6 py-4 whitespace-nowrap hidden md:table-cell">
-      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48 lg:w-64"></div>
-    </td>
-    
-    {/* Service access column - hidden on mobile */}
-    <td className="px-6 py-4 whitespace-nowrap hidden lg:table-cell">
-      <div className="flex space-x-2">
-        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-16"></div>
-        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-20"></div>
-      </div>
-    </td>
-    
-    {/* Users count column */}
-    <td className="px-6 py-4 whitespace-nowrap text-center">
-      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-8 mx-auto"></div>
-    </td>
-    
-    {/* Actions column */}
-    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-      <div className="flex justify-end space-x-2">
-        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-      </div>
-    </td>
-  </tr>
-);
-
-/**
- * Skeleton component for table header
- */
-const SkeletonTableHeader: React.FC = () => (
-  <thead className="bg-gray-50 dark:bg-gray-800">
-    <tr>
-      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-16 animate-pulse"></div>
-      </th>
-      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">
-        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-20 animate-pulse"></div>
-      </th>
-      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
-        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-24 animate-pulse"></div>
-      </th>
-      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-12 mx-auto animate-pulse"></div>
-      </th>
-      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-16 ml-auto animate-pulse"></div>
-      </th>
-    </tr>
-  </thead>
-);
-
-/**
- * Skeleton component for page header with search and actions
- */
-const SkeletonPageHeader: React.FC = () => (
-  <div className="mb-6 space-y-4 animate-fade-in">
-    {/* Page title and description */}
-    <div className="space-y-2">
-      <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-32 sm:w-48 animate-pulse"></div>
-      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-64 sm:w-96 animate-pulse"></div>
-    </div>
-    
-    {/* Search and actions bar */}
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      {/* Search bar */}
-      <div className="flex-1 max-w-md">
-        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"></div>
-      </div>
-      
-      {/* Action buttons */}
-      <div className="flex space-x-3">
-        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-md w-24 animate-pulse"></div>
-        <div className="h-10 bg-primary-200 dark:bg-primary-800 rounded-md w-28 animate-pulse"></div>
-      </div>
-    </div>
-  </div>
-);
-
-/**
- * Loading component for breadcrumbs
- */
-const SkeletonBreadcrumbs: React.FC = () => (
-  <nav 
-    className="mb-4 animate-fade-in" 
-    aria-label="Loading breadcrumb navigation"
-  >
-    <div className="flex items-center space-x-2">
-      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse"></div>
-      <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse"></div>
-      <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12 animate-pulse"></div>
-    </div>
-  </nav>
-);
-
-/**
- * Loading spinner component for use in various contexts
- */
-const LoadingSpinner: React.FC<{ 
-  size?: 'sm' | 'md' | 'lg';
+function SkeletonBlock({ 
+  className = '',
+  width = 'w-full',
+  height = 'h-4',
+  rounded = 'rounded-md',
+  'aria-label': ariaLabel = 'Loading content'
+}: {
   className?: string;
-}> = ({ size = 'md', className = '' }) => {
-  const sizeClasses = {
-    sm: 'h-4 w-4',
-    md: 'h-6 w-6',
-    lg: 'h-8 w-8'
-  };
-
+  width?: string;
+  height?: string;
+  rounded?: string;
+  'aria-label'?: string;
+}) {
   return (
-    <div 
-      className={`${sizeClasses[size]} animate-spin ${className}`}
+    <div
+      className={`animate-pulse bg-gray-200 dark:bg-gray-700 ${width} ${height} ${rounded} ${className}`}
       role="status"
-      aria-label="Loading"
+      aria-label={ariaLabel}
+      aria-live="polite"
+    />
+  );
+}
+
+/**
+ * Loading spinner component for inline loading states
+ * Provides accessible spinner with proper ARIA attributes
+ */
+function LoadingSpinner({ 
+  size = 'w-6 h-6',
+  className = '',
+  'aria-label': ariaLabel = 'Loading data'
+}: {
+  size?: string;
+  className?: string;
+  'aria-label'?: string;
+}) {
+  return (
+    <div
+      className={`${size} ${className} animate-spin`}
+      role="status"
+      aria-label={ariaLabel}
+      aria-live="polite"
     >
       <svg 
-        className="w-full h-full text-primary-500"
-        fill="none"
+        className="w-full h-full text-primary-600 dark:text-primary-400" 
+        fill="none" 
         viewBox="0 0 24 24"
         aria-hidden="true"
       >
@@ -166,98 +80,313 @@ const LoadingSpinner: React.FC<{
       </svg>
     </div>
   );
-};
+}
 
 /**
- * Main loading component for the roles management page
- * 
- * This component serves as the loading state for Next.js app router,
- * automatically displayed while the page is loading. It provides a
- * comprehensive skeleton layout matching the expected roles page structure.
+ * Table skeleton component for roles data table
+ * Displays a loading state that mimics the actual table structure
  */
-export default function RolesLoading(): JSX.Element {
+function TableSkeleton() {
   return (
     <div 
-      className="min-h-screen bg-white dark:bg-gray-900 p-4 sm:p-6 lg:p-8"
+      className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900"
       role="status"
+      aria-label="Loading roles table"
       aria-live="polite"
-      aria-label="Loading roles management page"
     >
-      {/* Screen reader announcement */}
-      <div className="sr-only">
-        Loading roles and permissions management interface. Please wait while we fetch your data.
-      </div>
-
-      {/* Breadcrumbs skeleton */}
-      <SkeletonBreadcrumbs />
-
-      {/* Page header skeleton */}
-      <SkeletonPageHeader />
-
-      {/* Main content area */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700 animate-fade-in">
-        {/* Table container */}
-        <div className="overflow-hidden">
-          {/* Stats or summary cards - mobile responsive */}
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[1, 2, 3, 4].map((item) => (
-                <div key={item} className="space-y-2 animate-pulse">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
-                  <div className="h-6 bg-primary-100 dark:bg-primary-900 rounded w-12"></div>
-                </div>
-              ))}
-            </div>
+      {/* Table Header */}
+      <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <SkeletonBlock width="w-32" height="h-5" aria-label="Loading table title" />
+            <SkeletonBlock width="w-16" height="h-5" rounded="rounded-full" aria-label="Loading item count" />
           </div>
-
-          {/* Table skeleton */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <SkeletonTableHeader />
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {/* Generate multiple skeleton rows */}
-                {Array.from({ length: 8 }, (_, index) => (
-                  <SkeletonTableRow key={index} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination skeleton */}
-          <div className="bg-white dark:bg-gray-800 px-6 py-3 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              {/* Results info */}
-              <div className="text-sm text-gray-700 dark:text-gray-300">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse"></div>
-              </div>
-              
-              {/* Pagination controls */}
-              <div className="flex items-center space-x-2">
-                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse"></div>
-                <div className="flex space-x-1">
-                  {[1, 2, 3, 4, 5].map((page) => (
-                    <div 
-                      key={page}
-                      className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-                    />
-                  ))}
-                </div>
-                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse"></div>
-              </div>
-            </div>
+          <div className="flex items-center space-x-3">
+            <SkeletonBlock width="w-24" height="h-9" rounded="rounded-md" aria-label="Loading search field" />
+            <SkeletonBlock width="w-20" height="h-9" rounded="rounded-md" aria-label="Loading filter button" />
+            <SkeletonBlock width="w-24" height="h-9" rounded="rounded-md" aria-label="Loading create button" />
           </div>
         </div>
       </div>
 
-      {/* Loading indicator with spinner */}
-      <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3">
-        <div className="flex items-center space-x-2">
-          <LoadingSpinner size="sm" />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            Loading roles...
-          </span>
+      {/* Table Column Headers */}
+      <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-12 gap-4 px-6 py-3">
+          <div className="col-span-1">
+            <SkeletonBlock width="w-4" height="h-4" aria-label="Loading checkbox header" />
+          </div>
+          <div className="col-span-3">
+            <SkeletonBlock width="w-16" height="h-4" aria-label="Loading role name header" />
+          </div>
+          <div className="col-span-2">
+            <SkeletonBlock width="w-12" height="h-4" aria-label="Loading type header" />
+          </div>
+          <div className="col-span-3">
+            <SkeletonBlock width="w-20" height="h-4" aria-label="Loading description header" />
+          </div>
+          <div className="col-span-2">
+            <SkeletonBlock width="w-16" height="h-4" aria-label="Loading status header" />
+          </div>
+          <div className="col-span-1">
+            <SkeletonBlock width="w-12" height="h-4" aria-label="Loading actions header" />
+          </div>
+        </div>
+      </div>
+
+      {/* Table Rows */}
+      <div className="divide-y divide-gray-200 dark:divide-gray-700">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <div 
+            key={index} 
+            className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200"
+          >
+            <div className="col-span-1 flex items-center">
+              <SkeletonBlock width="w-4" height="h-4" aria-label={`Loading row ${index + 1} checkbox`} />
+            </div>
+            <div className="col-span-3 flex items-center space-x-3">
+              <SkeletonBlock width="w-8" height="h-8" rounded="rounded-full" aria-label={`Loading row ${index + 1} avatar`} />
+              <div className="space-y-1">
+                <SkeletonBlock width="w-24" height="h-4" aria-label={`Loading row ${index + 1} role name`} />
+                <SkeletonBlock width="w-16" height="h-3" aria-label={`Loading row ${index + 1} role ID`} />
+              </div>
+            </div>
+            <div className="col-span-2 flex items-center">
+              <SkeletonBlock width="w-16" height="h-6" rounded="rounded-full" aria-label={`Loading row ${index + 1} type badge`} />
+            </div>
+            <div className="col-span-3 flex items-center">
+              <div className="space-y-1">
+                <SkeletonBlock width="w-32" height="h-4" aria-label={`Loading row ${index + 1} description line 1`} />
+                <SkeletonBlock width="w-24" height="h-3" aria-label={`Loading row ${index + 1} description line 2`} />
+              </div>
+            </div>
+            <div className="col-span-2 flex items-center">
+              <SkeletonBlock width="w-20" height="h-6" rounded="rounded-full" aria-label={`Loading row ${index + 1} status badge`} />
+            </div>
+            <div className="col-span-1 flex items-center space-x-1">
+              <SkeletonBlock width="w-6" height="h-6" rounded="rounded-md" aria-label={`Loading row ${index + 1} edit action`} />
+              <SkeletonBlock width="w-6" height="h-6" rounded="rounded-md" aria-label={`Loading row ${index + 1} delete action`} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <SkeletonBlock width="w-16" height="h-4" aria-label="Loading pagination info" />
+            <SkeletonBlock width="w-24" height="h-4" aria-label="Loading total count" />
+          </div>
+          <div className="flex items-center space-x-2">
+            <SkeletonBlock width="w-8" height="h-8" rounded="rounded-md" aria-label="Loading previous page button" />
+            <SkeletonBlock width="w-8" height="h-8" rounded="rounded-md" aria-label="Loading page 1" />
+            <SkeletonBlock width="w-8" height="h-8" rounded="rounded-md" aria-label="Loading page 2" />
+            <SkeletonBlock width="w-8" height="h-8" rounded="rounded-md" aria-label="Loading page 3" />
+            <SkeletonBlock width="w-8" height="h-8" rounded="rounded-md" aria-label="Loading next page button" />
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+/**
+ * Mobile skeleton component for responsive design
+ * Displays card-based layout for mobile viewports
+ */
+function MobileSkeleton() {
+  return (
+    <div className="space-y-4">
+      {/* Mobile Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="space-y-1">
+          <SkeletonBlock width="w-32" height="h-6" aria-label="Loading mobile page title" />
+          <SkeletonBlock width="w-20" height="h-4" aria-label="Loading mobile subtitle" />
+        </div>
+        <SkeletonBlock width="w-10" height="h-10" rounded="rounded-full" aria-label="Loading mobile menu button" />
+      </div>
+
+      {/* Search and Filter Bar */}
+      <div className="space-y-3">
+        <SkeletonBlock width="w-full" height="h-10" rounded="rounded-lg" aria-label="Loading mobile search field" />
+        <div className="flex space-x-3">
+          <SkeletonBlock width="w-20" height="h-8" rounded="rounded-full" aria-label="Loading mobile filter 1" />
+          <SkeletonBlock width="w-24" height="h-8" rounded="rounded-full" aria-label="Loading mobile filter 2" />
+          <SkeletonBlock width="w-16" height="h-8" rounded="rounded-full" aria-label="Loading mobile filter 3" />
+        </div>
+      </div>
+
+      {/* Mobile Cards */}
+      <div className="space-y-3">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div 
+            key={index}
+            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3"
+            role="status"
+            aria-label={`Loading role card ${index + 1}`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-3">
+                <SkeletonBlock width="w-10" height="h-10" rounded="rounded-full" aria-label={`Loading card ${index + 1} avatar`} />
+                <div className="space-y-1">
+                  <SkeletonBlock width="w-28" height="h-5" aria-label={`Loading card ${index + 1} title`} />
+                  <SkeletonBlock width="w-20" height="h-4" aria-label={`Loading card ${index + 1} subtitle`} />
+                </div>
+              </div>
+              <SkeletonBlock width="w-16" height="h-6" rounded="rounded-full" aria-label={`Loading card ${index + 1} status`} />
+            </div>
+            <SkeletonBlock width="w-full" height="h-4" aria-label={`Loading card ${index + 1} description`} />
+            <div className="flex items-center justify-between">
+              <SkeletonBlock width="w-20" height="h-6" rounded="rounded-full" aria-label={`Loading card ${index + 1} type`} />
+              <div className="flex space-x-2">
+                <SkeletonBlock width="w-8" height="h-8" rounded="rounded-md" aria-label={`Loading card ${index + 1} edit`} />
+                <SkeletonBlock width="w-8" height="h-8" rounded="rounded-md" aria-label={`Loading card ${index + 1} delete`} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile Pagination */}
+      <div className="flex items-center justify-center space-x-2 pt-4">
+        <SkeletonBlock width="w-8" height="h-8" rounded="rounded-md" aria-label="Loading mobile previous button" />
+        <SkeletonBlock width="w-8" height="h-8" rounded="rounded-md" aria-label="Loading mobile page indicator" />
+        <SkeletonBlock width="w-8" height="h-8" rounded="rounded-md" aria-label="Loading mobile next button" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Main loading component for roles management section
+ * 
+ * This component serves as the loading.tsx file for the Next.js app router,
+ * automatically displayed while the page.tsx component is loading.
+ * 
+ * Features:
+ * - WCAG 2.1 AA compliant with proper ARIA attributes
+ * - Responsive design with different layouts for mobile and desktop
+ * - Smooth Tailwind CSS animations with reduced motion support
+ * - Screen reader friendly with descriptive labels
+ * - Dark mode support with theme-aware styling
+ * 
+ * @returns {JSX.Element} Loading state component
+ */
+export default function RolesLoading(): JSX.Element {
+  return (
+    <div 
+      className="animate-fade-in p-4 sm:p-6 lg:p-8 min-h-screen bg-gray-50 dark:bg-gray-900"
+      role="status"
+      aria-label="Loading roles management page"
+      aria-live="polite"
+    >
+      {/* Screen reader announcement */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        Loading roles management interface. Please wait while we fetch your role data.
+      </div>
+
+      {/* Page Header Loading */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div className="space-y-2">
+            <SkeletonBlock 
+              width="w-48 sm:w-64" 
+              height="h-8 sm:h-10" 
+              aria-label="Loading page title"
+            />
+            <SkeletonBlock 
+              width="w-64 sm:w-80" 
+              height="h-4 sm:h-5" 
+              aria-label="Loading page description"
+            />
+          </div>
+          
+          {/* Header Actions - Hidden on mobile */}
+          <div className="hidden sm:flex items-center space-x-3">
+            <LoadingSpinner 
+              size="w-5 h-5" 
+              aria-label="Loading roles data"
+            />
+            <SkeletonBlock 
+              width="w-24" 
+              height="h-10" 
+              rounded="rounded-md"
+              aria-label="Loading refresh button"
+            />
+            <SkeletonBlock 
+              width="w-28" 
+              height="h-10" 
+              rounded="rounded-md"
+              aria-label="Loading create role button"
+            />
+          </div>
+        </div>
+
+        {/* Breadcrumb Loading */}
+        <div className="flex items-center space-x-2 text-sm">
+          <SkeletonBlock width="w-16" height="h-4" aria-label="Loading breadcrumb home" />
+          <span className="text-gray-400 dark:text-gray-600" aria-hidden="true">/</span>
+          <SkeletonBlock width="w-24" height="h-4" aria-label="Loading breadcrumb security" />
+          <span className="text-gray-400 dark:text-gray-600" aria-hidden="true">/</span>
+          <SkeletonBlock width="w-16" height="h-4" aria-label="Loading breadcrumb roles" />
+        </div>
+      </div>
+
+      {/* Responsive Content Loading */}
+      {/* Desktop and Tablet View */}
+      <div className="hidden sm:block">
+        <TableSkeleton />
+      </div>
+
+      {/* Mobile View */}
+      <div className="block sm:hidden">
+        <MobileSkeleton />
+      </div>
+
+      {/* Floating Action Button for Mobile */}
+      <div className="fixed bottom-6 right-6 sm:hidden">
+        <SkeletonBlock 
+          width="w-14" 
+          height="h-14" 
+          rounded="rounded-full"
+          className="shadow-lg"
+          aria-label="Loading floating action button"
+        />
+      </div>
+
+      {/* Global Loading Overlay for Critical Operations */}
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-10 dark:bg-opacity-20 pointer-events-none z-40 flex items-center justify-center"
+        aria-hidden="true"
+      >
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-xl flex items-center space-x-4 max-w-sm mx-4">
+          <LoadingSpinner 
+            size="w-8 h-8" 
+            aria-label="Global loading indicator"
+          />
+          <div className="space-y-2">
+            <SkeletonBlock width="w-32" height="h-4" aria-label="Loading status message" />
+            <SkeletonBlock width="w-24" height="h-3" aria-label="Loading progress indicator" />
+          </div>
+        </div>
+      </div>
+
+      {/* Accessibility Enhancement - Reduced Motion Support */}
+      <style jsx>{`
+        @media (prefers-reduced-motion: reduce) {
+          .animate-pulse, .animate-spin, .animate-fade-in {
+            animation: none;
+          }
+          .animate-pulse {
+            opacity: 0.7;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/**
+ * Export skeleton components for reuse in other loading states
+ */
+export { SkeletonBlock, LoadingSpinner, TableSkeleton, MobileSkeleton };
