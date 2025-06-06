@@ -1,12 +1,78 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "_metadata": {
-    "version": "1.0.0",
-    "locale": "en",
-    "direction": "ltr",
-    "lastModified": "2024-01-01T00:00:00.000Z",
-    "framework": "next.js",
-    "ssrOptimized": true
+  "title": "Scheduler",
+  "subtitle": "Scheduler task provide a way to schedule requests to the platform.",
+  "labels": {
+    "name": "Name",
+    "description": "Description",
+    "schedule": "Schedule",
+    "timezone": "Timezone",
+    "active": "Active",
+    "lastRun": "Last Run",
+    "nextRun": "Next Run",
+    "service": "Service",
+    "endpoint": "Endpoint",
+    "method": "Method",
+    "payload": "Payload (JSON)",
+    "headers": "Headers"
+  },
+  "schedule": {
+    "hourly": "Hourly",
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "custom": "Custom",
+    "cron": "Cron Expression"
+  },
+  "status": {
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
+    "disabled": "Disabled",
+    "pending": "Pending"
+  },
+  "actions": {
+    "runNow": "Run Now",
+    "enable": "Enable",
+    "disable": "Disable",
+    "viewHistory": "View History",
+    "editSchedule": "Edit Schedule"
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "minLength": "Minimum length is {{length}} characters",
+    "maxLength": "Maximum length is {{length}} characters",
+    "pattern": "Please enter a valid format",
+    "numeric": "Please enter a valid number",
+    "url": "Please enter a valid URL",
+    "custom": "Validation failed",
+    "cronExpression": "Please enter a valid cron expression",
+    "serviceRequired": "Service selection is required",
+    "endpointRequired": "Endpoint specification is required"
+  },
+  "messages": {
+    "create": {
+      "success": "Scheduled task created successfully",
+      "error": "Failed to create scheduled task",
+      "pending": "Creating scheduled task..."
+    },
+    "update": {
+      "success": "Scheduled task updated successfully",
+      "error": "Failed to update scheduled task",
+      "pending": "Updating scheduled task..."
+    },
+    "delete": {
+      "success": "Scheduled task deleted successfully",
+      "error": "Failed to delete scheduled task",
+      "pending": "Deleting scheduled task...",
+      "confirm": "Are you sure you want to delete this scheduled task?"
+    },
+    "fetch": {
+      "error": "Failed to load scheduled tasks",
+      "pending": "Loading scheduled tasks...",
+      "empty": "No scheduled tasks found"
+    }
   },
   "form": {
     "label": {
