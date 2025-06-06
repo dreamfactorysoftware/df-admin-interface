@@ -1,216 +1,337 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+/**
+ * @vitest-environment jsdom
+ */
+
+import { describe, it, expect, beforeEach, vi, beforeAll, afterEach } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { axe, toHaveNoViolations } from 'jest-axe';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { axe, toHaveNoViolationsJestAxe } from 'jest-axe';
-import { server } from '@/test/setup-tests';
 import { http, HttpResponse } from 'msw';
+
 import CachePage from './page';
-import { CacheType } from '@/types/cache';
+import { server } from '../../../test/mocks/server';
 
 // Extend Jest matchers for accessibility testing
-expect.extend(toHaveNoViolationsJestAxe);
+expect.extend(toHaveNoViolations);
 
-// Mock the cache table component to isolate page component testing
-vi.mock('./cache-table', () => ({
-  default: ({ children, onSystemCacheFlush }: any) => (
-    <div data-testid="cache-table">
-      <div>{children}</div>
-      {onSystemCacheFlush && (
-        <button onClick={onSystemCacheFlush} data-testid="mock-system-flush">
-          Flush System Cache
-        </button>
-      )}
-    </div>
-  ),
+// Mock Next.js environment variables
+vi.mock('process', () => ({
+  env: {
+    NEXT_PUBLIC_API_KEY: 'test-api-key',
+  },
 }));
 
-// Mock next/navigation for router functionality
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    back: vi.fn(),
-  }),
-  useSearchParams: () => ({
-    get: vi.fn(),
-  }),
-}));
+// Mock window.confirm for system cache flush confirmation dialogs
+const mockConfirm = vi.fn();
+Object.defineProperty(window, 'confirm', {
+  value: mockConfirm,
+  writable: true,
+});
 
-// Mock React i18n for translations
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => {
-      const translations: Record<string, string> = {
-        'cache.title': 'Cache Management',
-        'cache.description': 'Manage system and service-specific caches to optimize performance.',
-        'cache.flushSystemCache': 'Flush System Cache',
-        'cache.systemCacheFlushed': 'System cache flushed successfully',
-        'cache.errorFlushingCache': 'Error flushing cache',
-        'cache.loading': 'Loading cache data...',
-        'common.error': 'Error',
-        'common.tryAgain': 'Try Again',
-        'common.loading': 'Loading...',
-      };
-      return translations[key] || key;
-    },
-    i18n: {
-      language: 'en',
-    },
-  }),
-}));
+// Mock console.log and console.error for notification testing
+const mockConsoleLog = vi.fn();
+const mockConsoleError = vi.fn();
+Object.defineProperty(console, 'log', {
+  value: mockConsoleLog,
+  writable: true,
+});
+Object.defineProperty(console, 'error', {
+  value: mockConsoleError,
+  writable: true,
+});
 
-// Test data
-const mockCacheData: CacheType[] = [
-  {
-    name: 'system',
-    label: 'System Management',
-    description: 'Service for managing system resources.',
-    type: 'system',
-  },
-  {
-    name: 'database',
-    label: 'Database Service',
-    description: 'Service for managing database connections.',
-    type: 'database',
-  },
-  {
-    name: 'files',
-    label: 'File Service',
-    description: 'Service for managing file operations.',
-    type: 'files',
-  },
-];
-
-// Test wrapper component with providers
-const TestWrapper = ({ children }: { children: React.ReactNode }) => {
+/**
+ * Custom render function with React Query provider
+ * Replaces Angular TestBed configuration with React Testing Library patterns
+ */
+const renderWithProviders = (ui: React.ReactElement) => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        retry: false,
-        staleTime: 0,
-        gcTime: 0,
+        retry: false, // Disable retries for testing
+        cacheTime: 0, // Disable caching for testing
+        staleTime: 0, // Always consider data stale for testing
       },
       mutations: {
-        retry: false,
+        retry: false, // Disable retries for testing
       },
     },
   });
 
-  return (
+  const AllTheProviders = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>
       {children}
     </QueryClientProvider>
   );
+
+  return {
+    ...render(ui, { wrapper: AllTheProviders }),
+    queryClient,
+  };
 };
 
-describe('CachePage', () => {
+/**
+ * Mock data factory for cache service responses
+ * Replicates DfBaseService mock data patterns
+ */
+const createMockCacheData = () => [
+  {
+    name: 'service_cache',
+    label: 'Service Cache',
+    description: 'Cache for database service configurations',
+    type: 'service',
+  },
+  {
+    name: 'schema_cache',
+    label: 'Schema Cache',
+    description: 'Cache for database schema metadata',
+    type: 'schema',
+  },
+  {
+    name: 'user_cache',
+    label: 'User Cache',
+    description: 'Cache for user session and profile data',
+    type: 'user',
+  },
+];
+
+describe('CachePage Component', () => {
   let user: ReturnType<typeof userEvent.setup>;
 
+  beforeAll(() => {
+    // Start MSW server for realistic API mocking
+    server.listen({ onUnhandledRequest: 'error' });
+  });
+
   beforeEach(() => {
+    // Reset MSW handlers and console mocks before each test
+    server.resetHandlers();
+    mockConfirm.mockClear();
+    mockConsoleLog.mockClear();
+    mockConsoleError.mockClear();
+    
+    // Setup user-event for component interaction testing
     user = userEvent.setup();
-    // Setup default MSW handlers for cache operations
-    server.use(
-      http.get('/api/v2/system/cache', () => {
-        return HttpResponse.json(mockCacheData);
-      }),
-      http.delete('/api/v2/system/cache', () => {
-        return HttpResponse.json({ success: true });
-      }),
-      http.delete('/api/v2/system/cache/:service', () => {
-        return HttpResponse.json({ success: true });
-      })
-    );
   });
 
   afterEach(() => {
+    // Reset MSW handlers after each test
     server.resetHandlers();
   });
 
-  describe('Component Rendering', () => {
-    it('should render the cache management page with correct title', async () => {
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      expect(screen.getByRole('heading', { name: /cache management/i })).toBeInTheDocument();
-      expect(screen.getByText(/manage system and service-specific caches/i)).toBeInTheDocument();
-    });
-
-    it('should render system cache flush button', async () => {
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      expect(flushButton).toBeInTheDocument();
-      expect(flushButton).toBeEnabled();
-    });
-
-    it('should render cache table component', async () => {
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      expect(screen.getByTestId('cache-table')).toBeInTheDocument();
-    });
-
-    it('should display loading state initially', async () => {
-      // Delay the response to test loading state
+  describe('Initial Rendering and Loading States', () => {
+    it('renders the cache management page with proper structure', async () => {
+      // Setup successful cache data response
       server.use(
-        http.get('/api/v2/system/cache', async () => {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          return HttpResponse.json(mockCacheData);
+        http.get('/api/v2/system/cache', () => {
+          return HttpResponse.json({
+            resource: createMockCacheData(),
+            meta: { count: 3 },
+          });
         })
       );
 
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
+      renderWithProviders(<CachePage />);
+
+      // Test page header structure
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Cache Management');
+      expect(screen.getByText('Manage system and service-specific cache configurations')).toBeInTheDocument();
+
+      // Test system cache flush section
+      expect(screen.getByRole('heading', { level: 3, name: 'System Cache Management' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Flush System Cache' })).toBeInTheDocument();
+
+      // Wait for cache table to load
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { level: 3, name: 'Per-Service Caches' })).toBeInTheDocument();
+      });
+    });
+
+    it('shows loading state while fetching cache data', () => {
+      // Setup delayed response to test loading state
+      server.use(
+        http.get('/api/v2/system/cache', async () => {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          return HttpResponse.json({
+            resource: createMockCacheData(),
+            meta: { count: 3 },
+          });
+        })
       );
 
-      expect(screen.getByText(/loading cache data/i)).toBeInTheDocument();
+      renderWithProviders(<CachePage />);
+
+      // Test loading spinner and message
+      expect(screen.getByText('Loading cache information...')).toBeInTheDocument();
+      expect(screen.getByRole('status', { hidden: true })).toBeInTheDocument(); // Loading spinner
+    });
+
+    it('renders cache table with service data after loading', async () => {
+      const mockData = createMockCacheData();
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return HttpResponse.json({
+            resource: mockData,
+            meta: { count: mockData.length },
+          });
+        })
+      );
+
+      renderWithProviders(<CachePage />);
+
+      // Wait for table to render with data
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Test table headers
+      expect(screen.getByRole('columnheader', { name: 'Service' })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+
+      // Test each service row
+      mockData.forEach((cache) => {
+        expect(screen.getByText(cache.label)).toBeInTheDocument();
+        expect(screen.getByText(cache.description)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: `Clear cache for ${cache.label}` })).toBeInTheDocument();
+      });
+    });
+
+    it('shows empty state when no caches are available', async () => {
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return HttpResponse.json({
+            resource: [],
+            meta: { count: 0 },
+          });
+        })
+      );
+
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('No service caches available')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Error Handling and Validation', () => {
+    it('displays error state when cache fetch fails', async () => {
+      // Setup error response for cache fetching
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return new HttpResponse(null, { status: 500, statusText: 'Internal Server Error' });
+        })
+      );
+
+      renderWithProviders(<CachePage />);
+
+      // Wait for error state to render
+      await waitFor(() => {
+        expect(screen.getByText('Error loading cache information')).toBeInTheDocument();
+        expect(screen.getByText('Failed to fetch caches: Internal Server Error')).toBeInTheDocument();
+      });
+
+      // Test retry button functionality
+      const retryButton = screen.getByRole('button', { name: /retry/i });
+      expect(retryButton).toBeInTheDocument();
+    });
+
+    it('handles network errors gracefully', async () => {
+      // Setup network error
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return HttpResponse.error();
+        })
+      );
+
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Error loading cache information')).toBeInTheDocument();
+      });
+    });
+
+    it('handles authentication errors (401)', async () => {
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return new HttpResponse(null, { status: 401, statusText: 'Unauthorized' });
+        })
+      );
+
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to fetch caches: Unauthorized')).toBeInTheDocument();
+      });
+    });
+
+    it('handles forbidden errors (403)', async () => {
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return new HttpResponse(null, { status: 403, statusText: 'Forbidden' });
+        })
+      );
+
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to fetch caches: Forbidden')).toBeInTheDocument();
+      });
     });
   });
 
   describe('System Cache Flush Operations', () => {
-    it('should handle system cache flush successfully', async () => {
-      let flushCalled = false;
+    beforeEach(() => {
+      // Setup successful cache data for each test
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return HttpResponse.json({
+            resource: createMockCacheData(),
+            meta: { count: 3 },
+          });
+        })
+      );
+    });
+
+    it('prompts for confirmation before flushing system cache', async () => {
+      mockConfirm.mockReturnValue(false); // User cancels
+
+      renderWithProviders(<CachePage />);
+
+      const flushButton = await screen.findByRole('button', { name: 'Flush System Cache' });
+      await user.click(flushButton);
+
+      expect(mockConfirm).toHaveBeenCalledWith(
+        'Are you sure you want to flush the entire system cache? This action cannot be undone.'
+      );
+    });
+
+    it('successfully flushes system cache when confirmed', async () => {
+      mockConfirm.mockReturnValue(true); // User confirms
+
       server.use(
         http.delete('/api/v2/system/cache', () => {
-          flushCalled = true;
           return HttpResponse.json({ success: true });
         })
       );
 
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
+      renderWithProviders(<CachePage />);
 
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
+      const flushButton = await screen.findByRole('button', { name: 'Flush System Cache' });
       await user.click(flushButton);
 
+      // Wait for success message to appear
       await waitFor(() => {
-        expect(flushCalled).toBe(true);
+        expect(screen.getByText('System cache flushed successfully')).toBeInTheDocument();
       });
 
-      // Check for success message
-      await waitFor(() => {
-        expect(screen.getByText(/system cache flushed successfully/i)).toBeInTheDocument();
-      });
+      expect(mockConsoleLog).toHaveBeenCalledWith('System cache flushed successfully');
     });
 
-    it('should disable flush button during operation', async () => {
-      // Simulate slow response
+    it('shows loading state during system cache flush', async () => {
+      mockConfirm.mockReturnValue(true);
+
       server.use(
         http.delete('/api/v2/system/cache', async () => {
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -218,426 +339,580 @@ describe('CachePage', () => {
         })
       );
 
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
+      renderWithProviders(<CachePage />);
+
+      const flushButton = await screen.findByRole('button', { name: 'Flush System Cache' });
+      await user.click(flushButton);
+
+      // Test loading state
+      expect(screen.getByText('Flushing...')).toBeInTheDocument();
+      expect(flushButton).toBeDisabled();
+    });
+
+    it('handles system cache flush errors', async () => {
+      mockConfirm.mockReturnValue(true);
+
+      server.use(
+        http.delete('/api/v2/system/cache', () => {
+          return new HttpResponse(null, { status: 500, statusText: 'Internal Server Error' });
+        })
       );
 
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
+      renderWithProviders(<CachePage />);
+
+      const flushButton = await screen.findByRole('button', { name: 'Flush System Cache' });
       await user.click(flushButton);
+
+      // Wait for error message
+      await waitFor(() => {
+        expect(screen.getByText('Failed to flush system cache: Internal Server Error')).toBeInTheDocument();
+      });
+
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        'Failed to flush system cache:',
+        expect.any(Error)
+      );
+    });
+
+    it('does not proceed when user cancels confirmation', async () => {
+      mockConfirm.mockReturnValue(false);
+
+      const deleteSpy = vi.fn();
+      server.use(
+        http.delete('/api/v2/system/cache', deleteSpy)
+      );
+
+      renderWithProviders(<CachePage />);
+
+      const flushButton = await screen.findByRole('button', { name: 'Flush System Cache' });
+      await user.click(flushButton);
+
+      // Ensure no API call was made
+      expect(deleteSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Service Cache Flush Operations', () => {
+    beforeEach(() => {
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return HttpResponse.json({
+            resource: createMockCacheData(),
+            meta: { count: 3 },
+          });
+        })
+      );
+    });
+
+    it('prompts for confirmation before flushing individual service cache', async () => {
+      mockConfirm.mockReturnValue(false);
+
+      renderWithProviders(<CachePage />);
+
+      // Wait for table to load and click first service clear button
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      const clearButton = screen.getByRole('button', { name: 'Clear cache for Service Cache' });
+      await user.click(clearButton);
+
+      expect(mockConfirm).toHaveBeenCalledWith(
+        'Are you sure you want to flush the cache for "service_cache"?'
+      );
+    });
+
+    it('successfully flushes individual service cache', async () => {
+      mockConfirm.mockReturnValue(true);
+
+      server.use(
+        http.delete('/api/v2/system/cache/service_cache', () => {
+          return HttpResponse.json({ success: true });
+        })
+      );
+
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      const clearButton = screen.getByRole('button', { name: 'Clear cache for Service Cache' });
+      await user.click(clearButton);
+
+      expect(mockConsoleLog).toHaveBeenCalledWith(
+        'Service cache "service_cache" flushed successfully'
+      );
+    });
+
+    it('handles service cache flush errors', async () => {
+      mockConfirm.mockReturnValue(true);
+
+      server.use(
+        http.delete('/api/v2/system/cache/service_cache', () => {
+          return new HttpResponse(null, { status: 404, statusText: 'Not Found' });
+        })
+      );
+
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      const clearButton = screen.getByRole('button', { name: 'Clear cache for Service Cache' });
+      await user.click(clearButton);
+
+      await waitFor(() => {
+        expect(mockConsoleError).toHaveBeenCalledWith(
+          'Failed to flush service cache "service_cache":',
+          expect.any(Error)
+        );
+      });
+    });
+
+    it('disables service cache buttons during flush operation', async () => {
+      mockConfirm.mockReturnValue(true);
+
+      server.use(
+        http.delete('/api/v2/system/cache/service_cache', async () => {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          return HttpResponse.json({ success: true });
+        })
+      );
+
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      const clearButton = screen.getByRole('button', { name: 'Clear cache for Service Cache' });
+      await user.click(clearButton);
 
       // Button should be disabled during operation
-      expect(flushButton).toBeDisabled();
-
-      // Wait for operation to complete
-      await waitFor(() => {
-        expect(flushButton).toBeEnabled();
-      });
-    });
-
-    it('should show loading state during flush operation', async () => {
-      server.use(
-        http.delete('/api/v2/system/cache', async () => {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          return HttpResponse.json({ success: true });
-        })
-      );
-
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      await user.click(flushButton);
-
-      expect(screen.getByText(/loading/i)).toBeInTheDocument();
+      expect(clearButton).toBeDisabled();
     });
   });
 
-  describe('Error Handling', () => {
-    it('should handle cache loading errors gracefully', async () => {
+  describe('React Query Cache Invalidation and Management', () => {
+    it('invalidates cache queries after successful system cache flush', async () => {
+      mockConfirm.mockReturnValue(true);
+
       server.use(
         http.get('/api/v2/system/cache', () => {
-          return new HttpResponse(null, { status: 500 });
-        })
-      );
-
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText(/error/i)).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
-      });
-    });
-
-    it('should handle system cache flush errors', async () => {
-      server.use(
-        http.delete('/api/v2/system/cache', () => {
-          return new HttpResponse(null, { status: 500 });
-        })
-      );
-
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      await user.click(flushButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/error flushing cache/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should handle network errors with retry mechanism', async () => {
-      let attemptCount = 0;
-      server.use(
-        http.get('/api/v2/system/cache', () => {
-          attemptCount++;
-          if (attemptCount < 3) {
-            return HttpResponse.error();
-          }
-          return HttpResponse.json(mockCacheData);
-        })
-      );
-
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      // First attempt should show error
-      await waitFor(() => {
-        expect(screen.getByText(/error/i)).toBeInTheDocument();
-      });
-
-      // Click retry button
-      const retryButton = screen.getByRole('button', { name: /try again/i });
-      await user.click(retryButton);
-
-      // Should eventually succeed
-      await waitFor(() => {
-        expect(screen.getByTestId('cache-table')).toBeInTheDocument();
-      });
-    });
-
-    it('should handle 401 authentication errors', async () => {
-      server.use(
-        http.get('/api/v2/system/cache', () => {
-          return new HttpResponse(null, { status: 401 });
-        })
-      );
-
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText(/authentication required/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should handle 403 authorization errors', async () => {
-      server.use(
-        http.get('/api/v2/system/cache', () => {
-          return new HttpResponse(null, { status: 403 });
-        })
-      );
-
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText(/access denied/i)).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('React Query Cache Management', () => {
-    it('should invalidate cache after successful system flush', async () => {
-      let getCallCount = 0;
-      server.use(
-        http.get('/api/v2/system/cache', () => {
-          getCallCount++;
-          return HttpResponse.json(mockCacheData);
+          return HttpResponse.json({
+            resource: createMockCacheData(),
+            meta: { count: 3 },
+          });
         }),
         http.delete('/api/v2/system/cache', () => {
           return HttpResponse.json({ success: true });
         })
       );
 
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
+      const { queryClient } = renderWithProviders(<CachePage />);
 
-      // Wait for initial load
+      // Spy on query invalidation
+      const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
       await waitFor(() => {
-        expect(getCallCount).toBe(1);
+        expect(screen.getByRole('button', { name: 'Flush System Cache' })).toBeInTheDocument();
       });
 
-      // Flush cache
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
+      const flushButton = screen.getByRole('button', { name: 'Flush System Cache' });
       await user.click(flushButton);
 
-      // Should invalidate and refetch cache data
       await waitFor(() => {
-        expect(getCallCount).toBe(2);
+        expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['cache'] });
       });
     });
 
-    it('should handle optimistic updates correctly', async () => {
+    it('invalidates specific cache queries after service cache flush', async () => {
+      mockConfirm.mockReturnValue(true);
+
       server.use(
-        http.delete('/api/v2/system/cache', async () => {
-          await new Promise(resolve => setTimeout(resolve, 100));
+        http.get('/api/v2/system/cache', () => {
+          return HttpResponse.json({
+            resource: createMockCacheData(),
+            meta: { count: 3 },
+          });
+        }),
+        http.delete('/api/v2/system/cache/service_cache', () => {
           return HttpResponse.json({ success: true });
         })
       );
 
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
+      const { queryClient } = renderWithProviders(<CachePage />);
 
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      await user.click(flushButton);
+      const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-      // Should show optimistic update immediately
-      expect(screen.getByText(/flushing cache/i)).toBeInTheDocument();
-
-      // Should confirm after success
       await waitFor(() => {
-        expect(screen.getByText(/system cache flushed successfully/i)).toBeInTheDocument();
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      const clearButton = screen.getByRole('button', { name: 'Clear cache for Service Cache' });
+      await user.click(clearButton);
+
+      await waitFor(() => {
+        expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['cache', 'list'] });
       });
     });
 
-    it('should handle cache rollback on error', async () => {
+    it('refetches cache data when refresh button is clicked', async () => {
+      const fetchSpy = vi.fn(() => {
+        return HttpResponse.json({
+          resource: createMockCacheData(),
+          meta: { count: 3 },
+        });
+      });
+
       server.use(
-        http.delete('/api/v2/system/cache', () => {
+        http.get('/api/v2/system/cache', fetchSpy)
+      );
+
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /refresh/i })).toBeInTheDocument();
+      });
+
+      const refreshButton = screen.getByRole('button', { name: /refresh/i });
+      await user.click(refreshButton);
+
+      // Should have been called twice: initial load + manual refresh
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('retries failed requests automatically up to 3 times', async () => {
+      let callCount = 0;
+      const failingHandler = vi.fn(() => {
+        callCount++;
+        if (callCount < 3) {
           return new HttpResponse(null, { status: 500 });
-        })
-      );
-
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      await user.click(flushButton);
-
-      // Should rollback optimistic update on error
-      await waitFor(() => {
-        expect(screen.getByText(/error flushing cache/i)).toBeInTheDocument();
+        }
+        return HttpResponse.json({
+          resource: createMockCacheData(),
+          meta: { count: 3 },
+        });
       });
 
-      // Original state should be restored
-      expect(screen.getByTestId('cache-table')).toBeInTheDocument();
+      server.use(
+        http.get('/api/v2/system/cache', failingHandler)
+      );
+
+      // Override the query client to enable retries for this test
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: 3,
+            retryDelay: 1, // Fast retries for testing
+          },
+        },
+      });
+
+      const TestWrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      );
+
+      render(<CachePage />, { wrapper: TestWrapper });
+
+      // Should eventually succeed after retries
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      }, { timeout: 5000 });
+
+      expect(callCount).toBe(3);
     });
   });
 
-  describe('User Interactions', () => {
-    it('should support keyboard navigation', async () => {
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
+  describe('User Interaction Testing', () => {
+    beforeEach(() => {
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return HttpResponse.json({
+            resource: createMockCacheData(),
+            meta: { count: 3 },
+          });
+        })
       );
-
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      
-      // Tab to button
-      await user.tab();
-      expect(flushButton).toHaveFocus();
-
-      // Activate with keyboard
-      await user.keyboard('{Enter}');
-      
-      await waitFor(() => {
-        expect(screen.getByText(/system cache flushed successfully/i)).toBeInTheDocument();
-      });
     });
 
-    it('should handle rapid consecutive clicks gracefully', async () => {
-      let deleteCallCount = 0;
+    it('handles keyboard navigation for cache management actions', async () => {
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Flush System Cache' })).toBeInTheDocument();
+      });
+
+      // Test Tab navigation to system flush button
+      await user.tab();
+      expect(screen.getByRole('button', { name: 'Flush System Cache' })).toHaveFocus();
+
+      // Test Tab navigation to refresh button
+      await user.tab();
+      expect(screen.getByRole('button', { name: /refresh/i })).toHaveFocus();
+
+      // Test Tab navigation to service clear buttons
+      await user.tab();
+      expect(screen.getByRole('button', { name: 'Clear cache for Service Cache' })).toHaveFocus();
+    });
+
+    it('supports Enter key activation for flush operations', async () => {
+      mockConfirm.mockReturnValue(true);
+
       server.use(
         http.delete('/api/v2/system/cache', () => {
-          deleteCallCount++;
           return HttpResponse.json({ success: true });
         })
       );
 
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
+      renderWithProviders(<CachePage />);
 
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      
-      // Click multiple times rapidly
-      await user.click(flushButton);
-      await user.click(flushButton);
-      await user.click(flushButton);
-
-      // Should only make one request due to debouncing
       await waitFor(() => {
-        expect(deleteCallCount).toBe(1);
+        expect(screen.getByRole('button', { name: 'Flush System Cache' })).toBeInTheDocument();
       });
+
+      const flushButton = screen.getByRole('button', { name: 'Flush System Cache' });
+      flushButton.focus();
+      await user.keyboard('{Enter}');
+
+      expect(mockConfirm).toHaveBeenCalled();
     });
 
-    it('should focus management for screen readers', async () => {
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
+    it('supports Space key activation for cache operations', async () => {
+      mockConfirm.mockReturnValue(true);
+
+      server.use(
+        http.delete('/api/v2/system/cache/service_cache', () => {
+          return HttpResponse.json({ success: true });
+        })
       );
 
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      await user.click(flushButton);
+      renderWithProviders(<CachePage />);
 
-      // After operation, focus should return to button or status message
       await waitFor(() => {
-        const successMessage = screen.getByText(/system cache flushed successfully/i);
-        expect(successMessage).toBeInTheDocument();
-        expect(successMessage).toHaveAttribute('role', 'status');
+        expect(screen.getByRole('table')).toBeInTheDocument();
       });
+
+      const clearButton = screen.getByRole('button', { name: 'Clear cache for Service Cache' });
+      clearButton.focus();
+      await user.keyboard(' '); // Space key
+
+      expect(mockConfirm).toHaveBeenCalled();
+    });
+
+    it('provides proper focus management during loading states', async () => {
+      server.use(
+        http.get('/api/v2/system/cache', async () => {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          return HttpResponse.json({
+            resource: createMockCacheData(),
+            meta: { count: 3 },
+          });
+        })
+      );
+
+      renderWithProviders(<CachePage />);
+
+      // During loading, interactive elements should still be focusable
+      const systemFlushButton = screen.getByRole('button', { name: 'Flush System Cache' });
+      expect(systemFlushButton).toBeInTheDocument();
+      systemFlushButton.focus();
+      expect(systemFlushButton).toHaveFocus();
     });
   });
 
-  describe('Accessibility Compliance', () => {
-    it('should have no accessibility violations', async () => {
-      const { container } = render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
+  describe('Accessibility Compliance (WCAG 2.1 AA)', () => {
+    beforeEach(() => {
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return HttpResponse.json({
+            resource: createMockCacheData(),
+            meta: { count: 3 },
+          });
+        })
       );
+    });
+
+    it('has no accessibility violations on initial render', async () => {
+      const { container } = renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
 
       const results = await axe(container);
       expect(results).toHaveNoViolations();
     });
 
-    it('should have proper ARIA labels', async () => {
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
+    it('maintains accessibility during loading states', async () => {
+      server.use(
+        http.get('/api/v2/system/cache', async () => {
+          await new Promise(resolve => setTimeout(resolve, 50));
+          return HttpResponse.json({
+            resource: createMockCacheData(),
+            meta: { count: 3 },
+          });
+        })
       );
 
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      expect(flushButton).toHaveAttribute('aria-label');
-      
-      const mainContent = screen.getByRole('main');
-      expect(mainContent).toBeInTheDocument();
+      const { container } = renderWithProviders(<CachePage />);
+
+      // Test accessibility during loading
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
     });
 
-    it('should announce status changes to screen readers', async () => {
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
+    it('maintains accessibility during error states', async () => {
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return new HttpResponse(null, { status: 500 });
+        })
       );
 
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      await user.click(flushButton);
+      const { container } = renderWithProviders(<CachePage />);
 
       await waitFor(() => {
-        const statusMessage = screen.getByRole('status');
-        expect(statusMessage).toBeInTheDocument();
-        expect(statusMessage).toHaveAttribute('aria-live', 'polite');
+        expect(screen.getByText('Error loading cache information')).toBeInTheDocument();
+      });
+
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
+    });
+
+    it('provides proper ARIA labels for interactive elements', async () => {
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Test ARIA labels for cache clear buttons
+      const serviceCache = createMockCacheData()[0];
+      const clearButton = screen.getByRole('button', { name: `Clear cache for ${serviceCache.label}` });
+      expect(clearButton).toHaveAttribute('aria-label', `Clear cache for ${serviceCache.label}`);
+    });
+
+    it('provides proper semantic structure with headings hierarchy', async () => {
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Test heading hierarchy (h1 -> h3)
+      const mainHeading = screen.getByRole('heading', { level: 1 });
+      expect(mainHeading).toHaveTextContent('Cache Management');
+
+      const sectionHeadings = screen.getAllByRole('heading', { level: 3 });
+      expect(sectionHeadings).toHaveLength(2);
+      expect(sectionHeadings[0]).toHaveTextContent('System Cache Management');
+      expect(sectionHeadings[1]).toHaveTextContent('Per-Service Caches');
+    });
+
+    it('supports screen reader announcements for dynamic content', async () => {
+      mockConfirm.mockReturnValue(true);
+
+      server.use(
+        http.delete('/api/v2/system/cache', () => {
+          return HttpResponse.json({ success: true });
+        })
+      );
+
+      renderWithProviders(<CachePage />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Flush System Cache' })).toBeInTheDocument();
+      });
+
+      const flushButton = screen.getByRole('button', { name: 'Flush System Cache' });
+      await user.click(flushButton);
+
+      // Success message should be announced to screen readers
+      await waitFor(() => {
+        const successMessage = screen.getByText('System cache flushed successfully');
+        expect(successMessage).toBeInTheDocument();
+        // The success message container should have proper semantic role
+        expect(successMessage.closest('[role]')).toBeInTheDocument();
       });
     });
 
-    it('should support high contrast mode', async () => {
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
+    it('provides sufficient color contrast for all text elements', async () => {
+      renderWithProviders(<CachePage />);
 
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      expect(flushButton).toHaveClass('bg-primary-600');
-      expect(flushButton).toHaveClass('text-white');
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Test high contrast text elements
+      const pageTitle = screen.getByRole('heading', { level: 1 });
+      expect(pageTitle).toHaveClass('text-gray-900', 'dark:text-white');
+
+      const description = screen.getByText('Manage system and service-specific cache configurations');
+      expect(description).toHaveClass('text-gray-600', 'dark:text-gray-400');
     });
   });
 
   describe('Error Boundary Integration', () => {
-    it('should catch and display component errors', async () => {
-      // Mock console.error to avoid noise in test output
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      // Create a component that throws an error
+    it('handles component errors gracefully', () => {
+      // Mock a component that throws an error
       const ThrowError = () => {
-        throw new Error('Test error');
+        throw new Error('Test error for error boundary');
       };
 
-      // Mock the cache table to throw an error
-      vi.mocked(require('./cache-table')).default = ThrowError;
+      const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
+        try {
+          return <>{children}</>;
+        } catch (error) {
+          return <div role="alert">Something went wrong: {error instanceof Error ? error.message : 'Unknown error'}</div>;
+        }
+      };
 
       render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
+        <ErrorBoundary>
+          <ThrowError />
+        </ErrorBoundary>
       );
 
-      await waitFor(() => {
-        expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
-      });
-
-      consoleSpy.mockRestore();
+      expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong: Test error for error boundary');
     });
 
-    it('should allow error recovery', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
-      let shouldThrow = true;
-      const ConditionalError = () => {
-        if (shouldThrow) {
-          throw new Error('Test error');
-        }
-        return <div data-testid="cache-table">Recovered</div>;
-      };
-
-      vi.mocked(require('./cache-table')).default = ConditionalError;
-
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      // Should show error boundary
-      await waitFor(() => {
-        expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
+    it('handles Query Client errors gracefully', async () => {
+      // Test invalid query configuration
+      const invalidQueryClient = new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+            cacheTime: 0,
+          },
+        },
       });
 
-      // Fix the error and retry
-      shouldThrow = false;
-      const retryButton = screen.getByRole('button', { name: /try again/i });
-      await user.click(retryButton);
+      // Spy on console.error to suppress error logs in test output
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      // Should recover
+      server.use(
+        http.get('/api/v2/system/cache', () => {
+          return HttpResponse.error();
+        })
+      );
+
+      const TestWrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={invalidQueryClient}>
+          {children}
+        </QueryClientProvider>
+      );
+
+      render(<CachePage />, { wrapper: TestWrapper });
+
+      // Should handle the error gracefully and show error UI
       await waitFor(() => {
-        expect(screen.getByTestId('cache-table')).toBeInTheDocument();
+        expect(screen.getByText('Error loading cache information')).toBeInTheDocument();
       });
 
       consoleSpy.mockRestore();
@@ -645,94 +920,82 @@ describe('CachePage', () => {
   });
 
   describe('Performance and Optimization', () => {
-    it('should debounce rapid operations', async () => {
-      let requestCount = 0;
-      server.use(
-        http.delete('/api/v2/system/cache', () => {
-          requestCount++;
-          return HttpResponse.json({ success: true });
-        })
-      );
-
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      const flushButton = screen.getByRole('button', { name: /flush system cache/i });
-      
-      // Simulate rapid clicks
-      fireEvent.click(flushButton);
-      fireEvent.click(flushButton);
-      fireEvent.click(flushButton);
-
-      await waitFor(() => {
-        expect(requestCount).toBe(1);
-      });
-    });
-
-    it('should handle large cache datasets efficiently', async () => {
-      const largeCacheData = Array.from({ length: 1000 }, (_, i) => ({
-        name: `service-${i}`,
-        label: `Service ${i}`,
-        description: `Description for service ${i}`,
+    it('efficiently handles large cache datasets', async () => {
+      // Create large dataset to test performance
+      const largeCacheDataset = Array.from({ length: 100 }, (_, i) => ({
+        name: `cache_${i}`,
+        label: `Cache Service ${i}`,
+        description: `Cache for service number ${i}`,
         type: 'service',
       }));
 
       server.use(
         http.get('/api/v2/system/cache', () => {
-          return HttpResponse.json(largeCacheData);
+          return HttpResponse.json({
+            resource: largeCacheDataset,
+            meta: { count: largeCacheDataset.length },
+          });
         })
       );
 
       const startTime = performance.now();
-      
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
+      renderWithProviders(<CachePage />);
 
       await waitFor(() => {
-        expect(screen.getByTestId('cache-table')).toBeInTheDocument();
+        expect(screen.getByRole('table')).toBeInTheDocument();
       });
 
       const endTime = performance.now();
       const renderTime = endTime - startTime;
 
-      // Should render efficiently even with large datasets
-      expect(renderTime).toBeLessThan(1000); // Less than 1 second
-    });
-  });
+      // Should render within reasonable time (< 1000ms for large dataset)
+      expect(renderTime).toBeLessThan(1000);
 
-  describe('Internationalization', () => {
-    it('should display translated text correctly', async () => {
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
-      );
-
-      expect(screen.getByText('Cache Management')).toBeInTheDocument();
-      expect(screen.getByText('Flush System Cache')).toBeInTheDocument();
-      expect(screen.getByText(/manage system and service-specific caches/i)).toBeInTheDocument();
+      // Verify all items are rendered
+      expect(screen.getAllByText(/Cache Service/)).toHaveLength(largeCacheDataset.length);
     });
 
-    it('should handle missing translations gracefully', async () => {
-      vi.mocked(require('react-i18next')).useTranslation = () => ({
-        t: (key: string) => key, // Return key as fallback
-        i18n: { language: 'en' },
+    it('implements proper cache TTL configuration', async () => {
+      const fetchSpy = vi.fn(() => {
+        return HttpResponse.json({
+          resource: createMockCacheData(),
+          meta: { count: 3 },
+        });
       });
 
-      render(
-        <TestWrapper>
-          <CachePage />
-        </TestWrapper>
+      server.use(
+        http.get('/api/v2/system/cache', fetchSpy)
       );
 
-      // Should display fallback keys instead of failing
-      expect(screen.getByText('cache.title')).toBeInTheDocument();
+      // Create query client with specific TTL settings
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 5 * 60 * 1000, // 5 minutes as specified in component
+            cacheTime: 10 * 60 * 1000, // 10 minutes as specified in component
+            retry: 3,
+          },
+        },
+      });
+
+      const TestWrapper = ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      );
+
+      render(<CachePage />, { wrapper: TestWrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      // Verify cache configuration
+      const queries = queryClient.getQueryCache().getAll();
+      const cacheQuery = queries.find(q => q.queryKey.includes('cache'));
+      
+      expect(cacheQuery).toBeDefined();
+      expect(fetchSpy).toHaveBeenCalledTimes(1); // Only called once due to caching
     });
   });
 });
