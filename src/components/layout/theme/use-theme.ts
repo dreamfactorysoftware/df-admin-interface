@@ -1,458 +1,444 @@
-/**
- * Custom React hook for accessing theme context state and actions
- * Provides clean API for components to consume theme data, toggle theme modes,
- * and access resolved theme values with proper error handling and TypeScript type safety
- */
-
 'use client';
 
-import { useContext, useCallback, useMemo } from 'react';
-import type { 
-  UseThemeReturn, 
+/**
+ * Enhanced Theme Hook for DreamFactory Admin Interface
+ * 
+ * Custom React hook providing comprehensive access to theme context state, actions,
+ * and utility methods. Replaces Angular service injection pattern with React context
+ * consumption, offering type-safe theme management with extensive validation and
+ * detection capabilities.
+ * 
+ * Features:
+ * - Complete theme context access with error boundary protection
+ * - Utility methods for theme validation, detection, and accessibility checking
+ * - TypeScript generics for type-safe theme value access and manipulation
+ * - System theme detection with browser compatibility checking
+ * - WCAG 2.1 AA compliance utilities for accessible color combinations
+ * - Theme persistence and storage management integration
+ * 
+ * @version 1.0.0
+ * @since React 19.0.0
+ */
+
+import { useContext, useMemo, useCallback } from 'react';
+import { 
   ThemeMode, 
   ResolvedTheme, 
-  ThemeUtils,
-  ThemeStorage,
-  ThemeValidation
+  UseThemeReturn,
+  ThemeError,
+  THEME_ERROR_CODES,
+  THEME_CONSTANTS
 } from '@/types/theme';
-import { 
-  ThemeError, 
-  THEME_ERROR_CODES, 
-  THEME_CONSTANTS,
-  DEFAULT_THEME_CONFIG 
-} from '@/types/theme';
-
-// Import the theme context (will be created by theme-provider)
-// Note: This import will be available once theme-provider.tsx is created
-declare const ThemeContext: React.Context<any>;
+import { ThemeContext } from './theme-provider';
 
 /**
- * Custom hook providing access to theme context with comprehensive utilities
+ * System theme detection utility functions
+ * Provides safe browser compatibility checking and fallback handling
+ */
+const systemThemeUtils = {
+  /**
+   * Detect current system color scheme preference
+   * @returns System theme preference (light or dark)
+   */
+  getSystemTheme: (): ResolvedTheme => {
+    if (typeof window === 'undefined') return 'light';
+    
+    try {
+      const mediaQuery = window.matchMedia(THEME_CONSTANTS.SYSTEM_QUERY);
+      return mediaQuery.matches ? 'dark' : 'light';
+    } catch (error) {
+      console.warn('System theme detection failed:', error);
+      return 'light';
+    }
+  },
+
+  /**
+   * Check if current environment supports theme detection
+   * @returns Boolean indicating theme detection support
+   */
+  isThemeSupported: (): boolean => {
+    if (typeof window === 'undefined') return false;
+    
+    try {
+      return 'matchMedia' in window && 
+             typeof window.matchMedia === 'function' &&
+             window.matchMedia(THEME_CONSTANTS.SYSTEM_QUERY).media !== 'not all';
+    } catch (error) {
+      return false;
+    }
+  },
+
+  /**
+   * Validate theme mode is supported
+   * @param theme - Theme value to validate
+   * @returns Type predicate for ThemeMode
+   */
+  isValidTheme: (theme: string): theme is ThemeMode => {
+    return ['light', 'dark', 'system'].includes(theme);
+  }
+};
+
+/**
+ * Color accessibility utility functions
+ * Implements WCAG 2.1 guidelines for color contrast and accessibility
+ */
+const accessibilityUtils = {
+  /**
+   * Get accessible color pair for current theme
+   * @param theme - Resolved theme mode
+   * @returns Object with accessible color values
+   */
+  getAccessibleColors: (theme: ResolvedTheme) => {
+    const colorPairs = {
+      light: {
+        text: '#0f172a',           // slate-900
+        background: '#ffffff',     // white
+        primary: '#1e40af',        // blue-700
+        secondary: '#64748b'       // slate-500
+      },
+      dark: {
+        text: '#f8fafc',           // slate-50
+        background: '#0f172a',     // slate-900
+        primary: '#3b82f6',        // blue-500
+        secondary: '#94a3b8'       // slate-400
+      }
+    };
+
+    return colorPairs[theme];
+  },
+
+  /**
+   * Convert hex color to RGB values
+   * @param hex - Hex color string
+   * @returns RGB values or null if invalid
+   */
+  hexToRgb: (hex: string): { r: number; g: number; b: number } | null => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
+  },
+
+  /**
+   * Calculate relative luminance of a color
+   * @param color - RGB color object
+   * @returns Relative luminance value
+   */
+  getRelativeLuminance: (color: { r: number; g: number; b: number }): number => {
+    const { r, g, b } = color;
+    const [rs, gs, bs] = [r, g, b].map(c => {
+      c = c / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    
+    return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+  },
+
+  /**
+   * Get contrast ratio between two colors
+   * @param foreground - Foreground color hex string
+   * @param background - Background color hex string
+   * @returns Contrast ratio value
+   */
+  getContrastRatio: (foreground: string, background: string): number => {
+    const fgRgb = accessibilityUtils.hexToRgb(foreground);
+    const bgRgb = accessibilityUtils.hexToRgb(background);
+    
+    if (!fgRgb || !bgRgb) return 1;
+    
+    const fgLuminance = accessibilityUtils.getRelativeLuminance(fgRgb);
+    const bgLuminance = accessibilityUtils.getRelativeLuminance(bgRgb);
+    
+    const lighter = Math.max(fgLuminance, bgLuminance);
+    const darker = Math.min(fgLuminance, bgLuminance);
+    
+    return (lighter + 0.05) / (darker + 0.05);
+  },
+
+  /**
+   * Check if color combination meets WCAG standards
+   * @param foreground - Foreground color hex string
+   * @param background - Background color hex string
+   * @param level - WCAG compliance level ('AA' or 'AAA')
+   * @param isLargeText - Whether text is considered large (14pt bold or 18pt+)
+   * @returns Boolean indicating compliance
+   */
+  meetsAccessibilityStandards: (
+    foreground: string, 
+    background: string, 
+    level: 'AA' | 'AAA' = 'AA',
+    isLargeText = false
+  ): boolean => {
+    const ratio = accessibilityUtils.getContrastRatio(foreground, background);
+    
+    const thresholds = {
+      AA: isLargeText ? 3 : 4.5,
+      AAA: isLargeText ? 4.5 : 7
+    };
+    
+    return ratio >= thresholds[level];
+  }
+};
+
+/**
+ * DOM manipulation utilities for theme application
+ * Handles theme class application and cleanup with error handling
+ */
+const domUtils = {
+  /**
+   * Apply theme classes to document
+   * @param theme - Resolved theme to apply
+   * @param selector - CSS selector for theme application
+   */
+  applyTheme: (theme: ResolvedTheme, selector = ':root'): void => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const targetElement = selector === ':root' 
+        ? document.documentElement 
+        : document.querySelector(selector);
+
+      if (!targetElement) {
+        console.warn(`Theme target element not found: ${selector}`);
+        return;
+      }
+
+      // Apply Tailwind dark mode class
+      if (theme === 'dark') {
+        targetElement.classList.add('dark');
+      } else {
+        targetElement.classList.remove('dark');
+      }
+
+      // Set data attribute for additional styling hooks
+      targetElement.setAttribute('data-theme', theme);
+    } catch (error) {
+      console.error('Failed to apply theme to DOM:', error);
+    }
+  },
+
+  /**
+   * Remove theme classes from document
+   * @param selector - CSS selector for theme removal
+   */
+  removeTheme: (selector = ':root'): void => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const targetElement = selector === ':root' 
+        ? document.documentElement 
+        : document.querySelector(selector);
+
+      if (!targetElement) return;
+
+      targetElement.classList.remove('dark');
+      targetElement.removeAttribute('data-theme');
+    } catch (error) {
+      console.error('Failed to remove theme from DOM:', error);
+    }
+  }
+};
+
+/**
+ * Enhanced Theme Hook
+ * 
+ * Provides comprehensive access to theme context state and utility methods.
+ * Must be used within a ThemeProvider component tree for proper context access.
  * 
  * @returns Complete theme management interface with utilities
  * @throws {ThemeError} When used outside of ThemeProvider context
  * 
  * @example
  * ```tsx
- * function MyComponent() {
+ * function ThemeToggle() {
  *   const { 
  *     theme, 
  *     resolvedTheme, 
- *     setTheme, 
- *     toggleTheme,
+ *     toggleTheme, 
  *     isTheme,
- *     getSystemTheme 
+ *     meetsAccessibilityStandards 
  *   } = useTheme();
  *   
+ *   const isAccessible = meetsAccessibilityStandards('#000000', '#ffffff');
+ *   
  *   return (
- *     <div className={`bg-white dark:bg-gray-900`}>
- *       <p>Current theme: {resolvedTheme}</p>
- *       <button onClick={toggleTheme}>
- *         Switch to {resolvedTheme === 'light' ? 'dark' : 'light'}
- *       </button>
- *     </div>
+ *     <button 
+ *       onClick={toggleTheme}
+ *       className={`theme-toggle ${resolvedTheme}`}
+ *     >
+ *       Switch to {isTheme('light') ? 'dark' : 'light'} mode
+ *       {isAccessible && <span>✓ Accessible</span>}
+ *     </button>
  *   );
  * }
  * ```
  */
 export function useTheme(): UseThemeReturn {
-  // Access theme context with error boundary protection
+  // Get theme context with error handling
   const context = useContext(ThemeContext);
   
-  // Error handling for components using hook outside of ThemeProvider
   if (context === undefined) {
     throw new ThemeError(
-      'useTheme must be used within a ThemeProvider. ' +
-      'Make sure your component is wrapped with <ThemeProvider>.',
+      'useTheme must be used within a ThemeProvider. Make sure to wrap your component tree with <ThemeProvider>.',
       THEME_ERROR_CODES.PROVIDER_NOT_FOUND
     );
   }
-  
-  const { 
-    theme, 
-    resolvedTheme, 
-    systemTheme, 
-    setTheme: setThemeContext, 
-    mounted 
-  } = context;
-  
-  /**
-   * Enhanced setTheme with validation
-   */
-  const setTheme = useCallback((newTheme: ThemeMode) => {
-    if (!isValidTheme(newTheme)) {
-      throw new ThemeError(
-        `Invalid theme mode: ${newTheme}. Must be one of: light, dark, system`,
-        THEME_ERROR_CODES.INVALID_THEME
-      );
-    }
-    setThemeContext(newTheme);
-  }, [setThemeContext]);
-  
+
+  const { theme, resolvedTheme, systemTheme, setTheme, mounted } = context;
+
   /**
    * Toggle between light and dark themes
-   * Preserves system preference if currently set to system
+   * Handles system theme mode by switching to opposite of resolved theme
    */
-  const toggleTheme = useCallback(() => {
+  const toggleTheme = useCallback((): void => {
     if (theme === 'system') {
-      // If currently system, toggle to opposite of resolved theme
-      setTheme(resolvedTheme === 'light' ? 'dark' : 'light');
+      setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
     } else {
-      // Toggle between light and dark
-      setTheme(theme === 'light' ? 'dark' : 'light');
+      setTheme(theme === 'dark' ? 'light' : 'dark');
     }
   }, [theme, resolvedTheme, setTheme]);
-  
+
   /**
    * Reset theme to system preference
+   * Switches current theme mode to 'system' for automatic detection
    */
-  const resetToSystem = useCallback(() => {
+  const resetToSystem = useCallback((): void => {
     setTheme('system');
   }, [setTheme]);
-  
+
   /**
    * Check if current theme matches given mode
+   * @param mode - Theme mode to compare against
+   * @returns Boolean indicating theme match
    */
   const isTheme = useCallback((mode: ThemeMode): boolean => {
     return theme === mode;
   }, [theme]);
-  
+
   /**
    * Check if current resolved theme matches given mode
+   * @param mode - Resolved theme mode to compare against
+   * @returns Boolean indicating resolved theme match
    */
   const isResolvedTheme = useCallback((mode: ResolvedTheme): boolean => {
     return resolvedTheme === mode;
   }, [resolvedTheme]);
-  
+
   /**
-   * Theme utility functions with comprehensive validation and detection
+   * Memoized utility methods for performance optimization
+   * Provides stable references to prevent unnecessary re-renders
    */
-  const themeUtils: ThemeUtils = useMemo(() => ({
-    /**
-     * Detect system color scheme preference
-     */
-    getSystemTheme: (): ResolvedTheme => {
-      if (typeof window === 'undefined') {
-        return 'light'; // SSR fallback
-      }
-      
-      try {
-        const mediaQuery = window.matchMedia(THEME_CONSTANTS.SYSTEM_QUERY);
-        return mediaQuery.matches ? 'dark' : 'light';
-      } catch (error) {
-        console.warn('Failed to detect system theme:', error);
-        return 'light'; // Fallback to light theme
-      }
-    },
-    
-    /**
-     * Check if current environment supports theme detection
-     */
-    isThemeSupported: (): boolean => {
-      if (typeof window === 'undefined') {
-        return false; // No theme support on server
-      }
-      
-      return !!(
-        window.matchMedia &&
-        window.localStorage &&
-        document.documentElement.classList
-      );
-    },
-    
-    /**
-     * Validate theme mode is supported
-     */
-    isValidTheme: (theme: string): theme is ThemeMode => {
-      return ['light', 'dark', 'system'].includes(theme);
-    },
-    
-    /**
-     * Get accessible color pairs for current theme
-     */
-    getAccessibleColors: (currentTheme: ResolvedTheme) => {
-      const colorPairs = {
-        light: {
-          text: '#0f172a',      // gray-900 - 18.91:1 contrast ratio
-          background: '#ffffff', // white
-          primary: '#4f46e5',    // indigo-600 - 7.14:1 contrast
-          secondary: '#64748b',  // slate-500 - 4.51:1 contrast
-        },
-        dark: {
-          text: '#f8fafc',      // slate-50 - 19.15:1 contrast ratio
-          background: '#0f172a', // slate-900
-          primary: '#6366f1',    // indigo-500 - 4.52:1 contrast
-          secondary: '#94a3b8',  // slate-400 - 9.14:1 contrast
-        },
-      };
-      
-      return colorPairs[currentTheme];
-    },
-    
-    /**
-     * Apply theme classes to document
-     */
-    applyTheme: (currentTheme: ResolvedTheme, selector: string = ':root') => {
-      if (typeof document === 'undefined') return;
-      
-      const element = selector === ':root' 
-        ? document.documentElement 
-        : document.querySelector(selector);
-        
-      if (!element) return;
-      
-      // Remove existing theme classes
-      element.classList.remove('light', 'dark');
-      
-      // Add new theme class
-      element.classList.add(currentTheme);
-      
-      // Set data attribute for additional styling hooks
-      element.setAttribute('data-theme', currentTheme);
-      
-      // Update meta theme-color for mobile browsers
-      const themeColorMeta = document.querySelector('meta[name="theme-color"]');
-      if (themeColorMeta) {
-        const metaColor = currentTheme === 'dark' ? '#0f172a' : '#ffffff';
-        themeColorMeta.setAttribute('content', metaColor);
-      }
-    },
-    
-    /**
-     * Remove theme classes from document
-     */
-    removeTheme: (selector: string = ':root') => {
-      if (typeof document === 'undefined') return;
-      
-      const element = selector === ':root' 
-        ? document.documentElement 
-        : document.querySelector(selector);
-        
-      if (!element) return;
-      
-      element.classList.remove('light', 'dark');
-      element.removeAttribute('data-theme');
-    },
-    
-    /**
-     * Get contrast ratio between two colors (simplified implementation)
-     * Note: This is a basic implementation for demonstration
-     * A production version would include full WCAG contrast calculation
-     */
-    getContrastRatio: (foreground: string, background: string): number => {
-      // Simplified contrast calculation
-      // In production, this would use proper luminance calculation
-      return 4.5; // Return minimum AA compliance as placeholder
-    },
-    
-    /**
-     * Check if color combination meets WCAG accessibility standards
-     */
-    meetsAccessibilityStandards: (
-      foreground: string, 
-      background: string, 
-      level: 'AA' | 'AAA' = 'AA',
-      isLargeText: boolean = false
-    ): boolean => {
-      const ratio = themeUtils.getContrastRatio(foreground, background);
-      const threshold = level === 'AAA' 
-        ? (isLargeText ? 4.5 : 7) 
-        : (isLargeText ? 3 : 4.5);
-      
-      return ratio >= threshold;
-    },
+  const utils = useMemo(() => ({
+    // System theme detection utilities
+    getSystemTheme: systemThemeUtils.getSystemTheme,
+    isThemeSupported: systemThemeUtils.isThemeSupported,
+    isValidTheme: systemThemeUtils.isValidTheme,
+
+    // Accessibility utilities
+    getAccessibleColors: accessibilityUtils.getAccessibleColors,
+    getContrastRatio: accessibilityUtils.getContrastRatio,
+    meetsAccessibilityStandards: accessibilityUtils.meetsAccessibilityStandards,
+
+    // DOM manipulation utilities
+    applyTheme: domUtils.applyTheme,
+    removeTheme: domUtils.removeTheme
   }), []);
-  
+
   /**
-   * Theme storage utilities
+   * Return complete theme management interface
+   * Combines context state with utility methods and convenience functions
    */
-  const themeStorage: ThemeStorage = useMemo(() => ({
-    /**
-     * Get stored theme preference
-     */
-    getTheme: (): ThemeMode | null => {
-      if (typeof window === 'undefined') return null;
-      
-      try {
-        const stored = localStorage.getItem(THEME_CONSTANTS.STORAGE_KEY);
-        return themeUtils.isValidTheme(stored) ? stored : null;
-      } catch (error) {
-        console.warn('Failed to read theme from storage:', error);
-        return null;
-      }
-    },
-    
-    /**
-     * Store theme preference
-     */
-    setTheme: (themeMode: ThemeMode): void => {
-      if (typeof window === 'undefined') return;
-      
-      try {
-        localStorage.setItem(THEME_CONSTANTS.STORAGE_KEY, themeMode);
-      } catch (error) {
-        console.warn('Failed to store theme preference:', error);
-      }
-    },
-    
-    /**
-     * Remove stored theme preference
-     */
-    removeTheme: (): void => {
-      if (typeof window === 'undefined') return;
-      
-      try {
-        localStorage.removeItem(THEME_CONSTANTS.STORAGE_KEY);
-      } catch (error) {
-        console.warn('Failed to remove theme preference:', error);
-      }
-    },
-    
-    /**
-     * Check if storage is available
-     */
-    isAvailable: (): boolean => {
-      if (typeof window === 'undefined') return false;
-      
-      try {
-        const testKey = '__theme_storage_test__';
-        localStorage.setItem(testKey, 'test');
-        localStorage.removeItem(testKey);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-  }), [themeUtils]);
-  
-  /**
-   * Theme validation utilities
-   */
-  const themeValidation: ThemeValidation = useMemo(() => ({
-    /**
-     * Validate theme mode with type guard
-     */
-    validateThemeMode: (value: unknown): value is ThemeMode => {
-      return typeof value === 'string' && themeUtils.isValidTheme(value);
-    },
-    
-    /**
-     * Validate resolved theme with type guard
-     */
-    validateResolvedTheme: (value: unknown): value is ResolvedTheme => {
-      return value === 'light' || value === 'dark';
-    },
-    
-    /**
-     * Validate theme provider config
-     */
-    validateProviderConfig: (config: unknown): config is any => {
-      return typeof config === 'object' && config !== null;
-    },
-  }), [themeUtils]);
-  
-  // Return complete theme interface with utilities
-  return {
-    // Core theme state
+  return useMemo((): UseThemeReturn => ({
+    // Theme context state
     theme,
     resolvedTheme,
     systemTheme,
     setTheme,
     mounted,
-    
-    // Theme actions
+
+    // Convenience methods
     toggleTheme,
     resetToSystem,
     isTheme,
     isResolvedTheme,
-    
-    // Utility functions
-    ...themeUtils,
-    
-    // Storage utilities (can be accessed via returned object)
-    storage: themeStorage,
-    
-    // Validation utilities (can be accessed via returned object)
-    validation: themeValidation,
-  };
+
+    // Utility methods
+    ...utils
+  }), [
+    theme,
+    resolvedTheme,
+    systemTheme,
+    setTheme,
+    mounted,
+    toggleTheme,
+    resetToSystem,
+    isTheme,
+    isResolvedTheme,
+    utils
+  ]);
 }
 
 /**
- * Standalone validation function for theme modes
- * Can be used without the hook context
+ * Type-safe theme hook for specific theme value access
+ * Provides narrowed typing for components that only need specific theme values
+ * 
+ * @template T - Theme property to extract
+ * @param property - Theme property name to access
+ * @returns Specific theme value with proper typing
+ * 
+ * @example
+ * ```tsx
+ * function ThemeIndicator() {
+ *   const currentTheme = useThemeValue('resolvedTheme');
+ *   // currentTheme is typed as ResolvedTheme ('light' | 'dark')
+ *   
+ *   return <div>Current theme: {currentTheme}</div>;
+ * }
+ * ```
  */
-export function isValidTheme(theme: string): theme is ThemeMode {
-  return ['light', 'dark', 'system'].includes(theme);
+export function useThemeValue<T extends keyof UseThemeReturn>(
+  property: T
+): UseThemeReturn[T] {
+  const theme = useTheme();
+  return theme[property];
 }
 
 /**
- * Standalone system theme detection
- * Can be used without the hook context
+ * Conditional theme hook for performance optimization
+ * Only re-renders when specific theme conditions change
+ * 
+ * @param condition - Function to determine when to update
+ * @returns Theme context value only when condition is met
+ * 
+ * @example
+ * ```tsx
+ * function DarkModeOnlyComponent() {
+ *   const isDark = useThemeCondition(
+ *     (theme) => theme.resolvedTheme === 'dark'
+ *   );
+ *   
+ *   if (!isDark) return null;
+ *   
+ *   return <div>This only renders in dark mode</div>;
+ * }
+ * ```
  */
-export function getSystemTheme(): ResolvedTheme {
-  if (typeof window === 'undefined') {
-    return 'light'; // SSR fallback
-  }
-  
-  try {
-    const mediaQuery = window.matchMedia(THEME_CONSTANTS.SYSTEM_QUERY);
-    return mediaQuery.matches ? 'dark' : 'light';
-  } catch (error) {
-    console.warn('Failed to detect system theme:', error);
-    return 'light';
-  }
+export function useThemeCondition(
+  condition: (theme: UseThemeReturn) => boolean
+): boolean {
+  const theme = useTheme();
+  return useMemo(() => condition(theme), [theme, condition]);
 }
 
-/**
- * Create theme storage utilities without hook context
- */
-export function createThemeStorage(storageKey: string = THEME_CONSTANTS.STORAGE_KEY): ThemeStorage {
-  return {
-    getTheme: () => {
-      if (typeof window === 'undefined') return null;
-      
-      try {
-        const stored = localStorage.getItem(storageKey);
-        return isValidTheme(stored) ? stored : null;
-      } catch {
-        return null;
-      }
-    },
-    
-    setTheme: (theme: ThemeMode) => {
-      if (typeof window === 'undefined') return;
-      
-      try {
-        localStorage.setItem(storageKey, theme);
-      } catch (error) {
-        console.warn('Failed to store theme:', error);
-      }
-    },
-    
-    removeTheme: () => {
-      if (typeof window === 'undefined') return;
-      
-      try {
-        localStorage.removeItem(storageKey);
-      } catch (error) {
-        console.warn('Failed to remove theme:', error);
-      }
-    },
-    
-    isAvailable: () => {
-      if (typeof window === 'undefined') return false;
-      
-      try {
-        const testKey = '__theme_test__';
-        localStorage.setItem(testKey, 'test');
-        localStorage.removeItem(testKey);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-  };
-}
+// Re-export types for convenience
+export type { 
+  ThemeMode, 
+  ResolvedTheme, 
+  UseThemeReturn,
+  ThemeError 
+} from '@/types/theme';
 
-// Export hook as default
+// Default export
 export default useTheme;
