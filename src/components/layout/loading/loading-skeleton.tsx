@@ -1,573 +1,631 @@
-'use client';
+"use client";
 
-import React, { forwardRef } from 'react';
-import { cn } from '@/lib/utils';
+import React, { forwardRef } from "react";
+import { type VariantProps } from "class-variance-authority";
+import { cva } from "class-variance-authority";
+import { cn } from "@/lib/utils";
+import { type LoadingStateValue } from "@/types/loading";
 
 /**
- * Loading skeleton types and interfaces
- * These types define the shape and behavior of skeleton components
+ * Loading Skeleton Component for DreamFactory Admin Interface
+ * 
+ * Provides placeholder content shapes during data fetching operations with improved
+ * perceived performance. Integrates with TanStack React Query 5.0.0 loading states
+ * for automatic display triggering and responsive design patterns.
+ * 
+ * Features:
+ * - Shimmer animation effects using Tailwind CSS gradients and transforms
+ * - Configurable skeleton variants for text, images, buttons, and table rows  
+ * - Integration with React Query loading states for automatic skeleton display
+ * - Responsive skeleton layouts adapting to mobile and desktop viewports
+ * - WCAG 2.1 AA accessibility support with proper screen reader announcements
+ * - Performance optimized with CSS-only animations
+ * 
+ * @see Technical Specification Section 7.1 - CORE UI TECHNOLOGIES
+ * @see Technical Specification Section 4.3 - STATE MANAGEMENT WORKFLOWS
+ * @see WCAG 2.1 AA Guidelines: https://www.w3.org/WAI/WCAG21/Understanding/
  */
-interface BaseSkeletonProps {
-  /** Additional CSS classes for styling */
-  className?: string;
-  /** Whether to show shimmer animation effect */
-  animate?: boolean;
-  /** Accessibility label for screen readers */
-  'aria-label'?: string;
-  /** Test identifier for component testing */
-  'data-testid'?: string;
-}
 
-interface SkeletonTextProps extends BaseSkeletonProps {
-  /** Number of text lines to display */
+/**
+ * Base skeleton animation classes with shimmer effect
+ * Uses CSS gradients and transforms for performance-optimized animations
+ */
+const skeletonBase = cva([
+  // Base styling
+  "animate-pulse",
+  "bg-gradient-to-r",
+  "from-gray-200",
+  "via-gray-300", 
+  "to-gray-200",
+  "dark:from-gray-800",
+  "dark:via-gray-700",
+  "dark:to-gray-800",
+  "rounded",
+  
+  // Enhanced shimmer animation using CSS transforms
+  "relative",
+  "overflow-hidden",
+  "before:absolute",
+  "before:inset-0",
+  "before:-translate-x-full",
+  "before:animate-[shimmer_2s_infinite]",
+  "before:bg-gradient-to-r",
+  "before:from-transparent",
+  "before:via-white/60",
+  "before:to-transparent",
+  "dark:before:via-white/20",
+]);
+
+/**
+ * Skeleton variant styles for different content types
+ * Optimized for common DreamFactory interface patterns
+ */
+const skeletonVariants = cva(skeletonBase, {
+  variants: {
+    /**
+     * Content type variants
+     */
+    variant: {
+      // Text content skeletons
+      "text": "h-4 w-full",
+      "text-sm": "h-3 w-3/4",
+      "text-lg": "h-5 w-5/6", 
+      "text-xl": "h-6 w-4/5",
+      "heading": "h-8 w-2/3",
+      "subheading": "h-6 w-1/2",
+      
+      // UI element skeletons
+      "button": "h-10 w-24 rounded-md",
+      "button-sm": "h-8 w-20 rounded-md",
+      "button-lg": "h-12 w-32 rounded-md",
+      "input": "h-10 w-full rounded-md",
+      "select": "h-10 w-48 rounded-md",
+      "checkbox": "h-5 w-5 rounded",
+      "radio": "h-5 w-5 rounded-full",
+      "switch": "h-6 w-11 rounded-full",
+      
+      // Content block skeletons
+      "image": "aspect-video w-full rounded-lg",
+      "image-sm": "h-16 w-16 rounded-lg",
+      "image-md": "h-24 w-24 rounded-lg", 
+      "image-lg": "h-32 w-32 rounded-lg",
+      "avatar": "h-10 w-10 rounded-full",
+      "avatar-sm": "h-8 w-8 rounded-full",
+      "avatar-lg": "h-12 w-12 rounded-full",
+      "card": "h-48 w-full rounded-lg",
+      "card-sm": "h-32 w-full rounded-lg",
+      "icon": "h-6 w-6 rounded",
+      
+      // Database schema specific skeletons
+      "table-row": "h-12 w-full",
+      "table-cell": "h-6 w-full",
+      "tree-node": "h-8 w-full",
+      "tree-indent": "h-6 w-4/5 ml-6",
+      "connection-card": "h-24 w-full rounded-lg",
+      "schema-item": "h-10 w-full",
+      
+      // API generation specific skeletons
+      "endpoint-item": "h-16 w-full rounded-md",
+      "method-badge": "h-6 w-16 rounded-full",
+      "parameter-row": "h-8 w-full",
+      "code-block": "h-32 w-full rounded-md font-mono",
+      
+      // Dashboard and metrics skeletons
+      "metric-card": "h-20 w-full rounded-lg",
+      "chart": "h-64 w-full rounded-lg",
+      "progress-bar": "h-2 w-full rounded-full",
+      "badge": "h-6 w-16 rounded-full",
+      
+      // Form specific skeletons
+      "form-group": "space-y-2",
+      "form-label": "h-4 w-24",
+      "form-field": "h-10 w-full rounded-md",
+      "form-error": "h-3 w-48",
+      
+      // Navigation skeletons
+      "nav-item": "h-10 w-full rounded-md",
+      "breadcrumb": "h-4 w-32",
+      "tab": "h-10 w-20 rounded-t-md",
+      
+      // Custom variant for completely custom styling
+      "custom": "",
+    },
+    
+    /**
+     * Responsive size variants
+     * Adapts skeleton dimensions to different screen sizes
+     */
+    size: {
+      "sm": "scale-90 md:scale-100",
+      "md": "scale-100",
+      "lg": "scale-110 md:scale-125",
+      "responsive": "scale-90 sm:scale-95 md:scale-100 lg:scale-105",
+    },
+    
+    /**
+     * Animation intensity variants
+     */
+    animation: {
+      "subtle": "animate-pulse",
+      "normal": "animate-pulse before:animate-[shimmer_2s_infinite]",
+      "intense": "animate-pulse before:animate-[shimmer_1.5s_infinite]",
+      "slow": "animate-pulse before:animate-[shimmer_3s_infinite]",
+      "none": "",
+    },
+    
+    /**
+     * Corner radius variants
+     */
+    radius: {
+      "none": "rounded-none",
+      "sm": "rounded-sm",
+      "md": "rounded-md", 
+      "lg": "rounded-lg",
+      "xl": "rounded-xl",
+      "full": "rounded-full",
+    },
+  },
+  defaultVariants: {
+    variant: "text",
+    size: "md",
+    animation: "normal",
+    radius: "md",
+  },
+});
+
+/**
+ * Enhanced skeleton props interface
+ * Provides comprehensive configuration for all skeleton variations
+ */
+export interface LoadingSkeletonProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof skeletonVariants> {
+  /**
+   * Whether to show the skeleton
+   * Integrates with React Query loading states
+   */
+  show?: boolean;
+  
+  /**
+   * React Query loading state integration
+   * Automatically shows skeleton based on query status
+   */
+  queryState?: LoadingStateValue;
+  
+  /**
+   * Number of skeleton lines to render for text variants
+   * Useful for multi-line text content
+   */
   lines?: number;
-  /** Width of each line (px, %, or tailwind class) */
-  lineWidth?: string | string[];
-  /** Height of each line */
-  lineHeight?: 'sm' | 'md' | 'lg';
-  /** Spacing between lines */
-  spacing?: 'tight' | 'normal' | 'loose';
-}
-
-interface SkeletonImageProps extends BaseSkeletonProps {
-  /** Width of the image skeleton */
-  width?: string;
-  /** Height of the image skeleton */
-  height?: string;
-  /** Shape of the image placeholder */
-  shape?: 'rectangle' | 'circle' | 'rounded';
-  /** Aspect ratio for responsive images */
-  aspectRatio?: '1:1' | '16:9' | '4:3' | '3:2';
-}
-
-interface SkeletonTableProps extends BaseSkeletonProps {
-  /** Number of rows to display */
-  rows?: number;
-  /** Column configuration for table structure */
-  columns?: Array<{
-    width?: string;
-    align?: 'left' | 'center' | 'right';
-  }>;
-  /** Whether to show table header */
-  showHeader?: boolean;
-}
-
-interface SkeletonCardProps extends BaseSkeletonProps {
-  /** Include image placeholder in card */
-  includeImage?: boolean;
-  /** Include action buttons area */
-  includeActions?: boolean;
-  /** Card layout variant */
-  variant?: 'default' | 'compact' | 'detailed';
-}
-
-interface LoadingSkeletonProps extends BaseSkeletonProps {
-  /** Type of skeleton to display */
-  variant?: 'text' | 'image' | 'button' | 'table' | 'card' | 'custom';
-  /** Loading state from React Query or custom hook */
-  isLoading?: boolean;
-  /** Content to show when not loading */
-  children?: React.ReactNode;
-  /** Custom skeleton content */
-  skeleton?: React.ReactNode;
-  /** Props specific to the skeleton variant */
-  skeletonProps?: SkeletonTextProps | SkeletonImageProps | SkeletonTableProps | SkeletonCardProps;
-}
-
-/**
- * Base skeleton component with shimmer animation
- * Provides the foundational shimmer effect used by all skeleton variants
- */
-const SkeletonBase = forwardRef<HTMLDivElement, BaseSkeletonProps>(
-  ({ className, animate = true, 'aria-label': ariaLabel, 'data-testid': dataTestId, ...props }, ref) => {
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          'bg-gray-200 dark:bg-gray-700',
-          animate && [
-            'relative overflow-hidden',
-            'before:absolute before:inset-0',
-            'before:-translate-x-full',
-            'before:animate-[shimmer_2s_infinite]',
-            'before:bg-gradient-to-r',
-            'before:from-transparent before:via-white/60 before:to-transparent',
-            'dark:before:via-white/10'
-          ],
-          className
-        )}
-        role="status"
-        aria-label={ariaLabel || 'Loading content'}
-        aria-hidden="true"
-        data-testid={dataTestId}
-        {...props}
-      />
-    );
-  }
-);
-
-SkeletonBase.displayName = 'SkeletonBase';
-
-/**
- * Text skeleton component
- * Creates placeholder lines for text content with configurable spacing and width
- */
-const SkeletonText = forwardRef<HTMLDivElement, SkeletonTextProps>(
-  ({ 
-    lines = 3, 
-    lineWidth = '100%', 
-    lineHeight = 'md',
-    spacing = 'normal',
-    className,
-    animate = true,
-    'aria-label': ariaLabel,
-    'data-testid': dataTestId,
-    ...props 
-  }, ref) => {
-    const heightClasses = {
-      sm: 'h-3',
-      md: 'h-4',
-      lg: 'h-5'
-    };
-
-    const spacingClasses = {
-      tight: 'space-y-1',
-      normal: 'space-y-2',
-      loose: 'space-y-3'
-    };
-
-    const widths = Array.isArray(lineWidth) ? lineWidth : Array(lines).fill(lineWidth);
-
-    return (
-      <div
-        ref={ref}
-        className={cn('space-y-2', spacingClasses[spacing], className)}
-        role="status"
-        aria-label={ariaLabel || `Loading ${lines} lines of text`}
-        data-testid={dataTestId || 'skeleton-text'}
-        {...props}
-      >
-        {Array.from({ length: lines }, (_, index) => (
-          <SkeletonBase
-            key={index}
-            animate={animate}
-            className={cn(
-              'rounded',
-              heightClasses[lineHeight],
-              // Apply specific width or use default
-              typeof widths[index] === 'string' && widths[index].includes('%') 
-                ? { width: widths[index] }
-                : widths[index]?.startsWith('w-') 
-                  ? widths[index]
-                  : 'w-full',
-              // Make last line shorter for natural text appearance
-              index === lines - 1 && lineWidth === '100%' && 'w-4/5'
-            )}
-            style={
-              typeof widths[index] === 'string' && widths[index].includes('%')
-                ? { width: widths[index] }
-                : undefined
-            }
-            aria-hidden="true"
-          />
-        ))}
-      </div>
-    );
-  }
-);
-
-SkeletonText.displayName = 'SkeletonText';
-
-/**
- * Image skeleton component
- * Creates placeholder shapes for images with various aspect ratios and shapes
- */
-const SkeletonImage = forwardRef<HTMLDivElement, SkeletonImageProps>(
-  ({ 
-    width = 'w-full', 
-    height = 'h-48', 
-    shape = 'rectangle',
-    aspectRatio,
-    className,
-    animate = true,
-    'aria-label': ariaLabel,
-    'data-testid': dataTestId,
-    ...props 
-  }, ref) => {
-    const shapeClasses = {
-      rectangle: 'rounded',
-      circle: 'rounded-full',
-      rounded: 'rounded-lg'
-    };
-
-    const aspectRatioClasses = {
-      '1:1': 'aspect-square',
-      '16:9': 'aspect-video',
-      '4:3': 'aspect-[4/3]',
-      '3:2': 'aspect-[3/2]'
-    };
-
-    return (
-      <SkeletonBase
-        ref={ref}
-        animate={animate}
-        className={cn(
-          width,
-          aspectRatio ? aspectRatioClasses[aspectRatio] : height,
-          shapeClasses[shape],
-          className
-        )}
-        aria-label={ariaLabel || 'Loading image'}
-        data-testid={dataTestId || 'skeleton-image'}
-        {...props}
-      />
-    );
-  }
-);
-
-SkeletonImage.displayName = 'SkeletonImage';
-
-/**
- * Button skeleton component
- * Creates placeholder for button elements with proper sizing
- */
-const SkeletonButton = forwardRef<HTMLDivElement, BaseSkeletonProps>(
-  ({ className, animate = true, 'aria-label': ariaLabel, 'data-testid': dataTestId, ...props }, ref) => {
-    return (
-      <SkeletonBase
-        ref={ref}
-        animate={animate}
-        className={cn(
-          'h-10 w-24 rounded-md',
-          className
-        )}
-        aria-label={ariaLabel || 'Loading button'}
-        data-testid={dataTestId || 'skeleton-button'}
-        {...props}
-      />
-    );
-  }
-);
-
-SkeletonButton.displayName = 'SkeletonButton';
-
-/**
- * Table skeleton component
- * Creates placeholder for table structures with configurable rows and columns
- */
-const SkeletonTable = forwardRef<HTMLDivElement, SkeletonTableProps>(
-  ({ 
-    rows = 5, 
-    columns = [{ width: 'w-1/4' }, { width: 'w-1/2' }, { width: 'w-1/4' }],
-    showHeader = true,
-    className,
-    animate = true,
-    'aria-label': ariaLabel,
-    'data-testid': dataTestId,
-    ...props 
-  }, ref) => {
-    return (
-      <div
-        ref={ref}
-        className={cn('space-y-3', className)}
-        role="status"
-        aria-label={ariaLabel || `Loading table with ${rows} rows`}
-        data-testid={dataTestId || 'skeleton-table'}
-        {...props}
-      >
-        {/* Table header */}
-        {showHeader && (
-          <div className="flex space-x-3" data-testid="skeleton-table-header">
-            {columns.map((column, index) => (
-              <SkeletonBase
-                key={`header-${index}`}
-                animate={animate}
-                className={cn(
-                  'h-4 rounded',
-                  column.width || 'flex-1'
-                )}
-                aria-hidden="true"
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Table rows */}
-        <div className="space-y-2" data-testid="skeleton-table-rows">
-          {Array.from({ length: rows }, (_, rowIndex) => (
-            <div key={`row-${rowIndex}`} className="flex space-x-3">
-              {columns.map((column, colIndex) => (
-                <SkeletonBase
-                  key={`cell-${rowIndex}-${colIndex}`}
-                  animate={animate}
-                  className={cn(
-                    'h-4 rounded',
-                    column.width || 'flex-1'
-                  )}
-                  aria-hidden="true"
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-);
-
-SkeletonTable.displayName = 'SkeletonTable';
-
-/**
- * Card skeleton component
- * Creates placeholder for card layouts with optional image and actions
- */
-const SkeletonCard = forwardRef<HTMLDivElement, SkeletonCardProps>(
-  ({ 
-    includeImage = true,
-    includeActions = true,
-    variant = 'default',
-    className,
-    animate = true,
-    'aria-label': ariaLabel,
-    'data-testid': dataTestId,
-    ...props 
-  }, ref) => {
-    const variantSpacing = {
-      default: 'p-4 space-y-4',
-      compact: 'p-3 space-y-2',
-      detailed: 'p-6 space-y-6'
-    };
-
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          'border border-gray-200 dark:border-gray-700 rounded-lg',
-          variantSpacing[variant],
-          className
-        )}
-        role="status"
-        aria-label={ariaLabel || 'Loading card content'}
-        data-testid={dataTestId || 'skeleton-card'}
-        {...props}
-      >
-        {/* Card image */}
-        {includeImage && (
-          <SkeletonImage
-            animate={animate}
-            aspectRatio="16:9"
-            shape="rounded"
-            className="w-full"
-            data-testid="skeleton-card-image"
-          />
-        )}
-
-        {/* Card content */}
-        <div className="space-y-3" data-testid="skeleton-card-content">
-          {/* Title */}
-          <SkeletonBase
-            animate={animate}
-            className="h-6 w-3/4 rounded"
-            aria-hidden="true"
-          />
-          
-          {/* Description */}
-          <SkeletonText
-            animate={animate}
-            lines={variant === 'compact' ? 2 : variant === 'detailed' ? 4 : 3}
-            spacing={variant === 'compact' ? 'tight' : 'normal'}
-          />
-        </div>
-
-        {/* Card actions */}
-        {includeActions && (
-          <div className="flex space-x-2 pt-2" data-testid="skeleton-card-actions">
-            <SkeletonButton animate={animate} className="w-20" />
-            <SkeletonButton animate={animate} className="w-16" />
-          </div>
-        )}
-      </div>
-    );
-  }
-);
-
-SkeletonCard.displayName = 'SkeletonCard';
-
-/**
- * Main LoadingSkeleton component
- * Provides conditional rendering based on loading state with React Query integration
- */
-const LoadingSkeleton = forwardRef<HTMLDivElement, LoadingSkeletonProps>(
-  ({ 
-    variant = 'text',
-    isLoading = true,
-    children,
-    skeleton,
-    skeletonProps = {},
-    className,
-    animate = true,
-    'aria-label': ariaLabel,
-    'data-testid': dataTestId,
-    ...props 
-  }, ref) => {
-    // If not loading, render children
-    if (!isLoading) {
-      return <>{children}</>;
-    }
-
-    // If custom skeleton provided, use it
-    if (skeleton) {
-      return (
-        <div
-          ref={ref}
-          className={className}
-          role="status"
-          aria-label={ariaLabel || 'Loading content'}
-          data-testid={dataTestId || 'loading-skeleton'}
-          {...props}
-        >
-          {skeleton}
-        </div>
-      );
-    }
-
-    // Render appropriate skeleton variant
-    const commonProps = {
-      ref,
-      animate,
-      className,
-      'aria-label': ariaLabel,
-      'data-testid': dataTestId || `skeleton-${variant}`,
-      ...props
-    };
-
-    switch (variant) {
-      case 'text':
-        return <SkeletonText {...commonProps} {...(skeletonProps as SkeletonTextProps)} />;
-      
-      case 'image':
-        return <SkeletonImage {...commonProps} {...(skeletonProps as SkeletonImageProps)} />;
-      
-      case 'button':
-        return <SkeletonButton {...commonProps} />;
-      
-      case 'table':
-        return <SkeletonTable {...commonProps} {...(skeletonProps as SkeletonTableProps)} />;
-      
-      case 'card':
-        return <SkeletonCard {...commonProps} {...(skeletonProps as SkeletonCardProps)} />;
-      
-      default:
-        return <SkeletonText {...commonProps} />;
-    }
-  }
-);
-
-LoadingSkeleton.displayName = 'LoadingSkeleton';
-
-/**
- * Hook for React Query integration
- * Provides skeleton loading states for data fetching operations
- */
-export function useSkeletonLoader<T>(
-  queryResult: { isLoading: boolean; isError: boolean; data: T },
-  skeletonConfig?: Omit<LoadingSkeletonProps, 'isLoading' | 'children'>
-) {
-  const { isLoading, isError, data } = queryResult;
-
-  const renderSkeleton = (children: React.ReactNode) => (
-    <LoadingSkeleton
-      isLoading={isLoading && !isError}
-      {...skeletonConfig}
-    >
-      {children}
-    </LoadingSkeleton>
-  );
-
-  return {
-    isLoading: isLoading && !isError,
-    data,
-    isError,
-    renderSkeleton
-  };
+  
+  /**
+   * Custom width for text skeletons
+   * Can be percentage, px, rem, or Tailwind width classes
+   */
+  width?: string | number;
+  
+  /**
+   * Custom height for content skeletons
+   * Can be percentage, px, rem, or Tailwind height classes
+   */
+  height?: string | number;
+  
+  /**
+   * Accessibility label for screen readers
+   * Defaults to "Loading content"
+   */
+  ariaLabel?: string;
+  
+  /**
+   * Whether to announce loading state to screen readers
+   * Defaults to true for better accessibility
+   */
+  announceLoading?: boolean;
+  
+  /**
+   * Custom loading announcement text
+   * Used when announceLoading is true
+   */
+  loadingAnnouncement?: string;
+  
+  /**
+   * Delay before showing skeleton (in milliseconds)
+   * Prevents flashing for very fast operations
+   */
+  delay?: number;
+  
+  /**
+   * Whether this skeleton represents a repeated item
+   * Adds appropriate ARIA attributes for screen readers
+   */
+  isRepeated?: boolean;
+  
+  /**
+   * Index in a list of repeated skeletons
+   * Used for accessibility with isRepeated
+   */
+  repeatIndex?: number;
+  
+  /**
+   * Total count of repeated skeletons
+   * Used for accessibility with isRepeated
+   */
+  repeatTotal?: number;
 }
 
 /**
- * Responsive skeleton utilities
- * Provides responsive skeleton patterns for different screen sizes
+ * Multi-line text skeleton component
+ * Renders multiple skeleton lines with decreasing widths
  */
-export const ResponsiveSkeletonGrid = forwardRef<HTMLDivElement, {
-  items?: number;
-  columns?: {
-    sm?: number;
-    md?: number;
-    lg?: number;
-    xl?: number;
-  };
-  skeletonType?: 'card' | 'text' | 'image';
+interface TextLinesSkeletonProps {
+  lines: number;
   className?: string;
-  animate?: boolean;
-  'data-testid'?: string;
-}>(({ 
-  items = 6, 
-  columns = { sm: 1, md: 2, lg: 3, xl: 4 },
-  skeletonType = 'card',
-  className,
-  animate = true,
-  'data-testid': dataTestId,
-  ...props 
-}, ref) => {
-  const gridClasses = [
-    'grid gap-4',
-    columns.sm && `grid-cols-${columns.sm}`,
-    columns.md && `md:grid-cols-${columns.md}`,
-    columns.lg && `lg:grid-cols-${columns.lg}`,
-    columns.xl && `xl:grid-cols-${columns.xl}`
-  ].filter(Boolean).join(' ');
+  variant?: "text" | "text-sm" | "text-lg" | "text-xl";
+  animation?: "subtle" | "normal" | "intense" | "slow" | "none";
+}
 
+const TextLinesSkeleton: React.FC<TextLinesSkeletonProps> = ({
+  lines,
+  className,
+  variant = "text",
+  animation = "normal",
+}) => {
+  const lineWidths = [
+    "w-full",
+    "w-5/6", 
+    "w-4/5",
+    "w-3/4",
+    "w-2/3",
+    "w-3/5",
+    "w-1/2",
+  ];
+  
   return (
-    <div
-      ref={ref}
-      className={cn(gridClasses, className)}
-      role="status"
-      aria-label={`Loading ${items} items in grid layout`}
-      data-testid={dataTestId || 'skeleton-grid'}
-      {...props}
-    >
-      {Array.from({ length: items }, (_, index) => (
-        <LoadingSkeleton
+    <div className={cn("space-y-2", className)} role="presentation">
+      {Array.from({ length: lines }).map((_, index) => (
+        <div
           key={index}
-          variant={skeletonType}
-          animate={animate}
-          data-testid={`skeleton-grid-item-${index}`}
+          className={cn(
+            skeletonVariants({ 
+              variant, 
+              animation,
+            }),
+            lineWidths[index % lineWidths.length] || "w-1/2"
+          )}
+          aria-hidden="true"
         />
       ))}
     </div>
   );
-});
-
-ResponsiveSkeletonGrid.displayName = 'ResponsiveSkeletonGrid';
-
-// Export all components and utilities
-export {
-  LoadingSkeleton as default,
-  LoadingSkeleton,
-  SkeletonText,
-  SkeletonImage,
-  SkeletonButton,
-  SkeletonTable,
-  SkeletonCard,
-  SkeletonBase,
-  useSkeletonLoader,
-  ResponsiveSkeletonGrid
 };
 
-// Export types for TypeScript consumers
-export type {
-  LoadingSkeletonProps,
-  SkeletonTextProps,
-  SkeletonImageProps,
-  SkeletonTableProps,
-  SkeletonCardProps,
-  BaseSkeletonProps
+/**
+ * Main LoadingSkeleton component
+ * Provides intelligent skeleton rendering with accessibility and React Query integration
+ */
+export const LoadingSkeleton = forwardRef<HTMLDivElement, LoadingSkeletonProps>(
+  ({
+    className,
+    variant = "text",
+    size = "md", 
+    animation = "normal",
+    radius = "md",
+    show = true,
+    queryState,
+    lines = 1,
+    width,
+    height,
+    ariaLabel,
+    announceLoading = true,
+    loadingAnnouncement,
+    delay = 0,
+    isRepeated = false,
+    repeatIndex,
+    repeatTotal,
+    style,
+    ...props
+  }, ref) => {
+    // Determine if skeleton should be visible
+    const isVisible = React.useMemo(() => {
+      if (queryState) {
+        return queryState === "loading";
+      }
+      return show;
+    }, [show, queryState]);
+    
+    // Handle delayed rendering
+    const [showAfterDelay, setShowAfterDelay] = React.useState(delay === 0);
+    
+    React.useEffect(() => {
+      if (delay > 0 && isVisible) {
+        const timer = setTimeout(() => setShowAfterDelay(true), delay);
+        return () => clearTimeout(timer);
+      } else if (!isVisible) {
+        setShowAfterDelay(false);
+      }
+    }, [delay, isVisible]);
+    
+    // Handle loading announcements for screen readers
+    React.useEffect(() => {
+      if (announceLoading && isVisible && showAfterDelay) {
+        const announcement = loadingAnnouncement || "Loading content";
+        
+        // Create and announce to screen readers
+        const announcer = document.createElement("div");
+        announcer.setAttribute("aria-live", "polite");
+        announcer.setAttribute("aria-atomic", "true");
+        announcer.className = "sr-only";
+        announcer.textContent = announcement;
+        
+        document.body.appendChild(announcer);
+        
+        // Clean up announcer element
+        setTimeout(() => {
+          if (document.body.contains(announcer)) {
+            document.body.removeChild(announcer);
+          }
+        }, 1000);
+      }
+    }, [announceLoading, isVisible, showAfterDelay, loadingAnnouncement]);
+    
+    // Don't render if not visible or delay hasn't passed
+    if (!isVisible || !showAfterDelay) {
+      return null;
+    }
+    
+    // Build accessibility attributes
+    const accessibilityProps = {
+      "aria-label": ariaLabel || "Loading content",
+      "aria-busy": "true",
+      "aria-live": "polite" as const,
+      role: "status",
+      ...(isRepeated && repeatIndex !== undefined && repeatTotal !== undefined && {
+        "aria-setsize": repeatTotal,
+        "aria-posinset": repeatIndex + 1,
+      }),
+    };
+    
+    // Build custom styles
+    const customStyles = {
+      ...style,
+      ...(width && { 
+        width: typeof width === "number" ? `${width}px` : width 
+      }),
+      ...(height && { 
+        height: typeof height === "number" ? `${height}px` : height 
+      }),
+    };
+    
+    // Render multi-line text skeleton
+    if (lines > 1 && variant?.startsWith("text")) {
+      return (
+        <div
+          ref={ref}
+          className={cn(className)}
+          style={customStyles}
+          {...accessibilityProps}
+          {...props}
+        >
+          <TextLinesSkeleton
+            lines={lines}
+            variant={variant as TextLinesSkeletonProps["variant"]}
+            animation={animation}
+          />
+        </div>
+      );
+    }
+    
+    // Render single skeleton element
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          skeletonVariants({
+            variant,
+            size,
+            animation, 
+            radius,
+          }),
+          className
+        )}
+        style={customStyles}
+        {...accessibilityProps}
+        {...props}
+      />
+    );
+  }
+);
+
+LoadingSkeleton.displayName = "LoadingSkeleton";
+
+/**
+ * Specialized skeleton components for common patterns
+ */
+
+/**
+ * Database table skeleton for schema discovery
+ */
+export const TableSkeleton: React.FC<{
+  rows?: number;
+  showHeader?: boolean;
+  className?: string;
+}> = ({ rows = 5, showHeader = true, className }) => (
+  <div className={cn("space-y-2", className)} role="status" aria-label="Loading table data">
+    {showHeader && (
+      <LoadingSkeleton variant="table-row" className="bg-gray-50 dark:bg-gray-800" />
+    )}
+    {Array.from({ length: rows }).map((_, index) => (
+      <LoadingSkeleton
+        key={index}
+        variant="table-row"
+        isRepeated={true}
+        repeatIndex={index}
+        repeatTotal={rows}
+      />
+    ))}
+  </div>
+);
+
+/**
+ * Schema tree skeleton for hierarchical data
+ */
+export const SchemaTreeSkeleton: React.FC<{
+  nodes?: number;
+  maxDepth?: number;
+  className?: string;
+}> = ({ nodes = 8, maxDepth = 3, className }) => {
+  const generateTreeNodes = (count: number, depth = 0): React.ReactNode[] => {
+    if (depth >= maxDepth) return [];
+    
+    return Array.from({ length: count }).map((_, index) => {
+      const hasChildren = depth < maxDepth - 1 && Math.random() > 0.5;
+      const childCount = hasChildren ? Math.floor(Math.random() * 3) + 1 : 0;
+      
+      return (
+        <div key={`${depth}-${index}`} className="space-y-1">
+          <LoadingSkeleton
+            variant={depth === 0 ? "tree-node" : "tree-indent"}
+            isRepeated={true}
+            repeatIndex={index}
+            repeatTotal={count}
+          />
+          {childCount > 0 && (
+            <div className="ml-4 space-y-1">
+              {generateTreeNodes(childCount, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+  
+  return (
+    <div className={cn("space-y-2", className)} role="status" aria-label="Loading schema tree">
+      {generateTreeNodes(nodes)}
+    </div>
+  );
 };
+
+/**
+ * API endpoint list skeleton
+ */
+export const EndpointListSkeleton: React.FC<{
+  endpoints?: number;
+  className?: string;
+}> = ({ endpoints = 6, className }) => (
+  <div className={cn("space-y-3", className)} role="status" aria-label="Loading API endpoints">
+    {Array.from({ length: endpoints }).map((_, index) => (
+      <div key={index} className="flex items-center space-x-3">
+        <LoadingSkeleton variant="method-badge" />
+        <LoadingSkeleton 
+          variant="endpoint-item" 
+          className="flex-1"
+          isRepeated={true}
+          repeatIndex={index}
+          repeatTotal={endpoints}
+        />
+      </div>
+    ))}
+  </div>
+);
+
+/**
+ * Service connection card skeleton
+ */
+export const ServiceCardSkeleton: React.FC<{
+  count?: number;
+  className?: string;
+}> = ({ count = 3, className }) => (
+  <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-3", className)}>
+    {Array.from({ length: count }).map((_, index) => (
+      <div key={index} className="space-y-3 p-4 border rounded-lg">
+        <div className="flex items-center space-x-3">
+          <LoadingSkeleton variant="icon" />
+          <LoadingSkeleton variant="heading" className="flex-1" />
+        </div>
+        <LoadingSkeleton variant="text" lines={2} />
+        <div className="flex space-x-2">
+          <LoadingSkeleton variant="button-sm" />
+          <LoadingSkeleton variant="button-sm" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+/**
+ * Form skeleton for configuration interfaces
+ */
+export const FormSkeleton: React.FC<{
+  fields?: number;
+  showButtons?: boolean;
+  className?: string;
+}> = ({ fields = 5, showButtons = true, className }) => (
+  <div className={cn("space-y-6", className)} role="status" aria-label="Loading form">
+    {Array.from({ length: fields }).map((_, index) => (
+      <div key={index} className="space-y-2">
+        <LoadingSkeleton variant="form-label" />
+        <LoadingSkeleton variant="form-field" />
+        {Math.random() > 0.7 && (
+          <LoadingSkeleton variant="form-error" />
+        )}
+      </div>
+    ))}
+    {showButtons && (
+      <div className="flex space-x-3 pt-4">
+        <LoadingSkeleton variant="button" />
+        <LoadingSkeleton variant="button" />
+      </div>
+    )}
+  </div>
+);
+
+/**
+ * Utility function to create React Query skeleton integration
+ */
+export const withSkeletonQuery = <T,>(
+  query: { isLoading: boolean; data?: T; error?: unknown },
+  skeletonComponent: React.ReactNode,
+  children: (data: T) => React.ReactNode
+): React.ReactNode => {
+  if (query.isLoading) {
+    return skeletonComponent;
+  }
+  
+  if (query.error) {
+    return null; // Error handling should be done by error boundaries or explicit error components
+  }
+  
+  if (query.data) {
+    return children(query.data);
+  }
+  
+  return null;
+};
+
+/**
+ * Hook for managing skeleton display with React Query integration
+ */
+export const useSkeletonState = (
+  queryState: LoadingStateValue,
+  delay = 200
+) => {
+  const [shouldShow, setShouldShow] = React.useState(false);
+  
+  React.useEffect(() => {
+    if (queryState === "loading") {
+      const timer = setTimeout(() => setShouldShow(true), delay);
+      return () => clearTimeout(timer);
+    } else {
+      setShouldShow(false);
+    }
+  }, [queryState, delay]);
+  
+  return shouldShow;
+};
+
+// Export types for external usage
+export type { LoadingSkeletonProps };
+
+// Export variants for external composition
+export { skeletonVariants };
