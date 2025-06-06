@@ -1,25 +1,14 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { useForm, useController } from 'react-hook-form';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
 import { z } from 'zod';
+import { useRouter } from 'next/navigation';
 import { Tab } from '@headlessui/react';
-import { 
-  ChevronRightIcon, 
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  InformationCircleIcon 
-} from '@heroicons/react/24/outline';
+import dynamic from 'next/dynamic';
 
-// Types and Hooks
-import { 
-  SchedulerTaskData, 
-  CreateSchedulePayload, 
-  UpdateSchedulePayload 
-} from '@/types/scheduler';
-import { Service } from '@/types/service';
+// Hooks for data fetching and mutations
 import { useSchedulerTask } from '@/hooks/useSchedulerTask';
 import { useCreateSchedulerTask } from '@/hooks/useCreateSchedulerTask';
 import { useUpdateSchedulerTask } from '@/hooks/useUpdateSchedulerTask';
@@ -31,311 +20,423 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/toggle';
-import { AceEditor } from '@/components/ui/ace-editor';
+import { Toggle } from '@/components/ui/toggle';
+
+// Types
+import { SchedulerTaskData, SchedulerTaskPayload } from '@/types/scheduler';
+import { Service } from '@/types/service';
 
 // Utilities
 import { cn } from '@/lib/utils';
-import { schedulerValidationSchema } from '@/lib/validations/scheduler';
 
-// HTTP Methods configuration
-const HTTP_METHODS = [
-  { value: 'GET', label: 'GET' },
-  { value: 'POST', label: 'POST' },
-  { value: 'PUT', label: 'PUT' },
-  { value: 'PATCH', label: 'PATCH' },
-  { value: 'DELETE', label: 'DELETE' }
-] as const;
-
-// Zod validation schema for the scheduler form
-const formSchema = z.object({
-  name: z.string().min(1, 'Task name is required'),
-  description: z.string().optional(),
-  active: z.boolean().default(true),
-  serviceId: z.number().min(1, 'Service selection is required'),
-  component: z.string().min(1, 'Component selection is required'),
-  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).default('GET'),
-  frequency: z.number().min(1, 'Frequency must be a positive number'),
-  payload: z.string().optional().refine((val) => {
-    if (!val || val.trim() === '') return true;
-    try {
-      JSON.parse(val);
-      return true;
-    } catch {
-      return false;
-    }
-  }, 'Payload must be valid JSON')
+// Dynamic imports for heavy components
+const AceEditor = dynamic(() => import('@/components/ui/ace-editor'), { 
+  ssr: false,
+  loading: () => <div className="h-32 bg-gray-50 animate-pulse rounded-md" />
 });
 
-type FormData = z.infer<typeof formSchema>;
+/**
+ * Zod validation schema for scheduler form
+ * Provides comprehensive validation with real-time feedback
+ */
+const schedulerFormSchema = z.object({
+  name: z.string()
+    .min(1, 'Task name is required')
+    .max(64, 'Task name must be 64 characters or less')
+    .regex(/^[a-zA-Z0-9_\-\s]+$/, 'Task name can only contain letters, numbers, spaces, hyphens, and underscores'),
+  
+  description: z.string()
+    .max(255, 'Description must be 255 characters or less')
+    .optional(),
+  
+  isActive: z.boolean()
+    .default(true),
+  
+  serviceId: z.string()
+    .min(1, 'Service selection is required'),
+  
+  component: z.string()
+    .min(1, 'Component selection is required'),
+  
+  verb: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
+    .default('GET'),
+  
+  frequency: z.number()
+    .min(1, 'Frequency must be at least 1 second')
+    .max(86400, 'Frequency cannot exceed 24 hours (86400 seconds)'),
+  
+  payload: z.string()
+    .optional()
+    .refine((value) => {
+      if (!value || value.trim() === '') return true;
+      try {
+        JSON.parse(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'Payload must be valid JSON')
+});
+
+type SchedulerFormData = z.infer<typeof schedulerFormSchema>;
+
+/**
+ * HTTP verbs configuration for verb picker
+ */
+const HTTP_VERBS = [
+  { value: 'GET', label: 'GET', color: 'bg-blue-100 text-blue-800' },
+  { value: 'POST', label: 'POST', color: 'bg-green-100 text-green-800' },
+  { value: 'PUT', label: 'PUT', color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'PATCH', label: 'PATCH', color: 'bg-purple-100 text-purple-800' },
+  { value: 'DELETE', label: 'DELETE', color: 'bg-red-100 text-red-800' },
+] as const;
 
 interface SchedulerFormProps {
-  taskId?: number;
-  onSubmit?: (data: FormData) => void;
+  /** Task ID for edit mode, undefined for create mode */
+  taskId?: string;
+  /** Callback function called when form is successfully submitted */
+  onSuccess?: (task: SchedulerTaskData) => void;
+  /** Callback function called when form is cancelled */
   onCancel?: () => void;
-  className?: string;
 }
 
-export default function SchedulerForm({ 
-  taskId, 
-  onSubmit: onSubmitProp, 
-  onCancel: onCancelProp,
-  className 
-}: SchedulerFormProps) {
+/**
+ * SchedulerForm component for creating and editing scheduler tasks
+ * 
+ * This React component replaces the Angular DfSchedulerDetailsComponent,
+ * implementing React Hook Form with Zod validation, Tailwind CSS styling,
+ * and comprehensive accessibility features.
+ * 
+ * Features:
+ * - Supports both create and edit modes
+ * - Real-time form validation with Zod schema
+ * - Service and component dropdown population via React Query
+ * - JSON payload editing with syntax highlighting
+ * - HTTP method selection with conditional payload field
+ * - Tabbed interface for Basic and Log information
+ * - Optimistic updates with rollback on failure
+ * - Responsive design and keyboard navigation
+ */
+export default function SchedulerForm({ taskId, onSuccess, onCancel }: SchedulerFormProps) {
   const router = useRouter();
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const isEditMode = Boolean(taskId);
+  
+  // State for component management
+  const [selectedServiceId, setSelectedServiceId] = useState<string>('');
   const [componentOptions, setComponentOptions] = useState<string[]>([]);
-  const [log, setLog] = useState<string>('');
+  const [isLoadingComponents, setIsLoadingComponents] = useState(false);
   const [selectedTab, setSelectedTab] = useState(0);
+  const [alertMessage, setAlertMessage] = useState<string>('');
+  const [alertType, setAlertType] = useState<'success' | 'error' | 'info'>('info');
+  const [showAlert, setShowAlert] = useState(false);
 
-  // React Query hooks for data fetching and mutations
-  const { data: services = [], isLoading: servicesLoading } = useServices();
-  const { data: existingTask, isLoading: taskLoading } = useSchedulerTask(taskId);
-  const createMutation = useCreateSchedulerTask();
-  const updateMutation = useUpdateSchedulerTask();
+  // Data fetching hooks
+  const { data: services, isLoading: isLoadingServices } = useServices();
+  const { data: taskData, isLoading: isLoadingTask } = useSchedulerTask(taskId!, {
+    enabled: isEditMode
+  });
 
-  // React Hook Form setup
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+  // Mutation hooks for create/update operations
+  const createSchedulerTask = useCreateSchedulerTask();
+  const updateSchedulerTask = useUpdateSchedulerTask();
+
+  // Form configuration with Zod validation
+  const form = useForm<SchedulerFormData>({
+    resolver: zodResolver(schedulerFormSchema),
     defaultValues: {
       name: '',
       description: '',
-      active: true,
-      serviceId: 0,
+      isActive: true,
+      serviceId: '',
       component: '',
-      method: 'GET',
-      frequency: 1,
+      verb: 'GET',
+      frequency: 60,
       payload: ''
-    }
+    },
+    mode: 'onChange' // Enable real-time validation
   });
 
-  const { control, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = form;
-
-  // Watch form fields for reactive updates
-  const watchedMethod = watch('method');
+  const { control, handleSubmit, watch, setValue, formState: { errors, isValid, isDirty } } = form;
+  
+  // Watch form values for conditional logic
   const watchedServiceId = watch('serviceId');
-  const watchedPayload = watch('payload');
+  const watchedVerb = watch('verb');
+  const showPayloadField = watchedVerb !== 'GET';
 
-  // Show/hide payload field based on HTTP method
-  const showPayloadField = watchedMethod !== 'GET';
-
-  // Fetch component options when service changes
-  const fetchComponentOptions = useCallback(async (serviceId: number) => {
-    if (!serviceId) {
-      setComponentOptions([]);
-      return;
-    }
-
+  /**
+   * Fetches component options for the selected service
+   */
+  const fetchComponentOptions = useCallback(async (serviceId: string) => {
+    if (!serviceId || !services) return;
+    
     const service = services.find(s => s.id === serviceId);
-    if (!service) {
-      setComponentOptions([]);
-      return;
-    }
+    if (!service) return;
 
-    setSelectedService(service);
-
+    setIsLoadingComponents(true);
     try {
-      // Mock API call - in real implementation, this would fetch from the service
-      // This simulates the getServiceAccessList method from the Angular component
-      const response = await fetch(`/api/services/${service.name}?as_access_list=true`);
+      // Simulated API call - replace with actual service call
+      // This would typically call an API to get the service's access list
+      const response = await fetch(`/api/v2/${service.name}?as_access_list=true`);
       if (response.ok) {
         const data = await response.json();
         setComponentOptions(data.resource || []);
-      } else {
-        setComponentOptions([]);
       }
     } catch (error) {
       console.error('Failed to fetch component options:', error);
       setComponentOptions([]);
+    } finally {
+      setIsLoadingComponents(false);
     }
   }, [services]);
 
-  // Load existing task data when editing
+  /**
+   * Effect to populate form with existing task data in edit mode
+   */
   useEffect(() => {
-    if (existingTask) {
-      const taskData = existingTask as SchedulerTaskData;
+    if (isEditMode && taskData) {
+      setValue('name', taskData.name);
+      setValue('description', taskData.description || '');
+      setValue('isActive', taskData.isActive);
+      setValue('serviceId', taskData.serviceId);
+      setValue('component', taskData.component);
+      setValue('verb', taskData.verb as any);
+      setValue('frequency', taskData.frequency);
       
-      reset({
-        name: taskData.name,
-        description: taskData.description || '',
-        active: taskData.isActive,
-        serviceId: taskData.serviceId,
-        component: taskData.component,
-        method: taskData.verb as any,
-        frequency: taskData.frequency,
-        payload: taskData.payload || ''
-      });
-
-      // Set log content
-      setLog(taskData.taskLogByTaskId?.content || '');
-
-      // Fetch component options for the selected service
-      if (taskData.serviceId) {
-        fetchComponentOptions(taskData.serviceId);
+      if (taskData.payload && taskData.verb !== 'GET') {
+        setValue('payload', typeof taskData.payload === 'string' 
+          ? taskData.payload 
+          : JSON.stringify(taskData.payload, null, 2)
+        );
       }
-    }
-  }, [existingTask, reset, fetchComponentOptions]);
 
-  // Fetch component options when service selection changes
+      setSelectedServiceId(taskData.serviceId);
+    }
+  }, [isEditMode, taskData, setValue]);
+
+  /**
+   * Effect to fetch component options when service changes
+   */
   useEffect(() => {
     if (watchedServiceId) {
+      setSelectedServiceId(watchedServiceId);
       fetchComponentOptions(watchedServiceId);
+      
       // Reset component selection when service changes
-      setValue('component', '');
+      if (watchedServiceId !== selectedServiceId) {
+        setValue('component', '');
+      }
     }
-  }, [watchedServiceId, fetchComponentOptions, setValue]);
+  }, [watchedServiceId, selectedServiceId, fetchComponentOptions, setValue]);
 
-  // Helper function to get verb mask
-  const getVerbMask = (verb: string): number => {
-    switch (verb) {
-      case 'GET': return 1;
-      case 'POST': return 2;
-      case 'PUT': return 4;
-      case 'PATCH': return 8;
-      case 'DELETE': return 16;
-      default: return 1;
+  /**
+   * Effect to clear payload when switching to GET method
+   */
+  useEffect(() => {
+    if (watchedVerb === 'GET') {
+      setValue('payload', '');
     }
-  };
+  }, [watchedVerb, setValue]);
 
-  // Form submission handler
-  const onSubmit = async (data: FormData) => {
-    if (!selectedService) return;
+  /**
+   * Displays alert message with auto-dismiss
+   */
+  const showAlertMessage = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+    setAlertType(type);
+    setAlertMessage(message);
+    setShowAlert(true);
+    
+    // Auto-dismiss success messages after 3 seconds
+    if (type === 'success') {
+      setTimeout(() => setShowAlert(false), 3000);
+    }
+  }, []);
+
+  /**
+   * Handles form submission for both create and update modes
+   */
+  const onSubmit = async (data: SchedulerFormData) => {
+    if (!isValid || !isDirty) return;
 
     try {
-      const basePayload = {
-        component: data.component,
-        description: data.description || null,
-        frequency: data.frequency,
-        isActive: data.active,
+      const selectedService = services?.find(s => s.id === data.serviceId);
+      if (!selectedService) {
+        showAlertMessage('error', 'Selected service not found');
+        return;
+      }
+
+      // Prepare payload for API
+      const payload: SchedulerTaskPayload = {
         name: data.name,
-        payload: showPayloadField ? data.payload || null : null,
+        description: data.description,
+        isActive: data.isActive,
         serviceId: data.serviceId,
-        serviceName: selectedService.name,
-        verb: data.method,
-        service: {
-          id: data.serviceId,
-          name: selectedService.name,
-          label: selectedService.label,
-          description: selectedService.description,
-          type: selectedService.type,
-          components: componentOptions,
-        },
-        verbMask: getVerbMask(data.method),
+        component: data.component,
+        verb: data.verb,
+        frequency: data.frequency,
+        payload: data.payload && data.payload.trim() 
+          ? JSON.parse(data.payload) 
+          : undefined
       };
 
-      if (taskId && existingTask) {
-        // Update existing task
-        const updatePayload: UpdateSchedulePayload = {
-          ...basePayload,
+      if (isEditMode && taskId) {
+        // Update existing task with optimistic updates
+        await updateSchedulerTask.mutateAsync({
           id: taskId,
-          lastModifiedDate: existingTask.lastModifiedDate,
-          lastModifiedById: existingTask.lastModifiedById,
-          hasLog: !!existingTask.taskLogByTaskId,
-          createdDate: existingTask.createdDate,
-          createdById: existingTask.createdById,
-          taskLogByTaskId: existingTask.taskLogByTaskId
-        };
-        
-        await updateMutation.mutateAsync({ id: taskId, data: updatePayload });
+          data: payload
+        });
+        showAlertMessage('success', 'Scheduler task updated successfully');
       } else {
         // Create new task
-        const createPayload: CreateSchedulePayload = {
-          ...basePayload,
-          id: null
-        };
-        
-        await createMutation.mutateAsync(createPayload);
+        const newTask = await createSchedulerTask.mutateAsync(payload);
+        showAlertMessage('success', 'Scheduler task created successfully');
+        onSuccess?.(newTask);
       }
 
-      // Handle success
-      if (onSubmitProp) {
-        onSubmitProp(data);
-      } else {
+      // Navigate back to scheduler list
+      setTimeout(() => {
         router.push('/system-settings/scheduler');
-      }
-    } catch (error) {
-      console.error('Form submission error:', error);
-      // Error handling would be done by the mutation hooks with toast notifications
+      }, 1000);
+
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Failed to save scheduler task';
+      showAlertMessage('error', errorMessage);
     }
   };
 
-  const handleCancel = () => {
-    if (onCancelProp) {
-      onCancelProp();
-    } else {
-      router.push('/system-settings/scheduler');
-    }
+  /**
+   * Handles form cancellation
+   */
+  const handleCancel = useCallback(() => {
+    onCancel?.();
+    router.push('/system-settings/scheduler');
+  }, [onCancel, router]);
+
+  /**
+   * Gets the verb picker button styling based on selected value
+   */
+  const getVerbStyling = (verb: string) => {
+    const config = HTTP_VERBS.find(v => v.value === verb);
+    return config?.color || 'bg-gray-100 text-gray-800';
   };
 
-  // Loading state
-  if (taskLoading || servicesLoading) {
+  /**
+   * Formats execution log content for display
+   */
+  const formatLogContent = useMemo(() => {
+    if (!taskData?.taskLogByTaskId?.content) return 'No execution logs available';
+    
+    try {
+      const parsed = JSON.parse(taskData.taskLogByTaskId.content);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return taskData.taskLogByTaskId.content;
+    }
+  }, [taskData?.taskLogByTaskId?.content]);
+
+  // Loading state for edit mode
+  if (isEditMode && isLoadingTask) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin h-8 w-8 border-2 border-primary-500 border-t-transparent rounded-full" />
-        <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading...</span>
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className={cn("w-full max-w-4xl mx-auto", className)}>
+    <div className="w-full max-w-4xl mx-auto p-6 space-y-6">
+      {/* Alert Component */}
+      {showAlert && (
+        <div 
+          className={cn(
+            "p-4 rounded-md border-l-4",
+            alertType === 'success' && "bg-green-50 border-green-400 text-green-700",
+            alertType === 'error' && "bg-red-50 border-red-400 text-red-700",
+            alertType === 'info' && "bg-blue-50 border-blue-400 text-blue-700"
+          )}
+          role="alert"
+          aria-live="polite"
+        >
+          <div className="flex justify-between items-center">
+            <span>{alertMessage}</span>
+            <button
+              onClick={() => setShowAlert(false)}
+              className="text-current opacity-70 hover:opacity-100"
+              aria-label="Dismiss alert"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab Navigation */}
       <Tab.Group selectedIndex={selectedTab} onChange={setSelectedTab}>
-        <Tab.List className="flex space-x-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 mb-6">
+        <Tab.List className="flex space-x-1 rounded-xl bg-blue-900/20 p-1">
           <Tab
             className={({ selected }) =>
               cn(
-                'w-full rounded-lg py-2.5 text-sm font-medium leading-5',
-                'ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2',
+                "w-full rounded-lg py-2.5 text-sm font-medium leading-5",
+                "ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2",
                 selected
-                  ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 shadow'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-white/[0.12] hover:text-gray-800 dark:hover:text-gray-200'
+                  ? "bg-white shadow text-blue-700"
+                  : "text-blue-100 hover:bg-white/[0.12] hover:text-white"
               )
             }
           >
             Basic
           </Tab>
-          <Tab
-            className={({ selected }) =>
-              cn(
-                'w-full rounded-lg py-2.5 text-sm font-medium leading-5',
-                'ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2',
-                selected
-                  ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 shadow'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-white/[0.12] hover:text-gray-800 dark:hover:text-gray-200'
-              )
-            }
-          >
-            Log
-          </Tab>
+          {isEditMode && (
+            <Tab
+              className={({ selected }) =>
+                cn(
+                  "w-full rounded-lg py-2.5 text-sm font-medium leading-5",
+                  "ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2",
+                  selected
+                    ? "bg-white shadow text-blue-700"
+                    : "text-blue-100 hover:bg-white/[0.12] hover:text-white"
+                )
+              }
+            >
+              Log
+            </Tab>
+          )}
         </Tab.List>
 
-        <Tab.Panels>
+        <Tab.Panels className="mt-6">
           {/* Basic Tab */}
-          <Tab.Panel className="rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <Tab.Panel 
+            className={cn(
+              "rounded-xl bg-white p-6",
+              "ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2"
+            )}
+          >
             <div className="mb-6">
-              <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                Task Configuration
-              </h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Configure the scheduler task settings and execution parameters.
+              <h3 className="text-lg font-semibold text-gray-900">
+                {isEditMode ? 'Edit Scheduler Task' : 'Create New Scheduler Task'}
+              </h3>
+              <p className="text-sm text-gray-600">
+                Configure the task details and execution parameters
               </p>
             </div>
 
             <Form {...form}>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Task Name */}
+                {/* First Row: Name and Active Toggle */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <FormField
                     control={control}
                     name="name"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="md:col-span-2">
                         <FormLabel>Task Name *</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="Enter task name" 
-                            {...field} 
-                            aria-describedby={errors.name ? "name-error" : undefined}
+                          <Input
+                            placeholder="Enter task name"
+                            {...field}
+                            aria-describedby="name-error"
+                            className="transition-colors duration-200"
                           />
                         </FormControl>
                         <FormMessage id="name-error" />
@@ -343,25 +444,26 @@ export default function SchedulerForm({
                     )}
                   />
 
-                  {/* Active Toggle */}
                   <FormField
                     control={control}
-                    name="active"
+                    name="isActive"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Active</FormLabel>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            Enable or disable this scheduled task
-                          </div>
-                        </div>
+                      <FormItem className="flex flex-col justify-end">
+                        <FormLabel>Status</FormLabel>
                         <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            aria-describedby="active-description"
-                          />
+                          <div className="flex items-center space-x-2">
+                            <Toggle
+                              pressed={field.value}
+                              onPressedChange={field.onChange}
+                              aria-label="Toggle task active status"
+                              className="data-[state=on]:bg-green-600"
+                            />
+                            <span className="text-sm text-gray-600">
+                              {field.value ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -375,10 +477,10 @@ export default function SchedulerForm({
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Optional task description"
-                          className="min-h-[80px]"
-                          {...field} 
+                        <Textarea
+                          placeholder="Enter task description (optional)"
+                          className="min-h-[80px] resize-none"
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -386,104 +488,109 @@ export default function SchedulerForm({
                   )}
                 />
 
+                {/* Second Row: Service and Component */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Service Selection */}
                   <FormField
                     control={control}
                     name="serviceId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Service *</FormLabel>
-                        <Select 
-                          onValueChange={(value) => field.onChange(parseInt(value))}
-                          value={field.value?.toString()}
-                        >
-                          <FormControl>
+                        <FormControl>
+                          <Select value={field.value} onValueChange={field.onChange}>
                             <SelectTrigger>
                               <SelectValue placeholder="Select a service" />
                             </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {services.map((service) => (
-                              <SelectItem key={service.id} value={service.id.toString()}>
-                                {service.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                            <SelectContent>
+                              {isLoadingServices ? (
+                                <SelectItem value="loading" disabled>
+                                  Loading services...
+                                </SelectItem>
+                              ) : (
+                                services?.map((service) => (
+                                  <SelectItem key={service.id} value={service.id}>
+                                    {service.name}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  {/* Component Selection */}
                   <FormField
                     control={control}
                     name="component"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Component *</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          disabled={!watchedServiceId || componentOptions.length === 0}
-                        >
-                          <FormControl>
+                        <FormControl>
+                          <Select 
+                            value={field.value} 
+                            onValueChange={field.onChange}
+                            disabled={!selectedServiceId || isLoadingComponents}
+                          >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select a component" />
+                              <SelectValue placeholder={
+                                !selectedServiceId 
+                                  ? "Select a service first" 
+                                  : isLoadingComponents 
+                                    ? "Loading components..."
+                                    : "Select a component"
+                              } />
                             </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {componentOptions.map((component) => (
-                              <SelectItem key={component} value={component}>
-                                {component}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                            <SelectContent>
+                              {componentOptions.map((component) => (
+                                <SelectItem key={component} value={component}>
+                                  {component}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
 
+                {/* Third Row: HTTP Verb and Frequency */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* HTTP Method */}
                   <FormField
                     control={control}
-                    name="method"
+                    name="verb"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>HTTP Method *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
+                        <FormControl>
+                          <Select value={field.value} onValueChange={field.onChange}>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select HTTP method" />
+                              <SelectValue />
                             </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {HTTP_METHODS.map((method) => (
-                              <SelectItem key={method.value} value={method.value}>
-                                <span className={cn(
-                                  "font-mono text-xs px-2 py-1 rounded",
-                                  method.value === 'GET' && "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-                                  method.value === 'POST' && "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-                                  method.value === 'PUT' && "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-                                  method.value === 'PATCH' && "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-                                  method.value === 'DELETE' && "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                )}>
-                                  {method.label}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                            <SelectContent>
+                              {HTTP_VERBS.map((verb) => (
+                                <SelectItem key={verb.value} value={verb.value}>
+                                  <div className="flex items-center space-x-2">
+                                    <span className={cn(
+                                      "px-2 py-1 rounded text-xs font-medium",
+                                      verb.color
+                                    )}>
+                                      {verb.label}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  {/* Frequency */}
                   <FormField
                     control={control}
                     name="frequency"
@@ -491,12 +598,13 @@ export default function SchedulerForm({
                       <FormItem>
                         <FormLabel>Frequency (seconds) *</FormLabel>
                         <FormControl>
-                          <Input 
+                          <Input
                             type="number"
                             min="1"
-                            placeholder="Enter frequency in seconds"
+                            max="86400"
+                            placeholder="60"
                             {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
                           />
                         </FormControl>
                         <FormMessage />
@@ -505,71 +613,63 @@ export default function SchedulerForm({
                   />
                 </div>
 
-                {/* Payload Field - Conditional */}
+                {/* Conditional Payload Field */}
                 {showPayloadField && (
                   <FormField
                     control={control}
                     name="payload"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          JSON Payload
-                          <span className="text-sm text-gray-500 ml-2">(Optional)</span>
-                        </FormLabel>
+                        <FormLabel>JSON Payload</FormLabel>
                         <FormControl>
-                          <div className="relative">
+                          <div className="border rounded-md">
                             <AceEditor
                               mode="json"
                               theme="github"
                               value={field.value || ''}
                               onChange={field.onChange}
-                              placeholder="Enter JSON payload..."
-                              className="min-h-[120px] border rounded-md"
+                              width="100%"
+                              height="200px"
                               setOptions={{
-                                useWorker: false,
+                                enableBasicAutocompletion: true,
+                                enableLiveAutocompletion: true,
+                                enableSnippets: true,
                                 showLineNumbers: true,
                                 tabSize: 2,
+                                fontSize: 14
                               }}
+                              editorProps={{ $blockScrolling: true }}
                             />
                           </div>
                         </FormControl>
                         <FormMessage />
-                        {field.value && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            <InformationCircleIcon className="inline w-3 h-3 mr-1" />
-                            Payload will be sent as JSON in the request body
-                          </div>
-                        )}
                       </FormItem>
                     )}
                   />
                 )}
 
-                {/* Form Actions */}
-                <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-4 pt-6 border-t">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleCancel}
-                    disabled={isSubmitting}
+                    className="min-w-[100px]"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={!isValid || !isDirty || createSchedulerTask.isPending || updateSchedulerTask.isPending}
                     className="min-w-[100px]"
                   >
-                    {isSubmitting ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
-                        Saving...
+                    {createSchedulerTask.isPending || updateSchedulerTask.isPending ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Saving...</span>
                       </div>
                     ) : (
-                      <>
-                        <CheckCircleIcon className="w-4 h-4 mr-2" />
-                        {taskId ? 'Update' : 'Create'} Task
-                      </>
+                      isEditMode ? 'Update Task' : 'Create Task'
                     )}
                   </Button>
                 </div>
@@ -577,77 +677,89 @@ export default function SchedulerForm({
             </Form>
           </Tab.Panel>
 
-          {/* Log Tab */}
-          <Tab.Panel className="rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="mb-6">
-              <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                Task Execution Log
-              </h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                View the execution history and logs for this scheduled task.
-              </p>
-            </div>
-
-            {existingTask?.taskLogByTaskId ? (
-              <div className="space-y-4">
-                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Status Code:
-                    </span>
-                    <span className={cn(
-                      "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                      existingTask.taskLogByTaskId.statusCode >= 200 && existingTask.taskLogByTaskId.statusCode < 300
-                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                    )}>
-                      {existingTask.taskLogByTaskId.statusCode}
-                    </span>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    Last executed: {new Date(existingTask.taskLogByTaskId.lastModifiedDate).toLocaleString()}
-                  </div>
+          {/* Log Tab (only visible in edit mode) */}
+          {isEditMode && (
+            <Tab.Panel 
+              className={cn(
+                "rounded-xl bg-white p-6",
+                "ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2"
+              )}
+            >
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Execution Log
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    View the latest execution results for this task
+                  </p>
                 </div>
 
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                {/* Status Information */}
+                {taskData?.taskLogByTaskId && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium text-gray-700">Status Code:</span>
+                        <span className={cn(
+                          "ml-2 px-2 py-1 rounded text-xs font-medium",
+                          taskData.taskLogByTaskId.statusCode < 300 
+                            ? "bg-green-100 text-green-800"
+                            : taskData.taskLogByTaskId.statusCode < 400
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-red-100 text-red-800"
+                        )}>
+                          {taskData.taskLogByTaskId.statusCode}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Start Time:</span>
+                        <span className="ml-2 text-gray-600">
+                          {new Date(taskData.taskLogByTaskId.startTime).toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Duration:</span>
+                        <span className="ml-2 text-gray-600">
+                          {taskData.taskLogByTaskId.duration || 'N/A'}ms
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Log Content */}
+                <div className="border rounded-md">
                   <AceEditor
-                    mode="text"
+                    mode="json"
                     theme="github"
-                    value={log}
-                    readOnly={true}
-                    className="min-h-[300px]"
+                    value={formatLogContent}
+                    readOnly
+                    width="100%"
+                    height="300px"
                     setOptions={{
-                      useWorker: false,
                       showLineNumbers: true,
-                      showGutter: true,
-                      highlightActiveLine: false,
-                      showPrintMargin: false,
+                      tabSize: 2,
+                      fontSize: 14,
+                      wrap: true
                     }}
+                    editorProps={{ $blockScrolling: true }}
                   />
                 </div>
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">
-                  No execution logs
-                </h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  This task hasn't been executed yet or logs are not available.
-                </p>
-              </div>
-            )}
 
-            <div className="flex justify-end pt-6 border-t border-gray-200 dark:border-gray-700">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancel}
-              >
-                Go Back
-              </Button>
-            </div>
-          </Tab.Panel>
+                {/* Back Button */}
+                <div className="flex justify-end pt-4 border-t">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancel}
+                  >
+                    Go Back
+                  </Button>
+                </div>
+              </div>
+            </Tab.Panel>
+          )}
         </Tab.Panels>
       </Tab.Group>
     </div>
