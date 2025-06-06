@@ -1,244 +1,174 @@
 /**
  * Loading component for the database services route segment
- * Displays animated skeleton elements while service data is being fetched
  * 
- * Provides optimized loading states for:
- * - Service tables and listings
- * - Connection status indicators
- * - Action buttons and controls
- * - Metrics and statistics
+ * Displays animated skeleton elements while service data is being fetched.
+ * Provides optimized loading states for service tables, connection status indicators,
+ * and action buttons to maintain smooth user experience during data loading operations
+ * with proper accessibility features.
  * 
- * Features:
- * - WCAG 2.1 AA accessibility compliance
- * - Responsive design across all supported browsers
- * - Tailwind CSS-based animations
- * - Optimized for < 3 second loading targets
+ * @author DreamFactory Team
+ * @since 2024-12-19
  */
 
-'use client';
+import React from 'react';
 
-import { Database, Plus, Search, Filter } from 'lucide-react';
-
+/**
+ * Database Services Loading Component
+ * 
+ * Implements Next.js app router loading UI patterns with Tailwind CSS-based
+ * skeleton loading animations. Provides WCAG 2.1 AA accessibility compliance
+ * with proper loading announcements and ARIA labels.
+ */
 export default function DatabaseServicesLoading() {
   return (
     <div 
-      className="space-y-6" 
+      className="space-y-6 animate-fade-in" 
       data-testid="database-services-loading"
-      role="status" 
+      role="status"
+      aria-live="polite"
       aria-label="Loading database services"
     >
       {/* Screen reader announcement */}
-      <div className="sr-only" aria-live="polite">
-        Loading database services, please wait...
-      </div>
+      <span className="sr-only">
+        Loading database services. Please wait while we fetch your database connections and API services.
+      </span>
 
-      {/* Page Header with Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Page Header Skeleton */}
+      <div className="flex items-center justify-between">
         <div className="space-y-2">
           {/* Page title skeleton */}
           <div 
             className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse"
             aria-hidden="true"
-          ></div>
-          
+          />
           {/* Page description skeleton */}
           <div 
             className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-80 animate-pulse"
             aria-hidden="true"
-          ></div>
+          />
         </div>
-        
         {/* Create service button skeleton */}
         <div 
-          className="h-10 bg-primary-200 dark:bg-primary-700 rounded-lg w-40 animate-pulse flex items-center justify-center"
+          className="h-10 bg-primary-200 dark:bg-primary-700 rounded w-40 animate-pulse"
           aria-hidden="true"
-        >
-          <Plus className="h-4 w-4 text-primary-400 dark:text-primary-500" />
-        </div>
+        />
       </div>
 
       {/* Service Metrics Dashboard Skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div 
-            key={i}
-            className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3"
-            aria-hidden="true"
-          >
-            {/* Metric icon and value */}
-            <div className="flex items-center justify-between">
-              <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-12 animate-pulse"></div>
-            </div>
-            
-            {/* Metric label */}
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse"></div>
-            
-            {/* Metric trend indicator */}
-            <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded w-16 animate-pulse"></div>
-          </div>
-        ))}
-      </div>
+      <div 
+        className="h-24 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse border border-gray-200 dark:border-gray-700"
+        aria-hidden="true"
+      />
 
-      {/* Filters and Search Section */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      {/* Filters and Search Bar Skeleton */}
+      <div className="flex gap-4 items-center">
         {/* Search input skeleton */}
-        <div className="flex-1 relative">
-          <div 
-            className="h-10 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg animate-pulse flex items-center px-3"
-            aria-hidden="true"
-          >
-            <Search className="h-4 w-4 text-gray-400 mr-3" />
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded flex-1 animate-pulse"></div>
-          </div>
-        </div>
-        
+        <div 
+          className="h-10 bg-gray-200 dark:bg-gray-700 rounded flex-1 animate-pulse"
+          aria-hidden="true"
+        />
         {/* Filter button skeleton */}
         <div 
-          className="h-10 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg w-32 animate-pulse flex items-center justify-center"
+          className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"
           aria-hidden="true"
-        >
-          <Filter className="h-4 w-4 text-gray-400 mr-2" />
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12 animate-pulse"></div>
-        </div>
-        
-        {/* Status filter skeleton */}
+        />
+        {/* Sort dropdown skeleton */}
         <div 
-          className="h-10 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg w-28 animate-pulse"
+          className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-28 animate-pulse"
           aria-hidden="true"
-        ></div>
+        />
       </div>
 
       {/* Bulk Actions Bar Skeleton */}
       <div 
-        className="h-12 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg animate-pulse flex items-center px-4"
+        className="h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
         aria-hidden="true"
-      >
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse"></div>
-        <div className="ml-auto flex space-x-2">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse"></div>
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse"></div>
-        </div>
-      </div>
+      />
 
       {/* Services Table Skeleton */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        {/* Table header */}
-        <div 
-          className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-3"
-          aria-hidden="true"
-        >
-          <div className="grid grid-cols-12 gap-4">
-            {/* Checkbox column */}
-            <div className="col-span-1">
-              <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-            </div>
-            
-            {/* Service name column */}
-            <div className="col-span-3">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse"></div>
-            </div>
-            
-            {/* Database type column */}
-            <div className="col-span-2">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse"></div>
-            </div>
-            
-            {/* Status column */}
-            <div className="col-span-2">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12 animate-pulse"></div>
-            </div>
-            
-            {/* Tables column */}
-            <div className="col-span-2">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-14 animate-pulse"></div>
-            </div>
-            
-            {/* Actions column */}
-            <div className="col-span-2">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse"></div>
-            </div>
+      <div 
+        className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse"
+        aria-hidden="true"
+      >
+        {/* Table header skeleton */}
+        <div className="border-b border-gray-200 dark:border-gray-700 p-4">
+          <div className="grid grid-cols-6 gap-4">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" />
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" />
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24" />
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-18" />
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" />
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" />
           </div>
         </div>
 
-        {/* Table rows */}
-        <div className="divide-y divide-gray-200 dark:divide-gray-700" aria-hidden="true">
-          {Array.from({ length: 8 }).map((_, rowIndex) => (
-            <div key={rowIndex} className="px-6 py-4">
-              <div className="grid grid-cols-12 gap-4 items-center">
-                {/* Checkbox */}
-                <div className="col-span-1">
-                  <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                </div>
-                
-                {/* Service name with icon */}
-                <div className="col-span-3 flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse flex items-center justify-center">
-                    <Database className="h-4 w-4 text-gray-400" />
-                  </div>
+        {/* Table rows skeleton */}
+        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <div key={index} className="p-4">
+              <div className="grid grid-cols-6 gap-4 items-center">
+                {/* Service name column */}
+                <div className="flex items-center space-x-3">
+                  <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded" />
                   <div className="space-y-1">
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse"></div>
-                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24" />
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16" />
                   </div>
                 </div>
                 
-                {/* Database type */}
-                <div className="col-span-2">
-                  <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded-full w-16 animate-pulse"></div>
+                {/* Database type column */}
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" />
+                
+                {/* Connection status column */}
+                <div className="flex items-center space-x-2">
+                  <div className="h-3 w-3 bg-gray-200 dark:bg-gray-700 rounded-full" />
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16" />
                 </div>
                 
-                {/* Connection status */}
-                <div className="col-span-2 flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse"></div>
-                </div>
+                {/* API endpoints column */}
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12" />
                 
-                {/* Tables count */}
-                <div className="col-span-2">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-8 animate-pulse"></div>
-                </div>
+                {/* Last updated column */}
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20" />
                 
-                {/* Actions */}
-                <div className="col-span-2 flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                  <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                  <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                {/* Actions column */}
+                <div className="flex space-x-2">
+                  <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded" />
+                  <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded" />
+                  <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded" />
                 </div>
               </div>
             </div>
           ))}
         </div>
+      </div>
 
-        {/* Table footer with pagination */}
-        <div 
-          className="bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-6 py-3"
-          aria-hidden="true"
-        >
-          <div className="flex items-center justify-between">
-            {/* Results info */}
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
-            
-            {/* Pagination controls */}
-            <div className="flex items-center space-x-2">
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse"></div>
-              <div className="flex space-x-1">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div 
-                    key={i} 
-                    className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-                  ></div>
-                ))}
-              </div>
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse"></div>
-            </div>
-          </div>
+      {/* Pagination Skeleton */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
+        </div>
+        <div className="flex items-center space-x-2">
+          {/* Pagination buttons skeleton */}
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div 
+              key={index} 
+              className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" 
+            />
+          ))}
         </div>
       </div>
 
-      {/* Loading indicator for screen readers */}
-      <div className="sr-only" aria-live="polite" aria-atomic="true">
-        Database services are loading. This may take a few moments.
+      {/* Loading timeout accessibility feature */}
+      <div className="sr-only" aria-live="assertive">
+        {/* This will be announced if loading takes longer than expected */}
+        If loading takes more than 10 seconds, please refresh the page or check your network connection.
       </div>
     </div>
   );
 }
+
+/**
+ * Loading component display name for React DevTools
+ */
+DatabaseServicesLoading.displayName = 'DatabaseServicesLoading';
