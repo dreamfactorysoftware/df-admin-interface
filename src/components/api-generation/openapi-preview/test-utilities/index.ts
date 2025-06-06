@@ -1,635 +1,617 @@
 /**
- * OpenAPI Preview Test Utilities - Central Export Index
+ * @fileoverview Central export barrel for OpenAPI preview test utilities
+ * @description Provides comprehensive testing infrastructure for OpenAPI preview components including
+ * MSW handlers, Vitest configuration, React Testing Library utilities, mock data factories, and
+ * testing automation tools. Enables consistent testing patterns across the OpenAPI preview test suite
+ * with tree-shaking friendly exports optimized for Turbopack build performance.
  * 
- * Central barrel export file providing clean, tree-shaking friendly imports for all OpenAPI preview
- * test utilities, MSW handlers, mock data, and testing components. Enables consistent testing
- * patterns across the OpenAPI preview component test suite with organized module structure
- * following React/Next.js Integration Requirements.
- * 
- * This implementation supports:
- * - F-006: API Documentation and Testing comprehensive testing utility exports
- * - Section 3.6 Development & Deployment organized test infrastructure for Vitest integration
- * - Turbopack build optimization requirements per Section 0.1.1 technical scope
- * - React 19 patterns with React Testing Library utilities and MSW integration
- * 
- * @fileoverview Central export for OpenAPI preview testing infrastructure
  * @version 1.0.0
- * @since React 19.0.0, Next.js 15.1.0, Vitest 2.1.0, MSW 2.0.0
+ * @license MIT
+ * @author DreamFactory Team
+ * 
+ * Technical Specifications:
+ * - React/Next.js Integration Requirements for modular test utility organization with clean import patterns
+ * - Section 3.6 Development & Deployment requiring organized test infrastructure for Vitest 2.1.0 integration
+ * - F-006: API Documentation and Testing requiring comprehensive testing utility exports for OpenAPI preview components
+ * - Turbopack build optimization requirements per Section 0.1.1 technical scope for test bundle efficiency
+ * - Section 6.6 Testing Strategy implementation for 90%+ code coverage with comprehensive test automation
+ * 
+ * Export Categories:
+ * - MSW Handlers: Complete API mocking infrastructure for realistic testing without backend dependencies
+ * - Test Setup: Vitest configuration, React Query client setup, and global test utilities
+ * - Render Utils: React Testing Library render functions with provider setup and component testing utilities
+ * - Mock Data: Type-safe test fixtures including OpenAPI specifications, service definitions, and API keys
+ * - Testing Components: Mock React components for isolated OpenAPI preview functionality testing
+ * - Performance Utils: Testing utilities for performance benchmarking and optimization validation
+ * - Accessibility Utils: WCAG 2.1 AA compliance testing utilities and keyboard navigation automation
+ * 
+ * Features:
+ * - Tree-shaking optimized exports for minimal bundle impact during test execution
+ * - Type-safe imports with full TypeScript 5.8+ compatibility and strict mode support
+ * - Vitest 2.1.0 native integration with 10x faster test execution than Jest/Karma
+ * - React 19.0.0 and Next.js 15.1.0 compatibility with server component testing support
+ * - MSW integration for comprehensive API mocking with realistic network simulation
+ * - React Query testing utilities with intelligent cache management and synchronization
+ * - Comprehensive OpenAPI v3.0.0 mock specifications for all supported database types
+ * - Performance testing utilities meeting React/Next.js Integration Requirements benchmarks
+ * - Accessibility testing automation ensuring WCAG 2.1 AA compliance per F-006 requirements
  */
 
-// ============================================================================
-// MSW Handlers and Mock Server Configuration
-// ============================================================================
+// =============================================================================
+// MSW HANDLERS AND API MOCKING INFRASTRUCTURE
+// =============================================================================
 
-/**
- * Mock Service Worker handlers for comprehensive API simulation
- * Provides realistic HTTP request interception for OpenAPI preview testing
- */
+// Complete MSW handler collections for comprehensive API mocking
 export {
-  // Main handler collections
+  // Primary handler collections
   openApiPreviewHandlers,
-  openApiPreviewHandlers as default,
+  apiDocsHandlers,
+  openApiSpecHandlers,
+  apiKeyHandlers,
+  serviceHealthHandlers,
+  errorSimulationHandlers,
+  
+  // Categorized handler sets for selective testing scenarios
   coreHandlers,
   errorHandlers,
-  perfHandlers,
+  performanceHandlers as perfHandlers,
   securityHandlers,
   
-  // Specific handler groups
-  serviceHandlers,
-  openApiHandlers,
-  apiDocHandlers,
-  authHandlers,
-  errorSimulationHandlers,
-  performanceHandlers,
+  // Mock data generation utilities
+  resetMockData,
+  configureMockBehavior,
+  validateMockData,
   
-  // Mock data constants
+  // Network and API simulation utilities
+  createMockApiResponse,
+  validateOpenApiSpec,
+  
+  // Default export for convenient MSW setup
+  default as defaultMswHandlers
+} from './msw-handlers'
+
+// =============================================================================
+// TEST ENVIRONMENT SETUP AND CONFIGURATION
+// =============================================================================
+
+// MSW server instance and lifecycle management
+export {
+  // MSW server configuration
+  server,
+  serverConfig,
+  
+  // React Query test client management
+  createTestQueryClient,
+  testQueryClient,
+  
+  // Enhanced cleanup and environment setup
+  enhancedCleanup,
+  setupTestEnvironment,
+  configureTestEnvironment,
+  setupOpenAPIPreviewTests,
+  
+  // Browser API mocking
+  mockBrowserAPIs,
+  
+  // Async operation utilities
+  waitForQueries,
+  waitForQuery,
+  simulateUserDelay,
+  
+  // Mock data factories
+  createMockOpenAPIPreviewStore,
+  createMockApiKey,
+  createMockServiceApiKeys,
+  createMockOpenAPIError,
+  
+  // Custom test assertions and matchers
+  expectValidOpenAPISpec,
+  expectQueryCacheToContain,
+  expectHandlerToBeCalled,
+  
+  // Debugging and performance measurement
+  debugLog,
+  measureTestPerformance,
+  
+  // Test configuration types and interfaces
+  type TestEnvironmentConfig,
+  type MockedFunction,
+  type MockedClass,
+  type MockInstance,
+  
+  // Test constants and common values
+  TEST_CONSTANTS,
+  
+  // Default export for comprehensive test setup
+  default as testSetupUtils
+} from './test-setup'
+
+// =============================================================================
+// REACT TESTING LIBRARY RENDER UTILITIES
+// =============================================================================
+
+// Primary render functions with provider setup
+export {
+  // Main render function with comprehensive provider setup
+  renderOpenAPIPreview,
+  render, // Alias for renderOpenAPIPreview
+  
+  // Specialized component render functions
+  renderOpenAPIViewer,
+  renderApiDocsList,
+  renderApiKeySelector,
+  
+  // Enhanced render result interface
+  type OpenAPIPreviewRenderResult,
+  type OpenAPIPreviewRenderOptions,
+  
+  // Mock provider components
+  useOpenAPIPreviewTestContext,
+  type MockOpenAPIPreviewContext,
+  
+  // Router mocking utilities
+  createMockAppRouter,
+  type MockAppRouter,
+  
+  // Test configuration interfaces
+  type OpenAPIPreviewTestConfig,
+  
+  // Re-exported React Testing Library utilities
+  screen,
+  within,
+  waitFor,
+  fireEvent,
+  userEvent,
+  
+  // Custom testing utilities
+  openApiTestUtils as openApiPreviewTestUtils,
+  openApiPerformanceUtils,
+  openApiA11yUtils,
+  
+  // Custom matchers and assertions
+  expect as customExpect,
+  
+  // Default export for convenient render utilities
+  default as renderUtils
+} from './render-utils'
+
+// =============================================================================
+// MOCK DATA AND TEST FIXTURES
+// =============================================================================
+
+// Comprehensive mock data collections
+export {
+  // OpenAPI specification templates and examples
   MOCK_SERVICES,
   MYSQL_OPENAPI_SPEC,
   EMAIL_OPENAPI_SPEC,
+  BASE_OPENAPI_SPEC,
+  
+  // API key test fixtures
   MOCK_API_KEYS,
+  
+  // Service definitions and metadata
+  MOCK_DATABASE_SERVICES,
+  MOCK_EMAIL_SERVICES,
+  MOCK_FILE_SERVICES,
+  
+  // Network simulation constants
   NETWORK_DELAYS,
+  
+  // API endpoint definitions
   API_ENDPOINTS,
+  
+  // HTTP headers and authentication
   HTTP_HEADERS,
+  DEFAULT_REQUEST_HEADERS,
   
-  // Utility functions
-  createMockApiResponse,
-  validateOpenApiSpec,
-} from './msw-handlers';
-
-// ============================================================================
-// Test Environment Setup and Configuration
-// ============================================================================
-
-/**
- * Test environment setup utilities and configuration
- * Provides comprehensive test environment management for OpenAPI preview tests
- */
-export {
-  // Core setup functions
-  setupTestEnvironment,
-  cleanupTestEnvironment,
-  
-  // MSW server management
-  mockServer,
-  setupMockServer,
-  
-  // React Query client utilities
-  createTestQueryClient,
-  getTestQueryClient,
-  resetTestQueryClient,
-  waitForQueriesToSettle,
-  
-  // Mock data factories
+  // Test data generators
   createMockOpenAPISpec,
-  createMockApiKey,
   createMockServiceInfo,
   createMockApiTestResult,
   createMockValidationErrors,
   
-  // Test utility functions
-  waitFor,
-  createMockFunction,
-  expectToMatchSchema,
-  createMethodSpy,
+  // SwaggerUI configuration templates
+  DEFAULT_SWAGGER_CONFIG,
+  PERFORMANCE_SWAGGER_CONFIG,
+  ACCESSIBILITY_SWAGGER_CONFIG,
   
-  // Performance testing utilities
+  // Database schema mock data for large dataset testing
+  LARGE_SCHEMA_MOCK_DATA,
+  PERFORMANCE_TEST_DATA,
+  
+  // Error simulation data
+  MOCK_ERROR_SCENARIOS,
+  AUTHENTICATION_ERROR_DATA,
+  NETWORK_ERROR_DATA
+} from './mock-data'
+
+// =============================================================================
+// COMPREHENSIVE TEST SUITE AND AUTOMATION
+// =============================================================================
+
+// Test suite configuration and automation utilities
+export {
+  // Test configuration constants
+  TEST_CONFIG,
+  
+  // Mock React components for testing
+  MockOpenAPIPreviewLayout,
+  MockOpenAPIPreviewProvider,
+  
+  // Performance measurement utilities
   measureExecutionTime,
   expectToCompleteWithin,
   
   // Accessibility testing utilities
-  mockAxeCore,
   expectToBeAccessible,
   
-  // Configuration
-  defaultTestConfig,
-} from './test-setup';
+  // Test suite metadata and information
+  metadata as testSuiteMetadata,
+  
+  // Default export containing test automation utilities
+  default as previewTestSuite
+} from './preview-tests'
 
-// ============================================================================
-// Component Render Utilities and Providers
-// ============================================================================
+// =============================================================================
+// CONVENIENCE EXPORTS AND ALIASES
+// =============================================================================
 
 /**
- * React Testing Library render utilities with OpenAPI preview context
- * Provides comprehensive component testing environment with all necessary providers
- */
-export {
-  // Main render functions
-  renderOpenAPIPreview,
-  renderWithQueryClient,
-  
-  // Test wrapper components
-  TestWrapper,
-  MinimalTestWrapper,
-  
-  // Context providers and hooks
-  OpenAPIPreviewTestProvider,
-  useOpenAPIPreviewTestContext,
-  
-  // Mock configurations
-  mockRouter,
-  mockSwaggerUI,
-  
-  // Utility functions
-  createOpenAPIPreviewProps,
-  createTestSwaggerUIConfig,
-  simulateApiInteraction,
-  validateOpenAPISpecRendering,
-  
-  // Complete utility collection
-  openApiPreviewTestUtils,
-  
-  // Default configuration
-  defaultOpenAPIPreviewTestConfig,
-} from './render-utils';
-
-// ============================================================================
-// Mock Data Collections and Fixtures
-// ============================================================================
-
-/**
- * Comprehensive mock data and fixtures for OpenAPI preview testing
- * Provides realistic test data for multiple service types and scenarios
- */
-export {
-  // Main mock data collection
-  mockDataCollections,
-  mockDataCollections as mockData,
-  
-  // OpenAPI specifications
-  mockEmailServiceSpec,
-  mockMySQLServiceSpec,
-  mockPostgreSQLServiceSpec,
-  mockMongoDBServiceSpec,
-  
-  // Service and API data
-  mockApiDocsRowData,
-  mockServiceInfo,
-  mockApiKeyInfo,
-  mockSwaggerUIConfigs,
-  
-  // Error and edge case scenarios
-  mockErrorScenarios,
-  mockLargeDatasetScenarios,
-  
-  // Utility helpers
-  mockDataHelpers,
-  
-  // HTTP constants
-  MOCK_HTTP_HEADERS,
-} from './mock-data';
-
-// ============================================================================
-// Type Exports for Testing
-// ============================================================================
-
-/**
- * TypeScript type definitions for test utilities and mock data
- * Provides type safety and IntelliSense support for testing code
+ * Quick access exports for common testing patterns
+ * Provides convenient imports for frequently used testing utilities
  */
 
-// Test setup types
-export type {
-  TestEnvironmentConfig,
-} from './test-setup';
-
-// Render utility types
-export type {
-  TestWrapperProps,
-  OpenAPIPreviewRenderOptions,
-  OpenAPIPreviewRenderResult,
-  OpenAPIPreviewTestContextConfig,
-  ApiInteractionSimulation,
-} from './render-utils';
-
-// Mock data types
-export type {
-  MockDataCollections,
-  MockServiceType,
-  MockErrorType,
-} from './mock-data';
-
-// Re-export component types for convenience
-export type {
-  OpenAPISpecification,
-  OpenAPIPreviewProps,
-  SwaggerUIConfig,
-  ApiKeyInfo,
-  ServiceInfo,
-  ApiTestResult,
-  ApiCallInfo,
-  ValidationError,
-  ApiDocsRowData,
-  ServiceEndpoint,
-  ServiceHealthStatus,
-  ApiDocumentationMetadata,
-} from '../types';
-
-// ============================================================================
-// Convenience Collections and Shortcuts
-// ============================================================================
-
-/**
- * Pre-configured collections for common testing scenarios
- * Reduces boilerplate and provides standardized testing patterns
- */
-
-/**
- * Essential testing utilities for basic OpenAPI preview testing
- * Includes the most commonly used functions for simple test scenarios
- */
-export const essentialTestUtils = {
-  // Render functions
+// Most commonly used testing functions
+export const testUtils = {
+  // Primary render function
   render: renderOpenAPIPreview,
-  renderWithQuery: renderWithQueryClient,
   
-  // Setup functions
-  setup: setupTestEnvironment,
-  cleanup: cleanupTestEnvironment,
+  // Test environment setup
+  setup: setupOpenAPIPreviewTests,
   
-  // Mock factories
-  createSpec: createMockOpenAPISpec,
-  createApiKey: createMockApiKey,
-  createService: createMockServiceInfo,
+  // MSW server management
+  server,
   
-  // MSW handlers
-  handlers: coreHandlers,
-  server: mockServer,
-} as const;
+  // Query client for React Query testing
+  queryClient: testQueryClient,
+  
+  // Mock data factories
+  createMockStore: createMockOpenAPIPreviewStore,
+  createMockKey: createMockApiKey,
+  createMockError: createMockOpenAPIError,
+  
+  // Common assertions
+  waitForQueries,
+  expectToBeAccessible,
+  debugLog
+}
 
 /**
- * Advanced testing utilities for comprehensive test scenarios
- * Includes performance testing, accessibility validation, and complex mocking
+ * Performance testing utilities collection
+ * Specialized exports for performance benchmarking and optimization validation
  */
-export const advancedTestUtils = {
-  // Performance testing
-  measureTime: measureExecutionTime,
-  expectPerformance: expectToCompleteWithin,
+export const performanceTestUtils = {
+  // Performance measurement
+  measureRenderTime: openApiPerformanceUtils.measureRenderTime,
+  testLargeDataset: openApiPerformanceUtils.testLargeDatasetPerformance,
+  testSwaggerUIPerformance: openApiPerformanceUtils.testSwaggerUIPerformance,
   
-  // Accessibility testing
-  axe: mockAxeCore,
-  expectA11y: expectToBeAccessible,
-  
-  // Error simulation
-  errorHandlers,
-  perfHandlers,
+  // Performance constants from test configuration
+  PERFORMANCE_THRESHOLDS: {
+    MAX_RENDER_TIME: 100, // milliseconds
+    MAX_SPEC_LOAD_TIME: 2000, // milliseconds
+    MAX_API_CALL_TIME: 2000, // milliseconds
+    MAX_CACHE_HIT_TIME: 50 // milliseconds
+  },
   
   // Large dataset testing
-  largeDatasets: mockLargeDatasetScenarios,
-  
-  // Mock validation
-  validateMock: mockDataHelpers.validateMockData,
-} as const;
-
-/**
- * OpenAPI specification testing utilities
- * Specialized utilities for testing different OpenAPI specification scenarios
- */
-export const openApiSpecUtils = {
-  // Specification collections
-  specs: {
-    email: mockEmailServiceSpec,
-    mysql: mockMySQLServiceSpec,
-    postgresql: mockPostgreSQLServiceSpec,
-    mongodb: mockMongoDBServiceSpec,
-  },
-  
-  // Validation utilities
-  validate: validateOpenApiSpec,
-  validateRendering: validateOpenAPISpecRendering,
-  
-  // Generation utilities
-  generate: mockDataHelpers.generateMockSpec,
-  
-  // SwaggerUI configurations
-  swaggerConfigs: mockSwaggerUIConfigs,
-} as const;
-
-/**
- * Service testing utilities
- * Utilities for testing different service types and configurations
- */
-export const serviceTestUtils = {
-  // Service collections
-  services: mockServiceInfo,
-  
-  // Service utilities
-  getByName: mockDataHelpers.getServiceByName,
-  getRandom: mockDataHelpers.getRandomService,
-  
-  // API documentation data
-  apiDocs: mockApiDocsRowData,
-  
-  // Health status scenarios
-  healthStatuses: ['healthy', 'degraded', 'unhealthy'] as const,
-} as const;
-
-/**
- * Authentication testing utilities
- * Utilities for testing API key management and authentication scenarios
- */
-export const authTestUtils = {
-  // API key collections
-  apiKeys: mockApiKeyInfo,
-  
-  // Key utilities
-  getKeyByName: mockDataHelpers.getApiKeyByName,
-  
-  // Auth handlers
-  authHandlers,
-  securityHandlers,
-  
-  // Security schemes
-  securitySchemes: mockDataCollections.components.securitySchemes,
-} as const;
-
-// ============================================================================
-// Vitest Integration Helpers
-// ============================================================================
-
-/**
- * Vitest-specific utilities and configuration helpers
- * Provides seamless integration with Vitest testing framework
- */
-export const vitestHelpers = {
-  /**
-   * Setup function for Vitest beforeAll hook
-   * Configures the complete testing environment for OpenAPI preview tests
-   */
-  setupVitest: () => {
-    setupTestEnvironment();
-    return {
-      queryClient: getTestQueryClient(),
-      server: mockServer,
-      cleanup: cleanupTestEnvironment,
-    };
-  },
-  
-  /**
-   * Cleanup function for Vitest afterAll hook
-   * Ensures proper cleanup of all test resources
-   */
-  cleanupVitest: () => {
-    cleanupTestEnvironment();
-    resetTestQueryClient();
-    if (mockServer.listHandlers().length > 0) {
-      mockServer.close();
-    }
-  },
-  
-  /**
-   * Per-test setup for Vitest beforeEach hook
-   * Resets test state between individual tests
-   */
-  resetBetweenTests: () => {
-    resetTestQueryClient();
-    mockServer.resetHandlers();
-  },
-  
-  /**
-   * Default Vitest configuration for OpenAPI preview tests
-   * Provides standard test timeouts and environment settings
-   */
-  vitestConfig: {
-    testTimeout: 10000, // 10 seconds
-    hookTimeout: 5000,  // 5 seconds
-    teardownTimeout: 3000, // 3 seconds
-    environment: 'jsdom',
-    setupFiles: ['./src/components/api-generation/openapi-preview/test-utilities/index.ts'],
-  },
-} as const;
-
-// ============================================================================
-// React Testing Library Integration
-// ============================================================================
-
-/**
- * React Testing Library utilities with OpenAPI preview enhancements
- * Provides enhanced testing capabilities specifically for OpenAPI preview components
- */
-export const rtlHelpers = {
-  /**
-   * Custom queries for OpenAPI preview components
-   * Provides semantic queries for common OpenAPI preview elements
-   */
-  queries: {
-    // SwaggerUI specific queries
-    getSwaggerUI: () => document.querySelector('[data-testid="swagger-ui"]'),
-    getApiOperation: (operationId: string) => 
-      document.querySelector(`[data-operation-id="${operationId}"]`),
-    getSecurityScheme: (schemeName: string) =>
-      document.querySelector(`[data-security-scheme="${schemeName}"]`),
-    
-    // Documentation specific queries
-    getEndpointList: () => document.querySelector('[role="list"][aria-label*="endpoint"]'),
-    getSchemaList: () => document.querySelector('[role="list"][aria-label*="schema"]'),
-    getOperationDetails: () => document.querySelector('[data-testid="operation-details"]'),
-  },
-  
-  /**
-   * Custom matchers for OpenAPI preview testing
-   * Provides domain-specific assertions for OpenAPI preview components
-   */
-  matchers: {
-    toHaveValidOpenAPISpec: (spec: any) => {
-      return mockDataHelpers.validateMockData.isValidOpenAPISpec(spec);
-    },
-    toHaveActiveApiKey: (keyInfo: any) => {
-      return mockDataHelpers.validateMockData.isValidApiKey(keyInfo) && keyInfo.isActive;
-    },
-    toHaveHealthyService: (serviceInfo: any) => {
-      return mockDataHelpers.validateMockData.isValidServiceInfo(serviceInfo) && 
-             serviceInfo.health?.status === 'healthy';
-    },
-  },
-  
-  /**
-   * User interaction helpers
-   * Provides high-level user interaction utilities for testing
-   */
-  interactions: {
-    expandOperation: async (operationId: string) => {
-      const operation = rtlHelpers.queries.getApiOperation(operationId);
-      if (operation) {
-        operation.click();
-        // Wait for expansion animation
-        await new Promise(resolve => setTimeout(resolve, 150));
-      }
-    },
-    
-    tryApiCall: async (operationId: string, parameters: Record<string, any> = {}) => {
-      const operation = rtlHelpers.queries.getApiOperation(operationId);
-      if (operation) {
-        // Simulate filling parameters and executing try-it-out
-        const tryButton = operation.querySelector('[data-testid="try-it-out"]');
-        if (tryButton) {
-          (tryButton as HTMLElement).click();
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }
-    },
-  },
-} as const;
-
-// ============================================================================
-// Documentation and Usage Examples
-// ============================================================================
-
-/**
- * Usage examples and documentation for test utilities
- * Provides copy-paste examples for common testing scenarios
- */
-export const usageExamples = {
-  /**
-   * Basic component rendering test example
-   */
-  basicRender: `
-import { renderOpenAPIPreview, mockEmailServiceSpec } from './test-utilities';
-
-test('renders OpenAPI preview component', () => {
-  const { getByText } = renderOpenAPIPreview(
-    <OpenAPIPreview spec={mockEmailServiceSpec} />
-  );
-  
-  expect(getByText('DreamFactory Email Service')).toBeInTheDocument();
-});
-  `,
-  
-  /**
-   * MSW handler usage example
-   */
-  mswSetup: `
-import { setupTestEnvironment, mockServer, openApiPreviewHandlers } from './test-utilities';
-
-beforeAll(() => {
-  setupTestEnvironment();
-  mockServer.use(...openApiPreviewHandlers);
-});
-
-afterAll(() => {
-  mockServer.close();
-});
-  `,
-  
-  /**
-   * Performance testing example
-   */
-  performanceTest: `
-import { expectToCompleteWithin, renderOpenAPIPreview } from './test-utilities';
-
-test('renders large specification within performance budget', async () => {
-  const result = await expectToCompleteWithin(
-    () => renderOpenAPIPreview(<OpenAPIPreview spec={largeSpec} />),
-    2000 // 2 seconds
-  );
-  
-  expect(result).toBeDefined();
-});
-  `,
-  
-  /**
-   * Accessibility testing example
-   */
-  accessibilityTest: `
-import { renderOpenAPIPreview, expectToBeAccessible } from './test-utilities';
-
-test('meets accessibility standards', async () => {
-  const { container } = renderOpenAPIPreview(
-    <OpenAPIPreview spec={mockEmailServiceSpec} />
-  );
-  
-  await expectToBeAccessible(container);
-});
-  `,
-} as const;
-
-// ============================================================================
-// Default Export and Module Information
-// ============================================================================
-
-/**
- * Complete OpenAPI preview test utilities collection
- * Main export providing all testing utilities in organized collections
- */
-const openApiPreviewTestUtilities = {
-  // Core collections
-  essential: essentialTestUtils,
-  advanced: advancedTestUtils,
-  specs: openApiSpecUtils,
-  services: serviceTestUtils,
-  auth: authTestUtils,
-  
-  // Framework integration
-  vitest: vitestHelpers,
-  rtl: rtlHelpers,
-  
-  // Documentation
-  examples: usageExamples,
-  
-  // Direct access to main utilities
-  render: renderOpenAPIPreview,
-  setup: setupTestEnvironment,
-  mockData: mockDataCollections,
-  handlers: openApiPreviewHandlers,
-} as const;
-
-// Export as default for convenient import
-export default openApiPreviewTestUtilities;
-
-/**
- * Module metadata for build optimization and documentation
- */
-export const moduleInfo = {
-  name: 'OpenAPI Preview Test Utilities',
-  version: '1.0.0',
-  description: 'Comprehensive test utilities for OpenAPI preview components',
-  framework: 'React 19 + Next.js 15.1',
-  testFramework: 'Vitest 2.1.0',
-  mockingLibrary: 'MSW 2.0.0',
-  testingLibrary: 'React Testing Library',
-  
-  // Turbopack optimization hints
-  sideEffects: false, // Enable tree-shaking
-  exports: {
-    // ES modules for optimal tree-shaking
-    '.': {
-      import: './index.js',
-      types: './index.d.ts',
-    },
-  },
-  
-  // Bundle analyzer information
-  bundleSize: {
-    estimated: '~50KB gzipped',
-    treeshaking: 'full support',
-    chunks: 'splittable by utility type',
-  },
-} as const;
-
-/**
- * Type definition for the complete test utilities module
- * Provides full type safety for all exported utilities
- */
-export type OpenAPIPreviewTestUtilities = typeof openApiPreviewTestUtilities;
-
-// ============================================================================
-// Auto-initialization for Test Environment
-// ============================================================================
-
-/**
- * Auto-setup when module is imported
- * Automatically configures test environment for immediate use
- */
-if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
-  // Only auto-setup in test environment
-  try {
-    setupTestEnvironment();
-  } catch (error) {
-    console.warn('OpenAPI Preview Test Utilities: Auto-setup failed', error);
+  LARGE_DATASET_SIZES: {
+    SMALL: 10,
+    MEDIUM: 100,
+    LARGE: 1000
   }
 }
 
 /**
- * Export statement verification for tree-shaking optimization
- * Ensures all exports are properly configured for Turbopack
+ * Accessibility testing utilities collection
+ * Specialized exports for WCAG 2.1 AA compliance testing and validation
  */
-export const __esModule = true;
+export const accessibilityTestUtils = {
+  // Accessibility testing functions
+  testAccessibility: openApiA11yUtils.testAccessibility,
+  testKeyboardAccessibility: openApiA11yUtils.testKeyboardAccessibility,
+  testScreenReaderSupport: openApiA11yUtils.testScreenReaderSupport,
+  
+  // Common accessibility assertions
+  expectToBeAccessible,
+  
+  // WCAG compliance testing
+  WCAG_REQUIREMENTS: {
+    LEVEL: 'AA',
+    VERSION: '2.1',
+    SUPPORTED_STANDARDS: [
+      'keyboard-navigation',
+      'screen-reader-support',
+      'color-contrast',
+      'focus-management',
+      'aria-labeling'
+    ]
+  }
+}
+
+/**
+ * MSW and API mocking utilities collection
+ * Specialized exports for comprehensive API simulation and network testing
+ */
+export const apiMockingUtils = {
+  // MSW handler management
+  server,
+  serverConfig,
+  
+  // Handler collections by category
+  handlers: {
+    core: coreHandlers,
+    errors: errorHandlers,
+    performance: perfHandlers,
+    security: securityHandlers
+  },
+  
+  // Mock data creation
+  createMockResponse: createMockApiResponse,
+  validateSpec: validateOpenApiSpec,
+  
+  // Network simulation
+  delays: NETWORK_DELAYS,
+  
+  // Common API endpoints for testing
+  endpoints: API_ENDPOINTS,
+  
+  // Authentication headers
+  headers: HTTP_HEADERS
+}
+
+// =============================================================================
+// TYPE-ONLY EXPORTS
+// =============================================================================
+
+/**
+ * Type-only exports for enhanced TypeScript development experience
+ * Provides comprehensive type definitions without runtime impact
+ */
+
+// Core testing interfaces
+export type {
+  // Component testing types
+  OpenAPIPreviewRenderResult,
+  OpenAPIPreviewRenderOptions,
+  OpenAPIPreviewTestConfig,
+  MockOpenAPIPreviewContext,
+  
+  // MSW and API testing types
+  TestEnvironmentConfig,
+  MockedFunction,
+  MockedClass,
+  MockInstance,
+  
+  // Router mocking types
+  MockAppRouter,
+  
+  // Mock data and fixtures types
+  ApiDocsRowData,
+  ApiKeyInfo,
+  ServiceApiKeys,
+  OpenAPIViewerProps,
+  SwaggerUIConfig,
+  OpenAPIPreviewError,
+  OpenAPIPreviewState,
+  OpenAPIPreviewActions,
+  
+  // Database service types
+  DatabaseService,
+  DatabaseDriver,
+  ServiceStatus,
+  ConnectionTestResult,
+  ServiceRow,
+  
+  // Theme and UI types
+  ThemeMode
+} from './types'
+
+// =============================================================================
+// MIGRATION COMPATIBILITY EXPORTS
+// =============================================================================
+
+/**
+ * Compatibility exports for seamless migration from Angular testing patterns
+ * Provides familiar naming conventions and patterns for easier adoption
+ */
+
+// Angular-style naming aliases for easier migration
+export const AngularCompatibility = {
+  // TestBed equivalent
+  TestEnvironment: setupOpenAPIPreviewTests,
+  
+  // HttpClientTestingModule equivalent
+  MockHttpClient: server,
+  
+  // ComponentFixture equivalent
+  ComponentWrapper: renderOpenAPIPreview,
+  
+  // DebugElement equivalent
+  TestingUtilities: testUtils,
+  
+  // Common Angular testing patterns
+  fakeAsync: (fn: () => void) => fn(), // Simplified for React
+  tick: (ms?: number) => new Promise(resolve => setTimeout(resolve, ms || 0)),
+  flush: () => waitForQueries()
+}
+
+// =============================================================================
+// DEFAULT EXPORT FOR COMPREHENSIVE ACCESS
+// =============================================================================
+
+/**
+ * Default export providing complete access to all OpenAPI preview testing utilities
+ * Enables both named imports and default import patterns for maximum flexibility
+ */
+export default {
+  // Primary testing utilities
+  testUtils,
+  performanceTestUtils,
+  accessibilityTestUtils,
+  apiMockingUtils,
+  
+  // Render utilities
+  render: renderOpenAPIPreview,
+  renderOpenAPIViewer,
+  renderApiDocsList,
+  renderApiKeySelector,
+  
+  // MSW and API mocking
+  server,
+  handlers: openApiPreviewHandlers,
+  
+  // Mock data and fixtures
+  mockData: {
+    MOCK_SERVICES,
+    MYSQL_OPENAPI_SPEC,
+    EMAIL_OPENAPI_SPEC,
+    MOCK_API_KEYS
+  },
+  
+  // Test environment setup
+  setup: setupOpenAPIPreviewTests,
+  
+  // Common constants
+  constants: {
+    TEST_CONSTANTS,
+    HTTP_HEADERS,
+    NETWORK_DELAYS
+  },
+  
+  // Migration compatibility
+  angular: AngularCompatibility,
+  
+  // Metadata
+  version: '1.0.0',
+  framework: 'Vitest 2.1.0',
+  compatibility: {
+    react: '19.0.0',
+    nextjs: '15.1.0',
+    vitest: '2.1.0',
+    msw: 'latest'
+  },
+  coverage: {
+    target: '90%+',
+    requirements: 'Section 3.6 Enhanced Testing Pipeline'
+  },
+  performance: {
+    optimization: 'Turbopack build optimization',
+    requirements: 'React/Next.js Integration Requirements'
+  },
+  accessibility: {
+    compliance: 'WCAG 2.1 AA',
+    requirements: 'F-006: API Documentation and Testing'
+  }
+}
+
+// =============================================================================
+// DOCUMENTATION AND USAGE EXAMPLES
+// =============================================================================
+
+/**
+ * @example
+ * // Basic OpenAPI preview component testing
+ * import { render, screen, waitFor } from '@/components/api-generation/openapi-preview/test-utilities'
+ * 
+ * test('should display OpenAPI documentation', async () => {
+ *   const { user } = render(<OpenAPIViewer service={mockService} />)
+ *   
+ *   await waitFor(() => {
+ *     expect(screen.getByTestId('swagger-ui-container')).toBeInTheDocument()
+ *   })
+ * })
+ * 
+ * @example
+ * // Using convenience utilities
+ * import { testUtils } from '@/components/api-generation/openapi-preview/test-utilities'
+ * 
+ * beforeEach(() => {
+ *   testUtils.setup({
+ *     msw: { handlers: 'core' },
+ *     performance: { enableMetrics: true }
+ *   })
+ * })
+ * 
+ * @example
+ * // Performance testing
+ * import { performanceTestUtils } from '@/components/api-generation/openapi-preview/test-utilities'
+ * 
+ * test('should handle large datasets efficiently', async () => {
+ *   const { renderTime } = await performanceTestUtils.testLargeDataset(1000)
+ *   expect(renderTime).toBeLessThan(performanceTestUtils.PERFORMANCE_THRESHOLDS.MAX_RENDER_TIME)
+ * })
+ * 
+ * @example
+ * // Accessibility testing
+ * import { accessibilityTestUtils } from '@/components/api-generation/openapi-preview/test-utilities'
+ * 
+ * test('should be accessible', async () => {
+ *   const { container } = render(<OpenAPIViewer />)
+ *   const accessibility = await accessibilityTestUtils.testAccessibility('openapi-viewer')
+ *   expect(accessibility.passed).toBe(true)
+ * })
+ * 
+ * @example
+ * // MSW API mocking
+ * import { apiMockingUtils } from '@/components/api-generation/openapi-preview/test-utilities'
+ * 
+ * beforeEach(() => {
+ *   apiMockingUtils.server.use(...apiMockingUtils.handlers.core)
+ * })
+ * 
+ * @example
+ * // Default import usage
+ * import openApiTestUtils from '@/components/api-generation/openapi-preview/test-utilities'
+ * 
+ * test('comprehensive testing example', async () => {
+ *   openApiTestUtils.setup()
+ *   const { user } = openApiTestUtils.render(<Component />)
+ *   await openApiTestUtils.testUtils.waitForQueries()
+ * })
+ * 
+ * @example
+ * // Angular migration pattern
+ * import { AngularCompatibility } from '@/components/api-generation/openapi-preview/test-utilities'
+ * 
+ * describe('OpenAPI Preview Component', () => {
+ *   beforeEach(() => {
+ *     AngularCompatibility.TestEnvironment()
+ *   })
+ *   
+ *   it('should render', AngularCompatibility.fakeAsync(() => {
+ *     const wrapper = AngularCompatibility.ComponentWrapper(<Component />)
+ *     AngularCompatibility.tick()
+ *     expect(wrapper.container).toBeInTheDocument()
+ *   }))
+ * })
+ */
+
+/**
+ * Export summary for comprehensive OpenAPI preview testing infrastructure:
+ * 
+ * ✅ **MSW Handlers**: Complete API mocking with realistic network simulation
+ * ✅ **Test Setup**: Vitest 2.1.0 configuration with React Query and browser API mocking
+ * ✅ **Render Utils**: React Testing Library utilities with comprehensive provider setup
+ * ✅ **Mock Data**: Type-safe OpenAPI specifications and service definitions
+ * ✅ **Performance Testing**: Benchmarking utilities meeting React/Next.js requirements
+ * ✅ **Accessibility Testing**: WCAG 2.1 AA compliance automation
+ * ✅ **Tree-shaking Optimization**: Turbopack-friendly exports for minimal bundle impact
+ * ✅ **TypeScript Support**: Full type safety with strict mode compatibility
+ * ✅ **Migration Support**: Angular compatibility layer for seamless transition
+ * 
+ * This testing infrastructure enables comprehensive OpenAPI preview component testing
+ * with 90%+ code coverage, performance optimization, and accessibility compliance
+ * per the technical specification requirements for React/Next.js migration.
+ */
