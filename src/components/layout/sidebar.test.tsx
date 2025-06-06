@@ -1,784 +1,799 @@
 /**
- * Test suite for sidebar navigation component covering navigation item rendering,
- * responsive behavior, permission-based filtering, and user interaction scenarios.
- * Validates accessibility compliance and proper state management integration.
+ * Test suite for Sidebar navigation component
  * 
- * Converts Angular component testing to React Testing Library patterns with:
- * - User event simulation replacing Angular TestBed interactions
- * - Next.js navigation mocking instead of Angular router testing
- * - Mocked authentication context providers for permission testing
- * - Responsive behavior testing for sidebar collapse/expand functionality
- * - Keyboard navigation testing for WCAG 2.1 AA accessibility compliance
+ * Covers navigation item rendering, responsive behavior, permission-based filtering,
+ * user interaction scenarios, and accessibility compliance validation.
+ * 
+ * Tests migration from Angular TestBed patterns to React Testing Library with:
+ * - User event simulation replacing Angular click testing
+ * - Next.js navigation mocking replacing Angular router testing
+ * - Authentication context mocking for permission scenarios
+ * - Responsive behavior testing for sidebar collapse/expand
+ * - Accessibility testing including ARIA attributes and keyboard navigation
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { axe, toHaveNoViolations } from 'jest-axe'
-import { useRouter, usePathname } from 'next/navigation'
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useRouter, usePathname } from 'next/navigation';
+import { Sidebar, defaultNavigationItems } from './sidebar';
+import { useAppStore } from '@/stores/app-store';
+import { useAuth } from '@/hooks/use-auth';
+import { useNavigation } from '@/hooks/use-navigation';
+import { axe, toHaveNoViolations } from 'jest-axe';
 
-import { Sidebar } from './sidebar'
-import { renderWithProviders } from '@/test/utils/test-utils'
-import { MockAuthProvider } from '@/test/utils/mock-providers'
-import { createMockUser, createMockPermissions } from '@/test/utils/component-factories'
-import { navigationHandlers } from '@/test/mocks/navigation-handlers'
-import { server } from '@/test/mocks/server'
-
-// Extend jest-dom matchers for accessibility testing
-expect.extend(toHaveNoViolations)
+// =============================================================================
+// MOCK SETUP AND CONFIGURATION
+// =============================================================================
 
 // Mock Next.js navigation hooks
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
   usePathname: vi.fn(),
-}))
+}));
 
-// Mock Zustand store for sidebar state management
-vi.mock('@/stores/app-store', () => ({
-  useAppStore: vi.fn(),
-}))
+// Mock custom hooks
+vi.mock('@/stores/app-store');
+vi.mock('@/hooks/use-auth');
+vi.mock('@/hooks/use-navigation');
 
-// Mock ResizeObserver for responsive behavior testing
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}))
+// Mock Headless UI components for testing
+vi.mock('@headlessui/react', () => ({
+  Disclosure: {
+    Button: ({ children, onClick, ...props }: any) => (
+      <button onClick={onClick} {...props}>
+        {children}
+      </button>
+    ),
+    Panel: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  },
+  Transition: ({ children, show, ...props }: any) => 
+    show ? <div {...props}>{children}</div> : null,
+}));
+
+// Extend Jest matchers for accessibility testing
+expect.extend(toHaveNoViolations);
+
+// =============================================================================
+// TYPE DEFINITIONS FOR MOCKS
+// =============================================================================
+
+interface MockUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  isRootAdmin: boolean;
+  permissions: string[];
+  roles: string[];
+}
+
+interface MockNavigationItem {
+  id: string;
+  path: string;
+  label: string;
+  icon?: any;
+  subRoutes?: MockNavigationItem[];
+  permissions?: string[];
+  disabled?: boolean;
+  isCommercialFeature?: boolean;
+}
+
+// =============================================================================
+// MOCK DATA FACTORY FUNCTIONS
+// =============================================================================
+
+const createMockUser = (overrides: Partial<MockUser> = {}): MockUser => ({
+  id: '1',
+  email: 'admin@test.com',
+  firstName: 'Admin',
+  lastName: 'User',
+  isRootAdmin: false,
+  permissions: ['read'],
+  roles: ['user'],
+  ...overrides,
+});
+
+const createMockNavigationItems = (): MockNavigationItem[] => [
+  {
+    id: 'dashboard',
+    path: '/',
+    label: 'Dashboard',
+    icon: () => <div data-testid="dashboard-icon" />,
+  },
+  {
+    id: 'api-connections',
+    path: '/api-connections',
+    label: 'API Connections',
+    icon: () => <div data-testid="connections-icon" />,
+    subRoutes: [
+      {
+        id: 'database-services',
+        path: '/api-connections/database',
+        label: 'Database Services',
+        icon: () => <div data-testid="database-icon" />,
+      },
+    ],
+  },
+  {
+    id: 'admin-settings',
+    path: '/admin-settings',
+    label: 'Admin Settings',
+    icon: () => <div data-testid="admin-icon" />,
+    permissions: ['admin'],
+  },
+  {
+    id: 'system-settings',
+    path: '/system-settings',
+    label: 'System Settings',
+    icon: () => <div data-testid="system-icon" />,
+    permissions: ['system_admin'],
+    subRoutes: [
+      {
+        id: 'system-info',
+        path: '/system-settings/system-info',
+        label: 'System Info',
+      },
+    ],
+  },
+  {
+    id: 'commercial-feature',
+    path: '/commercial',
+    label: 'Commercial Feature',
+    isCommercialFeature: true,
+  },
+  {
+    id: 'disabled-feature',
+    path: '/disabled',
+    label: 'Disabled Feature',
+    disabled: true,
+  },
+];
+
+// =============================================================================
+// MOCK IMPLEMENTATIONS
+// =============================================================================
+
+const mockRouter = {
+  push: vi.fn(),
+  replace: vi.fn(),
+  back: vi.fn(),
+  forward: vi.fn(),
+  refresh: vi.fn(),
+  prefetch: vi.fn(),
+};
+
+const createMockAppStore = (overrides: any = {}) => ({
+  sidebarCollapsed: false,
+  setSidebarCollapsed: vi.fn(),
+  theme: 'light',
+  setTheme: vi.fn(),
+  ...overrides,
+});
+
+const createMockAuth = (user: MockUser | null = null, isAuthenticated = false) => ({
+  user,
+  isAuthenticated,
+  isLoading: false,
+  error: null,
+  login: vi.fn(),
+  logout: vi.fn(),
+  refresh: vi.fn(),
+});
+
+const createMockNavigation = (items: MockNavigationItem[] = []) => ({
+  navigationItems: items,
+  activeItem: null,
+  setActiveItem: vi.fn(),
+});
+
+// =============================================================================
+// TEST UTILITIES AND HELPERS
+// =============================================================================
+
+const renderSidebar = (options: {
+  user?: MockUser | null;
+  isAuthenticated?: boolean;
+  sidebarCollapsed?: boolean;
+  pathname?: string;
+  navigationItems?: MockNavigationItem[];
+} = {}) => {
+  const {
+    user = null,
+    isAuthenticated = false,
+    sidebarCollapsed = false,
+    pathname = '/',
+    navigationItems = createMockNavigationItems(),
+  } = options;
+
+  // Setup mocks
+  (useRouter as Mock).mockReturnValue(mockRouter);
+  (usePathname as Mock).mockReturnValue(pathname);
+  (useAppStore as unknown as Mock).mockReturnValue(
+    createMockAppStore({ sidebarCollapsed })
+  );
+  (useAuth as Mock).mockReturnValue(createMockAuth(user, isAuthenticated));
+  (useNavigation as Mock).mockReturnValue(createMockNavigation(navigationItems));
+
+  const user_event = userEvent.setup();
+
+  return {
+    user: user_event,
+    ...render(<Sidebar />),
+  };
+};
+
+// Utility to simulate responsive breakpoints
+const mockViewport = (width: number) => {
+  Object.defineProperty(window, 'innerWidth', {
+    writable: true,
+    configurable: true,
+    value: width,
+  });
+  window.dispatchEvent(new Event('resize'));
+};
+
+// =============================================================================
+// TEST SUITE: AUTHENTICATION AND UNAUTHENTICATED STATE
+// =============================================================================
 
 describe('Sidebar Component', () => {
-  const mockRouter = {
-    push: vi.fn(),
-    replace: vi.fn(),
-    prefetch: vi.fn(),
-    back: vi.fn(),
-    forward: vi.fn(),
-    refresh: vi.fn(),
-  }
-
-  const mockAppStore = {
-    sidebarCollapsed: false,
-    setSidebarCollapsed: vi.fn(),
-    theme: 'light' as const,
-    setTheme: vi.fn(),
-  }
-
-  // User permission scenarios for testing role-based menu filtering
-  const adminUser = createMockUser({
-    id: '1',
-    firstName: 'Admin',
-    lastName: 'User',
-    email: 'admin@dreamfactory.com',
-    isActive: true,
-    isSystemAdmin: true,
-    permissions: createMockPermissions({
-      canManageServices: true,
-      canManageUsers: true,
-      canManageRoles: true,
-      canViewSchema: true,
-      canViewReports: true,
-      canManageSystem: true,
-    }),
-  })
-
-  const regularUser = createMockUser({
-    id: '2',
-    firstName: 'Regular',
-    lastName: 'User',
-    email: 'user@dreamfactory.com',
-    isActive: true,
-    isSystemAdmin: false,
-    permissions: createMockPermissions({
-      canManageServices: false,
-      canManageUsers: false,
-      canManageRoles: false,
-      canViewSchema: true,
-      canViewReports: false,
-      canManageSystem: false,
-    }),
-  })
-
-  const limitedUser = createMockUser({
-    id: '3',
-    firstName: 'Limited',
-    lastName: 'User',
-    email: 'limited@dreamfactory.com',
-    isActive: true,
-    isSystemAdmin: false,
-    permissions: createMockPermissions({
-      canManageServices: false,
-      canManageUsers: false,
-      canManageRoles: false,
-      canViewSchema: false,
-      canViewReports: false,
-      canManageSystem: false,
-    }),
-  })
-
   beforeEach(() => {
-    vi.clearAllMocks()
-    
-    // Reset Next.js router mocks
-    vi.mocked(useRouter).mockReturnValue(mockRouter)
-    vi.mocked(usePathname).mockReturnValue('/dashboard')
-    
-    // Reset Zustand store mock
-    const { useAppStore } = require('@/stores/app-store')
-    vi.mocked(useAppStore).mockReturnValue(mockAppStore)
-
-    // Setup MSW handlers for navigation data
-    server.use(...navigationHandlers)
-  })
+    vi.clearAllMocks();
+    // Reset window dimensions
+    mockViewport(1024);
+  });
 
   afterEach(() => {
-    server.resetHandlers()
-  })
+    vi.restoreAllMocks();
+  });
 
-  describe('Basic Rendering', () => {
-    it('renders the sidebar with correct structure and ARIA attributes', async () => {
-      const { container } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+  describe('Unauthenticated State', () => {
+    it('should render promotional content when user is not authenticated', () => {
+      renderSidebar({ isAuthenticated: false });
 
-      // Verify sidebar has proper ARIA attributes for accessibility
-      const sidebar = screen.getByRole('navigation', { name: /main navigation/i })
-      expect(sidebar).toBeInTheDocument()
-      expect(sidebar).toHaveAttribute('aria-label', 'Main navigation')
+      expect(screen.getByText('Self Hosted')).toBeInTheDocument();
+      expect(screen.getByText('Database & Network')).toBeInTheDocument();
+      expect(screen.getByText('API Generation')).toBeInTheDocument();
+      expect(screen.getByText('API Security')).toBeInTheDocument();
+      expect(screen.getByText('API Scripting')).toBeInTheDocument();
+    });
 
-      // Verify navigation list structure
-      const navList = within(sidebar).getByRole('list')
-      expect(navList).toBeInTheDocument()
-      expect(navList).toHaveAttribute('role', 'list')
+    it('should display promotional images with correct alt text', () => {
+      renderSidebar({ isAuthenticated: false });
 
-      // Test for accessibility violations
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
+      expect(screen.getByAltText('Self Hosted')).toBeInTheDocument();
+      expect(screen.getByAltText('API Generation')).toBeInTheDocument();
+      expect(screen.getByAltText('API Security')).toBeInTheDocument();
+      expect(screen.getByAltText('API Scripting')).toBeInTheDocument();
+    });
 
-    it('displays navigation items based on user permissions', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should not render navigation menu when unauthenticated', () => {
+      renderSidebar({ isAuthenticated: false });
 
-      // Admin should see all navigation items
-      await waitFor(() => {
-        expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: /services/i })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: /schema/i })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: /users/i })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: /roles/i })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: /system settings/i })).toBeInTheDocument()
-      })
-    })
+      expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+      expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
+    });
+  });
 
-    it('filters navigation items for regular users', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={regularUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+  // =============================================================================
+  // TEST SUITE: AUTHENTICATED STATE AND NAVIGATION RENDERING
+  // =============================================================================
 
-      await waitFor(() => {
-        // Regular user should see limited navigation
-        expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: /schema/i })).toBeInTheDocument()
-        
-        // Should not see admin-only sections
-        expect(screen.queryByRole('link', { name: /users/i })).not.toBeInTheDocument()
-        expect(screen.queryByRole('link', { name: /roles/i })).not.toBeInTheDocument()
-        expect(screen.queryByRole('link', { name: /system settings/i })).not.toBeInTheDocument()
-      })
-    })
+  describe('Authenticated State', () => {
+    it('should render navigation menu when user is authenticated', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true });
 
-    it('shows minimal navigation for limited users', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={limitedUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+      expect(screen.getByRole('navigation', { name: 'Primary navigation' })).toBeInTheDocument();
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('API Connections')).toBeInTheDocument();
+    });
 
-      await waitFor(() => {
-        // Limited user should only see dashboard
-        expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
-        
-        // Should not see any restricted sections
-        expect(screen.queryByRole('link', { name: /schema/i })).not.toBeInTheDocument()
-        expect(screen.queryByRole('link', { name: /services/i })).not.toBeInTheDocument()
-        expect(screen.queryByRole('link', { name: /users/i })).not.toBeInTheDocument()
-      })
-    })
-  })
+    it('should display DreamFactory logo and brand name', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true });
 
-  describe('Active Route Highlighting', () => {
-    it('highlights the active navigation item based on current pathname', async () => {
-      vi.mocked(usePathname).mockReturnValue('/api-connections/database')
-      
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+      expect(screen.getByAltText('DreamFactory Logo')).toBeInTheDocument();
+      expect(screen.getByText('DreamFactory')).toBeInTheDocument();
+      expect(screen.getByLabelText('DreamFactory Admin Console')).toBeInTheDocument();
+    });
 
-      await waitFor(() => {
-        const servicesLink = screen.getByRole('link', { name: /services/i })
-        expect(servicesLink).toHaveAttribute('aria-current', 'page')
-        expect(servicesLink).toHaveClass('bg-primary-100', 'text-primary-700')
-      })
-    })
+    it('should render collapse toggle button for desktop', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true });
 
-    it('updates active state when pathname changes', async () => {
-      const { rerender } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+      expect(screen.getByLabelText('Collapse sidebar')).toBeInTheDocument();
+    });
+  });
 
-      // Initially on dashboard
-      vi.mocked(usePathname).mockReturnValue('/dashboard')
-      rerender(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+  // =============================================================================
+  // TEST SUITE: PERMISSION-BASED MENU FILTERING
+  // =============================================================================
 
-      await waitFor(() => {
-        const dashboardLink = screen.getByRole('link', { name: /dashboard/i })
-        expect(dashboardLink).toHaveAttribute('aria-current', 'page')
-      })
+  describe('Permission-based Menu Filtering', () => {
+    it('should show all menu items for root admin', () => {
+      const user = createMockUser({ isRootAdmin: true });
+      renderSidebar({ user, isAuthenticated: true });
 
-      // Navigate to schema
-      vi.mocked(usePathname).mockReturnValue('/schema')
-      rerender(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('API Connections')).toBeInTheDocument();
+      expect(screen.getByText('Admin Settings')).toBeInTheDocument();
+      expect(screen.getByText('System Settings')).toBeInTheDocument();
+    });
 
-      await waitFor(() => {
-        const schemaLink = screen.getByRole('link', { name: /schema/i })
-        expect(schemaLink).toHaveAttribute('aria-current', 'page')
-        
-        const dashboardLink = screen.getByRole('link', { name: /dashboard/i })
-        expect(dashboardLink).not.toHaveAttribute('aria-current', 'page')
-      })
-    })
-  })
+    it('should filter menu items based on user permissions', () => {
+      const user = createMockUser({ 
+        permissions: ['read', 'admin'], 
+        isRootAdmin: false 
+      });
+      renderSidebar({ user, isAuthenticated: true });
+
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('API Connections')).toBeInTheDocument();
+      expect(screen.getByText('Admin Settings')).toBeInTheDocument();
+      expect(screen.queryByText('System Settings')).not.toBeInTheDocument();
+    });
+
+    it('should hide restricted menu items for limited permissions', () => {
+      const user = createMockUser({ 
+        permissions: ['read'], 
+        isRootAdmin: false 
+      });
+      renderSidebar({ user, isAuthenticated: true });
+
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('API Connections')).toBeInTheDocument();
+      expect(screen.queryByText('Admin Settings')).not.toBeInTheDocument();
+      expect(screen.queryByText('System Settings')).not.toBeInTheDocument();
+    });
+
+    it('should show items without permission requirements to all users', () => {
+      const user = createMockUser({ permissions: [], isRootAdmin: false });
+      renderSidebar({ user, isAuthenticated: true });
+
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('API Connections')).toBeInTheDocument();
+    });
+  });
+
+  // =============================================================================
+  // TEST SUITE: RESPONSIVE BEHAVIOR AND SIDEBAR COLLAPSE
+  // =============================================================================
 
   describe('Responsive Behavior', () => {
-    it('toggles sidebar collapse state when collapse button is clicked', async () => {
-      const user = userEvent.setup()
-      
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should render mobile close button on small screens', () => {
+      mockViewport(768);
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true });
 
-      const collapseButton = screen.getByRole('button', { name: /collapse sidebar/i })
-      expect(collapseButton).toBeInTheDocument()
+      expect(screen.getByLabelText('Close sidebar')).toBeInTheDocument();
+    });
 
-      await user.click(collapseButton)
-      
-      expect(mockAppStore.setSidebarCollapsed).toHaveBeenCalledWith(true)
-    })
+    it('should hide mobile close button on large screens', () => {
+      mockViewport(1200);
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true });
 
-    it('renders collapsed sidebar with icon-only navigation', async () => {
-      // Mock collapsed state
-      vi.mocked(require('@/stores/app-store').useAppStore).mockReturnValue({
-        ...mockAppStore,
-        sidebarCollapsed: true,
-      })
+      expect(screen.queryByLabelText('Close sidebar')).not.toBeInTheDocument();
+    });
 
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should call setSidebarCollapsed when mobile close button is clicked', async () => {
+      const mockSetSidebarCollapsed = vi.fn();
+      (useAppStore as unknown as Mock).mockReturnValue(
+        createMockAppStore({ setSidebarCollapsed: mockSetSidebarCollapsed })
+      );
 
-      const sidebar = screen.getByRole('navigation')
-      expect(sidebar).toHaveClass('w-16') // Collapsed width
+      mockViewport(768);
+      const user = createMockUser();
+      const { user: userEvent } = renderSidebar({ user, isAuthenticated: true });
 
-      // Navigation items should show only icons with tooltips
-      const dashboardItem = screen.getByRole('link', { name: /dashboard/i })
-      expect(dashboardItem).toHaveAttribute('title', 'Dashboard')
-      
-      // Text should be hidden in collapsed state
-      const navTexts = screen.queryAllByText(/dashboard/i)
-      navTexts.forEach(text => {
-        expect(text).toHaveClass('sr-only')
-      })
-    })
+      const closeButton = screen.getByLabelText('Close sidebar');
+      await userEvent.click(closeButton);
 
-    it('handles responsive breakpoints correctly', async () => {
-      // Mock mobile viewport
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 640, // Mobile breakpoint
-      })
+      expect(mockSetSidebarCollapsed).toHaveBeenCalledWith(true);
+    });
 
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should render overlay for mobile when sidebar is expanded', () => {
+      mockViewport(768);
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true, sidebarCollapsed: false });
 
-      const sidebar = screen.getByRole('navigation')
-      
-      // On mobile, sidebar should be hidden by default
-      expect(sidebar).toHaveClass('md:translate-x-0')
-      
-      // Should have mobile overlay
-      const overlay = screen.getByRole('button', { name: /close sidebar/i })
-      expect(overlay).toBeInTheDocument()
-    })
+      const overlay = document.querySelector('.fixed.inset-0.z-40.bg-black.bg-opacity-50');
+      expect(overlay).toBeInTheDocument();
+    });
 
-    it('expands collapsed sidebar on hover when collapsed', async () => {
-      const user = userEvent.setup()
-      
-      vi.mocked(require('@/stores/app-store').useAppStore).mockReturnValue({
-        ...mockAppStore,
-        sidebarCollapsed: true,
-      })
+    it('should not render overlay for desktop', () => {
+      mockViewport(1200);
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true, sidebarCollapsed: false });
 
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+      const overlay = document.querySelector('.fixed.inset-0.z-40.bg-black.bg-opacity-50');
+      expect(overlay).not.toBeInTheDocument();
+    });
+  });
 
-      const sidebar = screen.getByRole('navigation')
-      
-      await user.hover(sidebar)
-      
-      // Should temporarily expand on hover
-      await waitFor(() => {
-        expect(sidebar).toHaveClass('group-hover:w-64')
-      })
+  describe('Sidebar Collapse Functionality', () => {
+    it('should toggle sidebar collapse when desktop toggle is clicked', async () => {
+      const mockSetSidebarCollapsed = vi.fn();
+      (useAppStore as unknown as Mock).mockReturnValue(
+        createMockAppStore({ 
+          sidebarCollapsed: false, 
+          setSidebarCollapsed: mockSetSidebarCollapsed 
+        })
+      );
 
-      await user.unhover(sidebar)
-      
-      // Should collapse again after hover ends
-      await waitFor(() => {
-        expect(sidebar).toHaveClass('w-16')
-      })
-    })
-  })
+      const user = createMockUser();
+      const { user: userEvent } = renderSidebar({ user, isAuthenticated: true });
+
+      const toggleButton = screen.getByLabelText('Collapse sidebar');
+      await userEvent.click(toggleButton);
+
+      expect(mockSetSidebarCollapsed).toHaveBeenCalledWith(true);
+    });
+
+    it('should display expand button when sidebar is collapsed', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true, sidebarCollapsed: true });
+
+      expect(screen.getByLabelText('Expand sidebar')).toBeInTheDocument();
+    });
+
+    it('should hide brand name when sidebar is collapsed', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true, sidebarCollapsed: true });
+
+      expect(screen.queryByText('DreamFactory')).not.toBeInTheDocument();
+    });
+  });
+
+  // =============================================================================
+  // TEST SUITE: NAVIGATION AND ROUTE HIGHLIGHTING
+  // =============================================================================
+
+  describe('Navigation and Route Highlighting', () => {
+    it('should highlight active navigation item', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true, pathname: '/api-connections' });
+
+      const activeLink = screen.getByText('API Connections').closest('a');
+      expect(activeLink).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('should highlight parent item when child route is active', () => {
+      const user = createMockUser();
+      renderSidebar({ 
+        user, 
+        isAuthenticated: true, 
+        pathname: '/api-connections/database' 
+      });
+
+      const parentButton = screen.getByText('API Connections').closest('button');
+      expect(parentButton).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('should auto-expand parent items with active children', () => {
+      const user = createMockUser();
+      renderSidebar({ 
+        user, 
+        isAuthenticated: true, 
+        pathname: '/api-connections/database' 
+      });
+
+      expect(screen.getByText('Database Services')).toBeInTheDocument();
+    });
+  });
+
+  // =============================================================================
+  // TEST SUITE: USER INTERACTION AND EVENT HANDLING
+  // =============================================================================
 
   describe('User Interactions', () => {
-    it('navigates to correct route when navigation item is clicked', async () => {
-      const user = userEvent.setup()
-      
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should expand collapsed navigation items when clicked', async () => {
+      const user = createMockUser();
+      const { user: userEvent } = renderSidebar({ 
+        user, 
+        isAuthenticated: true, 
+        pathname: '/' 
+      });
 
-      const servicesLink = screen.getByRole('link', { name: /services/i })
-      await user.click(servicesLink)
+      const expandButton = screen.getByText('API Connections').closest('button');
+      expect(expandButton).toHaveAttribute('aria-expanded', 'false');
 
-      expect(mockRouter.push).toHaveBeenCalledWith('/api-connections/database')
-    })
+      await userEvent.click(expandButton!);
+      expect(screen.getByText('Database Services')).toBeInTheDocument();
+    });
 
-    it('expands nested navigation sections on click', async () => {
-      const user = userEvent.setup()
-      
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should collapse expanded navigation items when clicked again', async () => {
+      const user = createMockUser();
+      const { user: userEvent } = renderSidebar({ 
+        user, 
+        isAuthenticated: true, 
+        pathname: '/api-connections/database' 
+      });
 
-      // Find expandable section (e.g., System Settings)
-      const systemSettingsButton = screen.getByRole('button', { name: /system settings/i })
-      expect(systemSettingsButton).toHaveAttribute('aria-expanded', 'false')
+      // Initially expanded due to active child
+      expect(screen.getByText('Database Services')).toBeInTheDocument();
 
-      await user.click(systemSettingsButton)
+      const collapseButton = screen.getByText('API Connections').closest('button');
+      await userEvent.click(collapseButton!);
 
-      expect(systemSettingsButton).toHaveAttribute('aria-expanded', 'true')
-      
-      // Sub-items should be visible
+      // Should be collapsed now
       await waitFor(() => {
-        expect(screen.getByRole('link', { name: /cache/i })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: /cors/i })).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: /email templates/i })).toBeInTheDocument()
-      })
-    })
+        expect(screen.queryByText('Database Services')).not.toBeInTheDocument();
+      });
+    });
 
-    it('focuses navigation items properly for keyboard users', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should handle navigation link clicks', async () => {
+      const user = createMockUser();
+      const { user: userEvent } = renderSidebar({ user, isAuthenticated: true });
 
-      const firstLink = screen.getByRole('link', { name: /dashboard/i })
-      firstLink.focus()
-      
-      expect(firstLink).toHaveFocus()
-      expect(firstLink).toHaveClass('focus:ring-2', 'focus:ring-primary-500')
-    })
-  })
+      const dashboardLink = screen.getByText('Dashboard').closest('a');
+      expect(dashboardLink).toHaveAttribute('href', '/');
+
+      // Link should be navigable
+      await userEvent.click(dashboardLink!);
+      // Note: Next.js Link component handles navigation internally
+    });
+
+    it('should not allow interaction with disabled items', async () => {
+      const navigationItems = createMockNavigationItems();
+      const user = createMockUser();
+      const { user: userEvent } = renderSidebar({ 
+        user, 
+        isAuthenticated: true, 
+        navigationItems 
+      });
+
+      const disabledLink = screen.getByText('Disabled Feature').closest('a');
+      expect(disabledLink).toHaveClass('pointer-events-none');
+    });
+  });
+
+  // =============================================================================
+  // TEST SUITE: KEYBOARD NAVIGATION AND ACCESSIBILITY
+  // =============================================================================
 
   describe('Keyboard Navigation', () => {
-    it('supports keyboard navigation through navigation items', async () => {
-      const user = userEvent.setup()
-      
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should support keyboard navigation through menu items', async () => {
+      const user = createMockUser();
+      const { user: userEvent } = renderSidebar({ user, isAuthenticated: true });
 
-      const sidebar = screen.getByRole('navigation')
-      sidebar.focus()
+      const firstLink = screen.getByText('Dashboard').closest('a');
+      firstLink?.focus();
 
-      // Tab through navigation items
-      await user.tab()
-      expect(screen.getByRole('link', { name: /dashboard/i })).toHaveFocus()
+      await userEvent.keyboard('{Tab}');
+      expect(document.activeElement).toBe(
+        screen.getByText('API Connections').closest('button')
+      );
+    });
 
-      await user.tab()
-      expect(screen.getByRole('link', { name: /services/i })).toHaveFocus()
+    it('should support Enter key to activate navigation items', async () => {
+      const user = createMockUser();
+      const { user: userEvent } = renderSidebar({ user, isAuthenticated: true });
 
-      await user.tab()
-      expect(screen.getByRole('link', { name: /schema/i })).toHaveFocus()
-    })
+      const expandButton = screen.getByText('API Connections').closest('button');
+      expandButton?.focus();
 
-    it('handles Enter key to activate navigation items', async () => {
-      const user = userEvent.setup()
-      
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+      await userEvent.keyboard('{Enter}');
+      expect(screen.getByText('Database Services')).toBeInTheDocument();
+    });
 
-      const servicesLink = screen.getByRole('link', { name: /services/i })
-      servicesLink.focus()
-      
-      await user.keyboard('{Enter}')
-      
-      expect(mockRouter.push).toHaveBeenCalledWith('/api-connections/database')
-    })
+    it('should support Space key to activate expandable items', async () => {
+      const user = createMockUser();
+      const { user: userEvent } = renderSidebar({ user, isAuthenticated: true });
 
-    it('handles Space key to expand/collapse sections', async () => {
-      const user = userEvent.setup()
-      
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+      const expandButton = screen.getByText('API Connections').closest('button');
+      expandButton?.focus();
 
-      const systemSettingsButton = screen.getByRole('button', { name: /system settings/i })
-      systemSettingsButton.focus()
-      
-      await user.keyboard(' ') // Space key
-      
-      expect(systemSettingsButton).toHaveAttribute('aria-expanded', 'true')
-    })
+      await userEvent.keyboard(' ');
+      expect(screen.getByText('Database Services')).toBeInTheDocument();
+    });
 
-    it('handles Escape key to close mobile sidebar', async () => {
-      const user = userEvent.setup()
-      
-      // Mock mobile viewport with sidebar open
-      vi.mocked(require('@/stores/app-store').useAppStore).mockReturnValue({
-        ...mockAppStore,
-        sidebarCollapsed: false,
-      })
+    it('should manage focus correctly when expanding/collapsing items', async () => {
+      const user = createMockUser();
+      const { user: userEvent } = renderSidebar({ user, isAuthenticated: true });
 
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+      const expandButton = screen.getByText('API Connections').closest('button');
+      await userEvent.click(expandButton!);
 
-      const sidebar = screen.getByRole('navigation')
-      sidebar.focus()
-      
-      await user.keyboard('{Escape}')
-      
-      expect(mockAppStore.setSidebarCollapsed).toHaveBeenCalledWith(true)
-    })
+      // Focus should remain on the expand button
+      expect(document.activeElement).toBe(expandButton);
+    });
+  });
 
-    it('manages focus trap when sidebar is expanded on mobile', async () => {
-      const user = userEvent.setup()
-      
-      // Mock mobile environment
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 640,
-      })
-
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
-
-      const sidebar = screen.getByRole('navigation')
-      
-      // First focusable element should be the close button
-      const closeButton = screen.getByRole('button', { name: /close sidebar/i })
-      closeButton.focus()
-      
-      // Tab should cycle through navigation items
-      await user.tab()
-      expect(screen.getByRole('link', { name: /dashboard/i })).toHaveFocus()
-      
-      // Shift+Tab should go back to close button
-      await user.keyboard('{Shift>}{Tab}{/Shift}')
-      expect(closeButton).toHaveFocus()
-    })
-  })
+  // =============================================================================
+  // TEST SUITE: ACCESSIBILITY COMPLIANCE
+  // =============================================================================
 
   describe('Accessibility Compliance', () => {
-    it('has proper ARIA landmarks and labels', async () => {
-      const { container } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should have proper ARIA labels and roles', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true });
 
-      const navigation = screen.getByRole('navigation')
-      expect(navigation).toHaveAttribute('aria-label', 'Main navigation')
+      expect(screen.getByRole('navigation', { name: 'Primary navigation' })).toBeInTheDocument();
+      expect(screen.getByLabelText('DreamFactory Admin Console')).toBeInTheDocument();
+      expect(screen.getByLabelText('Collapse sidebar')).toBeInTheDocument();
+    });
 
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
+    it('should have proper ARIA expanded states for expandable items', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true, pathname: '/api-connections/database' });
 
-    it('provides accessible names for all interactive elements', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+      const expandButton = screen.getByText('API Connections').closest('button');
+      expect(expandButton).toHaveAttribute('aria-expanded', 'true');
+    });
 
-      // All links should have accessible names
-      const links = screen.getAllByRole('link')
-      links.forEach(link => {
-        expect(link).toHaveAccessibleName()
-      })
+    it('should have proper ARIA current attributes for active items', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true, pathname: '/api-connections' });
 
-      // All buttons should have accessible names
-      const buttons = screen.getAllByRole('button')
-      buttons.forEach(button => {
-        expect(button).toHaveAccessibleName()
-      })
-    })
+      const activeLink = screen.getByText('API Connections').closest('a');
+      expect(activeLink).toHaveAttribute('aria-current', 'page');
+    });
 
-    it('maintains proper heading hierarchy', async () => {
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should have proper menu item labels', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true });
 
-      // If there are section headings, they should follow proper hierarchy
-      const headings = screen.queryAllByRole('heading')
-      if (headings.length > 0) {
-        headings.forEach((heading, index) => {
-          const level = parseInt(heading.tagName.substring(1))
-          expect(level).toBeGreaterThanOrEqual(2) // Should start at h2 in sidebar
-          if (index > 0) {
-            const prevLevel = parseInt(headings[index - 1].tagName.substring(1))
-            expect(level).toBeLessThanOrEqual(prevLevel + 1) // No skipping levels
-          }
-        })
-      }
-    })
+      const apiConnectionsButton = screen.getByLabelText('API Connections menu');
+      expect(apiConnectionsButton).toBeInTheDocument();
+    });
 
-    it('announces navigation changes to screen readers', async () => {
-      const user = userEvent.setup()
-      
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should pass axe accessibility audit', async () => {
+      const user = createMockUser();
+      const { container } = renderSidebar({ user, isAuthenticated: true });
 
-      const servicesLink = screen.getByRole('link', { name: /services/i })
-      
-      // Should have live region for announcements
-      const liveRegion = screen.queryByRole('status')
-      if (liveRegion) {
-        expect(liveRegion).toHaveAttribute('aria-live', 'polite')
-      }
+      const results = await axe(container);
+      expect(results).toHaveNoViolations();
+    });
 
-      await user.click(servicesLink)
-      
-      // Verify navigation was announced (if live region exists)
-      if (liveRegion) {
-        await waitFor(() => {
-          expect(liveRegion).toHaveTextContent(/navigated to services/i)
-        })
-      }
-    })
+    it('should provide proper tooltips for collapsed sidebar items', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true, sidebarCollapsed: true });
 
-    it('supports high contrast mode', async () => {
-      // Mock high contrast mode
-      Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        value: vi.fn().mockImplementation(query => ({
-          matches: query === '(prefers-contrast: high)',
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
-      })
+      const dashboardLink = screen.getByText('Dashboard').closest('a');
+      expect(dashboardLink).toHaveAttribute('title', 'Dashboard');
+    });
+  });
 
-      const { container } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+  // =============================================================================
+  // TEST SUITE: COMMERCIAL FEATURES AND SPECIAL STATES
+  // =============================================================================
 
-      const navigation = screen.getByRole('navigation')
-      
-      // Should have high contrast styling
-      expect(navigation).toHaveClass('contrast-more:border-2')
-      
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
+  describe('Commercial Features', () => {
+    it('should display lock icon for commercial features', () => {
+      const navigationItems = createMockNavigationItems();
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true, navigationItems });
 
-    it('supports reduced motion preferences', async () => {
-      // Mock reduced motion preference
-      Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        value: vi.fn().mockImplementation(query => ({
-          matches: query === '(prefers-reduced-motion: reduce)',
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
-      })
+      // Commercial feature should have lock icon
+      const commercialItem = screen.getByText('Commercial Feature');
+      const lockIcon = commercialItem.parentElement?.querySelector('svg');
+      expect(lockIcon).toBeInTheDocument();
+    });
 
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should indicate commercial features in sub-navigation', () => {
+      const commercialSubItem = {
+        id: 'commercial-sub',
+        path: '/commercial/sub',
+        label: 'Commercial Sub Feature',
+        isCommercialFeature: true,
+      };
 
-      const navigation = screen.getByRole('navigation')
-      
-      // Should disable transitions when reduced motion is preferred
-      expect(navigation).toHaveClass('motion-reduce:transition-none')
-    })
-  })
+      const navigationWithCommercialSub = [
+        {
+          id: 'parent',
+          path: '/parent',
+          label: 'Parent Item',
+          subRoutes: [commercialSubItem],
+        },
+      ];
 
-  describe('State Management Integration', () => {
-    it('synchronizes with Zustand app store state', async () => {
-      const user = userEvent.setup()
-      
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+      const user = createMockUser();
+      renderSidebar({ 
+        user, 
+        isAuthenticated: true, 
+        navigationItems: navigationWithCommercialSub,
+        pathname: '/parent/sub' 
+      });
 
-      const collapseButton = screen.getByRole('button', { name: /collapse sidebar/i })
-      await user.click(collapseButton)
+      expect(screen.getByText('Commercial Sub Feature')).toBeInTheDocument();
+    });
+  });
 
-      expect(mockAppStore.setSidebarCollapsed).toHaveBeenCalledWith(true)
-    })
+  // =============================================================================
+  // TEST SUITE: ERROR HANDLING AND EDGE CASES
+  // =============================================================================
 
-    it('persists sidebar state across page navigation', async () => {
-      const { rerender } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+  describe('Error Handling and Edge Cases', () => {
+    it('should handle missing navigation items gracefully', () => {
+      const user = createMockUser();
+      renderSidebar({ user, isAuthenticated: true, navigationItems: [] });
 
-      // Simulate state persistence
-      vi.mocked(require('@/stores/app-store').useAppStore).mockReturnValue({
-        ...mockAppStore,
-        sidebarCollapsed: true,
-      })
+      expect(screen.getByRole('navigation')).toBeInTheDocument();
+      expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
+    });
 
-      rerender(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should handle null user gracefully', () => {
+      renderSidebar({ user: null, isAuthenticated: false });
 
-      const sidebar = screen.getByRole('navigation')
-      expect(sidebar).toHaveClass('w-16') // Should maintain collapsed state
-    })
+      expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+      expect(screen.getByText('Self Hosted')).toBeInTheDocument();
+    });
 
-    it('updates theme classes when theme changes', async () => {
-      const { rerender } = renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should handle undefined permissions array', () => {
+      const user = createMockUser({ permissions: undefined as any });
+      renderSidebar({ user, isAuthenticated: true });
 
-      // Change to dark theme
-      vi.mocked(require('@/stores/app-store').useAppStore).mockReturnValue({
-        ...mockAppStore,
-        theme: 'dark' as const,
-      })
+      // Should still render basic navigation
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    });
 
-      rerender(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+    it('should handle mobile overlay click on mobile devices', async () => {
+      const mockSetSidebarCollapsed = vi.fn();
+      (useAppStore as unknown as Mock).mockReturnValue(
+        createMockAppStore({ setSidebarCollapsed: mockSetSidebarCollapsed })
+      );
 
-      const sidebar = screen.getByRole('navigation')
-      expect(sidebar).toHaveClass('dark:bg-gray-900') // Should apply dark theme classes
-    })
-  })
+      mockViewport(768);
+      const user = createMockUser();
+      const { user: userEvent } = renderSidebar({ 
+        user, 
+        isAuthenticated: true, 
+        sidebarCollapsed: false 
+      });
 
-  describe('Error Handling', () => {
-    it('handles navigation data loading errors gracefully', async () => {
-      // Mock navigation data error
-      server.use(
-        navigationHandlers.map(handler => 
-          handler.mockImplementationOnce(() => {
-            throw new Error('Navigation data failed to load')
-          })
-        )[0]
-      )
+      const overlay = document.querySelector('.fixed.inset-0.z-40');
+      await userEvent.click(overlay!);
 
-      renderWithProviders(
-        <MockAuthProvider user={adminUser}>
-          <Sidebar />
-        </MockAuthProvider>
-      )
+      expect(mockSetSidebarCollapsed).toHaveBeenCalledWith(true);
+    });
+  });
 
-      // Should show fallback navigation or error state
-      await waitFor(() => {
-        expect(screen.getByText(/dashboard/i)).toBeInTheDocument()
-      })
-    })
+  // =============================================================================
+  // TEST SUITE: INTEGRATION WITH STORE AND CONTEXT
+  // =============================================================================
 
-    it('handles permission context errors gracefully', async () => {
-      // Mock auth context with error
-      renderWithProviders(
-        <MockAuthProvider user={null} error="Failed to load user permissions">
-          <Sidebar />
-        </MockAuthProvider>
-      )
+  describe('Store and Context Integration', () => {
+    it('should respond to app store state changes', () => {
+      const user = createMockUser();
+      const { rerender } = renderSidebar({ user, isAuthenticated: true });
 
-      // Should render minimal navigation for unauthenticated state
-      await waitFor(() => {
-        expect(screen.getByRole('navigation')).toBeInTheDocument()
-        expect(screen.queryByRole('link', { name: /services/i })).not.toBeInTheDocument()
-      })
-    })
-  })
-})
+      // Update store to collapsed state
+      (useAppStore as unknown as Mock).mockReturnValue(
+        createMockAppStore({ sidebarCollapsed: true })
+      );
+
+      rerender(<Sidebar />);
+      expect(screen.getByLabelText('Expand sidebar')).toBeInTheDocument();
+    });
+
+    it('should respond to authentication state changes', () => {
+      const { rerender } = renderSidebar({ isAuthenticated: false });
+
+      expect(screen.getByText('Self Hosted')).toBeInTheDocument();
+
+      // Change to authenticated
+      const user = createMockUser();
+      (useAuth as Mock).mockReturnValue(createMockAuth(user, true));
+
+      rerender(<Sidebar />);
+      expect(screen.getByRole('navigation')).toBeInTheDocument();
+    });
+
+    it('should update navigation based on permission changes', () => {
+      const user = createMockUser({ permissions: ['read'] });
+      const { rerender } = renderSidebar({ user, isAuthenticated: true });
+
+      expect(screen.queryByText('Admin Settings')).not.toBeInTheDocument();
+
+      // Update user with admin permissions
+      const adminUser = createMockUser({ permissions: ['read', 'admin'] });
+      (useAuth as Mock).mockReturnValue(createMockAuth(adminUser, true));
+
+      rerender(<Sidebar />);
+      expect(screen.getByText('Admin Settings')).toBeInTheDocument();
+    });
+  });
+});
