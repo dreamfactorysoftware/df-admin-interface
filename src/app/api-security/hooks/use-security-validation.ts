@@ -1,1168 +1,1336 @@
 /**
  * Security Validation Hook for DreamFactory Admin Interface
  * 
- * Comprehensive React hook implementing security rule validation with Zod schema validation
- * and real-time validation under 100ms. Provides dynamic validation rules for security
- * configurations, access control policies, and permission enforcement while maintaining
- * compatibility with React Hook Form integration patterns for type-safe security workflows.
+ * Comprehensive React hook implementing security rule validation with Zod schema integration,
+ * real-time validation under 100ms, and role-based access control enforcement.
  * 
  * Features:
  * - Zod schema validators integrated with React Hook Form
- * - Real-time validation under 100ms response time
- * - Role-based access control with permission validation
- * - Type-safe security workflows
- * - Comprehensive security rule validation
- * - Dynamic validation schemas for RBAC rules
- * - Component-level access control validation
- * - Security configuration validation for rate limits and access policies
- * - Validation error handling compatible with React Hook Form
- * - Business logic validation for security rule constraints and policy combinations
+ * - Real-time validation with debouncing for performance optimization
+ * - Dynamic validation rules for security configurations
+ * - Permission validation with component-level access control
+ * - Rate limiting and access policy validation
+ * - Type-safe security workflows with comprehensive error handling
  * 
+ * Performance Requirements:
+ * - Real-time validation under 100ms per React/Next.js Integration Requirements
+ * - Debounced input validation to prevent excessive API calls
+ * - Optimized validation logic for large security rule sets
+ * 
+ * @fileoverview Security validation hook with RBAC and performance optimization
  * @version 1.0.0
- * @since 2024-12-19
+ * @since React Migration 1.0.0
  */
 
-import { useCallback, useMemo, useRef, useEffect, useState } from 'react';
-import { z, ZodSchema, ZodError } from 'zod';
-import { useDebounce } from '@/hooks/use-debounce';
-import type { 
-  Role, 
-  Permission, 
-  RBACContext,
-  AccessCheckResult,
-  AuthError,
-  AuthErrorCode 
-} from '@/types/auth';
-import type { 
-  FieldErrors, 
-  FieldValues, 
-  UseFormReturn,
-  FieldError 
-} from '@/types/forms';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { z } from 'zod';
+import { 
+  type UseFormReturn, 
+  type FieldValues, 
+  type Path,
+  type PathValue,
+  type FieldError,
+  type FieldErrors
+} from 'react-hook-form';
 
-// ============================================================================
-// CORE SECURITY VALIDATION TYPES
-// ============================================================================
+// =============================================================================
+// CORE VALIDATION TYPES AND INTERFACES
+// =============================================================================
 
 /**
- * Security validation configuration
- * Defines validation behavior and performance requirements
+ * Security validation context for rule evaluation
+ * Provides comprehensive context for dynamic security rule validation
  */
-export interface SecurityValidationConfig {
-  /** Enable real-time validation (default: true) */
-  realTimeEnabled: boolean;
-  /** Maximum validation time in milliseconds (requirement: <100ms) */
-  maxValidationTime: number;
-  /** Debounce delay for real-time validation */
-  debounceMs: number;
-  /** Enable permission caching for performance */
-  enablePermissionCaching: boolean;
-  /** Cache TTL for permission checks in milliseconds */
-  permissionCacheTTL: number;
-  /** Enable comprehensive audit logging */
-  enableAuditLogging: boolean;
-}
-
-/**
- * Security rule types supported by the validation system
- */
-export type SecurityRuleType =
-  | 'role-assignment'
-  | 'permission-grant'
-  | 'access-control'
-  | 'rate-limit'
-  | 'api-key'
-  | 'endpoint-security'
-  | 'database-access'
-  | 'field-level-security'
-  | 'cross-origin'
-  | 'authentication'
-  | 'session-management'
-  | 'security-policy';
-
-/**
- * Security validation rule definition
- */
-export interface SecurityValidationRule {
-  /** Rule identifier */
-  id: string;
-  /** Rule type */
-  type: SecurityRuleType;
-  /** Rule name for display */
-  name: string;
-  /** Rule description */
-  description?: string;
-  /** Zod validation schema */
-  schema: ZodSchema;
-  /** Business logic validator */
-  businessValidator?: (value: any, context: ValidationContext) => Promise<ValidationResult>;
-  /** Dependencies on other fields */
-  dependencies?: string[];
-  /** Required permissions to modify this rule */
-  requiredPermissions?: string[];
-  /** Rule priority (higher numbers take precedence) */
-  priority: number;
-  /** Rule is enabled */
-  enabled: boolean;
-}
-
-/**
- * Validation context for business logic validation
- */
-export interface ValidationContext {
-  /** Current user role */
-  userRole?: Role;
-  /** Current user permissions */
-  userPermissions: Permission[];
-  /** Form values for cross-field validation */
-  formValues: Record<string, any>;
-  /** Additional context data */
-  context?: Record<string, any>;
-  /** Validation timestamp */
-  timestamp: Date;
-}
-
-/**
- * Validation result from business logic validators
- */
-export interface ValidationResult {
-  /** Validation passed */
-  isValid: boolean;
-  /** Error message if validation failed */
-  errorMessage?: string;
-  /** Error code for programmatic handling */
-  errorCode?: string;
-  /** Suggested fix for the error */
-  suggestion?: string;
+export interface SecurityValidationContext {
+  /** Current user session information */
+  user?: {
+    id: number;
+    roleId: number;
+    isSysAdmin: boolean;
+    isRootAdmin: boolean;
+    permissions: string[];
+  };
+  /** Service context for service-specific validation */
+  service?: {
+    id: number;
+    type: string;
+    name: string;
+  };
+  /** Request context for endpoint validation */
+  request?: {
+    method: string;
+    endpoint: string;
+    userAgent?: string;
+    ipAddress?: string;
+  };
+  /** Environment context */
+  environment?: 'development' | 'staging' | 'production';
   /** Additional validation metadata */
   metadata?: Record<string, any>;
-  /** Validation time in milliseconds */
-  validationTime: number;
 }
 
 /**
- * Security policy configuration
+ * Security validation result with detailed error information
+ * Supports both synchronous and asynchronous validation scenarios
  */
-export interface SecurityPolicy {
-  /** Policy identifier */
+export interface SecurityValidationResult {
+  /** Validation success flag */
+  isValid: boolean;
+  /** Detailed error messages keyed by field path */
+  errors: Record<string, string>;
+  /** Validation warnings (non-blocking) */
+  warnings: Record<string, string>;
+  /** Validation performance metrics */
+  metrics: {
+    /** Validation execution time in milliseconds */
+    executionTime: number;
+    /** Number of rules evaluated */
+    rulesEvaluated: number;
+    /** Timestamp of validation */
+    timestamp: Date;
+  };
+  /** Additional context from validation */
+  context?: Record<string, any>;
+}
+
+/**
+ * Dynamic security rule definition for runtime validation
+ * Supports complex business logic validation scenarios
+ */
+export interface SecurityRule<TData = any> {
+  /** Unique rule identifier */
   id: string;
-  /** Policy name */
+  /** Human-readable rule name */
   name: string;
-  /** Policy rules */
-  rules: SecurityPolicyRule[];
-  /** Policy is enforced */
-  enforced: boolean;
-  /** Policy priority */
+  /** Rule description for documentation */
+  description?: string;
+  /** Rule category for organization */
+  category: SecurityRuleCategory;
+  /** Rule priority (higher numbers execute first) */
   priority: number;
+  /** Rule conditions for when it applies */
+  conditions?: SecurityRuleCondition[];
+  /** Validation function */
+  validate: (data: TData, context: SecurityValidationContext) => SecurityRuleResult | Promise<SecurityRuleResult>;
+  /** Rule enabled flag */
+  enabled: boolean;
+  /** Rule metadata */
+  metadata?: Record<string, any>;
 }
 
 /**
- * Individual security policy rule
+ * Security rule categories for organization and filtering
  */
-export interface SecurityPolicyRule {
-  /** Rule identifier */
-  id: string;
-  /** Resource being protected */
-  resource: string;
-  /** Actions allowed/denied */
-  actions: string[];
-  /** Conditions for rule application */
-  conditions?: Record<string, any>;
-  /** Effect: allow or deny */
-  effect: 'allow' | 'deny';
+export type SecurityRuleCategory = 
+  | 'authentication'
+  | 'authorization' 
+  | 'access_control'
+  | 'rate_limiting'
+  | 'data_validation'
+  | 'policy_enforcement'
+  | 'compliance'
+  | 'audit';
+
+/**
+ * Security rule condition for conditional execution
+ */
+export interface SecurityRuleCondition {
+  /** Field path to evaluate */
+  field: string;
+  /** Condition operator */
+  operator: 'equals' | 'not_equals' | 'in' | 'not_in' | 'greater_than' | 'less_than' | 'contains' | 'regex';
+  /** Expected value(s) */
+  value: any;
+  /** Logical operator for multiple conditions */
+  logicalOperator?: 'AND' | 'OR';
 }
 
 /**
- * Rate limiting configuration
+ * Individual security rule validation result
  */
-export interface RateLimitConfig {
-  /** Limit identifier */
-  id: string;
-  /** Limit name */
-  name: string;
-  /** Maximum requests per time period */
-  maxRequests: number;
-  /** Time period in seconds */
-  periodSeconds: number;
-  /** Scope of the limit */
-  scope: 'global' | 'user' | 'role' | 'api-key' | 'endpoint';
-  /** Scope identifier (if applicable) */
-  scopeId?: string;
-  /** Burst allowance */
-  burstAllowance?: number;
-  /** Limit is active */
-  active: boolean;
+export interface SecurityRuleResult {
+  /** Rule execution success */
+  success: boolean;
+  /** Error message if validation failed */
+  error?: string;
+  /** Warning message if applicable */
+  warning?: string;
+  /** Additional result data */
+  data?: any;
 }
 
 /**
- * Access control entry
+ * Permission validation configuration
+ * Supports role-based and resource-specific permission checking
  */
-export interface AccessControlEntry {
-  /** ACE identifier */
-  id: string;
-  /** Principal (user, role, or group) */
-  principal: AccessPrincipal;
-  /** Resource being controlled */
-  resource: string;
-  /** Permissions granted/denied */
-  permissions: string[];
-  /** Effect: allow or deny */
-  effect: 'allow' | 'deny';
-  /** Conditions for access */
-  conditions?: Record<string, any>;
+export interface PermissionValidationConfig {
+  /** Required permissions for validation */
+  requiredPermissions: string[];
+  /** Resource context for permission checking */
+  resource?: string;
+  /** Operation context */
+  operation?: 'create' | 'read' | 'update' | 'delete' | 'execute';
+  /** Service context for service-specific permissions */
+  serviceId?: number;
+  /** Component context for granular permissions */
+  component?: string;
+  /** Allow admin override */
+  allowAdminOverride?: boolean;
 }
 
 /**
- * Access control principal
+ * Validation performance configuration
+ * Ensures validation meets 100ms performance requirement
  */
-export interface AccessPrincipal {
-  /** Principal type */
-  type: 'user' | 'role' | 'group' | 'api-key';
-  /** Principal identifier */
-  id: string;
-  /** Principal name */
-  name: string;
+export interface ValidationPerformanceConfig {
+  /** Maximum validation time in milliseconds (default: 100ms) */
+  maxExecutionTime: number;
+  /** Debounce delay for real-time validation in milliseconds (default: 300ms) */
+  debounceDelay: number;
+  /** Enable validation caching */
+  enableCaching: boolean;
+  /** Cache duration in milliseconds (default: 5 minutes) */
+  cacheDuration: number;
+  /** Maximum concurrent validations */
+  maxConcurrentValidations: number;
 }
 
-// ============================================================================
-// VALIDATION SCHEMAS
-// ============================================================================
+// =============================================================================
+// ZOD SECURITY VALIDATION SCHEMAS
+// =============================================================================
 
 /**
- * Core security validation schemas using Zod
+ * Role-based access control validation schema
+ * Validates role assignments and permission configurations
  */
-export const SecurityValidationSchemas = {
-  /**
-   * Role assignment validation schema
-   */
-  roleAssignment: z.object({
-    userId: z.number().min(1, 'User ID is required'),
-    roleId: z.number().min(1, 'Role ID is required'),
-    effectiveDate: z.date().optional(),
-    expirationDate: z.date().optional(),
-    assignedBy: z.number().min(1, 'Assigned by user ID is required')
-  }).refine(data => {
+export const RoleValidationSchema = z.object({
+  roleId: z
+    .number()
+    .int()
+    .positive('Role ID must be a positive integer'),
+  permissions: z
+    .array(z.string())
+    .min(1, 'At least one permission is required')
+    .refine(
+      (permissions) => permissions.every(p => p.trim().length > 0),
+      'All permissions must be non-empty strings'
+    ),
+  serviceAccess: z
+    .array(z.object({
+      serviceId: z.number().int().positive(),
+      component: z.string().min(1),
+      verbMask: z.number().int().min(0).max(31),
+      filters: z.array(z.string()).optional(),
+    }))
+    .optional(),
+  expiresAt: z
+    .date()
+    .min(new Date(), 'Role assignment cannot expire in the past')
+    .optional(),
+}).refine(
+  (data) => {
+    // Business logic: Validate permission combinations
+    if (data.permissions.includes('admin') && data.permissions.length > 1) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: 'Admin permission cannot be combined with other permissions',
+    path: ['permissions'],
+  }
+);
+
+/**
+ * Rate limiting configuration validation schema
+ * Validates rate limiting rules and policies
+ */
+export const RateLimitValidationSchema = z.object({
+  type: z.enum(['user', 'role', 'service', 'endpoint', 'global'], {
+    errorMap: () => ({ message: 'Invalid rate limit type' }),
+  }),
+  rate: z
+    .number()
+    .int()
+    .min(1, 'Rate must be at least 1')
+    .max(10000, 'Rate cannot exceed 10,000 requests'),
+  period: z.enum(['minute', 'hour', 'day', '7-day', '30-day'], {
+    errorMap: () => ({ message: 'Invalid time period' }),
+  }),
+  burst: z
+    .number()
+    .int()
+    .min(1)
+    .optional(),
+  userId: z
+    .number()
+    .int()
+    .positive()
+    .optional(),
+  roleId: z
+    .number()
+    .int()
+    .positive()
+    .optional(),
+  serviceId: z
+    .number()
+    .int()
+    .positive()
+    .optional(),
+  endpoint: z
+    .string()
+    .regex(/^\/[a-zA-Z0-9\/_-]*$/, 'Invalid endpoint format')
+    .optional(),
+}).refine(
+  (data) => {
+    // Business logic: Validate type-specific requirements
+    switch (data.type) {
+      case 'user':
+        return data.userId !== undefined;
+      case 'role':
+        return data.roleId !== undefined;
+      case 'service':
+        return data.serviceId !== undefined;
+      case 'endpoint':
+        return data.endpoint !== undefined;
+      case 'global':
+        return true;
+      default:
+        return false;
+    }
+  },
+  {
+    message: 'Required fields missing for selected rate limit type',
+    path: ['type'],
+  }
+);
+
+/**
+ * API security configuration validation schema
+ * Validates API key configurations and security policies
+ */
+export const ApiSecurityValidationSchema = z.object({
+  apiKey: z
+    .string()
+    .min(32, 'API key must be at least 32 characters')
+    .max(512, 'API key cannot exceed 512 characters')
+    .regex(/^[A-Za-z0-9+/=_-]+$/, 'API key contains invalid characters'),
+  allowedHosts: z
+    .array(z.string().regex(/^[a-zA-Z0-9.-]+$/, 'Invalid hostname format'))
+    .min(1, 'At least one allowed host is required')
+    .max(100, 'Cannot exceed 100 allowed hosts'),
+  allowedMethods: z
+    .array(z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']))
+    .min(1, 'At least one HTTP method must be allowed'),
+  corsEnabled: z.boolean(),
+  corsOrigins: z
+    .array(z.string().url('Invalid CORS origin URL'))
+    .optional(),
+  rateLimitOverride: RateLimitValidationSchema.optional(),
+  expiresAt: z
+    .date()
+    .min(new Date(), 'API key cannot expire in the past')
+    .optional(),
+});
+
+/**
+ * Access policy validation schema
+ * Validates complex access control policies
+ */
+export const AccessPolicyValidationSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Policy name is required')
+    .max(100, 'Policy name cannot exceed 100 characters')
+    .regex(/^[a-zA-Z0-9_-\s]+$/, 'Policy name contains invalid characters'),
+  description: z
+    .string()
+    .max(500, 'Description cannot exceed 500 characters')
+    .optional(),
+  rules: z
+    .array(z.object({
+      resource: z.string().min(1),
+      action: z.enum(['allow', 'deny']),
+      conditions: z.array(z.object({
+        field: z.string().min(1),
+        operator: z.enum(['equals', 'not_equals', 'in', 'not_in', 'contains']),
+        value: z.any(),
+      })).optional(),
+    }))
+    .min(1, 'At least one access rule is required'),
+  priority: z
+    .number()
+    .int()
+    .min(0)
+    .max(1000),
+  enabled: z.boolean(),
+  effectiveDate: z.date().optional(),
+  expirationDate: z.date().optional(),
+}).refine(
+  (data) => {
+    // Business logic: Validate date constraints
     if (data.effectiveDate && data.expirationDate) {
       return data.effectiveDate < data.expirationDate;
     }
     return true;
-  }, {
+  },
+  {
     message: 'Effective date must be before expiration date',
-    path: ['expirationDate']
-  }),
+    path: ['expirationDate'],
+  }
+);
 
-  /**
-   * Permission grant validation schema
-   */
-  permissionGrant: z.object({
-    principalType: z.enum(['user', 'role', 'group']),
-    principalId: z.string().min(1, 'Principal ID is required'),
-    resource: z.string().min(1, 'Resource is required'),
-    actions: z.array(z.string()).min(1, 'At least one action is required'),
-    conditions: z.record(z.any()).optional(),
-    effect: z.enum(['allow', 'deny'])
-  }),
-
-  /**
-   * Rate limit configuration validation schema
-   */
-  rateLimit: z.object({
-    name: z.string().min(1, 'Rate limit name is required').max(255, 'Name too long'),
-    maxRequests: z.number().min(1, 'Maximum requests must be at least 1').max(10000, 'Maximum requests too high'),
-    periodSeconds: z.number().min(1, 'Period must be at least 1 second').max(86400, 'Period cannot exceed 24 hours'),
-    scope: z.enum(['global', 'user', 'role', 'api-key', 'endpoint']),
-    scopeId: z.string().optional(),
-    burstAllowance: z.number().min(0).optional(),
-    active: z.boolean()
-  }).refine(data => {
-    if (['user', 'role', 'api-key', 'endpoint'].includes(data.scope)) {
-      return !!data.scopeId;
-    }
-    return true;
-  }, {
-    message: 'Scope ID is required for scoped rate limits',
-    path: ['scopeId']
-  }),
-
-  /**
-   * API key validation schema
-   */
-  apiKey: z.object({
-    name: z.string().min(1, 'API key name is required').max(255, 'Name too long'),
-    description: z.string().max(1000, 'Description too long').optional(),
-    scopes: z.array(z.string()).min(1, 'At least one scope is required'),
-    expirationDate: z.date().optional(),
-    rateLimitId: z.string().optional(),
-    isActive: z.boolean()
-  }).refine(data => {
-    if (data.expirationDate) {
-      return data.expirationDate > new Date();
-    }
-    return true;
-  }, {
-    message: 'Expiration date must be in the future',
-    path: ['expirationDate']
-  }),
-
-  /**
-   * Endpoint security configuration validation schema
-   */
-  endpointSecurity: z.object({
-    endpoint: z.string().min(1, 'Endpoint is required'),
-    method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']),
-    requiresAuth: z.boolean(),
-    requiredPermissions: z.array(z.string()).optional(),
-    allowedRoles: z.array(z.number()).optional(),
-    rateLimitId: z.string().optional(),
-    corsEnabled: z.boolean(),
-    corsOrigins: z.array(z.string()).optional(),
-    securityHeaders: z.record(z.string()).optional()
-  }),
-
-  /**
-   * Database access control validation schema
-   */
-  databaseAccess: z.object({
-    serviceId: z.string().min(1, 'Service ID is required'),
-    tableName: z.string().min(1, 'Table name is required'),
-    principalType: z.enum(['user', 'role', 'group']),
-    principalId: z.string().min(1, 'Principal ID is required'),
-    permissions: z.array(z.enum(['create', 'read', 'update', 'delete'])).min(1, 'At least one permission is required'),
-    fieldRestrictions: z.array(z.string()).optional(),
-    rowLevelFilters: z.record(z.any()).optional()
-  }),
-
-  /**
-   * Security policy validation schema
-   */
-  securityPolicy: z.object({
-    name: z.string().min(1, 'Policy name is required').max(255, 'Name too long'),
-    description: z.string().max(1000, 'Description too long').optional(),
-    rules: z.array(z.object({
-      resource: z.string().min(1, 'Resource is required'),
-      actions: z.array(z.string()).min(1, 'At least one action is required'),
-      conditions: z.record(z.any()).optional(),
-      effect: z.enum(['allow', 'deny'])
-    })).min(1, 'At least one rule is required'),
-    enforced: z.boolean(),
-    priority: z.number().min(0).max(100)
-  })
-} as const;
-
-// ============================================================================
-// PERMISSION VALIDATION UTILITIES
-// ============================================================================
+// =============================================================================
+// CORE SECURITY VALIDATION HOOK
+// =============================================================================
 
 /**
- * Permission validation utilities for RBAC enforcement
+ * Configuration interface for useSecurityValidation hook
  */
-export class PermissionValidator {
-  private permissionCache = new Map<string, { result: boolean; expiry: number }>();
-  private readonly cacheTTL: number;
-
-  constructor(cacheTTL: number = 300000) { // 5 minutes default
-    this.cacheTTL = cacheTTL;
-  }
-
-  /**
-   * Check if user has permission for a specific action
-   */
-  hasPermission(
-    userPermissions: Permission[],
-    resource: string,
-    action: string
-  ): boolean {
-    const cacheKey = `${resource}:${action}:${JSON.stringify(userPermissions.map(p => p.id))}`;
-    const cached = this.permissionCache.get(cacheKey);
-    
-    if (cached && cached.expiry > Date.now()) {
-      return cached.result;
-    }
-
-    const hasPermission = userPermissions.some(permission => 
-      permission.resource === resource && 
-      permission.action === action
-    );
-
-    this.permissionCache.set(cacheKey, {
-      result: hasPermission,
-      expiry: Date.now() + this.cacheTTL
-    });
-
-    return hasPermission;
-  }
-
-  /**
-   * Check if user has any of the required permissions
-   */
-  hasAnyPermission(
-    userPermissions: Permission[],
-    requiredPermissions: string[]
-  ): boolean {
-    return requiredPermissions.some(permission => {
-      const [resource, action] = permission.split(':');
-      return this.hasPermission(userPermissions, resource, action);
-    });
-  }
-
-  /**
-   * Check if user has all required permissions
-   */
-  hasAllPermissions(
-    userPermissions: Permission[],
-    requiredPermissions: string[]
-  ): boolean {
-    return requiredPermissions.every(permission => {
-      const [resource, action] = permission.split(':');
-      return this.hasPermission(userPermissions, resource, action);
-    });
-  }
-
-  /**
-   * Clear permission cache
-   */
-  clearCache(): void {
-    this.permissionCache.clear();
-  }
-
-  /**
-   * Get cache statistics
-   */
-  getCacheStats(): { size: number; hitRate: number } {
-    return {
-      size: this.permissionCache.size,
-      hitRate: 0 // TODO: Implement hit rate tracking
-    };
-  }
-}
-
-// ============================================================================
-// BUSINESS LOGIC VALIDATORS
-// ============================================================================
-
-/**
- * Business logic validators for complex security rule validation
- */
-export const BusinessLogicValidators = {
-  /**
-   * Validate role assignment business rules
-   */
-  validateRoleAssignment: async (
-    value: any,
-    context: ValidationContext
-  ): Promise<ValidationResult> => {
-    const startTime = Date.now();
-    
-    try {
-      // Check if user has permission to assign roles
-      if (!context.userPermissions.some(p => p.resource === 'roles' && p.action === 'assign')) {
-        return {
-          isValid: false,
-          errorMessage: 'Insufficient permissions to assign roles',
-          errorCode: 'PERMISSION_DENIED',
-          validationTime: Date.now() - startTime
-        };
-      }
-
-      // Check if trying to assign higher privilege role
-      if (context.userRole && value.roleId > context.userRole.id) {
-        return {
-          isValid: false,
-          errorMessage: 'Cannot assign role with higher privileges',
-          errorCode: 'PRIVILEGE_ESCALATION',
-          suggestion: 'Contact system administrator for role assignment',
-          validationTime: Date.now() - startTime
-        };
-      }
-
-      return {
-        isValid: true,
-        validationTime: Date.now() - startTime
-      };
-    } catch (error) {
-      return {
-        isValid: false,
-        errorMessage: 'Validation error occurred',
-        errorCode: 'VALIDATION_ERROR',
-        validationTime: Date.now() - startTime
-      };
-    }
-  },
-
-  /**
-   * Validate rate limit configuration business rules
-   */
-  validateRateLimit: async (
-    value: any,
-    context: ValidationContext
-  ): Promise<ValidationResult> => {
-    const startTime = Date.now();
-    
-    try {
-      // Check for conflicting rate limits
-      const existingLimits = context.formValues.existingRateLimits || [];
-      const hasConflict = existingLimits.some((limit: any) => 
-        limit.scope === value.scope && 
-        limit.scopeId === value.scopeId &&
-        limit.id !== value.id
-      );
-
-      if (hasConflict) {
-        return {
-          isValid: false,
-          errorMessage: 'Rate limit already exists for this scope',
-          errorCode: 'DUPLICATE_RATE_LIMIT',
-          suggestion: 'Modify existing rate limit or choose different scope',
-          validationTime: Date.now() - startTime
-        };
-      }
-
-      // Validate reasonable rate limits
-      if (value.maxRequests / value.periodSeconds > 1000) {
-        return {
-          isValid: false,
-          errorMessage: 'Rate limit too high (>1000 requests/second)',
-          errorCode: 'RATE_LIMIT_TOO_HIGH',
-          suggestion: 'Consider implementing burst control or reducing limit',
-          validationTime: Date.now() - startTime
-        };
-      }
-
-      return {
-        isValid: true,
-        validationTime: Date.now() - startTime
-      };
-    } catch (error) {
-      return {
-        isValid: false,
-        errorMessage: 'Rate limit validation failed',
-        errorCode: 'VALIDATION_ERROR',
-        validationTime: Date.now() - startTime
-      };
-    }
-  },
-
-  /**
-   * Validate security policy combinations
-   */
-  validateSecurityPolicy: async (
-    value: any,
-    context: ValidationContext
-  ): Promise<ValidationResult> => {
-    const startTime = Date.now();
-    
-    try {
-      // Check for conflicting rules within the policy
-      const resources = new Set();
-      for (const rule of value.rules) {
-        const ruleKey = `${rule.resource}:${rule.actions.join(',')}`;
-        if (resources.has(ruleKey)) {
-          return {
-            isValid: false,
-            errorMessage: 'Conflicting rules detected within policy',
-            errorCode: 'POLICY_CONFLICT',
-            suggestion: 'Consolidate rules for the same resource and actions',
-            validationTime: Date.now() - startTime
-          };
-        }
-        resources.add(ruleKey);
-      }
-
-      // Validate rule combinations don't create security gaps
-      const allowRules = value.rules.filter((r: any) => r.effect === 'allow');
-      const denyRules = value.rules.filter((r: any) => r.effect === 'deny');
-      
-      if (allowRules.length === 0 && denyRules.length > 0) {
-        return {
-          isValid: false,
-          errorMessage: 'Policy has only deny rules, creating inaccessible resources',
-          errorCode: 'SECURITY_GAP',
-          suggestion: 'Add explicit allow rules or remove deny-only policy',
-          validationTime: Date.now() - startTime
-        };
-      }
-
-      return {
-        isValid: true,
-        validationTime: Date.now() - startTime
-      };
-    } catch (error) {
-      return {
-        isValid: false,
-        errorMessage: 'Security policy validation failed',
-        errorCode: 'VALIDATION_ERROR',
-        validationTime: Date.now() - startTime
-      };
-    }
-  }
-} as const;
-
-// ============================================================================
-// MAIN HOOK IMPLEMENTATION
-// ============================================================================
-
-/**
- * Security validation hook configuration
- */
-export interface UseSecurityValidationConfig extends Partial<SecurityValidationConfig> {
-  /** Form instance from React Hook Form */
-  form?: UseFormReturn<any>;
-  /** Custom validation rules */
-  customRules?: SecurityValidationRule[];
-  /** RBAC context */
-  rbacContext?: RBACContext;
+export interface UseSecurityValidationConfig<TFieldValues extends FieldValues = FieldValues> {
+  /** React Hook Form instance */
+  form?: UseFormReturn<TFieldValues>;
+  /** Validation context */
+  context?: SecurityValidationContext;
+  /** Performance configuration */
+  performance?: Partial<ValidationPerformanceConfig>;
+  /** Custom security rules */
+  customRules?: SecurityRule<TFieldValues>[];
+  /** Enable permission validation */
+  enablePermissionValidation?: boolean;
+  /** Permission configuration */
+  permissionConfig?: PermissionValidationConfig;
+  /** Enable real-time validation */
+  enableRealTimeValidation?: boolean;
+  /** Validation schemas */
+  schemas?: {
+    role?: z.ZodSchema<any>;
+    rateLimit?: z.ZodSchema<any>;
+    apiSecurity?: z.ZodSchema<any>;
+    accessPolicy?: z.ZodSchema<any>;
+    custom?: z.ZodSchema<any>;
+  };
 }
 
 /**
- * Security validation hook return type
+ * Return type for useSecurityValidation hook
  */
-export interface UseSecurityValidationReturn {
-  // Validation functions
-  validateRule: (ruleType: SecurityRuleType, value: any) => Promise<ValidationResult>;
-  validatePermission: (resource: string, action: string) => boolean;
-  validateRoleAssignment: (userId: number, roleId: number) => Promise<ValidationResult>;
-  validateRateLimit: (config: RateLimitConfig) => Promise<ValidationResult>;
-  validateSecurityPolicy: (policy: SecurityPolicy) => Promise<ValidationResult>;
-  validateAccessControl: (entry: AccessControlEntry) => Promise<ValidationResult>;
+export interface UseSecurityValidationReturn<TFieldValues extends FieldValues = FieldValues> {
+  /** Validate specific field */
+  validateField: (fieldName: Path<TFieldValues>, value?: PathValue<TFieldValues, Path<TFieldValues>>) => Promise<string | undefined>;
   
-  // Batch validation
-  validateMultiple: (validations: Array<{ type: SecurityRuleType; value: any }>) => Promise<ValidationResult[]>;
+  /** Validate entire form */
+  validateForm: (data: TFieldValues) => Promise<SecurityValidationResult>;
   
-  // Permission utilities
-  hasPermission: (resource: string, action: string) => boolean;
-  hasAnyPermission: (permissions: string[]) => boolean;
-  hasAllPermissions: (permissions: string[]) => boolean;
-  canModifyRole: (roleId: number) => boolean;
-  canCreateRateLimit: () => boolean;
-  canManageSecurityPolicy: () => boolean;
+  /** Validate permissions for current context */
+  validatePermissions: (config?: PermissionValidationConfig) => Promise<boolean>;
   
-  // Form integration
-  createFieldValidator: (ruleType: SecurityRuleType) => (value: any) => Promise<string | undefined>;
-  getFieldError: (fieldName: string) => FieldError | undefined;
-  setFieldError: (fieldName: string, error: string) => void;
-  clearFieldErrors: (fieldNames?: string[]) => void;
+  /** Validate role assignment */
+  validateRole: (roleData: any) => Promise<SecurityValidationResult>;
   
-  // Performance monitoring
-  getValidationMetrics: () => ValidationMetrics;
-  resetMetrics: () => void;
+  /** Validate rate limit configuration */
+  validateRateLimit: (limitData: any) => Promise<SecurityValidationResult>;
   
-  // State
+  /** Validate API security configuration */
+  validateApiSecurity: (securityData: any) => Promise<SecurityValidationResult>;
+  
+  /** Validate access policy */
+  validateAccessPolicy: (policyData: any) => Promise<SecurityValidationResult>;
+  
+  /** Execute custom security rules */
+  executeSecurityRules: (data: TFieldValues, rules?: SecurityRule<TFieldValues>[]) => Promise<SecurityValidationResult>;
+  
+  /** Check if user has specific permission */
+  hasPermission: (permission: string, resource?: string) => boolean;
+  
+  /** Get validation errors for React Hook Form */
+  getFormErrors: () => FieldErrors<TFieldValues>;
+  
+  /** Clear validation errors */
+  clearErrors: (fieldName?: Path<TFieldValues>) => void;
+  
+  /** Validation state */
   isValidating: boolean;
-  validationErrors: Record<string, string>;
-  lastValidationTime: number;
-  permissionCacheStats: { size: number; hitRate: number };
-}
-
-/**
- * Validation performance metrics
- */
-export interface ValidationMetrics {
-  totalValidations: number;
-  averageValidationTime: number;
-  maxValidationTime: number;
-  validationsUnder100ms: number;
-  validationErrors: number;
-  cacheHits: number;
-  cacheMisses: number;
-}
-
-/**
- * Default configuration for security validation
- */
-const DEFAULT_CONFIG: SecurityValidationConfig = {
-  realTimeEnabled: true,
-  maxValidationTime: 100, // Requirement: under 100ms
-  debounceMs: 50,
-  enablePermissionCaching: true,
-  permissionCacheTTL: 300000, // 5 minutes
-  enableAuditLogging: true
-};
-
-/**
- * Security Validation Hook
- * 
- * Provides comprehensive security rule validation with real-time feedback,
- * RBAC integration, and React Hook Form compatibility.
- */
-export function useSecurityValidation(config: UseSecurityValidationConfig = {}): UseSecurityValidationReturn {
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
   
-  // State management
+  /** Validation metrics */
+  validationMetrics: {
+    totalValidations: number;
+    averageExecutionTime: number;
+    cacheHitRate: number;
+    lastValidationTime?: Date;
+  };
+  
+  /** Current validation errors */
+  validationErrors: Record<string, string>;
+  
+  /** Current validation warnings */
+  validationWarnings: Record<string, string>;
+}
+
+/**
+ * Custom React hook for comprehensive security validation
+ * 
+ * Provides real-time validation under 100ms with Zod integration,
+ * role-based access control, and comprehensive security rule validation.
+ * 
+ * @param config - Hook configuration options
+ * @returns Security validation interface
+ * 
+ * @example
+ * ```tsx
+ * // Basic usage with React Hook Form
+ * const form = useForm<SecurityFormData>();
+ * const security = useSecurityValidation({
+ *   form,
+ *   context: { user: currentUser },
+ *   enableRealTimeValidation: true,
+ * });
+ * 
+ * // Field validation
+ * const validateRoleName = async (value: string) => {
+ *   const error = await security.validateField('roleName', value);
+ *   return error || true;
+ * };
+ * 
+ * // Permission checking
+ * const canManageRoles = security.hasPermission('role:manage');
+ * 
+ * // Form submission validation
+ * const handleSubmit = async (data: SecurityFormData) => {
+ *   const result = await security.validateForm(data);
+ *   if (result.isValid) {
+ *     // Submit form
+ *   } else {
+ *     // Handle validation errors
+ *   }
+ * };
+ * ```
+ */
+export function useSecurityValidation<TFieldValues extends FieldValues = FieldValues>(
+  config: UseSecurityValidationConfig<TFieldValues> = {}
+): UseSecurityValidationReturn<TFieldValues> {
+  
+  // =============================================================================
+  // STATE AND REFS
+  // =============================================================================
+  
+  const {
+    form,
+    context = {},
+    performance = {},
+    customRules = [],
+    enablePermissionValidation = true,
+    permissionConfig,
+    enableRealTimeValidation = true,
+    schemas = {},
+  } = config;
+
   const [isValidating, setIsValidating] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [lastValidationTime, setLastValidationTime] = useState(0);
-  
-  // Performance tracking
-  const metricsRef = useRef<ValidationMetrics>({
+  const [validationWarnings, setValidationWarnings] = useState<Record<string, string>>({});
+  const [validationMetrics, setValidationMetrics] = useState({
     totalValidations: 0,
-    averageValidationTime: 0,
-    maxValidationTime: 0,
-    validationsUnder100ms: 0,
-    validationErrors: 0,
-    cacheHits: 0,
-    cacheMisses: 0
+    averageExecutionTime: 0,
+    cacheHitRate: 0,
+    lastValidationTime: undefined as Date | undefined,
   });
 
-  // Permission validator instance
-  const permissionValidator = useMemo(
-    () => new PermissionValidator(finalConfig.permissionCacheTTL),
-    [finalConfig.permissionCacheTTL]
-  );
+  // Performance configuration with defaults
+  const performanceConfig: ValidationPerformanceConfig = {
+    maxExecutionTime: 100,
+    debounceDelay: 300,
+    enableCaching: true,
+    cacheDuration: 5 * 60 * 1000, // 5 minutes
+    maxConcurrentValidations: 3,
+    ...performance,
+  };
 
-  // Validation rules registry
-  const validationRules = useMemo(() => {
-    const rules = new Map<SecurityRuleType, SecurityValidationRule>();
-    
-    // Register built-in validation rules
-    rules.set('role-assignment', {
-      id: 'role-assignment',
-      type: 'role-assignment',
-      name: 'Role Assignment',
-      schema: SecurityValidationSchemas.roleAssignment,
-      businessValidator: BusinessLogicValidators.validateRoleAssignment,
-      requiredPermissions: ['roles:assign'],
+  // Validation cache and debounce refs
+  const validationCacheRef = useRef(new Map<string, { result: any; timestamp: number }>());
+  const debounceTimeoutsRef = useRef(new Map<string, NodeJS.Timeout>());
+  const activeValidationsRef = useRef(new Set<string>());
+
+  // =============================================================================
+  // DEFAULT SECURITY RULES
+  // =============================================================================
+
+  const defaultSecurityRules = useMemo<SecurityRule<TFieldValues>[]>(() => [
+    {
+      id: 'role_permission_consistency',
+      name: 'Role Permission Consistency',
+      description: 'Validates that role permissions are consistent and non-conflicting',
+      category: 'authorization',
       priority: 100,
-      enabled: true
-    });
-
-    rules.set('rate-limit', {
-      id: 'rate-limit',
-      type: 'rate-limit',
-      name: 'Rate Limit',
-      schema: SecurityValidationSchemas.rateLimit,
-      businessValidator: BusinessLogicValidators.validateRateLimit,
-      requiredPermissions: ['rate-limits:create', 'rate-limits:update'],
+      enabled: true,
+      validate: async (data: any, ctx) => {
+        if (data.permissions && Array.isArray(data.permissions)) {
+          // Check for conflicting permissions
+          const hasAdmin = data.permissions.includes('admin');
+          const hasOtherPerms = data.permissions.length > 1;
+          
+          if (hasAdmin && hasOtherPerms) {
+            return {
+              success: false,
+              error: 'Admin permission cannot be combined with other permissions',
+            };
+          }
+        }
+        return { success: true };
+      },
+    },
+    {
+      id: 'rate_limit_reasonableness',
+      name: 'Rate Limit Reasonableness',
+      description: 'Validates that rate limits are within reasonable bounds',
+      category: 'rate_limiting',
       priority: 90,
-      enabled: true
-    });
-
-    rules.set('security-policy', {
-      id: 'security-policy',
-      type: 'security-policy',
-      name: 'Security Policy',
-      schema: SecurityValidationSchemas.securityPolicy,
-      businessValidator: BusinessLogicValidators.validateSecurityPolicy,
-      requiredPermissions: ['security-policies:create', 'security-policies:update'],
+      enabled: true,
+      validate: async (data: any, ctx) => {
+        if (data.rate && data.period) {
+          const ratePerMinute = data.period === 'minute' ? data.rate :
+                               data.period === 'hour' ? data.rate / 60 :
+                               data.period === 'day' ? data.rate / (60 * 24) : data.rate;
+          
+          if (ratePerMinute > 1000) {
+            return {
+              success: false,
+              error: 'Rate limit exceeds maximum reasonable threshold of 1000 requests per minute',
+            };
+          }
+          
+          if (ratePerMinute < 0.01) {
+            return {
+              success: false,
+              warning: 'Rate limit is very restrictive and may impact user experience',
+            };
+          }
+        }
+        return { success: true };
+      },
+    },
+    {
+      id: 'api_key_security',
+      name: 'API Key Security',
+      description: 'Validates API key strength and security requirements',
+      category: 'authentication',
       priority: 95,
-      enabled: true
-    });
+      enabled: true,
+      validate: async (data: any, ctx) => {
+        if (data.apiKey) {
+          // Check entropy and patterns
+          const entropy = calculateEntropy(data.apiKey);
+          if (entropy < 4.5) {
+            return {
+              success: false,
+              error: 'API key has insufficient entropy for security requirements',
+            };
+          }
+          
+          // Check for common patterns
+          if (/(.)\1{3,}/.test(data.apiKey)) {
+            return {
+              success: false,
+              error: 'API key contains repeating character patterns',
+            };
+          }
+        }
+        return { success: true };
+      },
+    },
+  ], []);
 
-    // Add other built-in rules...
-    rules.set('permission-grant', {
-      id: 'permission-grant',
-      type: 'permission-grant',
-      name: 'Permission Grant',
-      schema: SecurityValidationSchemas.permissionGrant,
-      requiredPermissions: ['permissions:grant'],
-      priority: 85,
-      enabled: true
-    });
+  // =============================================================================
+  // UTILITY FUNCTIONS
+  // =============================================================================
 
-    rules.set('api-key', {
-      id: 'api-key',
-      type: 'api-key',
-      name: 'API Key',
-      schema: SecurityValidationSchemas.apiKey,
-      requiredPermissions: ['api-keys:create'],
-      priority: 80,
-      enabled: true
-    });
-
-    // Register custom rules
-    config.customRules?.forEach(rule => {
-      rules.set(rule.type, rule);
-    });
-
-    return rules;
-  }, [config.customRules]);
-
-  // Performance tracking helper
-  const trackValidation = useCallback((validationTime: number, hasError: boolean) => {
-    const metrics = metricsRef.current;
-    metrics.totalValidations++;
-    metrics.averageValidationTime = 
-      (metrics.averageValidationTime * (metrics.totalValidations - 1) + validationTime) / metrics.totalValidations;
-    metrics.maxValidationTime = Math.max(metrics.maxValidationTime, validationTime);
+  /**
+   * Calculate entropy of a string for security validation
+   */
+  const calculateEntropy = useCallback((str: string): number => {
+    const chars = Array.from(new Set(str));
+    const length = str.length;
     
-    if (validationTime < 100) {
-      metrics.validationsUnder100ms++;
-    }
+    if (length === 0) return 0;
     
-    if (hasError) {
-      metrics.validationErrors++;
-    }
-    
-    setLastValidationTime(validationTime);
+    return chars.reduce((entropy, char) => {
+      const frequency = str.split(char).length - 1;
+      const probability = frequency / length;
+      return entropy - probability * Math.log2(probability);
+    }, 0);
   }, []);
 
-  // Core validation function
-  const validateRule = useCallback(async (
-    ruleType: SecurityRuleType,
-    value: any
-  ): Promise<ValidationResult> => {
+  /**
+   * Get cache key for validation results
+   */
+  const getCacheKey = useCallback((type: string, data: any): string => {
+    return `${type}:${JSON.stringify(data)}`;
+  }, []);
+
+  /**
+   * Check if cached result is still valid
+   */
+  const isCacheValid = useCallback((timestamp: number): boolean => {
+    return Date.now() - timestamp < performanceConfig.cacheDuration;
+  }, [performanceConfig.cacheDuration]);
+
+  /**
+   * Execute validation with performance monitoring
+   */
+  const executeWithPerformanceTracking = useCallback(async <T>(
+    operation: () => Promise<T>,
+    operationType: string
+  ): Promise<T> => {
     const startTime = Date.now();
-    setIsValidating(true);
-
+    const validationId = `${operationType}:${startTime}`;
+    
     try {
-      const rule = validationRules.get(ruleType);
-      if (!rule || !rule.enabled) {
-        return {
-          isValid: false,
-          errorMessage: `Validation rule not found or disabled: ${ruleType}`,
-          errorCode: 'RULE_NOT_FOUND',
-          validationTime: Date.now() - startTime
-        };
-      }
-
-      // Check permissions first
-      if (rule.requiredPermissions && config.rbacContext) {
-        const hasRequiredPermissions = permissionValidator.hasAllPermissions(
-          config.rbacContext.permissions,
-          rule.requiredPermissions
-        );
-
-        if (!hasRequiredPermissions) {
-          const result = {
-            isValid: false,
-            errorMessage: 'Insufficient permissions for this operation',
-            errorCode: 'PERMISSION_DENIED',
-            validationTime: Date.now() - startTime
-          };
-          trackValidation(result.validationTime, true);
-          return result;
-        }
-      }
-
-      // Schema validation
-      const schemaResult = rule.schema.safeParse(value);
-      if (!schemaResult.success) {
-        const errorMessage = schemaResult.error.errors
-          .map(err => err.message)
-          .join(', ');
-        
-        const result = {
-          isValid: false,
-          errorMessage,
-          errorCode: 'SCHEMA_VALIDATION_FAILED',
-          validationTime: Date.now() - startTime
-        };
-        trackValidation(result.validationTime, true);
-        return result;
-      }
-
-      // Business logic validation
-      if (rule.businessValidator) {
-        const context: ValidationContext = {
-          userRole: config.rbacContext?.userRole,
-          userPermissions: config.rbacContext?.permissions || [],
-          formValues: config.form?.getValues() || {},
-          timestamp: new Date()
-        };
-
-        const businessResult = await rule.businessValidator(value, context);
-        trackValidation(businessResult.validationTime, !businessResult.isValid);
-        return businessResult;
-      }
-
-      const result = {
-        isValid: true,
-        validationTime: Date.now() - startTime
-      };
-      trackValidation(result.validationTime, false);
-      return result;
-
-    } catch (error) {
-      const result = {
-        isValid: false,
-        errorMessage: error instanceof Error ? error.message : 'Unknown validation error',
-        errorCode: 'VALIDATION_EXCEPTION',
-        validationTime: Date.now() - startTime
-      };
-      trackValidation(result.validationTime, true);
+      activeValidationsRef.current.add(validationId);
+      const result = await Promise.race([
+        operation(),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Validation timeout')), performanceConfig.maxExecutionTime)
+        ),
+      ]);
+      
+      const executionTime = Date.now() - startTime;
+      
+      // Update metrics
+      setValidationMetrics(prev => ({
+        totalValidations: prev.totalValidations + 1,
+        averageExecutionTime: (prev.averageExecutionTime * prev.totalValidations + executionTime) / (prev.totalValidations + 1),
+        cacheHitRate: prev.cacheHitRate, // Updated separately
+        lastValidationTime: new Date(),
+      }));
+      
       return result;
     } finally {
-      setIsValidating(false);
+      activeValidationsRef.current.delete(validationId);
     }
-  }, [validationRules, config.rbacContext, config.form, permissionValidator, trackValidation]);
+  }, [performanceConfig.maxExecutionTime]);
 
-  // Batch validation
-  const validateMultiple = useCallback(async (
-    validations: Array<{ type: SecurityRuleType; value: any }>
-  ): Promise<ValidationResult[]> => {
-    const startTime = Date.now();
-    
-    // Validate in parallel for better performance
-    const results = await Promise.all(
-      validations.map(({ type, value }) => validateRule(type, value))
-    );
-    
-    // Ensure total validation time is under requirements
-    const totalTime = Date.now() - startTime;
-    if (totalTime > finalConfig.maxValidationTime * validations.length) {
-      console.warn(`Batch validation exceeded time limit: ${totalTime}ms`);
+  // =============================================================================
+  // PERMISSION VALIDATION
+  // =============================================================================
+
+  /**
+   * Check if user has specific permission
+   */
+  const hasPermission = useCallback((permission: string, resource?: string): boolean => {
+    if (!enablePermissionValidation || !context.user) {
+      return true; // Allow if permission validation is disabled or no user context
     }
 
-    return results;
-  }, [validateRule, finalConfig.maxValidationTime]);
-
-  // Permission utilities
-  const hasPermission = useCallback((resource: string, action: string): boolean => {
-    if (!config.rbacContext) return false;
-    return permissionValidator.hasPermission(config.rbacContext.permissions, resource, action);
-  }, [config.rbacContext, permissionValidator]);
-
-  const hasAnyPermission = useCallback((permissions: string[]): boolean => {
-    if (!config.rbacContext) return false;
-    return permissionValidator.hasAnyPermission(config.rbacContext.permissions, permissions);
-  }, [config.rbacContext, permissionValidator]);
-
-  const hasAllPermissions = useCallback((permissions: string[]): boolean => {
-    if (!config.rbacContext) return false;
-    return permissionValidator.hasAllPermissions(config.rbacContext.permissions, permissions);
-  }, [config.rbacContext, permissionValidator]);
-
-  // Specific validation functions
-  const validatePermission = useCallback((resource: string, action: string): boolean => {
-    return hasPermission(resource, action);
-  }, [hasPermission]);
-
-  const validateRoleAssignment = useCallback(async (
-    userId: number,
-    roleId: number
-  ): Promise<ValidationResult> => {
-    return validateRule('role-assignment', { userId, roleId, assignedBy: config.rbacContext?.userRole?.id });
-  }, [validateRule, config.rbacContext]);
-
-  const validateRateLimit = useCallback(async (
-    rateLimitConfig: RateLimitConfig
-  ): Promise<ValidationResult> => {
-    return validateRule('rate-limit', rateLimitConfig);
-  }, [validateRule]);
-
-  const validateSecurityPolicy = useCallback(async (
-    policy: SecurityPolicy
-  ): Promise<ValidationResult> => {
-    return validateRule('security-policy', policy);
-  }, [validateRule]);
-
-  const validateAccessControl = useCallback(async (
-    entry: AccessControlEntry
-  ): Promise<ValidationResult> => {
-    return validateRule('access-control', entry);
-  }, [validateRule]);
-
-  // Higher-level permission checks
-  const canModifyRole = useCallback((roleId: number): boolean => {
-    if (!config.rbacContext?.userRole) return false;
+    const { user } = context;
     
-    // Users can't assign roles with higher privileges than their own
-    return (
-      hasPermission('roles', 'assign') &&
-      roleId <= config.rbacContext.userRole.id
-    );
-  }, [hasPermission, config.rbacContext]);
-
-  const canCreateRateLimit = useCallback((): boolean => {
-    return hasAnyPermission(['rate-limits:create', 'system:admin']);
-  }, [hasAnyPermission]);
-
-  const canManageSecurityPolicy = useCallback((): boolean => {
-    return hasAnyPermission(['security-policies:manage', 'system:admin']);
-  }, [hasAnyPermission]);
-
-  // React Hook Form integration
-  const createFieldValidator = useCallback((ruleType: SecurityRuleType) => {
-    return async (value: any): Promise<string | undefined> => {
-      const result = await validateRule(ruleType, value);
-      return result.isValid ? undefined : result.errorMessage;
-    };
-  }, [validateRule]);
-
-  const getFieldError = useCallback((fieldName: string): FieldError | undefined => {
-    if (!config.form) return undefined;
-    return config.form.formState.errors[fieldName] as FieldError;
-  }, [config.form]);
-
-  const setFieldError = useCallback((fieldName: string, error: string): void => {
-    if (!config.form) return;
-    config.form.setError(fieldName, { message: error });
-    setValidationErrors(prev => ({ ...prev, [fieldName]: error }));
-  }, [config.form]);
-
-  const clearFieldErrors = useCallback((fieldNames?: string[]): void => {
-    if (!config.form) return;
+    // Root admin has all permissions
+    if (user.isRootAdmin) {
+      return true;
+    }
     
-    if (fieldNames) {
-      fieldNames.forEach(name => config.form?.clearErrors(name));
-      setValidationErrors(prev => {
-        const newErrors = { ...prev };
-        fieldNames.forEach(name => delete newErrors[name]);
-        return newErrors;
+    // System admin has most permissions
+    if (user.isSysAdmin && !permission.includes('root')) {
+      return true;
+    }
+    
+    // Check explicit permissions
+    const userPermissions = user.permissions || [];
+    const resourcePermission = resource ? `${resource}:${permission}` : permission;
+    
+    return userPermissions.includes(permission) || 
+           userPermissions.includes(resourcePermission) ||
+           userPermissions.includes('*');
+  }, [enablePermissionValidation, context.user]);
+
+  /**
+   * Validate permissions for current context
+   */
+  const validatePermissions = useCallback(async (config?: PermissionValidationConfig): Promise<boolean> => {
+    const permConfig = config || permissionConfig;
+    
+    if (!permConfig || !enablePermissionValidation) {
+      return true;
+    }
+
+    const { requiredPermissions, resource, operation, allowAdminOverride = true } = permConfig;
+    
+    // Admin override check
+    if (allowAdminOverride && context.user?.isRootAdmin) {
+      return true;
+    }
+    
+    // Check all required permissions
+    return requiredPermissions.every(permission => {
+      const fullPermission = operation ? `${permission}:${operation}` : permission;
+      return hasPermission(fullPermission, resource);
+    });
+  }, [permissionConfig, enablePermissionValidation, context.user, hasPermission]);
+
+  // =============================================================================
+  // FIELD VALIDATION
+  // =============================================================================
+
+  /**
+   * Validate specific field with debouncing
+   */
+  const validateField = useCallback(async (
+    fieldName: Path<TFieldValues>,
+    value?: PathValue<TFieldValues, Path<TFieldValues>>
+  ): Promise<string | undefined> => {
+    const fieldKey = `field:${fieldName}:${JSON.stringify(value)}`;
+    
+    // Check cache first
+    if (performanceConfig.enableCaching) {
+      const cached = validationCacheRef.current.get(fieldKey);
+      if (cached && isCacheValid(cached.timestamp)) {
+        setValidationMetrics(prev => ({
+          ...prev,
+          cacheHitRate: (prev.cacheHitRate * prev.totalValidations + 1) / (prev.totalValidations + 1),
+        }));
+        return cached.result;
+      }
+    }
+    
+    // Debounce validation if real-time is enabled
+    if (enableRealTimeValidation) {
+      const existingTimeout = debounceTimeoutsRef.current.get(fieldKey);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+      
+      return new Promise((resolve) => {
+        const timeout = setTimeout(async () => {
+          const result = await executeFieldValidation(fieldName, value);
+          
+          // Cache result
+          if (performanceConfig.enableCaching) {
+            validationCacheRef.current.set(fieldKey, {
+              result,
+              timestamp: Date.now(),
+            });
+          }
+          
+          resolve(result);
+        }, performanceConfig.debounceDelay);
+        
+        debounceTimeoutsRef.current.set(fieldKey, timeout);
       });
-    } else {
-      config.form.clearErrors();
-      setValidationErrors({});
     }
-  }, [config.form]);
+    
+    return executeFieldValidation(fieldName, value);
+  }, [enableRealTimeValidation, performanceConfig]);
 
-  // Performance monitoring
-  const getValidationMetrics = useCallback((): ValidationMetrics => {
-    return { ...metricsRef.current };
+  /**
+   * Execute field validation logic
+   */
+  const executeFieldValidation = useCallback(async (
+    fieldName: Path<TFieldValues>,
+    value?: PathValue<TFieldValues, Path<TFieldValues>>
+  ): Promise<string | undefined> => {
+    return executeWithPerformanceTracking(async () => {
+      // Use form value if not provided
+      const fieldValue = value !== undefined ? value : form?.getValues(fieldName);
+      
+      // Check permission for field access
+      if (enablePermissionValidation && !hasPermission(`field:${fieldName}`, 'edit')) {
+        return 'Insufficient permissions to modify this field';
+      }
+      
+      // Execute field-specific validation based on field name
+      try {
+        if (fieldName.includes('role') && schemas.role) {
+          const result = await schemas.role.parseAsync({ [fieldName]: fieldValue });
+          return undefined; // No error
+        }
+        
+        if (fieldName.includes('rate') && schemas.rateLimit) {
+          const result = await schemas.rateLimit.parseAsync({ [fieldName]: fieldValue });
+          return undefined;
+        }
+        
+        if (fieldName.includes('api') && schemas.apiSecurity) {
+          const result = await schemas.apiSecurity.parseAsync({ [fieldName]: fieldValue });
+          return undefined;
+        }
+        
+        return undefined; // No validation error
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return error.errors[0]?.message || 'Validation failed';
+        }
+        return 'Validation error occurred';
+      }
+    }, 'field-validation');
+  }, [form, enablePermissionValidation, hasPermission, schemas, executeWithPerformanceTracking]);
+
+  // =============================================================================
+  // FORM VALIDATION
+  // =============================================================================
+
+  /**
+   * Validate entire form with comprehensive security rules
+   */
+  const validateForm = useCallback(async (data: TFieldValues): Promise<SecurityValidationResult> => {
+    return executeWithPerformanceTracking(async () => {
+      setIsValidating(true);
+      const startTime = Date.now();
+      
+      try {
+        const errors: Record<string, string> = {};
+        const warnings: Record<string, string> = {};
+        let rulesEvaluated = 0;
+        
+        // Permission validation
+        if (enablePermissionValidation) {
+          const hasPermission = await validatePermissions();
+          if (!hasPermission) {
+            errors.general = 'Insufficient permissions for this operation';
+          }
+        }
+        
+        // Execute security rules
+        const allRules = [...defaultSecurityRules, ...customRules];
+        const enabledRules = allRules
+          .filter(rule => rule.enabled)
+          .sort((a, b) => b.priority - a.priority);
+        
+        for (const rule of enabledRules) {
+          try {
+            // Check rule conditions
+            if (rule.conditions && !evaluateRuleConditions(rule.conditions, data)) {
+              continue;
+            }
+            
+            const result = await rule.validate(data, context);
+            rulesEvaluated++;
+            
+            if (!result.success) {
+              if (result.error) {
+                errors[rule.id] = result.error;
+              }
+              if (result.warning) {
+                warnings[rule.id] = result.warning;
+              }
+            }
+          } catch (error) {
+            errors[rule.id] = `Rule execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          }
+        }
+        
+        const executionTime = Date.now() - startTime;
+        const isValid = Object.keys(errors).length === 0;
+        
+        // Update component state
+        setValidationErrors(errors);
+        setValidationWarnings(warnings);
+        
+        return {
+          isValid,
+          errors,
+          warnings,
+          metrics: {
+            executionTime,
+            rulesEvaluated,
+            timestamp: new Date(),
+          },
+          context: {
+            user: context.user,
+            environment: context.environment,
+          },
+        };
+      } finally {
+        setIsValidating(false);
+      }
+    }, 'form-validation');
+  }, [
+    context,
+    customRules,
+    defaultSecurityRules,
+    enablePermissionValidation,
+    validatePermissions,
+    executeWithPerformanceTracking,
+  ]);
+
+  /**
+   * Evaluate rule conditions
+   */
+  const evaluateRuleConditions = useCallback((
+    conditions: SecurityRuleCondition[],
+    data: TFieldValues
+  ): boolean => {
+    if (conditions.length === 0) return true;
+    
+    const results = conditions.map(condition => {
+      const fieldValue = getNestedValue(data, condition.field);
+      
+      switch (condition.operator) {
+        case 'equals':
+          return fieldValue === condition.value;
+        case 'not_equals':
+          return fieldValue !== condition.value;
+        case 'in':
+          return Array.isArray(condition.value) && condition.value.includes(fieldValue);
+        case 'not_in':
+          return !Array.isArray(condition.value) || !condition.value.includes(fieldValue);
+        case 'greater_than':
+          return typeof fieldValue === 'number' && fieldValue > condition.value;
+        case 'less_than':
+          return typeof fieldValue === 'number' && fieldValue < condition.value;
+        case 'contains':
+          return typeof fieldValue === 'string' && fieldValue.includes(condition.value);
+        case 'regex':
+          return typeof fieldValue === 'string' && new RegExp(condition.value).test(fieldValue);
+        default:
+          return false;
+      }
+    });
+    
+    // Handle logical operators
+    const hasOr = conditions.some(c => c.logicalOperator === 'OR');
+    if (hasOr) {
+      return results.some(Boolean);
+    }
+    return results.every(Boolean);
   }, []);
 
-  const resetMetrics = useCallback((): void => {
-    metricsRef.current = {
-      totalValidations: 0,
-      averageValidationTime: 0,
-      maxValidationTime: 0,
-      validationsUnder100ms: 0,
-      validationErrors: 0,
-      cacheHits: 0,
-      cacheMisses: 0
-    };
-    permissionValidator.clearCache();
-  }, [permissionValidator]);
+  /**
+   * Get nested value from object
+   */
+  const getNestedValue = useCallback((obj: any, path: string): any => {
+    return path.split('.').reduce((current, key) => current?.[key], obj);
+  }, []);
 
-  // Cleanup on unmount
+  // =============================================================================
+  // SPECIFIC VALIDATION FUNCTIONS
+  // =============================================================================
+
+  /**
+   * Validate role configuration
+   */
+  const validateRole = useCallback(async (roleData: any): Promise<SecurityValidationResult> => {
+    return executeWithPerformanceTracking(async () => {
+      try {
+        const schema = schemas.role || RoleValidationSchema;
+        await schema.parseAsync(roleData);
+        
+        return {
+          isValid: true,
+          errors: {},
+          warnings: {},
+          metrics: {
+            executionTime: Date.now() - Date.now(),
+            rulesEvaluated: 1,
+            timestamp: new Date(),
+          },
+        };
+      } catch (error) {
+        const errors: Record<string, string> = {};
+        
+        if (error instanceof z.ZodError) {
+          error.errors.forEach(err => {
+            errors[err.path.join('.')] = err.message;
+          });
+        } else {
+          errors.general = 'Role validation failed';
+        }
+        
+        return {
+          isValid: false,
+          errors,
+          warnings: {},
+          metrics: {
+            executionTime: Date.now() - Date.now(),
+            rulesEvaluated: 1,
+            timestamp: new Date(),
+          },
+        };
+      }
+    }, 'role-validation');
+  }, [schemas.role, executeWithPerformanceTracking]);
+
+  /**
+   * Validate rate limit configuration
+   */
+  const validateRateLimit = useCallback(async (limitData: any): Promise<SecurityValidationResult> => {
+    return executeWithPerformanceTracking(async () => {
+      try {
+        const schema = schemas.rateLimit || RateLimitValidationSchema;
+        await schema.parseAsync(limitData);
+        
+        return {
+          isValid: true,
+          errors: {},
+          warnings: {},
+          metrics: {
+            executionTime: Date.now() - Date.now(),
+            rulesEvaluated: 1,
+            timestamp: new Date(),
+          },
+        };
+      } catch (error) {
+        const errors: Record<string, string> = {};
+        
+        if (error instanceof z.ZodError) {
+          error.errors.forEach(err => {
+            errors[err.path.join('.')] = err.message;
+          });
+        } else {
+          errors.general = 'Rate limit validation failed';
+        }
+        
+        return {
+          isValid: false,
+          errors,
+          warnings: {},
+          metrics: {
+            executionTime: Date.now() - Date.now(),
+            rulesEvaluated: 1,
+            timestamp: new Date(),
+          },
+        };
+      }
+    }, 'rate-limit-validation');
+  }, [schemas.rateLimit, executeWithPerformanceTracking]);
+
+  /**
+   * Validate API security configuration
+   */
+  const validateApiSecurity = useCallback(async (securityData: any): Promise<SecurityValidationResult> => {
+    return executeWithPerformanceTracking(async () => {
+      try {
+        const schema = schemas.apiSecurity || ApiSecurityValidationSchema;
+        await schema.parseAsync(securityData);
+        
+        return {
+          isValid: true,
+          errors: {},
+          warnings: {},
+          metrics: {
+            executionTime: Date.now() - Date.now(),
+            rulesEvaluated: 1,
+            timestamp: new Date(),
+          },
+        };
+      } catch (error) {
+        const errors: Record<string, string> = {};
+        
+        if (error instanceof z.ZodError) {
+          error.errors.forEach(err => {
+            errors[err.path.join('.')] = err.message;
+          });
+        } else {
+          errors.general = 'API security validation failed';
+        }
+        
+        return {
+          isValid: false,
+          errors,
+          warnings: {},
+          metrics: {
+            executionTime: Date.now() - Date.now(),
+            rulesEvaluated: 1,
+            timestamp: new Date(),
+          },
+        };
+      }
+    }, 'api-security-validation');
+  }, [schemas.apiSecurity, executeWithPerformanceTracking]);
+
+  /**
+   * Validate access policy
+   */
+  const validateAccessPolicy = useCallback(async (policyData: any): Promise<SecurityValidationResult> => {
+    return executeWithPerformanceTracking(async () => {
+      try {
+        const schema = schemas.accessPolicy || AccessPolicyValidationSchema;
+        await schema.parseAsync(policyData);
+        
+        return {
+          isValid: true,
+          errors: {},
+          warnings: {},
+          metrics: {
+            executionTime: Date.now() - Date.now(),
+            rulesEvaluated: 1,
+            timestamp: new Date(),
+          },
+        };
+      } catch (error) {
+        const errors: Record<string, string> = {};
+        
+        if (error instanceof z.ZodError) {
+          error.errors.forEach(err => {
+            errors[err.path.join('.')] = err.message;
+          });
+        } else {
+          errors.general = 'Access policy validation failed';
+        }
+        
+        return {
+          isValid: false,
+          errors,
+          warnings: {},
+          metrics: {
+            executionTime: Date.now() - Date.now(),
+            rulesEvaluated: 1,
+            timestamp: new Date(),
+          },
+        };
+      }
+    }, 'access-policy-validation');
+  }, [schemas.accessPolicy, executeWithPerformanceTracking]);
+
+  /**
+   * Execute custom security rules
+   */
+  const executeSecurityRules = useCallback(async (
+    data: TFieldValues,
+    rules?: SecurityRule<TFieldValues>[]
+  ): Promise<SecurityValidationResult> => {
+    const rulesToExecute = rules || customRules;
+    return executeWithPerformanceTracking(async () => {
+      const startTime = Date.now();
+      const errors: Record<string, string> = {};
+      const warnings: Record<string, string> = {};
+      let rulesEvaluated = 0;
+      
+      for (const rule of rulesToExecute.filter(r => r.enabled)) {
+        try {
+          const result = await rule.validate(data, context);
+          rulesEvaluated++;
+          
+          if (!result.success) {
+            if (result.error) {
+              errors[rule.id] = result.error;
+            }
+            if (result.warning) {
+              warnings[rule.id] = result.warning;
+            }
+          }
+        } catch (error) {
+          errors[rule.id] = `Rule execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        }
+      }
+      
+      return {
+        isValid: Object.keys(errors).length === 0,
+        errors,
+        warnings,
+        metrics: {
+          executionTime: Date.now() - startTime,
+          rulesEvaluated,
+          timestamp: new Date(),
+        },
+      };
+    }, 'security-rules-execution');
+  }, [customRules, context, executeWithPerformanceTracking]);
+
+  // =============================================================================
+  // REACT HOOK FORM INTEGRATION
+  // =============================================================================
+
+  /**
+   * Get validation errors formatted for React Hook Form
+   */
+  const getFormErrors = useCallback((): FieldErrors<TFieldValues> => {
+    const formErrors: FieldErrors<TFieldValues> = {};
+    
+    Object.entries(validationErrors).forEach(([key, message]) => {
+      const fieldPath = key as Path<TFieldValues>;
+      formErrors[fieldPath] = {
+        type: 'validation',
+        message,
+      } as FieldError;
+    });
+    
+    return formErrors;
+  }, [validationErrors]);
+
+  /**
+   * Clear validation errors
+   */
+  const clearErrors = useCallback((fieldName?: Path<TFieldValues>) => {
+    if (fieldName) {
+      setValidationErrors(prev => {
+        const next = { ...prev };
+        delete next[fieldName];
+        return next;
+      });
+      setValidationWarnings(prev => {
+        const next = { ...prev };
+        delete next[fieldName];
+        return next;
+      });
+    } else {
+      setValidationErrors({});
+      setValidationWarnings({});
+    }
+  }, []);
+
+  // =============================================================================
+  // CLEANUP
+  // =============================================================================
+
   useEffect(() => {
     return () => {
-      permissionValidator.clearCache();
+      // Clear all debounce timeouts
+      debounceTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+      debounceTimeoutsRef.current.clear();
+      
+      // Clear validation cache
+      validationCacheRef.current.clear();
+      
+      // Clear active validations
+      activeValidationsRef.current.clear();
     };
-  }, [permissionValidator]);
+  }, []);
+
+  // =============================================================================
+  // RETURN HOOK INTERFACE
+  // =============================================================================
 
   return {
-    // Validation functions
-    validateRule,
-    validatePermission,
-    validateRoleAssignment,
+    validateField,
+    validateForm,
+    validatePermissions,
+    validateRole,
     validateRateLimit,
-    validateSecurityPolicy,
-    validateAccessControl,
-    
-    // Batch validation
-    validateMultiple,
-    
-    // Permission utilities
+    validateApiSecurity,
+    validateAccessPolicy,
+    executeSecurityRules,
     hasPermission,
-    hasAnyPermission,
-    hasAllPermissions,
-    canModifyRole,
-    canCreateRateLimit,
-    canManageSecurityPolicy,
-    
-    // Form integration
-    createFieldValidator,
-    getFieldError,
-    setFieldError,
-    clearFieldErrors,
-    
-    // Performance monitoring
-    getValidationMetrics,
-    resetMetrics,
-    
-    // State
+    getFormErrors,
+    clearErrors,
     isValidating,
+    validationMetrics,
     validationErrors,
-    lastValidationTime,
-    permissionCacheStats: permissionValidator.getCacheStats()
+    validationWarnings,
   };
 }
 
-// ============================================================================
-// UTILITY EXPORTS
-// ============================================================================
+// =============================================================================
+// EXPORT DEFAULT SCHEMAS FOR CONVENIENCE
+// =============================================================================
 
-/**
- * Create a debounced version of the security validation hook
- * for improved performance with rapid user input
- */
-export function useDebouncedSecurityValidation(
-  config: UseSecurityValidationConfig = {},
-  delay: number = 50
-) {
-  const validation = useSecurityValidation(config);
-  const debouncedValidateRule = useDebounce(validation.validateRule, delay);
-  
-  return {
-    ...validation,
-    validateRule: debouncedValidateRule
-  };
-}
+export {
+  RoleValidationSchema,
+  RateLimitValidationSchema,
+  ApiSecurityValidationSchema,
+  AccessPolicyValidationSchema,
+};
 
-/**
- * Pre-configured security validation for common scenarios
- */
-export const SecurityValidationPresets = {
-  /**
-   * Role management validation configuration
-   */
-  roleManagement: (rbacContext: RBACContext): UseSecurityValidationConfig => ({
-    rbacContext,
-    customRules: [
-      {
-        id: 'role-hierarchy',
-        type: 'role-assignment',
-        name: 'Role Hierarchy',
-        schema: SecurityValidationSchemas.roleAssignment,
-        businessValidator: BusinessLogicValidators.validateRoleAssignment,
-        requiredPermissions: ['roles:assign'],
-        priority: 100,
-        enabled: true
-      }
-    ]
-  }),
+// =============================================================================
+// TYPE EXPORTS
+// =============================================================================
 
-  /**
-   * Rate limiting validation configuration
-   */
-  rateLimiting: (rbacContext: RBACContext): UseSecurityValidationConfig => ({
-    rbacContext,
-    customRules: [
-      {
-        id: 'rate-limit-config',
-        type: 'rate-limit',
-        name: 'Rate Limit Configuration',
-        schema: SecurityValidationSchemas.rateLimit,
-        businessValidator: BusinessLogicValidators.validateRateLimit,
-        requiredPermissions: ['rate-limits:manage'],
-        priority: 90,
-        enabled: true
-      }
-    ]
-  }),
-
-  /**
-   * Security policy validation configuration
-   */
-  securityPolicy: (rbacContext: RBACContext): UseSecurityValidationConfig => ({
-    rbacContext,
-    customRules: [
-      {
-        id: 'security-policy-config',
-        type: 'security-policy',
-        name: 'Security Policy Configuration',
-        schema: SecurityValidationSchemas.securityPolicy,
-        businessValidator: BusinessLogicValidators.validateSecurityPolicy,
-        requiredPermissions: ['security-policies:manage'],
-        priority: 95,
-        enabled: true
-      }
-    ]
-  })
-} as const;
-
-// Export all types for external use
 export type {
-  SecurityValidationConfig,
-  SecurityValidationRule,
-  ValidationContext,
-  ValidationResult,
-  SecurityPolicy,
-  SecurityPolicyRule,
-  RateLimitConfig,
-  AccessControlEntry,
-  AccessPrincipal,
+  SecurityValidationContext,
+  SecurityValidationResult,
+  SecurityRule,
+  SecurityRuleCategory,
+  SecurityRuleCondition,
+  SecurityRuleResult,
+  PermissionValidationConfig,
+  ValidationPerformanceConfig,
   UseSecurityValidationConfig,
   UseSecurityValidationReturn,
-  ValidationMetrics
 };
