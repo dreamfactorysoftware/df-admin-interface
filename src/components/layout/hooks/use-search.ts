@@ -1,177 +1,189 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 
-// Core hook dependencies (will be created separately)
-import { useDebounce } from '@/hooks/use-debounce';
-import { useLocalStorage } from '@/hooks/use-local-storage';
+import { apiClient, type ApiResponse } from '@/lib/api-client';
+import { useDebouncedValue, type DebounceOptions } from '@/hooks/use-debounce';
 
 /**
- * Search entity types that can be searched across the application
- */
-export type SearchEntityType = 
-  | 'services' 
-  | 'tables' 
-  | 'fields' 
-  | 'schemas' 
-  | 'users' 
-  | 'roles' 
-  | 'apps' 
-  | 'scripts' 
-  | 'files';
-
-/**
- * Individual search result item
+ * Search result interfaces and types
  */
 export interface SearchResult {
+  /** Unique identifier for the search result */
   id: string;
+  /** Display title for the result */
   title: string;
+  /** Optional description or subtitle */
   description?: string;
-  type: SearchEntityType;
+  /** Navigation path for the result */
   path: string;
+  /** Result category (e.g., 'database', 'service', 'table', 'user') */
+  category: string;
+  /** Optional icon identifier */
+  icon?: string;
+  /** Additional metadata for the result */
   metadata?: Record<string, any>;
-  highlightedTitle?: string;
-  highlightedDescription?: string;
-}
-
-/**
- * Grouped search results by entity type
- */
-export interface SearchResultGroup {
-  type: SearchEntityType;
-  label: string;
-  results: SearchResult[];
-  totalCount: number;
+  /** Search relevance score */
+  score?: number;
 }
 
 /**
  * Search API response structure
  */
-export interface SearchResponse {
-  query: string;
+export interface SearchApiResponse {
+  /** Array of search results */
+  results: SearchResult[];
+  /** Total number of available results (for pagination) */
   total: number;
-  groups: SearchResultGroup[];
-  executionTime: number;
+  /** Original search query */
+  query: string;
+  /** Response time in milliseconds */
+  took: number;
+  /** Available facets/categories */
+  facets?: Record<string, number>;
 }
 
 /**
- * Search dialog state configuration
+ * Search options and parameters
+ */
+export interface SearchOptions {
+  /** Search query string */
+  query: string;
+  /** Filter by specific categories */
+  categories?: string[];
+  /** Maximum number of results to return */
+  limit?: number;
+  /** Pagination offset */
+  offset?: number;
+  /** Include metadata in results */
+  includeMetadata?: boolean;
+  /** Minimum search score threshold */
+  minScore?: number;
+}
+
+/**
+ * Search dialog state management
  */
 export interface SearchDialogState {
+  /** Whether the search dialog is open */
   isOpen: boolean;
+  /** Current search query in the dialog */
+  query: string;
+  /** Dialog position (for future enhancements) */
   position?: { x: number; y: number };
 }
 
 /**
- * Recent search entry for local storage
+ * Recent search item for history tracking
  */
 export interface RecentSearch {
+  /** Search query */
   query: string;
+  /** When the search was performed */
   timestamp: number;
+  /** Number of results returned */
   resultCount: number;
 }
 
 /**
- * Search hook options for configuration
+ * Configuration options for the search hook
  */
 export interface UseSearchOptions {
+  /** Debounce delay in milliseconds (default: 1000ms per requirements) */
   debounceDelay?: number;
-  maxRecentSearches?: number;
-  enableCaching?: boolean;
+  /** Enable search result caching */
+  enableCache?: boolean;
+  /** Cache time in milliseconds */
   cacheTime?: number;
+  /** Stale time in milliseconds */
   staleTime?: number;
+  /** Enable recent search tracking */
+  trackRecentSearches?: boolean;
+  /** Maximum number of recent searches to store */
+  maxRecentSearches?: number;
+  /** Enable automatic search on input */
+  autoSearch?: boolean;
+  /** Minimum query length to trigger search */
+  minQueryLength?: number;
 }
 
 /**
- * Search hook return interface
+ * Search hook return type with comprehensive functionality
  */
 export interface UseSearchReturn {
-  // Search input state
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
+  // Search execution
+  /** Current search query */
+  query: string;
+  /** Set search query */
+  setQuery: (query: string) => void;
+  /** Debounced search query */
   debouncedQuery: string;
-  
-  // Search results
-  searchResults: SearchResponse | null;
-  isSearching: boolean;
-  searchError: Error | null;
-  
-  // Search dialog state
-  dialogState: SearchDialogState;
-  openSearchDialog: (position?: { x: number; y: number }) => void;
-  closeSearchDialog: () => void;
-  
-  // Search operations
-  executeSearch: (query: string) => Promise<SearchResponse | null>;
+  /** Execute search with specified options */
+  search: (options: Partial<SearchOptions>) => Promise<SearchApiResponse | undefined>;
+  /** Clear current search */
   clearSearch: () => void;
-  
+
+  // Search results
+  /** Current search results */
+  results: SearchResult[];
+  /** Search response metadata */
+  searchResponse: SearchApiResponse | undefined;
+  /** Whether search is loading */
+  isLoading: boolean;
+  /** Whether search is fetching (background) */
+  isFetching: boolean;
+  /** Search error if any */
+  error: Error | null;
+  /** Whether there are more results available */
+  hasMore: boolean;
+
+  // Search dialog state
+  /** Search dialog state */
+  dialogState: SearchDialogState;
+  /** Open search dialog */
+  openDialog: (initialQuery?: string) => void;
+  /** Close search dialog */
+  closeDialog: () => void;
+  /** Toggle search dialog */
+  toggleDialog: () => void;
+
   // Recent searches
+  /** Array of recent searches */
   recentSearches: RecentSearch[];
-  addRecentSearch: (query: string, resultCount: number) => void;
+  /** Add search to recent history */
+  addToRecentSearches: (query: string, resultCount: number) => void;
+  /** Clear recent searches */
   clearRecentSearches: () => void;
-  
-  // Navigation
+
+  // Validation and utilities
+  /** Whether current query is valid for searching */
+  isValidQuery: boolean;
+  /** Submit search with validation */
+  submitSearch: () => Promise<void>;
+  /** Navigation helper for search results */
   navigateToResult: (result: SearchResult) => void;
 }
 
 /**
- * Mock API client for search operations
- * This should be replaced with actual API client when available
+ * Default search configuration
  */
-const searchApiClient = {
-  async search(query: string): Promise<SearchResponse> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
-    
-    // Mock search results for different entity types
-    const mockResults: SearchResultGroup[] = [
-      {
-        type: 'services',
-        label: 'Database Services',
-        results: [
-          {
-            id: 'service-1',
-            title: `MySQL Production Service`,
-            description: `Production MySQL database service with ${query} configuration`,
-            type: 'services',
-            path: '/api-connections/database/mysql-prod',
-            metadata: { database: 'mysql', status: 'active' }
-          }
-        ],
-        totalCount: 1
-      },
-      {
-        type: 'tables',
-        label: 'Database Tables',
-        results: [
-          {
-            id: 'table-1',
-            title: `user_${query}`,
-            description: `Table containing user data matching ${query}`,
-            type: 'tables',
-            path: '/adf-schema/tables/user_data',
-            metadata: { rows: 1250, service: 'mysql-prod' }
-          }
-        ],
-        totalCount: 1
-      }
-    ].filter(group => 
-      group.results.some(result => 
-        result.title.toLowerCase().includes(query.toLowerCase()) ||
-        result.description?.toLowerCase().includes(query.toLowerCase())
-      )
-    );
-
-    return {
-      query,
-      total: mockResults.reduce((sum, group) => sum + group.totalCount, 0),
-      groups: mockResults,
-      executionTime: Math.round(50 + Math.random() * 100)
-    };
-  }
+const DEFAULT_SEARCH_OPTIONS: Required<UseSearchOptions> = {
+  debounceDelay: 1000, // 1000ms as per requirements
+  enableCache: true,
+  cacheTime: 300000, // 5 minutes
+  staleTime: 30000, // 30 seconds
+  trackRecentSearches: true,
+  maxRecentSearches: 10,
+  autoSearch: true,
+  minQueryLength: 2,
 };
+
+/**
+ * Local storage key for recent searches
+ */
+const RECENT_SEARCHES_KEY = 'dreamfactory-search-recent';
 
 /**
  * Global search functionality hook with debounced input handling, React Query caching,
@@ -179,287 +191,426 @@ const searchApiClient = {
  * Query caching and optimized search workflows.
  * 
  * Features:
- * - Debounced search input with configurable delay (default 1000ms)
- * - React Query caching with intelligent cache invalidation
- * - Search dialog state management with position controls
- * - Recent searches persistence with localStorage
- * - Cross-component search functionality integration
+ * - Debounced search input with configurable delay (1000ms default)
+ * - React Query caching with sub-50ms cache hit responses
+ * - Search dialog state management with position and visibility controls
+ * - Recent search history with localStorage persistence
+ * - Search result categorization and filtering
  * - Comprehensive error handling and validation
+ * - Search submission with proper user feedback
  * 
- * @param options Configuration options for search behavior
- * @returns Search state and operations interface
+ * @param options - Configuration options for search behavior
+ * @returns Comprehensive search functionality and state management
+ * 
+ * @example
+ * ```tsx
+ * function SearchComponent() {
+ *   const {
+ *     query,
+ *     setQuery,
+ *     results,
+ *     isLoading,
+ *     openDialog,
+ *     dialogState,
+ *     submitSearch,
+ *     navigateToResult,
+ *   } = useSearch({
+ *     debounceDelay: 500,
+ *     autoSearch: true,
+ *   });
+ * 
+ *   return (
+ *     <div>
+ *       <input
+ *         value={query}
+ *         onChange={(e) => setQuery(e.target.value)}
+ *         onKeyPress={(e) => e.key === 'Enter' && submitSearch()}
+ *       />
+ *       {isLoading && <div>Searching...</div>}
+ *       {results.map((result) => (
+ *         <div key={result.id} onClick={() => navigateToResult(result)}>
+ *           {result.title}
+ *         </div>
+ *       ))}
+ *     </div>
+ *   );
+ * }
+ * ```
+ * 
+ * @example
+ * ```tsx
+ * // Usage with search dialog integration
+ * function HeaderSearch() {
+ *   const { openDialog, dialogState, closeDialog } = useSearch();
+ * 
+ *   return (
+ *     <>
+ *       <button onClick={() => openDialog()}>
+ *         Search (Cmd+K)
+ *       </button>
+ *       <SearchDialog
+ *         open={dialogState.isOpen}
+ *         onClose={closeDialog}
+ *         initialQuery={dialogState.query}
+ *       />
+ *     </>
+ *   );
+ * }
+ * ```
  */
 export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
-  const {
-    debounceDelay = 1000,
-    maxRecentSearches = 10,
-    enableCaching = true,
-    cacheTime = 300000, // 5 minutes
-    staleTime = 30000,  // 30 seconds
-  } = options;
-
+  const config = useMemo(() => ({ ...DEFAULT_SEARCH_OPTIONS, ...options }), [options]);
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // Search input state with debouncing for performance optimization
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const debouncedQuery = useDebounce(searchQuery, debounceDelay);
-
-  // Search dialog state management
+  // Search state management
+  const [query, setQuery] = useState<string>('');
   const [dialogState, setDialogState] = useState<SearchDialogState>({
     isOpen: false,
+    query: '',
   });
 
-  // Recent searches persistence using localStorage
-  const [recentSearches, setRecentSearches] = useLocalStorage<RecentSearch[]>(
-    'df-recent-searches',
-    []
+  // Recent searches state
+  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+
+  // Debounced query for automatic search triggering
+  const { debouncedValue: debouncedQuery, isPending } = useDebouncedValue(
+    query,
+    {
+      delay: config.debounceDelay,
+      trailing: true,
+    } as DebounceOptions
   );
 
-  // React Query for search operations with intelligent caching
-  const {
-    data: searchResults,
-    error: searchError,
-    isLoading: isSearching,
-    refetch: refetchSearch,
-  } = useQuery({
-    queryKey: ['global-search', debouncedQuery],
-    queryFn: () => searchApiClient.search(debouncedQuery),
-    enabled: Boolean(debouncedQuery && debouncedQuery.trim().length >= 2),
-    staleTime: enableCaching ? staleTime : 0,
-    cacheTime: enableCaching ? cacheTime : 0,
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    // Keep previous data while fetching new results for better UX
-    keepPreviousData: true,
-    // Background refetching for fresh data
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
-  });
+  // Load recent searches from localStorage on mount
+  useEffect(() => {
+    if (config.trackRecentSearches && typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored) as RecentSearch[];
+          // Filter out searches older than 30 days
+          const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+          const filtered = parsed.filter(search => search.timestamp > thirtyDaysAgo);
+          setRecentSearches(filtered.slice(0, config.maxRecentSearches));
+        }
+      } catch (error) {
+        console.warn('Failed to load recent searches:', error);
+      }
+    }
+  }, [config.trackRecentSearches, config.maxRecentSearches]);
 
-  // Search execution mutation for manual search operations
-  const searchMutation = useMutation({
-    mutationFn: (query: string) => searchApiClient.search(query),
-    onSuccess: (data, query) => {
-      // Update the query cache with new results
-      queryClient.setQueryData(['global-search', query], data);
-      
-      // Add to recent searches if results found
-      if (data.total > 0) {
-        addRecentSearch(query, data.total);
+  // Validation helper
+  const isValidQuery = useMemo(() => {
+    return debouncedQuery.trim().length >= config.minQueryLength;
+  }, [debouncedQuery, config.minQueryLength]);
+
+  // Search query using React Query for intelligent caching
+  const searchQueryKey = ['search', debouncedQuery];
+  const {
+    data: searchResponse,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: searchQueryKey,
+    queryFn: async (): Promise<SearchApiResponse> => {
+      if (!isValidQuery) {
+        return {
+          results: [],
+          total: 0,
+          query: debouncedQuery,
+          took: 0,
+        };
+      }
+
+      try {
+        const searchOptions: SearchOptions = {
+          query: debouncedQuery.trim(),
+          limit: 50,
+          includeMetadata: true,
+        };
+
+        // Execute search via API client
+        const response = await apiClient.post<SearchApiResponse>(
+          '/search',
+          searchOptions,
+          {
+            timeout: 5000, // 5 second timeout
+            retries: 1,
+          }
+        );
+
+        if (response.data) {
+          return response.data;
+        }
+
+        throw new Error('Invalid search response format');
+      } catch (error) {
+        console.error('Search API error:', error);
+        throw error;
       }
     },
-    onError: (error) => {
-      console.error('Search execution failed:', error);
-    },
+    enabled: config.autoSearch && config.enableCache && isValidQuery,
+    staleTime: config.staleTime,
+    gcTime: config.cacheTime,
+    refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   });
 
-  /**
-   * Opens the search dialog with optional positioning
-   */
-  const openSearchDialog = useCallback((position?: { x: number; y: number }) => {
-    setDialogState({
-      isOpen: true,
-      position,
-    });
-  }, []);
+  // Extract search results with fallback
+  const results = useMemo(() => {
+    return searchResponse?.results || [];
+  }, [searchResponse]);
 
-  /**
-   * Closes the search dialog and optionally clears search state
-   */
-  const closeSearchDialog = useCallback(() => {
-    setDialogState({
-      isOpen: false,
-      position: undefined,
-    });
-  }, []);
+  // Check if there are more results available
+  const hasMore = useMemo(() => {
+    if (!searchResponse) return false;
+    return searchResponse.results.length < searchResponse.total;
+  }, [searchResponse]);
 
-  /**
-   * Executes a search operation manually with immediate results
-   */
-  const executeSearch = useCallback(async (query: string): Promise<SearchResponse | null> => {
-    if (!query || query.trim().length < 2) {
-      return null;
+  // Manual search function for advanced use cases
+  const search = useCallback(async (searchOptions: Partial<SearchOptions>): Promise<SearchApiResponse | undefined> => {
+    const options: SearchOptions = {
+      query: query.trim(),
+      limit: 50,
+      includeMetadata: true,
+      ...searchOptions,
+    };
+
+    if (!options.query || options.query.length < config.minQueryLength) {
+      throw new Error(`Query must be at least ${config.minQueryLength} characters long`);
     }
 
     try {
-      const result = await searchMutation.mutateAsync(query);
-      setSearchQuery(query);
-      return result;
+      const response = await apiClient.post<SearchApiResponse>(
+        '/search',
+        options,
+        {
+          timeout: 10000, // Longer timeout for manual searches
+          retries: 2,
+        }
+      );
+
+      if (response.data) {
+        // Update query cache with manual search results
+        queryClient.setQueryData(['search', options.query], response.data);
+        
+        // Add to recent searches if tracking enabled
+        if (config.trackRecentSearches) {
+          addToRecentSearches(options.query, response.data.results.length);
+        }
+
+        return response.data;
+      }
+
+      throw new Error('Invalid search response format');
     } catch (error) {
-      console.error('Search execution error:', error);
-      return null;
+      console.error('Manual search error:', error);
+      throw error;
     }
-  }, [searchMutation]);
+  }, [query, config.minQueryLength, config.trackRecentSearches, queryClient]);
 
-  /**
-   * Clears current search state and results
-   */
+  // Search submission with validation and error handling
+  const submitSearch = useCallback(async (): Promise<void> => {
+    if (!isValidQuery) {
+      throw new Error(`Please enter at least ${config.minQueryLength} characters to search`);
+    }
+
+    try {
+      await search({ query: debouncedQuery });
+    } catch (error) {
+      console.error('Search submission failed:', error);
+      throw error;
+    }
+  }, [isValidQuery, config.minQueryLength, search, debouncedQuery]);
+
+  // Clear search function
   const clearSearch = useCallback(() => {
-    setSearchQuery('');
-    // Clear the cache for the current query
-    if (debouncedQuery) {
-      queryClient.removeQueries(['global-search', debouncedQuery]);
+    setQuery('');
+    // Clear cache for empty searches
+    queryClient.removeQueries({ queryKey: ['search', ''] });
+  }, [queryClient]);
+
+  // Dialog state management functions
+  const openDialog = useCallback((initialQuery?: string) => {
+    setDialogState({
+      isOpen: true,
+      query: initialQuery || query,
+    });
+    if (initialQuery) {
+      setQuery(initialQuery);
     }
-  }, [debouncedQuery, queryClient]);
+  }, [query]);
 
-  /**
-   * Adds a search query to recent searches with deduplication
-   */
-  const addRecentSearch = useCallback((query: string, resultCount: number) => {
-    if (!query || query.trim().length < 2) return;
+  const closeDialog = useCallback(() => {
+    setDialogState(prev => ({
+      ...prev,
+      isOpen: false,
+    }));
+  }, []);
 
-    const newRecentSearch: RecentSearch = {
-      query: query.trim(),
+  const toggleDialog = useCallback(() => {
+    setDialogState(prev => ({
+      ...prev,
+      isOpen: !prev.isOpen,
+    }));
+  }, []);
+
+  // Recent searches management
+  const addToRecentSearches = useCallback((searchQuery: string, resultCount: number) => {
+    if (!config.trackRecentSearches || !searchQuery.trim()) return;
+
+    const newSearch: RecentSearch = {
+      query: searchQuery.trim(),
       timestamp: Date.now(),
       resultCount,
     };
 
-    setRecentSearches(prevRecent => {
-      // Remove duplicate queries
-      const filtered = prevRecent.filter(
-        recent => recent.query.toLowerCase() !== query.toLowerCase()
-      );
+    setRecentSearches(prev => {
+      // Remove any existing search with the same query
+      const filtered = prev.filter(search => search.query !== newSearch.query);
+      // Add new search to the beginning and limit the total
+      const updated = [newSearch, ...filtered].slice(0, config.maxRecentSearches);
       
-      // Add new search at the beginning and limit to max count
-      return [newRecentSearch, ...filtered].slice(0, maxRecentSearches);
+      // Persist to localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+        } catch (error) {
+          console.warn('Failed to save recent searches:', error);
+        }
+      }
+      
+      return updated;
     });
-  }, [maxRecentSearches, setRecentSearches]);
+  }, [config.trackRecentSearches, config.maxRecentSearches]);
 
-  /**
-   * Clears all recent searches from localStorage
-   */
   const clearRecentSearches = useCallback(() => {
     setRecentSearches([]);
-  }, [setRecentSearches]);
-
-  /**
-   * Navigates to a search result and closes the search dialog
-   */
-  const navigateToResult = useCallback((result: SearchResult) => {
-    // Add to recent searches if valid result
-    if (searchResults) {
-      addRecentSearch(searchResults.query, searchResults.total);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(RECENT_SEARCHES_KEY);
+      } catch (error) {
+        console.warn('Failed to clear recent searches:', error);
+      }
     }
-    
-    // Close dialog before navigation
-    closeSearchDialog();
+  }, []);
+
+  // Navigation helper for search results
+  const navigateToResult = useCallback((result: SearchResult) => {
+    // Add to recent searches
+    if (config.trackRecentSearches) {
+      addToRecentSearches(query, 1);
+    }
     
     // Navigate using Next.js router
     router.push(result.path);
-  }, [searchResults, addRecentSearch, closeSearchDialog, router]);
-
-  // Effect to automatically add successful searches to recent searches
-  useEffect(() => {
-    if (searchResults && searchResults.total > 0 && debouncedQuery) {
-      addRecentSearch(debouncedQuery, searchResults.total);
+    
+    // Close dialog if open
+    if (dialogState.isOpen) {
+      closeDialog();
     }
-  }, [searchResults, debouncedQuery, addRecentSearch]);
+  }, [config.trackRecentSearches, addToRecentSearches, query, router, dialogState.isOpen, closeDialog]);
 
-  // Memoized return object for performance optimization
-  const returnValue = useMemo(() => ({
-    // Search input state
-    searchQuery,
-    setSearchQuery,
+  // Auto-add successful searches to recent history
+  useEffect(() => {
+    if (searchResponse && searchResponse.results.length > 0 && isValidQuery) {
+      addToRecentSearches(debouncedQuery, searchResponse.results.length);
+    }
+  }, [searchResponse, isValidQuery, debouncedQuery, addToRecentSearches]);
+
+  return {
+    // Search execution
+    query,
+    setQuery,
     debouncedQuery,
-    
-    // Search results with null fallback
-    searchResults: searchResults || null,
-    isSearching: isSearching || searchMutation.isLoading,
-    searchError: searchError || searchMutation.error,
-    
+    search,
+    clearSearch,
+
+    // Search results
+    results,
+    searchResponse,
+    isLoading: isLoading || isPending,
+    isFetching,
+    error: error as Error | null,
+    hasMore,
+
     // Search dialog state
     dialogState,
-    openSearchDialog,
-    closeSearchDialog,
-    
-    // Search operations
-    executeSearch,
-    clearSearch,
-    
+    openDialog,
+    closeDialog,
+    toggleDialog,
+
     // Recent searches
     recentSearches,
-    addRecentSearch,
+    addToRecentSearches,
     clearRecentSearches,
-    
-    // Navigation
+
+    // Validation and utilities
+    isValidQuery,
+    submitSearch,
     navigateToResult,
-  }), [
-    searchQuery,
-    setSearchQuery,
-    debouncedQuery,
-    searchResults,
-    isSearching,
-    searchError,
-    searchMutation.isLoading,
-    searchMutation.error,
-    dialogState,
-    openSearchDialog,
-    closeSearchDialog,
-    executeSearch,
-    clearSearch,
-    recentSearches,
-    addRecentSearch,
-    clearRecentSearches,
-    navigateToResult,
-  ]);
-
-  return returnValue;
-}
-
-/**
- * Hook for accessing global search state across components
- * Provides a singleton-like pattern for search state
- */
-export function useGlobalSearch() {
-  return useSearch({
-    debounceDelay: 1000,
-    maxRecentSearches: 10,
-    enableCaching: true,
-    cacheTime: 300000,
-    staleTime: 30000,
-  });
-}
-
-/**
- * Utility function to generate translation keys for search result groups
- * Maintains compatibility with Angular translation patterns
- */
-export function getSearchTranslationKey(type: SearchEntityType): string {
-  const keyMap: Record<SearchEntityType, string> = {
-    services: 'search.groups.services',
-    tables: 'search.groups.tables',
-    fields: 'search.groups.fields',
-    schemas: 'search.groups.schemas',
-    users: 'search.groups.users',
-    roles: 'search.groups.roles',
-    apps: 'search.groups.apps',
-    scripts: 'search.groups.scripts',
-    files: 'search.groups.files',
   };
+}
+
+/**
+ * Simplified search hook for basic use cases without dialog management
+ * 
+ * @param initialQuery - Initial search query
+ * @param options - Search configuration options
+ * @returns Basic search functionality
+ * 
+ * @example
+ * ```tsx
+ * function SimpleSearch() {
+ *   const { query, setQuery, results, isLoading } = useSimpleSearch('', {
+ *     debounceDelay: 300,
+ *   });
+ * 
+ *   return (
+ *     <div>
+ *       <input value={query} onChange={(e) => setQuery(e.target.value)} />
+ *       {results.map(result => <div key={result.id}>{result.title}</div>)}
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+export function useSimpleSearch(
+  initialQuery: string = '',
+  options: UseSearchOptions = {}
+) {
+  const search = useSearch(options);
   
-  return keyMap[type] || `search.groups.${type}`;
+  useEffect(() => {
+    if (initialQuery) {
+      search.setQuery(initialQuery);
+    }
+  }, [initialQuery, search.setQuery]);
+
+  return {
+    query: search.query,
+    setQuery: search.setQuery,
+    results: search.results,
+    isLoading: search.isLoading,
+    error: search.error,
+    clearSearch: search.clearSearch,
+  };
 }
 
-/**
- * Utility function to format search result paths for navigation
- */
-export function formatSearchResultPath(result: SearchResult): string {
-  // Ensure path starts with '/' for Next.js routing
-  return result.path.startsWith('/') ? result.path : `/${result.path}`;
-}
+// Export types for external consumption
+export type {
+  SearchOptions,
+  SearchResult,
+  SearchApiResponse,
+  SearchDialogState,
+  RecentSearch,
+  UseSearchOptions,
+  UseSearchReturn,
+};
 
-/**
- * Type guard to check if a search result is valid for navigation
- */
-export function isValidSearchResult(result: any): result is SearchResult {
-  return (
-    result &&
-    typeof result.id === 'string' &&
-    typeof result.title === 'string' &&
-    typeof result.type === 'string' &&
-    typeof result.path === 'string'
-  );
-}
-
+// Default export
 export default useSearch;
