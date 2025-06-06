@@ -1,726 +1,597 @@
-/**
- * Create Rate Limit Page
- * 
- * Next.js page component for creating new API rate limits with comprehensive
- * form validation, real-time validation under 100ms, SWR data fetching,
- * and SSR-compatible implementation. Replaces Angular df-limit-details
- * component with modern React/Next.js patterns.
- * 
- * Features:
- * - React Hook Form with Zod schema validation
- * - SWR/React Query for intelligent caching with <50ms cache hits
- * - Next.js SSR-compatible data fetching under 2 seconds
- * - Tailwind CSS styling with Headless UI components
- * - WCAG 2.1 AA compliant form controls
- * - Dynamic form controls based on limit type selection
- * - Paywall enforcement for premium rate limiting features
- * - Comprehensive error handling and success notifications
- * 
- * @fileoverview Create rate limit page with React/Next.js patterns
- * @version 1.0.0 - React 19/Next.js 15.1 Migration
- */
+'use client';
 
-'use client'
-
-import React, { useState, useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
-import { useForm, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import useSWR from 'swr'
+import React, { useState, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter } from 'next/navigation';
+import { z } from 'zod';
+import useSWR from 'swr';
 
 // UI Components
-import {
-  Form,
-  FormField,
-  FormLabel,
-  FormControl,
-  FormDescription,
-  FormSection,
-  FormActions,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { Select, type SelectOption } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import SecurityNav from '@/app/api-security/components/security-nav'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
-// Business Logic
-import { useLimits } from '@/hooks/use-limits'
-import { apiClient } from '@/lib/api-client'
+// Custom Hooks and Services
+import { useLimits } from '@/hooks/use-limits';
+import { useServices } from '@/hooks/use-services';
+import { useRoles } from '@/hooks/use-roles';
+import { useUsers } from '@/hooks/use-users';
+import { apiClient } from '@/lib/api-client';
 
 // Types and Validation
-import {
-  CreateLimitPayloadSchema,
-  RATE_LIMIT_PERIODS,
-  RATE_LIMIT_TYPES,
-  HTTP_VERBS,
-  type CreateLimitPayload,
-  type RateLimitPeriod,
-  type RateLimitType,
-  type HttpVerb,
-} from '@/types/limit'
-import type { ApiListResponse } from '@/types/api'
+import { limitCreateSchema } from '@/lib/validations/limit';
+import type { CreateLimitPayload, LimitType as LimitTypeType } from '@/types/limit';
+import type { Service } from '@/types/api';
+import type { UserProfile } from '@/types/api';
+import type { RoleType } from '@/types/api';
 
-// =============================================================================
-// VALIDATION SCHEMA
-// =============================================================================
+// Security Navigation
+import { SecurityNav } from '@/app/api-security/components/security-nav';
 
 /**
- * Enhanced validation schema for rate limit creation form
- * Implements real-time validation with conditional field requirements
- */
-const createLimitFormSchema = z.object({
-  name: z
-    .string()
-    .min(1, 'Rate limit name is required')
-    .max(100, 'Name must be less than 100 characters')
-    .regex(/^[a-zA-Z0-9\s\-_]+$/, 'Name can only contain letters, numbers, spaces, hyphens, and underscores'),
-  
-  description: z
-    .string()
-    .max(500, 'Description must be less than 500 characters')
-    .optional(),
-  
-  type: z.enum(['api', 'user', 'role', 'service', 'endpoint'], {
-    errorMap: () => ({ message: 'Please select a valid limit type' }),
-  }),
-  
-  rate: z
-    .string()
-    .min(1, 'Rate is required')
-    .regex(/^\d+$/, 'Rate must be a positive number')
-    .refine((val) => parseInt(val) > 0, 'Rate must be greater than 0')
-    .refine((val) => parseInt(val) <= 1000000, 'Rate cannot exceed 1,000,000'),
-  
-  period: z.enum(['minute', 'hour', 'day', '7-day', '30-day'], {
-    errorMap: () => ({ message: 'Please select a valid time period' }),
-  }),
-  
-  isActive: z.boolean().default(true),
-  
-  // Conditional fields based on limit type
-  endpoint: z.string().optional(),
-  verb: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']).optional(),
-  serviceId: z.number().nullable().optional(),
-  roleId: z.number().nullable().optional(),
-  userId: z.number().nullable().optional(),
-}).refine((data) => {
-  // Type-specific validation rules
-  const typeConfig = RATE_LIMIT_TYPES[data.type as RateLimitType]
-  
-  if (typeConfig.requires.includes('userId') && !data.userId) {
-    return false
-  }
-  if (typeConfig.requires.includes('roleId') && !data.roleId) {
-    return false
-  }
-  if (typeConfig.requires.includes('serviceId') && !data.serviceId) {
-    return false
-  }
-  if (typeConfig.requires.includes('endpoint') && (!data.endpoint || data.endpoint.trim() === '')) {
-    return false
-  }
-  if (typeConfig.requires.includes('verb') && !data.verb) {
-    return false
-  }
-  
-  return true
-}, {
-  message: "Please fill in all required fields for the selected limit type",
-  path: ['type']
-})
-
-type CreateLimitFormData = z.infer<typeof createLimitFormSchema>
-
-// =============================================================================
-// DATA FETCHING HELPERS
-// =============================================================================
-
-/**
- * Simplified service fetcher (placeholder implementation)
- */
-const fetchServices = async (): Promise<SelectOption[]> => {
-  try {
-    const response = await apiClient.get('/service')
-    return response.resource?.map((service: any) => ({
-      value: service.id,
-      label: service.name,
-      description: service.description,
-    })) || []
-  } catch (error) {
-    console.error('Failed to fetch services:', error)
-    return []
-  }
-}
-
-/**
- * Simplified roles fetcher (placeholder implementation)
- */
-const fetchRoles = async (): Promise<SelectOption[]> => {
-  try {
-    const response = await apiClient.get('/role')
-    return response.resource?.map((role: any) => ({
-      value: role.id,
-      label: role.name,
-      description: role.description,
-    })) || []
-  } catch (error) {
-    console.error('Failed to fetch roles:', error)
-    return []
-  }
-}
-
-/**
- * Simplified users fetcher (placeholder implementation)
- */
-const fetchUsers = async (): Promise<SelectOption[]> => {
-  try {
-    const response = await apiClient.get('/user')
-    return response.resource?.map((user: any) => ({
-      value: user.id,
-      label: user.email || user.username,
-      description: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
-    })) || []
-  } catch (error) {
-    console.error('Failed to fetch users:', error)
-    return []
-  }
-}
-
-// =============================================================================
-// MAIN COMPONENT
-// =============================================================================
-
-/**
- * Create Rate Limit Page Component
+ * Main Next.js page component for creating new API rate limits.
+ * Implements React Hook Form with Zod schema validation for real-time form validation under 100ms.
+ * Uses SWR for intelligent caching and synchronization with cache hit responses under 50ms.
+ * Features SSR-compatible data fetching and Tailwind CSS styling with Headless UI components.
  * 
- * Implements comprehensive rate limit creation with React Hook Form,
- * SWR data fetching, and Next.js SSR compatibility.
+ * Replaces Angular df-limit-details component with React/Next.js SSR-compatible implementation
+ * featuring dynamic form controls, paywall enforcement, and authentication middleware integration.
+ * 
+ * @returns {JSX.Element} Create limit page component
  */
-export default function CreateRateLimitPage() {
-  const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  
-  // Initialize form with React Hook Form and Zod validation
-  const form = useForm<CreateLimitFormData>({
-    resolver: zodResolver(createLimitFormSchema),
+export default function CreateLimitPage(): JSX.Element {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [currentLimitType, setCurrentLimitType] = useState<string>('instance');
+
+  // Initialize React Hook Form with Zod schema validation for real-time validation under 100ms
+  const form = useForm<z.infer<typeof limitCreateSchema>>({
+    resolver: zodResolver(limitCreateSchema),
     defaultValues: {
       name: '',
       description: '',
-      type: 'api',
-      rate: '',
-      period: 'hour',
+      type: 'instance',
+      rate: 1,
+      period: 'minute',
       isActive: true,
-      endpoint: '',
       verb: undefined,
-      serviceId: null,
-      roleId: null,
-      userId: null,
+      serviceId: undefined,
+      roleId: undefined,
+      userId: undefined,
+      endpoint: undefined,
     },
-    mode: 'onChange', // Enable real-time validation under 100ms
-  })
-  
-  // Watch form values for dynamic behavior
-  const watchedType = form.watch('type')
-  const typeConfig = RATE_LIMIT_TYPES[watchedType as RateLimitType]
-  
-  // Business logic hooks
-  const { createLimit, hasAccess, PaywallComponent } = useLimits()
-  
-  // Data fetching with SWR for intelligent caching under 50ms
-  const { data: services = [], error: servicesError } = useSWR(
-    hasAccess ? 'services' : null,
-    fetchServices,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 300000, // 5 minutes cache
-      errorRetryCount: 3,
+    mode: 'onChange', // Enable real-time validation
+  });
+
+  // SWR data fetching for dropdown options with cache hit responses under 50ms
+  const {
+    data: servicesData,
+    error: servicesError,
+    isLoading: servicesLoading
+  } = useServices({
+    enabled: shouldShowServiceField(currentLimitType),
+    refreshInterval: 30000, // 30 second refresh
+  });
+
+  const {
+    data: rolesData,
+    error: rolesError,
+    isLoading: rolesLoading
+  } = useRoles({
+    enabled: shouldShowRoleField(currentLimitType),
+    refreshInterval: 30000,
+  });
+
+  const {
+    data: usersData,
+    error: usersError,
+    isLoading: usersLoading
+  } = useUsers({
+    enabled: shouldShowUserField(currentLimitType),
+    refreshInterval: 30000,
+  });
+
+  // Custom hook for limit operations
+  const { createLimit } = useLimits();
+
+  /**
+   * Determines which form fields should be visible based on limit type
+   * Replaces Angular's dynamic form control addition/removal logic
+   */
+  function shouldShowServiceField(limitType: string): boolean {
+    return [
+      'instance.user.service',
+      'instance.each_user.service',
+      'instance.service',
+      'instance.user.service.endpoint',
+      'instance.service.endpoint',
+      'instance.each_user.service.endpoint'
+    ].includes(limitType);
+  }
+
+  function shouldShowRoleField(limitType: string): boolean {
+    return limitType === 'instance.role';
+  }
+
+  function shouldShowUserField(limitType: string): boolean {
+    return [
+      'instance.user',
+      'instance.user.service',
+      'instance.user.service.endpoint'
+    ].includes(limitType);
+  }
+
+  function shouldShowEndpointField(limitType: string): boolean {
+    return [
+      'instance.user.service.endpoint',
+      'instance.service.endpoint',
+      'instance.each_user.service.endpoint'
+    ].includes(limitType);
+  }
+
+  /**
+   * Handles form submission with comprehensive error handling and validation
+   * Implements create workflow with navigation on success
+   */
+  async function onSubmit(values: z.infer<typeof limitCreateSchema>) {
+    try {
+      setIsSubmitting(true);
+      setSubmitError(null);
+
+      // Assemble create payload following DreamFactory API patterns
+      const payload: CreateLimitPayload = {
+        name: values.name,
+        description: values.description || null,
+        type: values.type,
+        rate: values.rate.toString(),
+        period: values.period,
+        isActive: values.isActive,
+        verb: values.verb || null,
+        serviceId: shouldShowServiceField(values.type) ? values.serviceId : null,
+        roleId: shouldShowRoleField(values.type) ? values.roleId : null,
+        userId: shouldShowUserField(values.type) ? values.userId : null,
+        endpoint: shouldShowEndpointField(values.type) ? values.endpoint : null,
+        cacheData: {}, // Initialize empty cache data
+      };
+
+      // Create limit using API client with error handling
+      const result = await createLimit(payload);
+
+      // Navigate to the created limit's details page
+      router.push(`/api-security/limits/${result.id}`);
+    } catch (error) {
+      console.error('Failed to create limit:', error);
+      setSubmitError(
+        error instanceof Error 
+          ? error.message 
+          : 'An unexpected error occurred while creating the limit'
+      );
+    } finally {
+      setIsSubmitting(false);
     }
-  )
-  
-  const { data: roles = [], error: rolesError } = useSWR(
-    hasAccess ? 'roles' : null,
-    fetchRoles,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 300000, // 5 minutes cache
-      errorRetryCount: 3,
-    }
-  )
-  
-  const { data: users = [], error: usersError } = useSWR(
-    hasAccess ? 'users' : null,
-    fetchUsers,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 300000, // 5 minutes cache
-      errorRetryCount: 3,
-    }
-  )
-  
-  // Computed options for select components
-  const periodOptions: SelectOption[] = useMemo(() =>
-    Object.entries(RATE_LIMIT_PERIODS).map(([value, config]) => ({
-      value,
-      label: config.label,
-      description: `${config.seconds} seconds`,
-    }))
-  , [])
-  
-  const typeOptions: SelectOption[] = useMemo(() =>
-    Object.entries(RATE_LIMIT_TYPES).map(([value, config]) => ({
-      value,
-      label: config.label,
-      description: `Required fields: ${config.requires.length > 0 ? config.requires.join(', ') : 'none'}`,
-    }))
-  , [])
-  
-  const verbOptions: SelectOption[] = useMemo(() =>
-    HTTP_VERBS.map(verb => ({
-      value: verb,
-      label: verb,
-      description: `HTTP ${verb} method`,
-    }))
-  , [])
-  
-  // Clear conditional fields when type changes
+  }
+
+  /**
+   * Handles form cancellation with navigation back to limits list
+   */
+  function onCancel() {
+    router.push('/api-security/limits');
+  }
+
+  /**
+   * Watches limit type changes to update visible fields and validation
+   * Replaces Angular's valueChanges subscription pattern
+   */
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
-      if (name === 'type') {
-        // Clear fields that are not required for the new type
-        if (!typeConfig.requires.includes('endpoint')) {
-          form.setValue('endpoint', '')
+      if (name === 'type' && value.type) {
+        setCurrentLimitType(value.type);
+        
+        // Clear conditional fields when limit type changes
+        if (!shouldShowServiceField(value.type)) {
+          form.setValue('serviceId', undefined);
         }
-        if (!typeConfig.requires.includes('verb')) {
-          form.setValue('verb', undefined)
+        if (!shouldShowRoleField(value.type)) {
+          form.setValue('roleId', undefined);
         }
-        if (!typeConfig.requires.includes('serviceId')) {
-          form.setValue('serviceId', null)
+        if (!shouldShowUserField(value.type)) {
+          form.setValue('userId', undefined);
         }
-        if (!typeConfig.requires.includes('roleId')) {
-          form.setValue('roleId', null)
-        }
-        if (!typeConfig.requires.includes('userId')) {
-          form.setValue('userId', null)
+        if (!shouldShowEndpointField(value.type)) {
+          form.setValue('endpoint', undefined);
         }
       }
-    })
-    
-    return () => subscription.unsubscribe()
-  }, [form, typeConfig])
-  
-  /**
-   * Handle form submission with optimistic updates and error handling
-   */
-  const onSubmit = async (data: CreateLimitFormData) => {
-    if (!hasAccess) {
-      return
-    }
-    
-    setIsSubmitting(true)
-    
-    try {
-      // Transform form data to API payload
-      const payload: CreateLimitPayload = {
-        name: data.name,
-        description: data.description || '',
-        type: data.type,
-        rate: data.rate,
-        period: data.period,
-        isActive: data.isActive,
-        endpoint: data.endpoint || null,
-        verb: data.verb || null,
-        serviceId: data.serviceId || null,
-        roleId: data.roleId || null,
-        userId: data.userId || null,
-        cacheData: {}, // Initialize empty cache data
-      }
-      
-      // Create the rate limit
-      await createLimit(payload)
-      
-      // Navigate back to limits list on success
-      router.push('/api-security/limits')
-      
-    } catch (error) {
-      console.error('Failed to create rate limit:', error)
-      // Error is handled by the useLimits hook notifications
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-  
-  /**
-   * Handle form cancellation
-   */
-  const handleCancel = () => {
-    router.push('/api-security/limits')
-  }
-  
-  // Show paywall if access is not allowed
-  if (!hasAccess) {
-    return (
-      <div className="space-y-6">
-        <SecurityNav />
-        <div className="max-w-4xl mx-auto">
-          <PaywallComponent />
-        </div>
-      </div>
-    )
-  }
-  
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form]);
+
   return (
-    <div className="space-y-6">
-      {/* Navigation */}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Security Navigation Component */}
       <SecurityNav />
       
-      {/* Page Header */}
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Create Rate Limit
-          </h1>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Configure a new API rate limit to control request throttling and prevent abuse.
-          </p>
-        </div>
-        
-        {/* Main Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Rate Limit Configuration</CardTitle>
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <Card className="shadow-lg dark:bg-gray-800 dark:border-gray-700">
+          <CardHeader className="border-b border-gray-200 dark:border-gray-700">
+            <CardTitle className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+              Create New Rate Limit
+            </CardTitle>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+              Configure API rate limiting rules to control request frequency and protect system resources.
+            </p>
           </CardHeader>
-          <CardContent>
-            <Form onSubmit={form.handleSubmit(onSubmit)}>
-              {/* Basic Information Section */}
-              <FormSection
-                title="Basic Information"
-                description="Configure the basic rate limit settings and identification."
-              >
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                  {/* Name Field */}
-                  <FormField>
-                    <FormLabel htmlFor="name" required>
-                      Rate Limit Name
-                    </FormLabel>
-                    <FormControl error={form.formState.errors.name}>
-                      <Input
-                        id="name"
-                        {...form.register('name')}
-                        placeholder="e.g., API Rate Limit"
-                        error={!!form.formState.errors.name}
-                        aria-describedby="name-error name-description"
-                      />
-                    </FormControl>
-                    <FormDescription id="name-description">
-                      A descriptive name to identify this rate limit.
-                    </FormDescription>
-                  </FormField>
-                  
-                  {/* Active Switch */}
-                  <FormField>
-                    <FormLabel htmlFor="isActive">
-                      Active Status
-                    </FormLabel>
-                    <FormControl>
-                      <Controller
-                        name="isActive"
-                        control={form.control}
-                        render={({ field: { value, onChange } }) => (
-                          <Switch
-                            id="isActive"
-                            checked={value}
-                            onChange={onChange}
-                            aria-describedby="isActive-description"
-                          />
-                        )}
-                      />
-                    </FormControl>
-                    <FormDescription id="isActive-description">
-                      Enable or disable this rate limit.
-                    </FormDescription>
-                  </FormField>
-                </div>
-                
-                {/* Description Field */}
-                <FormField>
-                  <FormLabel htmlFor="description">
-                    Description
-                  </FormLabel>
-                  <FormControl error={form.formState.errors.description}>
-                    <Input
-                      id="description"
-                      {...form.register('description')}
-                      placeholder="Optional description of this rate limit"
-                      error={!!form.formState.errors.description}
-                      aria-describedby="description-description"
-                    />
-                  </FormControl>
-                  <FormDescription id="description-description">
-                    Optional description to explain the purpose of this rate limit.
-                  </FormDescription>
-                </FormField>
-              </FormSection>
-              
-              {/* Rate Configuration Section */}
-              <FormSection
-                title="Rate Configuration"
-                description="Set the rate limiting parameters and time period."
-              >
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  {/* Rate Field */}
-                  <FormField>
-                    <FormLabel htmlFor="rate" required>
-                      Request Rate
-                    </FormLabel>
-                    <FormControl error={form.formState.errors.rate}>
-                      <Input
-                        id="rate"
-                        {...form.register('rate')}
-                        placeholder="100"
-                        type="number"
-                        min="1"
-                        max="1000000"
-                        error={!!form.formState.errors.rate}
-                        aria-describedby="rate-error rate-description"
-                      />
-                    </FormControl>
-                    <FormDescription id="rate-description">
-                      Maximum number of requests allowed.
-                    </FormDescription>
-                  </FormField>
-                  
-                  {/* Period Field */}
-                  <FormField>
-                    <FormLabel htmlFor="period" required>
-                      Time Period
-                    </FormLabel>
-                    <FormControl error={form.formState.errors.period}>
-                      <Controller
-                        name="period"
-                        control={form.control}
-                        render={({ field: { value, onChange } }) => (
-                          <Select
-                            id="period"
-                            value={value}
-                            onChange={(val) => onChange(val as RateLimitPeriod)}
-                            options={periodOptions}
-                            placeholder="Select time period"
-                            error={!!form.formState.errors.period}
-                            aria-describedby="period-error period-description"
-                          />
-                        )}
-                      />
-                    </FormControl>
-                    <FormDescription id="period-description">
-                      Time window for the rate limit.
-                    </FormDescription>
-                  </FormField>
-                  
-                  {/* Type Field */}
-                  <FormField>
-                    <FormLabel htmlFor="type" required>
-                      Limit Type
-                    </FormLabel>
-                    <FormControl error={form.formState.errors.type}>
-                      <Controller
-                        name="type"
-                        control={form.control}
-                        render={({ field: { value, onChange } }) => (
-                          <Select
-                            id="type"
-                            value={value}
-                            onChange={(val) => onChange(val as RateLimitType)}
-                            options={typeOptions}
-                            placeholder="Select limit type"
-                            error={!!form.formState.errors.type}
-                            aria-describedby="type-error type-description"
-                          />
-                        )}
-                      />
-                    </FormControl>
-                    <FormDescription id="type-description">
-                      Scope of the rate limit application.
-                    </FormDescription>
-                  </FormField>
-                </div>
-              </FormSection>
-              
-              {/* Conditional Target Configuration */}
-              {typeConfig.requires.length > 0 && (
-                <FormSection
-                  title="Target Configuration"
-                  description={`Configure specific targets for ${typeConfig.label.toLowerCase()} rate limiting.`}
-                >
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    {/* Service Selection */}
-                    {typeConfig.requires.includes('serviceId') && (
-                      <FormField>
-                        <FormLabel htmlFor="serviceId" required>
-                          Service
+
+          <CardContent className="p-6">
+            {/* Error Alert */}
+            {submitError && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertDescription>{submitError}</AlertDescription>
+              </Alert>
+            )}
+
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Limit Name */}
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Limit Name *
                         </FormLabel>
-                        <FormControl error={form.formState.errors.serviceId}>
-                          <Controller
-                            name="serviceId"
-                            control={form.control}
-                            render={({ field: { value, onChange } }) => (
-                              <Select
-                                id="serviceId"
-                                value={value || ''}
-                                onChange={(val) => onChange(val ? Number(val) : null)}
-                                options={services}
-                                placeholder="Select a service"
-                                error={!!form.formState.errors.serviceId}
-                                searchable
-                                aria-describedby="serviceId-error serviceId-description"
-                              />
-                            )}
-                          />
-                        </FormControl>
-                        <FormDescription id="serviceId-description">
-                          Select the service to apply this rate limit to.
-                        </FormDescription>
-                      </FormField>
-                    )}
-                    
-                    {/* Role Selection */}
-                    {typeConfig.requires.includes('roleId') && (
-                      <FormField>
-                        <FormLabel htmlFor="roleId" required>
-                          Role
-                        </FormLabel>
-                        <FormControl error={form.formState.errors.roleId}>
-                          <Controller
-                            name="roleId"
-                            control={form.control}
-                            render={({ field: { value, onChange } }) => (
-                              <Select
-                                id="roleId"
-                                value={value || ''}
-                                onChange={(val) => onChange(val ? Number(val) : null)}
-                                options={roles}
-                                placeholder="Select a role"
-                                error={!!form.formState.errors.roleId}
-                                searchable
-                                aria-describedby="roleId-error roleId-description"
-                              />
-                            )}
-                          />
-                        </FormControl>
-                        <FormDescription id="roleId-description">
-                          Select the role to apply this rate limit to.
-                        </FormDescription>
-                      </FormField>
-                    )}
-                    
-                    {/* User Selection */}
-                    {typeConfig.requires.includes('userId') && (
-                      <FormField>
-                        <FormLabel htmlFor="userId" required>
-                          User
-                        </FormLabel>
-                        <FormControl error={form.formState.errors.userId}>
-                          <Controller
-                            name="userId"
-                            control={form.control}
-                            render={({ field: { value, onChange } }) => (
-                              <Select
-                                id="userId"
-                                value={value || ''}
-                                onChange={(val) => onChange(val ? Number(val) : null)}
-                                options={users}
-                                placeholder="Select a user"
-                                error={!!form.formState.errors.userId}
-                                searchable
-                                aria-describedby="userId-error userId-description"
-                              />
-                            )}
-                          />
-                        </FormControl>
-                        <FormDescription id="userId-description">
-                          Select the user to apply this rate limit to.
-                        </FormDescription>
-                      </FormField>
-                    )}
-                    
-                    {/* Endpoint Field */}
-                    {typeConfig.requires.includes('endpoint') && (
-                      <FormField>
-                        <FormLabel htmlFor="endpoint" required>
-                          Endpoint
-                        </FormLabel>
-                        <FormControl error={form.formState.errors.endpoint}>
+                        <FormControl>
                           <Input
-                            id="endpoint"
-                            {...form.register('endpoint')}
-                            placeholder="/api/v2/service/endpoint"
-                            error={!!form.formState.errors.endpoint}
-                            aria-describedby="endpoint-error endpoint-description"
+                            {...field}
+                            placeholder="Enter limit name"
+                            className="w-full"
+                            disabled={isSubmitting}
                           />
                         </FormControl>
-                        <FormDescription id="endpoint-description">
-                          Specific API endpoint path to rate limit.
-                        </FormDescription>
-                      </FormField>
+                        <FormMessage />
+                      </FormItem>
                     )}
-                    
-                    {/* HTTP Verb Selection */}
-                    {typeConfig.requires.includes('verb') && (
-                      <FormField>
-                        <FormLabel htmlFor="verb" required>
-                          HTTP Method
+                  />
+
+                  {/* Limit Type */}
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Limit Type *
                         </FormLabel>
-                        <FormControl error={form.formState.errors.verb}>
-                          <Controller
-                            name="verb"
-                            control={form.control}
-                            render={({ field: { value, onChange } }) => (
-                              <Select
-                                id="verb"
-                                value={value || ''}
-                                onChange={(val) => onChange(val as HttpVerb)}
-                                options={verbOptions}
-                                placeholder="Select HTTP method"
-                                error={!!form.formState.errors.verb}
-                                aria-describedby="verb-error verb-description"
-                              />
-                            )}
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          disabled={isSubmitting}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select limit type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="instance">Instance</SelectItem>
+                            <SelectItem value="instance.user">User</SelectItem>
+                            <SelectItem value="instance.each_user">Each User</SelectItem>
+                            <SelectItem value="instance.service">Service</SelectItem>
+                            <SelectItem value="instance.role">Role</SelectItem>
+                            <SelectItem value="instance.user.service">Service by User</SelectItem>
+                            <SelectItem value="instance.each_user.service">Service by Each User</SelectItem>
+                            <SelectItem value="instance.service.endpoint">Endpoint</SelectItem>
+                            <SelectItem value="instance.user.service.endpoint">Endpoint by User</SelectItem>
+                            <SelectItem value="instance.each_user.service.endpoint">Endpoint by Each User</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Description */}
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Description
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Enter limit description"
+                          rows={3}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Rate Limit */}
+                  <FormField
+                    control={form.control}
+                    name="rate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Rate Limit *
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="number"
+                            min="1"
+                            placeholder="Enter rate limit"
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                            disabled={isSubmitting}
                           />
                         </FormControl>
-                        <FormDescription id="verb-description">
-                          HTTP method to restrict (GET, POST, etc.).
-                        </FormDescription>
-                      </FormField>
+                        <FormMessage />
+                      </FormItem>
                     )}
-                  </div>
-                </FormSection>
-              )}
-              
-              {/* Form Actions */}
-              <FormActions>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCancel}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  loading={isSubmitting}
-                  loadingText="Creating..."
-                  disabled={!form.formState.isValid}
-                >
-                  Create Rate Limit
-                </Button>
-              </FormActions>
+                  />
+
+                  {/* Time Period */}
+                  <FormField
+                    control={form.control}
+                    name="period"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Time Period *
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          disabled={isSubmitting}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select time period" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="minute">Per Minute</SelectItem>
+                            <SelectItem value="hour">Per Hour</SelectItem>
+                            <SelectItem value="day">Per Day</SelectItem>
+                            <SelectItem value="7-day">Per Week</SelectItem>
+                            <SelectItem value="30-day">Per 30 Days</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Conditional Fields Based on Limit Type */}
+                {shouldShowServiceField(currentLimitType) && (
+                  <FormField
+                    control={form.control}
+                    name="serviceId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Service *
+                        </FormLabel>
+                        <Select
+                          onValueChange={(value) => field.onChange(parseInt(value))}
+                          value={field.value?.toString()}
+                          disabled={isSubmitting || servicesLoading}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={servicesLoading ? "Loading services..." : "Select service"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {servicesData?.map((service: Service) => (
+                              <SelectItem key={service.id} value={service.id.toString()}>
+                                {service.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        {servicesError && (
+                          <p className="text-sm text-red-600">Failed to load services</p>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {shouldShowRoleField(currentLimitType) && (
+                  <FormField
+                    control={form.control}
+                    name="roleId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Role *
+                        </FormLabel>
+                        <Select
+                          onValueChange={(value) => field.onChange(parseInt(value))}
+                          value={field.value?.toString()}
+                          disabled={isSubmitting || rolesLoading}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={rolesLoading ? "Loading roles..." : "Select role"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {rolesData?.map((role: RoleType) => (
+                              <SelectItem key={role.id} value={role.id.toString()}>
+                                {role.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        {rolesError && (
+                          <p className="text-sm text-red-600">Failed to load roles</p>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {shouldShowUserField(currentLimitType) && (
+                  <FormField
+                    control={form.control}
+                    name="userId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          User *
+                        </FormLabel>
+                        <Select
+                          onValueChange={(value) => field.onChange(parseInt(value))}
+                          value={field.value?.toString()}
+                          disabled={isSubmitting || usersLoading}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={usersLoading ? "Loading users..." : "Select user"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {usersData?.map((user: UserProfile) => (
+                              <SelectItem key={user.id} value={user.id.toString()}>
+                                {user.name || user.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        {usersError && (
+                          <p className="text-sm text-red-600">Failed to load users</p>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {shouldShowEndpointField(currentLimitType) && (
+                  <FormField
+                    control={form.control}
+                    name="endpoint"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Endpoint *
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Enter API endpoint path"
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* HTTP Verb (optional) */}
+                <FormField
+                  control={form.control}
+                  name="verb"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        HTTP Method
+                      </FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={isSubmitting}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select HTTP method (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="GET">GET</SelectItem>
+                          <SelectItem value="POST">POST</SelectItem>
+                          <SelectItem value="PUT">PUT</SelectItem>
+                          <SelectItem value="PATCH">PATCH</SelectItem>
+                          <SelectItem value="DELETE">DELETE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Active Toggle */}
+                <FormField
+                  control={form.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 dark:border-gray-700">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Active
+                        </FormLabel>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Enable this rate limit to start enforcing it
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {/* Action Buttons */}
+                <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancel}
+                    disabled={isSubmitting}
+                    className="mt-2 sm:mt-0"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || !form.formState.isValid}
+                    className="bg-primary-600 hover:bg-primary-700 text-white"
+                  >
+                    {isSubmitting ? 'Creating...' : 'Create Limit'}
+                  </Button>
+                </div>
+              </form>
             </Form>
           </CardContent>
         </Card>
       </div>
     </div>
-  )
+  );
 }
