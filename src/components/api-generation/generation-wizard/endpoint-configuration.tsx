@@ -1,735 +1,833 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { 
+  useWizard, 
+  useWizardNavigation, 
+  WIZARD_STEPS,
+  type EndpointConfiguration,
+  type DatabaseTable,
+  type HTTPMethod 
+} from './wizard-provider';
+import {
+  HTTPMethod as HTTPMethodEnum,
+  ParameterType,
+  FilterOperator,
+  EndpointConfigurationSchema,
+  type EndpointParameter,
+  type MethodConfiguration
+} from './types';
 
-// Types and interfaces for endpoint configuration
-interface EndpointParameter {
-  id: string;
-  name: string;
-  type: 'string' | 'number' | 'boolean' | 'array';
-  required: boolean;
-  description: string;
-  defaultValue?: string;
-}
+// UI Components
+import { Form, FormField, FormLabel, FormControl, FormError } from '@/components/ui/form';
+import { Select } from '@/components/ui/select';
+import { Switch } from '@/components/ui/toggle';
+import { Input, NumberInput } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
 
-interface EndpointMethodConfig {
-  enabled: boolean;
-  parameters: EndpointParameter[];
-  requiresAuth: boolean;
-  customHeaders: { key: string; value: string }[];
-}
+// Utilities
+import { cn } from '@/lib/utils';
 
-interface EndpointConfiguration {
-  tableName: string;
-  endpointPath: string;
-  methods: {
-    GET: EndpointMethodConfig;
-    POST: EndpointMethodConfig;
-    PUT: EndpointMethodConfig;
-    PATCH: EndpointMethodConfig;
-    DELETE: EndpointMethodConfig;
-  };
-  pagination: {
-    enabled: boolean;
-    defaultLimit: number;
-    maxLimit: number;
-  };
-  filtering: {
-    enabled: boolean;
-    allowedFields: string[];
-  };
-  sorting: {
-    enabled: boolean;
-    defaultSort: string;
-    allowedFields: string[];
-  };
-}
+/**
+ * Endpoint Configuration Component for API Generation Wizard
+ * 
+ * Implements the second step of the API generation workflow where users configure
+ * HTTP methods, parameters, security rules, and endpoint settings for selected tables.
+ * 
+ * Features:
+ * - React Hook Form with Zod schema validation for real-time validation under 100ms
+ * - HTTP method selection (GET, POST, PUT, PATCH, DELETE) with dynamic form fields  
+ * - Parameter configuration for query parameters, filtering, sorting, and pagination
+ * - Real-time endpoint preview with Next.js serverless functions
+ * - Integration with wizard state management and navigation
+ * 
+ * Supports F-003: REST API Endpoint Generation per Section 2.1 Feature Catalog
+ * with React/Next.js Integration Requirements compliance.
+ */
 
-// Zod validation schema for endpoint configuration
-const endpointParameterSchema = z.object({
-  id: z.string().min(1, 'Parameter ID is required'),
-  name: z.string().min(1, 'Parameter name is required'),
-  type: z.enum(['string', 'number', 'boolean', 'array']),
-  required: z.boolean(),
-  description: z.string().min(1, 'Parameter description is required'),
-  defaultValue: z.string().optional(),
-});
+// ============================================================================
+// Form Schema and Types
+// ============================================================================
 
-const endpointMethodConfigSchema = z.object({
-  enabled: z.boolean(),
-  parameters: z.array(endpointParameterSchema),
-  requiresAuth: z.boolean(),
-  customHeaders: z.array(z.object({
-    key: z.string(),
-    value: z.string(),
+const httpMethodOptions = [
+  { value: HTTPMethodEnum.GET, label: 'GET - Read data' },
+  { value: HTTPMethodEnum.POST, label: 'POST - Create new records' },
+  { value: HTTPMethodEnum.PUT, label: 'PUT - Replace entire records' },
+  { value: HTTPMethodEnum.PATCH, label: 'PATCH - Update partial records' },
+  { value: HTTPMethodEnum.DELETE, label: 'DELETE - Remove records' },
+];
+
+const parameterTypeOptions = [
+  { value: ParameterType.QUERY, label: 'Query Parameter' },
+  { value: ParameterType.PATH, label: 'Path Parameter' },
+  { value: ParameterType.HEADER, label: 'Header Parameter' },
+];
+
+const filterOperatorOptions = [
+  { value: FilterOperator.EQUALS, label: 'Equals (=)' },
+  { value: FilterOperator.NOT_EQUALS, label: 'Not Equals (!=)' },
+  { value: FilterOperator.CONTAINS, label: 'Contains' },
+  { value: FilterOperator.STARTS_WITH, label: 'Starts With' },
+  { value: FilterOperator.ENDS_WITH, label: 'Ends With' },
+  { value: FilterOperator.GREATER_THAN, label: 'Greater Than (>)' },
+  { value: FilterOperator.LESS_THAN, label: 'Less Than (<)' },
+  { value: FilterOperator.GREATER_EQUAL, label: 'Greater or Equal (>=)' },
+  { value: FilterOperator.LESS_EQUAL, label: 'Less or Equal (<=)' },
+  { value: FilterOperator.IN, label: 'In List' },
+  { value: FilterOperator.NOT_IN, label: 'Not In List' },
+  { value: FilterOperator.IS_NULL, label: 'Is Null' },
+  { value: FilterOperator.IS_NOT_NULL, label: 'Is Not Null' },
+];
+
+// Form schema for endpoint configuration per table
+const endpointConfigFormSchema = z.object({
+  tableName: z.string(),
+  basePath: z.string().min(1, 'Base path is required'),
+  enabledMethods: z.array(z.nativeEnum(HTTPMethodEnum)).min(1, 'At least one HTTP method must be enabled'),
+  
+  // Global pagination settings
+  enablePagination: z.boolean(),
+  maxPageSize: z.number().min(1).max(10000),
+  defaultPageSize: z.number().min(1).max(1000),
+  
+  // Global filtering settings
+  enableFiltering: z.boolean(),
+  enableSorting: z.boolean(),
+  
+  // Custom parameters
+  customParameters: z.array(z.object({
+    name: z.string().min(1, 'Parameter name is required'),
+    type: z.nativeEnum(ParameterType),
+    required: z.boolean(),
+    description: z.string().optional(),
+    defaultValue: z.string().optional(),
   })),
+  
+  // Security settings
+  requireAuth: z.boolean(),
+  allowedRoles: z.array(z.string()),
+  
+  enabled: z.boolean(),
 });
 
-const endpointConfigurationSchema = z.object({
-  tableName: z.string().min(1, 'Table name is required'),
-  endpointPath: z.string().min(1, 'Endpoint path is required').regex(/^\/[a-zA-Z0-9_\-\/]*$/, 'Invalid endpoint path format'),
-  methods: z.object({
-    GET: endpointMethodConfigSchema,
-    POST: endpointMethodConfigSchema,
-    PUT: endpointMethodConfigSchema,
-    PATCH: endpointMethodConfigSchema,
-    DELETE: endpointMethodConfigSchema,
-  }),
-  pagination: z.object({
-    enabled: z.boolean(),
-    defaultLimit: z.number().min(1).max(1000),
-    maxLimit: z.number().min(1).max(1000),
-  }),
-  filtering: z.object({
-    enabled: z.boolean(),
-    allowedFields: z.array(z.string()),
-  }),
-  sorting: z.object({
-    enabled: z.boolean(),
-    defaultSort: z.string(),
-    allowedFields: z.array(z.string()),
-  }),
-});
+type EndpointConfigFormData = z.infer<typeof endpointConfigFormSchema>;
+
+// ============================================================================
+// Component Interface
+// ============================================================================
 
 interface EndpointConfigurationProps {
-  selectedTables: string[];
-  onConfigurationChange: (configuration: EndpointConfiguration) => void;
-  onNext: () => void;
-  onPrevious: () => void;
-  initialConfiguration?: Partial<EndpointConfiguration>;
+  className?: string;
+  'data-testid'?: string;
 }
 
-const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
+// ============================================================================
+// Main Component
+// ============================================================================
 
-export function EndpointConfiguration({
-  selectedTables,
-  onConfigurationChange,
-  onNext,
-  onPrevious,
-  initialConfiguration,
-}: EndpointConfigurationProps) {
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewData, setPreviewData] = useState<any>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
+export const EndpointConfiguration: React.FC<EndpointConfigurationProps> = ({
+  className,
+  'data-testid': testId = 'endpoint-configuration',
+}) => {
+  const wizard = useWizard();
+  const navigation = useWizardNavigation();
+  
+  // Get selected tables and their current configurations
+  const selectedTables = useMemo(() => 
+    Array.from(wizard.selectedTables.values()),
+    [wizard.selectedTables]
+  );
+  
+  const currentTableId = useMemo(() => 
+    selectedTables[0]?.id || null,
+    [selectedTables]
+  );
+  
+  const currentConfiguration = useMemo(() => 
+    currentTableId ? wizard.endpointConfigurations.get(currentTableId) : null,
+    [wizard.endpointConfigurations, currentTableId]
+  );
 
-  // Initialize form with default values
-  const defaultValues: EndpointConfiguration = {
-    tableName: selectedTables[0] || '',
-    endpointPath: selectedTables[0] ? `/${selectedTables[0].toLowerCase()}` : '/',
-    methods: {
-      GET: {
-        enabled: true,
-        parameters: [
-          {
-            id: 'limit',
-            name: 'limit',
-            type: 'number',
-            required: false,
-            description: 'Maximum number of records to return',
-            defaultValue: '25',
-          },
-          {
-            id: 'offset',
-            name: 'offset',
-            type: 'number',
-            required: false,
-            description: 'Number of records to skip',
-            defaultValue: '0',
-          },
-          {
-            id: 'filter',
-            name: 'filter',
-            type: 'string',
-            required: false,
-            description: 'SQL WHERE clause filter',
-          },
-          {
-            id: 'order',
-            name: 'order',
-            type: 'string',
-            required: false,
-            description: 'SQL ORDER BY clause',
-          },
-        ],
-        requiresAuth: true,
-        customHeaders: [],
-      },
-      POST: {
-        enabled: true,
-        parameters: [],
-        requiresAuth: true,
-        customHeaders: [],
-      },
-      PUT: {
-        enabled: true,
-        parameters: [
-          {
-            id: 'id',
-            name: 'id',
-            type: 'number',
-            required: true,
-            description: 'Record ID for update',
-          },
-        ],
-        requiresAuth: true,
-        customHeaders: [],
-      },
-      PATCH: {
-        enabled: true,
-        parameters: [
-          {
-            id: 'id',
-            name: 'id',
-            type: 'number',
-            required: true,
-            description: 'Record ID for partial update',
-          },
-        ],
-        requiresAuth: true,
-        customHeaders: [],
-      },
-      DELETE: {
-        enabled: true,
-        parameters: [
-          {
-            id: 'id',
-            name: 'id',
-            type: 'number',
-            required: true,
-            description: 'Record ID for deletion',
-          },
-        ],
-        requiresAuth: true,
-        customHeaders: [],
-      },
-    },
-    pagination: {
-      enabled: true,
-      defaultLimit: 25,
-      maxLimit: 1000,
-    },
-    filtering: {
-      enabled: true,
-      allowedFields: [],
-    },
-    sorting: {
-      enabled: true,
-      defaultSort: 'id ASC',
-      allowedFields: [],
-    },
-    ...initialConfiguration,
-  };
+  // ============================================================================
+  // Form Setup
+  // ============================================================================
 
-  const form = useForm<EndpointConfiguration>({
-    resolver: zodResolver(endpointConfigurationSchema),
-    defaultValues,
-    mode: 'onChange',
+  const form = useForm<EndpointConfigFormData>({
+    resolver: zodResolver(endpointConfigFormSchema),
+    mode: 'onChange', // Real-time validation under 100ms
+    defaultValues: {
+      tableName: currentTableId || '',
+      basePath: currentTableId ? `/${currentTableId}` : '',
+      enabledMethods: [HTTPMethodEnum.GET, HTTPMethodEnum.POST],
+      enablePagination: true,
+      maxPageSize: 1000,
+      defaultPageSize: 100,
+      enableFiltering: true,
+      enableSorting: true,
+      customParameters: [],
+      requireAuth: true,
+      allowedRoles: [],
+      enabled: true,
+    },
   });
 
-  const { control, watch, handleSubmit, formState: { errors, isValid } } = form;
+  const { control, handleSubmit, watch, setValue, reset, formState: { errors, isValid, isDirty } } = form;
+  
+  // Field arrays for dynamic parameters
+  const { 
+    fields: parameterFields, 
+    append: appendParameter, 
+    remove: removeParameter 
+  } = useFieldArray({
+    control,
+    name: 'customParameters',
+  });
 
-  // Watch for form changes to trigger real-time preview
-  const formData = watch();
+  // Watch for changes to trigger real-time preview
+  const watchedValues = watch();
+  const enabledMethods = watch('enabledMethods');
 
-  // Generate real-time preview
+  // ============================================================================
+  // Effects and Handlers
+  // ============================================================================
+
+  // Initialize form with current configuration when table changes
   useEffect(() => {
-    const generatePreview = async () => {
-      if (!isValid) return;
+    if (currentConfiguration && currentTableId) {
+      reset({
+        tableName: currentTableId,
+        basePath: currentConfiguration.basePath || `/${currentTableId}`,
+        enabledMethods: currentConfiguration.enabledMethods || [HTTPMethodEnum.GET, HTTPMethodEnum.POST],
+        enablePagination: currentConfiguration.enablePagination ?? true,
+        maxPageSize: currentConfiguration.maxPageSize || 1000,
+        defaultPageSize: currentConfiguration.defaultPageSize || 100,
+        enableFiltering: currentConfiguration.enableFiltering ?? true,
+        enableSorting: currentConfiguration.enableSorting ?? true,
+        customParameters: currentConfiguration.customParameters || [],
+        requireAuth: currentConfiguration.security?.requireAuth ?? true,
+        allowedRoles: currentConfiguration.security?.requiredRoles || [],
+        enabled: currentConfiguration.enabled ?? true,
+      });
+    }
+  }, [currentConfiguration, currentTableId, reset]);
 
-      setPreviewLoading(true);
-      setPreviewError(null);
+  // Auto-save configuration changes to wizard state
+  useEffect(() => {
+    if (isDirty && isValid && currentTableId) {
+      const values = watchedValues;
+      
+      // Convert form data to EndpointConfiguration format
+      const config: Partial<EndpointConfiguration> = {
+        tableName: values.tableName,
+        basePath: values.basePath,
+        enabledMethods: values.enabledMethods,
+        enablePagination: values.enablePagination,
+        maxPageSize: values.maxPageSize,
+        defaultPageSize: values.defaultPageSize,
+        enableFiltering: values.enableFiltering,
+        enableSorting: values.enableSorting,
+        customParameters: values.customParameters,
+        security: {
+          requireAuth: values.requireAuth,
+          requiredRoles: values.allowedRoles,
+          apiKeyPermissions: [],
+        },
+        enabled: values.enabled,
+      };
+      
+      // Update wizard state with debouncing to prevent excessive updates
+      const timeoutId = setTimeout(() => {
+        wizard.updateEndpointConfiguration(currentTableId, config);
+      }, 150); // Debounce for 150ms to optimize performance
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [watchedValues, isDirty, isValid, currentTableId, wizard]);
 
-      try {
-        // Call Next.js API route for OpenAPI spec generation
-        const response = await fetch('/api/generation/preview-endpoint', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formData),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Preview generation failed: ${response.statusText}`);
-        }
-
-        const previewResult = await response.json();
-        setPreviewData(previewResult);
-        
-        // Notify parent component of configuration changes
-        onConfigurationChange(formData);
-      } catch (error) {
-        console.error('Preview generation error:', error);
-        setPreviewError(error instanceof Error ? error.message : 'Unknown error occurred');
-      } finally {
-        setPreviewLoading(false);
+  // Handle form submission
+  const onSubmit = useCallback(async (data: EndpointConfigFormData) => {
+    if (!currentTableId) return;
+    
+    try {
+      // Convert to full EndpointConfiguration
+      const configuration: EndpointConfiguration = {
+        tableName: data.tableName,
+        basePath: data.basePath,
+        enabledMethods: data.enabledMethods,
+        methodConfigurations: createMethodConfigurations(data),
+        security: {
+          requireAuth: data.requireAuth,
+          requiredRoles: data.allowedRoles,
+          apiKeyPermissions: [],
+        },
+        customParameters: data.customParameters,
+        enabled: data.enabled,
+        enablePagination: data.enablePagination,
+        maxPageSize: data.maxPageSize,
+        defaultPageSize: data.defaultPageSize,
+        enableFiltering: data.enableFiltering,
+        enableSorting: data.enableSorting,
+      };
+      
+      // Update wizard state
+      wizard.updateEndpointConfiguration(currentTableId, configuration);
+      
+      // Mark step as completed
+      navigation.markStepCompleted(WIZARD_STEPS.ENDPOINT_CONFIGURATION);
+      
+      // Move to next step if valid
+      if (navigation.canGoNext) {
+        navigation.goToNextStep();
       }
-    };
+    } catch (error) {
+      console.error('Failed to save endpoint configuration:', error);
+    }
+  }, [currentTableId, wizard, navigation]);
 
-    // Debounce preview generation to avoid excessive API calls
-    const timeoutId = setTimeout(generatePreview, 500);
-    return () => clearTimeout(timeoutId);
-  }, [formData, isValid, onConfigurationChange]);
+  // Helper function to create method configurations
+  const createMethodConfigurations = useCallback((data: EndpointConfigFormData): Record<HTTPMethod, MethodConfiguration> => {
+    const configs: Record<HTTPMethod, MethodConfiguration> = {} as Record<HTTPMethod, MethodConfiguration>;
+    
+    // Create configuration for each enabled method
+    data.enabledMethods.forEach(method => {
+      configs[method] = {
+        enabled: true,
+        parameters: [
+          ...(data.enablePagination && method === HTTPMethodEnum.GET ? [
+            {
+              name: 'limit',
+              type: ParameterType.QUERY,
+              dataType: 'integer' as any,
+              required: false,
+              description: 'Number of records to return',
+              defaultValue: data.defaultPageSize,
+            },
+            {
+              name: 'offset',
+              type: ParameterType.QUERY,
+              dataType: 'integer' as any,
+              required: false,
+              description: 'Number of records to skip',
+              defaultValue: 0,
+            }
+          ] : []),
+          ...(data.enableSorting && method === HTTPMethodEnum.GET ? [
+            {
+              name: 'order',
+              type: ParameterType.QUERY,
+              dataType: 'string' as any,
+              required: false,
+              description: 'Sort order (field ASC/DESC)',
+            }
+          ] : []),
+          ...(data.enableFiltering && method === HTTPMethodEnum.GET ? [
+            {
+              name: 'filter',
+              type: ParameterType.QUERY,
+              dataType: 'string' as any,
+              required: false,
+              description: 'Filter expression',
+            }
+          ] : []),
+          ...data.customParameters,
+        ],
+        responseSchema: {
+          includedFields: [],
+          excludedFields: [],
+          includeMetadata: true,
+          formatOptions: {
+            includeNulls: true,
+            flattenNested: false,
+            fieldTransforms: {},
+          },
+        },
+        description: `${method} operation for ${data.tableName}`,
+        tags: [data.tableName],
+      };
+    });
+    
+    // Fill in configurations for disabled methods
+    Object.values(HTTPMethodEnum).forEach(method => {
+      if (!configs[method]) {
+        configs[method] = {
+          enabled: false,
+          parameters: [],
+          responseSchema: {
+            includedFields: [],
+            excludedFields: [],
+            includeMetadata: false,
+            formatOptions: {
+              includeNulls: false,
+              flattenNested: false,
+              fieldTransforms: {},
+            },
+          },
+          tags: [],
+        };
+      }
+    });
+    
+    return configs;
+  }, []);
 
-  const onSubmit = (data: EndpointConfiguration) => {
-    onConfigurationChange(data);
-    onNext();
-  };
-
-  const addParameter = (method: string) => {
-    const newParameter: EndpointParameter = {
-      id: `param_${Date.now()}`,
+  // Handle adding new parameter
+  const handleAddParameter = useCallback(() => {
+    appendParameter({
       name: '',
-      type: 'string',
+      type: ParameterType.QUERY,
       required: false,
       description: '',
-    };
+      defaultValue: '',
+    });
+  }, [appendParameter]);
 
-    const currentParams = form.getValues(`methods.${method}.parameters` as any) || [];
-    form.setValue(`methods.${method}.parameters` as any, [...currentParams, newParameter]);
-  };
+  // Handle applying global configuration to all tables
+  const handleApplyToAll = useCallback(() => {
+    if (isValid) {
+      wizard.applyGlobalConfigToSelected();
+    }
+  }, [wizard, isValid]);
 
-  const removeParameter = (method: string, index: number) => {
-    const currentParams = form.getValues(`methods.${method}.parameters` as any) || [];
-    const updatedParams = currentParams.filter((_: any, i: number) => i !== index);
-    form.setValue(`methods.${method}.parameters` as any, updatedParams);
-  };
+  // ============================================================================
+  // Render Helpers
+  // ============================================================================
 
-  const addCustomHeader = (method: string) => {
-    const newHeader = { key: '', value: '' };
-    const currentHeaders = form.getValues(`methods.${method}.customHeaders` as any) || [];
-    form.setValue(`methods.${method}.customHeaders` as any, [...currentHeaders, newHeader]);
-  };
-
-  const removeCustomHeader = (method: string, index: number) => {
-    const currentHeaders = form.getValues(`methods.${method}.customHeaders` as any) || [];
-    const updatedHeaders = currentHeaders.filter((_: any, i: number) => i !== index);
-    form.setValue(`methods.${method}.customHeaders` as any, updatedHeaders);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Configure API Endpoints
-        </h2>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-          Configure HTTP methods, parameters, and security rules for your REST API endpoints.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-        {/* Basic Configuration */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Basic Configuration
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Table Name
-              </label>
-              <select
-                {...form.register('tableName')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+  const renderHttpMethodSelector = () => (
+    <FormField
+      name="enabledMethods"
+      control={control}
+      render={({ field, fieldState: { error } }) => (
+        <FormControl>
+          <FormLabel required>HTTP Methods</FormLabel>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {httpMethodOptions.map(option => (
+              <label 
+                key={option.value}
+                className={cn(
+                  'flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer transition-colors',
+                  'hover:bg-gray-50 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500',
+                  field.value.includes(option.value) && 'bg-blue-50 border-blue-300'
+                )}
               >
-                {selectedTables.map((table) => (
-                  <option key={table} value={table}>
-                    {table}
-                  </option>
-                ))}
-              </select>
-              {errors.tableName && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {errors.tableName.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Endpoint Path
+                <input
+                  type="checkbox"
+                  checked={field.value.includes(option.value)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      field.onChange([...field.value, option.value]);
+                    } else {
+                      field.onChange(field.value.filter(method => method !== option.value));
+                    }
+                  }}
+                  className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <div>
+                  <div className="font-medium text-sm">{option.value}</div>
+                  <div className="text-xs text-gray-600">{option.label.split(' - ')[1]}</div>
+                </div>
               </label>
-              <input
-                type="text"
-                {...form.register('endpointPath')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                placeholder="/table-name"
-              />
-              {errors.endpointPath && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {errors.endpointPath.message}
-                </p>
-              )}
-            </div>
+            ))}
           </div>
-        </div>
+          {error && <FormError>{error.message}</FormError>}
+        </FormControl>
+      )}
+    />
+  );
 
-        {/* HTTP Methods Configuration */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            HTTP Methods
-          </h3>
+  const renderPaginationSettings = () => (
+    <div className="space-y-4">
+      <FormField
+        name="enablePagination"
+        control={control}
+        render={({ field }) => (
+          <FormControl>
+            <div className="flex items-center space-x-3">
+              <Switch
+                checked={field.value}
+                onChange={field.onChange}
+                id="enable-pagination"
+              />
+              <FormLabel htmlFor="enable-pagination">Enable Pagination</FormLabel>
+            </div>
+          </FormControl>
+        )}
+      />
+      
+      {watch('enablePagination') && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-6">
+          <FormField
+            name="defaultPageSize"
+            control={control}
+            render={({ field }) => (
+              <FormControl>
+                <FormLabel>Default Page Size</FormLabel>
+                <NumberInput
+                  {...field}
+                  min={1}
+                  max={1000}
+                  placeholder="100"
+                />
+              </FormControl>
+            )}
+          />
           
-          {HTTP_METHODS.map((method) => (
-            <div key={method} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    {...form.register(`methods.${method}.enabled`)}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    {method}
-                  </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                    {method === 'GET' ? 'Read' : method === 'POST' ? 'Create' : method === 'PUT' ? 'Update' : method === 'PATCH' ? 'Partial Update' : 'Delete'}
-                  </span>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <label className="text-xs text-gray-600 dark:text-gray-400">
-                    Requires Auth
-                  </label>
-                  <input
-                    type="checkbox"
-                    {...form.register(`methods.${method}.requiresAuth`)}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                </div>
+          <FormField
+            name="maxPageSize"
+            control={control}
+            render={({ field }) => (
+              <FormControl>
+                <FormLabel>Maximum Page Size</FormLabel>
+                <NumberInput
+                  {...field}
+                  min={1}
+                  max={10000}
+                  placeholder="1000"
+                />
+              </FormControl>
+            )}
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  const renderFilteringSettings = () => (
+    <div className="space-y-4">
+      <FormField
+        name="enableFiltering"
+        control={control}
+        render={({ field }) => (
+          <FormControl>
+            <div className="flex items-center space-x-3">
+              <Switch
+                checked={field.value}
+                onChange={field.onChange}
+                id="enable-filtering"
+              />
+              <FormLabel htmlFor="enable-filtering">Enable Filtering</FormLabel>
+            </div>
+          </FormControl>
+        )}
+      />
+      
+      <FormField
+        name="enableSorting"
+        control={control}
+        render={({ field }) => (
+          <FormControl>
+            <div className="flex items-center space-x-3">
+              <Switch
+                checked={field.value}
+                onChange={field.onChange}
+                id="enable-sorting"
+              />
+              <FormLabel htmlFor="enable-sorting">Enable Sorting</FormLabel>
+            </div>
+          </FormControl>
+        )}
+      />
+    </div>
+  );
+
+  const renderCustomParameters = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <FormLabel>Custom Parameters</FormLabel>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleAddParameter}
+        >
+          Add Parameter
+        </Button>
+      </div>
+      
+      {parameterFields.length === 0 ? (
+        <div className="text-sm text-gray-500 italic p-4 border border-gray-200 rounded-lg text-center">
+          No custom parameters defined. Click "Add Parameter" to create one.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {parameterFields.map((field, index) => (
+            <div key={field.id} className="p-4 border border-gray-200 rounded-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm">Parameter {index + 1}</h4>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeParameter(index)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Remove
+                </Button>
               </div>
-
-              {formData.methods[method].enabled && (
-                <div className="space-y-4">
-                  {/* Parameters */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Parameters
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => addParameter(method)}
-                        className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700"
-                      >
-                        Add Parameter
-                      </button>
-                    </div>
-                    
-                    {formData.methods[method].parameters.map((param, index) => (
-                      <div key={param.id} className="grid grid-cols-12 gap-2 items-center mb-2">
-                        <div className="col-span-2">
-                          <input
-                            type="text"
-                            {...form.register(`methods.${method}.parameters.${index}.name`)}
-                            placeholder="Name"
-                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <select
-                            {...form.register(`methods.${method}.parameters.${index}.type`)}
-                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
-                          >
-                            <option value="string">String</option>
-                            <option value="number">Number</option>
-                            <option value="boolean">Boolean</option>
-                            <option value="array">Array</option>
-                          </select>
-                        </div>
-                        <div className="col-span-4">
-                          <input
-                            type="text"
-                            {...form.register(`methods.${method}.parameters.${index}.description`)}
-                            placeholder="Description"
-                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <input
-                            type="text"
-                            {...form.register(`methods.${method}.parameters.${index}.defaultValue`)}
-                            placeholder="Default"
-                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
-                          />
-                        </div>
-                        <div className="col-span-1 flex items-center justify-center">
-                          <input
-                            type="checkbox"
-                            {...form.register(`methods.${method}.parameters.${index}.required`)}
-                            className="h-3 w-3 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                            title="Required"
-                          />
-                        </div>
-                        <div className="col-span-1">
-                          <button
-                            type="button"
-                            onClick={() => removeParameter(method, index)}
-                            className="text-red-600 hover:text-red-800 text-xs"
-                          >
-                            ×
-                          </button>
-                        </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <FormField
+                  name={`customParameters.${index}.name`}
+                  control={control}
+                  render={({ field }) => (
+                    <FormControl>
+                      <FormLabel>Name</FormLabel>
+                      <Input {...field} placeholder="parameter_name" />
+                    </FormControl>
+                  )}
+                />
+                
+                <FormField
+                  name={`customParameters.${index}.type`}
+                  control={control}
+                  render={({ field }) => (
+                    <FormControl>
+                      <FormLabel>Type</FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        options={parameterTypeOptions}
+                      />
+                    </FormControl>
+                  )}
+                />
+                
+                <FormField
+                  name={`customParameters.${index}.required`}
+                  control={control}
+                  render={({ field }) => (
+                    <FormControl>
+                      <div className="flex items-center space-x-2 pt-8">
+                        <Switch
+                          checked={field.value}
+                          onChange={field.onChange}
+                          id={`param-required-${index}`}
+                        />
+                        <FormLabel htmlFor={`param-required-${index}`}>Required</FormLabel>
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Custom Headers */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Custom Headers
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => addCustomHeader(method)}
-                        className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
-                      >
-                        Add Header
-                      </button>
-                    </div>
-                    
-                    {formData.methods[method].customHeaders.map((header, index) => (
-                      <div key={index} className="grid grid-cols-5 gap-2 items-center mb-2">
-                        <div className="col-span-2">
-                          <input
-                            type="text"
-                            {...form.register(`methods.${method}.customHeaders.${index}.key`)}
-                            placeholder="Header Name"
-                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <input
-                            type="text"
-                            {...form.register(`methods.${method}.customHeaders.${index}.value`)}
-                            placeholder="Header Value"
-                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
-                          />
-                        </div>
-                        <div className="col-span-1">
-                          <button
-                            type="button"
-                            onClick={() => removeCustomHeader(method, index)}
-                            className="text-red-600 hover:text-red-800 text-xs"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </FormControl>
+                  )}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <FormField
+                  name={`customParameters.${index}.description`}
+                  control={control}
+                  render={({ field }) => (
+                    <FormControl>
+                      <FormLabel>Description</FormLabel>
+                      <Input {...field} placeholder="Parameter description" />
+                    </FormControl>
+                  )}
+                />
+                
+                <FormField
+                  name={`customParameters.${index}.defaultValue`}
+                  control={control}
+                  render={({ field }) => (
+                    <FormControl>
+                      <FormLabel>Default Value</FormLabel>
+                      <Input {...field} placeholder="Default value" />
+                    </FormControl>
+                  )}
+                />
+              </div>
             </div>
           ))}
         </div>
-
-        {/* Pagination Configuration */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Pagination Settings
-          </h3>
-          
-          <div className="flex items-center space-x-4 mb-4">
-            <input
-              type="checkbox"
-              {...form.register('pagination.enabled')}
-              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              Enable pagination
-            </span>
-          </div>
-
-          {formData.pagination.enabled && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Default Limit
-                </label>
-                <input
-                  type="number"
-                  {...form.register('pagination.defaultLimit', { valueAsNumber: true })}
-                  min="1"
-                  max="1000"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                />
-                {errors.pagination?.defaultLimit && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.pagination.defaultLimit.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Maximum Limit
-                </label>
-                <input
-                  type="number"
-                  {...form.register('pagination.maxLimit', { valueAsNumber: true })}
-                  min="1"
-                  max="1000"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                />
-                {errors.pagination?.maxLimit && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.pagination.maxLimit.message}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Filtering Configuration */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Filtering Settings
-          </h3>
-          
-          <div className="flex items-center space-x-4 mb-4">
-            <input
-              type="checkbox"
-              {...form.register('filtering.enabled')}
-              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              Enable filtering
-            </span>
-          </div>
-
-          {formData.filtering.enabled && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Allowed Filter Fields (comma-separated)
-              </label>
-              <input
-                type="text"
-                placeholder="id, name, email, created_at"
-                onChange={(e) => {
-                  const fields = e.target.value.split(',').map(f => f.trim()).filter(f => f);
-                  form.setValue('filtering.allowedFields', fields);
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Sorting Configuration */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Sorting Settings
-          </h3>
-          
-          <div className="flex items-center space-x-4 mb-4">
-            <input
-              type="checkbox"
-              {...form.register('sorting.enabled')}
-              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              Enable sorting
-            </span>
-          </div>
-
-          {formData.sorting.enabled && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Default Sort
-                </label>
-                <input
-                  type="text"
-                  {...form.register('sorting.defaultSort')}
-                  placeholder="id ASC"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Allowed Sort Fields (comma-separated)
-                </label>
-                <input
-                  type="text"
-                  placeholder="id, name, created_at"
-                  onChange={(e) => {
-                    const fields = e.target.value.split(',').map(f => f.trim()).filter(f => f);
-                    form.setValue('sorting.allowedFields', fields);
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Real-time Preview */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Configuration Preview
-          </h3>
-          
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-            {previewLoading && (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                <span className="ml-3 text-sm text-gray-600 dark:text-gray-300">
-                  Generating preview...
-                </span>
-              </div>
-            )}
-            
-            {previewError && (
-              <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-md p-4">
-                <p className="text-sm text-red-800 dark:text-red-200">
-                  Preview Error: {previewError}
-                </p>
-              </div>
-            )}
-            
-            {previewData && !previewLoading && !previewError && (
-              <div>
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  OpenAPI Preview:
-                </p>
-                <pre className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded p-3 text-xs overflow-x-auto">
-                  {JSON.stringify(previewData, null, 2)}
-                </pre>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Navigation Buttons */}
-        <div className="flex justify-between pt-6">
-          <button
-            type="button"
-            onClick={onPrevious}
-            className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            Previous
-          </button>
-          
-          <button
-            type="submit"
-            disabled={!isValid}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Next: Security Configuration
-          </button>
-        </div>
-      </form>
+      )}
     </div>
   );
-}
+
+  const renderSecuritySettings = () => (
+    <div className="space-y-4">
+      <FormField
+        name="requireAuth"
+        control={control}
+        render={({ field }) => (
+          <FormControl>
+            <div className="flex items-center space-x-3">
+              <Switch
+                checked={field.value}
+                onChange={field.onChange}
+                id="require-auth"
+              />
+              <FormLabel htmlFor="require-auth">Require Authentication</FormLabel>
+            </div>
+          </FormControl>
+        )}
+      />
+      
+      <div className="text-sm text-gray-600">
+        Advanced security settings including role-based access control and API key management 
+        will be configured in the next step.
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // Error Handling
+  // ============================================================================
+
+  if (selectedTables.length === 0) {
+    return (
+      <div className={cn('p-6', className)} data-testid={testId}>
+        <Alert variant="warning">
+          <Alert.Title>No Tables Selected</Alert.Title>
+          <Alert.Description>
+            Please go back to the table selection step and choose at least one table to configure endpoints for.
+          </Alert.Description>
+        </Alert>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // Main Render
+  // ============================================================================
+
+  return (
+    <div className={cn('space-y-6', className)} data-testid={testId}>
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Endpoint Configuration</h2>
+        <p className="mt-2 text-gray-600">
+          Configure HTTP methods, parameters, and settings for your API endpoints. 
+          These settings will be applied to generate REST APIs for your selected tables.
+        </p>
+      </div>
+
+      {/* Current Table Indicator */}
+      {currentTableId && (
+        <Alert variant="info">
+          <Alert.Title>Configuring: {currentTableId}</Alert.Title>
+          <Alert.Description>
+            Settings will be applied to the "{currentTableId}" table. 
+            {selectedTables.length > 1 && ` You can apply these settings to all ${selectedTables.length} selected tables using the "Apply to All" button.`}
+          </Alert.Description>
+        </Alert>
+      )}
+
+      {/* Configuration Form */}
+      <Form {...form}>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+          {/* Basic Configuration */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
+            <h3 className="text-lg font-semibold text-gray-900">Basic Configuration</h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <FormField
+                name="basePath"
+                control={control}
+                render={({ field, fieldState: { error } }) => (
+                  <FormControl>
+                    <FormLabel required>Base Path</FormLabel>
+                    <Input 
+                      {...field} 
+                      placeholder="/table_name"
+                      className="font-mono"
+                    />
+                    {error && <FormError>{error.message}</FormError>}
+                  </FormControl>
+                )}
+              />
+              
+              <FormField
+                name="enabled"
+                control={control}
+                render={({ field }) => (
+                  <FormControl>
+                    <div className="flex items-center space-x-3 pt-8">
+                      <Switch
+                        checked={field.value}
+                        onChange={field.onChange}
+                        id="endpoint-enabled"
+                      />
+                      <FormLabel htmlFor="endpoint-enabled">Enable Endpoint</FormLabel>
+                    </div>
+                  </FormControl>
+                )}
+              />
+            </div>
+            
+            {renderHttpMethodSelector()}
+          </div>
+
+          {/* Parameter Configuration */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
+            <h3 className="text-lg font-semibold text-gray-900">Parameter Configuration</h3>
+            
+            {renderPaginationSettings()}
+            {renderFilteringSettings()}
+            {renderCustomParameters()}
+          </div>
+
+          {/* Security Configuration */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
+            <h3 className="text-lg font-semibold text-gray-900">Security Configuration</h3>
+            {renderSecuritySettings()}
+          </div>
+
+          {/* Form Actions */}
+          <div className="flex flex-col sm:flex-row justify-between gap-4 pt-6 border-t border-gray-200">
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={navigation.goToPreviousStep}
+                disabled={!navigation.canGoPrevious}
+              >
+                Previous
+              </Button>
+              
+              {selectedTables.length > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleApplyToAll}
+                  disabled={!isValid}
+                >
+                  Apply to All Tables
+                </Button>
+              )}
+            </div>
+            
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => reset()}
+              >
+                Reset
+              </Button>
+              
+              <Button
+                type="submit"
+                disabled={!isValid}
+                loading={wizard.generationProgress.isGenerating}
+              >
+                Continue to Security
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Form>
+
+      {/* Real-time Validation Feedback */}
+      {Object.keys(errors).length > 0 && (
+        <Alert variant="error">
+          <Alert.Title>Configuration Issues</Alert.Title>
+          <Alert.Description>
+            Please fix the highlighted issues before continuing to the next step.
+          </Alert.Description>
+        </Alert>
+      )}
+    </div>
+  );
+};
 
 export default EndpointConfiguration;
