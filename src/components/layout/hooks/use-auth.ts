@@ -1,542 +1,718 @@
 /**
- * Custom React hook for authentication state management
+ * Authentication Hook for DreamFactory Admin Interface
  * 
- * Replaces Angular DfAuthService with modern React patterns:
- * - React Query mutations for login/logout/session validation
- * - Zustand state management for authentication status and user data
+ * Custom React hook that manages authentication state, login/logout actions, 
+ * session validation, and user permissions. Replaces Angular DfAuthService 
+ * with React Query mutations, Zustand state management, and Next.js middleware 
+ * integration for JWT token handling.
+ * 
+ * Key Features:
+ * - React Query mutations for login, logout, and session validation
+ * - Zustand state integration for authentication status and user data persistence
  * - JWT token management with automatic refresh capabilities
- * - Next.js middleware integration for enhanced security
- * - Role-based access control with permission caching
+ * - User permission caching with role-based access control
+ * - Session validation on component mount with token expiration handling
+ * - Next.js router integration for authentication redirects
+ * - Optimistic updates and error handling for auth operations
  * 
- * @author DreamFactory Team
- * @version 1.0.0
+ * @example
+ * ```tsx
+ * function LoginComponent() {
+ *   const { 
+ *     login, 
+ *     logout, 
+ *     isAuthenticated, 
+ *     user, 
+ *     isLoading,
+ *     hasPermission 
+ *   } = useAuth();
+ * 
+ *   const handleLogin = async (credentials) => {
+ *     try {
+ *       await login.mutateAsync(credentials);
+ *       // Redirect handled automatically
+ *     } catch (error) {
+ *       // Error handling in UI
+ *     }
+ *   };
+ * 
+ *   return (
+ *     <div>
+ *       {isAuthenticated ? (
+ *         <div>Welcome {user?.name}!</div>
+ *       ) : (
+ *         <LoginForm onSubmit={handleLogin} />
+ *       )}
+ *     </div>
+ *   );
+ * }
+ * ```
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
-import { useCallback, useEffect } from 'react'
-import { toast } from 'sonner'
+import { useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { create } from 'zustand';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
+import { apiClient } from '@/lib/api-client';
+import type { 
+  LoginCredentials, 
+  LoginResponse, 
+  UserSession,
+  AuthState,
+  AuthActions,
+  AuthStore,
+  AuthError,
+  AuthErrorCode,
+  MiddlewareAuthResult,
+  TokenRefreshResult,
+  UserPermissions
+} from '@/types/auth';
+import type { UserProfile } from '@/types/user';
 
-// Type imports - these interfaces are expected to be defined in the dependency files
-interface User {
-  id: number
-  email: string
-  username: string
-  first_name?: string
-  last_name?: string
-  display_name: string
-  is_active: boolean
-  roles?: UserRole[]
-  permissions?: string[]
-  last_login_date?: string
-  created_date: string
-  modified_date: string
-}
-
-interface UserRole {
-  id: number
-  name: string
-  description?: string
-  is_active: boolean
-  role_service_access?: RoleServiceAccess[]
-}
-
-interface RoleServiceAccess {
-  service_id: number
-  component: string
-  verb_mask: number
-  filters?: string[]
-  filter_op: 'AND' | 'OR'
-}
-
-interface LoginCredentials {
-  email: string
-  password: string
-  remember_me?: boolean
-}
-
-interface LoginResponse {
-  session_token: string
-  session_id: string
-  user: User
-  expires_in?: number
-  refresh_token?: string
-}
-
-interface SessionValidationResponse {
-  valid: boolean
-  user?: User
-  expires_at?: string
-  refresh_token?: string
-}
-
-interface AuthError {
-  error: {
-    code: number
-    message: string
-    details?: string[]
-  }
-}
-
-// Mock API client functions - these would typically be imported from src/lib/api-client.ts
-const apiClient = {
-  async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    // This would be replaced with actual API client implementation
-    const response = await fetch('/api/v2/user/session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials),
-    })
-    
-    if (!response.ok) {
-      const error: AuthError = await response.json()
-      throw new Error(error.error.message || 'Authentication failed')
-    }
-    
-    return response.json()
-  },
-
-  async logout(): Promise<void> {
-    // This would be replaced with actual API client implementation
-    await fetch('/api/v2/user/session', {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${getStoredToken()}` },
-    })
-  },
-
-  async validateSession(): Promise<SessionValidationResponse> {
-    // This would be replaced with actual API client implementation
-    const token = getStoredToken()
-    if (!token) {
-      return { valid: false }
-    }
-
-    const response = await fetch('/api/v2/user/session', {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` },
-    })
-
-    if (!response.ok) {
-      return { valid: false }
-    }
-
-    const data = await response.json()
-    return {
-      valid: true,
-      user: data.user,
-      expires_at: data.expires_at,
-      refresh_token: data.refresh_token,
-    }
-  },
-
-  async refreshToken(): Promise<LoginResponse> {
-    // This would be replaced with actual API client implementation
-    const refreshToken = getStoredRefreshToken()
-    if (!refreshToken) {
-      throw new Error('No refresh token available')
-    }
-
-    const response = await fetch('/api/v2/user/session/refresh', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${refreshToken}`,
-      },
-    })
-
-    if (!response.ok) {
-      const error: AuthError = await response.json()
-      throw new Error(error.error.message || 'Token refresh failed')
-    }
-
-    return response.json()
-  },
-
-  async getUserPermissions(userId: number): Promise<string[]> {
-    // This would be replaced with actual API client implementation
-    const token = getStoredToken()
-    const response = await fetch(`/api/v2/user/${userId}/permissions`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch user permissions')
-    }
-
-    const data = await response.json()
-    return data.resource || []
-  }
-}
-
-// Mock Zustand store - this would typically be imported from src/stores/auth-store.ts
-interface AuthStore {
-  isAuthenticated: boolean
-  user: User | null
-  permissions: string[]
-  setAuthState: (isAuthenticated: boolean, user: User | null, permissions?: string[]) => void
-  clearAuth: () => void
-}
-
-// Mock store implementation - would be replaced with actual Zustand store
-const useAuthStore = (): AuthStore => {
-  // This is a simplified mock implementation
-  // The actual implementation would use Zustand's create function
-  const isAuthenticated = !!getStoredToken()
-  const user = getStoredUser()
-  const permissions = getStoredPermissions()
-
-  return {
-    isAuthenticated,
-    user,
-    permissions,
-    setAuthState: (isAuthenticated: boolean, user: User | null, permissions: string[] = []) => {
-      if (isAuthenticated && user) {
-        storeUserData(user)
-        storePermissions(permissions)
-      }
-    },
-    clearAuth: () => {
-      clearStoredAuth()
-    }
-  }
-}
-
-// Local storage utilities
-const TOKEN_KEY = 'df_session_token'
-const REFRESH_TOKEN_KEY = 'df_refresh_token'
-const USER_KEY = 'df_user_data'
-const PERMISSIONS_KEY = 'df_user_permissions'
-
-function getStoredToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(TOKEN_KEY)
-}
-
-function getStoredRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(REFRESH_TOKEN_KEY)
-}
-
-function getStoredUser(): User | null {
-  if (typeof window === 'undefined') return null
-  const userData = localStorage.getItem(USER_KEY)
-  return userData ? JSON.parse(userData) : null
-}
-
-function getStoredPermissions(): string[] {
-  if (typeof window === 'undefined') return []
-  const permissions = localStorage.getItem(PERMISSIONS_KEY)
-  return permissions ? JSON.parse(permissions) : []
-}
-
-function storeAuthData(loginResponse: LoginResponse): void {
-  if (typeof window === 'undefined') return
-  
-  localStorage.setItem(TOKEN_KEY, loginResponse.session_token)
-  if (loginResponse.refresh_token) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, loginResponse.refresh_token)
-  }
-  storeUserData(loginResponse.user)
-}
-
-function storeUserData(user: User): void {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(USER_KEY, JSON.stringify(user))
-}
-
-function storePermissions(permissions: string[]): void {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(permissions))
-}
-
-function clearStoredAuth(): void {
-  if (typeof window === 'undefined') return
-  
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(REFRESH_TOKEN_KEY)
-  localStorage.removeItem(USER_KEY)
-  localStorage.removeItem(PERMISSIONS_KEY)
-}
-
-// React Query cache keys
-const QUERY_KEYS = {
-  session: ['auth', 'session'] as const,
-  permissions: (userId: number) => ['auth', 'permissions', userId] as const,
-  user: (userId: number) => ['auth', 'user', userId] as const,
-} as const
+// ============================================================================
+// ZUSTAND AUTH STORE DEFINITION
+// ============================================================================
 
 /**
- * Custom hook for authentication state management
- * 
- * Provides comprehensive authentication functionality including:
- * - Login/logout operations with React Query mutations
- * - Session validation with automatic refresh
- * - User permission management with RBAC
- * - Integration with Next.js middleware for enhanced security
- * - Automatic token management and expiration handling
+ * Zustand store for authentication state management
+ * Persists authentication data across browser sessions using localStorage
+ * Integrates with React Query for server state synchronization
+ */
+const useAuthStore = create<AuthStore>()(
+  subscribeWithSelector(
+    persist(
+      (set, get) => ({
+        // State
+        isAuthenticated: false,
+        isLoading: false,
+        user: null,
+        error: null,
+        isRefreshing: false,
+
+        // Actions
+        login: async (credentials: LoginCredentials) => {
+          // This will be handled by React Query mutation
+          throw new Error('Login should be called through useAuth hook');
+        },
+
+        loginWithToken: async (token: string) => {
+          // This will be handled by React Query mutation
+          throw new Error('loginWithToken should be called through useAuth hook');
+        },
+
+        logout: async () => {
+          // This will be handled by React Query mutation
+          throw new Error('Logout should be called through useAuth hook');
+        },
+
+        refreshToken: async () => {
+          // This will be handled by React Query mutation
+          throw new Error('refreshToken should be called through useAuth hook');
+        },
+
+        updateUser: (user: Partial<UserSession>) => {
+          set((state) => ({
+            user: state.user ? { ...state.user, ...user } : null,
+          }));
+        },
+
+        clearError: () => {
+          set({ error: null });
+        },
+
+        checkSession: async () => {
+          // This will be handled by React Query
+          return false;
+        },
+
+        // Internal store actions
+        setAuthenticated: (isAuthenticated: boolean, user?: UserSession | null) => {
+          set({ 
+            isAuthenticated, 
+            user: isAuthenticated ? user : null,
+            error: null 
+          });
+        },
+
+        setLoading: (isLoading: boolean) => {
+          set({ isLoading });
+        },
+
+        setError: (error: AuthError | null) => {
+          set({ error });
+        },
+
+        setRefreshing: (isRefreshing: boolean) => {
+          set({ isRefreshing });
+        },
+
+        // Clear all auth data
+        reset: () => {
+          set({
+            isAuthenticated: false,
+            isLoading: false,
+            user: null,
+            error: null,
+            isRefreshing: false,
+          });
+        },
+      }),
+      {
+        name: 'auth-storage',
+        partialize: (state) => ({
+          isAuthenticated: state.isAuthenticated,
+          user: state.user,
+        }),
+        onRehydrateStorage: () => (state) => {
+          // Validate stored session on hydration
+          if (state?.user?.sessionToken) {
+            // Check if token is expired
+            const tokenExpiryDate = state.user.tokenExpiryDate;
+            if (tokenExpiryDate && new Date(tokenExpiryDate) <= new Date()) {
+              state.reset();
+            }
+          }
+        },
+      }
+    )
+  )
+);
+
+// ============================================================================
+// REACT QUERY KEY FACTORIES
+// ============================================================================
+
+/**
+ * Query key factory for authentication-related queries
+ * Ensures consistent cache key generation and invalidation
+ */
+const authKeys = {
+  all: ['auth'] as const,
+  session: () => [...authKeys.all, 'session'] as const,
+  user: (userId?: number) => [...authKeys.all, 'user', userId] as const,
+  permissions: (userId?: number) => [...authKeys.all, 'permissions', userId] as const,
+  refresh: () => [...authKeys.all, 'refresh'] as const,
+} as const;
+
+// ============================================================================
+// API FUNCTIONS FOR AUTHENTICATION
+// ============================================================================
+
+/**
+ * Login API call with credentials
+ */
+async function loginUser(credentials: LoginCredentials): Promise<LoginResponse> {
+  const response = await apiClient.post<LoginResponse>('/user/session', {
+    ...credentials,
+    // Ensure either email or username is provided
+    email: credentials.email || undefined,
+    username: credentials.username || undefined,
+  });
+
+  if (!response.data?.sessionToken && !response.data?.session_token) {
+    throw new Error('Login failed: No session token received');
+  }
+
+  return response.data;
+}
+
+/**
+ * Login with existing JWT token
+ */
+async function loginWithJwtToken(token: string): Promise<UserSession> {
+  const response = await apiClient.get<UserSession>('/user/profile', {
+    headers: {
+      'X-DreamFactory-Session-Token': token,
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.data) {
+    throw new Error('Failed to retrieve user profile');
+  }
+
+  // Construct full user session from profile data
+  const userSession: UserSession = {
+    ...response.data,
+    sessionToken: token,
+    sessionId: `session_${response.data.id}_${Date.now()}`,
+    tokenExpiryDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours default
+    lastLoginDate: new Date().toISOString(),
+  };
+
+  return userSession;
+}
+
+/**
+ * Logout API call
+ */
+async function logoutUser(): Promise<void> {
+  try {
+    await apiClient.delete('/user/session');
+  } catch (error) {
+    // Even if the API call fails, we should clear local session
+    console.warn('Logout API call failed, but continuing with local cleanup:', error);
+  }
+}
+
+/**
+ * Validate current session
+ */
+async function validateSession(): Promise<UserSession | null> {
+  try {
+    const response = await apiClient.get<UserSession>('/user/session');
+    return response.data || null;
+  } catch (error) {
+    // Session is invalid
+    return null;
+  }
+}
+
+/**
+ * Refresh authentication token
+ */
+async function refreshAuthToken(): Promise<TokenRefreshResult> {
+  try {
+    const response = await apiClient.post<{ sessionToken: string; expiresIn: number }>('/user/session/refresh');
+    
+    if (!response.data?.sessionToken) {
+      return {
+        success: false,
+        error: 'No refresh token received',
+        requiresReauth: true,
+      };
+    }
+
+    return {
+      success: true,
+      accessToken: response.data.sessionToken,
+      expiresIn: response.data.expiresIn || 24 * 60 * 60, // 24 hours default
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Token refresh failed',
+      requiresReauth: true,
+    };
+  }
+}
+
+/**
+ * Fetch user permissions
+ */
+async function fetchUserPermissions(userId: number): Promise<UserPermissions> {
+  const response = await apiClient.get<{ permissions: UserPermissions }>(`/user/${userId}/permissions`);
+  return response.data?.permissions || [];
+}
+
+// ============================================================================
+// MAIN USE-AUTH HOOK
+// ============================================================================
+
+/**
+ * Main authentication hook providing comprehensive auth management
+ * Integrates React Query mutations with Zustand state for optimal performance
  */
 export function useAuth() {
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const authStore = useAuthStore()
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  
+  // Access Zustand store state and actions
+  const {
+    isAuthenticated,
+    isLoading,
+    user,
+    error,
+    isRefreshing,
+    setAuthenticated,
+    setLoading,
+    setError,
+    setRefreshing,
+    updateUser,
+    clearError,
+    reset,
+  } = useAuthStore();
 
-  // Session validation query with automatic background refetching
+  // ============================================================================
+  // REACT QUERY MUTATIONS
+  // ============================================================================
+
+  /**
+   * Login mutation with optimistic updates and error handling
+   */
+  const loginMutation = useMutation({
+    mutationFn: loginUser,
+    onMutate: () => {
+      setLoading(true);
+      setError(null);
+    },
+    onSuccess: async (response) => {
+      try {
+        // Extract session token from response
+        const sessionToken = response.sessionToken || response.session_token;
+        if (!sessionToken) {
+          throw new Error('No session token in login response');
+        }
+
+        // Store token in localStorage for API client
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('session_token', sessionToken);
+        }
+
+        // Create user session object
+        const userSession: UserSession = {
+          ...response.user,
+          sessionToken,
+          sessionId: `session_${response.user?.id}_${Date.now()}`,
+          tokenExpiryDate: response.expiresAt 
+            ? new Date(response.expiresAt)
+            : new Date(Date.now() + 24 * 60 * 60 * 1000),
+          lastLoginDate: new Date().toISOString(),
+        } as UserSession;
+
+        // Update Zustand store
+        setAuthenticated(true, userSession);
+        
+        // Invalidate and refetch auth-related queries
+        await queryClient.invalidateQueries({ queryKey: authKeys.all });
+        
+        // Pre-fetch user permissions
+        if (userSession.id) {
+          queryClient.prefetchQuery({
+            queryKey: authKeys.permissions(userSession.id),
+            queryFn: () => fetchUserPermissions(userSession.id),
+          });
+        }
+
+        // Navigate to home page
+        router.push('/');
+        
+      } catch (error) {
+        setError({
+          code: AuthErrorCode.SERVER_ERROR,
+          message: error instanceof Error ? error.message : 'Login processing failed',
+          timestamp: new Date().toISOString(),
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: (error: Error) => {
+      setLoading(false);
+      setError({
+        code: AuthErrorCode.INVALID_CREDENTIALS,
+        message: error.message || 'Login failed',
+        timestamp: new Date().toISOString(),
+      });
+    },
+  });
+
+  /**
+   * Login with JWT token mutation
+   */
+  const loginWithTokenMutation = useMutation({
+    mutationFn: loginWithJwtToken,
+    onMutate: () => {
+      setLoading(true);
+      setError(null);
+    },
+    onSuccess: async (userSession) => {
+      try {
+        // Store token in localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('session_token', userSession.sessionToken);
+        }
+
+        // Update Zustand store
+        setAuthenticated(true, userSession);
+        
+        // Invalidate and refetch auth-related queries
+        await queryClient.invalidateQueries({ queryKey: authKeys.all });
+        
+        // Pre-fetch user permissions
+        if (userSession.id) {
+          queryClient.prefetchQuery({
+            queryKey: authKeys.permissions(userSession.id),
+            queryFn: () => fetchUserPermissions(userSession.id),
+          });
+        }
+
+        // Navigate to home page
+        router.push('/');
+        
+      } catch (error) {
+        setError({
+          code: AuthErrorCode.SERVER_ERROR,
+          message: error instanceof Error ? error.message : 'Token login processing failed',
+          timestamp: new Date().toISOString(),
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: (error: Error) => {
+      setLoading(false);
+      setError({
+        code: AuthErrorCode.TOKEN_INVALID,
+        message: error.message || 'Token login failed',
+        timestamp: new Date().toISOString(),
+      });
+    },
+  });
+
+  /**
+   * Logout mutation with cleanup
+   */
+  const logoutMutation = useMutation({
+    mutationFn: logoutUser,
+    onMutate: () => {
+      setLoading(true);
+    },
+    onSuccess: async () => {
+      // Clear localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('session_token');
+      }
+
+      // Reset Zustand store
+      reset();
+      
+      // Clear all React Query cache
+      queryClient.clear();
+      
+      // Navigate to login page
+      router.push('/login');
+      
+      setLoading(false);
+    },
+    onError: (error: Error) => {
+      // Even on error, clear local state
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('session_token');
+      }
+      reset();
+      queryClient.clear();
+      router.push('/login');
+      setLoading(false);
+    },
+  });
+
+  /**
+   * Token refresh mutation with automatic retry
+   */
+  const refreshTokenMutation = useMutation({
+    mutationFn: refreshAuthToken,
+    onMutate: () => {
+      setRefreshing(true);
+    },
+    onSuccess: async (result) => {
+      setRefreshing(false);
+      
+      if (result.success && result.accessToken) {
+        // Update stored token
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('session_token', result.accessToken);
+        }
+        
+        // Update user session with new token
+        if (user) {
+          const updatedUser: UserSession = {
+            ...user,
+            sessionToken: result.accessToken,
+            tokenExpiryDate: new Date(Date.now() + (result.expiresIn || 24 * 60 * 60) * 1000),
+          };
+          setAuthenticated(true, updatedUser);
+        }
+        
+        // Invalidate session query to refetch with new token
+        await queryClient.invalidateQueries({ queryKey: authKeys.session() });
+      } else if (result.requiresReauth) {
+        // Force logout and redirect to login
+        logoutMutation.mutate();
+      }
+    },
+    onError: () => {
+      setRefreshing(false);
+      // Force logout on refresh failure
+      logoutMutation.mutate();
+    },
+  });
+
+  // ============================================================================
+  // REACT QUERY QUERIES
+  // ============================================================================
+
+  /**
+   * Session validation query with automatic background refetching
+   */
   const sessionQuery = useQuery({
-    queryKey: QUERY_KEYS.session,
-    queryFn: apiClient.validateSession,
+    queryKey: authKeys.session(),
+    queryFn: validateSession,
+    enabled: isAuthenticated && !!user?.sessionToken,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchInterval: 15 * 60 * 1000, // 15 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+    refetchInterval: 15 * 60 * 1000, // 15 minutes background refetch
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     retry: (failureCount, error) => {
-      // Don't retry on authentication errors
-      if (error.message.includes('Authentication') || error.message.includes('Unauthorized')) {
-        return false
+      // Don't retry on auth errors
+      if (error && typeof error === 'object' && 'status' in error) {
+        const status = (error as any).status;
+        if (status === 401 || status === 403) {
+          return false;
+        }
       }
-      return failureCount < 3
+      return failureCount < 2;
     },
-    enabled: !!getStoredToken(), // Only run if we have a token
-  })
+    onError: () => {
+      // Session is invalid, logout user
+      logoutMutation.mutate();
+    },
+  });
 
-  // User permissions query with intelligent caching
+  /**
+   * User permissions query with caching
+   */
   const permissionsQuery = useQuery({
-    queryKey: authStore.user ? QUERY_KEYS.permissions(authStore.user.id) : ['permissions', 'disabled'],
-    queryFn: () => authStore.user ? apiClient.getUserPermissions(authStore.user.id) : Promise.resolve([]),
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!authStore.user?.id,
-  })
+    queryKey: authKeys.permissions(user?.id),
+    queryFn: () => user?.id ? fetchUserPermissions(user.id) : Promise.resolve([]),
+    enabled: isAuthenticated && !!user?.id,
+    staleTime: 15 * 60 * 1000, // 15 minutes
+    cacheTime: 30 * 60 * 1000, // 30 minutes
+  });
 
-  // Login mutation with optimistic updates
-  const loginMutation = useMutation({
-    mutationFn: apiClient.login,
-    onSuccess: async (data: LoginResponse) => {
-      // Store authentication data
-      storeAuthData(data)
-      
-      // Update Zustand store
-      authStore.setAuthState(true, data.user)
-      
-      // Update React Query cache
-      queryClient.setQueryData(QUERY_KEYS.session, {
-        valid: true,
-        user: data.user,
-        expires_at: data.expires_in ? new Date(Date.now() + data.expires_in * 1000).toISOString() : undefined,
-        refresh_token: data.refresh_token,
-      })
+  // ============================================================================
+  // AUTOMATIC TOKEN REFRESH LOGIC
+  // ============================================================================
 
-      // Fetch user permissions
-      if (data.user.id) {
-        const permissions = await apiClient.getUserPermissions(data.user.id)
-        storePermissions(permissions)
-        authStore.setAuthState(true, data.user, permissions)
-        
-        queryClient.setQueryData(QUERY_KEYS.permissions(data.user.id), permissions)
-      }
-
-      // Navigate to dashboard
-      router.push('/adf-home')
-      
-      toast.success(`Welcome back, ${data.user.display_name}!`)
-    },
-    onError: (error: Error) => {
-      console.error('Login failed:', error)
-      toast.error(error.message || 'Login failed. Please try again.')
-    },
-  })
-
-  // Logout mutation with cleanup
-  const logoutMutation = useMutation({
-    mutationFn: apiClient.logout,
-    onSuccess: () => {
-      performLogout()
-    },
-    onError: (error: Error) => {
-      console.error('Logout error:', error)
-      // Still perform logout cleanup even if server call fails
-      performLogout()
-    },
-  })
-
-  // Token refresh mutation for automatic token renewal
-  const refreshTokenMutation = useMutation({
-    mutationFn: apiClient.refreshToken,
-    onSuccess: (data: LoginResponse) => {
-      // Update stored tokens
-      storeAuthData(data)
-      
-      // Update auth store
-      authStore.setAuthState(true, data.user)
-      
-      // Update session query cache
-      queryClient.setQueryData(QUERY_KEYS.session, {
-        valid: true,
-        user: data.user,
-        expires_at: data.expires_in ? new Date(Date.now() + data.expires_in * 1000).toISOString() : undefined,
-        refresh_token: data.refresh_token,
-      })
-      
-      toast.success('Session refreshed successfully')
-    },
-    onError: (error: Error) => {
-      console.error('Token refresh failed:', error)
-      // Force logout on refresh failure
-      performLogout()
-      toast.error('Session expired. Please log in again.')
-    },
-  })
-
-  // Logout cleanup function
-  const performLogout = useCallback(() => {
-    // Clear all stored authentication data
-    clearStoredAuth()
-    
-    // Update Zustand store
-    authStore.clearAuth()
-    
-    // Clear React Query cache
-    queryClient.removeQueries({ queryKey: ['auth'] })
-    
-    // Navigate to login page
-    router.push('/login')
-    
-    toast.info('You have been logged out')
-  }, [authStore, queryClient, router])
-
-  // Automatic token refresh when near expiration
+  /**
+   * Setup automatic token refresh based on expiration
+   */
   useEffect(() => {
-    if (!sessionQuery.data?.valid || !sessionQuery.data.expires_at) {
-      return
+    if (!isAuthenticated || !user?.tokenExpiryDate || isRefreshing) {
+      return;
     }
 
-    const expiresAt = new Date(sessionQuery.data.expires_at).getTime()
-    const now = Date.now()
-    const timeUntilExpiry = expiresAt - now
+    const expiryDate = new Date(user.tokenExpiryDate);
+    const now = new Date();
+    const timeUntilExpiry = expiryDate.getTime() - now.getTime();
     
-    // Refresh token when 5 minutes before expiration
-    const refreshThreshold = 5 * 60 * 1000 // 5 minutes
+    // Refresh token 5 minutes before expiry
+    const refreshTime = timeUntilExpiry - (5 * 60 * 1000);
     
-    if (timeUntilExpiry > 0 && timeUntilExpiry <= refreshThreshold) {
-      const refreshToken = getStoredRefreshToken()
-      if (refreshToken && !refreshTokenMutation.isPending) {
-        refreshTokenMutation.mutate()
-      }
+    if (refreshTime > 0) {
+      const refreshTimeout = setTimeout(() => {
+        refreshTokenMutation.mutate();
+      }, refreshTime);
+      
+      return () => clearTimeout(refreshTimeout);
+    } else if (timeUntilExpiry <= 0) {
+      // Token is already expired, logout immediately
+      logoutMutation.mutate();
     }
-  }, [sessionQuery.data, refreshTokenMutation])
+  }, [isAuthenticated, user?.tokenExpiryDate, isRefreshing, refreshTokenMutation, logoutMutation]);
 
-  // Session validation on component mount
-  useEffect(() => {
-    const token = getStoredToken()
-    if (token && !sessionQuery.data) {
-      // Trigger session validation
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.session })
-    }
-  }, [queryClient, sessionQuery.data])
+  // ============================================================================
+  // PERMISSION CHECKING UTILITIES
+  // ============================================================================
 
-  // Permission checking utilities
+  /**
+   * Check if user has specific permission
+   */
   const hasPermission = useCallback((permission: string): boolean => {
-    if (!authStore.isAuthenticated || !permissionsQuery.data) {
-      return false
-    }
-    return permissionsQuery.data.includes(permission)
-  }, [authStore.isAuthenticated, permissionsQuery.data])
-
-  const hasRole = useCallback((roleName: string): boolean => {
-    if (!authStore.user?.roles) {
-      return false
-    }
-    return authStore.user.roles.some(role => role.name === roleName && role.is_active)
-  }, [authStore.user])
-
-  const hasAnyRole = useCallback((roleNames: string[]): boolean => {
-    return roleNames.some(roleName => hasRole(roleName))
-  }, [hasRole])
-
-  const hasAllRoles = useCallback((roleNames: string[]): boolean => {
-    return roleNames.every(roleName => hasRole(roleName))
-  }, [hasRole])
-
-  // Check if user can access a specific service/component
-  const canAccessService = useCallback((serviceId: number, component: string, verb: string): boolean => {
-    if (!authStore.user?.roles) {
-      return false
+    if (!isAuthenticated || !user) {
+      return false;
     }
 
-    const verbMasks: Record<string, number> = {
-      'GET': 1,
-      'POST': 2,
-      'PUT': 4,
-      'PATCH': 8,
-      'DELETE': 16,
+    // Root admin has all permissions
+    if (user.isRootAdmin || user.isSysAdmin) {
+      return true;
     }
 
-    const verbMask = verbMasks[verb.toUpperCase()]
-    if (!verbMask) {
-      return false
-    }
+    // Check against cached permissions
+    const permissions = permissionsQuery.data || [];
+    return permissions.some(p => 
+      p.resource === permission || 
+      p.operations?.includes(permission as any)
+    );
+  }, [isAuthenticated, user, permissionsQuery.data]);
 
-    return authStore.user.roles.some(role => {
-      if (!role.is_active || !role.role_service_access) {
-        return false
-      }
+  /**
+   * Check if user has any of the specified permissions
+   */
+  const hasAnyPermission = useCallback((permissions: string[]): boolean => {
+    return permissions.some(permission => hasPermission(permission));
+  }, [hasPermission]);
 
-      return role.role_service_access.some(access => 
-        access.service_id === serviceId && 
-        access.component === component && 
-        (access.verb_mask & verbMask) === verbMask
-      )
-    })
-  }, [authStore.user])
+  /**
+   * Check if user has all specified permissions
+   */
+  const hasAllPermissions = useCallback((permissions: string[]): boolean => {
+    return permissions.every(permission => hasPermission(permission));
+  }, [hasPermission]);
+
+  // ============================================================================
+  // RETURN HOOK INTERFACE
+  // ============================================================================
 
   return {
     // Authentication state
-    isAuthenticated: authStore.isAuthenticated,
-    user: authStore.user,
+    isAuthenticated,
+    isLoading: isLoading || loginMutation.isPending || logoutMutation.isPending,
+    user,
+    error,
+    isRefreshing: isRefreshing || refreshTokenMutation.isPending,
+
+    // Authentication actions (React Query mutations)
+    login: loginMutation,
+    loginWithToken: loginWithTokenMutation,
+    logout: logoutMutation,
+    refreshToken: refreshTokenMutation,
+
+    // User management
+    updateUser,
+    clearError,
+
+    // Session and permission data
+    sessionData: sessionQuery.data,
     permissions: permissionsQuery.data || [],
-    
-    // Loading states
-    isLoading: sessionQuery.isLoading || permissionsQuery.isLoading,
-    isValidating: sessionQuery.isFetching,
-    isLoggingIn: loginMutation.isPending,
-    isLoggingOut: logoutMutation.isPending,
-    isRefreshing: refreshTokenMutation.isPending,
-    
-    // Error states
-    sessionError: sessionQuery.error,
-    permissionsError: permissionsQuery.error,
-    loginError: loginMutation.error,
-    logoutError: logoutMutation.error,
-    
-    // Actions
-    login: loginMutation.mutate,
-    logout: () => logoutMutation.mutate(),
-    refreshToken: () => refreshTokenMutation.mutate(),
-    
-    // Utilities
+    isSessionLoading: sessionQuery.isLoading,
+    isPermissionsLoading: permissionsQuery.isLoading,
+
+    // Permission checking utilities
     hasPermission,
-    hasRole,
-    hasAnyRole,
-    hasAllRoles,
-    canAccessService,
-    
-    // Session management
-    validateSession: () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.session }),
-    clearSession: performLogout,
-  }
+    hasAnyPermission,
+    hasAllPermissions,
+
+    // Direct mutation functions for imperative usage
+    mutateLogin: loginMutation.mutateAsync,
+    mutateLoginWithToken: loginWithTokenMutation.mutateAsync,
+    mutateLogout: logoutMutation.mutateAsync,
+    mutateRefreshToken: refreshTokenMutation.mutateAsync,
+  };
 }
 
-// Export types for use in other components
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+export default useAuth;
+
+// Export types for external usage
 export type {
-  User,
-  UserRole,
-  RoleServiceAccess,
+  AuthState,
+  AuthActions,
+  AuthStore,
+  AuthError,
+  UserSession,
   LoginCredentials,
   LoginResponse,
-  SessionValidationResponse,
-  AuthError,
-}
+  UserPermissions,
+};
 
-// Export utility functions for external use
-export {
-  getStoredToken,
-  getStoredUser,
-  clearStoredAuth,
-}
+// Export auth store for direct access if needed
+export { useAuthStore };
+
+// Export query key factory for external invalidation
+export { authKeys };
