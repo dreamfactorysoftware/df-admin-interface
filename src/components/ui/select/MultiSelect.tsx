@@ -1,67 +1,113 @@
+"use client";
+
+import React, { forwardRef, useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { Listbox, Transition } from '@headlessui/react';
+import { ChevronDownIcon, XMarkIcon, CheckIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { cn } from '@/lib/utils';
+import { Button } from '../button/Button';
+import { useMultiSelect, useSelectKeyboard, useVerbTransform } from './hooks';
+import type { MultiSelectProps, SelectOption } from './types';
+
 /**
- * MultiSelect Component
+ * MultiSelect Component for DreamFactory Admin Interface
  * 
  * Advanced multiple selection component using Headless UI Listbox with comprehensive
- * functionality including chip display, search filtering, batch operations, keyboard
- * navigation, and value transformations. Supports React Hook Form integration with
- * validation and provides enterprise-grade accessibility (WCAG 2.1 AA compliant).
+ * multi-select capability. Displays selected items as chips/tags with remove functionality.
+ * Supports maximum selection limits, batch operations, search/filter, and complex value
+ * transformations including HTTP verb bitmasks for API generation workflows.
  * 
  * Features:
- * - Multiple selection with visual chips/tags
- * - Search/filter functionality within dropdown
- * - Batch operations (select all, deselect all, invert selection)
- * - Maximum selection limits with validation feedback
- * - Keyboard navigation for chips and options
- * - Value transformation support (arrays, bitmasks, comma-separated strings)
- * - HTTP verb picker compatibility for bitmask operations
- * - React Hook Form integration with comprehensive validation
- * - Loading states and error handling
- * - Customizable rendering and theming
+ * - Headless UI 2.0+ Listbox with accessible multi-selection
+ * - React Hook Form integration with array validation and error handling
+ * - Tailwind CSS styling with consistent chip/tag design patterns
+ * - Support for complex value transformations (arrays, bitmasks, comma-separated strings)
+ * - Maximum selection limits with validation and user feedback
+ * - Batch selection operations (select all, deselect all, invert selection)
+ * - Search/filter functionality within the multi-select dropdown
+ * - Proper keyboard navigation for chip removal and option selection
+ * - HTTP verb bitmask support replacing Angular df-verb-picker functionality
+ * - WCAG 2.1 AA accessibility compliance with screen reader support
  * 
- * @fileoverview MultiSelect component implementing Angular df-verb-picker functionality
- * @version 1.0.0
- * @since React 19.0.0 / Next.js 15.1+
+ * @see Technical Specification Section 7.1.1 for React 19/Headless UI requirements
+ * @see Angular df-verb-picker migration requirements for bitmask transformations
+ * 
+ * @example
+ * ```tsx
+ * // Basic multi-select with chips
+ * <MultiSelect
+ *   options={databaseOptions}
+ *   value={selectedDatabases}
+ *   onChange={setSelectedDatabases}
+ *   placeholder="Select databases..."
+ *   maxSelections={5}
+ * />
+ * 
+ * // HTTP verb picker with bitmask transformation
+ * <MultiSelect
+ *   options={httpVerbOptions}
+ *   value={selectedVerbs}
+ *   onChange={handleVerbChange}
+ *   transform={{
+ *     type: 'bitmask',
+ *     bitmask: {
+ *       mapping: { GET: 1, POST: 2, PUT: 4, DELETE: 8 }
+ *     }
+ *   }}
+ *   showSelectAll
+ *   searchable
+ * />
+ * 
+ * // Advanced multi-select with React Hook Form
+ * <MultiSelect
+ *   name="apiMethods"
+ *   control={control}
+ *   rules={{ required: 'At least one method is required' }}
+ *   options={apiMethodOptions}
+ *   maxSelections={10}
+ *   showSelectionCount
+ *   clearable
+ * />
+ * ```
  */
-
-'use client';
-
-import React, { useState, useEffect, useCallback, useMemo, useRef, forwardRef } from 'react';
-import { Listbox, Transition } from '@headlessui/react';
-import { ChevronDownIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { CheckIcon, XCircleIcon } from '@heroicons/react/24/solid';
-import { useFormContext, type FieldValues, type Path } from 'react-hook-form';
-import { cn } from '../../../lib/utils';
-import { 
-  useMultiSelect, 
-  useSelectOptions, 
-  useSelectKeyboard, 
-  useVerbTransform,
-  type SelectOption, 
-  type MultiSelectProps as BaseMultiSelectProps,
-  type HttpVerb 
-} from './hooks';
-
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-/**
- * Enhanced MultiSelect props with all required functionality
- */
-export interface MultiSelectProps<T = any, TFieldValues extends FieldValues = FieldValues> 
-  extends Omit<BaseMultiSelectProps<T, TFieldValues>, 'onChange'> {
-  
-  /** Array of options for selection */
+export interface MultiSelectProps<T = string | number> {
+  /** Array of available options */
   options: SelectOption<T>[];
   
-  /** Current selected values */
+  /** Array of selected values */
   value?: T[];
   
-  /** Default selected values for uncontrolled usage */
-  defaultValue?: T[];
+  /** Change handler for multi-select values */
+  onChange: (values: T[]) => void;
   
-  /** Change handler with selected values and options */
-  onChange?: (values: T[], options: SelectOption<T>[]) => void;
+  /** Field name for form integration */
+  name?: string;
+  
+  /** React Hook Form control object */
+  control?: any;
+  
+  /** Form validation rules */
+  rules?: Record<string, any>;
+  
+  /** Component label */
+  label?: string;
+  
+  /** Placeholder text when no selection */
+  placeholder?: string;
+  
+  /** Help text displayed below the component */
+  helpText?: string;
+  
+  /** Error message */
+  error?: string;
+  
+  /** Whether the field is required */
+  required?: boolean;
+  
+  /** Whether the component is disabled */
+  disabled?: boolean;
+  
+  /** Whether the component is in loading state */
+  loading?: boolean;
   
   /** Maximum number of selections allowed */
   maxSelections?: number;
@@ -69,941 +115,637 @@ export interface MultiSelectProps<T = any, TFieldValues extends FieldValues = Fi
   /** Minimum number of selections required */
   minSelections?: number;
   
-  /** Placeholder text when no selections made */
-  placeholder?: string;
+  /** Whether to show "Select All" option */
+  showSelectAll?: boolean;
   
-  /** Enable search/filter functionality */
+  /** Text for "Select All" option */
+  selectAllText?: string;
+  
+  /** Text for "Clear All" action */
+  clearAllText?: string;
+  
+  /** Whether to show selection count */
+  showSelectionCount?: boolean;
+  
+  /** Format function for selection count display */
+  selectionCountFormatter?: (count: number, total: number) => string;
+  
+  /** Whether the component is searchable */
   searchable?: boolean;
   
   /** Search placeholder text */
   searchPlaceholder?: string;
   
-  /** Enable select all functionality */
-  selectAllOption?: boolean;
-  
-  /** Custom select all option label */
-  selectAllLabel?: string;
-  
-  /** How to display selected values */
-  valueDisplay?: 'chips' | 'count' | 'list';
-  
-  /** Maximum chips to display before showing count */
-  maxChipsDisplay?: number;
-  
-  /** Close dropdown after each selection */
-  closeOnSelect?: boolean;
-  
-  /** Order of selected values */
-  orderSelected?: 'selection' | 'original' | 'alphabetical';
-  
-  /** Loading state */
-  isLoading?: boolean;
-  
-  /** Error message to display */
-  error?: string;
-  
-  /** Disabled state */
-  disabled?: boolean;
-  
-  /** Required field indicator */
-  required?: boolean;
-  
-  /** Component size variant */
-  size?: 'sm' | 'md' | 'lg';
-  
-  /** Visual style variant */
-  variant?: 'outline' | 'filled' | 'ghost';
-  
-  /** Clear all button functionality */
+  /** Whether the component is clearable */
   clearable?: boolean;
   
-  /** Form field name for React Hook Form integration */
-  name?: Path<TFieldValues>;
+  /** Whether chips can be removed individually */
+  removable?: boolean;
   
-  /** Enable HTTP verb bitmask mode for API endpoint configuration */
-  verbMode?: boolean;
-  
-  /** Value transformation mode */
-  transformMode?: 'array' | 'bitmask' | 'comma-separated';
+  /** Maximum number of chips to display before showing count */
+  maxChipsDisplayed?: number;
   
   /** Custom chip renderer */
-  chipRenderer?: (value: T, option: SelectOption<T>, onRemove: () => void) => React.ReactNode;
+  chipRenderer?: (option: SelectOption<T>, onRemove: () => void) => React.ReactNode;
   
-  /** Custom option renderer */
-  optionRenderer?: (option: SelectOption<T>, isSelected: boolean, isHighlighted: boolean) => React.ReactNode;
+  /** Value transformation configuration */
+  transform?: {
+    type: 'array' | 'bitmask' | 'comma-separated';
+    bitmask?: {
+      mapping: Record<string | number, number>;
+    };
+  };
   
-  /** Accessibility label for screen readers */
-  'aria-label'?: string;
+  /** Size variant */
+  size?: 'sm' | 'md' | 'lg';
   
-  /** Accessible description */
-  'aria-describedby'?: string;
+  /** Visual variant */
+  variant?: 'default' | 'outline' | 'filled';
   
-  /** Custom CSS classes */
+  /** Whether to take full width */
+  fullWidth?: boolean;
+  
+  /** Additional CSS classes */
   className?: string;
   
-  /** Additional props */
-  [key: string]: any;
+  /** Test ID for testing */
+  'data-testid'?: string;
+  
+  // Accessibility props
+  'aria-label'?: string;
+  'aria-describedby'?: string;
 }
 
 /**
- * Chip component for displaying selected values
+ * Individual chip component for selected items
+ * Implements proper accessibility and keyboard navigation
  */
-interface ChipProps<T = any> {
-  value: T;
+interface ChipProps<T> {
   option: SelectOption<T>;
   onRemove: () => void;
-  onKeyDown?: (event: React.KeyboardEvent) => void;
-  tabIndex?: number;
+  disabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
-  variant?: 'default' | 'primary' | 'secondary';
   className?: string;
 }
 
-/**
- * Search input component for filtering options
- */
-interface SearchInputProps {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  onKeyDown?: (event: React.KeyboardEvent) => void;
-  className?: string;
-}
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Filter options based on search term
- */
-function filterOptions<T>(options: SelectOption<T>[], searchTerm: string): SelectOption<T>[] {
-  if (!searchTerm.trim()) {
-    return options;
-  }
-
-  const term = searchTerm.toLowerCase();
-  return options.filter(option => 
-    option.label.toLowerCase().includes(term) ||
-    option.description?.toLowerCase().includes(term) ||
-    option.value?.toString().toLowerCase().includes(term) ||
-    option.searchKeywords?.some(keyword => keyword.toLowerCase().includes(term))
-  );
-}
-
-/**
- * Order selected options based on ordering preference
- */
-function orderSelectedOptions<T>(
-  selectedOptions: SelectOption<T>[],
-  allOptions: SelectOption<T>[],
-  orderType: 'selection' | 'original' | 'alphabetical'
-): SelectOption<T>[] {
-  switch (orderType) {
-    case 'original':
-      // Maintain original order from options array
-      return allOptions.filter(option => 
-        selectedOptions.some(selected => selected.value === option.value)
-      );
-    
-    case 'alphabetical':
-      // Sort alphabetically by label
-      return [...selectedOptions].sort((a, b) => a.label.localeCompare(b.label));
-    
-    case 'selection':
-    default:
-      // Maintain selection order
-      return selectedOptions;
-  }
-}
-
-/**
- * Transform values based on transformation mode
- */
-function transformValue<T>(
-  values: T[],
-  mode: 'array' | 'bitmask' | 'comma-separated'
-): any {
-  switch (mode) {
-    case 'bitmask':
-      // Convert HTTP verbs to bitmask for API configuration
-      if (values.every(v => typeof v === 'string')) {
-        const HTTP_VERB_BITMASKS: Record<string, number> = {
-          GET: 1,
-          POST: 2,
-          PUT: 4,
-          PATCH: 8,
-          DELETE: 16,
-        };
-        return values.reduce((mask, verb) => 
-          mask | (HTTP_VERB_BITMASKS[verb as string] || 0), 0
-        );
-      }
-      return 0;
-    
-    case 'comma-separated':
-      // Convert array to comma-separated string
-      return values.map(v => String(v)).join(',');
-    
-    case 'array':
-    default:
-      // Return as array
-      return values;
-  }
-}
-
-// ============================================================================
-// SUB-COMPONENTS
-// ============================================================================
-
-/**
- * Chip component for displaying selected values with remove functionality
- */
-const Chip = <T,>({ 
-  value, 
+const Chip = <T extends string | number>({ 
   option, 
   onRemove, 
-  onKeyDown,
-  tabIndex = 0,
+  disabled = false,
   size = 'md',
-  variant = 'default',
   className 
 }: ChipProps<T>) => {
   const sizeClasses = {
-    sm: 'text-xs px-2 py-0.5 gap-1',
-    md: 'text-sm px-2.5 py-1 gap-1.5',
-    lg: 'text-base px-3 py-1.5 gap-2',
-  };
-
-  const variantClasses = {
-    default: 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600',
-    primary: 'bg-primary-100 text-primary-800 hover:bg-primary-200 dark:bg-primary-900 dark:text-primary-200 dark:hover:bg-primary-800',
-    secondary: 'bg-accent-100 text-accent-800 hover:bg-accent-200 dark:bg-accent-900 dark:text-accent-200 dark:hover:bg-accent-800',
+    sm: 'text-xs px-2 py-1',
+    md: 'text-sm px-2.5 py-1.5',
+    lg: 'text-base px-3 py-2',
   };
 
   return (
-    <span 
+    <span
       className={cn(
-        'inline-flex items-center rounded-md font-medium transition-colors duration-200',
-        'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1',
+        "inline-flex items-center gap-1 rounded-md bg-primary-50 text-primary-700 border border-primary-200",
+        "dark:bg-primary-900/20 dark:text-primary-300 dark:border-primary-800",
+        "transition-colors duration-200",
         sizeClasses[size],
-        variantClasses[variant],
+        disabled && "opacity-50 cursor-not-allowed",
         className
       )}
-      tabIndex={tabIndex}
-      onKeyDown={onKeyDown}
-      role="button"
-      aria-label={`Remove ${option.label}`}
     >
-      <span className="truncate max-w-32">{option.label}</span>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onRemove();
-        }}
-        className={cn(
-          'ml-1 inline-flex items-center justify-center rounded-full',
-          'hover:bg-current hover:bg-opacity-20 focus:outline-none focus:bg-current focus:bg-opacity-20',
-          size === 'sm' && 'h-3 w-3',
-          size === 'md' && 'h-4 w-4',
-          size === 'lg' && 'h-5 w-5'
-        )}
-        aria-label={`Remove ${option.label}`}
-      >
-        <XMarkIcon className="h-full w-full" />
-      </button>
+      {option.icon && (
+        <span className="flex-shrink-0" aria-hidden="true">
+          <option.icon className="w-4 h-4" />
+        </span>
+      )}
+      
+      <span className="flex-1 truncate">{option.label}</span>
+      
+      {!disabled && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove();
+          }}
+          className={cn(
+            "flex-shrink-0 rounded-sm text-primary-600 hover:text-primary-800",
+            "dark:text-primary-400 dark:hover:text-primary-200",
+            "focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1",
+            "transition-colors duration-200"
+          )}
+          aria-label={`Remove ${option.label}`}
+        >
+          <XMarkIcon className="w-3 h-3" />
+        </button>
+      )}
     </span>
   );
 };
 
 /**
- * Search input component with filtering functionality
+ * MultiSelect component implementation
  */
-const SearchInput = ({ 
-  value, 
-  onChange, 
-  placeholder = 'Search...', 
-  onKeyDown,
-  className 
-}: SearchInputProps) => (
-  <div className={cn('relative', className)}>
-    <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={onKeyDown}
-      placeholder={placeholder}
-      className={cn(
-        'w-full pl-10 pr-3 py-2 text-sm border-0 border-b border-gray-200',
-        'focus:outline-none focus:border-primary-500 focus:ring-0',
-        'bg-transparent placeholder-gray-400',
-        'dark:border-gray-600 dark:placeholder-gray-500 dark:focus:border-primary-400'
-      )}
-    />
-  </div>
-);
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
-/**
- * MultiSelect component with comprehensive multiple selection functionality
- */
-export const MultiSelect = forwardRef<HTMLDivElement, MultiSelectProps>(
-  <T, TFieldValues extends FieldValues = FieldValues>({
-    options = [],
-    value,
-    defaultValue = [],
-    onChange,
-    maxSelections,
-    minSelections = 0,
-    placeholder = 'Select options...',
-    searchable = true,
-    searchPlaceholder = 'Search options...',
-    selectAllOption = true,
-    selectAllLabel = 'Select All',
-    valueDisplay = 'chips',
-    maxChipsDisplay = 3,
-    closeOnSelect = false,
-    orderSelected = 'selection',
-    isLoading = false,
-    error,
-    disabled = false,
-    required = false,
-    size = 'md',
-    variant = 'outline',
-    clearable = true,
-    name,
-    verbMode = false,
-    transformMode = 'array',
-    chipRenderer,
-    optionRenderer,
-    'aria-label': ariaLabel,
-    'aria-describedby': ariaDescribedBy,
-    className,
-    ...rest
-  }: MultiSelectProps<T, TFieldValues>, ref: React.Ref<HTMLDivElement>) => {
-    
-    // ========================================================================
-    // STATE MANAGEMENT
-    // ========================================================================
-    
-    const [searchTerm, setSearchTerm] = useState('');
+export const MultiSelect = forwardRef<HTMLButtonElement, MultiSelectProps>(
+  <T extends string | number>(
+    {
+      options = [],
+      value = [],
+      onChange,
+      name,
+      control,
+      rules,
+      label,
+      placeholder = "Select options...",
+      helpText,
+      error,
+      required = false,
+      disabled = false,
+      loading = false,
+      maxSelections,
+      minSelections = 0,
+      showSelectAll = false,
+      selectAllText = "Select All",
+      clearAllText = "Clear All",
+      showSelectionCount = false,
+      selectionCountFormatter,
+      searchable = false,
+      searchPlaceholder = "Search options...",
+      clearable = false,
+      removable = true,
+      maxChipsDisplayed = 3,
+      chipRenderer,
+      transform,
+      size = 'md',
+      variant = 'default',
+      fullWidth = false,
+      className,
+      'data-testid': dataTestId,
+      'aria-label': ariaLabel,
+      'aria-describedby': ariaDescribedBy,
+      ...props
+    }: MultiSelectProps<T>,
+    ref
+  ) => {
+    // Search state
+    const [searchQuery, setSearchQuery] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
-    const listboxButtonRef = useRef<HTMLButtonElement>(null);
-    
-    // Form context integration
-    const formContext = useFormContext<TFieldValues>();
-    const isControlled = value !== undefined;
-    
-    // Multi-select hook with form integration
-    const multiSelect = useMultiSelect<T>(
-      isControlled ? value : defaultValue,
+
+    // Use multi-select hook for state management
+    const {
+      selectedValues,
+      selectedOptions,
+      handleMultiSelect,
+      removeValue,
+      selectAll,
+      clearAll,
+      isAllSelected,
+      selectionCount,
+      isMaxReached,
+    } = useMultiSelect({
+      value,
+      onChange,
+      options,
       maxSelections,
-      { 
-        required,
-        customValidator: (values: T[]) => {
-          if (minSelections > 0 && values.length < minSelections) {
-            return { 
-              isValid: false, 
-              error: `At least ${minSelections} selection${minSelections > 1 ? 's' : ''} required` 
-            };
-          }
-          return { isValid: true };
-        }
-      }
-    );
-    
-    // Options management
-    const optionsData = useSelectOptions(options);
-    
-    // Verb transformation hook for bitmask operations
-    const verbTransform = useVerbTransform(
-      isControlled ? value as any : multiSelect.selectedValue as any,
-      verbMode ? 'verb_multiple' : undefined
-    );
-    
-    // Current selected values
-    const selectedValues = isControlled ? (value || []) : multiSelect.selectedValue;
-    const selectedOptions = useMemo(() => 
-      selectedValues.map(val => optionsData.getOptionByValue(val))
-        .filter((opt): opt is SelectOption<T> => opt !== undefined),
-      [selectedValues, optionsData]
-    );
-    
-    // Filtered options based on search
-    const filteredOptions = useMemo(() => 
-      filterOptions(optionsData.options, searchTerm),
-      [optionsData.options, searchTerm]
-    );
-    
-    // Keyboard navigation for options
-    const keyboard = useSelectKeyboard(
-      filteredOptions,
-      (optionValue: T) => {
-        if (!disabled) {
-          handleValueToggle(optionValue);
-        }
-      },
-      () => setIsOpen(false)
-    );
-    
-    // ========================================================================
-    // HANDLERS AND CALLBACKS
-    // ========================================================================
-    
-    /**
-     * Handle value selection/deselection
-     */
-    const handleValueToggle = useCallback((optionValue: T) => {
-      const newValues = selectedValues.includes(optionValue)
-        ? selectedValues.filter(v => v !== optionValue)
-        : maxSelections && selectedValues.length >= maxSelections
-          ? selectedValues // Don't add if max reached
-          : [...selectedValues, optionValue];
+      minSelections,
+      name,
+      control,
+      rules,
+    });
+
+    // HTTP verb transformation hook if bitmask mode
+    const verbTransform = transform?.type === 'bitmask' 
+      ? useVerbTransform(value as number, onChange as (value: number) => void)
+      : null;
+
+    // Filter options based on search query
+    const filteredOptions = useMemo(() => {
+      if (!searchQuery.trim()) return options;
       
-      const newSelectedOptions = newValues.map(val => optionsData.getOptionByValue(val))
-        .filter((opt): opt is SelectOption<T> => opt !== undefined);
-      
-      // Call external onChange handler
-      if (onChange) {
-        const transformedValue = transformMode !== 'array' 
-          ? transformValue(newValues, transformMode)
-          : newValues;
-        onChange(transformedValue, newSelectedOptions);
-      }
-      
-      // Update internal state if not controlled
-      if (!isControlled) {
-        multiSelect.setValue(newValues);
-      }
-      
-      // Update form context if available
-      if (formContext && name) {
-        const transformedValue = transformMode !== 'array' 
-          ? transformValue(newValues, transformMode)
-          : newValues;
-        formContext.setValue(name, transformedValue, { 
-          shouldValidate: true, 
-          shouldDirty: true 
-        });
-      }
-      
-      // Close dropdown if configured
-      if (closeOnSelect) {
-        setIsOpen(false);
-      }
-    }, [
-      selectedValues, 
-      maxSelections, 
-      optionsData, 
-      onChange, 
-      transformMode, 
-      isControlled, 
-      multiSelect, 
-      formContext, 
-      name, 
-      closeOnSelect
-    ]);
-    
-    /**
-     * Handle chip removal
-     */
-    const handleChipRemove = useCallback((valueToRemove: T) => {
-      if (!disabled) {
-        handleValueToggle(valueToRemove);
-      }
-    }, [disabled, handleValueToggle]);
-    
-    /**
-     * Handle select all functionality
-     */
-    const handleSelectAll = useCallback(() => {
-      if (disabled) return;
-      
-      const availableOptions = filteredOptions.filter(opt => !opt.disabled);
-      const allValues = availableOptions.map(opt => opt.value);
-      const valuesToSelect = maxSelections 
-        ? allValues.slice(0, maxSelections)
-        : allValues;
-      
-      const newSelectedOptions = valuesToSelect.map(val => optionsData.getOptionByValue(val))
-        .filter((opt): opt is SelectOption<T> => opt !== undefined);
-      
-      // Call external onChange handler
-      if (onChange) {
-        const transformedValue = transformMode !== 'array' 
-          ? transformValue(valuesToSelect, transformMode)
-          : valuesToSelect;
-        onChange(transformedValue, newSelectedOptions);
-      }
-      
-      // Update internal state if not controlled
-      if (!isControlled) {
-        multiSelect.setValue(valuesToSelect);
-      }
-      
-      // Update form context if available
-      if (formContext && name) {
-        const transformedValue = transformMode !== 'array' 
-          ? transformValue(valuesToSelect, transformMode)
-          : valuesToSelect;
-        formContext.setValue(name, transformedValue, { 
-          shouldValidate: true, 
-          shouldDirty: true 
-        });
-      }
-    }, [
-      disabled, 
-      filteredOptions, 
-      maxSelections, 
-      optionsData, 
-      onChange, 
-      transformMode, 
-      isControlled, 
-      multiSelect, 
-      formContext, 
-      name
-    ]);
-    
-    /**
-     * Handle clear all functionality
-     */
-    const handleClearAll = useCallback(() => {
-      if (disabled) return;
-      
-      // Call external onChange handler
-      if (onChange) {
-        const transformedValue = transformMode !== 'array' 
-          ? transformValue([], transformMode)
-          : [];
-        onChange(transformedValue, []);
-      }
-      
-      // Update internal state if not controlled
-      if (!isControlled) {
-        multiSelect.clearSelection();
-      }
-      
-      // Update form context if available
-      if (formContext && name) {
-        const transformedValue = transformMode !== 'array' 
-          ? transformValue([], transformMode)
-          : [];
-        formContext.setValue(name, transformedValue, { 
-          shouldValidate: true, 
-          shouldDirty: true 
-        });
-      }
-    }, [
-      disabled, 
-      onChange, 
-      transformMode, 
-      isControlled, 
-      multiSelect, 
-      formContext, 
-      name
-    ]);
-    
-    /**
-     * Handle search input changes
-     */
-    const handleSearchChange = useCallback((newSearchTerm: string) => {
-      setSearchTerm(newSearchTerm);
-      keyboard.setFocusedIndex(0); // Reset keyboard focus
-    }, [keyboard]);
-    
-    /**
-     * Handle keyboard navigation for chips
-     */
-    const handleChipKeyDown = useCallback((event: React.KeyboardEvent, valueToRemove: T) => {
-      switch (event.key) {
-        case 'Delete':
-        case 'Backspace':
-          event.preventDefault();
-          handleChipRemove(valueToRemove);
-          break;
-        case 'ArrowLeft':
-        case 'ArrowRight':
-          // Handle arrow navigation between chips
-          const chips = Array.from(event.currentTarget.parentElement?.children || []);
-          const currentIndex = chips.indexOf(event.currentTarget as Element);
-          const nextIndex = event.key === 'ArrowLeft' ? currentIndex - 1 : currentIndex + 1;
-          const nextChip = chips[nextIndex] as HTMLElement;
-          if (nextChip) {
-            event.preventDefault();
-            nextChip.focus();
-          }
-          break;
-      }
-    }, [handleChipRemove]);
-    
-    // ========================================================================
-    // STYLING AND VARIANTS
-    // ========================================================================
-    
-    const sizeClasses = {
-      sm: 'min-h-8 text-sm px-2.5 py-1',
-      md: 'min-h-10 text-sm px-3 py-2',
-      lg: 'min-h-12 text-base px-4 py-3',
-    };
-    
-    const variantClasses = {
-      outline: cn(
-        'border border-gray-300 bg-white shadow-sm',
-        'focus:border-primary-500 focus:ring-1 focus:ring-primary-500',
-        'dark:border-gray-600 dark:bg-gray-800',
-        'dark:focus:border-primary-400 dark:focus:ring-primary-400'
-      ),
-      filled: cn(
-        'border border-transparent bg-gray-100',
-        'focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500',
-        'dark:bg-gray-700 dark:focus:bg-gray-800',
-        'dark:focus:border-primary-400 dark:focus:ring-primary-400'
-      ),
-      ghost: cn(
-        'border border-transparent bg-transparent',
-        'focus:bg-gray-50 focus:border-gray-300',
-        'dark:focus:bg-gray-800 dark:focus:border-gray-600'
-      ),
-    };
-    
-    const buttonClasses = cn(
-      'relative w-full rounded-md text-left transition-colors duration-200',
-      'focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed',
-      sizeClasses[size],
-      variantClasses[variant],
-      error && 'border-red-500 focus:border-red-500 focus:ring-red-500',
-      disabled && 'bg-gray-50 dark:bg-gray-900',
-      className
-    );
-    
-    // ========================================================================
-    // RENDER HELPERS
-    // ========================================================================
-    
-    /**
-     * Render selected values based on display mode
-     */
-    const renderSelectedValues = () => {
-      if (selectedOptions.length === 0) {
-        return (
-          <span className="text-gray-500 dark:text-gray-400 truncate">
-            {placeholder}
-          </span>
-        );
-      }
-      
-      const orderedOptions = orderSelectedOptions(selectedOptions, optionsData.options, orderSelected);
-      
-      switch (valueDisplay) {
-        case 'count':
-          return (
-            <span className="text-gray-900 dark:text-gray-100">
-              {selectedOptions.length} selected
-            </span>
-          );
-        
-        case 'list':
-          return (
-            <span className="text-gray-900 dark:text-gray-100 truncate">
-              {orderedOptions.map(opt => opt.label).join(', ')}
-            </span>
-          );
-        
-        case 'chips':
-        default:
-          const displayOptions = orderedOptions.slice(0, maxChipsDisplay);
-          const remainingCount = orderedOptions.length - maxChipsDisplay;
-          
-          return (
-            <div className="flex flex-wrap items-center gap-1 min-w-0">
-              {displayOptions.map((option, index) => {
-                const chipElement = chipRenderer ? 
-                  chipRenderer(
-                    option.value, 
-                    option, 
-                    () => handleChipRemove(option.value)
-                  ) : (
-                    <Chip
-                      key={`${option.value}-${index}`}
-                      value={option.value}
-                      option={option}
-                      onRemove={() => handleChipRemove(option.value)}
-                      onKeyDown={(e) => handleChipKeyDown(e, option.value)}
-                      size={size === 'lg' ? 'md' : 'sm'}
-                      variant="primary"
-                    />
-                  );
-                
-                return chipElement;
-              })}
-              
-              {remainingCount > 0 && (
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">
-                  +{remainingCount} more
-                </span>
-              )}
-            </div>
-          );
-      }
-    };
-    
-    /**
-     * Render individual option in dropdown
-     */
-    const renderOption = (option: SelectOption<T>, index: number) => {
-      const isSelected = selectedValues.includes(option.value);
-      const isHighlighted = keyboard.focusedIndex === index;
-      const isDisabled = option.disabled || disabled;
-      
-      if (optionRenderer) {
-        return optionRenderer(option, isSelected, isHighlighted);
-      }
-      
-      return (
-        <Listbox.Option
-          key={`${option.value}-${index}`}
-          value={option.value}
-          disabled={isDisabled}
-          className={({ active, selected }) => cn(
-            'relative cursor-pointer select-none py-2 pl-3 pr-9 text-left',
-            active || isHighlighted 
-              ? 'bg-primary-100 text-primary-900 dark:bg-primary-900 dark:text-primary-100' 
-              : 'text-gray-900 dark:text-gray-100',
-            selected && 'bg-primary-50 dark:bg-primary-950',
-            isDisabled && 'opacity-50 cursor-not-allowed',
-            'transition-colors duration-150'
-          )}
-        >
-          {({ selected }) => (
-            <>
-              <div className="flex items-center gap-3">
-                {option.icon && (
-                  <span className="flex-shrink-0">
-                    {typeof option.icon === 'string' ? (
-                      <span className="h-5 w-5">{option.icon}</span>
-                    ) : (
-                      option.icon
-                    )}
-                  </span>
-                )}
-                
-                <div className="flex-1 min-w-0">
-                  <span className={cn(
-                    'block truncate font-medium',
-                    selected || isSelected ? 'font-semibold' : 'font-normal'
-                  )}>
-                    {option.label}
-                  </span>
-                  
-                  {option.description && (
-                    <span className="block text-sm text-gray-500 dark:text-gray-400 truncate">
-                      {option.description}
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              {(selected || isSelected) && (
-                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-primary-600 dark:text-primary-400">
-                  <CheckIcon className="h-5 w-5" aria-hidden="true" />
-                </span>
-              )}
-            </>
-          )}
-        </Listbox.Option>
+      const query = searchQuery.toLowerCase();
+      return options.filter(option => 
+        option.label.toLowerCase().includes(query) ||
+        option.value.toString().toLowerCase().includes(query) ||
+        option.description?.toLowerCase().includes(query)
       );
-    };
-    
-    // ========================================================================
-    // EFFECTS
-    // ========================================================================
-    
+    }, [options, searchQuery]);
+
+    // Keyboard navigation
+    const { highlightedIndex, handleKeyDown } = useSelectKeyboard(
+      filteredOptions,
+      handleMultiSelect,
+      isOpen,
+      setIsOpen
+    );
+
+    // Handle option selection with value transformation
+    const handleOptionSelect = useCallback((optionValue: T) => {
+      if (transform?.type === 'bitmask' && verbTransform) {
+        verbTransform.toggleVerb(optionValue as string);
+      } else {
+        handleMultiSelect(optionValue);
+      }
+    }, [transform, verbTransform, handleMultiSelect]);
+
+    // Handle select all
+    const handleSelectAll = useCallback(() => {
+      if (transform?.type === 'bitmask' && verbTransform) {
+        verbTransform.selectAllVerbs();
+      } else {
+        selectAll();
+      }
+    }, [transform, verbTransform, selectAll]);
+
+    // Handle clear all
+    const handleClearAll = useCallback(() => {
+      if (transform?.type === 'bitmask' && verbTransform) {
+        verbTransform.clearAllVerbs();
+      } else {
+        clearAll();
+      }
+    }, [transform, verbTransform, clearAll]);
+
+    // Get effective selected values and options
+    const effectiveSelectedValues = transform?.type === 'bitmask' && verbTransform 
+      ? verbTransform.selectedVerbs as T[]
+      : selectedValues;
+
+    const effectiveSelectedOptions = transform?.type === 'bitmask' && verbTransform
+      ? verbTransform.selectedVerbs.map(verb => 
+          options.find(opt => opt.value === verb)
+        ).filter(Boolean) as SelectOption<T>[]
+      : selectedOptions;
+
+    // Check if option is selected
+    const isOptionSelected = useCallback((optionValue: T) => {
+      if (transform?.type === 'bitmask' && verbTransform) {
+        return verbTransform.isVerbSelected(optionValue as string);
+      }
+      return effectiveSelectedValues.includes(optionValue);
+    }, [transform, verbTransform, effectiveSelectedValues]);
+
+    // Format selection count
+    const formatSelectionCount = useCallback((count: number, total: number) => {
+      if (selectionCountFormatter) {
+        return selectionCountFormatter(count, total);
+      }
+      return `${count}/${total} selected`;
+    }, [selectionCountFormatter]);
+
+    // Handle search input change
+    const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchQuery(e.target.value);
+    }, []);
+
     // Focus search input when dropdown opens
     useEffect(() => {
       if (isOpen && searchable && searchInputRef.current) {
-        searchInputRef.current.focus();
+        setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 100);
       }
     }, [isOpen, searchable]);
-    
-    // Reset search when dropdown closes
-    useEffect(() => {
-      if (!isOpen) {
-        setSearchTerm('');
-      }
-    }, [isOpen]);
-    
-    // ========================================================================
-    // RENDER
-    // ========================================================================
-    
+
+    // Size classes
+    const sizeClasses = {
+      sm: {
+        trigger: 'text-sm px-3 py-2 min-h-[36px]',
+        dropdown: 'text-sm',
+        chip: 'text-xs',
+      },
+      md: {
+        trigger: 'text-sm px-3 py-2.5 min-h-[40px]',
+        dropdown: 'text-sm',
+        chip: 'text-sm',
+      },
+      lg: {
+        trigger: 'text-base px-4 py-3 min-h-[44px]',
+        dropdown: 'text-base',
+        chip: 'text-base',
+      },
+    };
+
+    // Variant classes
+    const variantClasses = {
+      default: {
+        trigger: 'border-gray-300 bg-white hover:border-gray-400 focus:border-primary-500 focus:ring-primary-500',
+        dropdown: 'border-gray-200 bg-white shadow-lg',
+      },
+      outline: {
+        trigger: 'border-2 border-gray-300 bg-transparent hover:border-gray-400 focus:border-primary-500 focus:ring-primary-500',
+        dropdown: 'border-2 border-gray-200 bg-white shadow-lg',
+      },
+      filled: {
+        trigger: 'border-transparent bg-gray-50 hover:bg-gray-100 focus:bg-white focus:border-primary-500 focus:ring-primary-500',
+        dropdown: 'border-gray-200 bg-white shadow-lg',
+      },
+    };
+
+    // Render selected chips
+    const renderSelectedChips = () => {
+      if (effectiveSelectedOptions.length === 0) return null;
+
+      const visibleChips = effectiveSelectedOptions.slice(0, maxChipsDisplayed);
+      const hiddenCount = effectiveSelectedOptions.length - maxChipsDisplayed;
+
+      return (
+        <div className="flex flex-wrap gap-1 min-h-0">
+          {visibleChips.map((option) => {
+            const chipElement = chipRenderer ? (
+              chipRenderer(option, () => removeValue(option.value))
+            ) : (
+              <Chip
+                key={option.value}
+                option={option}
+                onRemove={() => removeValue(option.value)}
+                disabled={disabled}
+                size={size}
+              />
+            );
+            
+            return chipElement;
+          })}
+          
+          {hiddenCount > 0 && (
+            <span className={cn(
+              "inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-gray-600 text-xs",
+              "dark:bg-gray-800 dark:text-gray-400"
+            )}>
+              +{hiddenCount} more
+            </span>
+          )}
+        </div>
+      );
+    };
+
+    // Render dropdown content
+    const renderDropdownContent = () => (
+      <div className="max-h-60 overflow-auto">
+        {/* Search input */}
+        {searchable && (
+          <div className="sticky top-0 bg-white border-b border-gray-200 p-2">
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder={searchPlaceholder}
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className={cn(
+                  "w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md",
+                  "focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500",
+                  "text-sm placeholder-gray-500"
+                )}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Batch actions */}
+        {(showSelectAll || clearable) && (
+          <div className="sticky top-0 bg-white border-b border-gray-200 p-2 flex gap-2">
+            {showSelectAll && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleSelectAll}
+                disabled={disabled || isAllSelected}
+                className="flex-1"
+              >
+                {selectAllText}
+              </Button>
+            )}
+            
+            {clearable && effectiveSelectedValues.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleClearAll}
+                disabled={disabled}
+                className="flex-1"
+              >
+                {clearAllText}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Selection count */}
+        {showSelectionCount && (
+          <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-200">
+            {formatSelectionCount(effectiveSelectedValues.length, filteredOptions.length)}
+          </div>
+        )}
+
+        {/* Options list */}
+        <div className="py-1">
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-gray-500 text-center">
+              {searchQuery ? 'No options found' : 'No options available'}
+            </div>
+          ) : (
+            filteredOptions.map((option, index) => {
+              const isSelected = isOptionSelected(option.value);
+              const isHighlighted = index === highlightedIndex;
+              const isDisabledOption = option.disabled || (isMaxReached && !isSelected);
+
+              return (
+                <Listbox.Option
+                  key={option.value}
+                  value={option.value}
+                  disabled={isDisabledOption}
+                  className={({ active }) =>
+                    cn(
+                      "relative cursor-pointer select-none py-2 pl-3 pr-9",
+                      "transition-colors duration-150",
+                      active || isHighlighted
+                        ? "bg-primary-50 text-primary-900"
+                        : "text-gray-900",
+                      isDisabledOption
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-primary-50 hover:text-primary-900",
+                      "dark:text-gray-100 dark:hover:bg-primary-900/20"
+                    )
+                  }
+                  onClick={() => !isDisabledOption && handleOptionSelect(option.value)}
+                >
+                  {({ selected, active }) => (
+                    <>
+                      <div className="flex items-center gap-2">
+                        {option.icon && (
+                          <span className="flex-shrink-0" aria-hidden="true">
+                            <option.icon className="w-4 h-4" />
+                          </span>
+                        )}
+                        
+                        <div className="flex-1 min-w-0">
+                          <span
+                            className={cn(
+                              "block truncate",
+                              isSelected ? "font-medium" : "font-normal"
+                            )}
+                          >
+                            {option.label}
+                          </span>
+                          
+                          {option.description && (
+                            <span className="block text-xs text-gray-500 truncate">
+                              {option.description}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {isSelected && (
+                        <span
+                          className={cn(
+                            "absolute inset-y-0 right-0 flex items-center pr-3",
+                            active ? "text-primary-600" : "text-primary-600"
+                          )}
+                        >
+                          <CheckIcon className="w-4 h-4" aria-hidden="true" />
+                        </span>
+                      )}
+                    </>
+                  )}
+                </Listbox.Option>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+
     return (
-      <div ref={ref} className="relative w-full" {...rest}>
+      <div className={cn("w-full", fullWidth && "flex-1", className)}>
+        {/* Label */}
+        {label && (
+          <label
+            className={cn(
+              "block text-sm font-medium text-gray-700 mb-1",
+              "dark:text-gray-300",
+              required && "after:content-['*'] after:ml-0.5 after:text-red-500"
+            )}
+          >
+            {label}
+          </label>
+        )}
+
+        {/* Multi-select component */}
         <Listbox
-          value={selectedValues}
-          onChange={() => {}} // Handled by individual option clicks
+          value={effectiveSelectedValues}
+          onChange={() => {}} // Handled in individual option selection
           multiple
           disabled={disabled}
         >
-          {({ open }) => {
-            // Sync internal open state
-            if (open !== isOpen) {
-              setIsOpen(open);
-            }
-            
-            return (
-              <>
-                {/* Main Button */}
-                <Listbox.Button
-                  ref={listboxButtonRef}
-                  className={buttonClasses}
-                  aria-label={ariaLabel || `Select multiple options${required ? ' (required)' : ''}`}
-                  aria-describedby={ariaDescribedBy}
-                  aria-expanded={open}
-                  aria-invalid={!!error}
-                >
-                  <div className="flex items-center justify-between gap-2 min-w-0">
-                    <div className="flex-1 min-w-0">
-                      {isLoading ? (
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary-600 border-t-transparent" />
-                          <span className="text-gray-500">Loading...</span>
-                        </div>
-                      ) : (
-                        renderSelectedValues()
+          <div className="relative">
+            {/* Trigger button */}
+            <Listbox.Button
+              ref={ref}
+              className={cn(
+                "relative w-full cursor-pointer rounded-md border",
+                "focus:outline-none focus:ring-2 focus:ring-offset-2",
+                "transition-all duration-200",
+                sizeClasses[size].trigger,
+                variantClasses[variant].trigger,
+                disabled && "opacity-50 cursor-not-allowed",
+                error && "border-red-500 focus:border-red-500 focus:ring-red-500",
+                fullWidth && "w-full"
+              )}
+              onClick={() => !disabled && setIsOpen(!isOpen)}
+              onKeyDown={handleKeyDown}
+              aria-label={ariaLabel}
+              aria-describedby={ariaDescribedBy}
+              data-testid={dataTestId}
+              {...props}
+            >
+              <div className="flex items-center justify-between gap-2 min-h-0">
+                <div className="flex-1 min-w-0">
+                  {effectiveSelectedOptions.length > 0 ? (
+                    renderSelectedChips()
+                  ) : (
+                    <span className="block truncate text-gray-500">
+                      {placeholder}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {loading && (
+                    <div className="animate-spin w-4 h-4 border-2 border-gray-300 border-t-primary-600 rounded-full" />
+                  )}
+                  
+                  {clearable && effectiveSelectedValues.length > 0 && !disabled && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleClearAll();
+                      }}
+                      className={cn(
+                        "p-1 text-gray-400 hover:text-gray-600 rounded",
+                        "focus:outline-none focus:ring-2 focus:ring-primary-500"
                       )}
-                    </div>
-                    
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {/* Clear All Button */}
-                      {clearable && selectedValues.length > 0 && !disabled && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleClearAll();
-                          }}
-                          className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                          aria-label="Clear all selections"
-                        >
-                          <XCircleIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                      
-                      {/* Dropdown Chevron */}
-                      <ChevronDownIcon
-                        className={cn(
-                          'h-5 w-5 text-gray-400 transition-transform duration-200',
-                          open && 'rotate-180'
-                        )}
-                        aria-hidden="true"
-                      />
-                    </div>
-                  </div>
-                </Listbox.Button>
-                
-                {/* Dropdown Panel */}
-                <Transition
-                  show={open}
-                  enter="transition duration-100 ease-out"
-                  enterFrom="transform scale-95 opacity-0"
-                  enterTo="transform scale-100 opacity-100"
-                  leave="transition duration-75 ease-out"
-                  leaveFrom="transform scale-100 opacity-100"
-                  leaveTo="transform scale-95 opacity-0"
-                >
-                  <Listbox.Options
+                      aria-label="Clear all selections"
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  <ChevronDownIcon
                     className={cn(
-                      'absolute z-50 mt-1 w-full rounded-md bg-white shadow-lg',
-                      'ring-1 ring-black ring-opacity-5 focus:outline-none',
-                      'dark:bg-gray-800 dark:ring-gray-600',
-                      'max-h-60 overflow-auto'
+                      "w-4 h-4 text-gray-400 transition-transform duration-200",
+                      isOpen && "transform rotate-180"
                     )}
-                    onKeyDown={keyboard.handleKeyDown}
-                  >
-                    {/* Search Input */}
-                    {searchable && (
-                      <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-600">
-                        <SearchInput
-                          ref={searchInputRef}
-                          value={searchTerm}
-                          onChange={handleSearchChange}
-                          placeholder={searchPlaceholder}
-                          onKeyDown={(e) => {
-                            // Prevent listbox from handling arrow keys in search
-                            if (['ArrowUp', 'ArrowDown'].includes(e.key)) {
-                              e.stopPropagation();
-                              keyboard.handleKeyDown(e);
-                            }
-                          }}
-                        />
-                      </div>
-                    )}
-                    
-                    {/* Options List */}
-                    <div className="py-1">
-                      {/* Select All Option */}
-                      {selectAllOption && filteredOptions.length > 0 && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={handleSelectAll}
-                            disabled={disabled}
-                            className={cn(
-                              'w-full text-left px-3 py-2 text-sm font-medium',
-                              'hover:bg-gray-100 dark:hover:bg-gray-700',
-                              'focus:bg-gray-100 dark:focus:bg-gray-700 focus:outline-none',
-                              'disabled:opacity-50 disabled:cursor-not-allowed',
-                              'border-b border-gray-200 dark:border-gray-600'
-                            )}
-                          >
-                            {selectAllLabel}
-                          </button>
-                        </>
-                      )}
-                      
-                      {/* Filtered Options */}
-                      {filteredOptions.length > 0 ? (
-                        filteredOptions.map((option, index) => renderOption(option, index))
-                      ) : (
-                        <div className="relative py-4 px-3 text-center text-sm text-gray-500 dark:text-gray-400">
-                          {searchTerm ? 'No options found' : 'No options available'}
-                        </div>
-                      )}
-                    </div>
-                  </Listbox.Options>
-                </Transition>
-              </>
-            );
-          }}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+            </Listbox.Button>
+
+            {/* Dropdown */}
+            <Transition
+              show={isOpen}
+              enter="transition ease-out duration-100"
+              enterFrom="transform opacity-0 scale-95"
+              enterTo="transform opacity-100 scale-100"
+              leave="transition ease-in duration-75"
+              leaveFrom="transform opacity-100 scale-100"
+              leaveTo="transform opacity-0 scale-95"
+            >
+              <Listbox.Options
+                static
+                className={cn(
+                  "absolute z-10 mt-1 w-full rounded-md border py-1",
+                  "focus:outline-none",
+                  sizeClasses[size].dropdown,
+                  variantClasses[variant].dropdown
+                )}
+                onBlur={() => setIsOpen(false)}
+              >
+                {renderDropdownContent()}
+              </Listbox.Options>
+            </Transition>
+          </div>
         </Listbox>
-        
-        {/* Error Message */}
-        {error && (
-          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-            {error}
-          </p>
-        )}
-        
-        {/* Selection Count and Limits */}
-        {(maxSelections || minSelections > 0) && (
-          <div className="mt-1 flex justify-between text-xs text-gray-500 dark:text-gray-400">
-            <span>
-              {selectedValues.length} selected
-              {maxSelections && ` of ${maxSelections} max`}
-            </span>
-            
-            {maxSelections && selectedValues.length >= maxSelections && (
-              <span className="text-warning-600 dark:text-warning-400">
-                Maximum reached
-              </span>
+
+        {/* Help text and error message */}
+        {(helpText || error) && (
+          <div className="mt-1">
+            {error && (
+              <p className="text-sm text-red-600 dark:text-red-400">
+                {error}
+              </p>
+            )}
+            {helpText && !error && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {helpText}
+              </p>
             )}
           </div>
         )}
@@ -1012,13 +754,6 @@ export const MultiSelect = forwardRef<HTMLDivElement, MultiSelectProps>(
   }
 );
 
-MultiSelect.displayName = 'MultiSelect';
-
-// Export types for external usage
-export type { 
-  MultiSelectProps,
-  ChipProps,
-  SearchInputProps
-};
+MultiSelect.displayName = "MultiSelect";
 
 export default MultiSelect;
