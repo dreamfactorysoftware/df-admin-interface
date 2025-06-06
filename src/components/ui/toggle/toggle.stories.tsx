@@ -1,237 +1,436 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Toggle } from './toggle';
-import { toggleVariants } from './toggle-variants';
+/**
+ * Toggle Component Stories
+ * 
+ * Comprehensive Storybook 7+ documentation for Toggle, ToggleField, and ToggleGroup components
+ * demonstrating all variants, accessibility features, and integration patterns for the
+ * DreamFactory Admin Interface React/Next.js modernization.
+ * 
+ * Features demonstrated:
+ * - WCAG 2.1 AA compliance with proper contrast ratios and touch targets
+ * - All size variants (sm, md, lg) and styling options
+ * - Label positioning (left, right, top, bottom, none) and variants
+ * - State management (default, loading, disabled, error)
+ * - Color variants (primary, secondary, success, warning, error, outline, ghost)
+ * - Accessibility features including keyboard navigation and screen reader support
+ * - React Hook Form integration patterns
+ * - Dark mode compatibility and theme adaptation
+ * - Controlled and uncontrolled component usage
+ * 
+ * @fileoverview Storybook stories for Toggle component system
+ * @version 1.0.0
+ */
 
+import type { Meta, StoryObj } from '@storybook/react';
+import { fn } from '@storybook/test';
+import { useArgs } from '@storybook/preview-api';
+import { Toggle, ToggleField, ToggleGroup, type EnhancedToggleProps } from './toggle';
+import { useForm } from 'react-hook-form';
+import { useState } from 'react';
+import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+
+// Story metadata
 const meta = {
-  title: 'UI/Toggle',
+  title: 'UI Components/Toggle',
   component: Toggle,
   parameters: {
     layout: 'centered',
     docs: {
       description: {
         component: `
-A toggle switch component for binary state controls. Designed to replace Angular Material mat-slide-toggle 
-with enhanced accessibility, customization options, and React 19 optimizations.
+The Toggle component is a comprehensive, WCAG 2.1 AA compliant switch control built with Headless UI Switch primitive.
+It replaces Angular Material mat-slide-toggle with enhanced accessibility, proper keyboard navigation, and responsive design support.
 
-## Features
+## Key Features
 
-- **Accessibility**: WCAG 2.1 AA compliant with proper keyboard navigation and screen reader support
-- **Variants**: Multiple sizes, colors, and label positions
-- **Form Integration**: Works seamlessly with React Hook Form and validation
-- **Dark Mode**: Full dark mode support with proper contrast ratios
-- **Responsive**: Touch-friendly with appropriate target sizes
-- **Keyboard Navigation**: Full keyboard support with Enter and Space keys
-- **Loading States**: Displays loading state during async operations
+- **Accessibility First**: WCAG 2.1 AA compliance with proper contrast ratios (4.5:1 for text, 3:1 for UI)
+- **Touch-Friendly**: Minimum 44x44px touch targets for mobile accessibility
+- **Keyboard Navigation**: Focus-visible keyboard navigation with 2px outline system
+- **Screen Reader Support**: Proper ARIA labeling and announcements
+- **Form Integration**: React Hook Form integration for validation and state management
+- **Responsive Design**: Size variants (sm, md, lg) with responsive touch targets
+- **Flexible Styling**: Multiple variants, label positions, and custom styling options
+- **State Management**: Loading, disabled, and error states with visual feedback
+- **Theme Support**: Dark mode compatibility with automatic color adaptation
 
-## Usage
+## Usage Examples
 
-\`\`\`tsx
-import { Toggle } from '@/components/ui/toggle';
-
-// Basic usage
-<Toggle label="Enable notifications" />
-
-// Controlled component
-<Toggle 
-  checked={isEnabled} 
-  onCheckedChange={setIsEnabled}
-  label="Feature toggle"
-/>
-
-// With React Hook Form
-<Controller
-  name="settings.notifications"
-  control={control}
-  render={({ field }) => (
-    <Toggle
-      label="Email notifications"
-      checked={field.value}
-      onCheckedChange={field.onChange}
-    />
-  )}
-/>
-\`\`\`
+The component supports both controlled and uncontrolled usage patterns, with comprehensive form integration capabilities.
         `,
       },
     },
   },
   tags: ['autodocs'],
   argTypes: {
+    // Core toggle props
+    value: {
+      control: 'boolean',
+      description: 'Controlled value of the toggle',
+    },
+    defaultValue: {
+      control: 'boolean',
+      description: 'Default value for uncontrolled usage',
+    },
+    onChange: {
+      action: 'changed',
+      description: 'Callback fired when toggle value changes',
+    },
+    
+    // Styling variants
     size: {
       control: 'select',
       options: ['sm', 'md', 'lg'],
-      description: 'Toggle size variant',
+      description: 'Size variant affecting touch target and visual scale',
     },
     variant: {
       control: 'select',
-      options: ['default', 'success', 'warning', 'error'],
-      description: 'Toggle color variant',
+      options: ['primary', 'secondary', 'success', 'warning', 'error', 'outline', 'ghost'],
+      description: 'Visual style variant with different color schemes',
+    },
+    state: {
+      control: 'select',
+      options: ['default', 'loading', 'disabled', 'error'],
+      description: 'Component state affecting interaction and appearance',
+    },
+    
+    // Label configuration
+    label: {
+      control: 'text',
+      description: 'Toggle label text',
     },
     labelPosition: {
       control: 'select',
-      options: ['left', 'right'],
-      description: 'Label position relative to toggle',
+      options: ['left', 'right', 'top', 'bottom', 'none'],
+      description: 'Position of the label relative to the toggle',
     },
+    labelVariant: {
+      control: 'select',
+      options: ['default', 'muted', 'emphasis'],
+      description: 'Label styling variant',
+    },
+    showLabel: {
+      control: 'boolean',
+      description: 'Whether to display the label',
+    },
+    
+    // Accessibility props
+    'aria-label': {
+      control: 'text',
+      description: 'Accessible label for screen readers',
+    },
+    announceOnChange: {
+      control: 'text',
+      description: 'Message announced to screen readers on state change',
+    },
+    
+    // Form props
     disabled: {
       control: 'boolean',
-      description: 'Disable toggle interactions',
+      description: 'Whether the toggle is disabled',
     },
     loading: {
       control: 'boolean',
-      description: 'Show loading state',
+      description: 'Whether the toggle is in loading state',
     },
     required: {
       control: 'boolean',
-      description: 'Mark toggle as required for forms',
+      description: 'Whether the toggle is required in forms',
     },
-    checked: {
-      control: 'boolean',
-      description: 'Controlled checked state',
+    error: {
+      control: 'text',
+      description: 'Error message to display',
     },
-    defaultChecked: {
-      control: 'boolean',
-      description: 'Default checked state for uncontrolled usage',
+    helperText: {
+      control: 'text',
+      description: 'Helper text displayed below toggle',
     },
+    
+    // Layout props
+    layout: {
+      control: 'select',
+      options: ['horizontal', 'vertical'],
+      description: 'Layout direction for toggle and label',
+    },
+    alignment: {
+      control: 'select',
+      options: ['start', 'center', 'end', 'between'],
+      description: 'Alignment of toggle and label within container',
+    },
+    spacing: {
+      control: 'select',
+      options: ['compact', 'normal', 'relaxed'],
+      description: 'Spacing between toggle and label',
+    },
+  },
+  args: {
+    // Default values
+    onChange: fn(),
+    size: 'md',
+    variant: 'primary',
+    state: 'default',
+    labelPosition: 'right',
+    labelVariant: 'default',
+    showLabel: true,
+    layout: 'horizontal',
+    alignment: 'start',
+    spacing: 'normal',
   },
 } satisfies Meta<typeof Toggle>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Basic Examples
+// Basic toggle stories
 export const Default: Story = {
   args: {
-    label: 'Default toggle',
-    'aria-describedby': 'default-toggle-description',
+    label: 'Enable notifications',
+    defaultValue: false,
   },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Basic toggle with default styling and medium size.',
-      },
-    },
-  },
-  render: (args) => (
-    <div className="space-y-2">
-      <Toggle {...args} />
-      <p id="default-toggle-description" className="text-sm text-gray-600 dark:text-gray-400">
-        This is the default toggle appearance with medium size.
-      </p>
-    </div>
-  ),
 };
 
 export const Checked: Story = {
   args: {
-    label: 'Checked toggle',
-    defaultChecked: true,
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Toggle in checked state by default.',
-      },
-    },
+    label: 'Enable notifications',
+    defaultValue: true,
   },
 };
 
-export const Disabled: Story = {
+export const WithoutLabel: Story = {
   args: {
-    label: 'Disabled toggle',
-    disabled: true,
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Disabled toggle that cannot be interacted with.',
-      },
-    },
+    'aria-label': 'Toggle notifications',
+    showLabel: false,
+    defaultValue: false,
   },
 };
 
-export const DisabledChecked: Story = {
-  args: {
-    label: 'Disabled checked toggle',
-    disabled: true,
-    defaultChecked: true,
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Disabled toggle in checked state.',
-      },
-    },
-  },
-};
-
-// Size Variants
-export const Sizes: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: 'Available size variants: small (sm), medium (md), and large (lg).',
-      },
-    },
-  },
+// Size variants
+export const SizeVariants: Story = {
   render: () => (
-    <div className="space-y-4">
-      <Toggle size="sm" label="Small toggle" />
-      <Toggle size="md" label="Medium toggle (default)" />
-      <Toggle size="lg" label="Large toggle" />
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold">Size Variants</h3>
+        <p className="text-sm text-secondary-600 dark:text-secondary-400">
+          All sizes maintain WCAG 2.1 AA compliance with minimum 44px touch targets
+        </p>
+      </div>
+      
+      <div className="space-y-4">
+        <Toggle
+          size="sm"
+          label="Small (44px height)"
+          defaultValue={false}
+        />
+        <Toggle
+          size="md"
+          label="Medium (48px height) - Default"
+          defaultValue={true}
+        />
+        <Toggle
+          size="lg"
+          label="Large (56px height)"
+          defaultValue={false}
+        />
+      </div>
     </div>
   ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Toggle component supports three size variants, all maintaining WCAG accessibility requirements.',
+      },
+    },
+  },
 };
 
-// Color Variants
+// Color variants
 export const ColorVariants: Story = {
+  render: () => (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold">Color Variants</h3>
+        <p className="text-sm text-secondary-600 dark:text-secondary-400">
+          All variants maintain proper contrast ratios for accessibility
+        </p>
+      </div>
+      
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Toggle
+          variant="primary"
+          label="Primary (7.14:1 contrast)"
+          defaultValue={true}
+        />
+        <Toggle
+          variant="secondary"
+          label="Secondary (7.25:1 contrast)"
+          defaultValue={true}
+        />
+        <Toggle
+          variant="success"
+          label="Success (4.89:1 contrast)"
+          defaultValue={true}
+        />
+        <Toggle
+          variant="warning"
+          label="Warning (4.68:1 contrast)"
+          defaultValue={true}
+        />
+        <Toggle
+          variant="error"
+          label="Error (5.25:1 contrast)"
+          defaultValue={true}
+        />
+        <Toggle
+          variant="outline"
+          label="Outline variant"
+          defaultValue={true}
+        />
+        <Toggle
+          variant="ghost"
+          label="Ghost variant"
+          defaultValue={true}
+        />
+      </div>
+    </div>
+  ),
   parameters: {
     docs: {
       description: {
-        story: 'Color variants for different semantic meanings.',
+        story: 'Color variants provide semantic meaning while maintaining accessibility standards.',
       },
     },
   },
-  render: () => (
-    <div className="space-y-4">
-      <Toggle variant="default" label="Default variant" defaultChecked />
-      <Toggle variant="success" label="Success variant" defaultChecked />
-      <Toggle variant="warning" label="Warning variant" defaultChecked />
-      <Toggle variant="error" label="Error variant" defaultChecked />
-    </div>
-  ),
 };
 
-// Label Positioning
+// Label positioning
 export const LabelPositions: Story = {
+  render: () => (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold">Label Positioning</h3>
+        <p className="text-sm text-secondary-600 dark:text-secondary-400">
+          Labels can be positioned in multiple ways for different design needs
+        </p>
+      </div>
+      
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <Toggle
+          labelPosition="left"
+          label="Left positioned label"
+          defaultValue={false}
+        />
+        <Toggle
+          labelPosition="right"
+          label="Right positioned label"
+          defaultValue={true}
+        />
+        <Toggle
+          labelPosition="top"
+          label="Top positioned label"
+          defaultValue={false}
+        />
+        <Toggle
+          labelPosition="bottom"
+          label="Bottom positioned label"
+          defaultValue={true}
+        />
+      </div>
+    </div>
+  ),
   parameters: {
     docs: {
       description: {
-        story: 'Label can be positioned to the left or right of the toggle.',
+        story: 'Labels can be positioned in four directions around the toggle switch.',
       },
     },
   },
-  render: () => (
-    <div className="space-y-4">
-      <Toggle labelPosition="left" label="Label on left" />
-      <Toggle labelPosition="right" label="Label on right" />
-    </div>
-  ),
 };
 
-// Loading State
-export const Loading: Story = {
-  args: {
-    label: 'Loading toggle',
-    loading: true,
-  },
+// States demonstration
+export const States: Story = {
+  render: () => (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold">Component States</h3>
+        <p className="text-sm text-secondary-600 dark:text-secondary-400">
+          Different states provide visual feedback for various interaction scenarios
+        </p>
+      </div>
+      
+      <div className="space-y-4">
+        <Toggle
+          state="default"
+          label="Default state"
+          defaultValue={false}
+        />
+        <Toggle
+          state="loading"
+          label="Loading state"
+          defaultValue={true}
+        />
+        <Toggle
+          state="disabled"
+          label="Disabled state"
+          defaultValue={false}
+        />
+        <Toggle
+          state="error"
+          label="Error state"
+          error="Please enable this option"
+          defaultValue={true}
+        />
+      </div>
+    </div>
+  ),
   parameters: {
     docs: {
       description: {
-        story: 'Toggle showing loading state with spinner animation.',
+        story: 'States provide visual feedback for loading, disabled, and error conditions.',
+      },
+    },
+  },
+};
+
+// Accessibility demonstration
+export const AccessibilityFeatures: Story = {
+  render: () => (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold">Accessibility Features</h3>
+        <p className="text-sm text-secondary-600 dark:text-secondary-400">
+          WCAG 2.1 AA compliant with proper ARIA labeling and keyboard navigation
+        </p>
+      </div>
+      
+      <div className="space-y-4">
+        <Toggle
+          label="Screen reader announcements"
+          announceOnChange="Notifications are now {state}"
+          defaultValue={false}
+          helperText="Changes will be announced to screen readers"
+        />
+        <Toggle
+          label="Required field"
+          required
+          defaultValue={false}
+          helperText="This toggle is required for form submission"
+        />
+        <Toggle
+          aria-label="Hidden label toggle"
+          showLabel={false}
+          defaultValue={true}
+          helperText="Label is hidden but accessible to screen readers"
+        />
+        <Toggle
+          label="Keyboard navigation focus"
+          defaultValue={false}
+          helperText="Use Tab to focus, Space or Enter to toggle"
+        />
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Demonstrates comprehensive accessibility features including ARIA support and keyboard navigation.',
       },
     },
   },
@@ -239,446 +438,530 @@ export const Loading: Story = {
 
 // Controlled vs Uncontrolled
 export const ControlledExample: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: 'Controlled toggle where state is managed by parent component.',
-      },
-    },
-  },
-  render: () => {
-    const [checked, setChecked] = useState(false);
-    const [notifications, setNotifications] = useState(true);
-    const [darkMode, setDarkMode] = useState(false);
-
+  render: function ControlledToggle() {
+    const [args, updateArgs] = useArgs();
+    
+    const handleChange = (newValue: boolean) => {
+      updateArgs({ value: newValue });
+    };
+    
     return (
       <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-semibold mb-3">Controlled Toggles</h3>
-          <div className="space-y-4">
-            <Toggle
-              label="Feature enabled"
-              checked={checked}
-              onCheckedChange={setChecked}
-              description="Current state controlled by React state"
-            />
-            <Toggle
-              label="Email notifications"
-              checked={notifications}
-              onCheckedChange={setNotifications}
-            />
-            <Toggle
-              label="Dark mode"
-              checked={darkMode}
-              onCheckedChange={setDarkMode}
-              variant={darkMode ? 'default' : 'default'}
-            />
-          </div>
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold">Controlled Component</h3>
+          <p className="text-sm text-secondary-600 dark:text-secondary-400">
+            Value: {args.value ? 'true' : 'false'}
+          </p>
         </div>
         
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <h4 className="font-medium mb-2">Current State:</h4>
-          <ul className="text-sm space-y-1">
-            <li>Feature enabled: {checked ? 'Yes' : 'No'}</li>
-            <li>Notifications: {notifications ? 'Enabled' : 'Disabled'}</li>
-            <li>Dark mode: {darkMode ? 'On' : 'Off'}</li>
-          </ul>
-        </div>
+        <Toggle
+          value={args.value}
+          onChange={handleChange}
+          label="Controlled toggle"
+          helperText="State is managed externally"
+        />
+        
+        <button
+          type="button"
+          onClick={() => handleChange(!args.value)}
+          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+        >
+          Toggle from external button
+        </button>
       </div>
     );
   },
-};
-
-export const UncontrolledExample: Story = {
+  args: {
+    value: false,
+  },
   parameters: {
     docs: {
       description: {
-        story: 'Uncontrolled toggles manage their own state internally.',
+        story: 'Demonstrates controlled usage where the parent component manages the toggle state.',
       },
     },
   },
-  render: () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold mb-3">Uncontrolled Toggles</h3>
-      <Toggle
-        label="Auto-save documents"
-        defaultChecked={true}
-        onCheckedChange={(checked) => console.log('Auto-save:', checked)}
-      />
-      <Toggle
-        label="Show advanced options"
-        defaultChecked={false}
-        onCheckedChange={(checked) => console.log('Advanced options:', checked)}
-      />
-      <Toggle
-        label="Enable analytics"
-        defaultChecked={false}
-        onCheckedChange={(checked) => console.log('Analytics:', checked)}
-      />
-    </div>
-  ),
 };
 
-// Form Integration
+// Form integration with React Hook Form
 export const FormIntegration: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: 'Integration with React Hook Form including validation and error handling.',
-      },
-    },
-  },
-  render: () => {
-    const settingsSchema = z.object({
-      notifications: z.boolean(),
-      emailAlerts: z.boolean(),
-      marketing: z.boolean(),
-      terms: z.boolean().refine((val) => val === true, {
-        message: 'You must accept the terms and conditions',
-      }),
-      newsletter: z.boolean().optional(),
-    });
-
-    type SettingsForm = z.infer<typeof settingsSchema>;
-
+  render: function FormExample() {
     const {
-      control,
+      register,
       handleSubmit,
-      formState: { errors, isSubmitting },
       watch,
-    } = useForm<SettingsForm>({
-      resolver: zodResolver(settingsSchema),
+      formState: { errors },
+      setValue,
+    } = useForm({
       defaultValues: {
-        notifications: true,
-        emailAlerts: false,
-        marketing: false,
-        terms: false,
-        newsletter: false,
+        emailNotifications: true,
+        pushNotifications: false,
+        autoSync: false,
+        darkMode: false,
       },
     });
-
+    
     const watchedValues = watch();
-
-    const onSubmit = async (data: SettingsForm) => {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('Form submitted:', data);
-      alert('Settings saved successfully!');
+    
+    const onSubmit = (data: any) => {
+      alert(`Form submitted with values: ${JSON.stringify(data, null, 2)}`);
     };
-
+    
     return (
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-md">
-        <div>
-          <h3 className="text-lg font-semibold mb-4">Notification Settings</h3>
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold">React Hook Form Integration</h3>
+          <p className="text-sm text-secondary-600 dark:text-secondary-400">
+            Demonstrates integration with React Hook Form for validation and state management
+          </p>
+        </div>
+        
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <Toggle
+            {...register('emailNotifications')}
+            label="Email notifications"
+            variant="primary"
+            helperText="Receive updates via email"
+          />
           
-          <div className="space-y-4">
-            <div>
-              <Toggle
-                name="notifications"
-                control={control}
-                label="Push notifications"
-                description="Receive notifications on your device"
-              />
-            </div>
-
-            <div>
-              <Toggle
-                name="emailAlerts"
-                control={control}
-                label="Email alerts"
-                description="Get important updates via email"
-              />
-            </div>
-
-            <div>
-              <Toggle
-                name="marketing"
-                control={control}
-                label="Marketing emails"
-                description="Receive promotional content and offers"
-              />
-            </div>
-
-            <div>
-              <Toggle
-                name="newsletter"
-                control={control}
-                label="Newsletter subscription"
-                description="Monthly newsletter with tips and updates"
-                variant="success"
-              />
-            </div>
-
-            <div>
-              <Toggle
-                name="terms"
-                control={control}
-                label="I accept the terms and conditions"
-                required
-                error={errors.terms?.message}
-                variant={errors.terms ? 'error' : 'default'}
-              />
-            </div>
+          <Toggle
+            {...register('pushNotifications', {
+              required: 'Push notifications are required',
+            })}
+            label="Push notifications (Required)"
+            variant="secondary"
+            required
+            error={errors.pushNotifications?.message}
+            helperText="Browser push notifications"
+          />
+          
+          <Toggle
+            {...register('autoSync')}
+            label="Auto-sync data"
+            variant="success"
+            helperText="Automatically sync data in background"
+          />
+          
+          <Toggle
+            {...register('darkMode')}
+            label="Dark mode"
+            variant="outline"
+            helperText="Use dark theme"
+          />
+          
+          <div className="pt-4 border-t border-secondary-200 dark:border-secondary-700">
+            <h4 className="text-sm font-medium mb-2">Current Values:</h4>
+            <pre className="text-xs bg-secondary-100 dark:bg-secondary-800 p-3 rounded">
+              {JSON.stringify(watchedValues, null, 2)}
+            </pre>
           </div>
-        </div>
-
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <h4 className="font-medium mb-2">Current Values:</h4>
-          <pre className="text-sm">
-            {JSON.stringify(watchedValues, null, 2)}
-          </pre>
-        </div>
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isSubmitting ? 'Saving...' : 'Save Settings'}
-        </button>
-      </form>
+          
+          <button
+            type="submit"
+            className="w-full px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+          >
+            Submit Form
+          </button>
+        </form>
+      </div>
     );
   },
-};
-
-// Accessibility Features
-export const AccessibilityFeatures: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Comprehensive accessibility features including keyboard navigation, ARIA attributes, and screen reader support.',
+        story: 'Shows how to integrate Toggle with React Hook Form including validation and error handling.',
       },
     },
   },
+};
+
+// Toggle with icons
+export const WithIcons: Story = {
   render: () => (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Accessibility Features</h3>
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold">Toggle with Icons</h3>
+        <p className="text-sm text-secondary-600 dark:text-secondary-400">
+          Icons provide visual context for checked and unchecked states
+        </p>
+      </div>
+      
+      <div className="space-y-4">
+        <Toggle
+          label="With check/x icons"
+          checkedIcon={<CheckIcon className="h-3 w-3" />}
+          uncheckedIcon={<XMarkIcon className="h-3 w-3" />}
+          defaultValue={true}
+        />
+        <Toggle
+          label="Only checked icon"
+          checkedIcon={<CheckIcon className="h-4 w-4" />}
+          size="lg"
+          defaultValue={false}
+        />
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Toggles can display icons to provide additional visual context for their states.',
+      },
+    },
+  },
+};
+
+// Dark mode demonstration
+export const DarkMode: Story = {
+  render: () => (
+    <div className="dark">
+      <div className="bg-secondary-900 p-6 rounded-lg space-y-6">
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-white">Dark Mode Compatibility</h3>
+          <p className="text-sm text-secondary-400">
+            All variants automatically adapt to dark mode with proper contrast ratios
+          </p>
+        </div>
+        
         <div className="space-y-4">
           <Toggle
-            label="High contrast mode"
-            description="Increases contrast for better visibility"
-            aria-describedby="contrast-help"
+            variant="primary"
+            label="Primary in dark mode"
+            defaultValue={true}
           />
-          <p id="contrast-help" className="text-sm text-gray-600 dark:text-gray-400">
-            This setting will increase the contrast ratio to meet WCAG AAA standards.
-          </p>
-
           <Toggle
-            label="Screen reader announcements"
-            required
-            aria-describedby="sr-help"
+            variant="success"
+            label="Success in dark mode"
+            defaultValue={true}
           />
-          <p id="sr-help" className="text-sm text-gray-600 dark:text-gray-400">
-            Required setting for screen reader users.
-          </p>
-
           <Toggle
-            label="Keyboard navigation shortcuts"
-            defaultChecked
-            aria-describedby="keyboard-help"
+            variant="outline"
+            label="Outline in dark mode"
+            defaultValue={false}
           />
-          <p id="keyboard-help" className="text-sm text-gray-600 dark:text-gray-400">
-            Enable keyboard shortcuts for faster navigation.
-          </p>
+          <Toggle
+            state="error"
+            label="Error state in dark mode"
+            error="Error message in dark mode"
+            defaultValue={true}
+          />
         </div>
-      </div>
-
-      <div className="p-4 border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950 rounded-lg">
-        <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-          Keyboard Instructions
-        </h4>
-        <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-          <li><kbd className="px-1 py-0.5 bg-blue-200 dark:bg-blue-800 rounded">Tab</kbd> - Navigate to toggle</li>
-          <li><kbd className="px-1 py-0.5 bg-blue-200 dark:bg-blue-800 rounded">Space</kbd> or <kbd className="px-1 py-0.5 bg-blue-200 dark:bg-blue-800 rounded">Enter</kbd> - Toggle state</li>
-          <li><kbd className="px-1 py-0.5 bg-blue-200 dark:bg-blue-800 rounded">Escape</kbd> - Remove focus</li>
-        </ul>
       </div>
     </div>
   ),
-};
-
-// Dark Mode Demonstration
-export const DarkModeCompatibility: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Toggle appearance in both light and dark themes, ensuring proper contrast ratios.',
+        story: 'Demonstrates how Toggle components automatically adapt to dark mode while maintaining accessibility.',
       },
     },
-  },
-  render: () => {
-    const [isDark, setIsDark] = useState(false);
-
-    return (
-      <div className={isDark ? 'dark' : ''}>
-        <div className="p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Theme Preview
-            </h3>
-            <Toggle
-              label="Dark mode"
-              checked={isDark}
-              onCheckedChange={setIsDark}
-            />
-          </div>
-
-          <div className="space-y-4">
-            <Toggle label="Default variant" defaultChecked variant="default" />
-            <Toggle label="Success variant" defaultChecked variant="success" />
-            <Toggle label="Warning variant" defaultChecked variant="warning" />
-            <Toggle label="Error variant" defaultChecked variant="error" />
-            <Toggle label="Disabled state" disabled />
-            <Toggle label="Loading state" loading />
-          </div>
-
-          <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              All variants maintain WCAG 2.1 AA contrast ratios (4.5:1) in both light and dark themes.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
   },
 };
 
-// Advanced Usage Patterns
-export const AdvancedPatterns: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: 'Advanced usage patterns including conditional logic, grouped toggles, and complex form scenarios.',
-      },
-    },
-  },
-  render: () => {
-    const [masterEnabled, setMasterEnabled] = useState(false);
-    const [features, setFeatures] = useState({
-      feature1: false,
-      feature2: false,
-      feature3: false,
-    });
-
-    const handleMasterToggle = (checked: boolean) => {
-      setMasterEnabled(checked);
-      if (!checked) {
-        setFeatures({ feature1: false, feature2: false, feature3: false });
-      }
-    };
-
-    const handleFeatureToggle = (feature: keyof typeof features, checked: boolean) => {
-      setFeatures(prev => ({ ...prev, [feature]: checked }));
-    };
-
-    return (
-      <div className="space-y-6 max-w-md">
-        <div>
-          <h3 className="text-lg font-semibold mb-4">Master Control Pattern</h3>
-          
-          <Toggle
-            label="Enable all features"
-            checked={masterEnabled}
-            onCheckedChange={handleMasterToggle}
-            variant="success"
-            size="lg"
-          />
-        </div>
-
-        <div className="pl-6 border-l-2 border-gray-200 dark:border-gray-700">
-          <h4 className="font-medium mb-3 text-gray-700 dark:text-gray-300">
-            Individual Features
-          </h4>
-          
-          <div className="space-y-3">
-            <Toggle
-              label="Advanced search"
-              checked={features.feature1}
-              onCheckedChange={(checked) => handleFeatureToggle('feature1', checked)}
-              disabled={!masterEnabled}
-              description="Enhanced search capabilities"
-            />
-            
-            <Toggle
-              label="Real-time sync"
-              checked={features.feature2}
-              onCheckedChange={(checked) => handleFeatureToggle('feature2', checked)}
-              disabled={!masterEnabled}
-              description="Synchronize data in real-time"
-            />
-            
-            <Toggle
-              label="Auto backup"
-              checked={features.feature3}
-              onCheckedChange={(checked) => handleFeatureToggle('feature3', checked)}
-              disabled={!masterEnabled}
-              description="Automatic data backup"
-            />
-          </div>
-        </div>
-
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <h4 className="font-medium mb-2">Feature Status:</h4>
-          <div className="text-sm space-y-1">
-            <div className="flex justify-between">
-              <span>Master:</span>
-              <span className={masterEnabled ? 'text-green-600' : 'text-gray-500'}>
-                {masterEnabled ? 'Enabled' : 'Disabled'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>Active features:</span>
-              <span>{Object.values(features).filter(Boolean).length}/3</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  },
-};
-
-// Performance and Animation
-export const InteractiveStates: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: 'Interactive states showing hover, focus, and active behaviors with smooth animations.',
-      },
-    },
-  },
+// ToggleField stories
+export const ToggleFieldExample: Story = {
   render: () => (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Interactive States</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <h4 className="font-medium text-gray-700 dark:text-gray-300">Normal States</h4>
-            <Toggle label="Hover me" />
-            <Toggle label="Focus me" />
-            <Toggle label="Click me" />
-          </div>
-          
-          <div className="space-y-3">
-            <h4 className="font-medium text-gray-700 dark:text-gray-300">Checked States</h4>
-            <Toggle label="Hover checked" defaultChecked />
-            <Toggle label="Focus checked" defaultChecked />
-            <Toggle label="Active checked" defaultChecked />
-          </div>
-        </div>
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold">ToggleField Component</h3>
+        <p className="text-sm text-secondary-600 dark:text-secondary-400">
+          Enhanced form field wrapper with additional labeling and description capabilities
+        </p>
       </div>
-
-      <div className="p-4 border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 rounded-lg">
-        <h4 className="font-medium text-amber-900 dark:text-amber-100 mb-2">
-          Animation Details
-        </h4>
-        <ul className="text-sm text-amber-800 dark:text-amber-200 space-y-1">
-          <li>• Switch animation: 200ms ease-out transition</li>
-          <li>• Thumb movement: Smooth slide with spring physics</li>
-          <li>• Color transitions: 150ms for hover/focus states</li>
-          <li>• Loading spinner: 1s linear rotation</li>
-        </ul>
+      
+      <div className="space-y-6">
+        <ToggleField
+          fieldLabel="Notification Settings"
+          description="Control how you receive notifications from the system"
+          label="Enable email notifications"
+          defaultValue={true}
+          helperText="You can change this later in your profile"
+        />
+        
+        <ToggleField
+          fieldLabel="Security Features"
+          description="Additional security measures for your account"
+          label="Two-factor authentication"
+          required
+          variant="success"
+          defaultValue={false}
+          helperText="Highly recommended for account security"
+        />
+        
+        <ToggleField
+          fieldLabel="Developer Options"
+          description="Advanced features for developers and power users"
+          label="Enable debug mode"
+          variant="warning"
+          defaultValue={false}
+          error="Debug mode should only be enabled in development"
+        />
       </div>
     </div>
   ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'ToggleField provides enhanced form integration with field labels and descriptions.',
+      },
+    },
+  },
+};
+
+// ToggleGroup stories
+export const ToggleGroupExample: Story = {
+  render: () => (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold">ToggleGroup Component</h3>
+        <p className="text-sm text-secondary-600 dark:text-secondary-400">
+          Group related toggles with coordinated labeling and layout
+        </p>
+      </div>
+      
+      <div className="space-y-8">
+        <ToggleGroup
+          label="Notification Preferences"
+          description="Choose which types of notifications you want to receive"
+          orientation="vertical"
+          spacing="normal"
+        >
+          <Toggle
+            label="Email notifications"
+            defaultValue={true}
+            helperText="Daily digest emails"
+          />
+          <Toggle
+            label="Push notifications"
+            defaultValue={false}
+            helperText="Browser push notifications"
+          />
+          <Toggle
+            label="SMS notifications"
+            defaultValue={false}
+            helperText="Text message alerts"
+          />
+        </ToggleGroup>
+        
+        <ToggleGroup
+          label="Privacy Settings"
+          description="Control your privacy and data sharing preferences"
+          orientation="horizontal"
+          spacing="relaxed"
+          required
+        >
+          <Toggle
+            label="Public profile"
+            variant="outline"
+            defaultValue={false}
+          />
+          <Toggle
+            label="Share analytics"
+            variant="outline"
+            defaultValue={false}
+          />
+          <Toggle
+            label="Marketing emails"
+            variant="outline"
+            defaultValue={true}
+          />
+        </ToggleGroup>
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'ToggleGroup organizes related toggles with group labeling and coordinated layout options.',
+      },
+    },
+  },
+};
+
+// Performance demonstration
+export const PerformanceExample: Story = {
+  render: function PerformanceDemo() {
+    const [count, setCount] = useState(0);
+    
+    return (
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold">Performance Characteristics</h3>
+          <p className="text-sm text-secondary-600 dark:text-secondary-400">
+            Optimized for minimal re-renders and efficient state updates
+          </p>
+          <p className="text-xs text-secondary-500">
+            Render count: {count}
+          </p>
+        </div>
+        
+        <div className="space-y-4">
+          <Toggle
+            label="Optimized toggle"
+            onChange={() => setCount(c => c + 1)}
+            defaultValue={false}
+            helperText="Each toggle updates the render counter"
+          />
+          
+          <Toggle
+            label="Another optimized toggle"
+            onChange={() => setCount(c => c + 1)}
+            defaultValue={true}
+            helperText="Independent state management"
+          />
+          
+          <button
+            type="button"
+            onClick={() => setCount(0)}
+            className="px-3 py-1 text-sm bg-secondary-200 text-secondary-700 rounded hover:bg-secondary-300"
+          >
+            Reset Counter
+          </button>
+        </div>
+      </div>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Demonstrates performance characteristics and efficient re-rendering behavior.',
+      },
+    },
+  },
+};
+
+// Complete integration example
+export const CompleteExample: Story = {
+  render: function CompleteExample() {
+    const {
+      register,
+      handleSubmit,
+      watch,
+      setValue,
+      formState: { errors, isSubmitting },
+    } = useForm({
+      defaultValues: {
+        serviceEnabled: true,
+        autoBackup: false,
+        notifications: true,
+        advancedMode: false,
+      },
+    });
+    
+    const [loading, setLoading] = useState(false);
+    const watchedValues = watch();
+    
+    const onSubmit = async (data: any) => {
+      setLoading(true);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
+      setLoading(false);
+      alert(`Configuration saved: ${JSON.stringify(data, null, 2)}`);
+    };
+    
+    return (
+      <div className="max-w-2xl space-y-8">
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold">Complete Integration Example</h3>
+          <p className="text-sm text-secondary-600 dark:text-secondary-400">
+            Real-world example showing all Toggle features together
+          </p>
+        </div>
+        
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <ToggleGroup
+            label="Service Configuration"
+            description="Configure your DreamFactory service settings"
+            orientation="vertical"
+            spacing="normal"
+            required
+          >
+            <ToggleField
+              {...register('serviceEnabled', {
+                required: 'Service must be enabled',
+              })}
+              fieldLabel="Database Service"
+              description="Enable database connection and API generation"
+              label="Service enabled"
+              variant="primary"
+              size="lg"
+              required
+              error={errors.serviceEnabled?.message}
+              helperText="Required for API endpoint generation"
+            />
+            
+            <ToggleField
+              {...register('autoBackup')}
+              fieldLabel="Backup Configuration"
+              description="Automatic backup settings for your database schemas"
+              label="Enable automatic backups"
+              variant="success"
+              loading={loading && watchedValues.autoBackup}
+              helperText="Backups run daily at 2 AM UTC"
+            />
+            
+            <ToggleField
+              {...register('notifications')}
+              fieldLabel="System Notifications"
+              description="Receive alerts about system status and updates"
+              label="Enable notifications"
+              variant="secondary"
+              announceOnChange="Notifications are now {state}"
+              checkedIcon={<CheckIcon className="h-4 w-4" />}
+              uncheckedIcon={<XMarkIcon className="h-4 w-4" />}
+              helperText="Get notified about important system events"
+            />
+            
+            <ToggleField
+              {...register('advancedMode')}
+              fieldLabel="Advanced Features"
+              description="Enable advanced configuration options for power users"
+              label="Advanced mode"
+              variant="warning"
+              labelPosition="left"
+              helperText="Enables additional configuration options"
+            />
+          </ToggleGroup>
+          
+          <div className="border-t border-secondary-200 dark:border-secondary-700 pt-6">
+            <h4 className="text-sm font-medium mb-3">Current Configuration:</h4>
+            <div className="bg-secondary-50 dark:bg-secondary-800 p-4 rounded-lg">
+              <pre className="text-xs text-secondary-700 dark:text-secondary-300">
+                {JSON.stringify(watchedValues, null, 2)}
+              </pre>
+            </div>
+          </div>
+          
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={isSubmitting || loading}
+              className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isSubmitting || loading ? 'Saving...' : 'Save Configuration'}
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => {
+                setValue('serviceEnabled', true);
+                setValue('autoBackup', false);
+                setValue('notifications', true);
+                setValue('advancedMode', false);
+              }}
+              className="px-4 py-2 bg-secondary-200 text-secondary-700 rounded-md hover:bg-secondary-300 transition-colors"
+            >
+              Reset to Defaults
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Complete example showing Toggle components in a realistic form configuration scenario.',
+      },
+    },
+  },
 };
