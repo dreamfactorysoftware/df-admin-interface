@@ -1,22 +1,25 @@
 /**
- * @fileoverview React implementation of the user application roles management component
+ * User Application Roles Management Component
  * 
- * This component enables dynamic assignment of applications to roles through an accessible
- * form interface. It replaces the Angular Material-based implementation with modern React
- * patterns while maintaining full functionality and improving accessibility compliance.
+ * React implementation of dynamic application role assignment management with comprehensive
+ * accessibility, validation, and form integration capabilities. Replaces Angular Material
+ * accordion and table components with Headless UI and Tailwind CSS while maintaining 
+ * full functionality and exceeding WCAG 2.1 AA compliance standards.
  * 
- * Key Features:
- * - React Hook Form with useFieldArray for dynamic form management
+ * Features:
+ * - React Hook Form integration with useFieldArray for dynamic form management
  * - Headless UI Disclosure for accessible collapsible content
- * - WCAG 2.1 AA compliant data table with keyboard navigation
- * - Autocomplete selection with filtering and keyboard support
- * - Zod schema validation with real-time feedback under 100ms
+ * - Real-time Zod schema validation with sub-100ms response times
+ * - Full keyboard navigation and screen reader support
+ * - FontAwesome React icons with proper ARIA labeling
  * - Dark theme support via Zustand store integration
- * - Next.js i18n patterns for internationalization
- * - Backward compatibility with existing AppType and RoleType interfaces
+ * - Next.js i18n patterns for localized content
+ * - Responsive design with minimum 44px touch targets
+ * - Comprehensive error handling and user feedback
  * 
+ * @fileoverview User Application Roles management component
  * @version 1.0.0
- * @author DreamFactory Platform Team
+ * @since React 19.0.0 / Next.js 15.1+ / TypeScript 5.8+
  */
 
 'use client';
@@ -25,1025 +28,1322 @@ import React, {
   forwardRef, 
   useCallback, 
   useMemo, 
-  useState, 
-  useEffect,
-  useId,
-  useRef
+  useRef, 
+  useEffect, 
+  useState,
+  useImperativeHandle,
+  Fragment 
 } from 'react';
-import { 
-  useFieldArray, 
-  useFormContext, 
-  Controller,
-  useWatch
-} from 'react-hook-form';
-import { 
-  Disclosure, 
-  Transition, 
-  Combobox,
-  Listbox
-} from '@headlessui/react';
-import { 
-  ChevronDownIcon,
-  PlusIcon,
-  TrashIcon,
-  MagnifyingGlassIcon,
-  CheckIcon,
-  ChevronUpDownIcon,
-  ExclamationTriangleIcon
-} from '@heroicons/react/24/outline';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useFieldArray, Controller } from 'react-hook-form';
+import { Disclosure, Combobox, Transition } from '@headlessui/react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPlus, faTrashCan, faChevronDown, faCheck, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { z } from 'zod';
 import { useTranslations } from 'next-intl';
-import { cn } from '@/lib/utils';
 
-// Import types and schemas
-import {
-  UserAppRolesProps,
-  UserAppRoleAssignment,
-  AppType,
-  RoleType,
-  UserAppRolesFormData,
-  UserAppRoleAssignmentSchema,
-  ValidationErrors,
-  ThemeConfiguration,
-  DataSourceConfiguration
+// Internal imports
+import { 
+  type UserAppRolesProps,
+  type UserAppRole,
+  type UserAppRolesRef,
+  UserAppRoleSchema,
+  UserAppRolesFormSchema,
+  type UserAppRoleFieldArrayConfig,
+  type ValidationResult,
 } from './user-app-roles.types';
+import { Button } from '../button';
+import { useTheme } from '../../../hooks/use-theme';
+import { cn, generateId } from '../../../lib/utils';
+import type { AppType } from '../../../types/apps';
+import type { RoleType } from '../../../types/role';
 
-// Theme hook import (creating inline if not available)
-interface ThemeState {
-  theme: 'light' | 'dark' | 'system';
-  resolvedTheme: 'light' | 'dark';
-}
-
-const useTheme = (): ThemeState => {
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
-
-  useEffect(() => {
-    // Check for stored theme preference
-    const stored = localStorage.getItem('df-admin-theme') as 'light' | 'dark' | 'system';
-    if (stored) {
-      setTheme(stored);
-    }
-
-    // Detect system preference
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const updateResolvedTheme = () => {
-      const resolved = theme === 'system' 
-        ? (mediaQuery.matches ? 'dark' : 'light')
-        : theme;
-      setResolvedTheme(resolved === 'system' ? 'light' : resolved);
-    };
-
-    updateResolvedTheme();
-    mediaQuery.addEventListener('change', updateResolvedTheme);
-
-    return () => mediaQuery.removeEventListener('change', updateResolvedTheme);
-  }, [theme]);
-
-  return { theme, resolvedTheme };
-};
-
-// =============================================================================
-// SUB-COMPONENTS
-// =============================================================================
+// ============================================================================
+// VALIDATION SCHEMAS
+// ============================================================================
 
 /**
- * Accessible Button Component with WCAG 2.1 AA compliance
+ * Enhanced Zod validation schema with business rules
  */
-interface AccessibleButtonProps {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
-  size?: 'sm' | 'md' | 'lg';
-  disabled?: boolean;
-  children: React.ReactNode;
-  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  type?: 'button' | 'submit' | 'reset';
-  className?: string;
-  'aria-label'?: string;
-  'aria-describedby'?: string;
-  'data-testid'?: string;
-}
-
-const AccessibleButton = forwardRef<HTMLButtonElement, AccessibleButtonProps>(
-  ({ 
-    variant = 'primary',
-    size = 'md',
-    disabled = false,
-    children,
-    onClick,
-    type = 'button',
-    className,
-    'aria-label': ariaLabel,
-    'aria-describedby': ariaDescribedBy,
-    'data-testid': testId,
-    ...props
-  }, ref) => {
-    const baseStyles = cn(
-      "inline-flex items-center justify-center font-medium rounded-md transition-colors duration-200",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2",
-      "disabled:opacity-50 disabled:pointer-events-none",
-      "min-h-[44px]", // WCAG minimum touch target size
-      "focus:outline-none"
-    );
-
-    const variants = {
-      primary: "bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 border border-primary-600",
-      secondary: "bg-secondary-100 text-secondary-900 hover:bg-secondary-200 active:bg-secondary-300 border border-secondary-300",
-      outline: "bg-transparent text-primary-600 hover:bg-primary-50 active:bg-primary-100 border-2 border-primary-600",
-      ghost: "bg-transparent text-secondary-700 hover:bg-secondary-100 active:bg-secondary-200 border border-transparent",
-      danger: "bg-error-600 text-white hover:bg-error-700 active:bg-error-800 border border-error-600"
-    };
-
-    const sizes = {
-      sm: "h-11 px-4 text-sm min-w-[44px]",
-      md: "h-12 px-6 text-base min-w-[48px]",
-      lg: "h-14 px-8 text-lg min-w-[56px]"
-    };
-
-    return (
-      <button
-        ref={ref}
-        type={type}
-        disabled={disabled}
-        onClick={onClick}
-        className={cn(baseStyles, variants[variant], sizes[size], className)}
-        aria-label={ariaLabel}
-        aria-describedby={ariaDescribedBy}
-        data-testid={testId}
-        {...props}
-      >
-        {children}
-      </button>
-    );
+const UserAppRoleValidationSchema = UserAppRoleSchema.refine(
+  (data) => {
+    // Business rule: Ensure app and role IDs are different (they use different ID spaces)
+    return data.appId !== data.roleId;
+  },
+  {
+    message: 'Invalid application and role combination detected',
+    path: ['appId', 'roleId'],
   }
 );
 
-AccessibleButton.displayName = 'AccessibleButton';
+/**
+ * Form-level validation schema
+ */
+const FormValidationSchema = UserAppRolesFormSchema.superRefine((data, ctx) => {
+  // Check for duplicate app-role combinations
+  const combinations = new Map<string, number>();
+  
+  data.userAppRoles.forEach((assignment, index) => {
+    const combo = `${assignment.appId}-${assignment.roleId}`;
+    
+    if (combinations.has(combo)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Duplicate application-role combination found',
+        path: ['userAppRoles', index, 'appId'],
+      });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Duplicate application-role combination found',
+        path: ['userAppRoles', combinations.get(combo)!, 'roleId'],
+      });
+    } else {
+      combinations.set(combo, index);
+    }
+  });
+  
+  // Validate assignment limits
+  if (data.userAppRoles.length > 50) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.too_big,
+      maximum: 50,
+      type: 'array',
+      inclusive: true,
+      message: 'Maximum 50 role assignments allowed',
+      path: ['userAppRoles'],
+    });
+  }
+});
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
 /**
- * Application Selector with Autocomplete and Keyboard Navigation
+ * Filter applications based on search term and existing assignments
  */
-interface AppSelectorProps {
-  applications: AppType[];
-  selectedApp?: AppType;
-  onAppSelect: (app: AppType) => void;
-  disabled?: boolean;
-  loading?: boolean;
-  error?: string;
-  'aria-label'?: string;
-  'aria-describedby'?: string;
-  placeholder?: string;
-  'data-testid'?: string;
-}
-
-const AppSelector: React.FC<AppSelectorProps> = ({
-  applications,
-  selectedApp,
-  onAppSelect,
-  disabled = false,
-  loading = false,
-  error,
-  'aria-label': ariaLabel,
-  'aria-describedby': ariaDescribedBy,
-  placeholder = 'Select an application...',
-  'data-testid': testId
-}) => {
-  const [query, setQuery] = useState('');
-  const t = useTranslations('userAppRoles');
-
-  const filteredApps = useMemo(() => {
-    if (!query) return applications;
-    
-    return applications.filter((app) =>
-      app.name.toLowerCase().includes(query.toLowerCase()) ||
-      app.label?.toLowerCase().includes(query.toLowerCase()) ||
-      app.description?.toLowerCase().includes(query.toLowerCase())
-    );
-  }, [applications, query]);
-
-  return (
-    <Combobox value={selectedApp} onChange={onAppSelect} disabled={disabled}>
-      <div className="relative">
-        <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white dark:bg-gray-900 text-left shadow-md focus:outline-none border border-gray-300 dark:border-gray-600">
-          <Combobox.Input
-            className="w-full border-none py-3 pl-3 pr-10 text-sm leading-5 text-gray-900 dark:text-gray-100 bg-transparent focus:ring-0 focus:outline-none"
-            displayValue={(app: AppType | undefined) => app?.label || app?.name || ''}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={placeholder}
-            aria-label={ariaLabel || t('selectApplication')}
-            aria-describedby={ariaDescribedBy}
-            data-testid={testId}
-          />
-          <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
-            <ChevronUpDownIcon
-              className="h-5 w-5 text-gray-400"
-              aria-hidden="true"
-            />
-          </Combobox.Button>
-        </div>
-
-        <Transition
-          enter="transition duration-100 ease-out"
-          enterFrom="transform scale-95 opacity-0"
-          enterTo="transform scale-100 opacity-100"
-          leave="transition duration-75 ease-out"
-          leaveFrom="transform scale-100 opacity-100"
-          leaveTo="transform scale-95 opacity-0"
-        >
-          <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-            {loading && (
-              <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                {t('loading')}...
-              </div>
-            )}
-            
-            {!loading && filteredApps.length === 0 && query !== '' && (
-              <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                {t('noApplicationsFound')}
-              </div>
-            )}
-
-            {!loading && filteredApps.map((app) => (
-              <Combobox.Option
-                key={app.id}
-                className={({ active }) =>
-                  cn(
-                    "relative cursor-default select-none py-2 pl-10 pr-4",
-                    active
-                      ? "bg-primary-600 text-white"
-                      : "text-gray-900 dark:text-gray-100"
-                  )
-                }
-                value={app}
-              >
-                {({ selected, active }) => (
-                  <>
-                    <span
-                      className={cn(
-                        "block truncate",
-                        selected ? "font-medium" : "font-normal"
-                      )}
-                    >
-                      {app.label || app.name}
-                    </span>
-                    {app.description && (
-                      <span
-                        className={cn(
-                          "block text-xs truncate mt-1",
-                          active ? "text-primary-200" : "text-gray-500 dark:text-gray-400"
-                        )}
-                      >
-                        {app.description}
-                      </span>
-                    )}
-                    {selected ? (
-                      <span
-                        className={cn(
-                          "absolute inset-y-0 left-0 flex items-center pl-3",
-                          active ? "text-white" : "text-primary-600"
-                        )}
-                      >
-                        <CheckIcon className="h-5 w-5" aria-hidden="true" />
-                      </span>
-                    ) : null}
-                  </>
-                )}
-              </Combobox.Option>
-            ))}
-          </Combobox.Options>
-        </Transition>
-      </div>
-
-      {error && (
-        <p className="mt-2 text-sm text-error-600 dark:text-error-400" role="alert">
-          <ExclamationTriangleIcon className="inline h-4 w-4 mr-1" />
-          {error}
-        </p>
-      )}
-    </Combobox>
-  );
+const filterApplications = (
+  apps: AppType[],
+  searchTerm: string,
+  existingAssignments: UserAppRole[] = []
+): AppType[] => {
+  const assignedAppIds = new Set(existingAssignments.map(assignment => assignment.appId));
+  
+  return apps
+    .filter(app => !assignedAppIds.has(app.id))
+    .filter(app => 
+      app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .slice(0, 10); // Limit for performance
 };
 
 /**
- * Role Selector with similar autocomplete functionality
+ * Filter roles based on search term and selected application
  */
-interface RoleSelectorProps {
-  roles: RoleType[];
-  selectedRole?: RoleType;
-  onRoleSelect: (role: RoleType) => void;
-  disabled?: boolean;
-  loading?: boolean;
-  error?: string;
-  'aria-label'?: string;
-  'aria-describedby'?: string;
-  placeholder?: string;
-  'data-testid'?: string;
-}
-
-const RoleSelector: React.FC<RoleSelectorProps> = ({
-  roles,
-  selectedRole,
-  onRoleSelect,
-  disabled = false,
-  loading = false,
-  error,
-  'aria-label': ariaLabel,
-  'aria-describedby': ariaDescribedBy,
-  placeholder = 'Select a role...',
-  'data-testid': testId
-}) => {
-  const [query, setQuery] = useState('');
-  const t = useTranslations('userAppRoles');
-
-  const filteredRoles = useMemo(() => {
-    if (!query) return roles;
-    
-    return roles.filter((role) =>
-      role.name.toLowerCase().includes(query.toLowerCase()) ||
-      role.label?.toLowerCase().includes(query.toLowerCase()) ||
-      role.description?.toLowerCase().includes(query.toLowerCase())
-    );
-  }, [roles, query]);
-
-  return (
-    <Combobox value={selectedRole} onChange={onRoleSelect} disabled={disabled}>
-      <div className="relative">
-        <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-white dark:bg-gray-900 text-left shadow-md focus:outline-none border border-gray-300 dark:border-gray-600">
-          <Combobox.Input
-            className="w-full border-none py-3 pl-3 pr-10 text-sm leading-5 text-gray-900 dark:text-gray-100 bg-transparent focus:ring-0 focus:outline-none"
-            displayValue={(role: RoleType | undefined) => role?.label || role?.name || ''}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={placeholder}
-            aria-label={ariaLabel || t('selectRole')}
-            aria-describedby={ariaDescribedBy}
-            data-testid={testId}
-          />
-          <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
-            <ChevronUpDownIcon
-              className="h-5 w-5 text-gray-400"
-              aria-hidden="true"
-            />
-          </Combobox.Button>
-        </div>
-
-        <Transition
-          enter="transition duration-100 ease-out"
-          enterFrom="transform scale-95 opacity-0"
-          enterTo="transform scale-100 opacity-100"
-          leave="transition duration-75 ease-out"
-          leaveFrom="transform scale-100 opacity-100"
-          leaveTo="transform scale-95 opacity-0"
-        >
-          <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-            {loading && (
-              <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                {t('loading')}...
-              </div>
-            )}
-            
-            {!loading && filteredRoles.length === 0 && query !== '' && (
-              <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                {t('noRolesFound')}
-              </div>
-            )}
-
-            {!loading && filteredRoles.map((role) => (
-              <Combobox.Option
-                key={role.id}
-                className={({ active }) =>
-                  cn(
-                    "relative cursor-default select-none py-2 pl-10 pr-4",
-                    active
-                      ? "bg-primary-600 text-white"
-                      : "text-gray-900 dark:text-gray-100"
-                  )
-                }
-                value={role}
-              >
-                {({ selected, active }) => (
-                  <>
-                    <span
-                      className={cn(
-                        "block truncate",
-                        selected ? "font-medium" : "font-normal"
-                      )}
-                    >
-                      {role.label || role.name}
-                    </span>
-                    {role.description && (
-                      <span
-                        className={cn(
-                          "block text-xs truncate mt-1",
-                          active ? "text-primary-200" : "text-gray-500 dark:text-gray-400"
-                        )}
-                      >
-                        {role.description}
-                      </span>
-                    )}
-                    {selected ? (
-                      <span
-                        className={cn(
-                          "absolute inset-y-0 left-0 flex items-center pl-3",
-                          active ? "text-white" : "text-primary-600"
-                        )}
-                      >
-                        <CheckIcon className="h-5 w-5" aria-hidden="true" />
-                      </span>
-                    ) : null}
-                  </>
-                )}
-              </Combobox.Option>
-            ))}
-          </Combobox.Options>
-        </Transition>
-      </div>
-
-      {error && (
-        <p className="mt-2 text-sm text-error-600 dark:text-error-400" role="alert">
-          <ExclamationTriangleIcon className="inline h-4 w-4 mr-1" />
-          {error}
-        </p>
-      )}
-    </Combobox>
+const filterRoles = (
+  roles: RoleType[],
+  searchTerm: string,
+  selectedAppId?: number,
+  existingAssignments: UserAppRole[] = []
+): RoleType[] => {
+  const assignedRoleIds = new Set(
+    existingAssignments
+      .filter(assignment => assignment.appId === selectedAppId)
+      .map(assignment => assignment.roleId)
   );
+  
+  return roles
+    .filter(role => !assignedRoleIds.has(role.id))
+    .filter(role => 
+      role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      role.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .slice(0, 10); // Limit for performance
 };
 
-// =============================================================================
+/**
+ * Create new assignment with default values
+ */
+const createNewAssignment = (
+  appId?: number,
+  roleId?: number,
+  options: Partial<UserAppRole> = {}
+): UserAppRole => ({
+  id: generateId(12),
+  appId: appId || 0,
+  roleId: roleId || 0,
+  isActive: true,
+  createdAt: new Date().toISOString(),
+  notes: '',
+  ...options,
+});
+
+/**
+ * Get ARIA label for assignment item
+ */
+const getAssignmentAriaLabel = (
+  assignment: UserAppRole,
+  appName: string,
+  roleName: string,
+  index: number,
+  t: (key: string) => string
+): string => {
+  return t('assignment.ariaLabel', {
+    index: index + 1,
+    appName,
+    roleName,
+    status: assignment.isActive ? t('status.active') : t('status.inactive'),
+  });
+};
+
+// ============================================================================
 // MAIN COMPONENT
-// =============================================================================
+// ============================================================================
 
 /**
- * UserAppRoles Component - React implementation with full accessibility support
+ * User Application Roles Management Component
+ * 
+ * Comprehensive form component for managing user application role assignments
+ * with full accessibility, validation, and performance optimization.
  */
-const UserAppRoles = forwardRef<HTMLDivElement, UserAppRolesProps>(
-  ({
-    name = 'appRoles',
-    dataSource,
-    defaultValue = [],
-    value,
-    disabled = false,
-    readOnly = false,
-    maxAssignments,
-    minAssignments = 0,
-    size = 'md',
-    variant = 'default',
-    showDescriptions = true,
+export const UserAppRoles = forwardRef<UserAppRolesRef, UserAppRolesProps>(({
+  fieldArrayConfig,
+  availableApps = [],
+  availableRoles = [],
+  defaultValues = [],
+  mode = 'full',
+  size = 'md',
+  variant = 'default',
+  loading = false,
+  disabled = false,
+  readOnly = false,
+  maxAssignments = 50,
+  minAssignments = 0,
+  showAddButton = true,
+  showRemoveButtons = true,
+  showStatusToggles = true,
+  showNotesFields = false,
+  customValidation,
+  onAssignmentAdd,
+  onAssignmentRemove,
+  onAssignmentChange,
+  onValidationError,
+  accessibility = {},
+  theme = {},
+  i18n = {},
+  testConfig = {},
+  className,
+  ...props
+}, ref) => {
+  // ============================================================================
+  // HOOKS AND STATE
+  // ============================================================================
+  
+  const t = useTranslations('userAppRoles');
+  const { resolvedTheme } = useTheme();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // Local state for search functionality
+  const [appSearchQuery, setAppSearchQuery] = useState('');
+  const [roleSearchQueries, setRoleSearchQueries] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, ValidationResult[]>>({});
+  const [isValidating, setIsValidating] = useState(false);
+
+  // Extract field array utilities
+  const {
+    control,
+    register,
+    watch,
+    setValue,
+    trigger,
+    errors,
+  } = fieldArrayConfig;
+
+  const { fields, append, remove, move } = useFieldArray({
+    control,
+    name: 'userAppRoles',
+  });
+
+  // Watch all assignments for validation
+  const watchedAssignments = watch('userAppRoles') || [];
+
+  // ============================================================================
+  // MEMOIZED COMPUTATIONS
+  // ============================================================================
+
+  /**
+   * Filtered applications for autocomplete
+   */
+  const filteredApps = useMemo(() => 
+    filterApplications(availableApps, appSearchQuery, watchedAssignments),
+    [availableApps, appSearchQuery, watchedAssignments]
+  );
+
+  /**
+   * Filtered roles for each assignment
+   */
+  const getFilteredRoles = useCallback((assignmentId: string, selectedAppId?: number) => {
+    const searchQuery = roleSearchQueries[assignmentId] || '';
+    return filterRoles(availableRoles, searchQuery, selectedAppId, watchedAssignments);
+  }, [availableRoles, roleSearchQueries, watchedAssignments]);
+
+  /**
+   * Get application by ID
+   */
+  const getAppById = useCallback((appId: number): AppType | undefined => 
+    availableApps.find(app => app.id === appId),
+    [availableApps]
+  );
+
+  /**
+   * Get role by ID
+   */
+  const getRoleById = useCallback((roleId: number): RoleType | undefined => 
+    availableRoles.find(role => role.id === roleId),
+    [availableRoles]
+  );
+
+  /**
+   * Component CSS classes
+   */
+  const componentClasses = useMemo(() => ({
+    container: cn(
+      'user-app-roles-container',
+      'space-y-4',
+      theme.customClasses?.root,
+      {
+        'opacity-50 pointer-events-none': disabled,
+        'opacity-75': loading,
+      },
+      className
+    ),
+    disclosure: cn(
+      'disclosure-panel',
+      'bg-white dark:bg-gray-800',
+      'border border-gray-200 dark:border-gray-700',
+      'rounded-lg shadow-sm',
+      theme.customClasses?.assignmentList
+    ),
+    disclosureButton: cn(
+      'disclosure-button',
+      'w-full px-4 py-3',
+      'flex items-center justify-between',
+      'text-left font-medium',
+      'text-gray-900 dark:text-gray-100',
+      'hover:bg-gray-50 dark:hover:bg-gray-700',
+      'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+      'transition-colors duration-200'
+    ),
+    assignmentItem: cn(
+      'assignment-item',
+      'p-4 space-y-4',
+      'border-t border-gray-200 dark:border-gray-700',
+      theme.customClasses?.assignmentItem
+    ),
+    formGrid: cn(
+      'form-grid',
+      'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4',
+      {
+        'grid-cols-1 md:grid-cols-2': !showNotesFields,
+        'grid-cols-1 md:grid-cols-2 lg:grid-cols-4': showNotesFields,
+      }
+    ),
+    addButton: cn(
+      'add-assignment-button',
+      'w-full md:w-auto',
+      theme.customClasses?.addButton
+    ),
+    removeButton: cn(
+      'remove-assignment-button',
+      'ml-2',
+      theme.customClasses?.removeButton
+    ),
+    errorMessage: cn(
+      'error-message',
+      'text-sm text-red-600 dark:text-red-400',
+      'mt-1',
+      theme.customClasses?.errorMessage
+    ),
+  }), [
+    theme.customClasses,
     className,
-    eventHandlers,
-    customValidation,
-    showInlineErrors = true,
-    errorDisplayMode = 'inline',
-    'aria-label': ariaLabel,
-    'aria-describedby': ariaDescribedBy,
-    'data-testid': testId,
-    locale = 'en',
-    ...props
-  }, ref) => {
-    // Hooks and context
-    const { resolvedTheme } = useTheme();
-    const t = useTranslations('userAppRoles');
-    const formContext = useFormContext<UserAppRolesFormData>();
-    const componentId = useId();
-    const addButtonRef = useRef<HTMLButtonElement>(null);
+    disabled,
+    loading,
+    showNotesFields,
+  ]);
 
-    // Form field array management
-    const { fields, append, remove, update } = useFieldArray({
-      control: formContext?.control,
-      name: name as any,
-    });
+  // ============================================================================
+  // EVENT HANDLERS
+  // ============================================================================
 
-    // Watch for changes
-    const watchedFields = useWatch({
-      control: formContext?.control,
-      name: name as any,
-    });
+  /**
+   * Handle adding new assignment
+   */
+  const handleAddAssignment = useCallback(async () => {
+    if (disabled || readOnly || watchedAssignments.length >= maxAssignments) {
+      return;
+    }
 
-    // Local state
-    const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
-    const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
-    const [validationErrors, setValidationErrors] = useState<ValidationErrors | null>(null);
-
-    // Memoized values
-    const assignments = useMemo(() => 
-      value || watchedFields || defaultValue,
-      [value, watchedFields, defaultValue]
-    );
-
-    const canAddMore = useMemo(() => 
-      !maxAssignments || assignments.length < maxAssignments,
-      [maxAssignments, assignments.length]
-    );
-
-    const hasMinimumAssignments = useMemo(() => 
-      assignments.length >= minAssignments,
-      [assignments.length, minAssignments]
-    );
-
-    // Event handlers
-    const handleAddAssignment = useCallback(() => {
-      if (!canAddMore || disabled || readOnly) return;
-
-      const newAssignment: UserAppRoleAssignment = {
-        app: { id: 0, name: '', is_active: true },
-        role: { id: 0, name: '', is_active: true },
-        is_active: true,
-      };
-
+    const newAssignment = createNewAssignment();
+    
+    try {
+      // Validate new assignment
+      UserAppRoleValidationSchema.parse(newAssignment);
+      
       append(newAssignment);
       
-      // Expand the new item
-      const newIndex = assignments.length;
-      setExpandedItems(prev => new Set([...prev, newIndex]));
-      setFocusedIndex(newIndex);
-
-      // Call event handler
-      eventHandlers?.onAddAssignment?.();
-
+      // Call custom handler
+      await onAssignmentAdd?.(newAssignment, watchedAssignments.length);
+      
+      // Trigger form validation
+      setTimeout(() => trigger('userAppRoles'), 0);
+      
       // Announce to screen readers
-      const announcement = document.createElement('div');
-      announcement.setAttribute('aria-live', 'polite');
-      announcement.className = 'sr-only';
-      announcement.textContent = t('assignmentAdded');
-      document.body.appendChild(announcement);
-      setTimeout(() => document.body.removeChild(announcement), 1000);
-    }, [
-      canAddMore, disabled, readOnly, append, assignments.length, 
-      eventHandlers, t
-    ]);
+      const announcement = t('messages.assignmentAdded', { index: watchedAssignments.length + 1 });
+      announceToScreenReader(announcement);
+      
+    } catch (error) {
+      console.error('Error adding assignment:', error);
+      
+      const errorMsg = t('errors.addFailed');
+      announceToScreenReader(errorMsg);
+    }
+  }, [
+    disabled,
+    readOnly,
+    watchedAssignments.length,
+    maxAssignments,
+    append,
+    onAssignmentAdd,
+    trigger,
+    t,
+  ]);
 
-    const handleRemoveAssignment = useCallback((index: number) => {
-      if (disabled || readOnly) return;
+  /**
+   * Handle removing assignment
+   */
+  const handleRemoveAssignment = useCallback(async (index: number, assignmentId: string) => {
+    if (disabled || readOnly || watchedAssignments.length <= minAssignments) {
+      return;
+    }
 
-      const assignment = assignments[index];
+    try {
       remove(index);
-
-      // Update expanded items
-      setExpandedItems(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(index);
-        // Adjust indices for items after removed item
-        const adjustedSet = new Set<number>();
-        newSet.forEach(idx => {
-          if (idx < index) {
-            adjustedSet.add(idx);
-          } else if (idx > index) {
-            adjustedSet.add(idx - 1);
-          }
-        });
-        return adjustedSet;
-      });
-
-      // Clear focus if removed item was focused
-      if (focusedIndex === index) {
-        setFocusedIndex(null);
-      } else if (focusedIndex !== null && focusedIndex > index) {
-        setFocusedIndex(focusedIndex - 1);
-      }
-
-      // Call event handler
-      eventHandlers?.onRemoveAssignment?.(index, assignment);
-
+      
+      // Call custom handler
+      await onAssignmentRemove?.(assignmentId, index);
+      
+      // Clean up search queries
+      const { [assignmentId]: removedQuery, ...remainingQueries } = roleSearchQueries;
+      setRoleSearchQueries(remainingQueries);
+      
+      // Trigger form validation
+      setTimeout(() => trigger('userAppRoles'), 0);
+      
       // Announce to screen readers
-      const announcement = document.createElement('div');
-      announcement.setAttribute('aria-live', 'polite');
-      announcement.className = 'sr-only';
-      announcement.textContent = t('assignmentRemoved');
-      document.body.appendChild(announcement);
-      setTimeout(() => document.body.removeChild(announcement), 1000);
-    }, [
-      disabled, readOnly, assignments, remove, focusedIndex, 
-      eventHandlers, t
-    ]);
+      const announcement = t('messages.assignmentRemoved', { index: index + 1 });
+      announceToScreenReader(announcement);
+      
+      // Focus management - move to previous item or add button
+      setTimeout(() => {
+        const newIndex = Math.max(0, index - 1);
+        const nextElement = containerRef.current?.querySelector(
+          `[data-assignment-index="${newIndex}"] button, [data-testid="add-assignment-button"]`
+        ) as HTMLElement;
+        nextElement?.focus();
+      }, 0);
+      
+    } catch (error) {
+      console.error('Error removing assignment:', error);
+      
+      const errorMsg = t('errors.removeFailed');
+      announceToScreenReader(errorMsg);
+    }
+  }, [
+    disabled,
+    readOnly,
+    watchedAssignments.length,
+    minAssignments,
+    remove,
+    onAssignmentRemove,
+    roleSearchQueries,
+    trigger,
+    t,
+  ]);
 
-    const handleAppChange = useCallback((index: number, app: AppType) => {
-      if (disabled || readOnly) return;
+  /**
+   * Handle application selection
+   */
+  const handleAppSelection = useCallback((assignmentIndex: number, appId: number) => {
+    const fieldPath = `userAppRoles.${assignmentIndex}.appId` as const;
+    setValue(fieldPath, appId);
+    
+    // Reset role selection when app changes
+    const roleFieldPath = `userAppRoles.${assignmentIndex}.roleId` as const;
+    setValue(roleFieldPath, 0);
+    
+    // Trigger validation
+    setTimeout(() => trigger(['userAppRoles']), 0);
+    
+    // Clear app search
+    setAppSearchQuery('');
+  }, [setValue, trigger]);
 
-      const currentAssignment = assignments[index];
-      const updatedAssignment = {
-        ...currentAssignment,
-        app,
-      };
+  /**
+   * Handle role selection
+   */
+  const handleRoleSelection = useCallback((assignmentIndex: number, roleId: number) => {
+    const fieldPath = `userAppRoles.${assignmentIndex}.roleId` as const;
+    setValue(fieldPath, roleId);
+    
+    // Trigger validation
+    setTimeout(() => trigger(['userAppRoles']), 0);
+  }, [setValue, trigger]);
 
-      update(index, updatedAssignment);
-      eventHandlers?.onAppChange?.(app.id, updatedAssignment);
-    }, [disabled, readOnly, assignments, update, eventHandlers]);
+  /**
+   * Handle status toggle
+   */
+  const handleStatusToggle = useCallback((assignmentIndex: number, isActive: boolean) => {
+    const fieldPath = `userAppRoles.${assignmentIndex}.isActive` as const;
+    setValue(fieldPath, isActive);
+    
+    // Trigger validation
+    setTimeout(() => trigger(['userAppRoles']), 0);
+    
+    // Announce change to screen readers
+    const statusText = isActive ? t('status.active') : t('status.inactive');
+    const announcement = t('messages.statusChanged', { 
+      index: assignmentIndex + 1, 
+      status: statusText 
+    });
+    announceToScreenReader(announcement);
+  }, [setValue, trigger, t]);
 
-    const handleRoleChange = useCallback((index: number, role: RoleType) => {
-      if (disabled || readOnly) return;
+  /**
+   * Announce message to screen readers
+   */
+  const announceToScreenReader = useCallback((message: string) => {
+    const announcement = document.createElement('div');
+    announcement.setAttribute('aria-live', 'polite');
+    announcement.setAttribute('aria-atomic', 'true');
+    announcement.className = 'sr-only';
+    announcement.textContent = message;
+    
+    document.body.appendChild(announcement);
+    
+    setTimeout(() => {
+      document.body.removeChild(announcement);
+    }, 1000);
+  }, []);
 
-      const currentAssignment = assignments[index];
-      const updatedAssignment = {
-        ...currentAssignment,
-        role,
-      };
+  // ============================================================================
+  // VALIDATION LOGIC
+  // ============================================================================
 
-      update(index, updatedAssignment);
-      eventHandlers?.onRoleChange?.(role.id, updatedAssignment);
-    }, [disabled, readOnly, assignments, update, eventHandlers]);
-
-    const toggleExpanded = useCallback((index: number) => {
-      setExpandedItems(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(index)) {
-          newSet.delete(index);
-        } else {
-          newSet.add(index);
-        }
-        return newSet;
-      });
-    }, []);
-
-    // Validation effect
-    useEffect(() => {
+  /**
+   * Perform comprehensive validation
+   */
+  const validateAssignments = useCallback(async (): Promise<boolean> => {
+    setIsValidating(true);
+    
+    try {
+      // Schema validation
+      const result = FormValidationSchema.safeParse({ userAppRoles: watchedAssignments });
+      
+      if (!result.success) {
+        const errorMap: Record<string, ValidationResult[]> = {};
+        
+        result.error.issues.forEach(issue => {
+          const path = issue.path.join('.');
+          if (!errorMap[path]) {
+            errorMap[path] = [];
+          }
+          errorMap[path].push({
+            isValid: false,
+            message: issue.message,
+            field: path,
+            severity: 'error',
+          });
+        });
+        
+        setValidationErrors(errorMap);
+        onValidationError?.(errors);
+        return false;
+      }
+      
+      // Custom validation
       if (customValidation) {
-        const errors = customValidation(assignments);
-        setValidationErrors(errors);
-      } else {
-        // Default validation using Zod
-        try {
-          assignments.forEach(assignment => {
-            UserAppRoleAssignmentSchema.parse(assignment);
-          });
-          setValidationErrors(null);
-        } catch (error: any) {
-          setValidationErrors({
-            fieldErrors: error.errors?.reduce((acc: any, err: any) => {
-              acc[err.path.join('.')] = [err.message];
-              return acc;
-            }, {}) || {},
-            formErrors: [],
-            localizedErrors: {}
-          });
+        for (const assignment of watchedAssignments) {
+          if (customValidation.validateAppSelection) {
+            const appValidation = customValidation.validateAppSelection(
+              assignment.appId,
+              watchedAssignments
+            );
+            if (typeof appValidation === 'string') {
+              // Handle validation error
+              console.warn('App validation failed:', appValidation);
+            }
+          }
+          
+          if (customValidation.validateRoleSelection) {
+            const roleValidation = customValidation.validateRoleSelection(
+              assignment.roleId,
+              assignment.appId,
+              watchedAssignments
+            );
+            if (typeof roleValidation === 'string') {
+              // Handle validation error
+              console.warn('Role validation failed:', roleValidation);
+            }
+          }
         }
       }
-    }, [assignments, customValidation]);
+      
+      setValidationErrors({});
+      return true;
+      
+    } catch (error) {
+      console.error('Validation error:', error);
+      return false;
+    } finally {
+      setIsValidating(false);
+    }
+  }, [watchedAssignments, customValidation, errors, onValidationError]);
 
-    // Keyboard navigation
-    const handleKeyDown = useCallback((event: React.KeyboardEvent, index: number) => {
-      switch (event.key) {
-        case 'Enter':
-        case ' ':
-          event.preventDefault();
-          toggleExpanded(index);
-          break;
-        case 'ArrowDown':
-          event.preventDefault();
-          if (index < assignments.length - 1) {
-            setFocusedIndex(index + 1);
-          }
-          break;
-        case 'ArrowUp':
-          event.preventDefault();
-          if (index > 0) {
-            setFocusedIndex(index - 1);
-          } else {
-            addButtonRef.current?.focus();
-          }
-          break;
-        case 'Delete':
-        case 'Backspace':
-          if (event.ctrlKey || event.metaKey) {
-            event.preventDefault();
-            handleRemoveAssignment(index);
-          }
-          break;
+  // ============================================================================
+  // REF IMPERATIVE HANDLE
+  // ============================================================================
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      const firstFocusable = containerRef.current?.querySelector(
+        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)'
+      ) as HTMLElement;
+      firstFocusable?.focus();
+    },
+    validate: validateAssignments,
+    submit: () => {
+      trigger('userAppRoles');
+    },
+    reset: () => {
+      // Reset to default values
+      setValue('userAppRoles', defaultValues);
+      setValidationErrors({});
+      setAppSearchQuery('');
+      setRoleSearchQueries({});
+    },
+    getValues: () => ({ userAppRoles: watchedAssignments }),
+    setValues: (values) => {
+      if (values.userAppRoles) {
+        setValue('userAppRoles', values.userAppRoles);
       }
-    }, [toggleExpanded, assignments.length, handleRemoveAssignment]);
+    },
+  }), [validateAssignments, trigger, setValue, watchedAssignments, defaultValues]);
 
-    // Generate descriptive IDs for accessibility
-    const getTitleId = (index: number) => `${componentId}-title-${index}`;
-    const getContentId = (index: number) => `${componentId}-content-${index}`;
-    const getErrorId = (index: number) => `${componentId}-error-${index}`;
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
 
+  /**
+   * Initialize component with default values
+   */
+  useEffect(() => {
+    if (defaultValues.length > 0 && watchedAssignments.length === 0) {
+      setValue('userAppRoles', defaultValues);
+    }
+  }, [defaultValues, watchedAssignments.length, setValue]);
+
+  /**
+   * Call assignment change handler when assignments update
+   */
+  useEffect(() => {
+    onAssignmentChange?.(watchedAssignments);
+  }, [watchedAssignments, onAssignmentChange]);
+
+  /**
+   * Validate on mount and when assignments change
+   */
+  useEffect(() => {
+    if (watchedAssignments.length > 0) {
+      validateAssignments();
+    }
+  }, [watchedAssignments, validateAssignments]);
+
+  // ============================================================================
+  // RENDER HELPERS
+  // ============================================================================
+
+  /**
+   * Render application selection combobox
+   */
+  const renderAppSelection = useCallback((assignment: UserAppRole, index: number) => {
+    const selectedApp = getAppById(assignment.appId);
+    const fieldError = errors.userAppRoles?.[index]?.appId;
+    
     return (
-      <div
-        ref={ref}
-        className={cn(
-          "space-y-4",
-          resolvedTheme === 'dark' ? 'dark' : '',
-          className
+      <div className="space-y-1">
+        <label 
+          htmlFor={`app-selection-${assignment.id}`}
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          {t('labels.application')} <span className="text-red-500" aria-hidden="true">*</span>
+        </label>
+        
+        <Controller
+          name={`userAppRoles.${index}.appId`}
+          control={control}
+          rules={{ required: t('validation.appRequired') }}
+          render={({ field }) => (
+            <Combobox
+              value={assignment.appId}
+              onChange={(appId: number) => handleAppSelection(index, appId)}
+              disabled={disabled || readOnly}
+            >
+              <div className="relative">
+                <Combobox.Input
+                  id={`app-selection-${assignment.id}`}
+                  className={cn(
+                    'w-full rounded-md border px-3 py-2',
+                    'bg-white dark:bg-gray-800',
+                    'text-gray-900 dark:text-gray-100',
+                    'placeholder-gray-500 dark:placeholder-gray-400',
+                    'focus:border-primary-500 focus:ring-primary-500',
+                    'transition-colors duration-200',
+                    {
+                      'border-gray-300 dark:border-gray-600': !fieldError,
+                      'border-red-500 dark:border-red-400': fieldError,
+                      'cursor-not-allowed opacity-50': disabled || readOnly,
+                    }
+                  )}
+                  displayValue={(appId: number) => {
+                    const app = getAppById(appId);
+                    return app ? app.name : '';
+                  }}
+                  onChange={(event) => setAppSearchQuery(event.target.value)}
+                  placeholder={t('placeholders.selectApp')}
+                  aria-describedby={fieldError ? `app-error-${assignment.id}` : undefined}
+                  aria-invalid={!!fieldError}
+                />
+                
+                <Combobox.Button className="absolute inset-y-0 right-0 flex items-center px-2">
+                  <FontAwesomeIcon
+                    icon={faChevronDown}
+                    className="h-4 w-4 text-gray-400"
+                    aria-hidden="true"
+                  />
+                </Combobox.Button>
+                
+                <Transition
+                  as={Fragment}
+                  leave="transition ease-in duration-100"
+                  leaveFrom="opacity-100"
+                  leaveTo="opacity-0"
+                >
+                  <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                    {filteredApps.length === 0 && appSearchQuery !== '' ? (
+                      <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
+                        {t('messages.noAppsFound')}
+                      </div>
+                    ) : (
+                      filteredApps.map((app) => (
+                        <Combobox.Option
+                          key={app.id}
+                          className={({ active }) =>
+                            cn(
+                              'relative cursor-pointer select-none py-2 pl-10 pr-4',
+                              {
+                                'bg-primary-600 text-white': active,
+                                'text-gray-900 dark:text-gray-100': !active,
+                              }
+                            )
+                          }
+                          value={app.id}
+                        >
+                          {({ selected, active }) => (
+                            <>
+                              <span
+                                className={cn(
+                                  'block truncate',
+                                  selected ? 'font-medium' : 'font-normal'
+                                )}
+                              >
+                                {app.name}
+                              </span>
+                              {app.description && (
+                                <span
+                                  className={cn(
+                                    'block text-xs truncate',
+                                    active ? 'text-primary-200' : 'text-gray-500 dark:text-gray-400'
+                                  )}
+                                >
+                                  {app.description}
+                                </span>
+                              )}
+                              {selected ? (
+                                <span
+                                  className={cn(
+                                    'absolute inset-y-0 left-0 flex items-center pl-3',
+                                    active ? 'text-white' : 'text-primary-600'
+                                  )}
+                                >
+                                  <FontAwesomeIcon icon={faCheck} className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                              ) : null}
+                            </>
+                          )}
+                        </Combobox.Option>
+                      ))
+                    )}
+                  </Combobox.Options>
+                </Transition>
+              </div>
+            </Combobox>
+          )}
+        />
+        
+        {fieldError && (
+          <p 
+            id={`app-error-${assignment.id}`}
+            className={componentClasses.errorMessage}
+            role="alert"
+          >
+            <FontAwesomeIcon icon={faExclamationTriangle} className="h-4 w-4 mr-1" />
+            {fieldError.message}
+          </p>
         )}
-        role="region"
-        aria-label={ariaLabel || t('userApplicationRoles')}
-        aria-describedby={ariaDescribedBy}
-        data-testid={testId}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {t('applicationRoleAssignments')}
+      </div>
+    );
+  }, [
+    getAppById,
+    errors.userAppRoles,
+    t,
+    control,
+    disabled,
+    readOnly,
+    handleAppSelection,
+    filteredApps,
+    appSearchQuery,
+    componentClasses.errorMessage,
+  ]);
+
+  /**
+   * Render role selection combobox
+   */
+  const renderRoleSelection = useCallback((assignment: UserAppRole, index: number) => {
+    const selectedRole = getRoleById(assignment.roleId);
+    const fieldError = errors.userAppRoles?.[index]?.roleId;
+    const filteredRoles = getFilteredRoles(assignment.id, assignment.appId);
+    const searchQuery = roleSearchQueries[assignment.id] || '';
+    
+    return (
+      <div className="space-y-1">
+        <label 
+          htmlFor={`role-selection-${assignment.id}`}
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          {t('labels.role')} <span className="text-red-500" aria-hidden="true">*</span>
+        </label>
+        
+        <Controller
+          name={`userAppRoles.${index}.roleId`}
+          control={control}
+          rules={{ required: t('validation.roleRequired') }}
+          render={({ field }) => (
+            <Combobox
+              value={assignment.roleId}
+              onChange={(roleId: number) => handleRoleSelection(index, roleId)}
+              disabled={disabled || readOnly || !assignment.appId}
+            >
+              <div className="relative">
+                <Combobox.Input
+                  id={`role-selection-${assignment.id}`}
+                  className={cn(
+                    'w-full rounded-md border px-3 py-2',
+                    'bg-white dark:bg-gray-800',
+                    'text-gray-900 dark:text-gray-100',
+                    'placeholder-gray-500 dark:placeholder-gray-400',
+                    'focus:border-primary-500 focus:ring-primary-500',
+                    'transition-colors duration-200',
+                    {
+                      'border-gray-300 dark:border-gray-600': !fieldError,
+                      'border-red-500 dark:border-red-400': fieldError,
+                      'cursor-not-allowed opacity-50': disabled || readOnly || !assignment.appId,
+                    }
+                  )}
+                  displayValue={(roleId: number) => {
+                    const role = getRoleById(roleId);
+                    return role ? role.name : '';
+                  }}
+                  onChange={(event) => 
+                    setRoleSearchQueries(prev => ({
+                      ...prev,
+                      [assignment.id]: event.target.value
+                    }))
+                  }
+                  placeholder={
+                    assignment.appId 
+                      ? t('placeholders.selectRole')
+                      : t('placeholders.selectAppFirst')
+                  }
+                  aria-describedby={fieldError ? `role-error-${assignment.id}` : undefined}
+                  aria-invalid={!!fieldError}
+                />
+                
+                <Combobox.Button className="absolute inset-y-0 right-0 flex items-center px-2">
+                  <FontAwesomeIcon
+                    icon={faChevronDown}
+                    className="h-4 w-4 text-gray-400"
+                    aria-hidden="true"
+                  />
+                </Combobox.Button>
+                
+                <Transition
+                  as={Fragment}
+                  leave="transition ease-in duration-100"
+                  leaveFrom="opacity-100"
+                  leaveTo="opacity-0"
+                >
+                  <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                    {filteredRoles.length === 0 && searchQuery !== '' ? (
+                      <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
+                        {assignment.appId ? t('messages.noRolesFound') : t('messages.selectAppFirst')}
+                      </div>
+                    ) : (
+                      filteredRoles.map((role) => (
+                        <Combobox.Option
+                          key={role.id}
+                          className={({ active }) =>
+                            cn(
+                              'relative cursor-pointer select-none py-2 pl-10 pr-4',
+                              {
+                                'bg-primary-600 text-white': active,
+                                'text-gray-900 dark:text-gray-100': !active,
+                              }
+                            )
+                          }
+                          value={role.id}
+                        >
+                          {({ selected, active }) => (
+                            <>
+                              <span
+                                className={cn(
+                                  'block truncate',
+                                  selected ? 'font-medium' : 'font-normal'
+                                )}
+                              >
+                                {role.name}
+                              </span>
+                              {role.description && (
+                                <span
+                                  className={cn(
+                                    'block text-xs truncate',
+                                    active ? 'text-primary-200' : 'text-gray-500 dark:text-gray-400'
+                                  )}
+                                >
+                                  {role.description}
+                                </span>
+                              )}
+                              {selected ? (
+                                <span
+                                  className={cn(
+                                    'absolute inset-y-0 left-0 flex items-center pl-3',
+                                    active ? 'text-white' : 'text-primary-600'
+                                  )}
+                                >
+                                  <FontAwesomeIcon icon={faCheck} className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                              ) : null}
+                            </>
+                          )}
+                        </Combobox.Option>
+                      ))
+                    )}
+                  </Combobox.Options>
+                </Transition>
+              </div>
+            </Combobox>
+          )}
+        />
+        
+        {fieldError && (
+          <p 
+            id={`role-error-${assignment.id}`}
+            className={componentClasses.errorMessage}
+            role="alert"
+          >
+            <FontAwesomeIcon icon={faExclamationTriangle} className="h-4 w-4 mr-1" />
+            {fieldError.message}
+          </p>
+        )}
+      </div>
+    );
+  }, [
+    getRoleById,
+    errors.userAppRoles,
+    t,
+    control,
+    disabled,
+    readOnly,
+    handleRoleSelection,
+    getFilteredRoles,
+    roleSearchQueries,
+    componentClasses.errorMessage,
+  ]);
+
+  /**
+   * Render status toggle
+   */
+  const renderStatusToggle = useCallback((assignment: UserAppRole, index: number) => {
+    if (!showStatusToggles) return null;
+    
+    return (
+      <div className="space-y-1">
+        <label 
+          htmlFor={`status-toggle-${assignment.id}`}
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          {t('labels.status')}
+        </label>
+        
+        <Controller
+          name={`userAppRoles.${index}.isActive`}
+          control={control}
+          render={({ field }) => (
+            <button
+              id={`status-toggle-${assignment.id}`}
+              type="button"
+              className={cn(
+                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200',
+                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                'min-h-[44px] min-w-[44px] flex items-center justify-center',
+                {
+                  'bg-primary-600': assignment.isActive,
+                  'bg-gray-200 dark:bg-gray-700': !assignment.isActive,
+                  'cursor-not-allowed opacity-50': disabled || readOnly,
+                }
+              )}
+              onClick={() => handleStatusToggle(index, !assignment.isActive)}
+              disabled={disabled || readOnly}
+              aria-pressed={assignment.isActive}
+              aria-label={t('aria.statusToggle', { 
+                status: assignment.isActive ? t('status.active') : t('status.inactive') 
+              })}
+            >
+              <span
+                className={cn(
+                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200',
+                  {
+                    'translate-x-6': assignment.isActive,
+                    'translate-x-1': !assignment.isActive,
+                  }
+                )}
+              />
+            </button>
+          )}
+        />
+        
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          {assignment.isActive ? t('status.active') : t('status.inactive')}
+        </span>
+      </div>
+    );
+  }, [
+    showStatusToggles,
+    t,
+    control,
+    disabled,
+    readOnly,
+    handleStatusToggle,
+  ]);
+
+  /**
+   * Render notes field
+   */
+  const renderNotesField = useCallback((assignment: UserAppRole, index: number) => {
+    if (!showNotesFields) return null;
+    
+    const fieldError = errors.userAppRoles?.[index]?.notes;
+    
+    return (
+      <div className="space-y-1">
+        <label 
+          htmlFor={`notes-${assignment.id}`}
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          {t('labels.notes')}
+        </label>
+        
+        <textarea
+          id={`notes-${assignment.id}`}
+          {...register(`userAppRoles.${index}.notes`)}
+          className={cn(
+            'w-full rounded-md border px-3 py-2',
+            'bg-white dark:bg-gray-800',
+            'text-gray-900 dark:text-gray-100',
+            'placeholder-gray-500 dark:placeholder-gray-400',
+            'focus:border-primary-500 focus:ring-primary-500',
+            'transition-colors duration-200',
+            'resize-none',
+            {
+              'border-gray-300 dark:border-gray-600': !fieldError,
+              'border-red-500 dark:border-red-400': fieldError,
+              'cursor-not-allowed opacity-50': disabled || readOnly,
+            }
+          )}
+          rows={2}
+          placeholder={t('placeholders.enterNotes')}
+          disabled={disabled || readOnly}
+          aria-describedby={fieldError ? `notes-error-${assignment.id}` : undefined}
+          aria-invalid={!!fieldError}
+        />
+        
+        {fieldError && (
+          <p 
+            id={`notes-error-${assignment.id}`}
+            className={componentClasses.errorMessage}
+            role="alert"
+          >
+            <FontAwesomeIcon icon={faExclamationTriangle} className="h-4 w-4 mr-1" />
+            {fieldError.message}
+          </p>
+        )}
+      </div>
+    );
+  }, [
+    showNotesFields,
+    t,
+    register,
+    errors.userAppRoles,
+    disabled,
+    readOnly,
+    componentClasses.errorMessage,
+  ]);
+
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
+
+  return (
+    <div 
+      ref={containerRef}
+      className={componentClasses.container}
+      data-testid={testConfig?.testIdPrefix ? `${testConfig.testIdPrefix}-container` : 'user-app-roles-container'}
+      {...props}
+    >
+      {/* Component Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+            {t('title')}
           </h3>
-          
-          <AccessibleButton
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {t('subtitle')} 
+            {maxAssignments > 0 && (
+              <span className="ml-1">
+                ({watchedAssignments.length}/{maxAssignments})
+              </span>
+            )}
+          </p>
+        </div>
+        
+        {showAddButton && (
+          <Button
             ref={addButtonRef}
+            type="button"
             variant="primary"
             size={size}
             onClick={handleAddAssignment}
-            disabled={disabled || !canAddMore}
-            aria-label={t('addNewAssignment')}
+            disabled={disabled || readOnly || watchedAssignments.length >= maxAssignments}
+            className={componentClasses.addButton}
             data-testid="add-assignment-button"
+            aria-label={t('aria.addButton')}
           >
-            <PlusIcon className="h-5 w-5 mr-2" aria-hidden="true" />
-            {t('addAssignment')}
-          </AccessibleButton>
-        </div>
-
-        {/* Assignments List */}
-        <div className="space-y-3" role="list" aria-label={t('assignmentsList')}>
-          {assignments.length === 0 ? (
-            <div 
-              className="text-center py-8 text-gray-500 dark:text-gray-400"
-              role="status"
-              aria-label={t('noAssignments')}
-            >
-              <div className="text-sm">{t('noAssignmentsMessage')}</div>
-            </div>
-          ) : (
-            assignments.map((assignment, index) => {
-              const isExpanded = expandedItems.has(index);
-              const hasError = validationErrors?.fieldErrors[`${index}`];
-
-              return (
-                <Disclosure
-                  key={`${assignment.id || 'new'}-${index}`}
-                  as="div"
-                  className={cn(
-                    "border rounded-lg transition-all duration-200",
-                    "border-gray-200 dark:border-gray-700",
-                    hasError ? "border-error-500 dark:border-error-400" : "",
-                    isExpanded ? "shadow-md" : "shadow-sm"
-                  )}
-                  defaultOpen={isExpanded}
-                >
-                  <Disclosure.Button
-                    className={cn(
-                      "w-full px-4 py-3 text-left",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2",
-                      "hover:bg-gray-50 dark:hover:bg-gray-800",
-                      "flex items-center justify-between",
-                      "transition-colors duration-200"
-                    )}
-                    onKeyDown={(event) => handleKeyDown(event, index)}
-                    aria-expanded={isExpanded}
-                    aria-controls={getContentId(index)}
-                    id={getTitleId(index)}
-                    data-testid={`assignment-toggle-${index}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                            {assignment.app?.label || assignment.app?.name || t('noApplicationSelected')}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                            {assignment.role?.label || assignment.role?.name || t('noRoleSelected')}
-                          </p>
-                        </div>
-                        
-                        {/* Status indicator */}
-                        <div className={cn(
-                          "flex-shrink-0 w-3 h-3 rounded-full",
-                          assignment.is_active 
-                            ? "bg-success-500" 
-                            : "bg-gray-300 dark:bg-gray-600"
-                        )} />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2 ml-4">
-                      {hasError && (
-                        <ExclamationTriangleIcon 
-                          className="h-5 w-5 text-error-500" 
-                          aria-hidden="true"
-                        />
-                      )}
-                      
-                      <ChevronDownIcon
-                        className={cn(
-                          "h-5 w-5 text-gray-400 transition-transform duration-200",
-                          isExpanded ? "transform rotate-180" : ""
-                        )}
-                        aria-hidden="true"
-                      />
-                    </div>
-                  </Disclosure.Button>
-
-                  <Transition
-                    enter="transition duration-100 ease-out"
-                    enterFrom="transform scale-95 opacity-0"
-                    enterTo="transform scale-100 opacity-100"
-                    leave="transition duration-75 ease-out"
-                    leaveFrom="transform scale-100 opacity-100"
-                    leaveTo="transform scale-95 opacity-0"
-                  >
-                    <Disclosure.Panel
-                      className="px-4 pb-4 pt-2 border-t border-gray-200 dark:border-gray-700"
-                      id={getContentId(index)}
-                      aria-labelledby={getTitleId(index)}
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Application Selector */}
-                        <div>
-                          <label 
-                            htmlFor={`app-${index}`}
-                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                          >
-                            {t('application')} *
-                          </label>
-                          <AppSelector
-                            applications={dataSource.applications}
-                            selectedApp={assignment.app}
-                            onAppSelect={(app) => handleAppChange(index, app)}
-                            disabled={disabled}
-                            loading={dataSource.applicationsLoading}
-                            error={dataSource.loadingError}
-                            aria-label={t('selectApplicationFor', { index: index + 1 })}
-                            aria-describedby={hasError ? getErrorId(index) : undefined}
-                            data-testid={`app-selector-${index}`}
-                          />
-                        </div>
-
-                        {/* Role Selector */}
-                        <div>
-                          <label 
-                            htmlFor={`role-${index}`}
-                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                          >
-                            {t('role')} *
-                          </label>
-                          <RoleSelector
-                            roles={dataSource.roles}
-                            selectedRole={assignment.role}
-                            onRoleSelect={(role) => handleRoleChange(index, role)}
-                            disabled={disabled}
-                            loading={dataSource.rolesLoading}
-                            error={dataSource.loadingError}
-                            aria-label={t('selectRoleFor', { index: index + 1 })}
-                            aria-describedby={hasError ? getErrorId(index) : undefined}
-                            data-testid={`role-selector-${index}`}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Active Status Toggle */}
-                      <div className="mt-4 flex items-center justify-between">
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={assignment.is_active}
-                            onChange={(e) => {
-                              const updatedAssignment = {
-                                ...assignment,
-                                is_active: e.target.checked,
-                              };
-                              update(index, updatedAssignment);
-                              eventHandlers?.onToggleActive?.(index, e.target.checked);
-                            }}
-                            disabled={disabled}
-                            className={cn(
-                              "h-4 w-4 text-primary-600 border-gray-300 rounded",
-                              "focus:ring-primary-500 focus:ring-offset-0",
-                              "disabled:opacity-50"
-                            )}
-                            aria-describedby={`active-help-${index}`}
-                          />
-                          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                            {t('activeAssignment')}
-                          </span>
-                        </label>
-
-                        {/* Remove Button */}
-                        <AccessibleButton
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleRemoveAssignment(index)}
-                          disabled={disabled || (!hasMinimumAssignments && assignments.length <= minAssignments)}
-                          aria-label={t('removeAssignment', { index: index + 1 })}
-                          data-testid={`remove-assignment-${index}`}
-                        >
-                          <TrashIcon className="h-4 w-4 mr-1" aria-hidden="true" />
-                          {t('remove')}
-                        </AccessibleButton>
-                      </div>
-
-                      {/* Error Display */}
-                      {hasError && showInlineErrors && (
-                        <div 
-                          id={getErrorId(index)}
-                          className="mt-3 p-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-md"
-                          role="alert"
-                        >
-                          <div className="flex">
-                            <ExclamationTriangleIcon className="h-5 w-5 text-error-400" />
-                            <div className="ml-3">
-                              <h4 className="text-sm font-medium text-error-800 dark:text-error-200">
-                                {t('validationErrors')}
-                              </h4>
-                              <div className="mt-2 text-sm text-error-700 dark:text-error-300">
-                                <ul className="list-disc list-inside space-y-1">
-                                  {Object.entries(hasError).map(([field, errors]) => (
-                                    <li key={field}>{Array.isArray(errors) ? errors[0] : errors}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Description */}
-                      {showDescriptions && (assignment.app?.description || assignment.role?.description) && (
-                        <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
-                          {assignment.app?.description && (
-                            <div className="mb-2">
-                              <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                                {t('applicationDescription')}
-                              </h5>
-                              <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                                {assignment.app.description}
-                              </p>
-                            </div>
-                          )}
-                          {assignment.role?.description && (
-                            <div>
-                              <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                                {t('roleDescription')}
-                              </h5>
-                              <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                                {assignment.role.description}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </Disclosure.Panel>
-                  </Transition>
-                </Disclosure>
-              );
-            })
-          )}
-        </div>
-
-        {/* Summary Information */}
-        <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
-          <span>
-            {t('assignmentCount', { count: assignments.length })}
-            {maxAssignments && (
-              <span> / {maxAssignments}</span>
-            )}
-          </span>
-          
-          {minAssignments > 0 && assignments.length < minAssignments && (
-            <span className="text-warning-600 dark:text-warning-400">
-              {t('minimumRequired', { min: minAssignments })}
-            </span>
-          )}
-        </div>
-
-        {/* Form-level errors */}
-        {validationErrors?.formErrors && validationErrors.formErrors.length > 0 && (
-          <div 
-            className="p-4 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-md"
-            role="alert"
-          >
-            <div className="flex">
-              <ExclamationTriangleIcon className="h-5 w-5 text-error-400" />
-              <div className="ml-3">
-                <h4 className="text-sm font-medium text-error-800 dark:text-error-200">
-                  {t('formValidationErrors')}
-                </h4>
-                <div className="mt-2 text-sm text-error-700 dark:text-error-300">
-                  <ul className="list-disc list-inside space-y-1">
-                    {validationErrors.formErrors.map((error, index) => (
-                      <li key={index}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
+            <FontAwesomeIcon icon={faPlus} className="h-4 w-4 mr-2" />
+            {t('buttons.add')}
+          </Button>
         )}
       </div>
-    );
-  }
-);
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <span className="ml-3 text-gray-600 dark:text-gray-400">
+            {t('status.loading')}
+          </span>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && watchedAssignments.length === 0 && (
+        <div className="text-center py-8">
+          <div className="text-gray-400 dark:text-gray-500 mb-4">
+            <FontAwesomeIcon icon={faPlus} className="h-12 w-12 mx-auto" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            {t('empty.title')}
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-4">
+            {t('empty.description')}
+          </p>
+          {showAddButton && (
+            <Button
+              type="button"
+              variant="primary"
+              size={size}
+              onClick={handleAddAssignment}
+              disabled={disabled || readOnly}
+            >
+              <FontAwesomeIcon icon={faPlus} className="h-4 w-4 mr-2" />
+              {t('buttons.addFirst')}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Assignments List */}
+      {!loading && fields.length > 0 && (
+        <div className="space-y-4">
+          {fields.map((field, index) => {
+            const assignment = watchedAssignments[index];
+            if (!assignment) return null;
+            
+            const appName = getAppById(assignment.appId)?.name || t('labels.unknownApp');
+            const roleName = getRoleById(assignment.roleId)?.name || t('labels.unknownRole');
+            const ariaLabel = getAssignmentAriaLabel(assignment, appName, roleName, index, t);
+            
+            return (
+              <Disclosure key={field.id} defaultOpen={mode === 'full'}>
+                {({ open }) => (
+                  <div 
+                    className={componentClasses.disclosure}
+                    data-assignment-index={index}
+                    data-assignment-id={assignment.id}
+                  >
+                    <Disclosure.Button 
+                      className={componentClasses.disclosureButton}
+                      aria-label={ariaLabel}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-3">
+                          <span className="flex-shrink-0 w-8 h-8 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center text-sm font-medium text-primary-600 dark:text-primary-400">
+                            {index + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                {appName}
+                              </span>
+                              <span className="text-gray-400">→</span>
+                              <span className="text-gray-600 dark:text-gray-300 truncate">
+                                {roleName}
+                              </span>
+                              {assignment.isActive ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                  {t('status.active')}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">
+                                  {t('status.inactive')}
+                                </span>
+                              )}
+                            </div>
+                            {assignment.notes && (
+                              <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1">
+                                {assignment.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        {showRemoveButtons && (
+                          <Button
+                            type="button"
+                            variant="error"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveAssignment(index, assignment.id);
+                            }}
+                            disabled={disabled || readOnly || watchedAssignments.length <= minAssignments}
+                            className={componentClasses.removeButton}
+                            aria-label={t('aria.removeButton', { index: index + 1 })}
+                          >
+                            <FontAwesomeIcon icon={faTrashCan} className="h-4 w-4" />
+                          </Button>
+                        )}
+                        
+                        <FontAwesomeIcon
+                          icon={faChevronDown}
+                          className={cn(
+                            'h-4 w-4 text-gray-400 transition-transform duration-200',
+                            { 'rotate-180': open }
+                          )}
+                        />
+                      </div>
+                    </Disclosure.Button>
+                    
+                    <Transition
+                      enter="transition duration-100 ease-out"
+                      enterFrom="transform scale-95 opacity-0"
+                      enterTo="transform scale-100 opacity-100"
+                      leave="transition duration-75 ease-out"
+                      leaveFrom="transform scale-100 opacity-100"
+                      leaveTo="transform scale-95 opacity-0"
+                    >
+                      <Disclosure.Panel className={componentClasses.assignmentItem}>
+                        <div className={componentClasses.formGrid}>
+                          {renderAppSelection(assignment, index)}
+                          {renderRoleSelection(assignment, index)}
+                          {renderStatusToggle(assignment, index)}
+                          {renderNotesField(assignment, index)}
+                        </div>
+                      </Disclosure.Panel>
+                    </Transition>
+                  </div>
+                )}
+              </Disclosure>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Validation Summary */}
+      {Object.keys(validationErrors).length > 0 && (
+        <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <div className="flex">
+            <FontAwesomeIcon icon={faExclamationTriangle} className="h-5 w-5 text-red-400 mr-2 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-medium text-red-800 dark:text-red-200">
+                {t('validation.title')}
+              </h4>
+              <ul className="mt-2 text-sm text-red-700 dark:text-red-300 list-disc list-inside">
+                {Object.entries(validationErrors).map(([field, errors]) =>
+                  errors.map((error, index) => (
+                    <li key={`${field}-${index}`}>{error.message}</li>
+                  ))
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Instructions */}
+      {accessibility?.instructions && (
+        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            {accessibility.instructions}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+});
 
 UserAppRoles.displayName = 'UserAppRoles';
 
 export default UserAppRoles;
-
-// Export additional components for customization
-export { 
-  AccessibleButton,
-  AppSelector,
-  RoleSelector
-};
-
-// Export types for external use
-export type {
-  UserAppRolesProps,
-  UserAppRoleAssignment,
-  AppType,
-  RoleType,
-  DataSourceConfiguration,
-  ValidationErrors
-};
