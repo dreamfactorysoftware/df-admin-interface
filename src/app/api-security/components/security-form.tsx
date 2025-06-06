@@ -1,93 +1,45 @@
 /**
  * Generic Security Form Component
  * 
- * A highly reusable form component for CRUD operations in security management features.
- * Implements React Hook Form with Zod validation, supports dynamic field rendering,
- * provides real-time validation under 100ms, and includes full accessibility features.
+ * Reusable form component for CRUD operations in security management features.
+ * Implements React Hook Form with Zod validation, supports dynamic field rendering
+ * based on data type, provides real-time validation under 100ms, and includes
+ * accessibility features. Used by both limits and roles management for create/edit operations.
  * 
- * Features:
- * - Generic form structure supporting both limits and roles data
- * - Dynamic field rendering based on field configuration
- * - Real-time validation under 100ms with Zod schemas
- * - WCAG 2.1 AA accessibility compliance through Headless UI
- * - Conditional field display logic
- * - Comprehensive error handling and user feedback
- * - Loading states and submission handling
- * - Customizable form actions and layout
- * - Type-safe form data with TypeScript inference
- * - Performance optimized for complex nested forms
- * 
- * Usage Examples:
- * 
- * ```tsx
- * // For Limits Management
- * <SecurityForm
- *   formId="limits-form"
- *   title="Configure Rate Limit"
- *   schema={limitFormSchema}
- *   fields={limitFieldConfig}
- *   defaultValues={defaultLimitData}
- *   onSubmit={handleLimitSubmit}
- *   isLoading={isSubmitting}
- * />
- * 
- * // For Roles Management
- * <SecurityForm
- *   formId="roles-form"
- *   title="Create Role"
- *   schema={roleFormSchema}
- *   fields={roleFieldConfig}
- *   defaultValues={defaultRoleData}
- *   onSubmit={handleRoleSubmit}
- *   isLoading={isSubmitting}
- * />
- * ```
- * 
- * @module SecurityForm
+ * @fileoverview Generic security form with React Hook Form + Zod validation
  * @version 1.0.0
- * @since React 19 / Next.js 15.1 Migration
  */
 
 'use client';
 
-import React, { useEffect, useMemo, useCallback } from 'react';
-import { useForm, FieldValues, Path, PathValue, SubmitHandler, FieldError } from 'react-hook-form';
+import React, { useCallback, useMemo, useEffect } from 'react';
+import { 
+  useForm,
+  type UseFormReturn,
+  type FieldValues,
+  type SubmitHandler,
+  type SubmitErrorHandler,
+  type Path
+} from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { z, type ZodSchema } from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 
-// UI Components
-import {
-  Form,
-  FormField,
-  FormLabel,
-  FormControl,
-  FormDescription,
-  FormErrorMessage,
-  FormActions,
-  FormSection,
-  FormGroup
-} from '@/components/ui/form';
-import { Input, Textarea, PasswordInput, NumberInput } from '@/components/ui/input';
-import { Select, type SelectOption } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-
-// Types and Validation
-import type { 
-  DatabaseServiceFormData,
-  UserProfileFormData,
-  RoleAssignmentFormData 
-} from '@/types/validation';
-
 // ============================================================================
-// TYPES AND INTERFACES
+// TYPE DEFINITIONS
 // ============================================================================
 
 /**
- * Supported field types for dynamic form generation
+ * Supported field types for dynamic field rendering
  */
-export type FieldType = 
+export type SecurityFormFieldType = 
   | 'text'
   | 'email'
   | 'password'
@@ -97,529 +49,357 @@ export type FieldType =
   | 'multiselect'
   | 'checkbox'
   | 'radio'
-  | 'date'
-  | 'datetime-local'
   | 'url'
-  | 'tel'
-  | 'hidden'
-  | 'json'
-  | 'switch';
+  | 'json';
 
 /**
- * Field validation configuration
+ * Field configuration for dynamic form rendering
  */
-export interface FieldValidation {
-  required?: boolean;
-  min?: number;
-  max?: number;
-  minLength?: number;
-  maxLength?: number;
-  pattern?: RegExp;
-  custom?: (value: any) => boolean | string;
-}
-
-/**
- * Conditional field display logic
- */
-export interface ConditionalLogic {
-  field: string;
-  operator: 'equals' | 'notEquals' | 'contains' | 'notContains' | 'greaterThan' | 'lessThan';
-  value: any;
-  action: 'show' | 'hide' | 'enable' | 'disable';
-}
-
-/**
- * Dynamic field configuration
- */
-export interface FieldConfig {
+export interface SecurityFormField {
+  /** Unique field identifier - must match schema key */
   name: string;
+  /** Display label for the field */
   label: string;
-  type: FieldType;
+  /** Field input type */
+  type: SecurityFormFieldType;
+  /** Placeholder text */
   placeholder?: string;
-  description?: string;
-  defaultValue?: any;
-  validation?: FieldValidation;
-  options?: SelectOption[];
+  /** Help text displayed below the field */
+  helpText?: string;
+  /** Whether the field is required */
+  required?: boolean;
+  /** Whether the field is disabled */
   disabled?: boolean;
-  hidden?: boolean;
-  readonly?: boolean;
-  group?: string;
-  className?: string;
-  conditional?: ConditionalLogic[];
-  rows?: number; // For textarea
-  step?: number; // For number inputs
-  accept?: string; // For file inputs
-  multiple?: boolean; // For select/file inputs
-  size?: 'sm' | 'default' | 'lg';
-  variant?: 'default' | 'error' | 'success' | 'warning';
-  leftIcon?: React.ReactNode;
-  rightIcon?: React.ReactNode;
-  autoComplete?: string;
-  autoFocus?: boolean;
-}
-
-/**
- * Form action configuration
- */
-export interface FormAction {
-  label: string;
-  type: 'submit' | 'button' | 'reset';
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-  size?: 'sm' | 'default' | 'lg';
-  loading?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-  className?: string;
-  leftIcon?: React.ReactNode;
-  rightIcon?: React.ReactNode;
-  position?: 'left' | 'right' | 'center';
-}
-
-/**
- * Form layout configuration
- */
-export interface FormLayout {
-  variant?: 'default' | 'card' | 'inline';
-  columns?: 1 | 2 | 3 | 4;
-  spacing?: 'sm' | 'default' | 'lg';
-  sectioned?: boolean;
-  collapsible?: boolean;
-  responsive?: boolean;
-}
-
-/**
- * Form submission result
- */
-export interface FormSubmissionResult {
-  success: boolean;
-  data?: any;
-  errors?: Record<string, string>;
-  message?: string;
-}
-
-/**
- * Main SecurityForm component props
- */
-export interface SecurityFormProps<TSchema extends z.ZodType = z.ZodType> extends VariantProps<typeof formVariants> {
-  // Core Configuration
-  formId: string;
-  title?: string;
-  description?: string;
-  schema: TSchema;
-  fields: FieldConfig[];
-  
-  // Data Management
-  defaultValues?: Partial<z.infer<TSchema>>;
-  initialData?: Partial<z.infer<TSchema>>;
-  
-  // Event Handlers
-  onSubmit: (data: z.infer<TSchema>) => Promise<FormSubmissionResult> | FormSubmissionResult;
-  onReset?: () => void;
-  onChange?: (data: Partial<z.infer<TSchema>>) => void;
-  onFieldChange?: (fieldName: string, value: any) => void;
-  onValidationError?: (errors: Record<string, FieldError>) => void;
-  
-  // UI Configuration
-  layout?: FormLayout;
-  actions?: FormAction[];
-  showResetButton?: boolean;
-  hideSubmitButton?: boolean;
-  submitButtonText?: string;
-  resetButtonText?: string;
-  
-  // State
-  isLoading?: boolean;
-  isSubmitting?: boolean;
-  disabled?: boolean;
-  readonly?: boolean;
-  
-  // Styling
-  className?: string;
-  formClassName?: string;
-  
-  // Advanced Features
-  autoSave?: boolean;
-  autoSaveDelay?: number;
-  validateOnChange?: boolean;
-  validateOnBlur?: boolean;
-  clearErrorsOnChange?: boolean;
-  persistFormData?: boolean;
-  formStorageKey?: string;
-  
-  // Accessibility
-  'aria-label'?: string;
-  'aria-describedby'?: string;
-  'aria-labelledby'?: string;
-}
-
-// ============================================================================
-// FORM STYLING VARIANTS
-// ============================================================================
-
-const formVariants = cva(
-  'w-full',
-  {
-    variants: {
-      variant: {
-        default: '',
-        card: 'bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm',
-        compact: 'space-y-4',
-        spacious: 'space-y-8',
-      },
-      size: {
-        sm: 'max-w-md',
-        default: 'max-w-2xl',
-        lg: 'max-w-4xl',
-        full: 'w-full',
-      }
-    },
-    defaultVariants: {
-      variant: 'default',
-      size: 'default',
-    }
-  }
-);
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Evaluates conditional logic for field visibility and state
- */
-const evaluateConditional = (
-  conditional: ConditionalLogic,
-  formValues: Record<string, any>
-): boolean => {
-  const fieldValue = formValues[conditional.field];
-  const targetValue = conditional.value;
-
-  switch (conditional.operator) {
-    case 'equals':
-      return fieldValue === targetValue;
-    case 'notEquals':
-      return fieldValue !== targetValue;
-    case 'contains':
-      return String(fieldValue).includes(String(targetValue));
-    case 'notContains':
-      return !String(fieldValue).includes(String(targetValue));
-    case 'greaterThan':
-      return Number(fieldValue) > Number(targetValue);
-    case 'lessThan':
-      return Number(fieldValue) < Number(targetValue);
-    default:
-      return true;
-  }
-};
-
-/**
- * Determines field visibility based on conditional logic
- */
-const shouldShowField = (
-  field: FieldConfig,
-  formValues: Record<string, any>
-): boolean => {
-  if (field.hidden) return false;
-  
-  if (!field.conditional || field.conditional.length === 0) {
-    return true;
-  }
-
-  return field.conditional.every(conditional => {
-    const result = evaluateConditional(conditional, formValues);
-    return conditional.action === 'show' ? result : !result;
-  });
-};
-
-/**
- * Determines field enabled state based on conditional logic
- */
-const isFieldEnabled = (
-  field: FieldConfig,
-  formValues: Record<string, any>
-): boolean => {
-  if (field.disabled) return false;
-  
-  if (!field.conditional || field.conditional.length === 0) {
-    return true;
-  }
-
-  return field.conditional.every(conditional => {
-    if (conditional.action === 'enable' || conditional.action === 'disable') {
-      const result = evaluateConditional(conditional, formValues);
-      return conditional.action === 'enable' ? result : !result;
-    }
-    return true;
-  });
-};
-
-/**
- * Groups fields by their group property
- */
-const groupFields = (fields: FieldConfig[]): Record<string, FieldConfig[]> => {
-  return fields.reduce((groups, field) => {
-    const group = field.group || 'default';
-    if (!groups[group]) {
-      groups[group] = [];
-    }
-    groups[group].push(field);
-    return groups;
-  }, {} as Record<string, FieldConfig[]>);
-};
-
-/**
- * Debounce function for performance optimization
- */
-const useDebounce = <T extends any[]>(
-  callback: (...args: T) => void,
-  delay: number
-) => {
-  const timeoutRef = React.useRef<NodeJS.Timeout>();
-
-  return useCallback((...args: T) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = setTimeout(() => callback(...args), delay);
-  }, [callback, delay]);
-};
-
-// ============================================================================
-// FIELD RENDERERS
-// ============================================================================
-
-/**
- * Renders individual form fields based on type
- */
-const FieldRenderer: React.FC<{
-  field: FieldConfig;
-  value: any;
-  onChange: (value: any) => void;
-  onBlur: () => void;
-  error?: FieldError;
-  disabled?: boolean;
-  readonly?: boolean;
-}> = ({ field, value, onChange, onBlur, error, disabled = false, readonly = false }) => {
-  const isDisabled = disabled || field.disabled || readonly || field.readonly;
-  const hasError = Boolean(error);
-
-  const commonProps = {
-    id: field.name,
-    name: field.name,
-    placeholder: field.placeholder,
-    disabled: isDisabled,
-    error: hasError,
-    className: field.className,
-    autoComplete: field.autoComplete,
-    autoFocus: field.autoFocus,
-    size: field.size,
-    variant: hasError ? 'error' : field.variant,
-    'aria-describedby': field.description ? `${field.name}-description` : undefined,
-    'aria-invalid': hasError,
-    value: value || '',
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      const newValue = e.target.value;
-      onChange(newValue);
-    },
-    onBlur,
+  /** Field width in grid columns (1-12) */
+  width?: number;
+  /** Select/radio options */
+  options?: Array<{ value: string | number; label: string; disabled?: boolean }>;
+  /** Conditional rendering logic */
+  condition?: {
+    /** Field to watch for condition */
+    field: string;
+    /** Expected value to show this field */
+    value: any;
+    /** Operator for comparison */
+    operator?: 'equals' | 'not_equals' | 'includes' | 'excludes';
   };
+  /** Field validation rules (additional to schema) */
+  validation?: {
+    min?: number;
+    max?: number;
+    pattern?: RegExp;
+    customValidator?: (value: any) => string | undefined;
+  };
+}
 
-  // Handle different field types
-  switch (field.type) {
-    case 'text':
-    case 'email':
-    case 'url':
-    case 'tel':
-      return (
-        <Input
-          {...commonProps}
-          type={field.type}
-          leftIcon={field.leftIcon}
-          rightIcon={field.rightIcon}
-        />
-      );
+/**
+ * Form configuration for different entity types
+ */
+export interface SecurityFormConfig<T extends FieldValues = FieldValues> {
+  /** Form title */
+  title: string;
+  /** Form description */
+  description?: string;
+  /** Field definitions */
+  fields: SecurityFormField[];
+  /** Zod validation schema */
+  schema: ZodSchema<T>;
+  /** Default form values */
+  defaultValues?: Partial<T>;
+  /** Form submit button text */
+  submitText?: string;
+  /** Cancel button text */
+  cancelText?: string;
+  /** Whether to show reset button */
+  showReset?: boolean;
+  /** Loading state */
+  isLoading?: boolean;
+  /** Form mode */
+  mode?: 'create' | 'edit' | 'view';
+}
 
-    case 'password':
-      return (
-        <PasswordInput
-          {...commonProps}
-          showToggle={!readonly}
-        />
-      );
+/**
+ * Security form component props
+ */
+export interface SecurityFormProps<T extends FieldValues = FieldValues> {
+  /** Form configuration */
+  config: SecurityFormConfig<T>;
+  /** Form submission handler */
+  onSubmit: SubmitHandler<T>;
+  /** Form error handler */
+  onError?: SubmitErrorHandler<T>;
+  /** Cancel handler */
+  onCancel?: () => void;
+  /** Reset handler */
+  onReset?: () => void;
+  /** Form data for edit mode */
+  initialData?: Partial<T>;
+  /** Custom CSS classes */
+  className?: string;
+  /** Test ID for testing */
+  testId?: string;
+  /** Whether form is disabled */
+  disabled?: boolean;
+  /** Success message */
+  successMessage?: string;
+  /** Error message */
+  errorMessage?: string;
+}
 
-    case 'number':
-      return (
-        <NumberInput
-          {...commonProps}
-          min={field.validation?.min}
-          max={field.validation?.max}
-          step={field.step}
-          onChange={(e) => {
-            const newValue = e.target.value === '' ? undefined : Number(e.target.value);
-            onChange(newValue);
-          }}
-        />
-      );
+// ============================================================================
+// VALIDATION UTILITIES
+// ============================================================================
 
-    case 'textarea':
-      return (
-        <Textarea
-          {...commonProps}
-          rows={field.rows || 3}
-          resizable={!readonly}
-        />
-      );
+/**
+ * Creates common validation schemas for security forms
+ */
+export const createSecurityValidationSchemas = () => {
+  const nameSchema = z
+    .string()
+    .min(1, 'Name is required')
+    .min(3, 'Name must be at least 3 characters')
+    .max(255, 'Name cannot exceed 255 characters')
+    .regex(/^[a-zA-Z0-9\s\-_]+$/, 'Name can only contain letters, numbers, spaces, hyphens, and underscores');
 
-    case 'select':
-    case 'multiselect':
-      return (
-        <Select
-          value={value}
-          onChange={onChange}
-          options={field.options || []}
-          placeholder={field.placeholder}
-          multiple={field.type === 'multiselect' || field.multiple}
-          disabled={isDisabled}
-          error={hasError}
-          searchable={field.options && field.options.length > 5}
-          size={field.size}
-          className={field.className}
-          aria-describedby={field.description ? `${field.name}-description` : undefined}
-          aria-invalid={hasError}
-        />
-      );
+  const descriptionSchema = z
+    .string()
+    .max(1000, 'Description cannot exceed 1000 characters')
+    .optional();
 
-    case 'checkbox':
-      return (
-        <label className="flex items-center space-x-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={Boolean(value)}
-            onChange={(e) => onChange(e.target.checked)}
-            onBlur={onBlur}
-            disabled={isDisabled}
-            className={cn(
-              'rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring-primary-500',
-              isDisabled && 'opacity-50 cursor-not-allowed',
-              hasError && 'border-red-500 focus:border-red-500 focus:ring-red-500'
+  const urlSchema = z
+    .string()
+    .url('Please enter a valid URL')
+    .optional()
+    .or(z.literal(''));
+
+  const jsonSchema = z
+    .string()
+    .refine(
+      (value) => {
+        if (!value || value.trim() === '') return true;
+        try {
+          JSON.parse(value);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: 'Invalid JSON format. Please check syntax and try again.' }
+    );
+
+  const positiveNumberSchema = z
+    .number()
+    .min(0, 'Value must be positive')
+    .or(z.string().transform((val) => parseInt(val, 10)).pipe(z.number().min(0)));
+
+  return {
+    nameSchema,
+    descriptionSchema,
+    urlSchema,
+    jsonSchema,
+    positiveNumberSchema,
+  };
+};
+
+// ============================================================================
+// FIELD RENDERING COMPONENTS
+// ============================================================================
+
+/**
+ * Renders a dynamic form field based on field configuration
+ */
+const SecurityFormFieldRenderer: React.FC<{
+  field: SecurityFormField;
+  form: UseFormReturn<any>;
+  disabled?: boolean;
+}> = ({ field, form, disabled = false }) => {
+  const {
+    control,
+    formState: { errors },
+    watch,
+  } = form;
+
+  // Check conditional rendering
+  const shouldRender = useMemo(() => {
+    if (!field.condition) return true;
+    
+    const watchedValue = watch(field.condition.field);
+    const expectedValue = field.condition.value;
+    const operator = field.condition.operator || 'equals';
+    
+    switch (operator) {
+      case 'equals':
+        return watchedValue === expectedValue;
+      case 'not_equals':
+        return watchedValue !== expectedValue;
+      case 'includes':
+        return Array.isArray(watchedValue) ? watchedValue.includes(expectedValue) : false;
+      case 'excludes':
+        return Array.isArray(watchedValue) ? !watchedValue.includes(expectedValue) : true;
+      default:
+        return true;
+    }
+  }, [field.condition, watch]);
+
+  if (!shouldRender) return null;
+
+  const fieldError = errors[field.name];
+  const isDisabled = disabled || field.disabled;
+  const isRequired = field.required;
+
+  return (
+    <div className={cn('form-field-container', field.width && `col-span-${field.width}`)}>
+      <FormField
+        control={control}
+        name={field.name}
+        render={({ field: formField }) => (
+          <FormItem>
+            <FormLabel className={cn(isRequired && 'required')}>
+              {field.label}
+              {isRequired && <span className="text-red-500 ml-1" aria-label="required">*</span>}
+            </FormLabel>
+            <FormControl>
+              {(() => {
+                switch (field.type) {
+                  case 'textarea':
+                    return (
+                      <Textarea
+                        {...formField}
+                        placeholder={field.placeholder}
+                        disabled={isDisabled}
+                        className={cn(fieldError && 'border-red-500')}
+                        aria-describedby={field.helpText ? `${field.name}-help` : undefined}
+                        aria-invalid={!!fieldError}
+                      />
+                    );
+
+                  case 'select':
+                    return (
+                      <Select
+                        onValueChange={formField.onChange}
+                        value={formField.value}
+                        disabled={isDisabled}
+                      >
+                        <SelectTrigger className={cn(fieldError && 'border-red-500')}>
+                          <SelectValue placeholder={field.placeholder || 'Select an option'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {field.options?.map((option) => (
+                            <SelectItem
+                              key={option.value}
+                              value={String(option.value)}
+                              disabled={option.disabled}
+                            >
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    );
+
+                  case 'number':
+                    return (
+                      <Input
+                        {...formField}
+                        type="number"
+                        placeholder={field.placeholder}
+                        disabled={isDisabled}
+                        className={cn(fieldError && 'border-red-500')}
+                        aria-describedby={field.helpText ? `${field.name}-help` : undefined}
+                        aria-invalid={!!fieldError}
+                        min={field.validation?.min}
+                        max={field.validation?.max}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? '' : Number(e.target.value);
+                          formField.onChange(value);
+                        }}
+                      />
+                    );
+
+                  case 'email':
+                    return (
+                      <Input
+                        {...formField}
+                        type="email"
+                        placeholder={field.placeholder}
+                        disabled={isDisabled}
+                        className={cn(fieldError && 'border-red-500')}
+                        aria-describedby={field.helpText ? `${field.name}-help` : undefined}
+                        aria-invalid={!!fieldError}
+                        autoComplete="email"
+                      />
+                    );
+
+                  case 'password':
+                    return (
+                      <Input
+                        {...formField}
+                        type="password"
+                        placeholder={field.placeholder}
+                        disabled={isDisabled}
+                        className={cn(fieldError && 'border-red-500')}
+                        aria-describedby={field.helpText ? `${field.name}-help` : undefined}
+                        aria-invalid={!!fieldError}
+                        autoComplete="new-password"
+                      />
+                    );
+
+                  case 'url':
+                    return (
+                      <Input
+                        {...formField}
+                        type="url"
+                        placeholder={field.placeholder}
+                        disabled={isDisabled}
+                        className={cn(fieldError && 'border-red-500')}
+                        aria-describedby={field.helpText ? `${field.name}-help` : undefined}
+                        aria-invalid={!!fieldError}
+                      />
+                    );
+
+                  case 'json':
+                    return (
+                      <Textarea
+                        {...formField}
+                        placeholder={field.placeholder || 'Enter valid JSON'}
+                        disabled={isDisabled}
+                        className={cn(
+                          'font-mono text-sm',
+                          fieldError && 'border-red-500'
+                        )}
+                        aria-describedby={field.helpText ? `${field.name}-help` : undefined}
+                        aria-invalid={!!fieldError}
+                        rows={6}
+                      />
+                    );
+
+                  default:
+                    return (
+                      <Input
+                        {...formField}
+                        type="text"
+                        placeholder={field.placeholder}
+                        disabled={isDisabled}
+                        className={cn(fieldError && 'border-red-500')}
+                        aria-describedby={field.helpText ? `${field.name}-help` : undefined}
+                        aria-invalid={!!fieldError}
+                        pattern={field.validation?.pattern?.source}
+                      />
+                    );
+                }
+              })()}
+            </FormControl>
+            {field.helpText && (
+              <p id={`${field.name}-help`} className="text-sm text-muted-foreground mt-1">
+                {field.helpText}
+              </p>
             )}
-            aria-describedby={field.description ? `${field.name}-description` : undefined}
-            aria-invalid={hasError}
-          />
-          <span className={cn(
-            'text-sm text-gray-700 dark:text-gray-300',
-            isDisabled && 'opacity-50'
-          )}>
-            {field.label}
-          </span>
-        </label>
-      );
-
-    case 'radio':
-      return (
-        <div className="space-y-2">
-          {field.options?.map((option) => (
-            <label key={option.value} className="flex items-center space-x-2 cursor-pointer">
-              <input
-                type="radio"
-                name={field.name}
-                value={option.value}
-                checked={value === option.value}
-                onChange={(e) => onChange(e.target.value)}
-                onBlur={onBlur}
-                disabled={isDisabled || option.disabled}
-                className={cn(
-                  'border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring-primary-500',
-                  isDisabled && 'opacity-50 cursor-not-allowed',
-                  hasError && 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                )}
-                aria-describedby={field.description ? `${field.name}-description` : undefined}
-                aria-invalid={hasError}
-              />
-              <span className={cn(
-                'text-sm text-gray-700 dark:text-gray-300',
-                (isDisabled || option.disabled) && 'opacity-50'
-              )}>
-                {option.label}
-              </span>
-              {option.description && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {option.description}
-                </span>
-              )}
-            </label>
-          ))}
-        </div>
-      );
-
-    case 'date':
-    case 'datetime-local':
-      return (
-        <Input
-          {...commonProps}
-          type={field.type}
-        />
-      );
-
-    case 'hidden':
-      return (
-        <input
-          type="hidden"
-          name={field.name}
-          value={value || ''}
-          onChange={commonProps.onChange}
-        />
-      );
-
-    case 'json':
-      return (
-        <Textarea
-          {...commonProps}
-          rows={field.rows || 6}
-          placeholder={field.placeholder || 'Enter valid JSON...'}
-        />
-      );
-
-    case 'switch':
-      return (
-        <label className="flex items-center justify-between cursor-pointer">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {field.label}
-          </span>
-          <div className="relative">
-            <input
-              type="checkbox"
-              checked={Boolean(value)}
-              onChange={(e) => onChange(e.target.checked)}
-              onBlur={onBlur}
-              disabled={isDisabled}
-              className="sr-only"
-              aria-describedby={field.description ? `${field.name}-description` : undefined}
-              aria-invalid={hasError}
-            />
-            <div className={cn(
-              'block w-14 h-8 rounded-full transition-colors duration-200',
-              value ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600',
-              isDisabled && 'opacity-50 cursor-not-allowed',
-              hasError && 'ring-2 ring-red-500'
-            )}>
-              <div className={cn(
-                'absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-200',
-                value && 'transform translate-x-6'
-              )} />
-            </div>
-          </div>
-        </label>
-      );
-
-    default:
-      return (
-        <Input
-          {...commonProps}
-          type="text"
-        />
-      );
-  }
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </div>
+  );
 };
 
 // ============================================================================
@@ -629,467 +409,316 @@ const FieldRenderer: React.FC<{
 /**
  * Generic Security Form Component
  * 
- * Provides a comprehensive, accessible, and performant form solution
- * for all security management operations including limits and roles.
+ * Supports both rate limits and role-based access control configurations
+ * with dynamic field rendering and real-time validation under 100ms.
  */
-export function SecurityForm<TSchema extends z.ZodType>({
-  // Core Configuration
-  formId,
-  title,
-  description,
-  schema,
-  fields,
-  
-  // Data Management
-  defaultValues,
-  initialData,
-  
-  // Event Handlers
+export const SecurityForm = <T extends FieldValues = FieldValues>({
+  config,
   onSubmit,
+  onError,
+  onCancel,
   onReset,
-  onChange,
-  onFieldChange,
-  onValidationError,
-  
-  // UI Configuration
-  layout = {},
-  actions,
-  showResetButton = true,
-  hideSubmitButton = false,
-  submitButtonText = 'Save Changes',
-  resetButtonText = 'Reset Form',
-  
-  // State
-  isLoading = false,
-  isSubmitting = false,
-  disabled = false,
-  readonly = false,
-  
-  // Styling
+  initialData,
   className,
-  formClassName,
-  variant,
-  size,
-  
-  // Advanced Features
-  autoSave = false,
-  autoSaveDelay = 1000,
-  validateOnChange = true,
-  validateOnBlur = true,
-  clearErrorsOnChange = true,
-  persistFormData = false,
-  formStorageKey,
-  
-  // Accessibility
-  'aria-label': ariaLabel,
-  'aria-describedby': ariaDescribedBy,
-  'aria-labelledby': ariaLabelledBy,
-  
-  ...props
-}: SecurityFormProps<TSchema>) {
-  
-  // =========================================================================
-  // FORM INITIALIZATION
-  // =========================================================================
-  
-  const form = useForm<z.infer<TSchema>>({
-    resolver: zodResolver(schema),
+  testId = 'security-form',
+  disabled = false,
+  successMessage,
+  errorMessage,
+}: SecurityFormProps<T>) => {
+  // Initialize form with React Hook Form and Zod validation
+  const form = useForm<T>({
+    resolver: zodResolver(config.schema),
     defaultValues: {
-      ...defaultValues,
+      ...config.defaultValues,
       ...initialData,
-    } as any,
-    mode: validateOnChange ? 'onChange' : validateOnBlur ? 'onBlur' : 'onSubmit',
+    } as T,
+    mode: 'onChange', // Real-time validation
     reValidateMode: 'onChange',
-    shouldFocusError: true,
-    shouldUnregister: false,
   });
 
   const {
     handleSubmit,
     reset,
-    watch,
-    formState: { errors, isValid, isDirty },
-    register,
-    setValue,
-    getValues,
+    formState: { errors, isSubmitting, isDirty, isValid },
     clearErrors,
-    setError,
   } = form;
 
-  // Watch all form values for conditional logic
-  const formValues = watch();
-  
-  // =========================================================================
-  // FORM PERSISTENCE
-  // =========================================================================
-  
-  // Load persisted form data on mount
+  // Reset form when initialData changes
   useEffect(() => {
-    if (persistFormData && formStorageKey && typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem(formStorageKey);
-        if (saved) {
-          const parsedData = JSON.parse(saved);
-          reset(parsedData);
-        }
-      } catch (error) {
-        console.warn('Failed to load persisted form data:', error);
-      }
+    if (initialData) {
+      reset({
+        ...config.defaultValues,
+        ...initialData,
+      } as T);
     }
-  }, [persistFormData, formStorageKey, reset]);
+  }, [initialData, reset, config.defaultValues]);
 
-  // Save form data on changes
-  const debouncedSave = useDebounce((data: any) => {
-    if (persistFormData && formStorageKey && typeof window !== 'undefined') {
+  // Handle form submission
+  const handleFormSubmit = useCallback<SubmitHandler<T>>(
+    async (data) => {
       try {
-        localStorage.setItem(formStorageKey, JSON.stringify(data));
-      } catch (error) {
-        console.warn('Failed to persist form data:', error);
-      }
-    }
-  }, 500);
-
-  useEffect(() => {
-    if (isDirty) {
-      debouncedSave(formValues);
-    }
-  }, [formValues, isDirty, debouncedSave]);
-
-  // =========================================================================
-  // AUTO-SAVE FUNCTIONALITY
-  // =========================================================================
-  
-  const debouncedAutoSave = useDebounce(async (data: z.infer<TSchema>) => {
-    if (autoSave && isValid && isDirty) {
-      try {
+        clearErrors();
         await onSubmit(data);
       } catch (error) {
-        console.error('Auto-save failed:', error);
+        console.error('Form submission error:', error);
       }
-    }
-  }, autoSaveDelay);
+    },
+    [onSubmit, clearErrors]
+  );
 
-  useEffect(() => {
-    if (autoSave && isValid && isDirty) {
-      debouncedAutoSave(formValues);
-    }
-  }, [formValues, isValid, isDirty, autoSave, debouncedAutoSave]);
+  // Handle form errors
+  const handleFormError = useCallback<SubmitErrorHandler<T>>(
+    (errors) => {
+      console.error('Form validation errors:', errors);
+      onError?.(errors);
+    },
+    [onError]
+  );
 
-  // =========================================================================
-  // EVENT HANDLERS
-  // =========================================================================
-  
-  const handleFormSubmit: SubmitHandler<z.infer<TSchema>> = async (data) => {
-    try {
-      const result = await onSubmit(data);
-      
-      if (!result.success && result.errors) {
-        // Set field-specific errors
-        Object.entries(result.errors).forEach(([field, message]) => {
-          setError(field as Path<z.infer<TSchema>>, {
-            type: 'server',
-            message,
-          });
-        });
-      }
-
-      // Clear persisted data on successful submission
-      if (result.success && persistFormData && formStorageKey) {
-        localStorage.removeItem(formStorageKey);
-      }
-    } catch (error) {
-      console.error('Form submission failed:', error);
-    }
-  };
-
-  const handleFormReset = useCallback(() => {
-    reset();
+  // Handle form reset
+  const handleReset = useCallback(() => {
+    reset(config.defaultValues as T);
     clearErrors();
-    
-    // Clear persisted data
-    if (persistFormData && formStorageKey) {
-      localStorage.removeItem(formStorageKey);
-    }
-    
     onReset?.();
-  }, [reset, clearErrors, onReset, persistFormData, formStorageKey]);
+  }, [reset, clearErrors, onReset, config.defaultValues]);
 
-  const handleFieldChange = useCallback((fieldName: string, value: any) => {
-    setValue(fieldName as Path<z.infer<TSchema>>, value, {
-      shouldValidate: validateOnChange,
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-    
-    if (clearErrorsOnChange && errors[fieldName]) {
-      clearErrors(fieldName as Path<z.infer<TSchema>>);
-    }
-    
-    onFieldChange?.(fieldName, value);
-  }, [setValue, validateOnChange, clearErrorsOnChange, errors, clearErrors, onFieldChange]);
-
-  // Notify parent of form changes
-  useEffect(() => {
-    onChange?.(formValues);
-  }, [formValues, onChange]);
-
-  // Notify parent of validation errors
-  useEffect(() => {
-    if (Object.keys(errors).length > 0) {
-      onValidationError?.(errors);
-    }
-  }, [errors, onValidationError]);
-
-  // =========================================================================
-  // FIELD PROCESSING
-  // =========================================================================
-  
-  // Filter and process fields based on current form state
-  const visibleFields = useMemo(() => {
-    return fields.filter(field => shouldShowField(field, formValues));
-  }, [fields, formValues]);
-
-  // Group fields for layout
-  const groupedFields = useMemo(() => {
-    if (layout.sectioned) {
-      return groupFields(visibleFields);
-    }
-    return { default: visibleFields };
-  }, [visibleFields, layout.sectioned]);
-
-  // =========================================================================
-  // FORM ACTIONS
-  // =========================================================================
-  
-  const defaultActions: FormAction[] = [
-    ...(showResetButton ? [{
-      label: resetButtonText,
-      type: 'reset' as const,
-      variant: 'outline' as const,
-      onClick: handleFormReset,
-      disabled: !isDirty || isSubmitting,
-      position: 'left' as const,
-    }] : []),
-    ...(!hideSubmitButton ? [{
-      label: submitButtonText,
-      type: 'submit' as const,
-      variant: 'default' as const,
-      loading: isSubmitting,
-      disabled: disabled || isLoading || (!autoSave && !isValid),
-      position: 'right' as const,
-    }] : []),
-  ];
-
-  const formActions = actions || defaultActions;
-
-  // =========================================================================
-  // RENDER METHODS
-  // =========================================================================
-  
-  const renderField = (field: FieldConfig) => {
-    const fieldError = errors[field.name as keyof typeof errors] as FieldError | undefined;
-    const fieldValue = formValues[field.name];
-    const fieldEnabled = isFieldEnabled(field, formValues);
-
-    // Don't render hidden fields in the UI
-    if (field.type === 'hidden') {
-      return <input key={field.name} {...register(field.name as Path<z.infer<TSchema>>)} type="hidden" />;
-    }
-
-    return (
-      <FormField key={field.name} className={field.className}>
-        {field.type !== 'checkbox' && field.type !== 'switch' && (
-          <FormLabel
-            htmlFor={field.name}
-            required={field.validation?.required}
-          >
-            {field.label}
-          </FormLabel>
-        )}
-        
-        <FormControl error={fieldError}>
-          <FieldRenderer
-            field={field}
-            value={fieldValue}
-            onChange={(value) => handleFieldChange(field.name, value)}
-            onBlur={() => {
-              if (validateOnBlur) {
-                form.trigger(field.name as Path<z.infer<TSchema>>);
-              }
-            }}
-            error={fieldError}
-            disabled={disabled || isLoading || !fieldEnabled}
-            readonly={readonly}
-          />
-          
-          {field.description && (
-            <FormDescription id={`${field.name}-description`}>
-              {field.description}
-            </FormDescription>
-          )}
-        </FormControl>
-      </FormField>
-    );
-  };
-
-  const renderFieldGroup = (groupName: string, groupFields: FieldConfig[]) => {
-    if (groupName === 'default' && !layout.sectioned) {
-      return (
-        <div
-          key={groupName}
-          className={cn(
-            'grid gap-6',
-            layout.columns === 2 && 'grid-cols-1 md:grid-cols-2',
-            layout.columns === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
-            layout.columns === 4 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
-          )}
-        >
-          {groupFields.map(renderField)}
-        </div>
+  // Handle form cancel
+  const handleCancel = useCallback(() => {
+    if (isDirty) {
+      const confirmed = window.confirm(
+        'You have unsaved changes. Are you sure you want to cancel?'
       );
+      if (!confirmed) return;
     }
+    onCancel?.();
+  }, [isDirty, onCancel]);
 
-    return (
-      <FormSection
-        key={groupName}
-        title={groupName !== 'default' ? groupName : undefined}
-        collapsible={layout.collapsible}
-        className={cn(
-          layout.spacing === 'sm' && 'space-y-4',
-          layout.spacing === 'lg' && 'space-y-8'
-        )}
-      >
-        <div
-          className={cn(
-            'grid gap-6',
-            layout.columns === 2 && 'grid-cols-1 md:grid-cols-2',
-            layout.columns === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
-            layout.columns === 4 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
-          )}
-        >
-          {groupFields.map(renderField)}
-        </div>
-      </FormSection>
-    );
-  };
+  const isFormDisabled = disabled || config.isLoading || isSubmitting;
+  const isViewMode = config.mode === 'view';
 
-  // =========================================================================
-  // MAIN RENDER
-  // =========================================================================
-  
   return (
-    <div 
-      className={cn(formVariants({ variant, size }), className)}
-      {...props}
-    >
+    <div className={cn('security-form-container', className)} data-testid={testId}>
       {/* Form Header */}
-      {(title || description) && (
-        <div className="mb-6">
-          {title && (
-            <h2 
-              id={`${formId}-title`}
-              className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2"
-            >
-              {title}
-            </h2>
-          )}
-          {description && (
-            <p 
-              id={`${formId}-description`}
-              className="text-gray-600 dark:text-gray-400"
-            >
-              {description}
-            </p>
-          )}
-        </div>
+      <div className="form-header mb-6">
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+          {config.title}
+        </h2>
+        {config.description && (
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            {config.description}
+          </p>
+        )}
+      </div>
+
+      {/* Success Message */}
+      {successMessage && (
+        <Alert className="mb-6 border-green-200 bg-green-50 text-green-800">
+          <CheckCircleIcon className="h-4 w-4" />
+          <AlertDescription>{successMessage}</AlertDescription>
+        </Alert>
       )}
 
-      {/* Main Form */}
-      <Form
-        variant={layout.variant}
-        size={layout.spacing}
-        className={formClassName}
-      >
+      {/* Error Message */}
+      {errorMessage && (
+        <Alert variant="destructive" className="mb-6">
+          <ExclamationTriangleIcon className="h-4 w-4" />
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Form */}
+      <Form {...form}>
         <form
-          id={formId}
-          onSubmit={handleSubmit(handleFormSubmit)}
+          onSubmit={handleSubmit(handleFormSubmit, handleFormError)}
+          className="space-y-6"
           noValidate
-          aria-label={ariaLabel}
-          aria-describedby={ariaDescribedBy || (description ? `${formId}-description` : undefined)}
-          aria-labelledby={ariaLabelledBy || (title ? `${formId}-title` : undefined)}
         >
-          {/* Form Fields */}
-          <div className={cn(
-            layout.spacing === 'sm' && 'space-y-4',
-            layout.spacing === 'default' && 'space-y-6',
-            layout.spacing === 'lg' && 'space-y-8'
-          )}>
-            {Object.entries(groupedFields).map(([groupName, groupFields]) =>
-              renderFieldGroup(groupName, groupFields)
-            )}
+          {/* Dynamic Fields Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {config.fields.map((field) => (
+              <SecurityFormFieldRenderer
+                key={field.name}
+                field={field}
+                form={form}
+                disabled={isFormDisabled || isViewMode}
+              />
+            ))}
           </div>
 
           {/* Form Actions */}
-          {formActions.length > 0 && (
-            <FormActions className="mt-8">
-              {formActions.map((action, index) => (
+          {!isViewMode && (
+            <div className="form-actions flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                type="submit"
+                disabled={isFormDisabled || !isValid}
+                className="sm:order-1"
+                data-testid="submit-button"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    Saving...
+                  </>
+                ) : (
+                  config.submitText || 'Save'
+                )}
+              </Button>
+
+              {onCancel && (
                 <Button
-                  key={`${action.label}-${index}`}
-                  type={action.type}
-                  variant={action.variant}
-                  size={action.size}
-                  loading={action.loading}
-                  disabled={action.disabled}
-                  onClick={action.onClick}
-                  className={action.className}
-                  leftIcon={action.leftIcon}
-                  rightIcon={action.rightIcon}
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancel}
+                  disabled={isSubmitting}
+                  className="sm:order-3"
+                  data-testid="cancel-button"
                 >
-                  {action.label}
+                  {config.cancelText || 'Cancel'}
                 </Button>
-              ))}
-            </FormActions>
+              )}
+
+              {config.showReset && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleReset}
+                  disabled={isFormDisabled || !isDirty}
+                  className="sm:order-2"
+                  data-testid="reset-button"
+                >
+                  Reset
+                </Button>
+              )}
+            </div>
           )}
         </form>
       </Form>
-
-      {/* Loading Overlay */}
-      {(isLoading || isSubmitting) && (
-        <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 flex items-center justify-center rounded-lg">
-          <div className="flex items-center space-x-2 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-lg">
-            <div className="animate-spin h-4 w-4 border-2 border-primary-600 border-t-transparent rounded-full" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              {isSubmitting ? 'Saving...' : 'Loading...'}
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
-}
-
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
-export type {
-  SecurityFormProps,
-  FieldConfig,
-  FieldType,
-  FieldValidation,
-  ConditionalLogic,
-  FormAction,
-  FormLayout,
-  FormSubmissionResult,
 };
 
-export {
-  formVariants,
-  evaluateConditional,
-  shouldShowField,
-  isFieldEnabled,
-  groupFields,
-  useDebounce,
+// ============================================================================
+// PRESET CONFIGURATIONS
+// ============================================================================
+
+/**
+ * Predefined form configurations for common security entities
+ */
+export const securityFormConfigs = {
+  /**
+   * Rate limit configuration form
+   */
+  rateLimit: {
+    title: 'Rate Limit Configuration',
+    description: 'Configure API rate limiting rules to control request frequency',
+    fields: [
+      {
+        name: 'name',
+        label: 'Limit Name',
+        type: 'text' as const,
+        placeholder: 'Enter a descriptive name',
+        required: true,
+        width: 2,
+        helpText: 'A unique name to identify this rate limit rule',
+      },
+      {
+        name: 'description',
+        label: 'Description',
+        type: 'textarea' as const,
+        placeholder: 'Describe the purpose of this rate limit',
+        width: 3,
+        helpText: 'Optional description to explain when this limit applies',
+      },
+      {
+        name: 'rate',
+        label: 'Request Rate',
+        type: 'number' as const,
+        placeholder: '100',
+        required: true,
+        helpText: 'Maximum number of requests allowed',
+        validation: { min: 1, max: 10000 },
+      },
+      {
+        name: 'period',
+        label: 'Time Period',
+        type: 'select' as const,
+        required: true,
+        options: [
+          { value: 'minute', label: 'Per Minute' },
+          { value: 'hour', label: 'Per Hour' },
+          { value: 'day', label: 'Per Day' },
+        ],
+        helpText: 'Time period for the rate limit',
+      },
+      {
+        name: 'enabled',
+        label: 'Status',
+        type: 'select' as const,
+        required: true,
+        options: [
+          { value: 'true', label: 'Enabled' },
+          { value: 'false', label: 'Disabled' },
+        ],
+      },
+    ],
+    schema: z.object({
+      name: z.string().min(3).max(255),
+      description: z.string().max(1000).optional(),
+      rate: z.number().min(1).max(10000),
+      period: z.enum(['minute', 'hour', 'day']),
+      enabled: z.boolean().or(z.string().transform(val => val === 'true')),
+    }),
+    defaultValues: {
+      rate: 100,
+      period: 'hour' as const,
+      enabled: true,
+    },
+  },
+
+  /**
+   * Role configuration form
+   */
+  role: {
+    title: 'Role Configuration',
+    description: 'Configure role-based access control settings',
+    fields: [
+      {
+        name: 'name',
+        label: 'Role Name',
+        type: 'text' as const,
+        placeholder: 'Enter role name',
+        required: true,
+        width: 2,
+        helpText: 'A unique name for this role',
+      },
+      {
+        name: 'description',
+        label: 'Description',
+        type: 'textarea' as const,
+        placeholder: 'Describe the role permissions',
+        width: 3,
+        helpText: 'Optional description of what this role allows',
+      },
+      {
+        name: 'active',
+        label: 'Status',
+        type: 'select' as const,
+        required: true,
+        options: [
+          { value: 'true', label: 'Active' },
+          { value: 'false', label: 'Inactive' },
+        ],
+      },
+    ],
+    schema: z.object({
+      name: z.string().min(3).max(255),
+      description: z.string().max(1000).optional(),
+      active: z.boolean().or(z.string().transform(val => val === 'true')),
+    }),
+    defaultValues: {
+      active: true,
+    },
+  },
 };
 
 export default SecurityForm;
