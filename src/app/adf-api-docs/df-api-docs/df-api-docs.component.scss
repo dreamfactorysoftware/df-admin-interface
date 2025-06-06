@@ -134,9 +134,31 @@
       .main {
         display: flex;
         justify-content: space-between;
-        flex-direction: row-reverse;
+        flex-wrap: wrap;
         gap: 8px;
       }
     }
+  }
+}
+
+.curl-command-text {
+  white-space: pre;
+  font-family: monospace;
+  font-size: 0.9em;
+  margin: 0;
+  color: var(--df-script-editor-text-color);
+  overflow-x: auto;
+}
+
+.custom-swagger-content-wrapper {
+  width: 100%;
+}
+
+.curl-commands-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  .actions-container {
+    padding: 0px 8px;
   }
 }

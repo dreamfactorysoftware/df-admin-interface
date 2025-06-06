@@ -32,47 +32,88 @@
   </mat-form-field>
 </div>
 
-<div
-  #healthBannerElement
-  class="api-health-banner"
-  *ngIf="healthStatus"
-  [ngClass]="{
-    'status-loading': healthStatus === 'loading',
-    'status-healthy': healthStatus === 'healthy',
-    'status-unhealthy': healthStatus === 'unhealthy',
-    'status-warning': healthStatus === 'warning'
-  }">
-  <div *ngIf="healthStatus === 'loading'">
-    <p>{{ 'apiHealthBanner.loading' | transloco }}</p>
-  </div>
-  <div *ngIf="healthStatus === 'healthy'">
-    <p>{{ 'apiHealthBanner.healthy' | transloco }}</p>
-  </div>
-  <div *ngIf="healthStatus === 'unhealthy'">
-    <p>
-      {{ 'apiHealthBanner.unhealthyBase' | transloco }}
-      <button
-        mat-button
-        color="accent"
-        class="view-details-button"
-        (click)="toggleUnhealthyErrorDetails()">
-        {{
-          (showUnhealthyErrorDetails
-            ? 'apiHealthBanner.hideDetails'
-            : 'apiHealthBanner.viewDetails'
-          ) | transloco
-        }}
-      </button>
-    </p>
-    <div *ngIf="showUnhealthyErrorDetails" class="unhealthy-error-details">
-      <pre>{{ healthError }}</pre>
+<div #swaggerInjectedContentContainer class="custom-swagger-content-wrapper">
+  <div
+    #healthBannerElement
+    class="api-health-banner"
+    *ngIf="healthStatus"
+    [ngClass]="{
+      'status-loading': healthStatus === 'loading',
+      'status-healthy': healthStatus === 'healthy',
+      'status-unhealthy': healthStatus === 'unhealthy',
+      'status-warning': healthStatus === 'warning'
+    }">
+    <div *ngIf="healthStatus === 'loading'">
+      <p>{{ 'apiHealthBanner.loading' | transloco }}</p>
+    </div>
+    <div *ngIf="healthStatus === 'healthy'">
+      <p>{{ 'apiHealthBanner.healthy' | transloco }}</p>
+    </div>
+    <div *ngIf="healthStatus === 'unhealthy'">
+      <p>
+        {{ 'apiHealthBanner.unhealthyBase' | transloco }}
+        <button
+          mat-button
+          color="accent"
+          class="view-details-button"
+          (click)="toggleUnhealthyErrorDetails()">
+          {{
+            (showUnhealthyErrorDetails
+              ? 'apiHealthBanner.hideDetails'
+              : 'apiHealthBanner.viewDetails'
+            ) | transloco
+          }}
+        </button>
+      </p>
+      <div *ngIf="showUnhealthyErrorDetails" class="unhealthy-error-details">
+        <pre>{{ healthError }}</pre>
+      </div>
+    </div>
+    <div *ngIf="healthStatus === 'warning'">
+      <p>
+        {{ 'apiHealthBanner.warningDefault' | transloco }}
+      </p>
     </div>
   </div>
-  <div *ngIf="healthStatus === 'warning'">
-    <p>
-      {{ 'apiHealthBanner.warningDefault' | transloco }}
-    </p>
-  </div>
+
+  <mat-accordion>
+    <mat-expansion-panel #curlCommandsPanel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          {{ 'apiBasicCurlCommands.title' | transloco }}
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+
+      <ng-template matExpansionPanelContent>
+        <div
+          *ngIf="curlCommands && curlCommands.length > 0"
+          class="curl-commands-container">
+          <mat-card
+            *ngFor="let command of curlCommands; let i = index"
+            appearance="outlined">
+            <mat-card-content>
+              <pre class="curl-command-text">{{ command.text }}</pre>
+            </mat-card-content>
+            <mat-card-actions align="end" class="actions-container">
+              <button
+                mat-icon-button
+                (click)="
+                  $event.stopPropagation(); copyCurlCommand(command.text)
+                "
+                matTooltip="{{
+                  'apiBasicCurlCommands.copyTooltip' | transloco
+                }}">
+                <fa-icon size="xs" [icon]="faCopy"></fa-icon>
+              </button>
+            </mat-card-actions>
+          </mat-card>
+        </div>
+        <p *ngIf="!curlCommands || curlCommands.length === 0">
+          {{ 'apiBasicCurlCommands.noCommands' | transloco }}
+        </p>
+      </ng-template>
+    </mat-expansion-panel>
+  </mat-accordion>
 </div>
 
 <div #apiDocumentation class="swagger-ui"></div>

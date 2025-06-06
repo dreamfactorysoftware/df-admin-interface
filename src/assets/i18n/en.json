@@ -125,6 +125,10 @@
     "hideDetails": "Hide Details",
     "warningDefault": "Warning: This type of API currently does not support automatic health checks."
   },
+  "apiBasicCurlCommands": {
+    "title": "Test api yourself with this simple curl commads here:",
+    "copyTooltip": "Copy"
+  },
   "nav": {
     "error": {
       "header": "Error"

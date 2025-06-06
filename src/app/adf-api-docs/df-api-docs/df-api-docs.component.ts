@@ -31,6 +31,10 @@ import { ApiKeysService } from '../services/api-keys.service';
 import { ApiKeyInfo } from 'src/app/shared/types/api-keys';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatListModule } from '@angular/material/list';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { MatCardModule } from '@angular/material/card';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
 import { DfCurrentServiceService } from 'src/app/shared/services/df-current-service.service';
@@ -90,12 +94,18 @@ interface HealthCheckResult {
     SlicePipe,
     NgClass,
     FontAwesomeModule,
+    MatListModule,
+    MatTooltipModule,
+    MatExpansionModule,
+    MatCardModule,
   ],
 })
 export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   @ViewChild('apiDocumentation', { static: true }) apiDocElement:
     | ElementRef
     | undefined;
+  @ViewChild('swaggerInjectedContentContainer')
+  swaggerInjectedContentContainerRef: ElementRef | undefined;
   @ViewChild('healthBannerElement') healthBannerElementRef:
     | ElementRef
     | undefined;
@@ -103,6 +113,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   apiDocJson: ApiDocJson;
   apiKeys: ApiKeyInfo[] = [];
   faCopy = faCopy;
+  curlCommands: { text: string }[] = []; // Will be populated dynamically
   private subscriptions: Subscription[] = [];
   healthStatus: 'loading' | 'healthy' | 'unhealthy' | 'warning' = 'loading';
   healthError: string | null = null;
@@ -202,38 +213,27 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       },
       showMutatedRequest: true,
       onComplete: () => {
+        this.prepareCurlCommands();
+
         if (
-          this.healthBannerElementRef &&
-          this.healthBannerElementRef.nativeElement &&
           this.apiDocElement &&
-          this.apiDocElement.nativeElement
+          this.apiDocElement.nativeElement &&
+          this.swaggerInjectedContentContainerRef &&
+          this.swaggerInjectedContentContainerRef.nativeElement
         ) {
           const swaggerContainer = this.apiDocElement.nativeElement;
-          const bannerNode = this.healthBannerElementRef.nativeElement;
+          const customContentNode =
+            this.swaggerInjectedContentContainerRef.nativeElement;
 
-          // Try to find the information container within Swagger UI
           const infoContainer = swaggerContainer.querySelector(
             '.information-container .main'
           );
 
-          if (infoContainer) {
-            // Prepend banner to the information container (which typically holds the title)
-            if (infoContainer.firstChild) {
-              infoContainer.insertBefore(bannerNode, infoContainer.firstChild);
-            } else {
-              infoContainer.appendChild(bannerNode);
-            }
-          } else {
-            // Fallback: Prepend to the main swagger container if .information-container is not found
-            if (swaggerContainer.firstChild) {
-              swaggerContainer.insertBefore(
-                bannerNode,
-                swaggerContainer.firstChild
-              );
-            } else {
-              swaggerContainer.appendChild(bannerNode);
-            }
-          }
+          this.injectCustomContent(
+            swaggerContainer,
+            infoContainer,
+            customContentNode
+          );
         }
       },
     });
@@ -304,12 +304,56 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   copyApiKey(key: string) {
     this.clipboard.copy(key);
-    this.snackBar.open('API Key copied to clipboard', 'Close', {
-      duration: 3000,
+    this.snackBar.open('API Key copied to clipboard!', 'Close', {
+      duration: 2000,
     });
+  }
+
+  copyCurlCommand(commandText: string) {
+    this.clipboard.copy(commandText);
   }
 
   toggleUnhealthyErrorDetails(): void {
     this.showUnhealthyErrorDetails = !this.showUnhealthyErrorDetails;
+  }
+
+  private prepareCurlCommands(): void {
+    this.curlCommands = [];
+    if (!this.serviceName || !this.apiDocJson?.info?.group) {
+      return;
+    }
+
+    const endpoints = this.healthCheckEndpointsMap[this.apiDocJson.info.group];
+    if (endpoints && endpoints.length > 0) {
+      endpoints.forEach(endpoint => {
+        const sessionToken = this.userDataService.token
+          ? this.userDataService.token
+          : 'YOUR_SESSION_TOKEN';
+
+        console.log(`${BASE_URL}/${this.serviceName}${endpoint}`);
+          
+        const command = `curl -X 'GET' '${window.location.origin}${BASE_URL}/${this.serviceName}${endpoint}' -H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
+        this.curlCommands.push({ text: command });
+      });
+    }
+  }
+
+  private injectCustomContent(
+    swaggerContainer: HTMLElement,
+    infoContainer: HTMLElement | null,
+    customContentNode: HTMLElement
+  ): void {
+    if (infoContainer) {
+      infoContainer.appendChild(customContentNode);
+    } else {
+      if (swaggerContainer.firstChild) {
+        swaggerContainer.insertBefore(
+          customContentNode,
+          swaggerContainer.firstChild
+        );
+      } else {
+        swaggerContainer.appendChild(customContentNode);
+      }
+    }
   }
 }
