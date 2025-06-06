@@ -1,418 +1,333 @@
 /**
- * Loading Component for Edit Limit Page
+ * @fileoverview Loading component for the edit limit page ([id]/loading.tsx)
  * 
- * Displays skeleton states and loading indicators while limit data and form
- * dependencies are being fetched. Provides smooth user experience during data
- * loading with accessible loading states, form field skeletons, and responsive
+ * Displays skeleton states and loading indicators while limit data and form 
+ * dependencies are being fetched. Provides smooth user experience during data 
+ * loading with accessible loading states, form field skeletons, and responsive 
  * design patterns optimized for the edit workflow.
  * 
- * Features:
- * - WCAG 2.1 AA compliant skeleton UI
- * - Responsive design for all breakpoints
- * - Tailwind CSS animations for smooth transitions
- * - Form-specific loading patterns matching edit layout
- * - Accessible screen reader support
+ * This component replaces Angular Material progress indicators with Tailwind CSS
+ * skeleton patterns and ensures WCAG 2.1 AA compliance through proper ARIA 
+ * attributes and screen reader announcements.
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1.0
  */
 
 import React from 'react';
-import { Card, CardHeader, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-
-// ============================================================================
-// SKELETON COMPONENTS
-// ============================================================================
 
 /**
- * Basic skeleton component for loading states
+ * Skeleton component for form field loading states
+ * Creates accessible skeleton patterns with proper ARIA attributes
  */
-const Skeleton = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & {
-    className?: string;
-  }
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      'animate-pulse rounded-md bg-gray-200 dark:bg-gray-700',
-      className
-    )}
-    {...props}
-  />
-));
-Skeleton.displayName = 'Skeleton';
-
-/**
- * Form field skeleton with label and input
- */
-const FormFieldSkeleton: React.FC<{
-  label?: boolean;
-  description?: boolean;
+const FieldSkeleton: React.FC<{
+  lines?: number;
+  height?: 'sm' | 'md' | 'lg';
   className?: string;
-}> = ({ label = true, description = false, className }) => (
-  <div className={cn('space-y-2', className)}>
-    {label && <Skeleton className="h-4 w-24" />}
-    <Skeleton className="h-10 w-full" />
-    {description && <Skeleton className="h-3 w-32" />}
-  </div>
-);
+}> = ({ lines = 1, height = 'md', className = '' }) => {
+  const heightClasses = {
+    sm: 'h-8',
+    md: 'h-10',
+    lg: 'h-12'
+  };
+
+  return (
+    <div className={`space-y-2 ${className}`}>
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/3" />
+      {Array.from({ length: lines }).map((_, index) => (
+        <div 
+          key={index}
+          className={`bg-gray-200 dark:bg-gray-700 rounded animate-pulse ${heightClasses[height]}`}
+          aria-hidden="true"
+        />
+      ))}
+    </div>
+  );
+};
 
 /**
- * Select field skeleton with dropdown indicator
+ * Skeleton component for select dropdown loading states
+ * Includes loading indicator for dropdown options
  */
-const SelectFieldSkeleton: React.FC<{
-  label?: boolean;
+const SelectSkeleton: React.FC<{
   className?: string;
-}> = ({ label = true, className }) => (
-  <div className={cn('space-y-2', className)}>
-    {label && <Skeleton className="h-4 w-20" />}
+}> = ({ className = '' }) => (
+  <div className={`space-y-2 ${className}`}>
+    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/4" />
     <div className="relative">
-      <Skeleton className="h-10 w-full" />
-      <Skeleton className="absolute right-3 top-3 h-4 w-4" />
+      <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded border animate-pulse" />
+      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+        <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded animate-pulse" />
+      </div>
     </div>
   </div>
 );
 
 /**
- * Toggle switch skeleton
+ * Skeleton component for textarea loading states
+ * Provides multi-line skeleton for description fields
  */
-const ToggleSkeleton: React.FC<{
-  label?: boolean;
+const TextareaSkeleton: React.FC<{
   className?: string;
-}> = ({ label = true, className }) => (
-  <div className={cn('flex items-center justify-between space-x-3', className)}>
-    {label && <Skeleton className="h-4 w-16" />}
-    <Skeleton className="h-6 w-10 rounded-full" />
+}> = ({ className = '' }) => (
+  <div className={`space-y-2 ${className}`}>
+    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/3" />
+    <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
   </div>
 );
 
 /**
- * Badge skeleton for status indicators
+ * Skeleton component for switch/toggle loading states
+ * Displays loading state for boolean configuration options
  */
-const BadgeSkeleton: React.FC<{
+const SwitchSkeleton: React.FC<{
   className?: string;
-}> = ({ className }) => (
-  <Skeleton className={cn('h-6 w-16 rounded-full', className)} />
+}> = ({ className = '' }) => (
+  <div className={`flex items-center justify-between ${className}`}>
+    <div className="space-y-1">
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32" />
+      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-48" />
+    </div>
+    <div className="h-6 w-11 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+  </div>
 );
 
 /**
- * Button skeleton
+ * Skeleton component for button loading states
+ * Provides loading states for form action buttons
  */
 const ButtonSkeleton: React.FC<{
-  variant?: 'primary' | 'secondary' | 'outline';
-  size?: 'sm' | 'default' | 'lg';
+  variant?: 'primary' | 'secondary';
   className?: string;
-}> = ({ variant = 'primary', size = 'default', className }) => {
-  const sizeClasses = {
-    sm: 'h-8 w-16',
-    default: 'h-10 w-20',
-    lg: 'h-12 w-24',
-  };
+}> = ({ variant = 'primary', className = '' }) => {
+  const variantClasses = variant === 'primary' 
+    ? 'bg-primary-200 dark:bg-primary-700' 
+    : 'bg-gray-200 dark:bg-gray-700';
 
   return (
-    <Skeleton 
-      className={cn(
-        'rounded-md',
-        sizeClasses[size],
-        className
-      )} 
+    <div 
+      className={`h-10 w-24 ${variantClasses} rounded animate-pulse ${className}`}
+      aria-hidden="true"
     />
   );
 };
 
-// ============================================================================
-// SECTION SKELETONS
-// ============================================================================
-
 /**
- * General information section skeleton
+ * Skeleton component for card/section containers
+ * Creates loading state for form sections
  */
-const GeneralInfoSkeleton: React.FC = () => (
-  <Card>
-    <CardHeader>
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-6 w-32" /> {/* Section title */}
-        <BadgeSkeleton />
-      </div>
-    </CardHeader>
-    <CardContent className="space-y-6">
-      {/* Name field */}
-      <FormFieldSkeleton />
-      
-      {/* Description field */}
-      <FormFieldSkeleton description />
-      
-      {/* Active status toggle */}
-      <ToggleSkeleton />
-    </CardContent>
-  </Card>
+const CardSkeleton: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+}> = ({ children, className = '' }) => (
+  <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
+    {children}
+  </div>
 );
 
 /**
- * Rate limiting configuration section skeleton
+ * Loading spinner component for general loading states
+ * Provides accessible loading indicator with proper ARIA attributes
  */
-const RateLimitConfigSkeleton: React.FC = () => (
-  <Card>
-    <CardHeader>
-      <Skeleton className="h-6 w-40" /> {/* Section title */}
-    </CardHeader>
-    <CardContent className="space-y-6">
-      {/* Limit type selection */}
-      <SelectFieldSkeleton />
-      
-      {/* Rate and period configuration */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormFieldSkeleton />
-        <SelectFieldSkeleton />
-      </div>
-    </CardContent>
-  </Card>
-);
+const LoadingSpinner: React.FC<{
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}> = ({ size = 'md', className = '' }) => {
+  const sizeClasses = {
+    sm: 'h-4 w-4',
+    md: 'h-6 w-6',
+    lg: 'h-8 w-8'
+  };
 
-/**
- * Target configuration section skeleton
- */
-const TargetConfigSkeleton: React.FC = () => (
-  <Card>
-    <CardHeader>
-      <Skeleton className="h-6 w-36" /> {/* Section title */}
-    </CardHeader>
-    <CardContent className="space-y-6">
-      {/* Service selection */}
-      <SelectFieldSkeleton />
-      
-      {/* Role/User selection (conditional) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SelectFieldSkeleton />
-        <SelectFieldSkeleton />
-      </div>
-      
-      {/* Endpoint and verb configuration */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-2">
-          <FormFieldSkeleton />
-        </div>
-        <SelectFieldSkeleton />
-      </div>
-    </CardContent>
-  </Card>
-);
-
-/**
- * Cache and advanced settings section skeleton
- */
-const AdvancedSettingsSkeleton: React.FC = () => (
-  <Card>
-    <CardHeader>
-      <Skeleton className="h-6 w-44" /> {/* Section title */}
-    </CardHeader>
-    <CardContent className="space-y-6">
-      {/* Cache configuration */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormFieldSkeleton />
-        <FormFieldSkeleton />
-      </div>
-      
-      {/* Additional settings */}
-      <div className="space-y-4">
-        <ToggleSkeleton />
-        <ToggleSkeleton />
-      </div>
-    </CardContent>
-  </Card>
-);
-
-/**
- * Action buttons section skeleton
- */
-const ActionButtonsSkeleton: React.FC = () => (
-  <Card>
-    <CardContent className="pt-6">
-      <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
-        <ButtonSkeleton variant="secondary" />
-        <ButtonSkeleton variant="outline" />
-        <ButtonSkeleton variant="primary" />
-      </div>
-    </CardContent>
-  </Card>
-);
-
-// ============================================================================
-// MAIN LOADING COMPONENT
-// ============================================================================
-
-/**
- * Loading component for the edit limit page
- * 
- * Displays comprehensive skeleton states for all form sections while
- * limit data and dependencies are being fetched. Optimized for edit
- * workflow with pre-populated field patterns.
- */
-export default function LimitEditLoading() {
   return (
     <div 
-      className="container mx-auto py-6 px-4 space-y-6"
+      className={`${sizeClasses[size]} animate-spin rounded-full border-2 border-gray-300 border-t-primary-600 dark:border-gray-600 dark:border-t-primary-400 ${className}`}
       role="status"
-      aria-live="polite"
-      aria-label="Loading limit details..."
+      aria-label="Loading"
     >
-      {/* Page header skeleton */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-48" /> {/* Page title */}
-          <Skeleton className="h-4 w-72" /> {/* Page description */}
-        </div>
-        <div className="flex items-center gap-2">
-          <BadgeSkeleton />
-          <Skeleton className="h-4 w-24" /> {/* Last modified info */}
-        </div>
-      </div>
-
-      {/* Navigation breadcrumb skeleton */}
-      <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 mb-6">
-        <Skeleton className="h-4 w-20" />
-        <Skeleton className="h-4 w-4" />
-        <Skeleton className="h-4 w-16" />
-        <Skeleton className="h-4 w-4" />
-        <Skeleton className="h-4 w-24" />
-      </div>
-
-      {/* Form sections grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main form content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* General information section */}
-          <GeneralInfoSkeleton />
-          
-          {/* Rate limiting configuration */}
-          <RateLimitConfigSkeleton />
-          
-          {/* Target configuration */}
-          <TargetConfigSkeleton />
-        </div>
-
-        {/* Sidebar content */}
-        <div className="space-y-6">
-          {/* Advanced settings */}
-          <AdvancedSettingsSkeleton />
-          
-          {/* Current usage stats skeleton */}
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-28" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-4 w-12" />
-                </div>
-                <Skeleton className="h-2 w-full rounded-full" />
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-16" />
-                </div>
-                <Skeleton className="h-2 w-full rounded-full" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Action buttons */}
-      <ActionButtonsSkeleton />
-
-      {/* Loading spinner overlay for critical actions */}
-      <div className="sr-only" aria-live="assertive">
-        Loading limit configuration data...
-      </div>
+      <span className="sr-only">Loading...</span>
     </div>
   );
-}
-
-// ============================================================================
-// ACCESSIBILITY ENHANCEMENTS
-// ============================================================================
-
-/**
- * Enhanced loading component with reduced motion support
- */
-export function LimitEditLoadingAccessible() {
-  return (
-    <div 
-      className="container mx-auto py-6 px-4 space-y-6"
-      role="status"
-      aria-live="polite"
-      aria-label="Loading limit editing interface"
-    >
-      {/* Reduced motion CSS class for accessibility */}
-      <style jsx>{`
-        @media (prefers-reduced-motion: reduce) {
-          .animate-pulse {
-            animation: none;
-            opacity: 0.6;
-          }
-        }
-      `}</style>
-      
-      <LimitEditLoading />
-    </div>
-  );
-}
-
-// ============================================================================
-// COMPONENT VARIANTS
-// ============================================================================
-
-/**
- * Compact loading variant for mobile or constrained spaces
- */
-export function LimitEditLoadingCompact() {
-  return (
-    <div 
-      className="space-y-4 p-4"
-      role="status"
-      aria-live="polite"
-      aria-label="Loading limit details..."
-    >
-      {/* Compact header */}
-      <div className="space-y-2">
-        <Skeleton className="h-6 w-40" />
-        <Skeleton className="h-4 w-56" />
-      </div>
-
-      {/* Compact form sections */}
-      <div className="space-y-4">
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            <FormFieldSkeleton />
-            <div className="grid grid-cols-2 gap-3">
-              <FormFieldSkeleton />
-              <SelectFieldSkeleton />
-            </div>
-            <ToggleSkeleton />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Compact actions */}
-      <div className="flex gap-2">
-        <ButtonSkeleton size="sm" />
-        <ButtonSkeleton size="sm" variant="outline" />
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// EXPORT TYPES
-// ============================================================================
-
-export type {
-  // Export component props for potential customization
 };
+
+/**
+ * Main loading component for the edit limit page
+ * 
+ * Displays comprehensive skeleton states matching the edit form structure:
+ * - Page header with breadcrumb and title skeletons
+ * - General Information section with basic limit details
+ * - Conditions section with rule configuration fields
+ * - Actions section with response configuration
+ * - Form action buttons (Save, Cancel, Delete)
+ * 
+ * Features:
+ * - WCAG 2.1 AA compliance with proper ARIA attributes
+ * - Responsive design supporting all breakpoints (xs to 3xl)
+ * - Dark mode support with proper contrast ratios
+ * - Smooth loading transitions with Tailwind CSS animations
+ * - Screen reader announcements for loading states
+ * - Accessible loading indicators and skeleton patterns
+ * 
+ * @returns React component representing the loading state
+ */
+export default function EditLimitLoading(): React.JSX.Element {
+  return (
+    <div 
+      className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-4xl"
+      role="main"
+      aria-live="polite"
+      aria-label="Loading edit limit form"
+    >
+      {/* Screen reader announcement */}
+      <div className="sr-only" aria-live="assertive">
+        Loading edit limit form. Please wait while limit data and form options are being fetched.
+      </div>
+
+      {/* Page header skeleton */}
+      <div className="mb-8 space-y-4">
+        {/* Breadcrumb skeleton */}
+        <div className="flex items-center space-x-2 text-sm">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24" />
+          <div className="h-4 w-1 bg-gray-300 dark:bg-gray-600 rounded animate-pulse" />
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-20" />
+          <div className="h-4 w-1 bg-gray-300 dark:bg-gray-600 rounded animate-pulse" />
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-16" />
+        </div>
+
+        {/* Page title skeleton */}
+        <div className="space-y-2">
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-48" />
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-64" />
+        </div>
+      </div>
+
+      {/* Main form content */}
+      <div className="space-y-6">
+        {/* General Information Section */}
+        <CardSkeleton>
+          <div className="space-y-6">
+            {/* Section title */}
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-40" />
+            
+            {/* Form fields grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Limit name */}
+              <FieldSkeleton className="md:col-span-1" />
+              
+              {/* Service selection */}
+              <SelectSkeleton className="md:col-span-1" />
+              
+              {/* User/Role selection */}
+              <SelectSkeleton className="md:col-span-1" />
+              
+              {/* Limit type */}
+              <SelectSkeleton className="md:col-span-1" />
+              
+              {/* Description */}
+              <TextareaSkeleton className="md:col-span-2" />
+            </div>
+          </div>
+        </CardSkeleton>
+
+        {/* Conditions Section */}
+        <CardSkeleton>
+          <div className="space-y-6">
+            {/* Section title */}
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32" />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Rate limit value */}
+              <FieldSkeleton />
+              
+              {/* Time period */}
+              <SelectSkeleton />
+              
+              {/* Request method */}
+              <SelectSkeleton />
+              
+              {/* Endpoint pattern */}
+              <FieldSkeleton className="md:col-span-2 lg:col-span-3" />
+            </div>
+
+            {/* Advanced settings */}
+            <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-36" />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <SwitchSkeleton />
+                <SwitchSkeleton />
+              </div>
+            </div>
+          </div>
+        </CardSkeleton>
+
+        {/* Actions Section */}
+        <CardSkeleton>
+          <div className="space-y-6">
+            {/* Section title */}
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24" />
+            
+            <div className="space-y-6">
+              {/* Response settings */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <SelectSkeleton />
+                <FieldSkeleton />
+              </div>
+              
+              {/* Custom response message */}
+              <TextareaSkeleton />
+              
+              {/* Action toggles */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <SwitchSkeleton />
+                <SwitchSkeleton />
+              </div>
+            </div>
+          </div>
+        </CardSkeleton>
+
+        {/* Form Actions */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6">
+          {/* Left side - Delete button */}
+          <div className="flex justify-start">
+            <ButtonSkeleton variant="secondary" className="bg-red-200 dark:bg-red-800" />
+          </div>
+
+          {/* Right side - Save and Cancel buttons */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <ButtonSkeleton variant="secondary" />
+            <ButtonSkeleton variant="primary" className="w-32" />
+          </div>
+        </div>
+      </div>
+
+      {/* Loading status indicator */}
+      <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center space-x-3">
+          <LoadingSpinner size="sm" />
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            Loading limit data...
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Component metadata for Next.js app router
+ */
+EditLimitLoading.displayName = 'EditLimitLoading';
+
+/**
+ * Type exports for component props and configuration
+ */
+export type {
+  React.JSX.Element as EditLimitLoadingElement
+};
+
+/**
+ * Default export following Next.js loading component conventions
+ * This component will be automatically used by Next.js app router
+ * when the edit limit page ([id]/page.tsx) is loading
+ */
